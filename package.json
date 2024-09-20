@@ -2,7 +2,7 @@
   "name": "abr-react-ts-grid",
   "version": "0.1.0",
   "private": true,
-  "homepage": "https://osvaldo.martini.github.io/abr-react-ts-grid",
+  "homepage": ".",
   "dependencies": {
     "@emotion/react": "^11.13.3",
     "@emotion/styled": "^11.13.0",

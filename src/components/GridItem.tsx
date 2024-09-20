@@ -34,12 +34,24 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
         <div key={blockId} className="block">
           <h3 className="block-title">{blockData.blockName}</h3>
           <div className="instructions-list">
+            <div className="header-row">
+              <span>ID</span>
+              <span>Order</span>
+              <span>Name</span>
+              <span>Description</span>
+              <span>Block ID</span>
+              <span>Block Name</span>
+              <span>Type</span>
+            </div>
             {blockData.instructions.map((instruction) => (
               <div key={instruction.id} className="instruction-item">
-                <p>
-                  <strong>{instruction.instructionOrderNumber}. {instruction.name}</strong>:
-                  {` ${instruction.description} (${instruction.instructionType})`}
-                </p>
+                <span>{instruction.id}</span>
+                <span>{instruction.instructionOrderNumber}</span>
+                <span>{instruction.name}</span>
+                <span>{instruction.description}</span>
+                <span>{instruction.blockId}</span>
+                <span>{instruction.blockName}</span>
+                <span>{instruction.instructionType}</span>
               </div>
             ))}
           </div>
