@@ -38,11 +38,9 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
               <div key={instruction.id} className="instruction-item">
                 <span>{instruction.id}</span>
                 <span>{instruction.instructionOrderNumber}</span>
+                <span>{instruction.instructionType}</span> {/* Moved this before name */}
                 <span>{instruction.name}</span>
                 <span>{instruction.description}</span>
-                <span>{instruction.blockId}</span>
-                <span>{instruction.blockName}</span>
-                <span>{instruction.instructionType}</span>
               </div>
             ))}
           </div>
