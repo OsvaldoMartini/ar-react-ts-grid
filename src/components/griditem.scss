@@ -1,5 +1,5 @@
 .grid-container {
-  padding: 0; /* No padding to ensure the first block starts at the top */
+  padding: 0 3px; /* 3px padding on left and right */
   margin: 0; /* Ensure no margin for the container */
   display: flex;
   flex-direction: column;
@@ -21,7 +21,7 @@
   padding: 10px;
   border-radius: 10px;
   margin: 0; /* No margin around the block title */
-  box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.1); /* Optional: Add shadow to match rows */
+  box-shadow: 3px 3px 5px rgba(0, 0, 0, 0.5); /* Shadow on the bottom and right */
 }
 
 .instructions-list {
