@@ -47,6 +47,27 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   // Use state to manage the instructions data
   const [instructionsData, setInstructionsData] = useState<BlockLoopInstructionLoadDTO[]>(data);
 
+  // Function to move an instruction down
+  const handleMoveDown = (instructionId: number) => {
+    const updatedData = [...instructionsData];
+    const instructionIndex = updatedData.findIndex(instruction => instruction.id === instructionId);
+
+    // Ensure that the instruction exists and isn't already the last one
+    if (instructionIndex !== -1 && instructionIndex < updatedData.length - 1) {
+      // Swap the instructionOrderNumber with the one below it
+      const currentInstruction = updatedData[instructionIndex];
+      const nextInstruction = updatedData[instructionIndex + 1];
+
+      // Swap their instructionOrderNumbers
+      const tempOrderNumber = currentInstruction.instructionOrderNumber;
+      currentInstruction.instructionOrderNumber = nextInstruction.instructionOrderNumber;
+      nextInstruction.instructionOrderNumber = tempOrderNumber;
+
+      // Reassign the updatedData array
+      setInstructionsData(reassignInstructionOrderNumbersByBlock(updatedData));
+    }
+  };
+
   // Function to remove an instruction by its ID and reassign order numbers within each block
   const handleRemoveInstruction = (instructionId: number) => {
     const updatedData = instructionsData.filter(instruction => instruction.id !== instructionId);
@@ -93,7 +114,11 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                 <span>{instruction.description}</span>
                 <div className="move-buttons">
                   <img src="../up.png" className="move-button" />
-                  <img src="../down.png" className="move-button" />
+                  <img
+                    src="../down.png"
+                    className="move-button"
+                    onClick={() => handleMoveDown(instruction.id)}
+                  />
                   <img src="../edit.png" className="edit-button" />
                   {/* Add the cross button click handler */}
                   <img
