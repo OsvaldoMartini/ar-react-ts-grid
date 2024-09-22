@@ -24,6 +24,7 @@ const groupByBlock = (data: BlockLoopInstructionLoadDTO[]) => {
 
   return blocks;
 };
+
 const GridItem: React.FC<GridItemProps> = ({ data }) => {
   const groupedData = groupByBlock(data);
 
@@ -31,12 +32,11 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     <div className="grid-container">
       {Object.entries(groupedData).sort(([aId], [bId]) => parseInt(aId) - parseInt(bId)).map(([blockId, blockData]) => (
         <div key={blockId} className="block">
-          {/* Block header structured like the instruction rows */}
+          {/* Block header structured with Flexbox to position the buttons to the right */}
           <div className="block-header">
             <span>{blockId}</span>
             <span>{blockData.blockName}</span>
             <span>Instruction Count: {blockData.instructions.length}</span>
-            {/* Up and Down buttons */}
             <div className="move-buttons">
               <img src="../up.png" alt="Move block up" className="move-button" />
               <img src="../down.png" alt="Move block down" className="move-button" />
@@ -62,6 +62,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     </div>
   );
 };
+
 
 
 export default GridItem;

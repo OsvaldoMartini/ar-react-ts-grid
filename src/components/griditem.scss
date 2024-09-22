@@ -14,8 +14,8 @@
 }
 
 .block-header {
-  display: grid;
-  grid-template-columns: 1fr 1fr 2fr 1fr; /* Updated to add one more column for the buttons */
+  display: flex;
+  align-items: center;
   gap: 10px;
   padding: 10px;
   background-color: #0b5394; /* Dark blue background */
@@ -25,13 +25,13 @@
   border-radius: 10px; /* Rounded corners */
   margin: 0; /* No margin */
   box-shadow: 3px 3px 5px rgba(0, 0, 0, 0.5); /* Shadow effect */
-}
-
-.move-buttons {
-  display: flex;
-  gap: 5px; /* Space between buttons */
-  justify-content: center;
-  align-items: center;
+  
+  /* Make the buttons go to the right */
+  .move-buttons {
+    margin-left: auto; /* This pushes the buttons to the right */
+    display: flex;
+    gap: 0px; /* Space between buttons */
+  }
 }
 
 .move-button {
