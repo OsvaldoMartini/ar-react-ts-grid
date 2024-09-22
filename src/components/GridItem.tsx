@@ -52,21 +52,31 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     const updatedData = [...instructionsData];
     const instructionIndex = updatedData.findIndex(instruction => instruction.id === instructionId);
 
-    // Ensure that the instruction exists and isn't already the last one
-    if (instructionIndex !== -1 && instructionIndex < updatedData.length - 1) {
-      // Swap the instructionOrderNumber with the one below it
+    // Ensure that the instruction exists
+    if (instructionIndex !== -1) {
       const currentInstruction = updatedData[instructionIndex];
-      const nextInstruction = updatedData[instructionIndex + 1];
 
-      // Swap their instructionOrderNumbers
-      const tempOrderNumber = currentInstruction.instructionOrderNumber;
-      currentInstruction.instructionOrderNumber = nextInstruction.instructionOrderNumber;
-      nextInstruction.instructionOrderNumber = tempOrderNumber;
+      // Find all instructions within the same block
+      const blockInstructions = updatedData.filter(instruction => instruction.blockId === currentInstruction.blockId);
 
-      // Reassign the updatedData array
-      setInstructionsData(reassignInstructionOrderNumbersByBlock(updatedData));
+      // Find the index of the current instruction within its block
+      const blockInstructionIndex = blockInstructions.findIndex(instruction => instruction.id === instructionId);
+
+      // Ensure that the instruction isn't already the last one within its block
+      if (blockInstructionIndex < blockInstructions.length - 1) {
+        const nextInstruction = blockInstructions[blockInstructionIndex + 1];
+
+        // Swap their instructionOrderNumbers
+        const tempOrderNumber = currentInstruction.instructionOrderNumber;
+        currentInstruction.instructionOrderNumber = nextInstruction.instructionOrderNumber;
+        nextInstruction.instructionOrderNumber = tempOrderNumber;
+
+        // Reassign the updatedData array
+        setInstructionsData(reassignInstructionOrderNumbersByBlock(updatedData));
+      }
     }
   };
+
 
   // Function to remove an instruction by its ID and reassign order numbers within each block
   const handleRemoveInstruction = (instructionId: number) => {
