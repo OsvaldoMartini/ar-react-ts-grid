@@ -60,27 +60,72 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   const handleMoveBlockUp = (blockId: number) => {
     const updatedData = [...instructionsData];
 
-    // Find the current block and its order number
-    const currentBlock = updatedData.find(instruction => instruction.blockId === blockId);
-    if (!currentBlock) return;
+    // Find all instructions that belong to the current block
+    const currentBlockInstructions = updatedData.filter(instruction => instruction.blockId === blockId);
+    if (currentBlockInstructions.length === 0) return;
 
-    const currentBlockOrderNumber = currentBlock.blockOrderNumber;
+    const currentBlockOrderNumber = currentBlockInstructions[0].blockOrderNumber;
 
-    // Find the block with the previous order number
-    const previousBlock = updatedData
+    // Find the closest block with a smaller blockOrderNumber
+    const previousBlockInstructions = updatedData
       .filter(instruction => instruction.blockOrderNumber < currentBlockOrderNumber)
       .sort((a, b) => b.blockOrderNumber - a.blockOrderNumber)[0]; // Get the closest previous block
 
-    if (previousBlock) {
-      // Swap their blockOrderNumbers
-      const tempOrderNumber = currentBlock.blockOrderNumber;
-      currentBlock.blockOrderNumber = previousBlock.blockOrderNumber;
-      previousBlock.blockOrderNumber = tempOrderNumber;
+    if (!previousBlockInstructions) return;
 
-      // Reassign the instructions data to maintain consistency
-      setInstructionsData(reassignInstructionOrderNumbersByBlock(updatedData));
-    }
+    const previousBlockOrderNumber = previousBlockInstructions.blockOrderNumber;
+
+    // Update the blockOrderNumber for both current and previous blocks
+    updatedData.forEach(instruction => {
+      if (instruction.blockOrderNumber === currentBlockOrderNumber) {
+        // Move current block up by assigning the previous block's order number
+        instruction.blockOrderNumber = previousBlockOrderNumber;
+      } else if (instruction.blockOrderNumber === previousBlockOrderNumber) {
+        // Move previous block down by assigning the current block's order number
+        instruction.blockOrderNumber = currentBlockOrderNumber;
+      }
+    });
+
+    // Reassign the updated data array to maintain consistency
+    setInstructionsData(updatedData);
   };
+
+
+  // Function to move a block down by swapping blockOrderNumbers
+  const handleMoveBlockDown = (blockId: number) => {
+    const updatedData = [...instructionsData];
+
+    // Find all instructions that belong to the current block
+    const currentBlockInstructions = updatedData.filter(instruction => instruction.blockId === blockId);
+    if (currentBlockInstructions.length === 0) return;
+
+    const currentBlockOrderNumber = currentBlockInstructions[0].blockOrderNumber;
+
+    // Find the closest block with a larger blockOrderNumber
+    const nextBlockInstructions = updatedData
+      .filter(instruction => instruction.blockOrderNumber > currentBlockOrderNumber)
+      .sort((a, b) => a.blockOrderNumber - b.blockOrderNumber)[0]; // Get the closest next block
+
+    if (!nextBlockInstructions) return;
+
+    const nextBlockOrderNumber = nextBlockInstructions.blockOrderNumber;
+
+    // Update the blockOrderNumber for both current and next blocks
+    updatedData.forEach(instruction => {
+      if (instruction.blockOrderNumber === currentBlockOrderNumber) {
+        // Move current block down by assigning the next block's order number
+        instruction.blockOrderNumber = nextBlockOrderNumber;
+      } else if (instruction.blockOrderNumber === nextBlockOrderNumber) {
+        // Move next block up by assigning the current block's order number
+        instruction.blockOrderNumber = currentBlockOrderNumber;
+      }
+    });
+
+    // Reassign the updated data array to maintain consistency
+    setInstructionsData(updatedData);
+  };
+
+
 
   // Function to move an instruction down considering blockOrderNumber
   const handleMoveDown = (instructionId: number) => {
@@ -162,7 +207,32 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     setInstructionsData(reassignedData);
   };
 
+
+  const getInstructionTypeElement = (instruction: BlockLoopInstructionLoadDTO): JSX.Element | string | null => {
+    let imageSrc: string | null = null;
+
+    // Determine the image source based on instruction type
+    switch (instruction.instructionType) {
+      case "SET":
+        imageSrc = "../setValueBtn2.png";
+        break;
+      case "GET":
+        imageSrc = "../getValueBtn2.png";
+        break;
+      case "CK":
+        imageSrc = "../check3.png";
+        break;
+      default:
+        imageSrc = null; // No image for other types
+    }
+
+    // Return image element if imageSrc exists, otherwise return the instruction type text or null
+    return imageSrc ? <img src={imageSrc} className="operations" /> : instruction.name || null;
+  };
+
   const groupedData = groupByBlock(instructionsData);
+
+
 
   return (
     <div className="grid-container">
@@ -186,7 +256,9 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                 <img src="../up.png" className="move-button"
                   onClick={() => handleMoveBlockUp(Number(blockId))}
                 />
-                <img src="../down.png" className="move-button" />
+                <img src="../down.png" className="move-button"
+                  onClick={() => handleMoveBlockDown(Number(blockId))}
+                />
               </div>
             </div>
             <div className="instructions-list">
@@ -194,7 +266,9 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                 <div key={instruction.id} className="instruction-item">
                   <span>{instruction.id}</span>
                   <span>{instruction.instructionOrderNumber}</span>
-                  <span>{instruction.instructionType}</span>
+                  {/* Instruction Type with conditional image */}
+                  <span>{getInstructionTypeElement(instruction)}</span>
+
                   <span>{instruction.name}</span>
                   <span>{instruction.description}</span>
                   <div className="move-buttons">
