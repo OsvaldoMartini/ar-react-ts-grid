@@ -1,38 +1,29 @@
 .grid-container {
-  padding: 20px;
+  padding: 0; /* No padding to ensure the first block starts at the top */
+  margin: 0; /* Ensure no margin for the container */
   display: flex;
   flex-direction: column;
+  gap: 10px; /* Consistent gap between blocks */
 }
 
 .block {
-  margin-bottom: 20px;
+  margin: 0; /* No margin for blocks */
 }
 
 .block-title {
-  margin-bottom: 10px;
   font-size: 1.2em;
   font-weight: bold;
   background-color: #0b5394; /* Dark blue */
   color: white;
   padding: 10px;
   border-radius: 10px;
+  margin: 0; /* No margin around the block title */
 }
 
 .instructions-list {
   display: flex;
   flex-direction: column;
-  gap: 10px; /* Adds space between rows */
-}
-
-.header-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr 2fr 3fr 1fr 2fr 1fr; /* Defines the column widths */
-  gap: 10px;
-  padding: 10px;
-  font-weight: bold;
-  background-color: #e0f7fa; /* Light blue for the header row */
-  border-radius: 10px; /* Rounded corners for the header row */
-  border-bottom: 2px solid #0b5394;
+  gap: 10px; /* Adds space between instruction rows */
 }
 
 .instruction-item {
@@ -44,6 +35,10 @@
   box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.1); /* Original shadow */
   border-radius: 10px; /* Rounded corners for instructions */
   border: 1px solid #ddd;
+}
+
+.instruction-item:last-child {
+  margin-bottom: 0; /* Remove any bottom margin from the last row */
 }
 
 .instruction-item span {
