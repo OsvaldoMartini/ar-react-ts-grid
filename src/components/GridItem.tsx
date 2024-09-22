@@ -77,7 +77,35 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     }
   };
 
+  // Function to move an instruction up
+  const handleMoveUp = (instructionId: number) => {
+    const updatedData = [...instructionsData];
+    const instructionIndex = updatedData.findIndex(instruction => instruction.id === instructionId);
 
+    // Ensure that the instruction exists
+    if (instructionIndex !== -1) {
+      const currentInstruction = updatedData[instructionIndex];
+
+      // Find all instructions within the same block
+      const blockInstructions = updatedData.filter(instruction => instruction.blockId === currentInstruction.blockId);
+
+      // Find the index of the current instruction within its block
+      const blockInstructionIndex = blockInstructions.findIndex(instruction => instruction.id === instructionId);
+
+      // Ensure that the instruction isn't already the first one within its block
+      if (blockInstructionIndex > 0) {
+        const previousInstruction = blockInstructions[blockInstructionIndex - 1];
+
+        // Swap their instructionOrderNumbers
+        const tempOrderNumber = currentInstruction.instructionOrderNumber;
+        currentInstruction.instructionOrderNumber = previousInstruction.instructionOrderNumber;
+        previousInstruction.instructionOrderNumber = tempOrderNumber;
+
+        // Reassign the updatedData array
+        setInstructionsData(reassignInstructionOrderNumbersByBlock(updatedData));
+      }
+    }
+  };
   // Function to remove an instruction by its ID and reassign order numbers within each block
   const handleRemoveInstruction = (instructionId: number) => {
     const updatedData = instructionsData.filter(instruction => instruction.id !== instructionId);
@@ -123,7 +151,9 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                 <span>{instruction.name}</span>
                 <span>{instruction.description}</span>
                 <div className="move-buttons">
-                  <img src="../up.png" className="move-button" />
+                  <img src="../up.png" className="move-button"
+                    onClick={() => handleMoveUp(instruction.id)}
+                  />
                   <img
                     src="../down.png"
                     className="move-button"
