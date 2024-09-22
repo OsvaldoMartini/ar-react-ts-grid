@@ -1,49 +1,51 @@
 .grid-container {
-  padding: 0 18px 0 3px; /* 3px padding on the left, 5px padding on the right */
-  margin: 0; /* Ensure no margin for the container */
+  padding: 0 18px 0 3px;
+  margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px; /* Consistent gap between blocks */
+  gap: 10px;
 }
-
 
 .block {
-  margin: 0; /* No margin for blocks */
+  margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px; /* Ensures spacing between block title and first instruction row */
+  gap: 10px;
 }
 
-.block-title {
-  font-size: 1.2em;
-  font-weight: bold;
-  background-color: #0b5394; /* Dark blue */
-  color: white;
+.block-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr 2fr; /* Same layout as before */
+  gap: 10px;
   padding: 10px;
-  border-radius: 10px;
-  margin: 0; /* No margin around the block title */
-  box-shadow: 3px 3px 5px rgba(0, 0, 0, 0.5); /* Shadow on the bottom and right */
+  background-color: #0b5394; /* Dark blue background */
+  color: white; /* White text */
+  font-size: 1.2em; /* Slightly larger font size */
+  font-weight: bold; /* Bold text */
+  border-radius: 10px; /* Rounded corners */
+  margin: 0; /* No margin */
+  box-shadow: 3px 3px 5px rgba(0, 0, 0, 0.5); /* Shadow effect */
 }
 
 .instructions-list {
   display: flex;
   flex-direction: column;
-  gap: 10px; /* Adds space between instruction rows */
+  gap: 10px;
 }
 
 .instruction-item {
   display: grid;
-  grid-template-columns: 1fr 1fr 2fr 3fr 1fr 2fr 1fr; /* Same column structure */
+  grid-template-columns: 1fr 1fr 2fr 3fr 1fr 2fr 1fr;
   gap: 10px;
   padding: 10px;
-  background-color: #e0f7fa; /* Light blue background for the rows */
-  box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.1); /* Original shadow */
-  border-radius: 10px; /* Rounded corners for instructions */
+  background-color: #e0f7fa;
+  box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
   border: 1px solid #ddd;
 }
 
 .instruction-item:last-child {
-  margin-bottom: 0; /* Remove any bottom margin from the last row */
+  margin-bottom: 0;
 }
 
 .instruction-item span {
@@ -52,15 +54,13 @@
 
 .move-buttons {
   display: flex;
-  gap: 0px; /* Controls space between buttons, can be reduced if needed */
+  gap: 0px;
 }
 
 .move-button {
-  width: 24px; /* Adjust button size */
+  width: 24px;
   height: 24px;
-  background-color: transparent; /* Transparent background like JavaFX */
-  padding: 0; /* No padding around the buttons */
-  cursor: pointer; /* Make the button look clickable */
+  background-color: transparent;
+  padding: 0;
+  cursor: pointer;
 }
-
-

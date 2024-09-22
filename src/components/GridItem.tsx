@@ -32,7 +32,13 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     <div className="grid-container">
       {Object.entries(groupedData).sort(([aId], [bId]) => parseInt(aId) - parseInt(bId)).map(([blockId, blockData]) => (
         <div key={blockId} className="block">
-          <h3 className="block-title">{blockData.blockName}</h3>
+          {/* Block header structured like the instruction rows */}
+          <div className="block-header">
+            <span>{blockId}</span>
+            <span>{blockData.blockName}</span>
+            <span>Instruction Count: {blockData.instructions.length}</span>
+            {/* You can add more columns here if needed */}
+          </div>
           <div className="instructions-list">
             {blockData.instructions.map((instruction) => (
               <div key={instruction.id} className="instruction-item">
@@ -41,7 +47,6 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                 <span>{instruction.instructionType}</span>
                 <span>{instruction.name}</span>
                 <span>{instruction.description}</span>
-                {/* New column with up and down buttons */}
                 <div className="move-buttons">
                   <img src="../up.png" alt="Move up" className="move-button" />
                   <img src="../down.png" alt="Move down" className="move-button" />
@@ -54,5 +59,6 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     </div>
   );
 };
+
 
 export default GridItem;
