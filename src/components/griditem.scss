@@ -1,10 +1,11 @@
 .grid-container {
-  padding: 0 3px; /* 3px padding on left and right */
+  padding: 0 18px 0 3px; /* 3px padding on the left, 5px padding on the right */
   margin: 0; /* Ensure no margin for the container */
   display: flex;
   flex-direction: column;
   gap: 10px; /* Consistent gap between blocks */
 }
+
 
 .block {
   margin: 0; /* No margin for blocks */
@@ -51,11 +52,15 @@
 
 .move-buttons {
   display: flex;
-  gap: 10px; /* Space between buttons */
+  gap: 0px; /* Controls space between buttons, can be reduced if needed */
 }
 
 .move-button {
-  width: 24px; /* Adjust the size of the buttons as needed */
+  width: 24px; /* Adjust button size */
   height: 24px;
-  cursor: pointer;
+  background-color: transparent; /* Transparent background like JavaFX */
+  padding: 0; /* No padding around the buttons */
+  cursor: pointer; /* Make the button look clickable */
 }
+
+
