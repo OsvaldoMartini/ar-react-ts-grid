@@ -24,7 +24,6 @@ const groupByBlock = (data: BlockLoopInstructionLoadDTO[]) => {
 
   return blocks;
 };
-
 const GridItem: React.FC<GridItemProps> = ({ data }) => {
   const groupedData = groupByBlock(data);
 
@@ -37,7 +36,11 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
             <span>{blockId}</span>
             <span>{blockData.blockName}</span>
             <span>Instruction Count: {blockData.instructions.length}</span>
-            {/* You can add more columns here if needed */}
+            {/* Up and Down buttons */}
+            <div className="move-buttons">
+              <img src="../up.png" alt="Move block up" className="move-button" />
+              <img src="../down.png" alt="Move block down" className="move-button" />
+            </div>
           </div>
           <div className="instructions-list">
             {blockData.instructions.map((instruction) => (

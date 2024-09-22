@@ -15,7 +15,7 @@
 
 .block-header {
   display: grid;
-  grid-template-columns: 1fr 1fr 2fr; /* Same layout as before */
+  grid-template-columns: 1fr 1fr 2fr 1fr; /* Updated to add one more column for the buttons */
   gap: 10px;
   padding: 10px;
   background-color: #0b5394; /* Dark blue background */
@@ -25,6 +25,21 @@
   border-radius: 10px; /* Rounded corners */
   margin: 0; /* No margin */
   box-shadow: 3px 3px 5px rgba(0, 0, 0, 0.5); /* Shadow effect */
+}
+
+.move-buttons {
+  display: flex;
+  gap: 5px; /* Space between buttons */
+  justify-content: center;
+  align-items: center;
+}
+
+.move-button {
+  width: 24px; /* Adjust button size */
+  height: 24px;
+  background-color: transparent; /* Transparent background */
+  padding: 0;
+  cursor: pointer; /* Make the button look clickable */
 }
 
 .instructions-list {
@@ -50,17 +65,4 @@
 
 .instruction-item span {
   padding: 5px;
-}
-
-.move-buttons {
-  display: flex;
-  gap: 0px;
-}
-
-.move-button {
-  width: 24px;
-  height: 24px;
-  background-color: transparent;
-  padding: 0;
-  cursor: pointer;
 }
