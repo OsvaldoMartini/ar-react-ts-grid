@@ -35,6 +35,12 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     setInstructionsData(updatedData);
   };
 
+  // Function to remove a block by its blockId
+  const handleRemoveBlock = (blockId: number) => {
+    const updatedData = instructionsData.filter(instruction => instruction.blockId !== blockId);
+    setInstructionsData(updatedData);
+  };
+
   const groupedData = groupByBlock(instructionsData);
 
   return (
@@ -47,7 +53,12 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
             <span>{blockData.blockName}</span>
             <span>Instruction Count: {blockData.instructions.length}</span>
             <div className="move-buttons">
-              <img src="../garbage.png" className="garbage-button" /> {/* New garbage button */}
+              {/* Add the garbage button click handler */}
+              <img
+                src="../garbage.png"
+                className="garbage-button"
+                onClick={() => handleRemoveBlock(Number(blockId))}
+              />
               <img src="../up.png" className="move-button" />
               <img src="../down.png" className="move-button" />
             </div>
