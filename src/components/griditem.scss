@@ -26,11 +26,10 @@
   margin: 0; /* No margin */
   box-shadow: 3px 3px 5px rgba(0, 0, 0, 0.5); /* Shadow effect */
   
-  /* Make the buttons go to the right */
   .move-buttons {
-    margin-left: auto; /* This pushes the buttons to the right */
+    margin-left: auto; /* Push buttons to the right */
     display: flex;
-    gap: 0px; /* Space between buttons */
+    gap: 5px; /* Space between buttons */
   }
 }
 
@@ -39,7 +38,34 @@
   height: 24px;
   background-color: transparent; /* Transparent background */
   padding: 0;
-  cursor: pointer; /* Make the button look clickable */
+  cursor: pointer; /* Make button look clickable */
+}
+
+.garbage-button {
+  width: 24px; /* Same size for the garbage button */
+  height: 24px;
+  background-color: transparent;
+  margin-right: 3px; /* Space from the up button */
+  padding: 0;
+  cursor: pointer;
+}
+
+.edit-button {
+  width: 24px;
+  height: 24px;
+  background-color: transparent;
+  margin-left: 3px;
+  padding: 0;
+  cursor: pointer;
+}
+
+.cross-button {
+  width: 24px;
+  height: 24px;
+  background-color: transparent;
+  margin-left: 3px;
+  padding: 0;
+  cursor: pointer;
 }
 
 .instructions-list {

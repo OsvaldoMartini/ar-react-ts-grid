@@ -32,14 +32,15 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     <div className="grid-container">
       {Object.entries(groupedData).sort(([aId], [bId]) => parseInt(aId) - parseInt(bId)).map(([blockId, blockData]) => (
         <div key={blockId} className="block">
-          {/* Block header structured with Flexbox to position the buttons to the right */}
+          {/* Block header with garbage, up, and down buttons */}
           <div className="block-header">
             <span>{blockId}</span>
             <span>{blockData.blockName}</span>
             <span>Instruction Count: {blockData.instructions.length}</span>
             <div className="move-buttons">
-              <img src="../up.png" alt="Move block up" className="move-button" />
-              <img src="../down.png" alt="Move block down" className="move-button" />
+              <img src="../garbage.png" className="garbage-button" /> {/* New garbage button */}
+              <img src="../up.png" className="move-button" />
+              <img src="../down.png" className="move-button" />
             </div>
           </div>
           <div className="instructions-list">
@@ -51,8 +52,10 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                 <span>{instruction.name}</span>
                 <span>{instruction.description}</span>
                 <div className="move-buttons">
-                  <img src="../up.png" alt="Move up" className="move-button" />
-                  <img src="../down.png" alt="Move down" className="move-button" />
+                  <img src="../up.png" className="move-button" />
+                  <img src="../down.png" className="move-button" />
+                  <img src="../edit.png" className="edit-button" />
+                  <img src="../cross.png" className="cross-button" />
                 </div>
               </div>
             ))}
@@ -62,6 +65,8 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     </div>
   );
 };
+
+
 
 
 
