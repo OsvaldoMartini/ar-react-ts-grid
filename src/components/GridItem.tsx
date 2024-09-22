@@ -243,9 +243,8 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
           <div key={blockId} className="block">
             {/* Block header with garbage, up, and down buttons */}
             <div className="block-header">
-              <span>{blockId}</span>
               <span>{blockData.blockName}</span>
-              <span>Instruction Count: {blockData.instructions.length}</span>
+              <span>({blockData.instructions.length})</span>
               <div className="move-buttons">
                 {/* Add the garbage button click handler */}
                 <img
@@ -264,8 +263,6 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
             <div className="instructions-list">
               {blockData.instructions.map((instruction) => (
                 <div key={instruction.id} className="instruction-item">
-                  <span>{instruction.id}</span>
-                  <span>{instruction.instructionOrderNumber}</span>
                   {/* Instruction Type with conditional image */}
                   <span>{getInstructionTypeElement(instruction)}</span>
 
