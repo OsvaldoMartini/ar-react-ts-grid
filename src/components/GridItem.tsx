@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BlockLoopInstructionLoadDTO } from './instructionsMockData'; // Import the data model
 import './griditem.scss'; // Import the Sass file
 
@@ -26,7 +26,16 @@ const groupByBlock = (data: BlockLoopInstructionLoadDTO[]) => {
 };
 
 const GridItem: React.FC<GridItemProps> = ({ data }) => {
-  const groupedData = groupByBlock(data);
+  // Use state to manage the instructions data
+  const [instructionsData, setInstructionsData] = useState<BlockLoopInstructionLoadDTO[]>(data);
+
+  // Function to remove an instruction by its ID
+  const handleRemoveInstruction = (instructionId: number) => {
+    const updatedData = instructionsData.filter(instruction => instruction.id !== instructionId);
+    setInstructionsData(updatedData);
+  };
+
+  const groupedData = groupByBlock(instructionsData);
 
   return (
     <div className="grid-container">
@@ -55,7 +64,12 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                   <img src="../up.png" className="move-button" />
                   <img src="../down.png" className="move-button" />
                   <img src="../edit.png" className="edit-button" />
-                  <img src="../cross.png" className="cross-button" />
+                  {/* Add the cross button click handler */}
+                  <img
+                    src="../cross.png"
+                    className="cross-button"
+                    onClick={() => handleRemoveInstruction(instruction.id)}
+                  />
                 </div>
               </div>
             ))}
@@ -65,9 +79,5 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     </div>
   );
 };
-
-
-
-
 
 export default GridItem;
