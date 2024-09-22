@@ -25,20 +25,40 @@ const groupByBlock = (data: BlockLoopInstructionLoadDTO[]) => {
   return blocks;
 };
 
+// Helper function to reassign instructionOrderNumber starting from 1 within each block
+const reassignInstructionOrderNumbersByBlock = (instructions: BlockLoopInstructionLoadDTO[]) => {
+  // Group instructions by blockId
+  const grouped = groupByBlock(instructions);
+
+  // Iterate over each block and reassign instructionOrderNumbers
+  const updatedInstructions: BlockLoopInstructionLoadDTO[] = [];
+  Object.entries(grouped).forEach(([blockId, blockData]) => {
+    const reassignedInstructions = blockData.instructions.map((instruction, index) => ({
+      ...instruction,
+      instructionOrderNumber: index + 1, // Reassign starting from 1 within each block
+    }));
+    updatedInstructions.push(...reassignedInstructions);
+  });
+
+  return updatedInstructions;
+};
+
 const GridItem: React.FC<GridItemProps> = ({ data }) => {
   // Use state to manage the instructions data
   const [instructionsData, setInstructionsData] = useState<BlockLoopInstructionLoadDTO[]>(data);
 
-  // Function to remove an instruction by its ID
+  // Function to remove an instruction by its ID and reassign order numbers within each block
   const handleRemoveInstruction = (instructionId: number) => {
     const updatedData = instructionsData.filter(instruction => instruction.id !== instructionId);
-    setInstructionsData(updatedData);
+    const reassignedData = reassignInstructionOrderNumbersByBlock(updatedData);
+    setInstructionsData(reassignedData);
   };
 
-  // Function to remove a block by its blockId
+  // Function to remove a block by its blockId and reassign order numbers within each block
   const handleRemoveBlock = (blockId: number) => {
     const updatedData = instructionsData.filter(instruction => instruction.blockId !== blockId);
-    setInstructionsData(updatedData);
+    const reassignedData = reassignInstructionOrderNumbersByBlock(updatedData);
+    setInstructionsData(reassignedData);
   };
 
   const groupedData = groupByBlock(instructionsData);
