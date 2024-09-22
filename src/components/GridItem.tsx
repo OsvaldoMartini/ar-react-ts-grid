@@ -296,23 +296,26 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
                   <span className="instruction-details">{instruction.name}</span>
                   <span className="instruction-details">{instruction.description}</span>
-                  <div className="move-buttons">
-                    <img src={upImage} className="move-button"
-                      onClick={() => handleMoveUp(instruction.id)}
-                    />
-                    <img
-                      src={downImage}
-                      className="move-button"
-                      onClick={() => handleMoveDown(instruction.id)}
-                    />
-                    <img src={editImage} className="edit-button" />
-                    {/* Add the cross button click handler */}
-                    <img
-                      src={crossImage}
-                      className="cross-button"
-                      onClick={() => handleRemoveInstruction(instruction.id)}
-                    />
+                  <div className="fourth-column">
+                    <div className="move-buttons">
+                      <img src={upImage} className="move-button"
+                        onClick={() => handleMoveUp(instruction.id)}
+                      />
+                      <img
+                        src={downImage}
+                        className="move-button"
+                        onClick={() => handleMoveDown(instruction.id)}
+                      />
+                      <img src={editImage} className="edit-button" />
+                      {/* Add the cross button click handler */}
+                      <img
+                        src={crossImage}
+                        className="cross-button"
+                        onClick={() => handleRemoveInstruction(instruction.id)}
+                      />
+                    </div>
                   </div>
+
                 </div>
               ))}
             </div>
