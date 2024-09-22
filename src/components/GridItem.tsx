@@ -271,7 +271,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
           <div key={blockId} className="block">
             {/* Block header with garbage, up, and down buttons */}
             <div className="block-header">
-              <span>{blockData.blockName}</span>
+              <span className="block-name">{blockData.blockName}</span>
               <span>({blockData.instructions.length})</span>
               <div className="move-buttons">
                 {/* Add the garbage button click handler */}

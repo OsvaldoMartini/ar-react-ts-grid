@@ -31,12 +31,21 @@
   height: 20px; /* Set a fixed height */
 }
 
+/* Block Name Span */
+.block-header .block-name {
+  width: 100px; /* Set width of block name to 100px */
+  white-space: nowrap; /* Prevent text wrapping */
+  overflow: hidden; /* Hide overflow */
+  text-overflow: ellipsis; /* Add ellipsis if text is too long */
+}
+
 /* Move Buttons Container */
 .block-header .move-buttons {
   margin-left: auto;
   display: flex;
   gap: 4px; /* Smaller gap between buttons */
 }
+
 
 /* Button Styling */
 .move-button,
