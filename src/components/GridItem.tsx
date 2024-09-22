@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BlockLoopInstructionLoadDTO } from './instructionsMockData'; // Import the data model
 import './griditem.scss'; // Import the Sass file
 
@@ -48,7 +48,41 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   // Use state to manage the instructions data
   const [instructionsData, setInstructionsData] = useState<BlockLoopInstructionLoadDTO[]>(data);
 
-  // Function to move an instruction down
+  // Use useEffect to reassign instructionOrderNumbers on initial render
+  // Use useEffect to reassign instructionOrderNumbers on initial render
+  useEffect(() => {
+    // Reassign the instruction order numbers when the component first mounts
+    const reassignedData = reassignInstructionOrderNumbersByBlock(data);
+    setInstructionsData(reassignedData);
+  }, []);
+
+  // Function to move a block up by swapping blockOrderNumbers
+  const handleMoveBlockUp = (blockId: number) => {
+    const updatedData = [...instructionsData];
+
+    // Find the current block and its order number
+    const currentBlock = updatedData.find(instruction => instruction.blockId === blockId);
+    if (!currentBlock) return;
+
+    const currentBlockOrderNumber = currentBlock.blockOrderNumber;
+
+    // Find the block with the previous order number
+    const previousBlock = updatedData
+      .filter(instruction => instruction.blockOrderNumber < currentBlockOrderNumber)
+      .sort((a, b) => b.blockOrderNumber - a.blockOrderNumber)[0]; // Get the closest previous block
+
+    if (previousBlock) {
+      // Swap their blockOrderNumbers
+      const tempOrderNumber = currentBlock.blockOrderNumber;
+      currentBlock.blockOrderNumber = previousBlock.blockOrderNumber;
+      previousBlock.blockOrderNumber = tempOrderNumber;
+
+      // Reassign the instructions data to maintain consistency
+      setInstructionsData(reassignInstructionOrderNumbersByBlock(updatedData));
+    }
+  };
+
+  // Function to move an instruction down considering blockOrderNumber
   const handleMoveDown = (instructionId: number) => {
     const updatedData = [...instructionsData];
     const instructionIndex = updatedData.findIndex(instruction => instruction.id === instructionId);
@@ -57,8 +91,10 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     if (instructionIndex !== -1) {
       const currentInstruction = updatedData[instructionIndex];
 
-      // Find all instructions within the same block
-      const blockInstructions = updatedData.filter(instruction => instruction.blockId === currentInstruction.blockId);
+      // Find all instructions within the same block (determined by blockOrderNumber)
+      const blockInstructions = updatedData.filter(
+        instruction => instruction.blockId === currentInstruction.blockId && instruction.blockOrderNumber === currentInstruction.blockOrderNumber
+      );
 
       // Find the index of the current instruction within its block
       const blockInstructionIndex = blockInstructions.findIndex(instruction => instruction.id === instructionId);
@@ -78,7 +114,9 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     }
   };
 
+
   // Function to move an instruction up
+  // Function to move an instruction up considering blockOrderNumber
   const handleMoveUp = (instructionId: number) => {
     const updatedData = [...instructionsData];
     const instructionIndex = updatedData.findIndex(instruction => instruction.id === instructionId);
@@ -87,14 +125,15 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     if (instructionIndex !== -1) {
       const currentInstruction = updatedData[instructionIndex];
 
-      // Find all instructions within the same block
-      const blockInstructions = updatedData.filter(instruction => instruction.blockId === currentInstruction.blockId);
+      // Find all instructions within the same block (determined by blockId and blockOrderNumber)
+      const blockInstructions = updatedData.filter(
+        instruction => instruction.blockId === currentInstruction.blockId && instruction.blockOrderNumber === currentInstruction.blockOrderNumber
+      );
 
       // Find the index of the current instruction within its block
       const blockInstructionIndex = blockInstructions.findIndex(instruction => instruction.id === instructionId);
 
       // Ensure that the instruction isn't already the first one within its block
-      console.log("blockInstructionIndex", blockInstructionIndex);
       if (blockInstructionIndex > 0) {
         const previousInstruction = blockInstructions[blockInstructionIndex - 1];
 
@@ -108,6 +147,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       }
     }
   };
+
   // Function to remove an instruction by its ID and reassign order numbers within each block
   const handleRemoveInstruction = (instructionId: number) => {
     const updatedData = instructionsData.filter(instruction => instruction.id !== instructionId);
@@ -143,7 +183,9 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                   className="garbage-button"
                   onClick={() => handleRemoveBlock(Number(blockId))}
                 />
-                <img src="../up.png" className="move-button" />
+                <img src="../up.png" className="move-button"
+                  onClick={() => handleMoveBlockUp(Number(blockId))}
+                />
                 <img src="../down.png" className="move-button" />
               </div>
             </div>
