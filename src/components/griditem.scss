@@ -48,3 +48,14 @@
 .instruction-item span {
   padding: 5px;
 }
+
+.move-buttons {
+  display: flex;
+  gap: 10px; /* Space between buttons */
+}
+
+.move-button {
+  width: 24px; /* Adjust the size of the buttons as needed */
+  height: 24px;
+  cursor: pointer;
+}

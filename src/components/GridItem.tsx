@@ -38,9 +38,14 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
               <div key={instruction.id} className="instruction-item">
                 <span>{instruction.id}</span>
                 <span>{instruction.instructionOrderNumber}</span>
-                <span>{instruction.instructionType}</span> {/* Moved this before name */}
+                <span>{instruction.instructionType}</span>
                 <span>{instruction.name}</span>
                 <span>{instruction.description}</span>
+                {/* New column with up and down buttons */}
+                <div className="move-buttons">
+                  <img src="../up.png" alt="Move up" className="move-button" />
+                  <img src="../down.png" alt="Move down" className="move-button" />
+                </div>
               </div>
             ))}
           </div>
