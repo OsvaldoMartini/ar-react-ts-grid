@@ -1,0 +1,29 @@
+.cancel-button {
+    -fx-background-color: red;
+    -fx-background-radius: 5; 
+    -fx-text-fill: white; 
+    -fx-padding: 5 10 5 10;
+}
+
+.cancel-button:hover {
+    -fx-background-color: darkred; 
+}
+
+.cancel-button:pressed {
+    -fx-background-color: crimson;
+}
+
+.ok-button {
+    -fx-background-color: blue;
+    -fx-background-radius: 5; 
+    -fx-text-fill: white; 
+    -fx-padding: 5 10 5 10; 
+}
+
+.ok-button:hover {
+    -fx-background-color: darkblue;
+}
+
+.ok-button:pressed {
+    -fx-background-color: royalblue;
+}

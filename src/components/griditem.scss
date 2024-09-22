@@ -61,11 +61,11 @@
 
 /* Individual Button Padding */
 .edit-button {
-  padding: 6px; /* Corrected padding */
+  padding: 0 0 0 6px;
 }
 
 .cross-button {
-  padding: 3px; /* Corrected padding */
+  padding: 0 0 0 6px;
 }
 
 /* Operations Button */
@@ -88,7 +88,7 @@
 /* Instruction Item */
 .instruction-item {
   display: grid;
-  grid-template-columns: 1fr 1fr 2fr 3fr 1fr 2fr 1fr;
+  grid-template-columns: 1fr 2fr 3fr 1fr; /* Updated to 4 columns */
   gap: 8px; /* Decreased gap */
   padding: 8px; /* Decreased padding */
   background-color: #e0f7fa;
@@ -98,7 +98,27 @@
   align-items: center; /* Center content vertically */
 }
 
+
 /* Instruction Item Span */
 .instruction-item span {
   font-size: 0.9em; /* Smaller font size for span text */
 }
+
+/* For instruction-type: uses flex */
+.instruction-type {
+  display: flex;
+  align-items: center; /* Align content vertically */
+  gap: 3px; /* Add a 3px gap between elements */
+}
+
+.instruction-type span {
+  font-weight: bold; /* Make the text bold */
+}
+
+.instruction-details {
+  font-weight: bold; /* Make the text bold */
+  margin-right: 3px; /* Add a 3px gap after the span */
+  display: inline-block; /* Ensure the span behaves as a block but allows space for the next element */
+}
+
+

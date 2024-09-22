@@ -2,6 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { BlockLoopInstructionLoadDTO } from './instructionsMockData'; // Import the data model
 import './griditem.scss'; // Import the Sass file
 
+import setValueImage from '../assets/setValueBtn2.png';
+import getValueImage from '../assets/getValueBtn2.png';
+import checkImage from '../assets/check3.png';
+
+import crossImage from '../assets/cross.png';
+import editImage from '../assets/edit.png';
+import upImage from '../assets/up.png';
+import downImage from '../assets/down.png';
+import garbageImage from '../assets/garbage.png';
+
+
 interface GridItemProps {
   data: BlockLoopInstructionLoadDTO[];
 }
@@ -207,28 +218,45 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     setInstructionsData(reassignedData);
   };
 
-
   const getInstructionTypeElement = (instruction: BlockLoopInstructionLoadDTO): JSX.Element | string | null => {
     let imageSrc: string | null = null;
+    let text: string | null = null;
+    let isActionBold = false;
 
-    // Determine the image source based on instruction type
+    // Determine the image source and text based on instruction type
     switch (instruction.instructionType) {
       case "SET":
-        imageSrc = "../setValueBtn2.png";
+        imageSrc = setValueImage;
+        text = "SetValue";
         break;
       case "GET":
-        imageSrc = "../getValueBtn2.png";
+        imageSrc = getValueImage;
+        text = "GetValue";
         break;
       case "CK":
-        imageSrc = "../check3.png";
+        imageSrc = checkImage;
+        text = "Check";
         break;
       default:
         imageSrc = null; // No image for other types
+        text = instruction.actions || null;
+        isActionBold = true; // Set bold for actions
     }
 
-    // Return image element if imageSrc exists, otherwise return the instruction type text or null
-    return imageSrc ? <img src={imageSrc} className="operations" /> : instruction.name || null;
+    // Return a combined image and text element if imageSrc exists, otherwise return just the text
+    return imageSrc ? (
+      <div className="instruction-type">
+        <img src={imageSrc} className="operations" />
+        <span>{text}</span>
+      </div>
+    ) : (
+      <span style={{ fontWeight: isActionBold ? 'bold' : 'normal' }}>
+        {text}
+      </span>
+    );
   };
+
+
 
   const groupedData = groupByBlock(instructionsData);
 
@@ -248,14 +276,14 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
               <div className="move-buttons">
                 {/* Add the garbage button click handler */}
                 <img
-                  src="../garbage.png"
+                  src={garbageImage}
                   className="garbage-button"
                   onClick={() => handleRemoveBlock(Number(blockId))}
                 />
-                <img src="../up.png" className="move-button"
+                <img src={upImage} className="move-button"
                   onClick={() => handleMoveBlockUp(Number(blockId))}
                 />
-                <img src="../down.png" className="move-button"
+                <img src={downImage} className="move-button"
                   onClick={() => handleMoveBlockDown(Number(blockId))}
                 />
               </div>
@@ -266,21 +294,21 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                   {/* Instruction Type with conditional image */}
                   <span>{getInstructionTypeElement(instruction)}</span>
 
-                  <span>{instruction.name}</span>
-                  <span>{instruction.description}</span>
+                  <span className="instruction-details">{instruction.name}</span>
+                  <span className="instruction-details">{instruction.description}</span>
                   <div className="move-buttons">
-                    <img src="../up.png" className="move-button"
+                    <img src={upImage} className="move-button"
                       onClick={() => handleMoveUp(instruction.id)}
                     />
                     <img
-                      src="../down.png"
+                      src={downImage}
                       className="move-button"
                       onClick={() => handleMoveDown(instruction.id)}
                     />
-                    <img src="../edit.png" className="edit-button" />
+                    <img src={editImage} className="edit-button" />
                     {/* Add the cross button click handler */}
                     <img
-                      src="../cross.png"
+                      src={crossImage}
                       className="cross-button"
                       onClick={() => handleRemoveInstruction(instruction.id)}
                     />
