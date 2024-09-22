@@ -1,78 +1,63 @@
 .grid-container {
-  padding: 0 18px 0 3px;
+  padding: 0 12px 0 2px; /* Decreased padding */
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px; /* Decreased gap */
 }
 
 .block {
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px; /* Decreased gap */
 }
 
 .block-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px;
+  gap: 8px; /* Decreased gap */
+  padding: 8px; /* Decreased padding */
   background-color: #0b5394; /* Dark blue background */
   color: white; /* White text */
-  font-size: 1.2em; /* Slightly larger font size */
+  font-size: 1em; /* Decreased font size */
   font-weight: bold; /* Bold text */
-  border-radius: 10px; /* Rounded corners */
-  margin: 0; /* No margin */
-  box-shadow: 3px 3px 5px rgba(0, 0, 0, 0.5); /* Shadow effect */
+  border-radius: 8px; /* Smaller rounded corners */
+  margin: 0;
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.4); /* Slightly smaller shadow */
   
   .move-buttons {
-    margin-left: auto; /* Push buttons to the right */
+    margin-left: auto;
     display: flex;
-    gap: 5px; /* Space between buttons */
+    gap: 4px; /* Smaller gap between buttons */
   }
 }
 
-.move-button {
-  width: 24px; /* Adjust button size */
-  height: 24px;
-  background-color: transparent; /* Transparent background */
+.move-button,
+.garbage-button,
+.edit-button,
+.cross-button {
+  width: 20px; /* Decreased button size */
+  height: 20px;
+  background-color: transparent;
   padding: 0;
-  cursor: pointer; /* Make button look clickable */
+  cursor: pointer;
 }
 
 .garbage-button {
-  width: 24px; /* Same size for the garbage button */
-  height: 24px;
-  background-color: transparent;
-  margin-right: 3px; /* Space from the up button */
-  padding: 0;
-  cursor: pointer;
+  margin-right: 2px; /* Reduced space from the up button */
 }
 
-.edit-button {
-  width: 24px;
-  height: 24px;
-  background-color: transparent;
-  margin-left: 3px;
-  padding: 0;
-  cursor: pointer;
+.edit-button,
+.cross-button {
+  margin-left: 2px; /* Reduced margins */
 }
 
 .operations {
-  width: 34px;
-  height: 30px;
+  width: 30px; /* Adjusted size */
+  height: 26px; /* Adjusted size */
   background-color: transparent;
-  margin-left: 3px;
-  padding: 0;
-  cursor: pointer;
-}
-
-.cross-button {
-  width: 24px;
-  height: 24px;
-  background-color: transparent;
-  margin-left: 3px;
+  margin-left: 2px;
   padding: 0;
   cursor: pointer;
 }
@@ -80,24 +65,21 @@
 .instructions-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px; /* Decreased gap */
 }
 
 .instruction-item {
   display: grid;
   grid-template-columns: 1fr 1fr 2fr 3fr 1fr 2fr 1fr;
-  gap: 10px;
-  padding: 10px;
+  gap: 8px; /* Decreased gap */
+  padding: 8px; /* Decreased padding */
   background-color: #e0f7fa;
-  box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.1);
-  border-radius: 10px;
+  box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1); /* Reduced shadow size */
+  border-radius: 8px; /* Smaller border-radius */
   border: 1px solid #ddd;
 }
 
-.instruction-item:last-child {
-  margin-bottom: 0;
-}
-
 .instruction-item span {
-  padding: 5px;
+  padding: 3px; /* Decreased padding */
+  font-size: 0.9em; /* Smaller font size for span text */
 }
