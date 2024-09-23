@@ -66,41 +66,72 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     const data: BlockLoopInstructionLoadDTO[] = JSON.parse(jsonData);
     if (data && data.length > 0) {
       setMockData(true);
-      setInstructionsData(data);
       setIsDataReordered(false); // Reset this flag on new data load
+      setInstructionsData(data);
     }
   };
 
   // Function to send data back to JavaFX
-  const sendDataBackToJava = function () {
-    const data = JSON.stringify({ key: "value" }); // Example data to send back
+  const sendDataBackToJava = function (data: BlockLoopInstructionLoadDTO[]) {
     if ((window as any).javaBridge) {
+      console.log("Send back to Java bridge.");
       (window as any).javaBridge.sendDataToJava(data);
     } else {
       console.error("Java bridge is not available.");
+
+      // If Java bridge is not available, create and download a JSON file
+      // downloadJsonFile(data, "blockLoopInstructionData");
     }
+  };
+
+  // Function to create and download a JSON file
+  const downloadJsonFile = (data: any, fileName: string) => {
+    const json = JSON.stringify(data, null, 2); // Convert data to JSON string
+    const blob = new Blob([json], { type: "application/json" }); // Create a blob with JSON data
+    const url = URL.createObjectURL(blob); // Create URL for the blob
+
+    const a = document.createElement("a"); // Create a link element
+    a.href = url;
+    a.download = `${fileName}.json`; // Set the download file name
+    document.body.appendChild(a); // Append the link to the body
+    a.click(); // Programmatically click the link to start the download
+    document.body.removeChild(a); // Remove the link after downloading
   };
 
   // Function to reassign order numbers
-  const reassignOrderNumbers = () => {
-    console.log("reassignOrderNumbers");
-    const reassignedData = reassignInstructionOrderNumbersByBlock(instructionsData);
-    setInstructionsData(reassignedData);
-    setIsDataReordered(true); // Mark the data as reordered
-  };
+  // const reassignOrderNumbers = () => {
+  //   console.log("reassignOrderNumbers");
+  //   const reassignedData = reassignInstructionOrderNumbersByBlock(instructionsData);
+  //   setInstructionsData(reassignedData);
+  //   setIsDataReordered(true); // Mark the data as reordered
+  // };
 
   useEffect(() => {
     if (!isDataReordered && instructionsData.length > 0) {
-      // Reassign the instruction order numbers when data is loaded and not yet reordered
-      console.log("isDataReordered");
+      console.log("useEffect - reassigning order numbers");
 
-      reassignOrderNumbers();
+      // Use functional form to update instructionsData based on the previous value
+      setInstructionsData((prevData) => {
+        const reassignedData = reassignInstructionOrderNumbersByBlock([...prevData]);
+        return reassignedData;
+      });
+      sendDataBackToJava(instructionsData);
     }
-  }, [instructionsData, isDataReordered]); // Only re-run if instructionsData changes or if data has not been reordered
+  }, [instructionsData, isDataReordered]); // This will only run when instructionsData or isDataReordered changes
+
+
+  useEffect(() => {
+    if (instructionsData.length > 0 && !isDataReordered) {
+      console.log("Setting isDataReordered to true");
+      setIsDataReordered(true); // Set this in a separate effect to avoid immediate blocking
+    }
+  }, [instructionsData]); // Only trigger when instructionsData changes
+
 
 
   // Function to move a block up by swapping blockOrderNumbers
   const handleMoveBlockUp = (blockId: number) => {
+    console.log("handleMoveBlockUp");
     const updatedData = [...instructionsData];
 
     // Find all instructions that belong to the current block
@@ -129,8 +160,10 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       }
     });
 
-    // Reassign the updated data array to maintain consistency
-    setInstructionsData(updatedData);
+    setInstructionsData([...updatedData]); // Make sure to use a copy
+    setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
+
+
   };
 
 
@@ -164,8 +197,8 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       }
     });
 
-    // Reassign the updated data array to maintain consistency
-    setInstructionsData(updatedData);
+    setInstructionsData([...updatedData]); // Make sure to use a copy
+    setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
   };
 
 
@@ -197,7 +230,8 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
         nextInstruction.instructionOrderNumber = tempOrderNumber;
 
         // Reassign the updatedData array
-        setInstructionsData(reassignInstructionOrderNumbersByBlock(updatedData));
+        setInstructionsData([...reassignInstructionOrderNumbersByBlock(updatedData)]);
+        setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
       }
     }
   };
@@ -231,7 +265,8 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
         previousInstruction.instructionOrderNumber = tempOrderNumber;
 
         // Reassign the updatedData array
-        setInstructionsData(reassignInstructionOrderNumbersByBlock(updatedData));
+        setInstructionsData([...reassignInstructionOrderNumbersByBlock(updatedData)]);
+        setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
       }
     }
   };
@@ -240,14 +275,16 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   const handleRemoveInstruction = (instructionId: number) => {
     const updatedData = instructionsData.filter(instruction => instruction.id !== instructionId);
     const reassignedData = reassignInstructionOrderNumbersByBlock(updatedData);
-    setInstructionsData(reassignedData);
+    setInstructionsData([...reassignedData]);
+    setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
   };
 
   // Function to remove a block by its blockId and reassign order numbers within each block
   const handleRemoveBlock = (blockId: number) => {
     const updatedData = instructionsData.filter(instruction => instruction.blockId !== blockId);
     const reassignedData = reassignInstructionOrderNumbersByBlock(updatedData);
-    setInstructionsData(reassignedData);
+    setInstructionsData([...reassignedData]);
+    setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
   };
 
   const getInstructionTypeElement = (instruction: BlockLoopInstructionLoadDTO): JSX.Element | string | null => {
