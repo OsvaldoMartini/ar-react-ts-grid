@@ -17,6 +17,8 @@ interface GridItemProps {
   data: BlockLoopInstructionLoadDTO[];
 }
 
+
+
 // Function to group data by blockId and sort instructions within each block
 const groupByBlock = (data: BlockLoopInstructionLoadDTO[]) => {
   const blocks = data.reduce((result, item) => {
@@ -39,7 +41,6 @@ const groupByBlock = (data: BlockLoopInstructionLoadDTO[]) => {
 // Helper function to reassign instructionOrderNumber starting from 1 within each block
 const reassignInstructionOrderNumbersByBlock = (instructions: BlockLoopInstructionLoadDTO[]) => {
   // Group instructions by blockId
-  console.log("reassignInstructionOrderNumbersByBlock: ");
   const grouped = groupByBlock(instructions);
 
   // Iterate over each block and reassign instructionOrderNumbers
@@ -57,15 +58,46 @@ const reassignInstructionOrderNumbersByBlock = (instructions: BlockLoopInstructi
 
 const GridItem: React.FC<GridItemProps> = ({ data }) => {
   // Use state to manage the instructions data
+  const [mockData, setMockData] = useState<boolean>(false);
   const [instructionsData, setInstructionsData] = useState<BlockLoopInstructionLoadDTO[]>(data);
+  const [isDataReordered, setIsDataReordered] = useState<boolean>(false);
+  // Function to handle receiving data from JavaFX
+  (window as any).receiveDataFromJava = function (jsonData: string) {
+    const data: BlockLoopInstructionLoadDTO[] = JSON.parse(jsonData);
+    if (data && data.length > 0) {
+      setMockData(true);
+      setInstructionsData(data);
+      setIsDataReordered(false); // Reset this flag on new data load
+    }
+  };
 
-  // Use useEffect to reassign instructionOrderNumbers on initial render
-  // Use useEffect to reassign instructionOrderNumbers on initial render
-  useEffect(() => {
-    // Reassign the instruction order numbers when the component first mounts
-    const reassignedData = reassignInstructionOrderNumbersByBlock(data);
+  // Function to send data back to JavaFX
+  const sendDataBackToJava = function () {
+    const data = JSON.stringify({ key: "value" }); // Example data to send back
+    if ((window as any).javaBridge) {
+      (window as any).javaBridge.sendDataToJava(data);
+    } else {
+      console.error("Java bridge is not available.");
+    }
+  };
+
+  // Function to reassign order numbers
+  const reassignOrderNumbers = () => {
+    console.log("reassignOrderNumbers");
+    const reassignedData = reassignInstructionOrderNumbersByBlock(instructionsData);
     setInstructionsData(reassignedData);
-  }, []);
+    setIsDataReordered(true); // Mark the data as reordered
+  };
+
+  useEffect(() => {
+    if (!isDataReordered && instructionsData.length > 0) {
+      // Reassign the instruction order numbers when data is loaded and not yet reordered
+      console.log("isDataReordered");
+
+      reassignOrderNumbers();
+    }
+  }, [instructionsData, isDataReordered]); // Only re-run if instructionsData changes or if data has not been reordered
+
 
   // Function to move a block up by swapping blockOrderNumbers
   const handleMoveBlockUp = (blockId: number) => {
@@ -272,7 +304,10 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
             {/* Block header with garbage, up, and down buttons */}
             <div className="block-header">
               <span className="block-name">{blockData.blockName}</span>
-              <span>({blockData.instructions.length})</span>
+              <span>
+                ({blockData.instructions.length})
+                {!mockData ? "-mock" : ""}
+              </span>
               <div className="move-buttons">
                 {/* Add the garbage button click handler */}
                 <img
