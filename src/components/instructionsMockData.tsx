@@ -11,6 +11,11 @@ export interface BlockLoopInstructionLoadDTO {
   instructionType: string;
 }
 
+// Define the message type for better type safety
+export interface Message {
+  body: string;
+}
+
 const instructionsMockData: BlockLoopInstructionLoadDTO[] = [
   { id: 1, instructionOrderNumber: 1, name: "Instruction 1", description: "Description 1", blockId: 1, blockOrderNumber: 1, blockName: "Default Block", actions: "click", instructionType: "SET" },
   { id: 2, instructionOrderNumber: 4, name: "Instruction 2", description: "Description 2", blockId: 2, blockOrderNumber: 2, blockName: "Block Test 1", actions: "click", instructionType: "SET" },
