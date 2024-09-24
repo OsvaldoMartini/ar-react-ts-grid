@@ -315,6 +315,23 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     const reassignedData = reassignInstructionOrderNumbersByBlock(updatedData);
     setInstructionsData([...reassignedData]);
     setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
+
+    // Send WebSocket message
+    if (client && connected) { // Assuming `client` is your STOMP client and `connected` is a boolean indicating the connection state
+      const message = {
+        type: 'DELETE_INSTRUCTION',
+        instructionId: instructionId,
+      };
+
+      // Publish the delete message to the WebSocket server
+      client.publish({
+        destination: '/app/instruction/delete', // Destination to which you want to send the message (configured on the server)
+        body: JSON.stringify(message),
+      });
+
+      console.log(`Sent delete instruction message for ID: ${instructionId}`);
+    }
+
   };
 
   // Function to remove a block by its blockId and reassign order numbers within each block
@@ -323,6 +340,22 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     const reassignedData = reassignInstructionOrderNumbersByBlock(updatedData);
     setInstructionsData([...reassignedData]);
     setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
+
+    // Send WebSocket message
+    if (client && connected) { // Assuming `client` is your STOMP client and `connected` is a boolean indicating the connection state
+      const message = {
+        type: 'DELETE_BLOCK',
+        blockId: blockId,
+      };
+
+      // Publish the delete message to the WebSocket server
+      client.publish({
+        destination: '/app/block/delete', // Destination to which you want to send the message (configured on the server)
+        body: JSON.stringify(message),
+      });
+
+      console.log(`Sent delete block message for Block ID: ${blockId}`);
+    }
   };
 
   const getInstructionTypeElement = (instruction: BlockLoopInstructionLoadDTO): JSX.Element | string | null => {

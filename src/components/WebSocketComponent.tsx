@@ -12,7 +12,7 @@ const WebSocketComponent: React.FC = () => {
   useEffect(() => {
     // Create a STOMP client
     const stompClient: Client = new Client({
-      brokerURL: "ws://localhost:8080/websocket2", // Your WebSocket URL
+      brokerURL: "ws://localhost:8080/websocket", // Your WebSocket URL
       reconnectDelay: 5000, // Try reconnecting after 5 seconds if the connection fails
       heartbeatIncoming: 4000, // Heartbeat configuration
       heartbeatOutgoing: 4000,
