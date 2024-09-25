@@ -158,22 +158,29 @@
 /* Dropdown menu styling */
 .dropdown-menu {
   position: absolute;
-  top: 25px; /* Adjust to your layout */
+  top: 25px; /* Adjust based on the layout */
   right: 0;
-  background-color: white;
+  background-color: #e0f7fa; /* Same background color as the instructions rows */
   border: 1px solid #ddd;
-  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
-  border-radius: 4px;
-  padding: 8px;
-  z-index: 100;
+  border-radius: 4px; /* Rounded corners */
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+  padding: 4px 0; /* Padding around the menu */
+  font-size: 0.85em; /* Reduced font size to fit items per line */
+  z-index: 100; /* Make sure it's on top of other elements */
+  width: 150px; /* Width adjusted for single-line items */
 }
 
+/* Individual menu items */
 .dropdown-menu div {
   padding: 8px 12px;
   cursor: pointer;
+  white-space: nowrap; /* Ensure the text stays on a single line */
 }
 
+/* Hover effect for menu items */
 .dropdown-menu div:hover {
-  background-color: #f0f0f0; /* Change the background color on hover */
+  background-color: #b2ebf2; /* Light blue background on hover */
+  color: #00796b; /* Darker text color on hover */
 }
+
 
