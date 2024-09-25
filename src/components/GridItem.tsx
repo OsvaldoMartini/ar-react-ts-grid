@@ -558,7 +558,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                   {/* Instruction Type with conditional image */}
                   <span>{getInstructionTypeElement(instruction)}</span>
                   <span className="instruction-details">{instruction.description}</span>
-                  <div className="fourth-column">
+                  <div className="options-column">
                     <div className="move-buttons">
                       <img src={upImage} className="move-button"
                         onClick={() => handleMoveRowUp(instruction.id)}

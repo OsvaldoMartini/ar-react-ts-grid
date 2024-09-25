@@ -97,9 +97,9 @@
 /* Instruction Item */
 .instruction-item {
   display: grid;
-  grid-template-columns: 150px 150px 150px auto; /* Fixed widths for first three columns, auto for the fourth */
-  gap: 8px; /* Decreased gap */
-  padding: 8px; /* Decreased padding */
+  grid-template-columns: 150px 150px minmax(120px, 1fr) auto;
+  // gap: 8px; /* Decreased gap */
+  // padding: 8px; /* Decreased padding */
   background-color: #e0f7fa;
   box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1); /* Reduced shadow size */
   border-radius: 8px; /* Smaller border-radius */
@@ -107,12 +107,16 @@
   align-items: center; /* Center content vertically */
 }
 
-/* Fourth column styling */
-.instruction-item .fourth-column {
+/* Margin for the first span element with instruction type */
+.instruction-item span:first-child {
+  margin-left: 3px; /* Add left margin of 3px */
+}
+
+/* Options column styling */
+.instruction-item .options-column {
   display: flex;
-  margin-left: auto; /* Push the fourth column content to the right */
-  width: 100px; /* Fixed width */
-  justify-content: flex-end; /* Ensure content like images stay aligned to the right */
+  justify-content: flex-end; /* Align content to the right */
+  margin-right: 3px; /* Add right margin of 3px */
 }
 
 
