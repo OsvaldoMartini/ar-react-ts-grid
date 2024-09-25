@@ -224,6 +224,20 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
     const nextBlockOrderNumber = nextBlockInstructions.blockOrderNumber;
 
+    // Prepare data for the blocks that will be swapped
+    const blockSwaps = {
+      currentBlock: {
+        blockId: blockId,
+        newOrderNumber: nextBlockOrderNumber,
+      },
+      nextBlock: {
+        blockId: nextBlockInstructions.blockId,
+        newOrderNumber: currentBlockOrderNumber,
+      },
+    };
+
+    console.log('Sent block move message:', blockSwaps);
+
     // Update the blockOrderNumber for both current and next blocks
     updatedData.forEach(instruction => {
       if (instruction.blockOrderNumber === currentBlockOrderNumber) {
@@ -235,9 +249,25 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       }
     });
 
-    setInstructionsData([...updatedData]); // Make sure to use a copy
+    setInstructionsData([...updatedData]); // Update the state
     setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
+
+    // Send WebSocket message with block swap details
+    if (client && connected) {
+      const message = {
+        type: 'BLOCK_MOVE',
+        blocks: blockSwaps,
+      };
+
+      client.publish({
+        destination: '/app/block/move', // Update based on your WebSocket endpoint configuration
+        body: JSON.stringify(message),
+      });
+
+      console.log('Sent block move message:', message);
+    }
   };
+
 
 
 
@@ -412,6 +442,9 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
             {/* Block header with garbage, up, and down buttons */}
             <div className="block-header">
               <span className="block-name">{blockData.blockName}</span>
+              <span className="block-id">{blockId}</span>
+              <span className="block-order-number">Block Order: {blockData.instructions[0].blockOrderNumber}</span>
+
               <span>
                 ({blockData.instructions.length})
                 {!mockData ? "-mock" : ""}
