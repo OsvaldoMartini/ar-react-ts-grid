@@ -485,22 +485,22 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     let isActionBold = false;
 
     // Determine the image source and text based on instruction type
-    switch (instruction.instructionType) {
+    switch (instruction.actions) {
       case "SET":
         imageSrc = setValueImage;
-        text = "SetValue";
+        text = instruction.name;
         break;
       case "GET":
         imageSrc = getValueImage;
-        text = "GetValue";
+        text = instruction.name;
         break;
       case "CK":
         imageSrc = checkImage;
-        text = "Check";
+        text = instruction.actions;
         break;
       default:
         imageSrc = null; // No image for other types
-        text = instruction.actions || null;
+        text = instruction.name || null;
         isActionBold = true; // Set bold for actions
     }
 
@@ -557,8 +557,6 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                 <div key={instruction.id} className="instruction-item">
                   {/* Instruction Type with conditional image */}
                   <span>{getInstructionTypeElement(instruction)}</span>
-
-                  <span className="instruction-details">{instruction.name}</span>
                   <span className="instruction-details">{instruction.description}</span>
                   <div className="fourth-column">
                     <div className="move-buttons">
