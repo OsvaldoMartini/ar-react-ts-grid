@@ -52,8 +52,8 @@
 .garbage-button,
 .edit-button,
 .cross-button {
-  width: 20px; /* Decreased button size */
-  height: 20px;
+  width: 15px; /* Decreased button size */
+  height: 15px;
   background-color: transparent;
   padding: 0;
   cursor: pointer;
@@ -79,8 +79,8 @@
 
 /* Operations Button */
 .operations {
-  width: 30px; /* Adjusted size */
-  height: 26px; /* Adjusted size */
+  width: 20px;
+  height: 17px;
   background-color: transparent;
   margin-left: 2px;
   padding: 0;
@@ -116,7 +116,7 @@
 .instruction-item .options-column {
   display: flex;
   justify-content: flex-end; /* Align content to the right */
-  margin-right: 3px; /* Add right margin of 3px */
+  margin-right: 8px; /* Add right margin of 3px */
 }
 
 
@@ -143,4 +143,37 @@
   display: inline-block; /* Ensure the span behaves as a block but allows space for the next element */
 }
 
+/* Dropdown arrow styling */
+.dropdown-column {
+  position: relative;
+  margin-right: 8px;
+}
+
+.dropdown-arrow {
+  cursor: pointer;
+  width: 15px;
+  height: 15px;
+}
+
+/* Dropdown menu styling */
+.dropdown-menu {
+  position: absolute;
+  top: 25px; /* Adjust to your layout */
+  right: 0;
+  background-color: white;
+  border: 1px solid #ddd;
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+  padding: 8px;
+  z-index: 100;
+}
+
+.dropdown-menu div {
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.dropdown-menu div:hover {
+  background-color: #f0f0f0; /* Change the background color on hover */
+}
 

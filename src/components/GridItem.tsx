@@ -3,15 +3,16 @@ import { Client, IMessage } from "@stomp/stompjs";
 import { BlockLoopInstructionLoadDTO } from './instructionsMockData'; // Import the data model
 import './griditem.scss'; // Import the Sass file
 
-import setValueImage from '../assets/setValueBtn2.png';
-import getValueImage from '../assets/getValueBtn2.png';
-import checkImage from '../assets/check3.png';
+import setValueImage from '../assets/setValueBtn3.png';
+import getValueImage from '../assets/getValueBtn3.png';
+import checkImage from '../assets/check4.png';
 
 import crossImage from '../assets/cross.png';
 import editImage from '../assets/edit.png';
 import upImage from '../assets/up.png';
 import downImage from '../assets/down.png';
 import garbageImage from '../assets/garbage.png';
+import menuDownImage from '../assets/menu-down.png';
 
 
 interface GridItemProps {
@@ -66,6 +67,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   const [connected, setConnected] = useState(false);
   const [messages, setMessages] = useState<string[]>([]);
   const [inputMessage, setInputMessage] = useState<string>("");
+  const [openDropdown, setOpenDropdown] = useState<number | null>(null);
 
   useEffect(() => {
     // Create a STOMP client
@@ -230,6 +232,31 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
         console.error('Error sending WebSocket message:', error);
       }
     }
+  };
+
+
+
+  const handleToggleDropdown = (instructionId: number) => {
+    if (openDropdown === instructionId) {
+      setOpenDropdown(null); // Close the menu if it's already open
+    } else {
+      setOpenDropdown(instructionId); // Open the menu for this specific instruction
+    }
+  };
+
+  const handleInsertStepBefore = (instructionId: number) => {
+    // Logic to insert a step before
+    console.log("Insert Step Before for instruction", instructionId);
+  };
+
+  const handleInsertStepAfter = (instructionId: number) => {
+    // Logic to insert a step after
+    console.log("Insert Step After for instruction", instructionId);
+  };
+
+  const handleDeleteInstruction = (instructionId: number) => {
+    // Logic to delete the instruction
+    console.log("Delete instruction", instructionId);
   };
 
 
@@ -526,7 +553,6 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   return (
     <div className="grid-container">
       {Object.entries(groupedData)
-        // Sort by blockOrderNumber instead of blockId
         .sort(([, aBlockData], [, bBlockData]) => aBlockData.instructions[0].blockOrderNumber - bBlockData.instructions[0].blockOrderNumber)
         .map(([blockId, blockData]) => (
           <div key={blockId} className="block">
@@ -538,7 +564,6 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                 {!mockData ? "-mock" : ""}
               </span>
               <div className="move-buttons">
-                {/* Add the garbage button click handler */}
                 <img
                   src={garbageImage}
                   className="garbage-button"
@@ -555,7 +580,6 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
             <div className="instructions-list">
               {blockData.instructions.map((instruction) => (
                 <div key={instruction.id} className="instruction-item">
-                  {/* Instruction Type with conditional image */}
                   <span>{getInstructionTypeElement(instruction)}</span>
                   <span className="instruction-details">{instruction.description}</span>
                   <div className="options-column">
@@ -569,7 +593,6 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                         onClick={() => handleMoveRowDown(instruction.id)}
                       />
                       <img src={editImage} className="edit-button" />
-                      {/* Add the cross button click handler */}
                       <img
                         src={crossImage}
                         className="cross-button"
@@ -577,7 +600,21 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                       />
                     </div>
                   </div>
-
+                  {/* New column for dropdown menu */}
+                  <div className="dropdown-column">
+                    <img
+                      src={menuDownImage} /* Replace with your arrow down image */
+                      className="dropdown-arrow"
+                      onClick={() => handleToggleDropdown(instruction.id)}
+                    />
+                    {openDropdown === instruction.id && (
+                      <div className="dropdown-menu">
+                        <div onClick={() => handleInsertStepBefore(instruction.id)}>Insert Step Before</div>
+                        <div onClick={() => handleInsertStepAfter(instruction.id)}>Insert Step After</div>
+                        <div onClick={() => handleDeleteInstruction(instruction.id)}>Delete</div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
