@@ -310,7 +310,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       return;
     }
 
-    // Create a new block with subsequent instructions
+    // Create a new block with subsequent instructions, preserving the crescent order
     const newBlockId = Date.now(); // Generate a unique block ID
     const newBlockOrderNumber = blockOrderNumber + 1; // Increment the current block's order number by 1
     const newBlock = {
@@ -320,15 +320,17 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
         ...instruction,
         blockId: newBlockId, // Assign new block ID to the instructions
         blockOrderNumber: newBlockOrderNumber, // Assign new block order number to the instructions
-        instructionOrderNumber: index + 1, // Reassign instructionOrderNumber starting from 1
+        instructionOrderNumber: index + 1, // Reassign instructionOrderNumber starting from 1 within the new block
       })),
     };
 
-
-    // Update the block data to remove these instructions from the original block
+    // Update the block data to remove these instructions from the original block, preserving the crescent order
     const updatedBlock = {
       ...blockToSplit,
-      instructions: blockToSplit.instructions.slice(0, selectedInstructionIndex + 1),
+      instructions: blockToSplit.instructions.slice(0, selectedInstructionIndex + 1).map((instruction, index) => ({
+        ...instruction,
+        instructionOrderNumber: index + 1, // Preserve original crescent order for remaining instructions in current block
+      })),
     };
 
     // Prepare blockOrderNumber updates for blocks after the current one
