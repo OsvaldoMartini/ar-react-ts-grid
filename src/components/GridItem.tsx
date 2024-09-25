@@ -1,25 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from "react";
 import { Client, IMessage } from "@stomp/stompjs";
-import { BlockLoopInstructionLoadDTO } from './instructionsMockData'; // Import the data model
-import './griditem.scss'; // Import the Sass file
+import { BlockLoopInstructionLoadDTO } from "./instructionsMockData"; // Import the data model
+import "./griditem.scss"; // Import the Sass file
 
-import setValueImage from '../assets/setValueBtn3.png';
-import getValueImage from '../assets/getValueBtn3.png';
-import checkImage from '../assets/check4.png';
+import setValueImage from "../assets/setValueBtn3.png";
+import getValueImage from "../assets/getValueBtn3.png";
+import checkImage from "../assets/check4.png";
 
-import crossImage from '../assets/cross.png';
-import editImage from '../assets/edit.png';
-import upImage from '../assets/up.png';
-import downImage from '../assets/down.png';
-import garbageImage from '../assets/garbage.png';
-import menuDownImage from '../assets/menu-down.png';
-
+import crossImage from "../assets/cross.png";
+import editImage from "../assets/edit.png";
+import upImage from "../assets/up.png";
+import downImage from "../assets/down.png";
+import garbageImage from "../assets/garbage.png";
+import menuDownImage from "../assets/menu-down.png";
 
 interface GridItemProps {
   data: BlockLoopInstructionLoadDTO[];
 }
-
-
 
 // Function to group data by blockId and sort instructions within each block
 const groupByBlock = (data: BlockLoopInstructionLoadDTO[]) => {
@@ -33,25 +30,31 @@ const groupByBlock = (data: BlockLoopInstructionLoadDTO[]) => {
   }, {} as Record<number, { blockName: string; instructions: BlockLoopInstructionLoadDTO[] }>);
 
   // Sort each block's instructions by instructionOrderNumber
-  Object.values(blocks).forEach(block => {
-    block.instructions.sort((a, b) => a.instructionOrderNumber - b.instructionOrderNumber);
+  Object.values(blocks).forEach((block) => {
+    block.instructions.sort(
+      (a, b) => a.instructionOrderNumber - b.instructionOrderNumber
+    );
   });
 
   return blocks;
 };
 
 // Helper function to reassign instructionOrderNumber starting from 1 within each block
-const reassignInstructionOrderNumbersByBlock = (instructions: BlockLoopInstructionLoadDTO[]) => {
+const reassignInstructionOrderNumbersByBlock = (
+  instructions: BlockLoopInstructionLoadDTO[]
+) => {
   // Group instructions by blockId
   const grouped = groupByBlock(instructions);
 
   // Iterate over each block and reassign instructionOrderNumbers
   const updatedInstructions: BlockLoopInstructionLoadDTO[] = [];
   Object.entries(grouped).forEach(([blockId, blockData]) => {
-    const reassignedInstructions = blockData.instructions.map((instruction, index) => ({
-      ...instruction,
-      instructionOrderNumber: index + 1, // Reassign starting from 1 within each block
-    }));
+    const reassignedInstructions = blockData.instructions.map(
+      (instruction, index) => ({
+        ...instruction,
+        instructionOrderNumber: index + 1, // Reassign starting from 1 within each block
+      })
+    );
     updatedInstructions.push(...reassignedInstructions);
   });
 
@@ -61,13 +64,15 @@ const reassignInstructionOrderNumbersByBlock = (instructions: BlockLoopInstructi
 const GridItem: React.FC<GridItemProps> = ({ data }) => {
   // Use state to manage the instructions data
   const [mockData, setMockData] = useState<boolean>(false);
-  const [instructionsData, setInstructionsData] = useState<BlockLoopInstructionLoadDTO[]>(data);
+  const [instructionsData, setInstructionsData] =
+    useState<BlockLoopInstructionLoadDTO[]>(data);
   const [isDataReordered, setIsDataReordered] = useState<boolean>(false);
   const [client, setClient] = useState<Client | null>(null);
   const [connected, setConnected] = useState(false);
   const [messages, setMessages] = useState<string[]>([]);
   const [inputMessage, setInputMessage] = useState<string>("");
   const [openDropdown, setOpenDropdown] = useState<number | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Create a STOMP client
@@ -152,13 +157,14 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
       // Use functional form to update instructionsData based on the previous value
       setInstructionsData((prevData) => {
-        const reassignedData = reassignInstructionOrderNumbersByBlock([...prevData]);
+        const reassignedData = reassignInstructionOrderNumbersByBlock([
+          ...prevData,
+        ]);
         return reassignedData;
       });
       sendDataBackToJava(instructionsData);
     }
   }, [instructionsData, isDataReordered]); // This will only run when instructionsData or isDataReordered changes
-
 
   useEffect(() => {
     if (instructionsData.length > 0 && !isDataReordered) {
@@ -167,6 +173,24 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     }
   }, [instructionsData]); // Only trigger when instructionsData changes
 
+  // Close the dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setOpenDropdown(null); // Close the dropdown if clicked outside
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+
+    // Cleanup the event listener on component unmount
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [openDropdown]);
 
   // Function to move a block up by swapping blockOrderNumbers
   const handleMoveBlockUp = (blockId: number) => {
@@ -174,14 +198,19 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     const updatedData = [...instructionsData];
 
     // Find all instructions that belong to the current block
-    const currentBlockInstructions = updatedData.filter(instruction => instruction.blockId === blockId);
+    const currentBlockInstructions = updatedData.filter(
+      (instruction) => instruction.blockId === blockId
+    );
     if (currentBlockInstructions.length === 0) return;
 
-    const currentBlockOrderNumber = currentBlockInstructions[0].blockOrderNumber;
+    const currentBlockOrderNumber =
+      currentBlockInstructions[0].blockOrderNumber;
 
     // Find the closest block with a smaller blockOrderNumber
     const previousBlockInstructions = updatedData
-      .filter(instruction => instruction.blockOrderNumber < currentBlockOrderNumber)
+      .filter(
+        (instruction) => instruction.blockOrderNumber < currentBlockOrderNumber
+      )
       .sort((a, b) => b.blockOrderNumber - a.blockOrderNumber)[0]; // Get the closest previous block
 
     if (!previousBlockInstructions) return;
@@ -201,7 +230,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     };
 
     // Update the blockOrderNumber for both current and previous blocks
-    updatedData.forEach(instruction => {
+    updatedData.forEach((instruction) => {
       if (instruction.blockOrderNumber === currentBlockOrderNumber) {
         // Move current block up by assigning the previous block's order number
         instruction.blockOrderNumber = previousBlockOrderNumber;
@@ -217,24 +246,22 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     // Send WebSocket message with the block swap details
     if (client && connected) {
       const message = {
-        type: 'BLOCK_MOVE',
+        type: "BLOCK_MOVE",
         blocks: blockSwaps,
       };
 
       try {
         client.publish({
-          destination: '/app/block/move', // Update based on your WebSocket endpoint configuration
+          destination: "/app/block/move", // Update based on your WebSocket endpoint configuration
           body: JSON.stringify(message),
         });
 
-        console.log('Sent block move message:', message);
+        console.log("Sent block move message:", message);
       } catch (error) {
-        console.error('Error sending WebSocket message:', error);
+        console.error("Error sending WebSocket message:", error);
       }
     }
   };
-
-
 
   const handleToggleDropdown = (instructionId: number) => {
     if (openDropdown === instructionId) {
@@ -255,25 +282,28 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   };
 
   const handleDeleteInstruction = (instructionId: number) => {
-    // Logic to delete the instruction
+    handleRemoveInstruction(instructionId);
     console.log("Delete instruction", instructionId);
   };
-
-
 
   // Function to move a block down by swapping blockOrderNumbers
   const handleMoveBlockDown = (blockId: number) => {
     const updatedData = [...instructionsData];
 
     // Find all instructions that belong to the current block
-    const currentBlockInstructions = updatedData.filter(instruction => instruction.blockId === blockId);
+    const currentBlockInstructions = updatedData.filter(
+      (instruction) => instruction.blockId === blockId
+    );
     if (currentBlockInstructions.length === 0) return;
 
-    const currentBlockOrderNumber = currentBlockInstructions[0].blockOrderNumber;
+    const currentBlockOrderNumber =
+      currentBlockInstructions[0].blockOrderNumber;
 
     // Find the closest block with a larger blockOrderNumber
     const nextBlockInstructions = updatedData
-      .filter(instruction => instruction.blockOrderNumber > currentBlockOrderNumber)
+      .filter(
+        (instruction) => instruction.blockOrderNumber > currentBlockOrderNumber
+      )
       .sort((a, b) => a.blockOrderNumber - b.blockOrderNumber)[0]; // Get the closest next block
 
     if (!nextBlockInstructions) return;
@@ -293,7 +323,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     };
 
     // Update the blockOrderNumber for both current and next blocks
-    updatedData.forEach(instruction => {
+    updatedData.forEach((instruction) => {
       if (instruction.blockOrderNumber === currentBlockOrderNumber) {
         // Move current block down by assigning the next block's order number
         instruction.blockOrderNumber = nextBlockOrderNumber;
@@ -309,26 +339,25 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     // Send WebSocket message with block swap details
     if (client && connected) {
       const message = {
-        type: 'BLOCK_MOVE',
+        type: "BLOCK_MOVE",
         blocks: blockSwaps,
       };
 
       client.publish({
-        destination: '/app/block/move', // Update based on your WebSocket endpoint configuration
+        destination: "/app/block/move", // Update based on your WebSocket endpoint configuration
         body: JSON.stringify(message),
       });
 
-      console.log('Sent block move message:', message);
+      console.log("Sent block move message:", message);
     }
   };
-
-
-
 
   // Function to move an instruction down considering blockOrderNumber
   const handleMoveRowDown = (instructionId: number) => {
     const updatedData = [...instructionsData];
-    const instructionIndex = updatedData.findIndex(instruction => instruction.id === instructionId);
+    const instructionIndex = updatedData.findIndex(
+      (instruction) => instruction.id === instructionId
+    );
 
     // Ensure that the instruction exists
     if (instructionIndex !== -1) {
@@ -336,11 +365,15 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
       // Find all instructions within the same block (determined by blockOrderNumber)
       const blockInstructions = updatedData.filter(
-        instruction => instruction.blockId === currentInstruction.blockId && instruction.blockOrderNumber === currentInstruction.blockOrderNumber
+        (instruction) =>
+          instruction.blockId === currentInstruction.blockId &&
+          instruction.blockOrderNumber === currentInstruction.blockOrderNumber
       );
 
       // Find the index of the current instruction within its block
-      const blockInstructionIndex = blockInstructions.findIndex(instruction => instruction.id === instructionId);
+      const blockInstructionIndex = blockInstructions.findIndex(
+        (instruction) => instruction.id === instructionId
+      );
 
       // Ensure that the instruction isn't already the last one within its block
       if (blockInstructionIndex < blockInstructions.length - 1) {
@@ -361,40 +394,44 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
         // Swap their instructionOrderNumbers
         const tempOrderNumber = currentInstruction.instructionOrderNumber;
-        currentInstruction.instructionOrderNumber = nextInstruction.instructionOrderNumber;
+        currentInstruction.instructionOrderNumber =
+          nextInstruction.instructionOrderNumber;
         nextInstruction.instructionOrderNumber = tempOrderNumber;
 
         // Reassign the updatedData array and update the state
-        setInstructionsData([...reassignInstructionOrderNumbersByBlock(updatedData)]);
+        setInstructionsData([
+          ...reassignInstructionOrderNumbersByBlock(updatedData),
+        ]);
         setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
 
         // Send WebSocket message with the row swap details
         if (client && connected) {
           const message = {
-            type: 'ROW_MOVE',
+            type: "ROW_MOVE",
             rows: rowsSwaps,
           };
 
           try {
             client.publish({
-              destination: '/app/row/move', // Update based on your WebSocket endpoint configuration
+              destination: "/app/row/move", // Update based on your WebSocket endpoint configuration
               body: JSON.stringify(message),
             });
 
-            console.log('Sent row move message:', message);
+            console.log("Sent row move message:", message);
           } catch (error) {
-            console.error('Error sending WebSocket message:', error);
+            console.error("Error sending WebSocket message:", error);
           }
         }
       }
     }
   };
 
-
   // Function to move an instruction up considering blockOrderNumber
   const handleMoveRowUp = (instructionId: number) => {
     const updatedData = [...instructionsData];
-    const instructionIndex = updatedData.findIndex(instruction => instruction.id === instructionId);
+    const instructionIndex = updatedData.findIndex(
+      (instruction) => instruction.id === instructionId
+    );
 
     // Ensure that the instruction exists
     if (instructionIndex !== -1) {
@@ -402,15 +439,20 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
       // Find all instructions within the same block (determined by blockId and blockOrderNumber)
       const blockInstructions = updatedData.filter(
-        instruction => instruction.blockId === currentInstruction.blockId && instruction.blockOrderNumber === currentInstruction.blockOrderNumber
+        (instruction) =>
+          instruction.blockId === currentInstruction.blockId &&
+          instruction.blockOrderNumber === currentInstruction.blockOrderNumber
       );
 
       // Find the index of the current instruction within its block
-      const blockInstructionIndex = blockInstructions.findIndex(instruction => instruction.id === instructionId);
+      const blockInstructionIndex = blockInstructions.findIndex(
+        (instruction) => instruction.id === instructionId
+      );
 
       // Ensure that the instruction isn't already the first one within its block
       if (blockInstructionIndex > 0) {
-        const previousInstruction = blockInstructions[blockInstructionIndex - 1];
+        const previousInstruction =
+          blockInstructions[blockInstructionIndex - 1];
 
         // Capture rowsSwaps for WebSocket message including blockId
         const rowsSwaps = {
@@ -427,78 +469,85 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
         // Swap their instructionOrderNumbers
         const tempOrderNumber = currentInstruction.instructionOrderNumber;
-        currentInstruction.instructionOrderNumber = previousInstruction.instructionOrderNumber;
+        currentInstruction.instructionOrderNumber =
+          previousInstruction.instructionOrderNumber;
         previousInstruction.instructionOrderNumber = tempOrderNumber;
 
         // Reassign the updatedData array
-        setInstructionsData([...reassignInstructionOrderNumbersByBlock(updatedData)]);
+        setInstructionsData([
+          ...reassignInstructionOrderNumbersByBlock(updatedData),
+        ]);
         setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
 
         // Send WebSocket message with the row swap details
         if (client && connected) {
           const message = {
-            type: 'ROW_MOVE',
+            type: "ROW_MOVE",
             rows: rowsSwaps,
           };
 
           try {
             client.publish({
-              destination: '/app/row/move', // Update based on your WebSocket endpoint configuration
+              destination: "/app/row/move", // Update based on your WebSocket endpoint configuration
               body: JSON.stringify(message),
             });
 
-            console.log('Sent row move message:', message);
+            console.log("Sent row move message:", message);
           } catch (error) {
-            console.error('Error sending WebSocket message:', error);
+            console.error("Error sending WebSocket message:", error);
           }
         }
       }
     }
   };
 
-
   // Function to remove an instruction by its ID and reassign order numbers within each block
   const handleRemoveInstruction = (instructionId: number) => {
-    const updatedData = instructionsData.filter(instruction => instruction.id !== instructionId);
+    const updatedData = instructionsData.filter(
+      (instruction) => instruction.id !== instructionId
+    );
     const reassignedData = reassignInstructionOrderNumbersByBlock(updatedData);
     setInstructionsData([...reassignedData]);
     setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
 
     // Send WebSocket message
-    if (client && connected) { // Assuming `client` is your STOMP client and `connected` is a boolean indicating the connection state
+    if (client && connected) {
+      // Assuming `client` is your STOMP client and `connected` is a boolean indicating the connection state
       const message = {
-        type: 'DELETE_INSTRUCTION',
+        type: "DELETE_INSTRUCTION",
         instructionId: instructionId,
       };
 
       // Publish the delete message to the WebSocket server
       client.publish({
-        destination: '/app/instruction/delete', // Destination to which you want to send the message (configured on the server)
+        destination: "/app/instruction/delete", // Destination to which you want to send the message (configured on the server)
         body: JSON.stringify(message),
       });
 
       console.log(`Sent delete instruction message for ID: ${instructionId}`);
     }
-
   };
 
   // Function to remove a block by its blockId and reassign order numbers within each block
   const handleRemoveBlock = (blockId: number) => {
-    const updatedData = instructionsData.filter(instruction => instruction.blockId !== blockId);
+    const updatedData = instructionsData.filter(
+      (instruction) => instruction.blockId !== blockId
+    );
     const reassignedData = reassignInstructionOrderNumbersByBlock(updatedData);
     setInstructionsData([...reassignedData]);
     setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
 
     // Send WebSocket message
-    if (client && connected) { // Assuming `client` is your STOMP client and `connected` is a boolean indicating the connection state
+    if (client && connected) {
+      // Assuming `client` is your STOMP client and `connected` is a boolean indicating the connection state
       const message = {
-        type: 'DELETE_BLOCK',
+        type: "DELETE_BLOCK",
         blockId: blockId,
       };
 
       // Publish the delete message to the WebSocket server
       client.publish({
-        destination: '/app/block/delete', // Destination to which you want to send the message (configured on the server)
+        destination: "/app/block/delete", // Destination to which you want to send the message (configured on the server)
         body: JSON.stringify(message),
       });
 
@@ -506,7 +555,9 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     }
   };
 
-  const getInstructionTypeElement = (instruction: BlockLoopInstructionLoadDTO): JSX.Element | string | null => {
+  const getInstructionTypeElement = (
+    instruction: BlockLoopInstructionLoadDTO
+  ): JSX.Element | string | null => {
     let imageSrc: string | null = null;
     let text: string | null = null;
     let isActionBold = false;
@@ -538,30 +589,29 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
         <span>{text}</span>
       </div>
     ) : (
-      <span style={{ fontWeight: isActionBold ? 'bold' : 'normal' }}>
+      <span style={{ fontWeight: isActionBold ? "bold" : "normal" }}>
         {text}
       </span>
     );
   };
 
-
-
   const groupedData = groupByBlock(instructionsData);
-
-
 
   return (
     <div className="grid-container">
       {Object.entries(groupedData)
-        .sort(([, aBlockData], [, bBlockData]) => aBlockData.instructions[0].blockOrderNumber - bBlockData.instructions[0].blockOrderNumber)
+        .sort(
+          ([, aBlockData], [, bBlockData]) =>
+            aBlockData.instructions[0].blockOrderNumber -
+            bBlockData.instructions[0].blockOrderNumber
+        )
         .map(([blockId, blockData]) => (
           <div key={blockId} className="block">
             {/* Block header with garbage, up, and down buttons */}
             <div className="block-header">
               <span className="block-name">{blockData.blockName}</span>
               <span>
-                ({blockData.instructions.length})
-                {!mockData ? "-mock" : ""}
+                ({blockData.instructions.length}){!mockData ? "-mock" : ""}
               </span>
               <div className="move-buttons">
                 <img
@@ -569,10 +619,14 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                   className="garbage-button"
                   onClick={() => handleRemoveBlock(Number(blockId))}
                 />
-                <img src={upImage} className="move-button"
+                <img
+                  src={upImage}
+                  className="move-button"
                   onClick={() => handleMoveBlockUp(Number(blockId))}
                 />
-                <img src={downImage} className="move-button"
+                <img
+                  src={downImage}
+                  className="move-button"
                   onClick={() => handleMoveBlockDown(Number(blockId))}
                 />
               </div>
@@ -581,10 +635,14 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
               {blockData.instructions.map((instruction) => (
                 <div key={instruction.id} className="instruction-item">
                   <span>{getInstructionTypeElement(instruction)}</span>
-                  <span className="instruction-details">{instruction.description}</span>
+                  <span className="instruction-details">
+                    {instruction.description}
+                  </span>
                   <div className="options-column">
                     <div className="move-buttons">
-                      <img src={upImage} className="move-button"
+                      <img
+                        src={upImage}
+                        className="move-button"
                         onClick={() => handleMoveRowUp(instruction.id)}
                       />
                       <img
@@ -603,15 +661,32 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                   {/* New column for dropdown menu */}
                   <div className="dropdown-column">
                     <img
-                      src={menuDownImage} /* Replace with your arrow down image */
+                      src={
+                        menuDownImage
+                      } /* Replace with your arrow down image */
                       className="dropdown-arrow"
                       onClick={() => handleToggleDropdown(instruction.id)}
                     />
+                    {/* Dropdown menu that shows/hides when the arrow is clicked */}
                     {openDropdown === instruction.id && (
-                      <div className="dropdown-menu">
-                        <div onClick={() => handleInsertStepBefore(instruction.id)}>Insert Step Before</div>
-                        <div onClick={() => handleInsertStepAfter(instruction.id)}>Insert Step After</div>
-                        <div onClick={() => handleDeleteInstruction(instruction.id)}>Delete</div>
+                      <div ref={dropdownRef} className="dropdown-menu">
+                        <div
+                          onClick={() => handleInsertStepBefore(instruction.id)}
+                        >
+                          Insert Step Before
+                        </div>
+                        <div
+                          onClick={() => handleInsertStepAfter(instruction.id)}
+                        >
+                          Insert Step After
+                        </div>
+                        <div
+                          onClick={() =>
+                            handleDeleteInstruction(instruction.id)
+                          }
+                        >
+                          Delete
+                        </div>
                       </div>
                     )}
                   </div>
