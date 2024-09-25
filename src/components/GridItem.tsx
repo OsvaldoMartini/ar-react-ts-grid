@@ -166,7 +166,6 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   }, [instructionsData]); // Only trigger when instructionsData changes
 
 
-
   // Function to move a block up by swapping blockOrderNumbers
   const handleMoveBlockUp = (blockId: number) => {
     console.log("handleMoveBlockUp");
@@ -187,6 +186,18 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
     const previousBlockOrderNumber = previousBlockInstructions.blockOrderNumber;
 
+    // Prepare data for the blocks that will be swapped
+    const blockSwaps = {
+      currentBlock: {
+        blockId: blockId,
+        newOrderNumber: previousBlockOrderNumber,
+      },
+      previousBlock: {
+        blockId: previousBlockInstructions.blockId,
+        newOrderNumber: currentBlockOrderNumber,
+      },
+    };
+
     // Update the blockOrderNumber for both current and previous blocks
     updatedData.forEach(instruction => {
       if (instruction.blockOrderNumber === currentBlockOrderNumber) {
@@ -201,8 +212,26 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     setInstructionsData([...updatedData]); // Make sure to use a copy
     setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
 
+    // Send WebSocket message with the block swap details
+    if (client && connected) {
+      const message = {
+        type: 'BLOCK_MOVE',
+        blocks: blockSwaps,
+      };
 
+      try {
+        client.publish({
+          destination: '/app/block/move', // Update based on your WebSocket endpoint configuration
+          body: JSON.stringify(message),
+        });
+
+        console.log('Sent block move message:', message);
+      } catch (error) {
+        console.error('Error sending WebSocket message:', error);
+      }
+    }
   };
+
 
 
   // Function to move a block down by swapping blockOrderNumbers
@@ -235,8 +264,6 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
         newOrderNumber: currentBlockOrderNumber,
       },
     };
-
-    console.log('Sent block move message:', blockSwaps);
 
     // Update the blockOrderNumber for both current and next blocks
     updatedData.forEach(instruction => {
