@@ -729,7 +729,6 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
               {blockData.instructions.map((instruction) => (
                 <div key={instruction.id} className="instruction-item">
                   <span>{getInstructionTypeElement(instruction)}</span>
-                  <span >{instruction.instructionOrderNumber}</span>
                   <span className="instruction-details">{instruction.description}</span>
                   <div className="options-column">
                     <div className="move-buttons">
