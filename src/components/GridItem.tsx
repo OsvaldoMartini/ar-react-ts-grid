@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Client, IMessage } from "@stomp/stompjs";
 import { BlockLoopInstructionLoadDTO } from './instructionsMockData'; // Import the data model
 import './griditem.scss'; // Import the Sass file
@@ -124,6 +124,23 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       setInputMessage(""); // Clear the input after sending
     }
   };
+
+  // Memoized function to handle outside clicks on the dropdown
+  const handleClickOutside = useCallback((event: MouseEvent) => {
+    if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      setOpenDropdown(null); // Close the dropdown if clicked outside
+    }
+  }, [dropdownRef]);
+
+  // Add the event listener to detect clicks outside the dropdown
+  useEffect(() => {
+    document.addEventListener('mousedown', handleClickOutside);
+
+    // Cleanup the event listener on component unmount
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [handleClickOutside]);
 
   // Function to handle receiving data from JavaFX
   (window as any).receiveDataFromJava = function (jsonData: string) {
@@ -411,6 +428,8 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
       console.log('Sent block split message:', message);
     }
+
+    setOpenDropdown(null);
   };
 
 
