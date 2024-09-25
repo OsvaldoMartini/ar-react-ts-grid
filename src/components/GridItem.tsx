@@ -316,12 +316,14 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     const newBlock = {
       blockName: `${blockToSplit.blockName}`, // Same name as the current block
       blockOrderNumber: newBlockOrderNumber, // Assign the new block order number
-      instructions: subsequentInstructions.map((instruction) => ({
+      instructions: subsequentInstructions.map((instruction, index) => ({
         ...instruction,
         blockId: newBlockId, // Assign new block ID to the instructions
         blockOrderNumber: newBlockOrderNumber, // Assign new block order number to the instructions
+        instructionOrderNumber: index + 1, // Reassign instructionOrderNumber starting from 1
       })),
     };
+
 
     // Update the block data to remove these instructions from the original block
     const updatedBlock = {
