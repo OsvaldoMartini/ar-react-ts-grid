@@ -279,10 +279,9 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     console.log("Delete instruction", instructionId);
   };
 
-
   const handleSplitComponent = (
     instructionId: number,
-    groupedData: { [blockId: string]: { blockName: string; instructions: BlockLoopInstructionLoadDTO[] } }, // Updated groupedData type
+    groupedData: { [blockId: string]: { blockName: string; instructions: BlockLoopInstructionLoadDTO[] } },
     setGroupedData: (data: { [blockId: string]: { blockName: string; instructions: BlockLoopInstructionLoadDTO[] } }) => void
   ) => {
     // Find the block and instruction related to the instructionId
@@ -312,12 +311,15 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     }
 
     // Create a new block with subsequent instructions
-    const newBlockId = Date.now(); // Generate a unique block ID (or use a UUID library)
+    const newBlockId = Date.now(); // Generate a unique block ID
+    const newBlockOrderNumber = blockOrderNumber + 1; // Increment the current block's order number by 1
     const newBlock = {
       blockName: `${blockToSplit.blockName}`, // Same name as the current block
+      blockOrderNumber: newBlockOrderNumber, // Assign the new block order number
       instructions: subsequentInstructions.map((instruction) => ({
         ...instruction,
         blockId: newBlockId, // Assign new block ID to the instructions
+        blockOrderNumber: newBlockOrderNumber, // Assign new block order number to the instructions
       })),
     };
 
@@ -327,8 +329,8 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       instructions: blockToSplit.instructions.slice(0, selectedInstructionIndex + 1),
     };
 
-    // Update other blocks' blockOrderNumber if they are after the current block
-    const updatedGroupedData = Object.entries(groupedData).reduce((acc, [key, blockData]) => {
+    // Prepare blockOrderNumber updates for blocks after the current one
+    const updatedBlocks = Object.entries(groupedData).reduce((acc, [key, blockData]) => {
       if (blockData.instructions[0].blockOrderNumber > blockOrderNumber) {
         // Increment the block order number for blocks after the current one
         acc[key] = {
@@ -345,14 +347,62 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     }, {} as { [blockId: string]: { blockName: string; instructions: BlockLoopInstructionLoadDTO[] } });
 
     // Add the new block to the updated data
-    updatedGroupedData[newBlockId] = newBlock;
-    updatedGroupedData[blockId] = updatedBlock;
+    updatedBlocks[newBlockId] = newBlock;
+    updatedBlocks[blockId] = updatedBlock;
+
+    // Call setInstructionsData and setIsDataReordered BEFORE updating groupedData
+    const updatedInstructions = Object.values(updatedBlocks).flatMap(block => block.instructions);
+    setInstructionsData([...reassignInstructionOrderNumbersByBlock(updatedInstructions)]);
+    setIsDataReordered(false); // Trigger reorder logic
 
     // Set the updated grouped data (or pass it to your state management)
-    setGroupedData(updatedGroupedData);
+    setGroupedData(updatedBlocks);
 
     console.log("Split component created with new block:", newBlock);
+
+    // Send WebSocket message with block split details, including newBlock
+    if (client && connected) {
+      const blockSplitDetails = {
+        originalBlock: {
+          blockId: blockId,
+          updatedInstructions: updatedBlock.instructions.map(instruction => ({
+            instructionId: instruction.id,
+            blockId: instruction.blockId,
+            orderNumber: instruction.instructionOrderNumber
+          })),
+        },
+        newBlock: {
+          blockId: newBlockId,
+          blockName: newBlock.blockName,
+          blockOrderNumber: newBlock.blockOrderNumber,
+          instructions: newBlock.instructions.map(instruction => ({
+            instructionId: instruction.id,
+            blockId: instruction.blockId,
+            orderNumber: instruction.instructionOrderNumber
+          })),
+        },
+        updatedBlocks: Object.values(updatedBlocks).map(block => ({
+          blockId: block.instructions[0].blockId,
+          blockName: block.blockName,
+          blockOrderNumber: block.instructions[0].blockOrderNumber
+        }))
+      };
+
+      const message = {
+        type: 'BLOCKS_SPLITTED',
+        details: blockSplitDetails,
+      };
+
+      client.publish({
+        destination: '/app/block/split', // Adjust the WebSocket destination if necessary
+        body: JSON.stringify(message),
+      });
+
+      console.log('Sent block split message:', message);
+    }
   };
+
+
 
   // Function to move a block down by swapping blockOrderNumbers
   const handleMoveBlockDown = (blockId: number) => {
@@ -668,6 +718,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
               {blockData.instructions.map((instruction) => (
                 <div key={instruction.id} className="instruction-item">
                   <span>{getInstructionTypeElement(instruction)}</span>
+                  <span >{instruction.instructionOrderNumber}</span>
                   <span className="instruction-details">{instruction.description}</span>
                   <div className="options-column">
                     <div className="move-buttons">
