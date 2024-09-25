@@ -533,9 +533,6 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
             {/* Block header with garbage, up, and down buttons */}
             <div className="block-header">
               <span className="block-name">{blockData.blockName}</span>
-              <span className="block-id">{blockId}</span>
-              <span className="block-order-number">Block Order: {blockData.instructions[0].blockOrderNumber}</span>
-
               <span>
                 ({blockData.instructions.length})
                 {!mockData ? "-mock" : ""}
