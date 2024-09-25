@@ -385,11 +385,18 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
             orderNumber: instruction.instructionOrderNumber
           })),
         },
-        updatedBlocks: Object.values(updatedBlocks).map(block => ({
-          blockId: block.instructions[0].blockId,
-          blockName: block.blockName,
-          blockOrderNumber: block.instructions[0].blockOrderNumber
-        }))
+        // Filter only blocks that had blockOrderNumber modified, excluding the newBlock
+        updatedBlocks: Object.values(updatedBlocks)
+          .filter(block => block.instructions.length > 0
+            && block.instructions[0].blockOrderNumber > blockOrderNumber
+            && block.instructions[0].blockId !== newBlockId // Exclude the newBlock
+          )
+          .map(block => ({
+            blockId: block.instructions[0].blockId,
+            blockName: block.blockName,
+            blockOrderNumber: block.instructions[0].blockOrderNumber
+          }))
+
       };
 
       const message = {
