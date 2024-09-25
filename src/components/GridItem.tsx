@@ -364,10 +364,8 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   };
 
 
-
-  // Function to move an instruction up
   // Function to move an instruction up considering blockOrderNumber
-  const handleMoveUp = (instructionId: number) => {
+  const handleMoveRowUp = (instructionId: number) => {
     const updatedData = [...instructionsData];
     const instructionIndex = updatedData.findIndex(instruction => instruction.id === instructionId);
 
@@ -387,6 +385,19 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       if (blockInstructionIndex > 0) {
         const previousInstruction = blockInstructions[blockInstructionIndex - 1];
 
+        // Capture rowsSwaps for WebSocket message including blockId
+        const rowsSwaps = {
+          blockId: currentInstruction.blockId, // Add the blockId of the instruction
+          currentRow: {
+            instructionId: currentInstruction.id,
+            newOrderNumber: previousInstruction.instructionOrderNumber,
+          },
+          previousRow: {
+            instructionId: previousInstruction.id,
+            newOrderNumber: currentInstruction.instructionOrderNumber,
+          },
+        };
+
         // Swap their instructionOrderNumbers
         const tempOrderNumber = currentInstruction.instructionOrderNumber;
         currentInstruction.instructionOrderNumber = previousInstruction.instructionOrderNumber;
@@ -395,9 +406,29 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
         // Reassign the updatedData array
         setInstructionsData([...reassignInstructionOrderNumbersByBlock(updatedData)]);
         setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
+
+        // Send WebSocket message with the row swap details
+        if (client && connected) {
+          const message = {
+            type: 'ROW_MOVE',
+            rows: rowsSwaps,
+          };
+
+          try {
+            client.publish({
+              destination: '/app/row/move', // Update based on your WebSocket endpoint configuration
+              body: JSON.stringify(message),
+            });
+
+            console.log('Sent row move message:', message);
+          } catch (error) {
+            console.error('Error sending WebSocket message:', error);
+          }
+        }
       }
     }
   };
+
 
   // Function to remove an instruction by its ID and reassign order numbers within each block
   const handleRemoveInstruction = (instructionId: number) => {
@@ -535,7 +566,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                   <div className="fourth-column">
                     <div className="move-buttons">
                       <img src={upImage} className="move-button"
-                        onClick={() => handleMoveUp(instruction.id)}
+                        onClick={() => handleMoveRowUp(instruction.id)}
                       />
                       <img
                         src={downImage}
