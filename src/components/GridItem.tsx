@@ -299,7 +299,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
 
   // Function to move an instruction down considering blockOrderNumber
-  const handleMoveDown = (instructionId: number) => {
+  const handleMoveRowDown = (instructionId: number) => {
     const updatedData = [...instructionsData];
     const instructionIndex = updatedData.findIndex(instruction => instruction.id === instructionId);
 
@@ -319,17 +319,50 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       if (blockInstructionIndex < blockInstructions.length - 1) {
         const nextInstruction = blockInstructions[blockInstructionIndex + 1];
 
+        // Capture rowsSwaps for WebSocket message including blockId
+        const rowsSwaps = {
+          blockId: currentInstruction.blockId, // Add the blockId of the instruction
+          currentRow: {
+            instructionId: currentInstruction.id,
+            newOrderNumber: nextInstruction.instructionOrderNumber,
+          },
+          nextRow: {
+            instructionId: nextInstruction.id,
+            newOrderNumber: currentInstruction.instructionOrderNumber,
+          },
+        };
+
         // Swap their instructionOrderNumbers
         const tempOrderNumber = currentInstruction.instructionOrderNumber;
         currentInstruction.instructionOrderNumber = nextInstruction.instructionOrderNumber;
         nextInstruction.instructionOrderNumber = tempOrderNumber;
 
-        // Reassign the updatedData array
+        // Reassign the updatedData array and update the state
         setInstructionsData([...reassignInstructionOrderNumbersByBlock(updatedData)]);
         setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
+
+        // Send WebSocket message with the row swap details
+        if (client && connected) {
+          const message = {
+            type: 'ROW_MOVE',
+            rows: rowsSwaps,
+          };
+
+          try {
+            client.publish({
+              destination: '/app/row/move', // Update based on your WebSocket endpoint configuration
+              body: JSON.stringify(message),
+            });
+
+            console.log('Sent row move message:', message);
+          } catch (error) {
+            console.error('Error sending WebSocket message:', error);
+          }
+        }
       }
     }
   };
+
 
 
   // Function to move an instruction up
@@ -507,7 +540,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                       <img
                         src={downImage}
                         className="move-button"
-                        onClick={() => handleMoveDown(instruction.id)}
+                        onClick={() => handleMoveRowDown(instruction.id)}
                       />
                       <img src={editImage} className="edit-button" />
                       {/* Add the cross button click handler */}
