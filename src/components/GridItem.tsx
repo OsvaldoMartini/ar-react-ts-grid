@@ -496,7 +496,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
         break;
       case "CK":
         imageSrc = checkImage;
-        text = instruction.actions;
+        text = instruction.name;
         break;
       default:
         imageSrc = null; // No image for other types
