@@ -330,9 +330,13 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     // Create a new block with subsequent instructions, preserving the crescent order
     const newBlockId = Date.now(); // Generate a unique block ID
     const newBlockOrderNumber = blockOrderNumber + 1; // Increment the current block's order number by 1
+    // Assuming that all instructions in blockToSplit have the same botJobId
+    const botJobId = blockToSplit.instructions[0]?.botJobId || null; // Retrieve botJobId from the first instruction
+
     const newBlock = {
       blockName: `${blockToSplit.blockName}`, // Same name as the current block
       blockOrderNumber: newBlockOrderNumber, // Assign the new block order number
+      botJobId: botJobId, // Preserve the botJobId in the new instructions
       instructions: subsequentInstructions.map((instruction, index) => ({
         ...instruction,
         blockId: newBlockId, // Assign new block ID to the instructions
@@ -393,6 +397,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
           })),
         },
         newBlock: {
+          botJobId: botJobId,
           blockId: newBlockId,
           blockName: newBlock.blockName,
           blockOrderNumber: newBlock.blockOrderNumber,
@@ -725,10 +730,11 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
           <div key={blockId} className="block">
             {/* Block header with garbage, up, and down buttons */}
             <div className="block-header">
+              <span className="block-order-number">{blockData.instructions[0].blockOrderNumber}</span>
               <span className="block-name">{blockData.blockName}</span>
               <span>
                 ({blockData.instructions.length})
-                {!mockData ? "-mock" : ""}
+                {!mockData ? "-Moock Data" : ""}
               </span>
               <div className="move-buttons">
                 <img
