@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Client, IMessage } from "@stomp/stompjs";
-import { BlockLoopInstructionLoadDTO, UpdatedBlock } from './instructionsMockData'; // Import the data model
-import './griditem.scss'; // Import the Sass file
+import { BlockLoopInstructionLoadDTO, UpdatedBlock } from './instructionsMockData';
+import './griditem.scss';
 
 import setValueImage from '../assets/setValueBtn3.png';
 import getValueImage from '../assets/getValueBtn3.png';
@@ -67,12 +67,39 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   const [client, setClient] = useState<Client | null>(null);
   const [connected, setConnected] = useState(false);
   const [messages, setMessages] = useState<string[]>([]);
-  const [inputMessage, setInputMessage] = useState<string>("");
   const [openDropdown, setOpenDropdown] = useState<number | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [updatedBlocks, setUpdatedBlocks] = useState<UpdatedBlock[]>([]);
+
+
+  // Sample block data
+  const sampleBlockData: UpdatedBlock = {
+    botJobId: 101,         // Example botJobId (can be null if necessary)
+    blockId: 1,            // Unique block identifier
+    blockOrderNumber: 2    // New order number for the block
+  };
+
+  // Updating the blocks using updateBlocks
+  const updateSampleBlocks = () => {
+    // In this case, we use the sampleBlockData as an example
+    updateBlocks([sampleBlockData]);  // You can pass multiple blocks if needed
+  };
+
+  const updateBlocks = (newBlocks: UpdatedBlock[]) => {
+    setUpdatedBlocks(newBlocks);  // This should trigger the useEffect when called
+  };
+
+
+  // Memoized function to handle outside clicks on the dropdown
+  const handleClickOutside = useCallback((event: MouseEvent) => {
+    if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      setOpenDropdown(null); // Close the dropdown if clicked outside
+    }
+  }, [dropdownRef]);
+
+
 
   useEffect(() => {
-
     // Create a STOMP client
     const stompClient: Client = new Client({
       brokerURL: "ws://localhost:8080/websocket", // Your WebSocket URL
@@ -114,24 +141,53 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     };
   }, []);
 
-  const sendMessage = () => {
-    if (client && connected) {
-      // Send a message to the server (e.g., "/app/send")
-      client.publish({
-        destination: "/app/send", // Adjust the destination as per server config
-        body: inputMessage,
-      });
-      console.log("Message sent: ", inputMessage);
-      setInputMessage(""); // Clear the input after sending
+  useEffect(() => {
+    if (connected) {
+      // Assuming correctBlockOrderNumbers sets updatedBlocks based on some logic
+      const { updatedData, updatedBlocks } = correctBlockOrderNumbers(instructionsData);
+      setInstructionsData(updatedData);
+      setUpdatedBlocks(updatedBlocks);  // Trigger the `useEffect` to send WebSocket message
     }
-  };
+  }, [connected]);
 
-  // Memoized function to handle outside clicks on the dropdown
-  const handleClickOutside = useCallback((event: MouseEvent) => {
-    if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-      setOpenDropdown(null); // Close the dropdown if clicked outside
+  useEffect(() => {
+    if (updatedBlocks.length > 0 && client && connected) {
+      const message = {
+        type: 'BLOCK_ORDER',
+        blocks: updatedBlocks,
+      };
+
+      try {
+        client.publish({
+          destination: '/app/block/order', // WebSocket destination
+          body: JSON.stringify(message),
+        });
+        console.log('Sent block order message:', message);
+      } catch (error) {
+        console.error('Error sending WebSocket message:', error);
+      }
     }
-  }, [dropdownRef]);
+  }, [updatedBlocks, client, connected]); // Triggered when updatedBlocks or connected changes
+
+  useEffect(() => {
+    if (!isDataReordered && instructionsData.length > 0) {
+      console.log("Reassigning instruction order numbers");
+
+      // Reassign the instruction order numbers
+      const reassignedData = reassignInstructionOrderNumbersByBlock([...instructionsData]);
+
+      // Update instructionsData first
+      setInstructionsData(reassignedData);
+
+      // Group the data and update groupedData
+      const updatedGroupedData = groupByBlock(reassignedData);
+      setGroupedData(updatedGroupedData);
+
+      // Set the flag to true to indicate that the data has been reordered
+      setIsDataReordered(true);
+    }
+  }, [instructionsData, isDataReordered]);
+
 
   // Add the event listener to detect clicks outside the dropdown
   useEffect(() => {
@@ -142,53 +198,6 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [handleClickOutside]);
-
-  // Function to handle receiving data from JavaFX
-  (window as any).receiveDataFromJava = function (jsonData: string) {
-    const data: BlockLoopInstructionLoadDTO[] = JSON.parse(jsonData);
-    if (data && data.length > 0) {
-      setMockData(true);
-      setIsDataReordered(false); // Reset this flag on new data load
-      setInstructionsData(data);
-    }
-  };
-
-  // Function to send data back to JavaFX
-  const sendDataBackToJava = function (data: BlockLoopInstructionLoadDTO[]) {
-    if ((window as any).javaBridge) {
-      console.log("Send back to Java bridge.");
-      (window as any).javaBridge.sendDataToJava(data);
-    } else {
-      console.error("Java bridge is not available.");
-
-      // If Java bridge is not available, create and download a JSON file
-      // downloadJsonFile(data, "blockLoopInstructionData");
-    }
-  };
-
-  useEffect(() => {
-    if (!isDataReordered && instructionsData.length > 0) {
-      console.log("useEffect - reassigning order numbers");
-
-      // Use functional form to update instructionsData based on the previous value
-      setInstructionsData((prevData) => {
-        const reassignedData = reassignInstructionOrderNumbersByBlock([...prevData]);
-        return reassignedData;
-      });
-      sendDataBackToJava(instructionsData);
-    }
-  }, [instructionsData, isDataReordered]); // This will only run when instructionsData or isDataReordered changes
-
-
-  useEffect(() => {
-    if (instructionsData.length > 0 && !isDataReordered) {
-      console.log("Setting isDataReordered to true");
-      setIsDataReordered(true); // Set this in a separate effect to avoid immediate blocking
-      const updatedGroupedData = groupByBlock(instructionsData);
-      setGroupedData(updatedGroupedData);
-    }
-  }, [instructionsData]); // Only trigger when instructionsData changes
-
 
   // Close the dropdown when clicking outside
   useEffect(() => {
@@ -206,6 +215,20 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     };
   }, [openDropdown]);
 
+
+
+  // Function to handle receiving data from JavaFX
+  (window as any).receiveDataFromJava = function (jsonData: string) {
+    const data: BlockLoopInstructionLoadDTO[] = JSON.parse(jsonData);
+    if (data && data.length > 0) {
+      setMockData(true);
+      setIsDataReordered(false); // Reset this flag on new data load
+      setInstructionsData(data);
+    }
+  };
+
+
+
   const correctBlockOrderNumbers = (data: any[]) => {
     console.log("Correcting blockOrderNumbers");
 
@@ -213,8 +236,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
     const uniqueBlocks = Array.from(new Set(updatedData.map(instruction => instruction.blockId)));
 
-    // Define the type and initialize the array to track updated blocks
-    const updatedBlocks: UpdatedBlock[] = [];
+    const updatedBlocks: UpdatedBlock[] = []; // To track blocks with changed blockOrderNumber
 
     uniqueBlocks.forEach((blockId, index) => {
       const newOrderNumber = index + 1; // Start block order from 1
@@ -225,7 +247,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
           if (instruction.blockOrderNumber !== newOrderNumber) {
             // Track the updated block
             updatedBlocks.push({
-              botJobId: instruction.botJobId || null,  // Assuming botJobId is part of the instruction
+              botJobId: instruction.botJobId || null, // Assuming botJobId is part of the instruction
               blockId: instruction.blockId,
               blockOrderNumber: newOrderNumber,
             });
@@ -237,12 +259,9 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       });
     });
 
-    // Return both the updated data and the list of changed blocks
+    // Return updated data
     return { updatedData, updatedBlocks };
   };
-
-
-
 
 
   // Function to move a block up by swapping blockOrderNumbers
