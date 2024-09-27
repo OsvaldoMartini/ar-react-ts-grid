@@ -183,4 +183,8 @@
   color: #00796b; /* Darker text color on hover */
 }
 
-
+.dropdown-above {
+  /* When the dropdown is in the last block, show it above */
+  top: auto;    /* Reset the top position */
+  bottom: 25px; /* Position above the clicked element */
+}

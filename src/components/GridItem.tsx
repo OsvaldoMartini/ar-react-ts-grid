@@ -358,7 +358,8 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   const handleSplitComponent = (
     instructionId: number,
     groupedData: { [blockId: string]: { blockName: string; instructions: BlockLoopInstructionLoadDTO[] } },
-    setGroupedData: (data: { [blockId: string]: { blockName: string; instructions: BlockLoopInstructionLoadDTO[] } }) => void
+    setGroupedData: (data: { [blockId: string]: { blockName: string; instructions: BlockLoopInstructionLoadDTO[] } }) => void,
+    instructionsData: BlockLoopInstructionLoadDTO[]
   ) => {
     // Find the block and instruction related to the instructionId
     const blockToSplit = Object.values(groupedData).find((blockData) =>
@@ -387,7 +388,10 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     }
 
     // Create a new block with subsequent instructions, preserving the crescent order
-    const newBlockId = Date.now(); // Generate a unique block ID
+    // Find the maximum blockId from the entire instructionsData
+    const maxBlockId = Math.max(...instructionsData.map(instruction => instruction.blockId));
+    const newBlockId = maxBlockId + 1; // Generate a unique block ID
+
     const newBlockOrderNumber = blockOrderNumber + 1; // Increment the current block's order number by 1
     // Assuming that all instructions in blockToSplit have the same botJobId
     const botJobId = blockToSplit.instructions[0]?.botJobId || null; // Retrieve botJobId from the first instruction
@@ -481,7 +485,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       };
 
       const message = {
-        type: 'BLOCKS_SPLITTED',
+        type: 'BLOCKS_SPLITTER',
         details: blockSplitDetails,
       };
 
@@ -696,6 +700,16 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
   // Function to remove an instruction by its ID and reassign order numbers within each block
   const handleRemoveInstruction = (instructionId: number) => {
+    // Find the blockId associated with the instructionId
+    const instructionToRemove = instructionsData.find(instruction => instruction.id === instructionId);
+
+    // If the instruction is not found, return early
+    if (!instructionToRemove) return;
+
+    const botJobId = instructionToRemove.botJobId; // Get the blockId from the instruction
+    const blockId = instructionToRemove.blockId; // Get the blockId from the instruction
+
+    // Filter out the instruction to remove
     const updatedData = instructionsData.filter(instruction => instruction.id !== instructionId);
     const reassignedData = reassignInstructionOrderNumbersByBlock(updatedData);
     setInstructionsData([...reassignedData]);
@@ -706,6 +720,8 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       const message = {
         type: 'DELETE_INSTRUCTION',
         instructionId: instructionId,
+        botJobId: botJobId, // Include the blockId in the message
+        blockId: blockId, // Include the blockId in the message
       };
 
       // Publish the delete message to the WebSocket server
@@ -714,10 +730,10 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
         body: JSON.stringify(message),
       });
 
-      console.log(`Sent delete instruction message for ID: ${instructionId}`);
+      console.log(`Sent delete instruction message for instruction ID: ${instructionId} in block ID: ${blockId}`);
     }
-
   };
+
 
   // Function to remove a block by its blockId and reassign order numbers within each block
   const handleRemoveBlock = (blockId: number) => {
@@ -789,6 +805,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
           <div key={blockId} className="block">
             {/* Block header with garbage, up, and down buttons */}
             <div className="block-header">
+              <span className="block-id">{blockId}</span>
               <span className="block-order-number">{blockData.instructions[0].blockOrderNumber}</span>
               <span className="block-name">{blockData.blockName}</span>
               <span>
@@ -810,50 +827,56 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
               </div>
             </div>
             <div className="instructions-list">
-              {blockData.instructions.map((instruction) => (
-                <div key={instruction.id} className="instruction-item">
-                  <span>{getInstructionTypeElement(instruction)}</span>
-                  <span className="instruction-details">{instruction.description}</span>
-                  <div className="options-column">
-                    <div className="move-buttons">
-                      <img src={upImage} className="move-button"
-                        onClick={() => handleMoveRowUp(instruction.id)}
-                      />
+              {blockData.instructions.map((instruction, index) => {
+                const isLastInstruction = index === blockData.instructions.length - 1;
+                const isLastBlock = Number(blockId) === Object.keys(groupedData).length; // Check if this is the last block
+
+                return (
+                  <div key={instruction.id} className="instruction-item">
+                    <span>{getInstructionTypeElement(instruction)}</span>
+                    <span className="instruction-details">{instruction.description}</span>
+                    <div className="options-column">
+                      <div className="move-buttons">
+                        <img src={upImage} className="move-button" onClick={() => handleMoveRowUp(instruction.id)} />
+                        <img src={downImage} className="move-button" onClick={() => handleMoveRowDown(instruction.id)} />
+                        <img src={editImage} className="edit-button" />
+                        <img src={crossImage} className="cross-button" onClick={() => handleRemoveInstruction(instruction.id)} />
+                      </div>
+                    </div>
+
+                    {/* New column for dropdown menu */}
+                    <div className="dropdown-column">
                       <img
-                        src={downImage}
-                        className="move-button"
-                        onClick={() => handleMoveRowDown(instruction.id)}
+                        src={menuDownImage} /* Replace with your arrow down image */
+                        className="dropdown-arrow"
+                        onClick={() => handleToggleDropdown(instruction.id)}
                       />
-                      <img src={editImage} className="edit-button" />
-                      <img
-                        src={crossImage}
-                        className="cross-button"
-                        onClick={() => handleRemoveInstruction(instruction.id)}
-                      />
+
+                      {/* Dropdown menu that shows/hides when the arrow is clicked */}
+                      {openDropdown === instruction.id && (
+                        <div
+                          ref={dropdownRef}
+                          className={`dropdown-menu ${isLastBlock ? 'dropdown-above' : ''}`} // Conditional class for last block
+                        >
+                          <div onClick={() => handleInsertStepBefore(instruction.id)}>Insert Step Before</div>
+                          <div onClick={() => handleInsertStepAfter(instruction.id)}>Insert Step After</div>
+
+                          {/* Conditionally render "Split Component" only if this is not the last instruction */}
+                          {!isLastInstruction && (
+                            <div onClick={() => handleSplitComponent(instruction.id, groupedData, setGroupedData, instructionsData)}>
+                              Split Component
+                            </div>
+                          )}
+
+                          <div onClick={() => handleDeleteInstruction(instruction.id)}>Delete</div>
+                        </div>
+                      )}
                     </div>
                   </div>
-                  {/* New column for dropdown menu */}
-                  <div className="dropdown-column">
-                    <img
-                      src={menuDownImage} /* Replace with your arrow down image */
-                      className="dropdown-arrow"
-                      onClick={() => handleToggleDropdown(instruction.id)}
-                    />
-                    {/* Dropdown menu that shows/hides when the arrow is clicked */}
-                    {openDropdown === instruction.id && (
-                      <div ref={dropdownRef} className="dropdown-menu">
-                        <div onClick={() => handleInsertStepBefore(instruction.id)}>Insert Step Before</div>
-                        <div onClick={() => handleInsertStepAfter(instruction.id)}>Insert Step After</div>
-                        <div onClick={() => handleDeleteInstruction(instruction.id)}>Delete</div>
-                        <div onClick={() => handleSplitComponent(instruction.id, groupedData, setGroupedData)}>
-                          Split Component
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
+
           </div>
         ))}
     </div>
