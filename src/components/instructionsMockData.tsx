@@ -16,8 +16,15 @@ export interface Message {
   body: string;
 }
 
+export interface UpdatedBlock {
+  botJobId: number | null;  // Adjust the type based on actual data (use `null` if it's nullable)
+  blockId: number;
+  blockOrderNumber: number;
+}
+
+
 const instructionsMockData: BlockLoopInstructionLoadDTO[] = [
-  { botJobId: 11, id: 1, instructionOrderNumber: 1, name: "SetValue", description: "Description 1", blockId: 1, blockOrderNumber: 1, blockName: "Default Block", actions: "SET" },
+  { botJobId: 11, id: 1, instructionOrderNumber: 1, name: "SetValue", description: "Description 1", blockId: 1, blockOrderNumber: 0, blockName: "Default Block", actions: "SET" },
   { botJobId: 11, id: 2, instructionOrderNumber: 4, name: "GetValue", description: "Description 2", blockId: 2, blockOrderNumber: 2, blockName: "Block Test 1", actions: "GET" },
   { botJobId: 11, id: 3, instructionOrderNumber: 3, name: "Check", description: "Description 3", blockId: 2, blockOrderNumber: 2, blockName: "Block Test 1", actions: "CK" },
   { botJobId: 11, id: 4, instructionOrderNumber: 2, name: "Instruction 4", description: "Description 4", blockId: 2, blockOrderNumber: 2, blockName: "Block Test 1", actions: "click" },
