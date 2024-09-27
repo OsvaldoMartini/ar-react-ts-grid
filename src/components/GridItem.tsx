@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Client, IMessage } from "@stomp/stompjs";
-import { BlockLoopInstructionLoadDTO } from './instructionsMockData'; // Import the data model
+import { BlockLoopInstructionLoadDTO, UpdatedBlock } from './instructionsMockData'; // Import the data model
 import './griditem.scss'; // Import the Sass file
 
 import setValueImage from '../assets/setValueBtn3.png';
@@ -72,6 +72,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+
     // Create a STOMP client
     const stompClient: Client = new Client({
       brokerURL: "ws://localhost:8080/websocket", // Your WebSocket URL
@@ -204,6 +205,45 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [openDropdown]);
+
+  const correctBlockOrderNumbers = (data: any[]) => {
+    console.log("Correcting blockOrderNumbers");
+
+    const updatedData = [...data]; // Make a copy of the instructions data
+
+    const uniqueBlocks = Array.from(new Set(updatedData.map(instruction => instruction.blockId)));
+
+    // Define the type and initialize the array to track updated blocks
+    const updatedBlocks: UpdatedBlock[] = [];
+
+    uniqueBlocks.forEach((blockId, index) => {
+      const newOrderNumber = index + 1; // Start block order from 1
+
+      updatedData.forEach(instruction => {
+        if (instruction.blockId === blockId) {
+          // Check if blockOrderNumber is changing
+          if (instruction.blockOrderNumber !== newOrderNumber) {
+            // Track the updated block
+            updatedBlocks.push({
+              botJobId: instruction.botJobId || null,  // Assuming botJobId is part of the instruction
+              blockId: instruction.blockId,
+              blockOrderNumber: newOrderNumber,
+            });
+          }
+
+          // Update the blockOrderNumber
+          instruction.blockOrderNumber = newOrderNumber;
+        }
+      });
+    });
+
+    // Return both the updated data and the list of changed blocks
+    return { updatedData, updatedBlocks };
+  };
+
+
+
+
 
   // Function to move a block up by swapping blockOrderNumbers
   const handleMoveBlockUp = (blockId: number) => {
