@@ -1,88 +1,72 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Client, IMessage } from "@stomp/stompjs";
 
+interface BlockLoopInstructionLoadDTO {
+  botJobId: number;
+  id: number;
+  instructionOrderNumber: number;
+  name: string;
+  description: string;
+  blockId: number;
+  blockOrderNumber: number;
+  blockName: string;
+  actions: string;
+}
 
-
-const WebSocketComponent: React.FC = () => {
-  const [client, setClient] = useState<Client | null>(null);
+const WebSocketComponent = () => {
+  const [instructions, setInstructions] = useState<BlockLoopInstructionLoadDTO[]>([]);
   const [connected, setConnected] = useState(false);
-  const [messages, setMessages] = useState<string[]>([]);
-  const [inputMessage, setInputMessage] = useState<string>("");
 
   useEffect(() => {
-    // Create a STOMP client
-    const stompClient: Client = new Client({
-      brokerURL: "ws://localhost:8080/websocket", // Your WebSocket URL
-      reconnectDelay: 5000, // Try reconnecting after 5 seconds if the connection fails
-      heartbeatIncoming: 4000, // Heartbeat configuration
-      heartbeatOutgoing: 4000,
-      debug: (str: string) => {
-        console.log("STOMP: " + str);
-      },
+    const stompClient = new Client({
+      brokerURL: "ws://localhost:8080/websocket", // Your WebSocket endpoint
+      debug: (str) => console.log(str),
+      reconnectDelay: 5000,
     });
 
-    // Handle connection success
     stompClient.onConnect = (frame) => {
       console.log("Connected: " + frame);
       setConnected(true);
 
       // Subscribe to a topic (e.g., "/topic/messages")
       stompClient.subscribe("/topic/messages", (message: IMessage) => {
+        console.log("Full STOMP message: ", message);
+
         if (message.body) {
-          setMessages((prevMessages) => [...prevMessages, message.body]);
-          console.log("Received message: ", message.body);
+          // Parse the received JSON into an array of BlockLoopInstructionLoadDTO
+          const parsedData: BlockLoopInstructionLoadDTO[] = JSON.parse(message.body);
+          console.log("Parsed data: ", parsedData);
+
+          setInstructions(parsedData);
+        } else {
+          console.log("No message body received");
         }
       });
     };
 
-    // Handle STOMP errors
     stompClient.onStompError = (frame) => {
       console.error("Broker reported error: " + frame.headers["message"]);
       console.error("Additional details: " + frame.body);
     };
 
-    // Activate the connection
     stompClient.activate();
-    setClient(stompClient);
 
-    // Cleanup when component unmounts
     return () => {
       stompClient.deactivate();
     };
   }, []);
 
-  const sendMessage = () => {
-    if (client && connected) {
-      // Send a message to the server (e.g., "/app/send")
-      client.publish({
-        destination: "/app/send", // Adjust the destination as per server config
-        body: inputMessage,
-      });
-      console.log("Message sent: ", inputMessage);
-      setInputMessage(""); // Clear the input after sending
-    }
-  };
-
   return (
     <div>
-      <h1>STOMP WebSocket Example</h1>
-      <div>
-        <input
-          type="text"
-          value={inputMessage}
-          onChange={(e) => setInputMessage(e.target.value)}
-          placeholder="Enter message"
-        />
-        <button onClick={sendMessage}>Send</button>
-      </div>
-      <div>
-        <h2>Messages</h2>
-        <ul>
-          {messages.map((msg, index) => (
-            <li key={index}>{msg}</li>
-          ))}
-        </ul>
-      </div>
+      <h2>Received Instructions</h2>
+      {connected ? <p>Connected to WebSocket</p> : <p>Connecting...</p>}
+      <ul>
+        {instructions.map((instruction, index) => (
+          <li key={index}>
+            {instruction.name} - {instruction.description} - Block: {instruction.blockName}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 };

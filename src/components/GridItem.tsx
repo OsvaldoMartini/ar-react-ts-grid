@@ -11,6 +11,7 @@ import crossImage from '../assets/cross.png';
 import editImage from '../assets/edit.png';
 import upImage from '../assets/up.png';
 import downImage from '../assets/down.png';
+import rollBackImage from '../assets/rollback4.png';
 import garbageImage from '../assets/garbage.png';
 import menuDownImage from '../assets/menu-down.png';
 
@@ -120,7 +121,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       stompClient.subscribe("/topic/messages", (message: IMessage) => {
         if (message.body) {
           setMessages((prevMessages) => [...prevMessages, message.body]);
-          console.log("Received message: ", message.body);
+          console.log("Received message: ", message);
         }
       });
     };
@@ -453,10 +454,13 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       const blockSplitDetails = {
         originalBlock: {
           blockId: blockId,
+          botJobId: botJobId,
+          blockOrderNumber: blockOrderNumber,
           updatedInstructions: updatedBlock.instructions.map(instruction => ({
             instructionId: instruction.id,
             blockId: instruction.blockId,
-            orderNumber: instruction.instructionOrderNumber
+            blockOrderNumber: blockOrderNumber,
+            instructionOrderNumber: instruction.instructionOrderNumber
           })),
         },
         newBlock: {
@@ -467,7 +471,8 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
           instructions: newBlock.instructions.map(instruction => ({
             instructionId: instruction.id,
             blockId: instruction.blockId,
-            orderNumber: instruction.instructionOrderNumber
+            blockOrderNumber: newBlock.blockOrderNumber,
+            instructionOrderNumber: instruction.instructionOrderNumber
           })),
         },
         // Filter only blocks that had blockOrderNumber modified, excluding the newBlock
@@ -478,6 +483,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
           )
           .map(block => ({
             blockId: block.instructions[0].blockId,
+            botJobId: botJobId,
             blockName: block.blockName,
             blockOrderNumber: block.instructions[0].blockOrderNumber
           }))
@@ -737,6 +743,16 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
   // Function to remove a block by its blockId and reassign order numbers within each block
   const handleRemoveBlock = (blockId: number) => {
+
+    // Find the botJobId associated with the blockId
+    const blockInstruction = instructionsData.find(instruction => instruction.blockId === blockId);
+    const botJobId = blockInstruction ? blockInstruction.botJobId : null;
+
+    if (!botJobId) {
+      console.error(`No botJobId found for Block ID: ${blockId}`);
+      return; // Exit if no botJobId is found
+    }
+
     const updatedData = instructionsData.filter(instruction => instruction.blockId !== blockId);
     const reassignedData = reassignInstructionOrderNumbersByBlock(updatedData);
     setInstructionsData([...reassignedData]);
@@ -747,6 +763,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       const message = {
         type: 'DELETE_BLOCK',
         blockId: blockId,
+        botJobId: botJobId,
       };
 
       // Publish the delete message to the WebSocket server
@@ -758,6 +775,72 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       console.log(`Sent delete block message for Block ID: ${blockId}`);
     }
   };
+
+  const handleRollbackBlock = (blockId: number) => {
+    console.log(`Rollback action for block ID: ${blockId}`);
+
+    // Get the first blockId after sorting
+    const sortedBlocks = Object.entries(groupedData).sort(
+      ([, aBlockData], [, bBlockData]) =>
+        aBlockData.instructions[0].blockOrderNumber - bBlockData.instructions[0].blockOrderNumber
+    );
+
+    if (sortedBlocks.length === 0) {
+      console.error('No blocks available for rollback.');
+      return;
+    }
+
+    const firstBlockId = Number(sortedBlocks[0][0]);
+
+    // Get the botJobId from the first instruction
+    const firstInstruction = instructionsData.find(instr => instr.blockId === firstBlockId);
+    const botJobId = firstInstruction ? firstInstruction.botJobId : null;
+
+    if (!botJobId) {
+      console.error(`No botJobId found for Block ID: ${firstBlockId}`);
+      return; // Exit if no botJobId is found
+    }
+
+    // Update all instructions to have blockId of firstBlockId and blockOrderNumber 1
+    const updatedData = instructionsData.map(instruction => ({
+      ...instruction,
+      blockId: firstBlockId,
+      blockOrderNumber: 1,
+    }));
+
+    // Reassign instructionOrderNumbers sequentially starting from 1
+    const reassignedData = updatedData.map((instruction, index) => ({
+      ...instruction,
+      instructionOrderNumber: index + 1,
+    }));
+
+    // Update the state
+    setInstructionsData([...reassignedData]);
+    setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
+
+    // Send WebSocket message to inform about the rollback
+    if (client && connected) {
+      const message = {
+        type: 'BLOCK_ROLLBACK',
+        botJobId: botJobId,
+        blockId: firstBlockId,
+        instructions: reassignedData.map(instr => ({
+          instructionId: instr.id,
+          blockId: instr.blockId,
+          blockOrderNumber: instr.blockOrderNumber,
+          instructionOrderNumber: instr.instructionOrderNumber,
+        })),
+      };
+
+      client.publish({
+        destination: '/app/block/rollback',
+        body: JSON.stringify(message),
+      });
+
+      console.log('Sent block rollback message:', message);
+    }
+  };
+
 
   const getInstructionTypeElement = (instruction: BlockLoopInstructionLoadDTO): JSX.Element | string | null => {
     let imageSrc: string | null = null;
@@ -801,7 +884,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     <div className="grid-container">
       {Object.entries(groupedData)
         .sort(([, aBlockData], [, bBlockData]) => aBlockData.instructions[0].blockOrderNumber - bBlockData.instructions[0].blockOrderNumber)
-        .map(([blockId, blockData]) => (
+        .map(([blockId, blockData], index) => (
           <div key={blockId} className="block">
             {/* Block header with garbage, up, and down buttons */}
             <div className="block-header">
@@ -813,6 +896,13 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                 {!mockData ? "-Moock Data" : ""}
               </span>
               <div className="move-buttons">
+                {index === 0 && (
+                  <img
+                    src={rollBackImage}
+                    className="rollback-button"
+                    onClick={() => handleRollbackBlock(Number(blockId))}
+                  />
+                )}
                 <img
                   src={garbageImage}
                   className="garbage-button"

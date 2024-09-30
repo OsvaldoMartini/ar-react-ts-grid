@@ -49,9 +49,11 @@
 
 /* Button Styling */
 .move-button,
+.rollback-button,
 .garbage-button,
 .edit-button,
 .cross-button {
+
   width: 15px; /* Decreased button size */
   height: 15px;
   background-color: transparent;
