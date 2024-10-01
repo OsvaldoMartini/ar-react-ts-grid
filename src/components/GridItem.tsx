@@ -511,40 +511,45 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   };
 
 
-
   // Function to move a block down by swapping blockOrderNumbers
   const handleMoveBlockDown = (blockId: number) => {
     const updatedData = [...instructionsData];
 
     // Find all instructions that belong to the current block
-    const currentBlockInstructions = updatedData.filter(instruction => instruction.blockId === blockId);
+    const currentBlockInstructions = updatedData.filter(
+      (instruction) => instruction.blockId === blockId
+    );
     if (currentBlockInstructions.length === 0) return;
 
     const currentBlockOrderNumber = currentBlockInstructions[0].blockOrderNumber;
 
     // Find the closest block with a larger blockOrderNumber
     const nextBlockInstructions = updatedData
-      .filter(instruction => instruction.blockOrderNumber > currentBlockOrderNumber)
+      .filter((instruction) => instruction.blockOrderNumber > currentBlockOrderNumber)
       .sort((a, b) => a.blockOrderNumber - b.blockOrderNumber)[0]; // Get the closest next block
 
     if (!nextBlockInstructions) return;
 
     const nextBlockOrderNumber = nextBlockInstructions.blockOrderNumber;
 
-    // Prepare data for the blocks that will be swapped
-    const blockSwaps = {
-      currentBlock: {
+    // Prepare the list of BlockOrderDetailDTO for updated blocks
+    const updatedBlocks = [
+      {
         blockId: blockId,
-        newOrderNumber: nextBlockOrderNumber,
+        botJobId: currentBlockInstructions[0].botJobId,
+        blockOrderNumber: nextBlockOrderNumber,
+        blockName: currentBlockInstructions[0].blockName,
       },
-      previousBlock: {
+      {
         blockId: nextBlockInstructions.blockId,
-        newOrderNumber: currentBlockOrderNumber,
+        botJobId: nextBlockInstructions.botJobId,
+        blockOrderNumber: currentBlockOrderNumber,
+        blockName: nextBlockInstructions.blockName,
       },
-    };
+    ];
 
-    // Update the blockOrderNumber for both current and next blocks
-    updatedData.forEach(instruction => {
+    // Update the blockOrderNumber for both current and next blocks in the local data
+    updatedData.forEach((instruction) => {
       if (instruction.blockOrderNumber === currentBlockOrderNumber) {
         // Move current block down by assigning the next block's order number
         instruction.blockOrderNumber = nextBlockOrderNumber;
@@ -557,21 +562,26 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     setInstructionsData([...updatedData]); // Update the state
     setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
 
-    // Send WebSocket message with block swap details
+    // Send WebSocket message with the updated blocks list
     if (client && connected) {
       const message = {
         type: 'BLOCK_MOVE',
-        updatedBlocks: blockSwaps,
+        updatedBlocks: updatedBlocks,
       };
 
-      client.publish({
-        destination: '/app/block/move', // Update based on your WebSocket endpoint configuration
-        body: JSON.stringify(message),
-      });
+      try {
+        client.publish({
+          destination: '/app/block/move', // Update based on your WebSocket endpoint configuration
+          body: JSON.stringify(message),
+        });
 
-      console.log('Sent block move message:', message);
+        console.log('Sent block move message:', message);
+      } catch (error) {
+        console.error('Error sending WebSocket message:', error);
+      }
     }
   };
+
 
 
 
@@ -597,18 +607,20 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       if (blockInstructionIndex < blockInstructions.length - 1) {
         const nextInstruction = blockInstructions[blockInstructionIndex + 1];
 
+
         // Capture rowsSwaps for WebSocket message including blockId
-        const rowsSwaps = {
-          blockId: currentInstruction.blockId, // Add the blockId of the instruction
-          currentRow: {
+        const updatedRows = [
+          {
+            blockId: currentInstruction.blockId, // Add the blockId of the instruction
             instructionId: currentInstruction.id,
-            newOrderNumber: nextInstruction.instructionOrderNumber,
+            instructionOrderNumber: nextInstruction.instructionOrderNumber,
           },
-          nextRow: {
+          {
+            blockId: currentInstruction.blockId, // Add the blockId of the instruction
             instructionId: nextInstruction.id,
-            newOrderNumber: currentInstruction.instructionOrderNumber,
+            instructionOrderNumber: currentInstruction.instructionOrderNumber,
           },
-        };
+        ];
 
         // Swap their instructionOrderNumbers
         const tempOrderNumber = currentInstruction.instructionOrderNumber;
@@ -623,7 +635,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
         if (client && connected) {
           const message = {
             type: 'ROW_MOVE',
-            rows: rowsSwaps,
+            updatedRows: updatedRows,
           };
 
           try {
@@ -664,17 +676,18 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
         const previousInstruction = blockInstructions[blockInstructionIndex - 1];
 
         // Capture rowsSwaps for WebSocket message including blockId
-        const rowsSwaps = {
-          blockId: currentInstruction.blockId, // Add the blockId of the instruction
-          currentRow: {
+        const updatedRows = [
+          {
+            blockId: currentInstruction.blockId, // Add the blockId of the instruction
             instructionId: currentInstruction.id,
-            newOrderNumber: previousInstruction.instructionOrderNumber,
+            instructionOrderNumber: previousInstruction.instructionOrderNumber,
           },
-          previousRow: {
+          {
+            blockId: currentInstruction.blockId, // Add the blockId of the instruction
             instructionId: previousInstruction.id,
-            newOrderNumber: currentInstruction.instructionOrderNumber,
+            instructionOrderNumber: currentInstruction.instructionOrderNumber,
           },
-        };
+        ];
 
         // Swap their instructionOrderNumbers
         const tempOrderNumber = currentInstruction.instructionOrderNumber;
@@ -689,7 +702,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
         if (client && connected) {
           const message = {
             type: 'ROW_MOVE',
-            rows: rowsSwaps,
+            updatedRows: updatedRows,
           };
 
           try {
@@ -919,10 +932,9 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
           <div key={blockId} className="block">
             {/* Block header with garbage, up, and down buttons */}
             <div className="block-header">
-              <span className="block-id">{blockId}</span>
-              <span className="block-order-number">{blockData.instructions[0].blockOrderNumber}</span>
+              <span className="block-order-number">#{blockData.instructions[0].blockOrderNumber}</span>
               <span className="block-name">{blockData.blockName}</span>
-              <span>
+              <span className="block-count">
                 ({blockData.instructions.length})
                 {!mockData ? "-Moock Data" : ""}
               </span>

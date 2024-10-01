@@ -33,7 +33,15 @@
 
 /* Block Name Span */
 .block-header .block-name {
-  width: 100px; /* Set width of block name to 100px */
+  width: 200px; /* Set width of block name to 100px */
+  white-space: nowrap; /* Prevent text wrapping */
+  overflow: hidden; /* Hide overflow */
+  text-overflow: ellipsis; /* Add ellipsis if text is too long */
+}
+
+/* Block Name Span */
+.block-header .block-count {
+  width: 200px; /* Set width of block name to 100px */
   white-space: nowrap; /* Prevent text wrapping */
   overflow: hidden; /* Hide overflow */
   text-overflow: ellipsis; /* Add ellipsis if text is too long */
