@@ -155,7 +155,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     if (updatedBlocks.length > 0 && client && connected) {
       const message = {
         type: 'BLOCK_ORDER',
-        blocks: updatedBlocks,
+        updatedBlocks: updatedBlocks,
       };
 
       try {
@@ -285,17 +285,21 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
     const previousBlockOrderNumber = previousBlockInstructions.blockOrderNumber;
 
-    // Prepare data for the blocks that will be swapped
-    const blockSwaps = {
-      currentBlock: {
+    // Prepare the list of BlockOrderDetailDTO for updated blocks
+    const updatedBlocks = [
+      {
         blockId: blockId,
-        newOrderNumber: previousBlockOrderNumber,
+        botJobId: currentBlockInstructions[0].botJobId,
+        blockOrderNumber: previousBlockOrderNumber,
+        blockName: currentBlockInstructions[0].blockName,
       },
-      previousBlock: {
+      {
         blockId: previousBlockInstructions.blockId,
-        newOrderNumber: currentBlockOrderNumber,
+        botJobId: previousBlockInstructions.botJobId,
+        blockOrderNumber: currentBlockOrderNumber,
+        blockName: previousBlockInstructions.blockName,
       },
-    };
+    ];
 
     // Update the blockOrderNumber for both current and previous blocks
     updatedData.forEach(instruction => {
@@ -315,7 +319,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     if (client && connected) {
       const message = {
         type: 'BLOCK_MOVE',
-        blocks: blockSwaps,
+        updatedBlocks: updatedBlocks,
       };
 
       try {
@@ -533,7 +537,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
         blockId: blockId,
         newOrderNumber: nextBlockOrderNumber,
       },
-      nextBlock: {
+      previousBlock: {
         blockId: nextBlockInstructions.blockId,
         newOrderNumber: currentBlockOrderNumber,
       },
@@ -557,7 +561,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     if (client && connected) {
       const message = {
         type: 'BLOCK_MOVE',
-        blocks: blockSwaps,
+        updatedBlocks: blockSwaps,
       };
 
       client.publish({
@@ -744,37 +748,64 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   // Function to remove a block by its blockId and reassign order numbers within each block
   const handleRemoveBlock = (blockId: number) => {
 
-    // Find the botJobId associated with the blockId
+    // Find the botJobId and blockOrderNumber associated with the blockId
     const blockInstruction = instructionsData.find(instruction => instruction.blockId === blockId);
     const botJobId = blockInstruction ? blockInstruction.botJobId : null;
+    const removedBlockOrderNumber = blockInstruction ? blockInstruction.blockOrderNumber : null;
 
-    if (!botJobId) {
-      console.error(`No botJobId found for Block ID: ${blockId}`);
-      return; // Exit if no botJobId is found
+    if (!botJobId || removedBlockOrderNumber === null) {
+      console.error(`No botJobId or blockOrderNumber found for Block ID: ${blockId}`);
+      return; // Exit if no botJobId or blockOrderNumber is found
     }
 
+    // Remove the block from instructionsData
     const updatedData = instructionsData.filter(instruction => instruction.blockId !== blockId);
+
+    // Update blockOrderNumber for blocks after the removed block
+    const blocksToUpdateSet = new Set<number>();
+    updatedData.forEach(instruction => {
+      if (instruction.blockOrderNumber > removedBlockOrderNumber) {
+        instruction.blockOrderNumber -= 1;
+        blocksToUpdateSet.add(instruction.blockId);
+      }
+    });
+
     const reassignedData = reassignInstructionOrderNumbersByBlock(updatedData);
     setInstructionsData([...reassignedData]);
     setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
 
+    // Prepare list of updated blocks
+    const blocksToUpdate = Array.from(blocksToUpdateSet).map(blockId => {
+      const instructionsInBlock = reassignedData.filter(instr => instr.blockId === blockId);
+      const blockOrderNumber = instructionsInBlock[0].blockOrderNumber; // Assuming all instructions in a block have the same blockOrderNumber
+      const blockName = instructionsInBlock[0].blockName; // Assuming blockName is consistent within the block
+
+      return {
+        blockId: blockId,
+        botJobId: botJobId,
+        blockOrderNumber: blockOrderNumber,
+        blockName: blockName,
+      };
+    });
+
     // Send WebSocket message
-    if (client && connected) { // Assuming `client` is your STOMP client and `connected` is a boolean indicating the connection state
+    if (client && connected) {
       const message = {
         type: 'DELETE_BLOCK',
         blockId: blockId,
         botJobId: botJobId,
+        updatedBlocks: blocksToUpdate, // Include the list of updated blocks
       };
 
-      // Publish the delete message to the WebSocket server
       client.publish({
-        destination: '/app/block/delete', // Destination to which you want to send the message (configured on the server)
+        destination: '/app/block/delete',
         body: JSON.stringify(message),
       });
 
-      console.log(`Sent delete block message for Block ID: ${blockId}`);
+      console.log(`Sent delete block message for Block ID: ${blockId} with updated blocks:`, message);
     }
   };
+
 
   const handleRollbackBlock = (blockId: number) => {
     console.log(`Rollback action for block ID: ${blockId}`);
