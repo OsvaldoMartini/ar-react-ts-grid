@@ -73,23 +73,6 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   const [updatedBlocks, setUpdatedBlocks] = useState<UpdatedBlock[]>([]);
 
 
-  // Sample block data
-  const sampleBlockData: UpdatedBlock = {
-    botJobId: 101,         // Example botJobId (can be null if necessary)
-    blockId: 1,            // Unique block identifier
-    blockOrderNumber: 2    // New order number for the block
-  };
-
-  // Updating the blocks using updateBlocks
-  const updateSampleBlocks = () => {
-    // In this case, we use the sampleBlockData as an example
-    updateBlocks([sampleBlockData]);  // You can pass multiple blocks if needed
-  };
-
-  const updateBlocks = (newBlocks: UpdatedBlock[]) => {
-    setUpdatedBlocks(newBlocks);  // This should trigger the useEffect when called
-  };
-
 
   // Memoized function to handle outside clicks on the dropdown
   const handleClickOutside = useCallback((event: MouseEvent) => {
@@ -150,6 +133,13 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       setUpdatedBlocks(updatedBlocks);  // Trigger the `useEffect` to send WebSocket message
     }
   }, [connected]);
+
+  useEffect(() => {
+    if (messages && messages.length > 0) {
+      console.log("Messages: " + messages);
+    }
+
+  }, [messages]);
 
   useEffect(() => {
     if (updatedBlocks.length > 0 && client && connected) {
@@ -914,7 +904,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     // Return a combined image and text element if imageSrc exists, otherwise return just the text
     return imageSrc ? (
       <div className="instruction-type">
-        <img src={imageSrc} className="operations" />
+        <img src={imageSrc} alt="" className="operations" />
         <span>{text}</span>
       </div>
     ) : (
@@ -942,6 +932,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                 {index === 0 && (
                   <img
                     src={rollBackImage}
+                    alt=""
                     className="rollback-button"
                     onClick={() => handleRollbackBlock(Number(blockId))}
                   />
@@ -949,12 +940,13 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                 <img
                   src={garbageImage}
                   className="garbage-button"
+                  alt=""
                   onClick={() => handleRemoveBlock(Number(blockId))}
                 />
-                <img src={upImage} className="move-button"
+                <img src={upImage} alt="" className="move-button"
                   onClick={() => handleMoveBlockUp(Number(blockId))}
                 />
-                <img src={downImage} className="move-button"
+                <img src={downImage} alt="" className="move-button"
                   onClick={() => handleMoveBlockDown(Number(blockId))}
                 />
               </div>
@@ -970,10 +962,10 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                     <span className="instruction-details">{instruction.description}</span>
                     <div className="options-column">
                       <div className="move-buttons">
-                        <img src={upImage} className="move-button" onClick={() => handleMoveRowUp(instruction.id)} />
-                        <img src={downImage} className="move-button" onClick={() => handleMoveRowDown(instruction.id)} />
-                        <img src={editImage} className="edit-button" />
-                        <img src={crossImage} className="cross-button" onClick={() => handleRemoveInstruction(instruction.id)} />
+                        <img src={upImage} alt="" className="move-button" onClick={() => handleMoveRowUp(instruction.id)} />
+                        <img src={downImage} alt="" className="move-button" onClick={() => handleMoveRowDown(instruction.id)} />
+                        <img src={editImage} alt="" className="edit-button" />
+                        <img src={crossImage} alt="" className="cross-button" onClick={() => handleRemoveInstruction(instruction.id)} />
                       </div>
                     </div>
 
@@ -982,6 +974,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                       <img
                         src={menuDownImage} /* Replace with your arrow down image */
                         className="dropdown-arrow"
+                        alt=""
                         onClick={() => handleToggleDropdown(instruction.id)}
                       />
 
