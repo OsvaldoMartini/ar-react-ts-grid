@@ -941,8 +941,24 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   ) => {
     const validActions = ["SET", "GET", "CK"];
 
-    // If the instruction has an operation, split it into left and right parts
-    if (instruction.operation) {
+    // Handle the "CK" action with special formatting for operation
+    if (instruction.actions === "CK" && instruction.operation) {
+      const [left, middle, right] = instruction.operation.split(":").map(part => part.trim());
+
+      if (middle === "=") {
+        // Render the left and right parts with "=" in between, using specific colors
+        return (
+          <span className="instruction-details">
+            <span style={{ color: '#0b5394' }}>{left}</span>
+            <span style={{ color: '#0b5394' }}>{middle}</span>
+            <span style={{ color: '#FFA500' }}>{right}</span>
+          </span>
+        );
+      }
+    }
+
+    // Handle operation for other actions (SET, GET)
+    if (instruction.operation && validActions.includes(instruction.actions)) {
       const [left, right] = instruction.operation.split(":");
 
       return (
@@ -953,7 +969,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       );
     }
 
-    // If no parentId or parent is not found, check for valid actions
+    // Render the action if it is valid but has no operation
     if (validActions.includes(instruction.actions)) {
       return <span className="instruction-details">{instruction.actions}</span>;
     }
@@ -990,12 +1006,14 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                     onClick={() => handleRollbackBlock(Number(blockId))}
                   />
                 )}
-                <img
-                  src={garbageImage}
-                  className="garbage-button"
-                  alt=""
-                  onClick={() => handleRemoveBlock(Number(blockId))}
-                />
+                {index !== 0 && (
+                  <img
+                    src={garbageImage}
+                    className="garbage-button"
+                    alt=""
+                    onClick={() => handleRemoveBlock(Number(blockId))}
+                  />
+                )}
                 <img src={upImage} alt="" className="move-button"
                   onClick={() => handleMoveBlockUp(Number(blockId))}
                 />

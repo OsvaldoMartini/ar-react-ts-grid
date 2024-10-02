@@ -26,20 +26,20 @@ export interface UpdatedBlock {
 
 
 const instructionsMockData: BlockLoopInstructionLoadDTO[] = [
-  { botJobId: 11, id: 1, instructionOrderNumber: 1, name: "SetValue", description: "Description 1", blockId: 33, blockOrderNumber: 0, blockName: "Default Block", actions: "SET", parentId: 4, operation: "firstName:Osvaldo" },
-  { botJobId: 11, id: 2, instructionOrderNumber: 4, name: "GetValue", description: "Description 2", blockId: 34, blockOrderNumber: 2, blockName: "Block Test 1", actions: "GET", parentId: 4, operation: "firstName:Osvaldo" },
-  { botJobId: 11, id: 3, instructionOrderNumber: 3, name: "Check", description: "Description 3", blockId: 34, blockOrderNumber: 2, blockName: "Block Test 1", actions: "CK", parentId: 4, operation: "firstName:Osvaldo" },
+  { botJobId: 11, id: 1, instructionOrderNumber: 1, name: "SetValue", description: "Description 1", blockId: 33, blockOrderNumber: 0, blockName: "Default Block", actions: "SET", parentId: 4, operation: "firstName:MockData" },
+  { botJobId: 11, id: 2, instructionOrderNumber: 4, name: "GetValue", description: "Description 2", blockId: 34, blockOrderNumber: 2, blockName: "Block Test 1", actions: "GET", parentId: 4, operation: "firstname:$FIRSTNAME" },
+  { botJobId: 11, id: 3, instructionOrderNumber: 3, name: "Check", description: "Description 3", blockId: 34, blockOrderNumber: 2, blockName: "Block Test 1", actions: "CK", parentId: 4, operation: "$firstname:=:Osvaldo" },
   { botJobId: 11, id: 4, instructionOrderNumber: 2, name: "Instruction 4", description: "Description 4", blockId: 34, blockOrderNumber: 2, blockName: "Block Test 1", actions: "click", parentId: 4 },
   { botJobId: 11, id: 5, instructionOrderNumber: 1, name: "Instruction 5", description: "Description 5", blockId: 34, blockOrderNumber: 2, blockName: "Block Test 1", actions: "click", parentId: 4 },
   { botJobId: 11, id: 6, instructionOrderNumber: 2, name: "SetValue", description: "Description 6", blockId: 35, blockOrderNumber: 3, blockName: "Block Test 2", actions: "SET", parentId: 4, operation: "firstName:Osvaldo" },
-  { botJobId: 11, id: 7, instructionOrderNumber: 1, name: "GetValue", description: "Description 7", blockId: 35, blockOrderNumber: 3, blockName: "Block Test 2", actions: "GET", parentId: 4, operation: "firstName:Osvaldo" },
+  { botJobId: 11, id: 7, instructionOrderNumber: 1, name: "GetValue", description: "Description 7", blockId: 35, blockOrderNumber: 3, blockName: "Block Test 2", actions: "GET", parentId: 4, operation: "firstname:$FIRSTNAME" },
 
   // Block 3                                                                                                                                                                                        
   { botJobId: 11, id: 8, instructionOrderNumber: 1, name: "Instruction 8", description: "Description 8", blockId: 36, blockOrderNumber: 4, blockName: "Block Test 3", actions: "click", parentId: 4, operation: "firstName:Osvaldo" },
   { botJobId: 11, id: 9, instructionOrderNumber: 2, name: "SetValue", description: "Description 9", blockId: 36, blockOrderNumber: 4, blockName: "Block Test 3", actions: "SET", parentId: 4, operation: "firstName:Osvaldo" },
-  { botJobId: 11, id: 10, instructionOrderNumber: 3, name: "GetValue", description: "Description 10", blockId: 36, blockOrderNumber: 4, blockName: "Block Test 3", actions: "GET", parentId: 4, operation: "firstName:Osvaldo" },
+  { botJobId: 11, id: 10, instructionOrderNumber: 3, name: "GetValue", description: "Description 10", blockId: 36, blockOrderNumber: 4, blockName: "Block Test 3", actions: "GET", parentId: 4, operation: "firstname:$FIRSTNAME" },
   { botJobId: 11, id: 11, instructionOrderNumber: 4, name: "Instruction 11", description: "Description 11", blockId: 36, blockOrderNumber: 4, blockName: "Block Test 3", actions: "click", parentId: 4 },
-  { botJobId: 11, id: 12, instructionOrderNumber: 5, name: "Check", description: "Description 12", blockId: 36, blockOrderNumber: 4, blockName: "Block Test 3", actions: "CK", parentId: 4, operation: "firstName:Osvaldo" },
+  { botJobId: 11, id: 12, instructionOrderNumber: 5, name: "Check", description: "Description 12", blockId: 36, blockOrderNumber: 4, blockName: "Block Test 3", actions: "CK", parentId: 4, operation: "$firstname:=:Osvaldo" },
 
   // Block 4                                                                                                                                                                                        
   { botJobId: 11, id: 13, instructionOrderNumber: 1, name: "Instruction 13", description: "Description 13", blockId: 37, blockOrderNumber: 5, blockName: "Block Test 4", actions: "click", parentId: 4 },
