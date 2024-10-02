@@ -14,6 +14,7 @@ import downImage from '../assets/down.png';
 import rollBackImage from '../assets/rollback4.png';
 import garbageImage from '../assets/garbage.png';
 import menuDownImage from '../assets/menu-down.png';
+import AlertModal from './AlertModal';
 
 
 interface GridItemProps {
@@ -71,6 +72,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   const [openDropdown, setOpenDropdown] = useState<number | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [updatedBlocks, setUpdatedBlocks] = useState<UpdatedBlock[]>([]);
+  const [alertMessage, setAlertMessage] = useState<string | null>(null);
 
 
 
@@ -336,13 +338,32 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   };
 
   const handleInsertStepBefore = (instructionId: number) => {
-    // Logic to insert a step before
-    console.log("Insert Step Before for instruction", instructionId);
+    // Find the instruction based on the instructionId
+    const instruction = instructionsData.find(instruction => instruction.id === instructionId);
+
+    if (instruction) {
+      // If the instruction is found, use its name for the alert message
+      setAlertMessage(`Inserting step before instruction: ${instruction.name}`);
+    } else {
+      console.error(`Instruction with ID ${instructionId} not found.`);
+    }
+  };
+
+
+  const closeAlert = () => {
+    setAlertMessage(null);
   };
 
   const handleInsertStepAfter = (instructionId: number) => {
-    // Logic to insert a step after
-    console.log("Insert Step After for instruction", instructionId);
+    // Find the instruction based on the instructionId
+    const instruction = instructionsData.find(instruction => instruction.id === instructionId);
+
+    if (instruction) {
+      // If the instruction is found, use its name for the alert message
+      setAlertMessage(`Inserting step after instruction: ${instruction.name}`);
+    } else {
+      console.error(`Instruction with ID ${instructionId} not found.`);
+    }
   };
 
   const handleDeleteInstruction = (instructionId: number) => {
@@ -916,6 +937,9 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
   return (
     <div className="grid-container">
+      {alertMessage && (
+        <AlertModal message={alertMessage} onClose={closeAlert} />
+      )}
       {Object.entries(groupedData)
         .sort(([, aBlockData], [, bBlockData]) => aBlockData.instructions[0].blockOrderNumber - bBlockData.instructions[0].blockOrderNumber)
         .map(([blockId, blockData], index) => (
@@ -1002,6 +1026,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                 );
               })}
             </div>
+
 
           </div>
         ))}
