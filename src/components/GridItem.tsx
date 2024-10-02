@@ -935,6 +935,35 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     );
   };
 
+  const renderInstructionActions = (
+    instruction: BlockLoopInstructionLoadDTO,
+    allInstructions: BlockLoopInstructionLoadDTO[]
+  ) => {
+    const validActions = ["SET", "GET", "CK"];
+
+    // If the instruction has an operation, split it into left and right parts
+    if (instruction.operation) {
+      const [left, right] = instruction.operation.split(":");
+
+      return (
+        <span className="instruction-details">
+          <span style={{ color: '#0b5394' }}>{left}</span>:
+          <span style={{ color: '#FFA500' }}>{right}</span>
+        </span>
+      );
+    }
+
+    // If no parentId or parent is not found, check for valid actions
+    if (validActions.includes(instruction.actions)) {
+      return <span className="instruction-details">{instruction.actions}</span>;
+    }
+
+    // Return a blank span with a non-breaking space to maintain alignment
+    return <span className="instruction-details">&nbsp;</span>;
+  };
+
+
+
   return (
     <div className="grid-container">
       {alertMessage && (
@@ -983,7 +1012,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                 return (
                   <div key={instruction.id} className="instruction-item">
                     <span>{getInstructionTypeElement(instruction)}</span>
-                    <span className="instruction-details">{instruction.description}</span>
+                    {renderInstructionActions(instruction, instructionsData)}
                     <div className="options-column">
                       <div className="move-buttons">
                         <img src={upImage} alt="" className="move-button" onClick={() => handleMoveRowUp(instruction.id)} />
