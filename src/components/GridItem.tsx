@@ -1149,7 +1149,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
                       {openDropdown === instruction.id && (
                         <div
-                          id={`dropdown-${instruction.id}`}  // Add unique ID for each dropdown
+                          id={`dropdown-${instruction.id}`}  // Use unique ID for each dropdown
                           ref={dropdownRef}
                           className={`dropdown-menu ${dropdownPosition === 'above' ? 'dropdown-above' : ''}`}
                         >
@@ -1165,6 +1165,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                           <div onClick={() => handleRemoveInstruction(instruction.id)}>Delete</div>
                         </div>
                       )}
+
                     </div>
 
                   </div>
