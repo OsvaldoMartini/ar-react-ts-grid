@@ -177,17 +177,24 @@
 /* Dropdown menu styling */
 .dropdown-menu {
   position: absolute;
-  top: 25px; /* Adjust based on the layout */
+  top: 25px; /* Default: Adjust based on layout */
   right: 0;
-  background-color: #e0f7fa; /* Same background color as the instructions rows */
+  background-color: #e0f7fa;
   border: 1px solid #ddd;
-  border-radius: 4px; /* Rounded corners */
-  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1); /* Subtle shadow */
-  padding: 4px 0; /* Padding around the menu */
-  font-size: 0.85em; /* Reduced font size to fit items per line */
-  z-index: 100; /* Make sure it's on top of other elements */
-  width: 150px; /* Width adjusted for single-line items */
+  border-radius: 4px;
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+  padding: 4px 0;
+  font-size: 0.85em;
+  z-index: 100;
+  width: 150px;
 }
+
+.dropdown-above {
+  top: auto;    /* Reset top */
+  bottom: 25px; /* Position the dropdown above the clicked element */
+}
+
+
 
 /* Individual menu items */
 .dropdown-menu div {
@@ -200,10 +207,4 @@
 .dropdown-menu div:hover {
   background-color: #b2ebf2; /* Light blue background on hover */
   color: #00796b; /* Darker text color on hover */
-}
-
-.dropdown-above {
-  /* When the dropdown is in the last block, show it above */
-  top: auto;    /* Reset the top position */
-  bottom: 25px; /* Position above the clicked element */
 }

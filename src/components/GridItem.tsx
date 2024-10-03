@@ -71,6 +71,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   const [connected, setConnected] = useState(false);
   const [messages, setMessages] = useState<string[]>([]);
   const [openDropdown, setOpenDropdown] = useState<number | null>(null);
+  const [dropdownPosition, setDropdownPosition] = useState('below'); // Default to 'below'
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [updatedBlocks, setUpdatedBlocks] = useState<UpdatedBlock[]>([]);
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
@@ -330,15 +331,33 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     }
   };
 
-
-
   const handleToggleDropdown = (instructionId: number) => {
-    if (openDropdown === instructionId) {
-      setOpenDropdown(null); // Close the menu if it's already open
-    } else {
-      setOpenDropdown(instructionId); // Open the menu for this specific instruction
-    }
+    setOpenDropdown(openDropdown === instructionId ? null : instructionId);
+
+    // Use a small delay to allow the dropdown to be rendered before calculating position
+    setTimeout(() => {
+      const dropdown = document.getElementById(`dropdown-${instructionId}`);
+      if (dropdown) {
+        const rect = dropdown.getBoundingClientRect();
+        const windowHeight = window.innerHeight;
+
+        // Calculate space above and below the clicked element
+        const spaceAbove = rect.top;
+        const spaceBelow = windowHeight - rect.bottom;
+
+        // Approximate dropdown height
+        const dropdownHeight = dropdown.offsetHeight;
+
+        // Check if we have enough space above or below
+        if (spaceBelow < dropdownHeight && spaceAbove >= dropdownHeight) {
+          setDropdownPosition('above'); // Render above if not enough space below
+        } else {
+          setDropdownPosition('below'); // Render below if enough space
+        }
+      }
+    }, 0); // Delay just enough to let the dropdown render
   };
+
 
   const handleInsertStepBefore = (instructionId: number) => {
     // Find the instruction based on the instructionId
@@ -1122,22 +1141,21 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                     {/* New column for dropdown menu */}
                     <div className="dropdown-column">
                       <img
-                        src={menuDownImage} /* Replace with your arrow down image */
+                        src={menuDownImage}
                         className="dropdown-arrow"
                         alt=""
                         onClick={() => handleToggleDropdown(instruction.id)}
                       />
 
-                      {/* Dropdown menu that shows/hides when the arrow is clicked */}
                       {openDropdown === instruction.id && (
                         <div
+                          id={`dropdown-${instruction.id}`}  // Add unique ID for each dropdown
                           ref={dropdownRef}
-                          className={`dropdown-menu ${isLastBlock ? 'dropdown-above' : ''}`} // Conditional class for last block
+                          className={`dropdown-menu ${dropdownPosition === 'above' ? 'dropdown-above' : ''}`}
                         >
                           <div onClick={() => handleInsertStepBefore(instruction.id)}>Insert Step Before</div>
                           <div onClick={() => handleInsertStepAfter(instruction.id)}>Insert Step After</div>
 
-                          {/* Conditionally render "Split Component" only if this is not the last instruction */}
                           {!isLastInstruction && (
                             <div onClick={() => handleSplitComponent(instruction.id, groupedData, setGroupedData, instructionsData)}>
                               Split Component
@@ -1148,6 +1166,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                         </div>
                       )}
                     </div>
+
                   </div>
                 );
               })}
