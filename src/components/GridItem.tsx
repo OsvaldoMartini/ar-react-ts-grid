@@ -64,6 +64,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   // Use state to manage the instructions data
   const [mockData, setMockData] = useState<boolean>(false);
   const [instructionsData, setInstructionsData] = useState<BlockLoopInstructionLoadDTO[]>(data);
+  const [socketPort, setSocketPort] = useState<number>(8080);
   const [groupedData, setGroupedData] = useState<{ [blockId: number]: { blockName: string; instructions: BlockLoopInstructionLoadDTO[] } }>({});
   const [isDataReordered, setIsDataReordered] = useState<boolean>(false);
   const [client, setClient] = useState<Client | null>(null);
@@ -73,6 +74,19 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [updatedBlocks, setUpdatedBlocks] = useState<UpdatedBlock[]>([]);
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
+
+
+  // Function to handle receiving data from JavaFX
+  (window as any).receiveDataFromJava = function (jsonData: string, socketPort: number) {
+    const data: BlockLoopInstructionLoadDTO[] = JSON.parse(jsonData);
+    if (data && data.length > 0) {
+      setMockData(true);
+      setIsDataReordered(false); // Reset this flag on new data load
+      setInstructionsData(data);
+    }
+    setSocketPort(socketPort);
+    // setAlertMessage("receiveDataFromJava Socket " + socketPort);
+  };
 
 
 
@@ -86,9 +100,10 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
 
   useEffect(() => {
+    // setAlertMessage("useEffect Socket " + socketPort);
     // Create a STOMP client
     const stompClient: Client = new Client({
-      brokerURL: "ws://localhost:8080/websocket", // Your WebSocket URL
+      brokerURL: `ws://localhost:${socketPort}/websocket`, // Your WebSocket URL
       reconnectDelay: 5000, // Try reconnecting after 5 seconds if the connection fails
       heartbeatIncoming: 4000, // Heartbeat configuration
       heartbeatOutgoing: 4000,
@@ -125,7 +140,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     return () => {
       stompClient.deactivate();
     };
-  }, []);
+  }, [socketPort]);
 
   useEffect(() => {
     if (connected) {
@@ -207,18 +222,6 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [openDropdown]);
-
-
-
-  // Function to handle receiving data from JavaFX
-  (window as any).receiveDataFromJava = function (jsonData: string) {
-    const data: BlockLoopInstructionLoadDTO[] = JSON.parse(jsonData);
-    if (data && data.length > 0) {
-      setMockData(true);
-      setIsDataReordered(false); // Reset this flag on new data load
-      setInstructionsData(data);
-    }
-  };
 
 
 
@@ -1001,12 +1004,17 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
               </span>
               <div className="move-buttons">
                 {index === 0 && (
+                  // <div>
+                  //   <span className="socket-port">
+                  //     {socketPort}
+                  //   </span>
                   <img
                     src={rollBackImage}
                     alt=""
                     className="rollback-button"
                     onClick={() => handleRollbackBlock(Number(blockId))}
                   />
+                  // </div>
                 )}
                 {index !== 0 && (
                   <img
