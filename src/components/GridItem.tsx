@@ -830,7 +830,6 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     }
   };
 
-
   const handleRollbackBlock = (blockId: number) => {
     console.log(`Rollback action for block ID: ${blockId}`);
 
@@ -847,9 +846,10 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
     const firstBlockId = Number(sortedBlocks[0][0]);
 
-    // Get the botJobId from the first instruction
+    // Get the botJobId and blockName from the first instruction
     const firstInstruction = instructionsData.find(instr => instr.blockId === firstBlockId);
     const botJobId = firstInstruction ? firstInstruction.botJobId : null;
+    const firstBlockName = firstInstruction ? firstInstruction.blockName : 'Unknown Block'; // Default to 'Unknown Block' if not found
 
     if (!botJobId) {
       console.error(`No botJobId found for Block ID: ${firstBlockId}`);
@@ -879,6 +879,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
         type: 'BLOCK_ROLLBACK',
         botJobId: botJobId,
         blockId: firstBlockId,
+        blockName: firstBlockName, // Pass the block name here
         instructions: reassignedData.map(instr => ({
           instructionId: instr.id,
           blockId: instr.blockId,
@@ -895,6 +896,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       console.log('Sent block rollback message:', message);
     }
   };
+
 
 
   const getInstructionTypeElement = (instruction: BlockLoopInstructionLoadDTO): JSX.Element | string | null => {
