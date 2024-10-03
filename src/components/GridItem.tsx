@@ -358,6 +358,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
         blockId: instruction.blockId,
         blockOrderNumber: instruction.blockOrderNumber,
         instructionOrderNumber: instruction.instructionOrderNumber,
+        instructionName: instruction.name
       };
 
       // WebSocket message for "INSERT_BEFORE" with the selected instruction's details
@@ -383,6 +384,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     } else {
       console.error(`Instruction with ID ${instructionId} not found.`);
     }
+    setOpenDropdown(null);
   };
 
 
@@ -397,7 +399,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       const botJobId = instruction.botJobId || null;
 
       // If the instruction is found, use its name for the alert message
-      setAlertMessage(`Inserting step after instruction: ${instruction.name}`);
+      // setAlertMessage(`Inserting step after instruction: ${instruction.name}`);
 
       // Create the InstructionDTO object with necessary details
       const instructionDTO = {
@@ -406,6 +408,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
         blockId: instruction.blockId,
         blockOrderNumber: instruction.blockOrderNumber,
         instructionOrderNumber: instruction.instructionOrderNumber,
+        instructionName: instruction.name
       };
 
       // WebSocket message for "INSERT_AFTER" with the selected instruction's details
@@ -419,11 +422,11 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       if (client && connected) {
         try {
           client.publish({
-            destination: '/app/row/insert-before', // Update based on your WebSocket endpoint configuration
+            destination: '/app/row/insert-after', // Update based on your WebSocket endpoint configuration
             body: JSON.stringify(message),
           });
 
-          console.log('Sent insert before message:', message);
+          console.log('Sent insert after message:', message);
         } catch (error) {
           console.error('Error sending WebSocket message:', error);
         }
@@ -431,6 +434,8 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     } else {
       console.error(`Instruction with ID ${instructionId} not found.`);
     }
+
+    setOpenDropdown(null);
   };
 
   const closeAlert = () => {
@@ -832,6 +837,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
       console.log(`Sent delete instruction message for instruction ID: ${instructionId} in block ID: ${blockId}`);
     }
+    setOpenDropdown(null);
   };
 
 
