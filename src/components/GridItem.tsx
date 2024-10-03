@@ -345,33 +345,96 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     const instruction = instructionsData.find(instruction => instruction.id === instructionId);
 
     if (instruction) {
+
+      const botJobId = instruction.botJobId || null;
+
       // If the instruction is found, use its name for the alert message
-      setAlertMessage(`Inserting step before instruction: ${instruction.name}`);
+      // setAlertMessage(`Inserting step before instruction: ${instruction.name}`);
+
+      // Create the InstructionDTO object with necessary details
+      const instructionDTO = {
+        botJobId: botJobId,
+        instructionId: instruction.id,
+        blockId: instruction.blockId,
+        blockOrderNumber: instruction.blockOrderNumber,
+        instructionOrderNumber: instruction.instructionOrderNumber,
+      };
+
+      // WebSocket message for "INSERT_BEFORE" with the selected instruction's details
+      const message = {
+        type: 'INSERT_BEFORE',
+        botJobId: botJobId,
+        updatedRows: [instructionDTO], // Wrap the instructionDTO in an array
+      };
+
+      // Send WebSocket message
+      if (client && connected) {
+        try {
+          client.publish({
+            destination: '/app/row/insert-before', // Update based on your WebSocket endpoint configuration
+            body: JSON.stringify(message),
+          });
+
+          console.log('Sent insert before message:', message);
+        } catch (error) {
+          console.error('Error sending WebSocket message:', error);
+        }
+      }
     } else {
       console.error(`Instruction with ID ${instructionId} not found.`);
     }
   };
 
 
-  const closeAlert = () => {
-    setAlertMessage(null);
-  };
+
 
   const handleInsertStepAfter = (instructionId: number) => {
     // Find the instruction based on the instructionId
     const instruction = instructionsData.find(instruction => instruction.id === instructionId);
 
     if (instruction) {
+
+      const botJobId = instruction.botJobId || null;
+
       // If the instruction is found, use its name for the alert message
       setAlertMessage(`Inserting step after instruction: ${instruction.name}`);
+
+      // Create the InstructionDTO object with necessary details
+      const instructionDTO = {
+        botJobId: botJobId,
+        instructionId: instruction.id,
+        blockId: instruction.blockId,
+        blockOrderNumber: instruction.blockOrderNumber,
+        instructionOrderNumber: instruction.instructionOrderNumber,
+      };
+
+      // WebSocket message for "INSERT_AFTER" with the selected instruction's details
+      const message = {
+        type: 'INSERT_AFTER',
+        botJobId: botJobId,
+        updatedRows: [instructionDTO], // Wrap the instructionDTO in an array
+      };
+
+      // Send WebSocket message
+      if (client && connected) {
+        try {
+          client.publish({
+            destination: '/app/row/insert-before', // Update based on your WebSocket endpoint configuration
+            body: JSON.stringify(message),
+          });
+
+          console.log('Sent insert before message:', message);
+        } catch (error) {
+          console.error('Error sending WebSocket message:', error);
+        }
+      }
     } else {
       console.error(`Instruction with ID ${instructionId} not found.`);
     }
   };
 
-  const handleDeleteInstruction = (instructionId: number) => {
-    handleRemoveInstruction(instructionId);
-    console.log("Delete instruction", instructionId);
+  const closeAlert = () => {
+    setAlertMessage(null);
   };
 
   const handleSplitComponent = (
@@ -1075,7 +1138,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                             </div>
                           )}
 
-                          <div onClick={() => handleDeleteInstruction(instruction.id)}>Delete</div>
+                          <div onClick={() => handleRemoveInstruction(instruction.id)}>Delete</div>
                         </div>
                       )}
                     </div>
