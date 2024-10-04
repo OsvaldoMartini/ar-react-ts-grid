@@ -1067,7 +1067,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       return;
     }
 
-    const { blockId, botJobId } = instructionToUpdate;
+    const { blockId, blockOrderNumber, botJobId, instructionOrderNumber } = instructionToUpdate;
 
     // Update the instruction's name
     const updatedInstructions = instructionsData.map((instruction) => {
@@ -1080,15 +1080,30 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     setInstructionsData(updatedInstructions);
     setEditingInstructionId(null); // Exit edit mode
 
+    const instructionUpdated = instructionsData.find(instruction => instruction.id === instructionId);
     // Send WebSocket message with the updated instruction
     if (client && connected) {
       const message = {
         type: 'ROW_UPDATE',
-        instructionId: instructionId,
-        blockId: blockId,
         botJobId: botJobId,
-        name: instructionName, // The updated name
+        updatedRows: [{
+          instructionId: instructionId,
+          instructionOrderNumber: instructionOrderNumber,
+          blockId: blockId,
+          blockOrderNumber: blockOrderNumber,
+          botJobId: botJobId,
+          instructionName: instructionName, // The updated name
+        }]
       };
+
+      instructionToUpdate.name = instructionName;
+
+
+      // const message = {
+      //   type: 'ROW_UPDATE',
+      //   botJobId: botJobId,
+      //   updatedRows: [instructionToUpdate], // Wrap the instructionDTO in an array
+      // };
 
       try {
         client.publish({
