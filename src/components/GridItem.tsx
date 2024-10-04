@@ -1044,7 +1044,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   };
 
   const renderEditButton = (actionType: string, editImage: string, instruction: BlockLoopInstructionLoadDTO) => {
-    if (["SET", "GET", "CK", "E"].includes(actionType)) {
+    if (["SET", "GET", "CK", "Q", "E"].includes(actionType)) {
       return <span className="edit-button-space">&nbsp;</span>; // Render a space or an empty element
     }
 
