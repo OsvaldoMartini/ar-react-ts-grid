@@ -15,6 +15,7 @@ import rollBackImage from '../assets/rollback4.png';
 import garbageImage from '../assets/garbage.png';
 import menuDownImage from '../assets/menu-down.png';
 import saveImage from "../assets/save.png";
+import excelImage from "../assets/excel.png";
 import AlertModal from './AlertModal';
 
 
@@ -1019,6 +1020,10 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
         imageSrc = checkImage;
         text = instruction.name;
         break;
+      case "E":
+        imageSrc = excelImage;
+        text = instruction.name;
+        break;
       default:
         imageSrc = null; // No image for other types
         text = instruction.name || null;
@@ -1039,7 +1044,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   };
 
   const renderEditButton = (actionType: string, editImage: string, instruction: BlockLoopInstructionLoadDTO) => {
-    if (["SET", "GET", "CK"].includes(actionType)) {
+    if (["SET", "GET", "CK", "E"].includes(actionType)) {
       return <span className="edit-button-space">&nbsp;</span>; // Render a space or an empty element
     }
 
@@ -1125,7 +1130,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     instruction: BlockLoopInstructionLoadDTO,
     allInstructions: BlockLoopInstructionLoadDTO[]
   ) => {
-    const validActions = ["SET", "GET", "CK"];
+    const validActions = ["SET", "GET", "CK", "E"];
 
     // Handle the "CK" action with special formatting for operation
     if (instruction.actions === "CK" && instruction.operation) {
@@ -1237,7 +1242,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                         />
                       </div>
                     ) : (
-                      <span>{instruction.name}</span>  // Render instruction name instead of `getInstructionTypeElement`
+                      <span>{getInstructionTypeElement(instruction)}</span>
                     )}
                     {renderInstructionActions(instruction, instructionsData)}
                     <div className="options-column">
