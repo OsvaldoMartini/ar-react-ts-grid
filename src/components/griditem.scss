@@ -75,6 +75,11 @@
   gap: 5px;              /* Add space between the text box and save button */
 }
 
+.edit-textbox {
+  flex: 1; /* Make the input take the available space */
+  width: 10%;
+}
+
 .socket-port {
   font-size: 7px;
   display: inline-block;

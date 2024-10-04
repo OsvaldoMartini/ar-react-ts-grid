@@ -1054,17 +1054,56 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   };
 
   const handleEditInstruction = (instruction: BlockLoopInstructionLoadDTO) => {
-    setEditingInstructionId(instruction.id);   // Set the current instruction to edit
-    setInstructionName(instruction.name);      // Pre-fill the textbox with the current name
+    setEditingInstructionId(instruction.id);
+    setInstructionName(instruction.name);
   };
 
   const handleSaveInstruction = (instructionId: number) => {
-    // Logic to save the edited name, e.g., update your data or send an API request
-    console.log(`Saving instruction ID: ${instructionId} with name: ${instructionName}`);
+    // Find the instruction to get blockId and botJobId
+    const instructionToUpdate = instructionsData.find(instruction => instruction.id === instructionId);
 
-    // Exit the edit mode by resetting editingInstructionId
-    setEditingInstructionId(null);
+    if (!instructionToUpdate) {
+      console.error(`Instruction with ID ${instructionId} not found`);
+      return;
+    }
+
+    const { blockId, botJobId } = instructionToUpdate;
+
+    // Update the instruction's name
+    const updatedInstructions = instructionsData.map((instruction) => {
+      if (instruction.id === instructionId) {
+        return { ...instruction, name: instructionName }; // Update the name
+      }
+      return instruction;
+    });
+
+    setInstructionsData(updatedInstructions);
+    setEditingInstructionId(null); // Exit edit mode
+
+    // Send WebSocket message with the updated instruction
+    if (client && connected) {
+      const message = {
+        type: 'ROW_UPDATE',
+        instructionId: instructionId,
+        blockId: blockId,
+        botJobId: botJobId,
+        name: instructionName, // The updated name
+      };
+
+      try {
+        client.publish({
+          destination: '/app/instruction/update', // WebSocket destination
+          body: JSON.stringify(message),
+        });
+
+        console.log('Sent instruction update message:', message);
+      } catch (error) {
+        console.error('Error sending WebSocket message:', error);
+      }
+    }
   };
+
+
 
 
   const renderInstructionActions = (
