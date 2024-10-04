@@ -60,13 +60,19 @@
 .rollback-button,
 .garbage-button,
 .edit-button,
-.cross-button {
-
+.cross-button,
+.save-button {
   width: 15px; /* Decreased button size */
   height: 15px;
   background-color: transparent;
   padding: 0;
   cursor: pointer;
+}
+
+.edit-container {
+  display: inline-flex;  /* Make input and image inline */
+  align-items: center;   /* Vertically center the items */
+  gap: 5px;              /* Add space between the text box and save button */
 }
 
 .socket-port {

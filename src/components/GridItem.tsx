@@ -14,6 +14,7 @@ import downImage from '../assets/down.png';
 import rollBackImage from '../assets/rollback4.png';
 import garbageImage from '../assets/garbage.png';
 import menuDownImage from '../assets/menu-down.png';
+import saveImage from "../assets/save.png";
 import AlertModal from './AlertModal';
 
 
@@ -62,6 +63,8 @@ const reassignInstructionOrderNumbersByBlock = (instructions: BlockLoopInstructi
 
 const GridItem: React.FC<GridItemProps> = ({ data }) => {
   // Use state to manage the instructions data
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const [mockData, setMockData] = useState<boolean>(false);
   const [instructionsData, setInstructionsData] = useState<BlockLoopInstructionLoadDTO[]>(data);
   const [socketPort, setSocketPort] = useState<number>(8080);
@@ -72,9 +75,10 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   const [messages, setMessages] = useState<string[]>([]);
   const [openDropdown, setOpenDropdown] = useState<number | null>(null);
   const [dropdownPosition, setDropdownPosition] = useState('below'); // Default to 'below'
-  const dropdownRef = useRef<HTMLDivElement>(null);
   const [updatedBlocks, setUpdatedBlocks] = useState<UpdatedBlock[]>([]);
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
+  const [editingInstructionId, setEditingInstructionId] = useState<number | null>(null);
+  const [instructionName, setInstructionName] = useState<string>('');
 
 
   // Function to handle receiving data from JavaFX
@@ -142,6 +146,12 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       stompClient.deactivate();
     };
   }, [socketPort]);
+
+  useEffect(() => {
+    if (editingInstructionId && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [editingInstructionId]);
 
   useEffect(() => {
     if (connected) {
@@ -1028,6 +1038,35 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     );
   };
 
+  const renderEditButton = (actionType: string, editImage: string, instruction: BlockLoopInstructionLoadDTO) => {
+    if (["SET", "GET", "CK"].includes(actionType)) {
+      return <span className="edit-button-space">&nbsp;</span>; // Render a space or an empty element
+    }
+
+    return (
+      <img
+        src={editImage}
+        alt="edit"
+        className="edit-button"
+        onClick={() => handleEditInstruction(instruction)}  // Trigger edit mode
+      />
+    );
+  };
+
+  const handleEditInstruction = (instruction: BlockLoopInstructionLoadDTO) => {
+    setEditingInstructionId(instruction.id);   // Set the current instruction to edit
+    setInstructionName(instruction.name);      // Pre-fill the textbox with the current name
+  };
+
+  const handleSaveInstruction = (instructionId: number) => {
+    // Logic to save the edited name, e.g., update your data or send an API request
+    console.log(`Saving instruction ID: ${instructionId} with name: ${instructionName}`);
+
+    // Exit the edit mode by resetting editingInstructionId
+    setEditingInstructionId(null);
+  };
+
+
   const renderInstructionActions = (
     instruction: BlockLoopInstructionLoadDTO,
     allInstructions: BlockLoopInstructionLoadDTO[]
@@ -1127,13 +1166,31 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
                 return (
                   <div key={instruction.id} className="instruction-item">
-                    <span>{getInstructionTypeElement(instruction)}</span>
+                    {editingInstructionId === instruction.id ? (
+                      <div className="edit-container">
+                        <input
+                          type="text"
+                          value={instructionName}
+                          onChange={(e) => setInstructionName(e.target.value)}
+                          ref={inputRef}  // Associate the ref with the input element
+                          className="edit-textbox"
+                        />
+                        <img
+                          src={saveImage}
+                          alt="save"
+                          className="save-button"
+                          onClick={() => handleSaveInstruction(instruction.id)} // Save instruction logic
+                        />
+                      </div>
+                    ) : (
+                      <span>{instruction.name}</span>  // Render instruction name instead of `getInstructionTypeElement`
+                    )}
                     {renderInstructionActions(instruction, instructionsData)}
                     <div className="options-column">
                       <div className="move-buttons">
+                        {renderEditButton(instruction.actions, editImage, instruction)}
                         <img src={upImage} alt="" className="move-button" onClick={() => handleMoveRowUp(instruction.id)} />
                         <img src={downImage} alt="" className="move-button" onClick={() => handleMoveRowDown(instruction.id)} />
-                        <img src={editImage} alt="" className="edit-button" />
                         <img src={crossImage} alt="" className="cross-button" onClick={() => handleRemoveInstruction(instruction.id)} />
                       </div>
                     </div>
