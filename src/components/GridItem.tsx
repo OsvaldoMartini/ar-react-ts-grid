@@ -16,6 +16,7 @@ import garbageImage from '../assets/garbage.png';
 import menuDownImage from '../assets/menu-down.png';
 import saveImage from "../assets/save.png";
 import excelImage from "../assets/excel.png";
+import screenImage from "../assets/screen.png";
 import AlertModal from './AlertModal';
 
 
@@ -395,6 +396,8 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       const message = {
         type: 'INSERT_BEFORE',
         botJobId: botJobId,
+        blockId: instruction.blockId,
+        blockName: instruction.blockName,
         updatedRows: [instructionDTO], // Wrap the instructionDTO in an array
       };
 
@@ -445,6 +448,8 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       const message = {
         type: 'INSERT_AFTER',
         botJobId: botJobId,
+        blockId: instruction.blockId,
+        blockName: instruction.blockName,
         updatedRows: [instructionDTO], // Wrap the instructionDTO in an array
       };
 
@@ -747,6 +752,9 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
         if (client && connected) {
           const message = {
             type: 'ROW_MOVE',
+            botJobId: currentInstruction.botJobId,
+            blockId: currentInstruction.blockId,
+            blockName: currentInstruction.blockName,
             updatedRows: updatedRows,
           };
 
@@ -1024,6 +1032,10 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
         imageSrc = excelImage;
         text = instruction.name;
         break;
+      case "P":
+        imageSrc = screenImage;
+        text = instruction.name;
+        break;
       default:
         imageSrc = null; // No image for other types
         text = instruction.name || null;
@@ -1044,7 +1056,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   };
 
   const renderEditButton = (actionType: string, editImage: string, instruction: BlockLoopInstructionLoadDTO) => {
-    if (["SET", "GET", "CK", "Q", "E"].includes(actionType)) {
+    if (["SET", "GET", "CK", "Q", "E", "P"].includes(actionType)) {
       return <span className="edit-button-space">&nbsp;</span>; // Render a space or an empty element
     }
 
@@ -1072,7 +1084,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       return;
     }
 
-    const { blockId, blockOrderNumber, botJobId, instructionOrderNumber } = instructionToUpdate;
+    const { blockId, blockName, blockOrderNumber, botJobId, instructionOrderNumber } = instructionToUpdate;
 
     // Update the instruction's name
     const updatedInstructions = instructionsData.map((instruction) => {
@@ -1091,6 +1103,8 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       const message = {
         type: 'ROW_UPDATE',
         botJobId: botJobId,
+        blockId: blockId,
+        blockName: blockName,
         updatedRows: [{
           instructionId: instructionId,
           instructionOrderNumber: instructionOrderNumber,
@@ -1130,7 +1144,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     instruction: BlockLoopInstructionLoadDTO,
     allInstructions: BlockLoopInstructionLoadDTO[]
   ) => {
-    const validActions = ["SET", "GET", "CK", "E"];
+    const validActions = ["SET", "GET", "CK", "E", "P"];
 
     // Handle the "CK" action with special formatting for operation
     if (instruction.actions === "CK" && instruction.operation) {
