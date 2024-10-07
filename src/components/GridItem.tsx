@@ -82,6 +82,8 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
   const [editingInstructionId, setEditingInstructionId] = useState<number | null>(null);
   const [instructionName, setInstructionName] = useState<string>('');
+  const [editingBlockId, setEditingBlockId] = useState<number | null>(null);
+  const [blockName, setBlockName] = useState<string>('');
 
 
   // Function to handle receiving data from JavaFX
@@ -237,6 +239,62 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     };
   }, [openDropdown]);
 
+
+
+
+  // Start editing block name
+  const handleEditBlock = (blockId: number, currentBlockName: string) => {
+    setEditingBlockId(blockId);
+    setBlockName(currentBlockName);
+  };
+  const handleSaveBlockName = (blockId: number) => {
+    // Find the botJobId from the instructionsData for the given blockId
+    const botJobId = instructionsData.find(instruction => instruction.blockId === blockId)?.botJobId;
+
+    // Check if botJobId is found, if not handle the error
+    if (!botJobId) {
+      console.error(`botJobId not found for blockId: ${blockId}`);
+      return;
+    }
+
+    // Update instructionsData with the new block name
+    const updatedInstructions = instructionsData.map((instruction) => {
+      if (instruction.blockId === blockId) {
+        return { ...instruction, blockName: blockName }; // Update the block name
+      }
+      return instruction;
+    });
+
+    // Update the instructionsData state
+    setInstructionsData(updatedInstructions);
+
+    // Recompute groupedData based on the updated instructionsData
+    const updatedGroupedData = groupByBlock(updatedInstructions);
+    setGroupedData(updatedGroupedData);
+
+    // Exit edit mode
+    setEditingBlockId(null);
+
+    // Send WebSocket message for block name update
+    if (client && connected) {
+      const message = {
+        type: 'BLOCK_UPDATE',
+        botJobId: botJobId,  // Include the botJobId in the message
+        blockId: blockId,
+        blockName: blockName, // Send the updated block name
+      };
+
+      try {
+        client.publish({
+          destination: '/app/block/update',
+          body: JSON.stringify(message),
+        });
+        console.log('Sent block name update message:', message);
+      } catch (error) {
+        console.error('Error sending WebSocket message:', error);
+      }
+    }
+  };
 
 
   const correctBlockOrderNumbers = (data: any[]) => {
@@ -1044,7 +1102,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
         break;
       default:
         imageSrc = null; // No image for other types
-        text = instruction.name || null;
+        text = instruction.id + "-" + instruction.name || null;
         isActionBold = true; // Set bold for actions
     }
 
@@ -1063,7 +1121,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
 
   const renderEditButton = (actionType: string, editImage: string, instruction: BlockLoopInstructionLoadDTO) => {
-    if (["SET", "GET", "CK", "Q", "E", "P"].includes(actionType)) {
+    if (["SET", "GET", "CK", "Q", "E", "P", "H"].includes(actionType)) {
       return <span className="edit-button-space">&nbsp;</span>; // Render a space or an empty element
     }
 
@@ -1161,7 +1219,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
         // Render the left and right parts with "=" in between, using specific colors
         return (
           <span className="instruction-details">
-            <span style={{ color: '#0b5394' }}>{left}</span>
+            <span style={{ color: '#0b5394' }}>({instruction.parentId}){left}</span>
             <span style={{ color: '#0b5394' }}>{middle}</span>
             <span style={{ color: '#FFA500' }}>{right}</span>
           </span>
@@ -1175,7 +1233,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
       return (
         <span className="instruction-details">
-          <span style={{ color: '#0b5394' }}>{left}</span>:
+          <span style={{ color: '#0b5394' }}>({instruction.parentId}){left}</span>:
           <span style={{ color: '#FFA500' }}>{right}</span>
         </span>
       );
@@ -1204,7 +1262,25 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
             {/* Block header with garbage, up, and down buttons */}
             <div className="block-header">
               <span className="block-order-number">#{blockData.instructions[0].blockOrderNumber}</span>
-              <span className="block-name">{blockData.blockName}</span>
+              {editingBlockId === Number(blockId) ? (
+                <div className="edit-container">
+                  <input
+                    type="text"
+                    value={blockName}
+                    onChange={(e) => setBlockName(e.target.value)}
+                    className="edit-textbox"
+                  />
+                  <img
+                    src={saveImage}
+                    alt="save"
+                    className="save-button"
+                    onClick={() => handleSaveBlockName(Number(blockId))}
+                  />
+                </div>
+              ) : (
+                <span className="block-name">{blockData.blockName}</span>
+              )}
+
               <span className="block-count">
                 ({blockData.instructions.length})
                 {!mockData ? "-Moock Data" : ""}
@@ -1215,6 +1291,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                   //   <span className="socket-port">
                   //     {socketPort}
                   //   </span>
+
                   <img
                     src={rollBackImage}
                     alt=""
@@ -1223,6 +1300,15 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                   />
                   // </div>
                 )}
+
+                {/* Edit Block Name Button */}
+                <img
+                  src={editImage}
+                  alt="edit"
+                  className="edit-button"
+                  onClick={() => handleEditBlock(Number(blockId), blockData.blockName)}  // Edit block logic
+                />
+
                 {index !== 0 && (
                   <img
                     src={garbageImage}
