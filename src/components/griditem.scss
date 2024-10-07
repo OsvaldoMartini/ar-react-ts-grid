@@ -117,6 +117,12 @@
   cursor: pointer;
 }
 
+/* New class for waitImage with same styles but different height */
+.wait-image {
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
+
 /* Instructions List */
 .instructions-list {
   display: flex;

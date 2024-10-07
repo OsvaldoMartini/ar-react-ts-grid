@@ -17,6 +17,7 @@ import menuDownImage from '../assets/menu-down.png';
 import saveImage from "../assets/save.png";
 import excelImage from "../assets/excel.png";
 import screenImage from "../assets/screen.png";
+import waitImage from "../assets/wait.png";
 import AlertModal from './AlertModal';
 
 
@@ -1008,11 +1009,11 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   };
 
 
-
   const getInstructionTypeElement = (instruction: BlockLoopInstructionLoadDTO): JSX.Element | string | null => {
     let imageSrc: string | null = null;
     let text: string | null = null;
     let isActionBold = false;
+    let imageClass = "operations"; // Default class for images
 
     // Determine the image source and text based on instruction type
     switch (instruction.actions) {
@@ -1036,6 +1037,11 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
         imageSrc = screenImage;
         text = instruction.name;
         break;
+      case "H":
+        imageSrc = waitImage;
+        text = instruction.name;
+        imageClass = "wait-image"; // Use the new class for waitImage
+        break;
       default:
         imageSrc = null; // No image for other types
         text = instruction.name || null;
@@ -1045,7 +1051,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     // Return a combined image and text element if imageSrc exists, otherwise return just the text
     return imageSrc ? (
       <div className="instruction-type">
-        <img src={imageSrc} alt="" className="operations" />
+        <img src={imageSrc} alt="" className={imageClass} />
         <span>{text}</span>
       </div>
     ) : (
@@ -1054,6 +1060,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       </span>
     );
   };
+
 
   const renderEditButton = (actionType: string, editImage: string, instruction: BlockLoopInstructionLoadDTO) => {
     if (["SET", "GET", "CK", "Q", "E", "P"].includes(actionType)) {
@@ -1144,7 +1151,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     instruction: BlockLoopInstructionLoadDTO,
     allInstructions: BlockLoopInstructionLoadDTO[]
   ) => {
-    const validActions = ["SET", "GET", "CK", "E", "P"];
+    const validActions = ["SET", "GET", "CK", "E"];
 
     // Handle the "CK" action with special formatting for operation
     if (instruction.actions === "CK" && instruction.operation) {
