@@ -143,6 +143,11 @@
   align-items: center; /* Center content vertically */
 }
 
+/* Change background to white when dropdown is open */
+.instruction-item.dropdown-open {
+  background-color: #9ee6ef; /* Change background to white */
+}
+
 /* Margin for the first span element with instruction type */
 .instruction-item span:first-child {
   margin-left: 3px; /* Add left margin of 3px */

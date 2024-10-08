@@ -456,7 +456,10 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
         blockId: instruction.blockId,
         blockOrderNumber: instruction.blockOrderNumber,
         instructionOrderNumber: instruction.instructionOrderNumber,
-        instructionName: instruction.name
+        instructionName: instruction.name,
+        operation: instruction.operation,
+        actions: instruction.actions,
+        parentId: instruction.parentId
       };
 
       // WebSocket message for "INSERT_BEFORE" with the selected instruction's details
@@ -508,7 +511,10 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
         blockId: instruction.blockId,
         blockOrderNumber: instruction.blockOrderNumber,
         instructionOrderNumber: instruction.instructionOrderNumber,
-        instructionName: instruction.name
+        instructionName: instruction.name,
+        operation: instruction.operation,
+        actions: instruction.actions,
+        parentId: instruction.parentId
       };
 
       // WebSocket message for "INSERT_AFTER" with the selected instruction's details
@@ -1340,7 +1346,8 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                 const isLastBlock = Number(blockId) === Object.keys(groupedData).length; // Check if this is the last block
 
                 return (
-                  <div key={instruction.id} className="instruction-item">
+                  <div key={instruction.id}
+                    className={`instruction-item ${openDropdown === instruction.id ? 'dropdown-open' : ''}`}>
                     {editingInstructionId === instruction.id ? (
                       <div className="edit-container">
                         <input
