@@ -66,8 +66,10 @@ const reassignInstructionOrderNumbersByBlock = (instructions: BlockLoopInstructi
 
 const GridItem: React.FC<GridItemProps> = ({ data }) => {
   // Use state to manage the instructions data
-  const inputRef = useRef<HTMLInputElement>(null);
+  const instructionRef = useRef<HTMLInputElement>(null);
+  const blockRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [openDropdown, setOpenDropdown] = useState<number | null>(null);
   const [mockData, setMockData] = useState<boolean>(false);
   const [instructionsData, setInstructionsData] = useState<BlockLoopInstructionLoadDTO[]>(data);
   const [socketPort, setSocketPort] = useState<number>(8080);
@@ -76,7 +78,6 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   const [client, setClient] = useState<Client | null>(null);
   const [connected, setConnected] = useState(false);
   const [messages, setMessages] = useState<string[]>([]);
-  const [openDropdown, setOpenDropdown] = useState<number | null>(null);
   const [dropdownPosition, setDropdownPosition] = useState('below'); // Default to 'below'
   const [updatedBlocks, setUpdatedBlocks] = useState<UpdatedBlock[]>([]);
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
@@ -153,10 +154,16 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   }, [socketPort]);
 
   useEffect(() => {
-    if (editingInstructionId && inputRef.current) {
-      inputRef.current.focus();
+    if (editingInstructionId && instructionRef.current) {
+      instructionRef.current.focus();
     }
   }, [editingInstructionId]);
+
+  useEffect(() => {
+    if (editingBlockId && blockRef.current) {
+      blockRef.current.focus();
+    }
+  }, [editingBlockId]);
 
   useEffect(() => {
     if (connected) {
@@ -317,6 +324,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
             updatedBlocks.push({
               botJobId: instruction.botJobId || null, // Assuming botJobId is part of the instruction
               blockId: instruction.blockId,
+              blockName: instruction.blockName,
               blockOrderNumber: newOrderNumber,
             });
           }
@@ -1268,6 +1276,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                     type="text"
                     value={blockName}
                     onChange={(e) => setBlockName(e.target.value)}
+                    ref={blockRef}  // Associate the ref with the input element
                     className="edit-textbox"
                   />
                   <img
@@ -1338,7 +1347,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                           type="text"
                           value={instructionName}
                           onChange={(e) => setInstructionName(e.target.value)}
-                          ref={inputRef}  // Associate the ref with the input element
+                          ref={instructionRef}  // Associate the ref with the input element
                           className="edit-textbox"
                         />
                         <img

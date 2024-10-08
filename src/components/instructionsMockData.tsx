@@ -21,13 +21,14 @@ export interface Message {
 export interface UpdatedBlock {
   botJobId: number | null;  // Adjust the type based on actual data (use `null` if it's nullable)
   blockId: number;
+  blockName: string;
   blockOrderNumber: number;
 }
 
 
 const instructionsMockData: BlockLoopInstructionLoadDTO[] = [
   { botJobId: 1, id: 1, instructionOrderNumber: 1, name: "Instruction 4", description: "Description 4", blockId: 1, blockOrderNumber: 1, blockName: "Default Block", actions: "click", parentId: 4 },
-  { botJobId: 1, id: 2, instructionOrderNumber: 2, name: "SetValue", description: "Description 1", blockId: 1, blockOrderNumber: 2, blockName: "Default Block", actions: "SET", parentId: 4, operation: "firstName:MockData" },
+  { botJobId: 1, id: 2, instructionOrderNumber: 2, name: "SetValue", description: "Description 1", blockId: 1, blockOrderNumber: 2, blockName: "Default Block", actions: "SET", parentId: 4, operation: "firstName:MockData-martini-martini" },
 
   // Block 2                                                                                                                                                                                        
   { botJobId: 11, id: 3, instructionOrderNumber: 3, name: "GetValue", description: "Description 2", blockId: 34, blockOrderNumber: 2, blockName: "Block Test 1", actions: "GET", parentId: 4, operation: "firstname:$FIRSTNAME" },
@@ -37,16 +38,16 @@ const instructionsMockData: BlockLoopInstructionLoadDTO[] = [
   { botJobId: 11, id: 7, instructionOrderNumber: 1, name: "GetValue", description: "Description 7", blockId: 35, blockOrderNumber: 3, blockName: "Block Test 2", actions: "GET", parentId: 4, operation: "firstname:$FIRSTNAME" },
 
   // Block 3                                                                                                                                                                                        
-  { botJobId: 11, id: 8, instructionOrderNumber: 1, name: "Instruction 8", description: "Description 8", blockId: 36, blockOrderNumber: 4, blockName: "Block Test 3", actions: "click", parentId: 4, operation: "firstName:Osvaldo" },
+  { botJobId: 11, id: 8, instructionOrderNumber: 1, name: "ExcelWrite", description: "Description 8", blockId: 36, blockOrderNumber: 4, blockName: "Block Test 3", actions: "E", parentId: 4, operation: "$payment:56855874" },
   { botJobId: 11, id: 9, instructionOrderNumber: 2, name: "SetValue", description: "Description 9", blockId: 36, blockOrderNumber: 4, blockName: "Block Test 3", actions: "SET", parentId: 4, operation: "firstName:Osvaldo" },
   { botJobId: 11, id: 10, instructionOrderNumber: 3, name: "GetValue", description: "Description 10", blockId: 36, blockOrderNumber: 4, blockName: "Block Test 3", actions: "GET", parentId: 4, operation: "firstname:$FIRSTNAME" },
   { botJobId: 11, id: 11, instructionOrderNumber: 4, name: "Instruction 11", description: "Description 11", blockId: 36, blockOrderNumber: 4, blockName: "Block Test 3", actions: "click", parentId: 4 },
   { botJobId: 11, id: 12, instructionOrderNumber: 5, name: "Check", description: "Description 12", blockId: 36, blockOrderNumber: 4, blockName: "Block Test 3", actions: "CK", parentId: 4, operation: "$firstname:=:Osvaldo" },
 
   // Block 4                                                                                                                                                                                        
-  { botJobId: 11, id: 13, instructionOrderNumber: 1, name: "Instruction 13", description: "Description 13", blockId: 37, blockOrderNumber: 5, blockName: "Block Test 4", actions: "click", parentId: 4 },
-  { botJobId: 11, id: 14, instructionOrderNumber: 2, name: "Instruction 14", description: "Description 14", blockId: 37, blockOrderNumber: 5, blockName: "Block Test 4", actions: "click", parentId: 4 },
-  { botJobId: 11, id: 15, instructionOrderNumber: 3, name: "Instruction 15", description: "Description 15", blockId: 37, blockOrderNumber: 5, blockName: "Block Test 4", actions: "click", parentId: 4 },
+  { botJobId: 11, id: 13, instructionOrderNumber: 1, name: "Close Browser", description: "Close Browser", blockId: 37, blockOrderNumber: 5, blockName: "Block Test 4", actions: "Q" },
+  { botJobId: 11, id: 14, instructionOrderNumber: 2, name: "Screen Shot", description: "Screen Shot", blockId: 37, blockOrderNumber: 5, blockName: "Block Test 4", actions: "P" },
+  { botJobId: 11, id: 15, instructionOrderNumber: 3, name: "Wait 15second(s)", description: "Waiting action", blockId: 37, blockOrderNumber: 5, blockName: "Block Test 4", actions: "H" },
   { botJobId: 11, id: 16, instructionOrderNumber: 4, name: "Instruction 16", description: "Description 16", blockId: 37, blockOrderNumber: 5, blockName: "Block Test 4", actions: "click", parentId: 4 },
   { botJobId: 11, id: 17, instructionOrderNumber: 5, name: "Instruction 17", description: "Description 17", blockId: 37, blockOrderNumber: 5, blockName: "Block Test 4", actions: "click", parentId: 4 },
 
