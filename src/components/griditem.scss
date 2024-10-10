@@ -123,6 +123,24 @@
   height: 20px; /* Override height */
 }
 
+/* New class for waitImage with same styles but different height */
+.ifelse-image {
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
+
+/* New class for waitImage with same styles but different height */
+.else-image {
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
+
+/* New class for waitImage with same styles but different height */
+.goto-image {
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
+
 /* Instructions List */
 .instructions-list {
   display: flex;

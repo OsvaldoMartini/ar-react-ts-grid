@@ -18,6 +18,9 @@ import saveImage from "../assets/save.png";
 import excelImage from "../assets/excel.png";
 import screenImage from "../assets/screen.png";
 import waitImage from "../assets/wait.png";
+import gotoImage from "../assets/goto8.png";
+import ifElseImage from "../assets/ifElse.png";
+import elseImage from "../assets/else6.png";
 import AlertModal from './AlertModal';
 
 
@@ -246,14 +249,12 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     };
   }, [openDropdown]);
 
-
-
-
   // Start editing block name
   const handleEditBlock = (blockId: number, currentBlockName: string) => {
     setEditingBlockId(blockId);
     setBlockName(currentBlockName);
   };
+
   const handleSaveBlockName = (blockId: number) => {
     // Find the botJobId from the instructionsData for the given blockId
     const botJobId = instructionsData.find(instruction => instruction.blockId === blockId)?.botJobId;
@@ -1114,6 +1115,21 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
         text = instruction.name;
         imageClass = "wait-image"; // Use the new class for waitImage
         break;
+      case "IF":
+        imageSrc = ifElseImage;
+        text = instruction.name;
+        imageClass = "ifelse-image"; // Use the new class for waitImage
+        break;
+      case "GOTO":
+        imageSrc = gotoImage;
+        text = instruction.name;
+        imageClass = "goto-image"; // Use the new class for waitImage
+        break;
+      case "ENDIF":
+        imageSrc = elseImage;
+        text = instruction.name;
+        imageClass = "else-image"; // Use the new class for waitImage
+        break;
       default:
         imageSrc = null; // No image for other types
         text = instruction.id + "-" + instruction.name || null;
@@ -1135,7 +1151,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
 
   const renderEditButton = (actionType: string, editImage: string, instruction: BlockLoopInstructionLoadDTO) => {
-    if (["SET", "GET", "CK", "Q", "E", "P", "H"].includes(actionType)) {
+    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO"].includes(actionType)) {
       return <span className="edit-button-space">&nbsp;</span>; // Render a space or an empty element
     }
 
@@ -1218,12 +1234,11 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
 
 
-
-  const renderInstructionActions = (
+  const renderOperations = (
     instruction: BlockLoopInstructionLoadDTO,
     allInstructions: BlockLoopInstructionLoadDTO[]
   ) => {
-    const validActions = ["SET", "GET", "CK", "E"];
+    const validActions = ["SET", "GET", "CK", "E", "GOTO"];
 
     // Handle the "CK" action with special formatting for operation
     if (instruction.actions === "CK" && instruction.operation) {
@@ -1241,7 +1256,16 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       }
     }
 
-    // Handle operation for other actions (SET, GET)
+    // Special case for "GOTO" action - render only the operation without parentId or colon
+    if (instruction.actions === "GOTO" && instruction.operation) {
+      return (
+        <span className="instruction-details">
+          <span style={{ color: '#b163ff' }}>{instruction.operation}</span>
+        </span>
+      );
+    }
+
+    // Handle operation for other actions (SET, GET, E)
     if (instruction.operation && validActions.includes(instruction.actions)) {
       const [left, right] = instruction.operation.split(":");
 
@@ -1264,6 +1288,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
 
 
+
   return (
     <div className="grid-container">
       {alertMessage && (
@@ -1282,6 +1307,11 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                     type="text"
                     value={blockName}
                     onChange={(e) => setBlockName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        handleSaveBlockName(Number(blockId)); // Trigger save when "Enter" is pressed
+                      }
+                    }}
                     ref={blockRef}  // Associate the ref with the input element
                     className="edit-textbox"
                   />
@@ -1361,13 +1391,18 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                           src={saveImage}
                           alt="save"
                           className="save-button"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              handleSaveBlockName(Number(blockId)); // Trigger save when "Enter" is pressed
+                            }
+                          }}
                           onClick={() => handleSaveInstruction(instruction.id)} // Save instruction logic
                         />
                       </div>
                     ) : (
                       <span>{getInstructionTypeElement(instruction)}</span>
                     )}
-                    {renderInstructionActions(instruction, instructionsData)}
+                    {renderOperations(instruction, instructionsData)}
                     <div className="options-column">
                       <div className="move-buttons">
                         {renderEditButton(instruction.actions, editImage, instruction)}
