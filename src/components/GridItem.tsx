@@ -112,51 +112,82 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
   // Drag-and-drop event handler
   const onDragEnd = (result: any) => {
-    const { destination, source } = result;
+    const { source, destination } = result;
 
-    // No destination (dropped outside a droppable area)
+    // If dropped outside the droppable area
     if (!destination) {
       return;
     }
 
-    // Reordering within the same block
-    const blockId = source.droppableId;
-    const updatedBlockData = reorder(
-      groupedData[blockId].instructions,
-      source.index,
-      destination.index
-    );
+    const sourceBlockId = source.droppableId;
+    const destinationBlockId = destination.droppableId;
 
-    const updatedGroupedData = {
-      ...groupedData,
-      [blockId]: {
-        ...groupedData[blockId],
-        instructions: updatedBlockData,
-      },
-    };
+    // If the instruction was moved within the same block
+    if (sourceBlockId === destinationBlockId) {
+      const reorderedInstructions = reorder(
+        groupedData[sourceBlockId].instructions,
+        source.index,
+        destination.index
+      );
 
-    // Update state with the new order
-    setGroupedData(updatedGroupedData);
-
-    // Send WebSocket message with the new row order
-    if (client && connected) {
-      const updatedRows = updatedBlockData.map((instruction: BlockLoopInstructionLoadDTO, index: number) => ({
-        blockId: instruction.blockId,
-        instructionId: instruction.id,
-        instructionOrderNumber: index + 1, // Reassign order numbers
-      }));
-
-      const message = {
-        type: 'ROW_MOVE',
-        updatedRows,
+      const updatedGroupedData = {
+        ...groupedData,
+        [sourceBlockId]: {
+          ...groupedData[sourceBlockId],
+          instructions: reorderedInstructions,
+        },
       };
 
-      client.publish({
-        destination: '/app/row/move',
-        body: JSON.stringify(message),
-      });
+      setGroupedData(updatedGroupedData);
+    } else {
+      // If the instruction was moved to a different block, update the blockId
+      const sourceInstructions = Array.from(groupedData[sourceBlockId].instructions);
+      const destinationInstructions = Array.from(groupedData[destinationBlockId].instructions);
 
-      console.log('Sent row move message:', message);
+      // Remove the dragged instruction from the source block
+      const [movedInstruction] = sourceInstructions.splice(source.index, 1);
+
+      // Update the blockId of the moved instruction to match the destination block
+      movedInstruction.blockId = parseInt(destinationBlockId, 10);
+
+      // Insert the moved instruction into the destination block at the new position
+      destinationInstructions.splice(destination.index, 0, movedInstruction);
+
+      const updatedGroupedData = {
+        ...groupedData,
+        [sourceBlockId]: {
+          ...groupedData[sourceBlockId],
+          instructions: sourceInstructions,
+        },
+        [destinationBlockId]: {
+          ...groupedData[destinationBlockId],
+          instructions: destinationInstructions,
+        },
+      };
+
+      setGroupedData(updatedGroupedData);
+    }
+
+    // Optionally send a WebSocket message after the drag-and-drop action is completed
+    if (client && connected) {
+      const message = {
+        type: 'ROW_MOVE',
+        updatedRows: groupedData[destinationBlockId].instructions.map((instruction, index) => ({
+          blockId: instruction.blockId,
+          instructionId: instruction.id,
+          instructionOrderNumber: index + 1, // Update the order numbers
+        })),
+      };
+
+      try {
+        client.publish({
+          destination: '/app/row/move', // WebSocket endpoint for row move
+          body: JSON.stringify(message),
+        });
+        console.log('Sent row move message:', message);
+      } catch (error) {
+        console.error('Error sending WebSocket message:', error);
+      }
     }
   };
 
