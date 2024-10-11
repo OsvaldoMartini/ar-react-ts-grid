@@ -96,7 +96,6 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   const [editingBlockId, setEditingBlockId] = useState<number | null>(null);
   const [blockName, setBlockName] = useState<string>('');
 
-
   // Function to handle receiving data from JavaFX
   (window as any).receiveDataFromJava = function (jsonData: string, socketPort: number) {
     const data: BlockLoopInstructionLoadDTO[] = JSON.parse(jsonData);
@@ -170,10 +169,15 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
         instructionOrderNumber: index + 1,
       }));
 
+      const { blockId, blockName, blockOrderNumber } = groupedData[destinationBlockId].instructions[0] || {};
+
       // Reassign instructionOrderNumbers in destination block
       const updatedDestinationInstructions = destinationInstructions.map((instruction, index) => ({
         ...instruction,
         instructionOrderNumber: index + 1,
+        blockId: blockId,
+        blockName: blockName,
+        blockOrderNumber: destination.droppableId,  // Update blockOrderNumber
       }));
 
       updatedGroupedData = {
@@ -188,9 +192,41 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
         },
       };
 
+
       // Remove the block from `groupedData` if it has no instructions left
       if (updatedSourceInstructions.length === 0) {
         delete updatedGroupedData[sourceBlockId];
+
+        // Assuming `updatedGroupedData` is an object where keys are strings and values are arrays of instructions
+        // const updatedGroupedData: { [key: string]: UpdatedBlock[] } = {}; // Array of instructions within each block
+
+        // Reorder blockOrderNumbers for remaining blocks and update each instruction within the block
+        let blockOrder = 1; // Start from 1, or adjust as needed
+
+        // Use `for...in` to iterate over the keys of updatedGroupedData
+        for (const blockKey in updatedGroupedData) {
+          if (Object.prototype.hasOwnProperty.call(updatedGroupedData, blockKey)) {
+            const instructions = updatedGroupedData[blockKey]; // Array of instructions for this block
+            if (instructions && instructions.length > 0) {
+              console.log(instructions); // Log the array of instructions for the block
+
+              // Create a new array of updated instructions with the correct blockOrderNumber
+              const updatedInstructions = instructions.map((instruction: any) => {
+                return {
+                  ...instruction, // Spread the existing instruction properties
+                  blockOrderNumber: blockOrder, // Update blockOrderNumber for this block
+                };
+              });
+
+              // Assign the updated instructions array back to updatedGroupedData for this block
+              updatedGroupedData[blockKey] = updatedInstructions;
+
+              blockOrder++; // Increment for the next block
+            }
+          }
+        }
+
+
       }
     }
 
