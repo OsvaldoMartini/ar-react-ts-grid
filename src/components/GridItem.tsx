@@ -112,82 +112,51 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
   // Drag-and-drop event handler
   const onDragEnd = (result: any) => {
-    const { source, destination } = result;
+    const { destination, source } = result;
 
-    // If dropped outside the droppable area
+    // No destination (dropped outside a droppable area)
     if (!destination) {
       return;
     }
 
-    const sourceBlockId = source.droppableId;
-    const destinationBlockId = destination.droppableId;
+    // Reordering within the same block
+    const blockId = source.droppableId;
+    const updatedBlockData = reorder(
+      groupedData[blockId].instructions,
+      source.index,
+      destination.index
+    );
 
-    // If the instruction was moved within the same block
-    if (sourceBlockId === destinationBlockId) {
-      const reorderedInstructions = reorder(
-        groupedData[sourceBlockId].instructions,
-        source.index,
-        destination.index
-      );
+    const updatedGroupedData = {
+      ...groupedData,
+      [blockId]: {
+        ...groupedData[blockId],
+        instructions: updatedBlockData,
+      },
+    };
 
-      const updatedGroupedData = {
-        ...groupedData,
-        [sourceBlockId]: {
-          ...groupedData[sourceBlockId],
-          instructions: reorderedInstructions,
-        },
-      };
+    // Update state with the new order
+    setGroupedData(updatedGroupedData);
 
-      setGroupedData(updatedGroupedData);
-    } else {
-      // If the instruction was moved to a different block, update the blockId
-      const sourceInstructions = Array.from(groupedData[sourceBlockId].instructions);
-      const destinationInstructions = Array.from(groupedData[destinationBlockId].instructions);
-
-      // Remove the dragged instruction from the source block
-      const [movedInstruction] = sourceInstructions.splice(source.index, 1);
-
-      // Update the blockId of the moved instruction to match the destination block
-      movedInstruction.blockId = parseInt(destinationBlockId, 10);
-
-      // Insert the moved instruction into the destination block at the new position
-      destinationInstructions.splice(destination.index, 0, movedInstruction);
-
-      const updatedGroupedData = {
-        ...groupedData,
-        [sourceBlockId]: {
-          ...groupedData[sourceBlockId],
-          instructions: sourceInstructions,
-        },
-        [destinationBlockId]: {
-          ...groupedData[destinationBlockId],
-          instructions: destinationInstructions,
-        },
-      };
-
-      setGroupedData(updatedGroupedData);
-    }
-
-    // Optionally send a WebSocket message after the drag-and-drop action is completed
+    // Send WebSocket message with the new row order
     if (client && connected) {
+      const updatedRows = updatedBlockData.map((instruction, index) => ({
+        blockId: instruction.blockId,
+        instructionId: instruction.id,
+        instructionOrderNumber: index + 1, // Reassign order numbers
+      }));
+
       const message = {
         type: 'ROW_MOVE',
-        updatedRows: groupedData[destinationBlockId].instructions.map((instruction, index) => ({
-          blockId: instruction.blockId,
-          instructionId: instruction.id,
-          instructionOrderNumber: index + 1, // Update the order numbers
-        })),
+        updatedRows,
       };
 
-      try {
-        client.publish({
-          destination: '/app/row/move', // WebSocket endpoint for row move
-          body: JSON.stringify(message),
-        });
-        console.log('Sent row move message:', message);
-      } catch (error) {
-        console.error('Error sending WebSocket message:', error);
-      }
+      client.publish({
+        destination: '/app/row/move',
+        body: JSON.stringify(message),
+      });
+
+      console.log('Sent row move message:', message);
     }
   };
 
