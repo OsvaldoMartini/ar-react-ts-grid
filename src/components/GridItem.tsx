@@ -177,7 +177,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
         instructionOrderNumber: index + 1,
         blockId: blockId,
         blockName: blockName,
-        blockOrderNumber: destination.droppableId,  // Update blockOrderNumber
+        blockOrderNumber: blockOrderNumber
       }));
 
       updatedGroupedData = {
@@ -197,35 +197,29 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       if (updatedSourceInstructions.length === 0) {
         delete updatedGroupedData[sourceBlockId];
 
-        // Assuming `updatedGroupedData` is an object where keys are strings and values are arrays of instructions
-        // const updatedGroupedData: { [key: string]: UpdatedBlock[] } = {}; // Array of instructions within each block
-
-        // Reorder blockOrderNumbers for remaining blocks and update each instruction within the block
+        // Reorder blockOrderNumbers for remaining blocks in groupedData
         let blockOrder = 1; // Start from 1, or adjust as needed
+        Object.keys(updatedGroupedData).forEach((blockKey) => {
+          const blockId = Number(blockKey); // Convert string key to number
+          const block = updatedGroupedData[blockId];
+          if (block) {
+            // Only update blockOrderNumber for each instruction inside this block
+            const updatedInstructions = block.instructions.map((instruction: any) => {
+              return {
+                ...instruction,
+                blockOrderNumber: blockOrder,  // Update blockOrderNumber in instruction
+              };
+            });
 
-        // Use `for...in` to iterate over the keys of updatedGroupedData
-        for (const blockKey in updatedGroupedData) {
-          if (Object.prototype.hasOwnProperty.call(updatedGroupedData, blockKey)) {
-            const instructions = updatedGroupedData[blockKey]; // Array of instructions for this block
-            if (instructions && instructions.length > 0) {
-              console.log(instructions); // Log the array of instructions for the block
+            // Add the updated block with updated instructions to newUpdatedGroupedData
+            updatedGroupedData[blockId] = {
+              ...block,
+              instructions: updatedInstructions, // Replace the instructions with updated ones
+            };
 
-              // Create a new array of updated instructions with the correct blockOrderNumber
-              const updatedInstructions = instructions.map((instruction: any) => {
-                return {
-                  ...instruction, // Spread the existing instruction properties
-                  blockOrderNumber: blockOrder, // Update blockOrderNumber for this block
-                };
-              });
-
-              // Assign the updated instructions array back to updatedGroupedData for this block
-              updatedGroupedData[blockKey] = updatedInstructions;
-
-              blockOrder++; // Increment for the next block
-            }
+            blockOrder++; // Increment blockOrder for the next block
           }
-        }
-
+        });
 
       }
     }
@@ -283,7 +277,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   useEffect(() => {
     // setAlertMessage("useEffect Socket " + socketPort);
     // Create a STOMP client
-    console.log("UseEffect -> socketPort");
+    //console.log("UseEffect -> socketPort");
     const stompClient: Client = new Client({
       brokerURL: `ws://localhost:${socketPort}/websocket`, // Your WebSocket URL
       reconnectDelay: 5000, // Try reconnecting after 5 seconds if the connection fails
@@ -325,21 +319,21 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   }, [socketPort]);
 
   useEffect(() => {
-    console.log("UseEffect -> editingInstructionId");
+    //console.log("UseEffect -> editingInstructionId");
     if (editingInstructionId && instructionRef.current) {
       instructionRef.current.focus();
     }
   }, [editingInstructionId]);
 
   useEffect(() => {
-    console.log("UseEffect -> editingBlockId");
+    //console.log("UseEffect -> editingBlockId");
     if (editingBlockId && blockRef.current) {
       blockRef.current.focus();
     }
   }, [editingBlockId]);
 
   useEffect(() => {
-    console.log("UseEffect -> connected");
+    //console.log("UseEffect -> connected");
     if (connected) {
       // Assuming correctBlockOrderNumbers sets updatedBlocks based on some logic
       const { updatedData, updatedBlocks } = correctBlockOrderNumbers(instructionsData);
@@ -349,7 +343,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   }, [connected]);
 
   useEffect(() => {
-    console.log("UseEffect -> messages");
+    //console.log("UseEffect -> messages");
     if (messages && messages.length > 0) {
       console.log("Messages: " + messages);
     }
@@ -357,7 +351,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   }, [messages]);
 
   useEffect(() => {
-    console.log("UseEffect -> updatedBlocks, client, connected");
+    //console.log("UseEffect -> updatedBlocks, client, connected");
     if (updatedBlocks.length > 0 && client && connected) {
       const message = {
         type: 'BLOCK_ORDER',
@@ -377,7 +371,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   }, [updatedBlocks, client, connected]); // Triggered when updatedBlocks or connected changes
 
   useEffect(() => {
-    console.log("UseEffect -> instructionsData, isDataReordered");
+    //console.log("UseEffect -> instructionsData, isDataReordered");
     if (!isDataReordered && instructionsData.length > 0) {
       console.log("Reassigning instruction order numbers");
 
@@ -399,7 +393,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
   // Add the event listener to detect clicks outside the dropdown
   useEffect(() => {
-    console.log("UseEffect -> handleClickOutside");
+    //console.log("UseEffect -> handleClickOutside");
     document.addEventListener('mousedown', handleClickOutside);
 
     // Cleanup the event listener on component unmount
@@ -410,7 +404,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
   // Close the dropdown when clicking outside
   useEffect(() => {
-    console.log("UseEffect -> openDropdown");
+    //console.log("UseEffect -> openDropdown");
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setOpenDropdown(null); // Close the dropdown if clicked outside
