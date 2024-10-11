@@ -111,6 +111,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
 
   // Drag-and-drop event handler
+  // Drag-and-drop event handler
   const onDragEnd = (result: any) => {
     const { destination, source } = result;
 
@@ -119,31 +120,93 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       return;
     }
 
-    // Reordering within the same block
-    const blockId = source.droppableId;
-    const updatedBlockData = reorder(
-      groupedData[blockId].instructions,
-      source.index,
-      destination.index
-    );
+    const sourceBlockId = source.droppableId;
+    const destinationBlockId = destination.droppableId;
 
-    const updatedGroupedData = {
-      ...groupedData,
-      [blockId]: {
-        ...groupedData[blockId],
-        instructions: updatedBlockData,
-      },
-    };
+    // Check if source and destination blocks exist
+    if (!groupedData[sourceBlockId] || !groupedData[destinationBlockId]) {
+      return;
+    }
 
-    // Update state with the new order
+    let updatedGroupedData = { ...groupedData };
+
+    if (sourceBlockId === destinationBlockId) {
+      // Reordering within the same block
+      const updatedBlockData = reorder(
+        groupedData[sourceBlockId].instructions,
+        source.index,
+        destination.index
+      );
+
+      // Reassign instructionOrderNumbers within the block
+      const updatedInstructions = updatedBlockData.map((instruction, index) => ({
+        ...instruction,
+        instructionOrderNumber: index + 1, // Reassign order numbers
+      }));
+
+      updatedGroupedData = {
+        ...groupedData,
+        [sourceBlockId]: {
+          ...groupedData[sourceBlockId],
+          instructions: updatedInstructions,
+        },
+      };
+    } else {
+      // Moving instruction to a different block
+      const sourceInstructions = Array.from(groupedData[sourceBlockId].instructions);
+      const destinationInstructions = Array.from(groupedData[destinationBlockId].instructions);
+
+      // Remove the dragged instruction from source block
+      const [movedInstruction] = sourceInstructions.splice(source.index, 1);
+
+      // Update the blockId of the moved instruction
+      movedInstruction.blockId = parseInt(destinationBlockId, 10);
+
+      // Insert the moved instruction into destination block at the specified position
+      destinationInstructions.splice(destination.index, 0, movedInstruction);
+
+      // Reassign instructionOrderNumbers in source block
+      const updatedSourceInstructions = sourceInstructions.map((instruction, index) => ({
+        ...instruction,
+        instructionOrderNumber: index + 1,
+      }));
+
+      // Reassign instructionOrderNumbers in destination block
+      const updatedDestinationInstructions = destinationInstructions.map((instruction, index) => ({
+        ...instruction,
+        instructionOrderNumber: index + 1,
+      }));
+
+      updatedGroupedData = {
+        ...groupedData,
+        [sourceBlockId]: {
+          ...groupedData[sourceBlockId],
+          instructions: updatedSourceInstructions,
+        },
+        [destinationBlockId]: {
+          ...groupedData[destinationBlockId],
+          instructions: updatedDestinationInstructions,
+        },
+      };
+    }
+
+    // Update state with the new grouped data
     setGroupedData(updatedGroupedData);
 
-    // Send WebSocket message with the new row order
+    // Flatten updatedGroupedData into instructionsData array
+    const updatedInstructionsData = Object.values(updatedGroupedData).flatMap(block => block.instructions);
+
+    // Update instructionsData state
+    setInstructionsData(updatedInstructionsData);
+
+    setIsDataReordered(false); // To trigger reordering logic if needed
+
+    // Send WebSocket message with the updated instructions
     if (client && connected) {
-      const updatedRows = updatedBlockData.map((instruction, index) => ({
+      const updatedRows = updatedInstructionsData.map(instruction => ({
         blockId: instruction.blockId,
         instructionId: instruction.id,
-        instructionOrderNumber: index + 1, // Reassign order numbers
+        instructionOrderNumber: instruction.instructionOrderNumber,
       }));
 
       const message = {
@@ -151,14 +214,19 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
         updatedRows,
       };
 
-      client.publish({
-        destination: '/app/row/move',
-        body: JSON.stringify(message),
-      });
-
-      console.log('Sent row move message:', message);
+      try {
+        client.publish({
+          destination: '/app/row/move',
+          body: JSON.stringify(message),
+        });
+        console.log('Sent row move message:', message);
+      } catch (error) {
+        console.error('Error sending WebSocket message:', error);
+      }
     }
   };
+
+
 
 
   // Memoized function to handle outside clicks on the dropdown
