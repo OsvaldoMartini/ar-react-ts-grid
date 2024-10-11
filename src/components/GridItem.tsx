@@ -111,7 +111,6 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
 
   // Drag-and-drop event handler
-  // Drag-and-drop event handler
   const onDragEnd = (result: any) => {
     const { destination, source } = result;
 
@@ -188,13 +187,19 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
           instructions: updatedDestinationInstructions,
         },
       };
+
+      // Remove the block from `groupedData` if it has no instructions left
+      if (updatedSourceInstructions.length === 0) {
+        delete updatedGroupedData[sourceBlockId];
+      }
     }
 
-    // Update state with the new grouped data
+    // Update state with the new grouped data, ensuring no empty blocks
     setGroupedData(updatedGroupedData);
 
-    // Flatten updatedGroupedData into instructionsData array
-    const updatedInstructionsData = Object.values(updatedGroupedData).flatMap(block => block.instructions);
+    // Flatten updatedGroupedData into instructionsData array, excluding empty blocks
+    const updatedInstructionsData = Object.values(updatedGroupedData)
+      .flatMap(block => block.instructions);
 
     // Update instructionsData state
     setInstructionsData(updatedInstructionsData);
@@ -225,6 +230,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       }
     }
   };
+
 
 
 
