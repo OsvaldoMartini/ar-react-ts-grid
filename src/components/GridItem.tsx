@@ -24,6 +24,9 @@ import ifElseImage from "../assets/ifElse.png";
 import elseImage from "../assets/else6.png";
 import clickImage from "../assets/click.png";
 import inputImage from "../assets/input_field.png";
+import constructionImage from '../assets/construction.png';
+import forbiddenImage from '../assets/forbidden.png';
+
 import AlertModal from './AlertModal';
 
 
@@ -93,6 +96,8 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   const [dropdownPosition, setDropdownPosition] = useState('below'); // Default to 'below'
   const [updatedBlocks, setUpdatedBlocks] = useState<UpdatedBlock[]>([]);
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
+  const [alertImage, setAlertImage] = useState(constructionImage);
+  const [alertClass, setAlertClass] = useState('construction-image')
   const [editingInstructionId, setEditingInstructionId] = useState<number | null>(null);
   const [instructionName, setInstructionName] = useState<string>('');
   const [editingBlockId, setEditingBlockId] = useState<number | null>(null);
@@ -131,6 +136,47 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     let updatedGroupedData = { ...groupedData };
 
     if (sourceBlockId === destinationBlockId) {
+
+      // Moving instruction to a different block
+      const sourceInstructions = Array.from(groupedData[sourceBlockId].instructions);
+
+      const instructionToMove = sourceInstructions[source.index];
+
+      if (instructionToMove.name === "IF") {
+        // Filter the corresponding ENDIF instruction
+        const parentEndIF = sourceInstructions.find(
+          (instruction) =>
+            instruction.id === instructionToMove.parentId && instruction.actions === "ENDIF"
+        );
+
+        // Check if parentEndIF is found and compare the instruction order
+        if (parentEndIF) {
+          if (parentEndIF.instructionOrderNumber - 1 <= destination.index) {
+            setAlertMessage('Moving "IF" BELOW his parent "ENDIF" is Not Allowed!!!');
+            setAlertImage(forbiddenImage);
+            return;
+          }
+        }
+      } else if (instructionToMove.name === "ENDIF") {
+        // Filter the corresponding ENDIF instruction
+        const parentIF = sourceInstructions.find(
+          (instruction) =>
+            instruction.id === instructionToMove.parentId && instruction.actions === "IF"
+        );
+
+        // Check if parentEndIF is found and compare the instruction order
+        if (parentIF) {
+          if (parentIF.instructionOrderNumber - 1 >= destination.index) {
+            setAlertMessage('Moving "ENDIF" ABOVE his parent "IF" is Not Allowed!!!');
+            setAlertImage(forbiddenImage);
+            return;
+          }
+        }
+      }
+
+      // Remove the dragged instruction from source block
+      const [movedInstruction] = sourceInstructions.splice(source.index, 1);
+
       // Reordering within the same block
       const updatedBlockData = reorder(
         groupedData[sourceBlockId].instructions,
@@ -158,6 +204,13 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
       // Remove the dragged instruction from source block
       const [movedInstruction] = sourceInstructions.splice(source.index, 1);
+
+      if (movedInstruction.name === "IF" || movedInstruction.name === "ENDIF") {
+        setAlertMessage('Moving "IF" or "ENDIF" is Not Allowed Out Side from their Block!!!');
+        setAlertImage(forbiddenImage);
+        setAlertClass('construction-image');
+        return;
+      }
 
       // Update the blockId of the moved instruction
       movedInstruction.blockId = parseInt(destinationBlockId, 10);
@@ -262,9 +315,6 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       }
     }
   };
-
-
-
 
 
   // Memoized function to handle outside clicks on the dropdown
@@ -1474,7 +1524,12 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   return (
     <div className="grid-container">
       {alertMessage && (
-        <AlertModal message={alertMessage} onClose={closeAlert} />
+        <AlertModal
+          message={alertMessage}
+          onClose={closeAlert}
+          imageSrc={alertImage}          // Pass the image source
+          imageClass={alertClass}
+        />
       )}
       <DragDropContext
         onDragEnd={onDragEnd} // Define the onDragEnd handler to update the state when the dragging stops
