@@ -22,6 +22,8 @@ import waitImage from "../assets/wait.png";
 import gotoImage from "../assets/goto8.png";
 import ifElseImage from "../assets/ifElse.png";
 import elseImage from "../assets/else6.png";
+import clickImage from "../assets/click.png";
+import inputImage from "../assets/input_field.png";
 import AlertModal from './AlertModal';
 
 
@@ -1259,51 +1261,62 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     let imageClass = "operations"; // Default class for images
 
     // Determine the image source and text based on instruction type
-    switch (instruction.actions) {
-      case "SET":
-        imageSrc = setValueImage;
-        text = instruction.name;
-        break;
-      case "GET":
-        imageSrc = getValueImage;
-        text = instruction.name;
-        break;
-      case "CK":
-        imageSrc = checkImage;
-        text = instruction.name;
-        break;
-      case "E":
-        imageSrc = excelImage;
-        text = instruction.name;
-        break;
-      case "P":
-        imageSrc = screenImage;
-        text = instruction.name;
-        break;
-      case "H":
-        imageSrc = waitImage;
-        text = instruction.name;
-        imageClass = "wait-image"; // Use the new class for waitImage
-        break;
-      case "IF":
-        imageSrc = ifElseImage;
-        text = instruction.name;
-        imageClass = "ifelse-image"; // Use the new class for waitImage
-        break;
-      case "GOTO":
-        imageSrc = gotoImage;
-        text = instruction.name;
-        imageClass = "goto-image"; // Use the new class for waitImage
-        break;
-      case "ENDIF":
-        imageSrc = elseImage;
-        text = instruction.name;
-        imageClass = "else-image"; // Use the new class for waitImage
-        break;
-      default:
-        imageSrc = null; // No image for other types
-        text = instruction.id + "-" + instruction.name || null;
-        isActionBold = true; // Set bold for actions
+    if (instruction.actions.startsWith("I:")) {
+      imageSrc = inputImage;
+      text = instruction.name;
+      imageClass = "input-image"; // Use the new class for waitImage
+    } else {
+      switch (instruction.actions) {
+        case "SET":
+          imageSrc = setValueImage;
+          text = instruction.name;
+          break;
+        case "GET":
+          imageSrc = getValueImage;
+          text = instruction.name;
+          break;
+        case "CK":
+          imageSrc = checkImage;
+          text = instruction.name;
+          break;
+        case "E":
+          imageSrc = excelImage;
+          text = instruction.name;
+          break;
+        case "P":
+          imageSrc = screenImage;
+          text = instruction.name;
+          break;
+        case "C":
+          imageSrc = clickImage;
+          text = instruction.name;
+          imageClass = "click-image"; // Use the new class for waitImage
+          break;
+        case "H":
+          imageSrc = waitImage;
+          text = instruction.name;
+          imageClass = "wait-image"; // Use the new class for waitImage
+          break;
+        case "IF":
+          imageSrc = ifElseImage;
+          text = instruction.name;
+          imageClass = "ifelse-image"; // Use the new class for waitImage
+          break;
+        case "GOTO":
+          imageSrc = gotoImage;
+          text = instruction.name;
+          imageClass = "goto-image"; // Use the new class for waitImage
+          break;
+        case "ENDIF":
+          imageSrc = elseImage;
+          text = instruction.name;
+          imageClass = "else-image"; // Use the new class for waitImage
+          break;
+        default:
+          imageSrc = null; // No image for other types
+          text = instruction.id + "-" + instruction.name || null;
+          isActionBold = true; // Set bold for actions
+      }
     }
 
     // Return a combined image and text element if imageSrc exists, otherwise return just the text
@@ -1321,7 +1334,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
 
   const renderEditButton = (actionType: string, editImage: string, instruction: BlockLoopInstructionLoadDTO) => {
-    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO"].includes(actionType)) {
+    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "IF", "ENDIF"].includes(actionType)) {
       return <span className="edit-button-space">&nbsp;</span>; // Render a space or an empty element
     }
 
