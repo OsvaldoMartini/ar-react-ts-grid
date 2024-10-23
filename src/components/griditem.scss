@@ -61,13 +61,20 @@
 .garbage-button,
 .edit-button,
 .cross-button,
-.save-button {
+.save-button,
+.brick-button {
   width: 15px; /* Decreased button size */
   height: 15px;
   background-color: transparent;
   padding: 0;
   cursor: pointer;
+  transition: transform 0.3s ease; /* Smooth scaling on hover */
+
+  &:hover {
+    transform: scale(1.4); /* Slightly increase size on hover */
+  }
 }
+
 
 .edit-container {
   display: inline-flex;  /* Make input and image inline */
@@ -220,6 +227,11 @@
   cursor: pointer;
   width: 15px;
   height: 15px;
+  transition: transform 0.3s ease; /* Smooth scaling on hover */
+
+  &:hover {
+    transform: scale(1.4); /* Slightly increase size on hover */
+  }
 }
 
 /* Dropdown menu styling */

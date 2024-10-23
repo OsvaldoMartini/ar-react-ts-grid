@@ -13,7 +13,7 @@ import editImage from '../assets/edit.png';
 import upImage from '../assets/up.png';
 import downImage from '../assets/down.png';
 import rollBackImage from '../assets/rollback4.png';
-import garbageImage from '../assets/garbage.png';
+import binImage from '../assets/bin.png';
 import menuDownImage from '../assets/menu-down.png';
 import saveImage from "../assets/save.png";
 import excelImage from "../assets/excel.png";
@@ -26,6 +26,7 @@ import clickImage from "../assets/click.png";
 import inputImage from "../assets/input_field.png";
 import constructionImage from '../assets/construction.png';
 import forbiddenImage from '../assets/forbidden.png';
+import brickImage from '../assets/brick.png';
 
 import AlertModal from './AlertModal';
 
@@ -1585,23 +1586,6 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                       onClick={() => handleRollbackBlock(Number(blockId))}
                     />
                   )}
-
-                  {/* Edit Block Name Button */}
-                  <img
-                    src={editImage}
-                    alt="edit"
-                    className="edit-button"
-                    onClick={() => handleEditBlock(Number(blockId), blockData.blockName)} // Edit block logic
-                  />
-
-                  {index !== 0 && (
-                    <img
-                      src={garbageImage}
-                      className="garbage-button"
-                      alt=""
-                      onClick={() => handleRemoveBlock(Number(blockId))}
-                    />
-                  )}
                   <img
                     src={upImage}
                     alt=""
@@ -1614,6 +1598,22 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                     className="move-button"
                     onClick={() => handleMoveBlockDown(Number(blockId))}
                   />
+                  {/* Edit Block Name Button */}
+                  <img
+                    src={editImage}
+                    alt="edit"
+                    className="edit-button"
+                    onClick={() => handleEditBlock(Number(blockId), blockData.blockName)} // Edit block logic
+                  />
+                  {index !== 0 && (
+                    <img
+                      src={crossImage}
+                      alt=""
+                      className="cross-button"
+                      onClick={() => handleRemoveBlock(Number(blockId))}
+                    />
+                  )}
+
                 </div>
               </div>
               <Droppable droppableId={blockId} key={blockId}>
@@ -1678,6 +1678,22 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                               {renderOperations(instruction, instructionsData)}
                               <div className="options-column">
                                 <div className="move-buttons">
+
+                                  {!isLastInstruction && (
+                                    <img
+                                      src={brickImage}
+                                      alt=""
+                                      className="brick-button"
+                                      onClick={() =>
+                                        handleSplitComponent(
+                                          instruction.id,
+                                          groupedData,
+                                          setGroupedData,
+                                          instructionsData
+                                        )
+                                      }
+                                    />
+                                  )}
                                   {renderEditButton(
                                     instruction.actions,
                                     editImage,
