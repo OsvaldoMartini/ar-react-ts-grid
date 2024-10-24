@@ -778,7 +778,8 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     instructionId: number,
     groupedData: { [blockId: string]: { blockName: string; instructions: BlockLoopInstructionLoadDTO[] } },
     setGroupedData: (data: { [blockId: string]: { blockName: string; instructions: BlockLoopInstructionLoadDTO[] } }) => void,
-    instructionsData: BlockLoopInstructionLoadDTO[]
+    instructionsData: BlockLoopInstructionLoadDTO[],
+    preComponent: boolean // New parameter
   ) => {
     // Find the block and instruction related to the instructionId
     const blockToSplit = Object.values(groupedData).find((blockData) =>
@@ -819,11 +820,13 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       blockName: `${blockToSplit.blockName}`, // Same name as the current block
       blockOrderNumber: newBlockOrderNumber, // Assign the new block order number
       botJobId: botJobId, // Preserve the botJobId in the new instructions
+      preComponent: true, // Preserve the preComponent in the new instructions 
       instructions: subsequentInstructions.map((instruction, index) => ({
         ...instruction,
         blockId: newBlockId, // Assign new block ID to the instructions
         blockOrderNumber: newBlockOrderNumber, // Assign new block order number to the instructions
         instructionOrderNumber: index + 1, // Reassign instructionOrderNumber starting from 1 within the new block
+        preComponent: preComponent ? true : instruction.preComponent // Update preComponent if the flag is true
       })),
     };
 
@@ -893,7 +896,6 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
             instructionOrderNumber: instruction.instructionOrderNumber
           })),
         },
-        // Filter only blocks that had blockOrderNumber modified, excluding the newBlock
         updatedBlocks: Object.values(updatedBlocks)
           .filter(block => block.instructions.length > 0
             && block.instructions[0].blockOrderNumber > blockOrderNumber
@@ -905,7 +907,6 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
             blockName: block.blockName,
             blockOrderNumber: block.instructions[0].blockOrderNumber
           }))
-
       };
 
       const message = {
@@ -1689,7 +1690,8 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                                           instruction.id,
                                           groupedData,
                                           setGroupedData,
-                                          instructionsData
+                                          instructionsData,
+                                          true
                                         )
                                       }
                                     />
@@ -1768,7 +1770,8 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                                             instruction.id,
                                             groupedData,
                                             setGroupedData,
-                                            instructionsData
+                                            instructionsData,
+                                            false
                                           )
                                         }
                                       >
