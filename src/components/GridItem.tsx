@@ -889,6 +889,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
           blockId: newBlockId,
           blockName: newBlock.blockName,
           blockOrderNumber: newBlock.blockOrderNumber,
+          preComponent: newBlock.preComponent,
           instructions: newBlock.instructions.map(instruction => ({
             instructionId: instruction.id,
             blockId: instruction.blockId,
