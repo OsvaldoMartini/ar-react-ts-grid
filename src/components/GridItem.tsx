@@ -396,7 +396,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   }, [connected]);
 
   useEffect(() => {
-    //console.log("UseEffect -> messages");
+    //console.log("UseEffect -> messages");Splir
     if (messages && messages.length > 0) {
       console.log("Messages: " + messages);
     }
@@ -774,12 +774,70 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     setAlertMessage(null);
   };
 
+
+
+  const handleCreateComponent = (blockId: number) => {
+    // Access groupedData, setGroupedData, instructionsData, and preComponent from the component's scope
+    const blockToSplit = groupedData[blockId]; // Get the block directly by its blockId
+
+    if (!blockToSplit) return; // Ensure the block exists
+
+    // Get the block order
+    const blockOrderNumber = blockToSplit.instructions[0].blockOrderNumber;
+
+    const botJobId = blockToSplit.instructions[0]?.botJobId || null; // Retrieve botJobId from the first instruction
+
+    const newBlock = {
+      id: blockId,
+      blockName: `${blockToSplit.blockName}`, // Same name as the current block
+      blockOrderNumber: blockOrderNumber, // Assign the new block order number
+      botJobId: botJobId, // Preserve the botJobId in the new instructions
+      instructions: blockToSplit.instructions.map((instruction, index) => ({
+        ...instruction,
+        blockId: blockId, // Assign new block ID to the instructions
+        blockOrderNumber: -1, // Assign new block order number to the instructions
+        instructionOrderNumber: index + 1, // Reassign instructionOrderNumber starting from 1 within the new block
+      })),
+    };
+
+    // Send WebSocket message with block split details
+    if (client && connected) {
+      const blockSplitDetails = {
+        newBlock: {
+          botJobId: botJobId,
+          blockId: newBlock.id,
+          blockName: newBlock.blockName,
+          blockOrderNumber: newBlock.blockOrderNumber,
+          instructions: newBlock.instructions.map(instruction => ({
+            instructionId: instruction.id,
+            blockId: blockId, // Use newBlockId here
+            blockOrderNumber: newBlock.blockOrderNumber,
+            instructionOrderNumber: instruction.instructionOrderNumber,
+          })),
+        },
+      };
+
+      const message = {
+        type: 'BLOCKS_COMPONENT',
+        details: blockSplitDetails,
+      };
+
+      client.publish({
+        destination: '/app/block/component', // Adjust the WebSocket destination if necessary
+        body: JSON.stringify(message),
+      });
+
+      console.log('Sent block split message:', message);
+    }
+
+    setOpenDropdown(null);
+  };
+
   const handleSplitComponent = (
     instructionId: number,
     groupedData: { [blockId: string]: { blockName: string; instructions: BlockLoopInstructionLoadDTO[] } },
     setGroupedData: (data: { [blockId: string]: { blockName: string; instructions: BlockLoopInstructionLoadDTO[] } }) => void,
-    instructionsData: BlockLoopInstructionLoadDTO[],
-    preComponent: boolean // New parameter
+    instructionsData: BlockLoopInstructionLoadDTO[]
   ) => {
     // Find the block and instruction related to the instructionId
     const blockToSplit = Object.values(groupedData).find((blockData) =>
@@ -820,13 +878,11 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       blockName: `${blockToSplit.blockName}`, // Same name as the current block
       blockOrderNumber: newBlockOrderNumber, // Assign the new block order number
       botJobId: botJobId, // Preserve the botJobId in the new instructions
-      preComponent: true, // Preserve the preComponent in the new instructions 
       instructions: subsequentInstructions.map((instruction, index) => ({
         ...instruction,
         blockId: newBlockId, // Assign new block ID to the instructions
         blockOrderNumber: newBlockOrderNumber, // Assign new block order number to the instructions
-        instructionOrderNumber: index + 1, // Reassign instructionOrderNumber starting from 1 within the new block
-        preComponent: preComponent ? true : instruction.preComponent // Update preComponent if the flag is true
+        instructionOrderNumber: index + 1 // Reassign instructionOrderNumber starting from 1 within the new block
       })),
     };
 
@@ -889,7 +945,6 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
           blockId: newBlockId,
           blockName: newBlock.blockName,
           blockOrderNumber: newBlock.blockOrderNumber,
-          preComponent: newBlock.preComponent,
           instructions: newBlock.instructions.map(instruction => ({
             instructionId: instruction.id,
             blockId: instruction.blockId,
@@ -1607,6 +1662,12 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                     className="edit-button"
                     onClick={() => handleEditBlock(Number(blockId), blockData.blockName)} // Edit block logic
                   />
+                  <img
+                    src={saveImage}
+                    alt="save"
+                    className="save-button"
+                    onClick={() => handleCreateComponent(Number(blockId))}
+                  />
                   {index !== 0 && (
                     <img
                       src={crossImage}
@@ -1680,23 +1741,6 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                               {renderOperations(instruction, instructionsData)}
                               <div className="options-column">
                                 <div className="move-buttons">
-
-                                  {!isLastInstruction && (
-                                    <img
-                                      src={brickImage}
-                                      alt=""
-                                      className="brick-button"
-                                      onClick={() =>
-                                        handleSplitComponent(
-                                          instruction.id,
-                                          groupedData,
-                                          setGroupedData,
-                                          instructionsData,
-                                          true
-                                        )
-                                      }
-                                    />
-                                  )}
                                   {renderEditButton(
                                     instruction.actions,
                                     editImage,
@@ -1771,8 +1815,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                                             instruction.id,
                                             groupedData,
                                             setGroupedData,
-                                            instructionsData,
-                                            false
+                                            instructionsData
                                           )
                                         }
                                       >
