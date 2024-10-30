@@ -1180,13 +1180,13 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     // If the instruction is not found, return early
     if (!instructionToRemove) return;
 
-    const botJobId = instructionToRemove.botJobId; // Get the blockId from the instruction
-    const blockId = instructionToRemove.blockId; // Get the blockId from the instruction
-    const actions = instructionToRemove.actions; // Get the blockId from the instruction
-    const parentId = instructionToRemove.parentId;
+    const { botJobId, blockId, actions, parentId } = instructionToRemove;
 
-    // Filter out the instruction to remove
-    const updatedData = instructionsData.filter(instruction => instruction.id !== instructionId);
+    // Define the filtering logic based on actions type
+    const updatedData = actions === "IF" || actions === "ELSE" || actions === "ENDIF"
+      ? instructionsData.filter(instruction => instruction.parentId !== instructionToRemove.parentId) // Exclude based on parentId
+      : instructionsData.filter(instruction => instruction.id !== instructionId); // Exclude based on instructionId
+
     const reassignedData = reassignInstructionOrderNumbersByBlock(updatedData);
     setInstructionsData([...reassignedData]);
     setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
