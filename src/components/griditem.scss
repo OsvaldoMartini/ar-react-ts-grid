@@ -151,6 +151,12 @@
   height: 20px; /* Override height */
 }
 
+.endif-image {
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
+
+
 .goto-image {
   @extend .operations; /* Inherit styles from .operations */
   height: 20px; /* Override height */
@@ -215,6 +221,10 @@
   font-weight: bold; /* Make the text bold */
   margin-right: 3px; /* Add a 3px gap after the span */
   display: inline-block; /* Ensure the span behaves as a block but allows space for the next element */
+}
+
+.light-yellow-background {
+  background-color: #ffffe0; /* Light yellow color */
 }
 
 /* Dropdown arrow styling */

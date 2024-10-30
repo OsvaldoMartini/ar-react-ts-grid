@@ -12,6 +12,7 @@ const AlertModal: React.FC<AlertModalProps> = ({ message, onClose, imageSrc, ima
   return (
     <div className="alert-modal">
       <div className="alert-content">
+        {/* Use the passed image class if provided; otherwise, default */}
         <img src={imageSrc} alt="Alert Image" className={imageClass || 'default-image-class'} />
         <p>{message}</p>
         <button onClick={onClose} className="close-btn">Close</button>

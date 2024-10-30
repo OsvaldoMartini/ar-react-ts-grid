@@ -43,9 +43,9 @@ const instructionsMockData: BlockLoopInstructionLoadDTO[] = [
   // Block 2                                                                                                                                                                                        
   { botJobId: 1, id: 4, instructionOrderNumber: 1, name: "GetValue", description: "Description 2", blockId: 2, blockOrderNumber: 2, blockName: "Block Test 2", actions: "GET", parentId: 4, operation: "firstname:$FIRSTNAME" },
   { botJobId: 1, id: 5, instructionOrderNumber: 2, name: "Check", description: "Description 3", blockId: 2, blockOrderNumber: 2, blockName: "Block Test 2", actions: "CK", parentId: 4, operation: "$firstname:=:Osvaldo" },
-  { botJobId: 1, id: 6, instructionOrderNumber: 1, name: "IF", description: "IF", blockId: 3, blockOrderNumber: 3, blockName: "Block Test 3", actions: "IF", parentId: 7 },
-  { botJobId: 1, id: 7, instructionOrderNumber: 2, name: "ENDIF", description: "ENDIF", blockId: 3, blockOrderNumber: 3, blockName: "Block Test 4", actions: "ENDIF", parentId: 6, },
-  { botJobId: 11, id: 8, instructionOrderNumber: 1, name: "GetValue", description: "Description 7", blockId: 4, blockOrderNumber: 4, blockName: "Block Test 4", actions: "GET", parentId: 4, operation: "firstname:$FIRSTNAME" },
+  { botJobId: 1, id: 6, instructionOrderNumber: 1, name: "IF", description: "IF", blockId: 3, blockOrderNumber: 3, blockName: "Block Test 3", actions: "IF", parentId: 6 },
+  { botJobId: 1, id: 7, instructionOrderNumber: 2, name: "ELSE", description: "ELSE", blockId: 3, blockOrderNumber: 3, blockName: "Block Test 3", actions: "ELSE", parentId: 6, },
+  { botJobId: 1, id: 8, instructionOrderNumber: 3, name: "ENDIF", description: "ENDIF", blockId: 3, blockOrderNumber: 3, blockName: "Block Test 3", actions: "ENDIF", parentId: 6 },
 
   // Block 3                                                                                                                                                                                        
   { botJobId: 11, id: 9, instructionOrderNumber: 1, name: "ExcelWrite", description: "Description 8", blockId: 36, blockOrderNumber: 4, blockName: "Block Test 3", actions: "E", parentId: 4, operation: "$payment:56855874" },

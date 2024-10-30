@@ -22,6 +22,7 @@ import waitImage from "../assets/wait.png";
 import gotoImage from "../assets/goto8.png";
 import ifElseImage from "../assets/ifElse.png";
 import elseImage from "../assets/else6.png";
+import endIfImage from "../assets/endIf4.png";
 import clickImage from "../assets/click.png";
 import inputImage from "../assets/input_field.png";
 import constructionImage from '../assets/construction.png';
@@ -143,36 +144,12 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
       const instructionToMove = sourceInstructions[source.index];
 
-      if (instructionToMove.name === "IF") {
-        // Filter the corresponding ENDIF instruction
-        const parentEndIF = sourceInstructions.find(
-          (instruction) =>
-            instruction.id === instructionToMove.parentId && instruction.actions === "ENDIF"
-        );
 
-        // Check if parentEndIF is found and compare the instruction order
-        if (parentEndIF) {
-          if (parentEndIF.instructionOrderNumber - 1 <= destination.index) {
-            setAlertMessage('Moving "IF" BELOW his parent "ENDIF" is Not Allowed!!!');
-            setAlertImage(forbiddenImage);
-            return;
-          }
-        }
-      } else if (instructionToMove.name === "ENDIF") {
-        // Filter the corresponding ENDIF instruction
-        const parentIF = sourceInstructions.find(
-          (instruction) =>
-            instruction.id === instructionToMove.parentId && instruction.actions === "IF"
-        );
+      if (instructionToMove.name === "IF" || instructionToMove.name === "ELSE" || instructionToMove.name === "ENDIF") {
+        setAlertMessage('Moving "IF" or "ELSE or "ENDIF" is Not Allowed!   Move the nested instructions instead!');
+        setAlertImage(forbiddenImage);
+        return;
 
-        // Check if parentEndIF is found and compare the instruction order
-        if (parentIF) {
-          if (parentIF.instructionOrderNumber - 1 >= destination.index) {
-            setAlertMessage('Moving "ENDIF" ABOVE his parent "IF" is Not Allowed!!!');
-            setAlertImage(forbiddenImage);
-            return;
-          }
-        }
       }
 
       // Remove the dragged instruction from source block
@@ -206,8 +183,8 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       // Remove the dragged instruction from source block
       const [movedInstruction] = sourceInstructions.splice(source.index, 1);
 
-      if (movedInstruction.name === "IF" || movedInstruction.name === "ENDIF") {
-        setAlertMessage('Moving "IF" or "ENDIF" is Not Allowed Out Side from their Block!!!');
+      if (movedInstruction.name === "IF" || movedInstruction.name === "ELSE" || movedInstruction.name === "ENDIF") {
+        setAlertMessage('Moving "IF" or "ELSE" or "ENDIF" is Not Allowed Out Side from their Block!');
         setAlertImage(forbiddenImage);
         setAlertClass('construction-image');
         return;
@@ -1205,6 +1182,8 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
     const botJobId = instructionToRemove.botJobId; // Get the blockId from the instruction
     const blockId = instructionToRemove.blockId; // Get the blockId from the instruction
+    const actions = instructionToRemove.actions; // Get the blockId from the instruction
+    const parentId = instructionToRemove.parentId;
 
     // Filter out the instruction to remove
     const updatedData = instructionsData.filter(instruction => instruction.id !== instructionId);
@@ -1217,6 +1196,8 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       const message = {
         type: 'DELETE_INSTRUCTION',
         instructionId: instructionId,
+        actions: actions,
+        parentId: parentId,
         botJobId: botJobId, // Include the blockId in the message
         blockId: blockId, // Include the blockId in the message
       };
@@ -1415,10 +1396,15 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
           text = instruction.name;
           imageClass = "goto-image"; // Use the new class for waitImage
           break;
-        case "ENDIF":
+        case "ELSE":
           imageSrc = elseImage;
           text = instruction.name;
           imageClass = "else-image"; // Use the new class for waitImage
+          break;
+        case "ENDIF":
+          imageSrc = endIfImage;
+          text = instruction.name;
+          imageClass = "endif-image"; // Use the new class for waitImage
           break;
         default:
           imageSrc = null; // No image for other types
@@ -1442,7 +1428,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
 
   const renderEditButton = (actionType: string, editImage: string, instruction: BlockLoopInstructionLoadDTO) => {
-    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "IF", "ENDIF"].includes(actionType)) {
+    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "IF", "ELSE", "ENDIF"].includes(actionType)) {
       return <span className="edit-button-space">&nbsp;</span>; // Render a space or an empty element
     }
 
@@ -1455,6 +1441,31 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       />
     );
   };
+
+  // Function to render the move buttons based on the action type
+  const renderMoveButtons = (actionType: string, instructionId: number) => {
+    if (["IF", "ELSE", "ENDIF"].includes(actionType)) {
+      return null; // Don't render buttons for these action types
+    }
+
+    return (
+      <>
+        <img
+          src={upImage}
+          alt="Move Up"
+          className="move-button"
+          onClick={() => handleMoveRowUp(instructionId)}
+        />
+        <img
+          src={downImage}
+          alt="Move Down"
+          className="move-button"
+          onClick={() => handleMoveRowDown(instructionId)}
+        />
+      </>
+    );
+  };
+
 
   const handleEditInstruction = (instruction: BlockLoopInstructionLoadDTO) => {
     setEditingInstructionId(instruction.id);
@@ -1703,9 +1714,10 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                               ref={provided.innerRef}
                               {...provided.draggableProps}
                               {...provided.dragHandleProps}
-                              className={`instruction-item ${openDropdown === instruction.id
-                                ? 'dropdown-open'
-                                : ''
+                              className={`instruction-item ${openDropdown === instruction.id ? 'dropdown-open' : ''
+                                } ${instruction.actions === 'IF' || instruction.actions === 'ELSE' || instruction.actions === 'ENDIF'
+                                  ? 'light-yellow-background'
+                                  : ''
                                 }`}
                             >
                               {editingInstructionId === instruction.id ? (
@@ -1746,22 +1758,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                                     editImage,
                                     instruction
                                   )}
-                                  <img
-                                    src={upImage}
-                                    alt=""
-                                    className="move-button"
-                                    onClick={() =>
-                                      handleMoveRowUp(instruction.id)
-                                    }
-                                  />
-                                  <img
-                                    src={downImage}
-                                    alt=""
-                                    className="move-button"
-                                    onClick={() =>
-                                      handleMoveRowDown(instruction.id)
-                                    }
-                                  />
+                                  {renderMoveButtons(instruction.actions, instruction.id)}
                                   <img
                                     src={crossImage}
                                     alt=""
@@ -1808,7 +1805,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                                       Insert Step After
                                     </div>
 
-                                    {!isLastInstruction && (
+                                    {!isLastInstruction && !["IF", "ELSE", "ENDIF"].includes(instruction.actions) && (
                                       <div
                                         onClick={() =>
                                           handleSplitComponent(

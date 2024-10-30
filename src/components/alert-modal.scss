@@ -8,6 +8,7 @@
   border-radius: 8px;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
   z-index: 1000;
+  width: 300px; // Set a width for consistent layout
 
   .alert-content {
     display: flex;
@@ -15,16 +16,25 @@
     align-items: center;
     justify-content: center;
 
+    // Apply default styling for images if no class is provided
+    img.default-image-class {
+      width: 100px;
+      height: auto;
+      margin-bottom: 20px;
+    }
+
+    // Additional styling if a specific image class is provided
     img.construction-image {
       width: 100px;
       height: auto;
-      margin-bottom: 20px; // Space between image and message
+      margin-bottom: 20px;
     }
 
     p {
       font-size: 18px;
       margin-bottom: 20px;
       color: #333;
+      text-align: center;
     }
 
     .close-btn {
