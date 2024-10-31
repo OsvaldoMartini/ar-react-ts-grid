@@ -1352,7 +1352,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     // Determine the image source and text based on instruction type
     if (instruction.actions.startsWith("I:")) {
       imageSrc = inputImage;
-      text = instruction.name;
+      text = `(${instruction.id})${instruction.name}`;
       imageClass = "input-image"; // Use the new class for waitImage
     } else {
       switch (instruction.actions) {
