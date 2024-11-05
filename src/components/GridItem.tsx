@@ -810,6 +810,25 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     setOpenDropdown(null);
   };
 
+
+
+  const isBetweenIfAndEndIf = (currentOrderNumber: number, instructions: BlockLoopInstructionLoadDTO[]) => {
+    let ifFound = false;
+
+    for (const instr of instructions) {
+      if (instr.actions === "IF") {
+        ifFound = true;
+      }
+      if (instr.instructionOrderNumber === currentOrderNumber && ifFound) {
+        return true; // The instruction is between IF and ENDIF
+      }
+      if (instr.actions === "ENDIF" && ifFound) {
+        ifFound = false; // Reset once ENDIF is encountered
+      }
+    }
+    return false;
+  }
+
   const handleSplitComponent = (
     instructionId: number,
     groupedData: { [blockId: string]: { blockName: string; instructions: BlockLoopInstructionLoadDTO[] } },
@@ -1182,10 +1201,20 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
     const { botJobId, blockId, actions, parentId } = instructionToRemove;
 
-    // Define the filtering logic based on actions type
-    const updatedData = actions === "IF" || actions === "ELSE" || actions === "ENDIF"
-      ? instructionsData.filter(instruction => instruction.parentId !== instructionToRemove.parentId) // Exclude based on parentId
-      : instructionsData.filter(instruction => instruction.id !== instructionId); // Exclude based on instructionId
+    // Define filtering logic based on actions type
+    const updatedData =
+      actions === "IF" || actions === "ELSE" || actions === "ENDIF"
+        ? instructionsData.filter(
+          (instruction) =>
+            instruction.blockId !== blockId ||
+            // instruction.id !== instructionId ||
+            (instruction.actions !== "IF" &&
+              instruction.actions !== "ELSE" &&
+              instruction.actions !== "ENDIF")
+        )
+        : instructionsData.filter(
+          (instruction) => instruction.id !== instructionId
+        );
 
     const reassignedData = reassignInstructionOrderNumbersByBlock(updatedData);
     setInstructionsData([...reassignedData]);
@@ -1805,20 +1834,25 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                                       Insert Step After
                                     </div>
 
-                                    {!isLastInstruction && !["IF", "ELSE", "ENDIF"].includes(instruction.actions) && (
-                                      <div
-                                        onClick={() =>
-                                          handleSplitComponent(
-                                            instruction.id,
-                                            groupedData,
-                                            setGroupedData,
-                                            instructionsData
-                                          )
-                                        }
-                                      >
-                                        Split Component
-                                      </div>
-                                    )}
+                                    {!isLastInstruction &&
+                                      (instruction.actions === "ENDIF" ||
+                                        (!["IF", "ELSE"].includes(instruction.actions) &&
+                                          !isBetweenIfAndEndIf(instruction.instructionOrderNumber, blockData.instructions))) && (
+                                        <div
+                                          onClick={() =>
+                                            handleSplitComponent(
+                                              instruction.id,
+                                              groupedData,
+                                              setGroupedData,
+                                              instructionsData
+                                            )
+                                          }
+                                        >
+                                          Split Component
+                                        </div>
+                                      )
+                                    }
+
 
                                     <div
                                       onClick={() =>
