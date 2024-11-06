@@ -135,6 +135,11 @@
   height: 20px; /* Override height */
 }
 
+.output-image {
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
+
 .click-image {
   @extend .operations; /* Inherit styles from .operations */
   height: 20px; /* Override height */

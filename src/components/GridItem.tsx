@@ -25,6 +25,7 @@ import elseImage from "../assets/else6.png";
 import endIfImage from "../assets/endIf4.png";
 import clickImage from "../assets/click.png";
 import inputImage from "../assets/input_field.png";
+import outPutImage from "../assets/output1.png";
 import constructionImage from '../assets/construction.png';
 import forbiddenImage from '../assets/forbidden.png';
 import brickImage from '../assets/brick.png';
@@ -1383,6 +1384,10 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       imageSrc = inputImage;
       text = `(${instruction.id})${instruction.name}`;
       imageClass = "input-image"; // Use the new class for waitImage
+    } else if (instruction.actions.startsWith("O:")) {
+      imageSrc = outPutImage;
+      text = `(${instruction.id})${instruction.name}`;
+      imageClass = "output-image"; // Use the new class for waitImage
     } else {
       switch (instruction.actions) {
         case "SET":
