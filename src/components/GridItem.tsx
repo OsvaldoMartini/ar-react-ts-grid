@@ -1702,7 +1702,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                   />
                   {/* Edit Block Name Button */}
                   <img
-                    src={editImage}
+                    src={excelImage}
                     alt="edit"
                     className="edit-button"
                     onClick={() => handleEditBlock(Number(blockId), blockData.blockName)} // Edit block logic
