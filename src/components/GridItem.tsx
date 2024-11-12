@@ -23,7 +23,7 @@ import gotoImage from "../assets/goto8.png";
 import ifElseImage from "../assets/ifElse.png";
 import elseImage from "../assets/else6.png";
 import endIfImage from "../assets/endIf4.png";
-import pauseImage from "../assets/pause3.png";
+import pauseImage from "../assets/pause4.png";
 import clickImage from "../assets/click.png";
 import inputImage from "../assets/input_field.png";
 import outPutImage from "../assets/output1.png";
