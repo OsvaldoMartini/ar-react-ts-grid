@@ -162,6 +162,11 @@
 }
 
 
+.pause-image {
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
+
 .goto-image {
   @extend .operations; /* Inherit styles from .operations */
   height: 20px; /* Override height */

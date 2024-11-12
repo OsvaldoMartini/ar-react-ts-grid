@@ -23,6 +23,7 @@ import gotoImage from "../assets/goto8.png";
 import ifElseImage from "../assets/ifElse.png";
 import elseImage from "../assets/else6.png";
 import endIfImage from "../assets/endIf4.png";
+import pauseImage from "../assets/pause3.png";
 import clickImage from "../assets/click.png";
 import inputImage from "../assets/input_field.png";
 import outPutImage from "../assets/output1.png";
@@ -1440,6 +1441,11 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
           text = instruction.name;
           imageClass = "endif-image"; // Use the new class for waitImage
           break;
+        case "PAUSE":
+          imageSrc = pauseImage;
+          text = instruction.name;
+          imageClass = "pause-image"; // Use the new class for waitImage
+          break;
         default:
           imageSrc = null; // No image for other types
           text = instruction.id + "-" + instruction.name || null;
@@ -1462,7 +1468,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
 
   const renderEditButton = (actionType: string, editImage: string, instruction: BlockLoopInstructionLoadDTO) => {
-    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "IF", "ELSE", "ENDIF"].includes(actionType)) {
+    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "IF", "ELSE", "ENDIF", "PAUSE"].includes(actionType)) {
       return <span className="edit-button-space">&nbsp;</span>; // Render a space or an empty element
     }
 

@@ -37,7 +37,9 @@ export interface Block {
 
 const instructionsMockData: BlockLoopInstructionLoadDTO[] = [
   // { botJobId: 1, id: 1, instructionOrderNumber: 1, name: "Popolari", description: "Label Popolari", blockId: 1, blockOrderNumber: 1, blockName: "Default Block", actions: "O:popolari" },
-  // { botJobId: 1, id: 2, instructionOrderNumber: 2, name: "SetValue", description: "Description 1", blockId: 1, blockOrderNumber: 1, blockName: "Default Block", actions: "SET", parentId: 4, operation: "firstName:MockData-martini-martini" },
+  // { botJobId: 1, id: 2, instructionOrderNumber: 2, name: "SetValue", description: "SetValue", blockId: 1, blockOrderNumber: 1, blockName: "Default Block", actions: "SET", parentId: 4, operation: "firstName:MockData-martini-martini" },
+  // { botJobId: 1, id: 34, instructionOrderNumber: 3, name: "PAUSE", description: "PAUSE", blockId: 1, blockOrderNumber: 1, blockName: "Default Block", actions: "PAUSE" },
+
   // { botJobId: 1, id: 3, instructionOrderNumber: 3, name: "GOTO", description: "GOTO", blockId: 1, blockOrderNumber: 1, blockName: "Default Block", actions: "GOTO", parentId: 2, operation: "2# Block Test 2" },
 
   // // Block 2                                                                                                                                                                                        
