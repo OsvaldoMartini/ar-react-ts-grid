@@ -49,13 +49,13 @@ const reorder = (list: any[], startIndex: number, endIndex: number) => {
 // Function to group data by blockId and sort instructions within each block
 const groupByBlock = (data: BlockLoopInstructionLoadDTO[]) => {
   const blocks = data.reduce((result, item) => {
-    const { blockId, blockName } = item;
+    const { blockId, blockName, exportFile } = item;
     if (!result[blockId]) {
-      result[blockId] = { blockName, instructions: [] };
+      result[blockId] = { blockName, instructions: [], exportFile: exportFile || "No Excel Export File" };  // Set exportFile
     }
     result[blockId].instructions.push(item);
     return result;
-  }, {} as Record<number, { blockName: string; instructions: BlockLoopInstructionLoadDTO[] }>);
+  }, {} as Record<number, { blockName: string; exportFile?: string; instructions: BlockLoopInstructionLoadDTO[] }>);
 
   // Sort each block's instructions by instructionOrderNumber
   Object.values(blocks).forEach(block => {
@@ -64,6 +64,8 @@ const groupByBlock = (data: BlockLoopInstructionLoadDTO[]) => {
 
   return blocks;
 };
+
+
 
 // Helper function to reassign instructionOrderNumber starting from 1 within each block
 const reassignInstructionOrderNumbersByBlock = (instructions: BlockLoopInstructionLoadDTO[]) => {
@@ -92,7 +94,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   const [mockData, setMockData] = useState<boolean>(false);
   const [instructionsData, setInstructionsData] = useState<BlockLoopInstructionLoadDTO[]>(data);
   const [socketPort, setSocketPort] = useState<number>(8080);
-  const [groupedData, setGroupedData] = useState<{ [blockId: number]: { blockName: string; instructions: BlockLoopInstructionLoadDTO[] } }>({});
+  const [groupedData, setGroupedData] = useState<{ [blockId: number]: { blockName: string; exportFile?: string; instructions: BlockLoopInstructionLoadDTO[] } }>({});
   const [isDataReordered, setIsDataReordered] = useState<boolean>(false);
   const [client, setClient] = useState<Client | null>(null);
   const [connected, setConnected] = useState(false);
@@ -105,7 +107,9 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   const [editingInstructionId, setEditingInstructionId] = useState<number | null>(null);
   const [instructionName, setInstructionName] = useState<string>('');
   const [editingBlockId, setEditingBlockId] = useState<number | null>(null);
+  const [blockId, setBlockId] = useState<number | null>(null);
   const [blockName, setBlockName] = useState<string>('');
+  const [showFilePickerModal, setShowFilePickerModal] = useState(false);
 
   // Function to handle receiving data from JavaFX
   (window as any).receiveDataFromJava = function (jsonData: string, socketPort: number) {
@@ -507,6 +511,40 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   };
 
 
+
+  const handleExcelFileBlockName = (blockId: number, blockName: string, exportFile?: string) => {
+    // Find the botJobId from the instructionsData for the given blockId
+    const botJobId = instructionsData.find(instruction => instruction.blockId === blockId)?.botJobId;
+
+    // Check if botJobId is found, if not handle the error
+    if (!botJobId) {
+      console.error(`botJobId not found for blockId: ${blockId}`);
+      return;
+    }
+
+    // Send WebSocket message for block name update
+    if (client && connected) {
+      const message = {
+        type: 'BLOCK_EXCEL_FILE',
+        botJobId: botJobId,  // Include the botJobId in the message
+        blockId: blockId,
+        blockName: blockName, // Send the updated block name
+        exportFile: exportFile
+      };
+
+      try {
+        client.publish({
+          destination: '/app/block/excel',
+          body: JSON.stringify(message),
+        });
+        console.log('Sent block name update message:', message);
+      } catch (error) {
+        console.error('Error sending WebSocket message:', error);
+      }
+    }
+  };
+
+
   const correctBlockOrderNumbers = (data: any[]) => {
     console.log("Correcting blockOrderNumbers");
 
@@ -752,8 +790,6 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   const closeAlert = () => {
     setAlertMessage(null);
   };
-
-
 
   const handleCreateComponent = (blockId: number) => {
     // Access groupedData, setGroupedData, instructionsData, and preComponent from the component's scope
@@ -1685,6 +1721,10 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                   ({blockData.instructions.length})
                   {!mockData ? "-Moock Data" : ""}
                 </span>
+                {/* Show the export file or "No Export File" */}
+                <span className="block-export-file">
+                  {blockData.exportFile}
+                </span>
                 <div className="move-buttons">
                   {index === 0 && (
                     <img
@@ -1708,10 +1748,17 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                   />
                   {/* Edit Block Name Button */}
                   <img
-                    src={excelImage}
+                    src={editImage}
                     alt="edit"
                     className="edit-button"
                     onClick={() => handleEditBlock(Number(blockId), blockData.blockName)} // Edit block logic
+                  />
+                  {/* Edit Block Name Button */}
+                  <img
+                    src={excelImage}
+                    alt="excel"
+                    className="excel-button"
+                    onClick={() => handleExcelFileBlockName(Number(blockId), blockData.blockName, blockData.exportFile)} // Edit block logic
                   />
                   <img
                     src={saveImage}
