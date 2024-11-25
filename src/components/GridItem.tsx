@@ -1467,12 +1467,12 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
         case "REFRESH":
           imageSrc = refreshOnlyImage;
           text = instruction.name;
-          imageClass = "ifelse-image"; // Use the new class for waitImage
+          imageClass = "refresh-image"; // Use the new class for waitImage
           break;
         case "REFRESH_LOOP":
           imageSrc = refreshLoopImage;
           text = instruction.name;
-          imageClass = "ifelse-image"; // Use the new class for waitImage
+          imageClass = "refresh-image"; // Use the new class for waitImage
           break;
         case "GOTO":
           imageSrc = gotoImage;
@@ -1635,7 +1635,6 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       const [left, middle, right] = instruction.operation.split(":").map((part) => part.trim());
 
       if (middle === "=") {
-        // Render the left and right parts with "=" in between, using specific colors
         return (
           <span className="instruction-details">
             <span style={{ color: "#0b5394" }}>({instruction.parentId}){left}</span>
@@ -1655,17 +1654,19 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       );
     }
 
-    // Handle "REFRESH_LOOP" operation
+    // Handle "REFRESH_LOOP" operation with extended details
     if (instruction.actions === "REFRESH_LOOP" && instruction.operation) {
-      const [refreshLabel, refreshValue, loopLabel, loopValue] =
-        instruction.operation.split(":").map((part) => part.trim());
+      const parts = instruction.operation.split(":").map((part) => part.trim());
+      const [refreshLabel, refreshValue, loopLabel, loopValue, parentLabel, parentValue] = parts;
 
       return (
         <span className="instruction-details">
           <span style={{ color: "#0b5394" }}>{refreshLabel}</span>{" "}
           <span style={{ color: "#FFA500" }}>{refreshValue}s</span> :{" "}
           <span style={{ color: "#0b5394" }}>{loopLabel}</span>{" "}
-          <span style={{ color: "#FFA500" }}>{loopValue} times</span>
+          <span style={{ color: "#FFA500" }}>{loopValue} times</span> :{" "}
+          <span style={{ color: "#0b5394" }}>{parentLabel}</span>{" "}
+          <span style={{ color: "#FFA500" }}>({instruction.parentId}){parentValue}</span>
         </span>
       );
     }
@@ -1690,8 +1691,6 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     // Return a blank span with a non-breaking space to maintain alignment
     return <span className="instruction-details">&nbsp;</span>;
   };
-
-
 
 
   return (

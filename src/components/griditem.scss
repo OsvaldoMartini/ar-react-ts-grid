@@ -157,6 +157,10 @@
   height: 20px; /* Override height */
 }
 
+.refresh-image {
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
 
 .else-image {
   @extend .operations; /* Inherit styles from .operations */
