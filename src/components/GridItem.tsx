@@ -1422,11 +1422,11 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     if (instruction.actions.startsWith("I:")) {
       imageSrc = inputImage;
       text = `(${instruction.id})${instruction.name}`;
-      imageClass = "input-image"; // Use the new class for waitImage
+      imageClass = "input-image";
     } else if (instruction.actions.startsWith("O:")) {
       imageSrc = outPutImage;
       text = `(${instruction.id})${instruction.name}`;
-      imageClass = "output-image"; // Use the new class for waitImage
+      imageClass = "output-image";
     } else {
       switch (instruction.actions) {
         case "SET":
@@ -1452,47 +1452,47 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
         case "C":
           imageSrc = clickImage;
           text = instruction.name;
-          imageClass = "click-image"; // Use the new class for waitImage
+          imageClass = "click-image";
           break;
         case "H":
           imageSrc = waitImage;
           text = instruction.name;
-          imageClass = "wait-image"; // Use the new class for waitImage
+          imageClass = "wait-image";
           break;
         case "IF":
           imageSrc = ifElseImage;
           text = instruction.name;
-          imageClass = "ifelse-image"; // Use the new class for waitImage
+          imageClass = "ifelse-image";
           break;
         case "REFRESH":
           imageSrc = refreshOnlyImage;
           text = instruction.name;
-          imageClass = "refresh-image"; // Use the new class for waitImage
+          imageClass = "refresh-image";
           break;
         case "REFRESH_LOOP":
           imageSrc = refreshLoopImage;
           text = instruction.name;
-          imageClass = "refresh-image"; // Use the new class for waitImage
+          imageClass = "refresh-image";
           break;
         case "GOTO":
           imageSrc = gotoImage;
           text = instruction.name;
-          imageClass = "goto-image"; // Use the new class for waitImage
+          imageClass = "goto-image";
           break;
         case "ELSE":
           imageSrc = elseImage;
           text = instruction.name;
-          imageClass = "else-image"; // Use the new class for waitImage
+          imageClass = "else-image";
           break;
         case "ENDIF":
           imageSrc = endIfImage;
           text = instruction.name;
-          imageClass = "endif-image"; // Use the new class for waitImage
+          imageClass = "endif-image";
           break;
         case "PAUSE":
           imageSrc = pauseImage;
           text = instruction.name;
-          imageClass = "pause-image"; // Use the new class for waitImage
+          imageClass = "pause-image";
           break;
         default:
           imageSrc = null; // No image for other types
@@ -1654,18 +1654,18 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       );
     }
 
-    // Handle "REFRESH_LOOP" operation with extended details
+    // Handle "REFRESH_LOOP" operation with simplified details
     if (instruction.actions === "REFRESH_LOOP" && instruction.operation) {
       const parts = instruction.operation.split(":").map((part) => part.trim());
-      const [refreshLabel, refreshValue, loopLabel, loopValue, parentLabel, parentValue] = parts;
+      const [refreshValue, loopValue, parentValue] = parts;
 
       return (
         <span className="instruction-details">
-          <span style={{ color: "#0b5394" }}>{refreshLabel}</span>{" "}
+          <span style={{ color: "#0b5394" }}>Refresh</span>{" "}
           <span style={{ color: "#FFA500" }}>{refreshValue}s</span> :{" "}
-          <span style={{ color: "#0b5394" }}>{loopLabel}</span>{" "}
+          <span style={{ color: "#0b5394" }}>Loop</span>{" "}
           <span style={{ color: "#FFA500" }}>{loopValue} times</span> :{" "}
-          <span style={{ color: "#0b5394" }}>{parentLabel}</span>{" "}
+          <span style={{ color: "#0b5394" }}>Parent</span>{" "}
           <span style={{ color: "#FFA500" }}>({instruction.parentId}){parentValue}</span>
         </span>
       );
