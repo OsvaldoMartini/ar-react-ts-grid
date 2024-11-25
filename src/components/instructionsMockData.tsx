@@ -38,7 +38,7 @@ export interface Block {
 
 const instructionsMockData: BlockLoopInstructionLoadDTO[] = [
   { botJobId: 1, id: 1, instructionOrderNumber: 1, name: "Popolari", description: "Label Popolari", blockId: 1, blockOrderNumber: 1, blockName: "Default Block", actions: "O:popolari", exportFile: "D:/Projects/AllinWeb/ABRWeb/Export/banca export.xlsx" },
-  { botJobId: 1, id: 2, instructionOrderNumber: 2, name: "SetValue", description: "SetValue", blockId: 1, blockOrderNumber: 1, blockName: "Default Block", actions: "SET", parentId: 4, operation: "firstName:MockData-martini-martini" },
+  { botJobId: 1, id: 2, instructionOrderNumber: 2, name: "Refresh Loop", description: "Refresh Loop", blockId: 1, blockOrderNumber: 1, blockName: "Default Block", actions: "REFRESH_LOOP", parentId: 1, operation: "Refresh:30:Loop:20:Parent:popolari" },
   { botJobId: 1, id: 34, instructionOrderNumber: 3, name: "PAUSE", description: "PAUSE", blockId: 1, blockOrderNumber: 1, blockName: "Default Block", actions: "PAUSE" },
 
   { botJobId: 1, id: 3, instructionOrderNumber: 3, name: "GOTO", description: "GOTO", blockId: 1, blockOrderNumber: 1, blockName: "Default Block", actions: "GOTO", parentId: 2, operation: "2# Block Test 2" },

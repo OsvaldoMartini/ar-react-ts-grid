@@ -24,6 +24,8 @@ import ifElseImage from "../assets/ifElse.png";
 import elseImage from "../assets/else6.png";
 import endIfImage from "../assets/endIf4.png";
 import pauseImage from "../assets/pause4.png";
+import refreshOnlyImage from "../assets/refresh-only.png";
+import refreshLoopImage from "../assets/refresh-loop.png";
 import clickImage from "../assets/click.png";
 import inputImage from "../assets/input_field.png";
 import outPutImage from "../assets/output1.png";
@@ -1462,6 +1464,16 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
           text = instruction.name;
           imageClass = "ifelse-image"; // Use the new class for waitImage
           break;
+        case "REFRESH":
+          imageSrc = refreshOnlyImage;
+          text = instruction.name;
+          imageClass = "ifelse-image"; // Use the new class for waitImage
+          break;
+        case "REFRESH_LOOP":
+          imageSrc = refreshLoopImage;
+          text = instruction.name;
+          imageClass = "ifelse-image"; // Use the new class for waitImage
+          break;
         case "GOTO":
           imageSrc = gotoImage;
           text = instruction.name;
@@ -1504,7 +1516,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
 
   const renderEditButton = (actionType: string, editImage: string, instruction: BlockLoopInstructionLoadDTO) => {
-    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "IF", "ELSE", "ENDIF", "PAUSE"].includes(actionType)) {
+    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "IF", "ELSE", "ENDIF", "PAUSE", "REFRESH", "REFRESH_LOOP"].includes(actionType)) {
       return <span className="edit-button-space">&nbsp;</span>; // Render a space or an empty element
     }
 
@@ -1616,19 +1628,19 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     instruction: BlockLoopInstructionLoadDTO,
     allInstructions: BlockLoopInstructionLoadDTO[]
   ) => {
-    const validActions = ["SET", "GET", "CK", "E", "GOTO"];
+    const validActions = ["SET", "GET", "CK", "E", "GOTO", "REFRESH_LOOP"];
 
     // Handle the "CK" action with special formatting for operation
     if (instruction.actions === "CK" && instruction.operation) {
-      const [left, middle, right] = instruction.operation.split(":").map(part => part.trim());
+      const [left, middle, right] = instruction.operation.split(":").map((part) => part.trim());
 
       if (middle === "=") {
         // Render the left and right parts with "=" in between, using specific colors
         return (
           <span className="instruction-details">
-            <span style={{ color: '#0b5394' }}>({instruction.parentId}){left}</span>
-            <span style={{ color: '#0b5394' }}>{middle}</span>
-            <span style={{ color: '#FFA500' }}>{right}</span>
+            <span style={{ color: "#0b5394" }}>({instruction.parentId}){left}</span>
+            <span style={{ color: "#0b5394" }}>{middle}</span>
+            <span style={{ color: "#FFA500" }}>{right}</span>
           </span>
         );
       }
@@ -1638,7 +1650,22 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     if (instruction.actions === "GOTO" && instruction.operation) {
       return (
         <span className="instruction-details">
-          <span style={{ color: '#b163ff' }}>{instruction.operation}</span>
+          <span style={{ color: "#b163ff" }}>{instruction.operation}</span>
+        </span>
+      );
+    }
+
+    // Handle "REFRESH_LOOP" operation
+    if (instruction.actions === "REFRESH_LOOP" && instruction.operation) {
+      const [refreshLabel, refreshValue, loopLabel, loopValue] =
+        instruction.operation.split(":").map((part) => part.trim());
+
+      return (
+        <span className="instruction-details">
+          <span style={{ color: "#0b5394" }}>{refreshLabel}</span>{" "}
+          <span style={{ color: "#FFA500" }}>{refreshValue}s</span> :{" "}
+          <span style={{ color: "#0b5394" }}>{loopLabel}</span>{" "}
+          <span style={{ color: "#FFA500" }}>{loopValue} times</span>
         </span>
       );
     }
@@ -1649,8 +1676,8 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
       return (
         <span className="instruction-details">
-          <span style={{ color: '#0b5394' }}>({instruction.parentId}){left}</span>:
-          <span style={{ color: '#FFA500' }}>{right}</span>
+          <span style={{ color: "#0b5394" }}>({instruction.parentId}){left}</span>:
+          <span style={{ color: "#FFA500" }}>{right}</span>
         </span>
       );
     }
@@ -1663,6 +1690,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     // Return a blank span with a non-breaking space to maintain alignment
     return <span className="instruction-details">&nbsp;</span>;
   };
+
 
 
 
