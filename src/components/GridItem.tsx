@@ -1657,7 +1657,25 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     // Handle "REFRESH_LOOP" operation with simplified details
     if (instruction.actions === "REFRESH_LOOP" && instruction.operation) {
       const parts = instruction.operation.split(":").map((part) => part.trim());
-      const [refreshValue, loopValue, parentValue] = parts;
+      const [refreshValue, loopValue] = parts;
+
+      // Retrieve parentValue from allInstructions
+      const parentInstruction = allInstructions.find((item) => item.id === instruction.parentId);
+
+      // Validate parentInstruction
+      if (
+        parentInstruction &&
+        (parentInstruction.blockId !== instruction.blockId ||
+          parentInstruction.instructionOrderNumber >= instruction.instructionOrderNumber)
+      ) {
+        console.log(
+          `Invalid parent instruction for REFRESH_LOOP. Parent ID: ${instruction.parentId}, ` +
+          `Block ID: ${parentInstruction?.blockId}, Instruction Order Number: ${parentInstruction?.instructionOrderNumber}`
+        );
+        return null;
+      }
+
+      const parentValue = parentInstruction?.name || "Unknown";
 
       return (
         <span className="instruction-details">
