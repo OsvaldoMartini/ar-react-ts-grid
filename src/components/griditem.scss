@@ -129,6 +129,7 @@
   margin-left: 2px;
   padding: 0;
   cursor: pointer;
+  pointer-events: none; 
 }
 
 /* New class for waitImage with same styles but different height */
@@ -155,6 +156,11 @@
 .ifelse-image {
   @extend .operations; /* Inherit styles from .operations */
   height: 20px; /* Override height */
+}
+
+.instruction-line {
+  display: inline-flex; /* Ensures the elements inside are in a single line */
+  align-items: center; /* Vertically aligns text and image */
 }
 
 .refresh-image {
@@ -307,3 +313,5 @@
   margin-left: 10px;
   font-style: italic;
 }
+
+

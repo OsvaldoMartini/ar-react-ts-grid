@@ -1683,7 +1683,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
           <span style={{ color: "#FFA500" }}>{refreshValue}s</span> :{" "}
           <span style={{ color: "#0b5394" }}>Loop</span>{" "}
           <span style={{ color: "#FFA500" }}>{loopValue} times</span> :{" "}
-          <span style={{ color: "#0b5394" }}>Parent</span>{" "}
+          <span style={{ color: "#0b5394" }}>Jump To Parent</span>{" "}
           <span style={{ color: "#FFA500" }}>({instruction.parentId}){parentValue}</span>
         </span>
       );
@@ -1755,6 +1755,11 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                       src={saveImage}
                       alt="save"
                       className="save-button"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleSaveBlockName(Number(blockId)); // Trigger save when "Enter" is pressed
+                        }
+                      }}
                       onClick={() => handleSaveBlockName(Number(blockId))}
                     />
                   </div>
@@ -1869,7 +1874,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                                     className="save-button"
                                     onKeyDown={(e) => {
                                       if (e.key === 'Enter') {
-                                        handleSaveBlockName(Number(blockId)); // Trigger save when "Enter" is pressed
+                                        handleSaveInstruction(instruction.id); // Trigger save when "Enter" is pressed
                                       }
                                     }}
                                     onClick={() =>
@@ -1878,9 +1883,17 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                                   />
                                 </div>
                               ) : (
-                                <span>
+                                <span className="instruction-line">
                                   {getInstructionTypeElement(instruction)}
+                                  {instruction.refreshLoop && (
+                                    <img
+                                      src={refreshLoopImage}
+                                      alt="refresh"
+                                      className="refresh-image"
+                                    />
+                                  )}
                                 </span>
+
                               )}
                               {renderOperations(instruction, instructionsData)}
                               <div className="options-column">
