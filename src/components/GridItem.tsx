@@ -431,6 +431,25 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   }, [instructionsData, isDataReordered]);
 
 
+
+  useEffect(() => {
+    //console.log("UseEffect -> instructionsData, isDataReordered");
+    if (isDataReordered && instructionsData.length > 0) {
+
+      // Update instructionsData first
+      setInstructionsData(instructionsData);
+
+      // Group the data and update groupedData
+      const updatedGroupedData = groupByBlock(instructionsData);
+      setGroupedData(updatedGroupedData);
+
+      // Set the flag to true to indicate that the data has been reordered
+      setIsDataReordered(true);
+    }
+  }, [instructionsData, isDataReordered]);
+
+
+
   // Add the event listener to detect clicks outside the dropdown
   useEffect(() => {
     //console.log("UseEffect -> handleClickOutside");
@@ -1591,10 +1610,24 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
     const { blockId, blockName, blockOrderNumber, botJobId, instructionOrderNumber } = instructionToUpdate;
 
-    // Update the instruction's name
+    // Update the instruction's name and actions
     const updatedInstructions = instructionsData.map((instruction) => {
       if (instruction.id === instructionId) {
-        return { ...instruction, name: instructionName }; // Update the name
+        // Update the name
+        const updatedName = instructionName;
+
+        // Update actions in the format "I:instructionName"
+        let updatedActions = instruction.actions;
+
+        if (instruction.actions.includes(":")) {
+          const actionParts = instruction.actions.split(":"); // Split into parts
+          if (actionParts.length >= 2) {
+            actionParts[1] = updatedName; // Replace the name part
+            updatedActions = actionParts.join(":"); // Reassemble the updated actions
+          }
+        }
+
+        return { ...instruction, name: updatedName, actions: updatedActions };
       }
       return instruction;
     });
@@ -1602,9 +1635,10 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     setInstructionsData(updatedInstructions);
     setEditingInstructionId(null); // Exit edit mode
 
-    const instructionUpdated = instructionsData.find(instruction => instruction.id === instructionId);
+    const updatedInstruction = updatedInstructions.find(instruction => instruction.id === instructionId);
+
     // Send WebSocket message with the updated instruction
-    if (client && connected) {
+    if (client && connected && updatedInstruction) {
       const message = {
         type: 'ROW_UPDATE',
         botJobId: botJobId,
@@ -1617,17 +1651,9 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
           blockOrderNumber: blockOrderNumber,
           botJobId: botJobId,
           instructionName: instructionName, // The updated name
+          actions: updatedInstruction.actions, // Include the updated actions
         }]
       };
-
-      instructionToUpdate.name = instructionName;
-
-
-      // const message = {
-      //   type: 'ROW_UPDATE',
-      //   botJobId: botJobId,
-      //   updatedRows: [instructionToUpdate], // Wrap the instructionDTO in an array
-      // };
 
       try {
         client.publish({
@@ -1641,8 +1667,6 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       }
     }
   };
-
-
 
   const renderOperations = (
     instruction: BlockLoopInstructionLoadDTO,
@@ -1882,9 +1906,16 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                                   <input
                                     type="text"
                                     value={instructionName}
-                                    onChange={(e) =>
-                                      setInstructionName(e.target.value)
-                                    }
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        handleSaveInstruction(instruction.id); // Trigger save when "Enter" is pressed
+                                      }
+                                    }}
+                                    onChange={(e) => {
+
+                                      console.log(e.target.value);
+                                      setInstructionName(e.target.value);
+                                    }}
                                     ref={instructionRef} // Associate the ref with the input element
                                     className="edit-textbox"
                                   />
@@ -1892,11 +1923,6 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                                     src={saveImage}
                                     alt="save"
                                     className="save-button"
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') {
-                                        handleSaveInstruction(instruction.id); // Trigger save when "Enter" is pressed
-                                      }
-                                    }}
                                     onClick={() =>
                                       handleSaveInstruction(instruction.id)
                                     } // Save instruction logic
