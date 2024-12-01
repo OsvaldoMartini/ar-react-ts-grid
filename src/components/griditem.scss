@@ -168,6 +168,11 @@
   height: 20px; /* Override height */
 }
 
+.hidden-image {
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
+
 .else-image {
   @extend .operations; /* Inherit styles from .operations */
   height: 20px; /* Override height */

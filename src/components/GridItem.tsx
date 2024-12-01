@@ -32,6 +32,8 @@ import outPutImage from "../assets/output1.png";
 import constructionImage from '../assets/construction.png';
 import forbiddenImage from '../assets/forbidden.png';
 import brickImage from '../assets/brick.png';
+import hiddenImage from '../assets/hidden-black.png';
+
 
 import AlertModal from './AlertModal';
 
@@ -1417,12 +1419,20 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     let text: string | null = null;
     let isActionBold = false;
     let imageClass = "operations"; // Default class for images
+    let hiddenField: boolean = false;
+
 
     // Determine the image source and text based on instruction type
     if (instruction.actions.startsWith("I:")) {
+      const actionParts: string[] = instruction.actions.split(":");
       imageSrc = inputImage;
       text = `(${instruction.id})${instruction.name}`;
       imageClass = "input-image";
+
+      // Check if the third part is 'hidden'
+      if (actionParts.length === 3 && actionParts[2] === "hidden") {
+        hiddenField = true;
+      }
     } else if (instruction.actions.startsWith("O:")) {
       imageSrc = outPutImage;
       text = `(${instruction.id})${instruction.name}`;
@@ -1502,16 +1512,26 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     }
 
     // Return a combined image and text element if imageSrc exists, otherwise return just the text
-    return imageSrc ? (
+    // Return a combined image and text element if imageSrc exists, otherwise return just the text
+    return (
       <div className="instruction-type">
-        <img src={imageSrc} alt="" className={imageClass} />
-        <span>{text}</span>
+        {imageSrc && (
+          <>
+            <img src={imageSrc} alt="" className={imageClass} />
+            {hiddenField && (
+              <img src={hiddenImage} alt="hidden" className="hidden-image" />
+            )}
+            <span>{text}</span>
+          </>
+        )}
+        {!imageSrc && (
+          <span style={{ fontWeight: isActionBold ? 'bold' : 'normal' }}>
+            {text}
+          </span>
+        )}
       </div>
-    ) : (
-      <span style={{ fontWeight: isActionBold ? 'bold' : 'normal' }}>
-        {text}
-      </span>
     );
+
   };
 
 
@@ -1892,7 +1912,9 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
                                       className="refresh-image"
                                     />
                                   )}
+
                                 </span>
+
 
                               )}
                               {renderOperations(instruction, instructionsData)}
