@@ -1678,7 +1678,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     if (instruction.actions === "CK" && instruction.operation) {
       const [left, middle, right] = instruction.operation.split(":").map((part) => part.trim());
 
-      if (middle === "=") {
+      if (middle === "=" || middle === ">" || middle === "!=") {
         return (
           <span className="instruction-details">
             <span style={{ color: "#0b5394" }}>({instruction.parentId}){left}</span>

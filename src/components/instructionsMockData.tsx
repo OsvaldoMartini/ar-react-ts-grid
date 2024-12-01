@@ -57,7 +57,7 @@ const instructionsMockData: BlockLoopInstructionLoadDTO[] = [
   // { botJobId: 11, id: 10, instructionOrderNumber: 2, name: "SetValue", description: "Description 9", blockId: 36, blockOrderNumber: 4, blockName: "Block Test 3", actions: "SET", parentId: 4, operation: "firstName:Osvaldo" },
   // { botJobId: 11, id: 11, instructionOrderNumber: 3, name: "GetValue", description: "Description 10", blockId: 36, blockOrderNumber: 4, blockName: "Block Test 3", actions: "GET", parentId: 4, operation: "firstname:$FIRSTNAME" },
   // { botJobId: 11, id: 12, instructionOrderNumber: 4, name: "Search", description: "Search", blockId: 36, blockOrderNumber: 4, blockName: "Block Test 3", actions: "C", parentId: 4 },
-  // { botJobId: 11, id: 13, instructionOrderNumber: 5, name: "Check", description: "Description 12", blockId: 36, blockOrderNumber: 4, blockName: "Block Test 3", actions: "CK", parentId: 4, operation: "$firstname:=:Osvaldo" },
+  // { botJobId: 11, id: 13, instructionOrderNumber: 5, name: "Check", description: "Description 12", blockId: 36, blockOrderNumber: 4, blockName: "Block Test 3", actions: "CK", parentId: 4, operation: "$firstname:!=:Osvaldo" },
 
   // // Block 4                                                                                                                                                                                        
   // { botJobId: 11, id: 14, instructionOrderNumber: 1, name: "Close Browser", description: "Close Browser", blockId: 37, blockOrderNumber: 5, blockName: "Block Test 4", actions: "Q" },
