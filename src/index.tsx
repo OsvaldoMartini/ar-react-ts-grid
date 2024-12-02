@@ -4,6 +4,7 @@ import './index.css';
 import reportWebVitals from './reportWebVitals';
 import GridItem from './components/GridItem';
 import instructionsMockData from './components/instructionsMockData';
+import Navigable from './components/Navigable';
 // import WebSocketComponent from './components/WebSocketComponent';
 
 
@@ -13,8 +14,9 @@ const root = ReactDOM.createRoot(
 );
 root.render(
   <React.StrictMode>
-    <GridItem data={instructionsMockData} />
+    {/* <GridItem data={instructionsMockData} /> */}
     {/* <WebSocketComponent></WebSocketComponent> */}
+    <Navigable />
   </React.StrictMode>
 );
 

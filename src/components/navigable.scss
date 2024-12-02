@@ -1,0 +1,49 @@
+.grid-container {
+  position: relative;
+  height: 100vh;
+}
+
+.navigation-buttons {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  gap: 10px;
+  background-color: white;
+  padding: 10px;
+  border-radius: 5px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+
+  button {
+    padding: 5px 10px;
+    font-size: 14px;
+    cursor: pointer;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+
+    &:hover {
+      background-color: #f0f0f0;
+    }
+  }
+}
+
+.scrollable-container {
+  margin-top: 50px;
+  height: calc(100vh - 60px);
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.navigable {
+  padding: 10px;
+  margin: 10px;
+  border: 1px solid black;
+  display: inline-block;
+}
+
+.highlight {
+  background-color: yellow;
+  border: 2px solid red;
+}
