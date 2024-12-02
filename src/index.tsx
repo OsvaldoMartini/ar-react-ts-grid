@@ -5,14 +5,13 @@ import reportWebVitals from './reportWebVitals';
 import GridItem from './components/GridItem';
 import instructionsMockData from './components/instructionsMockData';
 import Navigable from './components/Navigable';
+import NavigableBKP from './components/NavigableBKP';
 // import WebSocketComponent from './components/WebSocketComponent';
 
 
 // The HTML string to be passed as dataHtml
-const dataHtml = `
-  <input class="iam-form-control ng-pristine ng-invalid ng-touched" name="username" type="text" id="username" placeholder="" autocapitalize="off" spellcheck="false">
-  <input class="iam-form-control ng-untouched ng-pristine ng-invalid" name="password" type="password" id="password" placeholder="" autocapitalize="off" spellcheck="false">
-`;
+const dataHtml = [`<input class="iam-form-control ng-pristine ng-invalid ng-touched" name="username" type="text" id="username" placeholder="" autocapitalize="off" spellcheck="false">`,
+  `<input class="iam-form-control ng-untouched ng-pristine ng-invalid" name="password" type="password" id="password" placeholder="" autocapitalize="off" spellcheck="false">`];
 
 
 const root = ReactDOM.createRoot(
@@ -22,7 +21,8 @@ root.render(
   <React.StrictMode>
     {/* <GridItem data={instructionsMockData} /> */}
     {/* <WebSocketComponent></WebSocketComponent> */}
-    <Navigable />
+    <Navigable dataHtml={dataHtml} />
+    {/* <NavigableBKP /> */}
   </React.StrictMode>
 );
 
