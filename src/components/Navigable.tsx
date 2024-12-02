@@ -96,6 +96,9 @@ const Navigable: React.FC = () => {
   useEffect(() => {
     const randomItems = [...Array(20)].map((_, index) => generateRandomItem(index)); // Generate 20 random items
     setItems(randomItems);
+
+    // Highlight the first item on initial render
+    navigateElement(0); // Highlight the first item (index 0)
   }, []); // Empty dependency array ensures this effect runs only once when the component mounts
 
   return (
