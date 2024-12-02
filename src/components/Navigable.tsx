@@ -55,6 +55,9 @@ const generateRandomItem = (index: number): RandomItem => {
 const Navigable: React.FC = () => {
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [items, setItems] = useState<RandomItem[]>([]); // State to store random items
+  // const [htmlContent, setHtmlContent] = useState<string>('https://flatfox.ch/c/en/'); // Initial URL for iframe
+  const [htmlContent, setHtmlContent] = useState<string>('https://example.com/'); // Initial URL for iframe
+
 
   // Function to navigate elements by index
   const navigateElement = (index: number): void => {
@@ -113,8 +116,20 @@ const Navigable: React.FC = () => {
 
       {/* Scrollable Container */}
       <div className="scrollable-container">
-        {/* Render generated random items */}
         {items}
+        {htmlContent ? (
+          <iframe
+            src={htmlContent}
+            width="100%"
+            height="100%"
+            frameBorder="0"
+            title="External Site"
+          />
+        ) : (
+          <div className="placeholder">
+            <p>Loading site...</p>
+          </div>
+        )}
       </div>
     </div>
   );

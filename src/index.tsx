@@ -8,6 +8,12 @@ import Navigable from './components/Navigable';
 // import WebSocketComponent from './components/WebSocketComponent';
 
 
+// The HTML string to be passed as dataHtml
+const dataHtml = `
+  <input class="iam-form-control ng-pristine ng-invalid ng-touched" name="username" type="text" id="username" placeholder="" autocapitalize="off" spellcheck="false">
+  <input class="iam-form-control ng-untouched ng-pristine ng-invalid" name="password" type="password" id="password" placeholder="" autocapitalize="off" spellcheck="false">
+`;
+
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
