@@ -147,6 +147,8 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
     let updatedGroupedData = { ...groupedData };
     let deleteBlockId = -1; // Default value for deleted blockId
+    // Retrieve botJobId from the first instruction in the source block
+    const botJobId = groupedData[destinationBlockId].instructions?.[0]?.botJobId;
 
     if (sourceBlockId === destinationBlockId) {
 
@@ -289,6 +291,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
       const message = {
         type: 'ROW_MOVE',
+        botJobId,
         deleteBlockId, // Include the deleted blockId
         updatedRows,
       };
