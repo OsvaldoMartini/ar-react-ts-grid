@@ -19,9 +19,9 @@ const root = ReactDOM.createRoot(
 );
 root.render(
   <React.StrictMode>
-    {/* <GridItem data={instructionsMockData} /> */}
+    <GridItem data={instructionsMockData} />
     {/* <WebSocketComponent></WebSocketComponent> */}
-    <Navigable dataHtml={dataHtml} />
+    {/* <Navigable dataHtml={dataHtml} /> */}
     {/* <NavigableBKP /> */}
   </React.StrictMode>
 );

@@ -129,6 +129,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
 
   // Drag-and-drop event handler
+  // Drag-and-drop event handler
   const onDragEnd = (result: any) => {
     const { destination, source } = result;
 
@@ -146,36 +147,29 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     }
 
     let updatedGroupedData = { ...groupedData };
+    let deleteBlockId = -1; // Default value for deleted blockId
 
     if (sourceBlockId === destinationBlockId) {
-
-      // Moving instruction to a different block
+      // Handle reordering within the same block
       const sourceInstructions = Array.from(groupedData[sourceBlockId].instructions);
 
       const instructionToMove = sourceInstructions[source.index];
 
-
       if (instructionToMove.name === "IF" || instructionToMove.name === "ELSE" || instructionToMove.name === "ENDIF") {
-        setAlertMessage('Moving "IF" or "ELSE or "ENDIF" is Not Allowed!   Move the nested instructions instead!');
+        setAlertMessage('Moving "IF", "ELSE", or "ENDIF" is not allowed! Move the nested instructions instead.');
         setAlertImage(forbiddenImage);
         return;
-
       }
 
-      // Remove the dragged instruction from source block
-      const [movedInstruction] = sourceInstructions.splice(source.index, 1);
-
-      // Reordering within the same block
       const updatedBlockData = reorder(
         groupedData[sourceBlockId].instructions,
         source.index,
         destination.index
       );
 
-      // Reassign instructionOrderNumbers within the block
       const updatedInstructions = updatedBlockData.map((instruction, index) => ({
         ...instruction,
-        instructionOrderNumber: index + 1, // Reassign order numbers
+        instructionOrderNumber: index + 1,
       }));
 
       updatedGroupedData = {
@@ -186,41 +180,30 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
         },
       };
     } else {
-      // Moving instruction to a different block
+      // Handle moving between different blocks
       const sourceInstructions = Array.from(groupedData[sourceBlockId].instructions);
       const destinationInstructions = Array.from(groupedData[destinationBlockId].instructions);
 
-      // Remove the dragged instruction from source block
       const [movedInstruction] = sourceInstructions.splice(source.index, 1);
 
       if (movedInstruction.name === "IF" || movedInstruction.name === "ELSE" || movedInstruction.name === "ENDIF") {
-        setAlertMessage('Moving "IF" or "ELSE" or "ENDIF" is Not Allowed Out Side from their Block!');
+        setAlertMessage('Moving "IF", "ELSE", or "ENDIF" is not allowed outside their block!');
         setAlertImage(forbiddenImage);
         setAlertClass('construction-image');
         return;
       }
 
-      // Update the blockId of the moved instruction
       movedInstruction.blockId = parseInt(destinationBlockId, 10);
-
-      // Insert the moved instruction into destination block at the specified position
       destinationInstructions.splice(destination.index, 0, movedInstruction);
 
-      // Reassign instructionOrderNumbers in source block
       const updatedSourceInstructions = sourceInstructions.map((instruction, index) => ({
         ...instruction,
         instructionOrderNumber: index + 1,
       }));
 
-      const { blockId, blockName, blockOrderNumber } = groupedData[destinationBlockId].instructions[0] || {};
-
-      // Reassign instructionOrderNumbers in destination block
       const updatedDestinationInstructions = destinationInstructions.map((instruction, index) => ({
         ...instruction,
         instructionOrderNumber: index + 1,
-        blockId: blockId,
-        blockName: blockName,
-        blockOrderNumber: blockOrderNumber
       }));
 
       updatedGroupedData = {
@@ -235,51 +218,22 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
         },
       };
 
-
-      // Remove the block from `groupedData` if it has no instructions left
+      // Identify the block to delete if source block becomes empty
       if (updatedSourceInstructions.length === 0) {
+        deleteBlockId = parseInt(sourceBlockId, 10); // Track the blockId to delete
         delete updatedGroupedData[sourceBlockId];
-
-        // Reorder blockOrderNumbers for remaining blocks in groupedData
-        let blockOrder = 1; // Start from 1, or adjust as needed
-        Object.keys(updatedGroupedData).forEach((blockKey) => {
-          const blockId = Number(blockKey); // Convert string key to number
-          const block = updatedGroupedData[blockId];
-          if (block) {
-            // Only update blockOrderNumber for each instruction inside this block
-            const updatedInstructions = block.instructions.map((instruction: any) => {
-              return {
-                ...instruction,
-                blockOrderNumber: blockOrder,  // Update blockOrderNumber in instruction
-              };
-            });
-
-            // Add the updated block with updated instructions to newUpdatedGroupedData
-            updatedGroupedData[blockId] = {
-              ...block,
-              instructions: updatedInstructions, // Replace the instructions with updated ones
-            };
-
-            blockOrder++; // Increment blockOrder for the next block
-          }
-        });
-
       }
     }
 
-    // Update state with the new grouped data, ensuring no empty blocks
     setGroupedData(updatedGroupedData);
 
-    // Flatten updatedGroupedData into instructionsData array, excluding empty blocks
     const updatedInstructionsData = Object.values(updatedGroupedData)
       .flatMap(block => block.instructions);
 
-    // Update instructionsData state
     setInstructionsData(updatedInstructionsData);
 
-    setIsDataReordered(false); // To trigger reordering logic if needed
+    setIsDataReordered(false);
 
-    // Send WebSocket message with the updated instructions
     if (client && connected) {
       const updatedRows = updatedInstructionsData.map(instruction => ({
         blockId: instruction.blockId,
@@ -289,6 +243,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
 
       const message = {
         type: 'ROW_MOVE',
+        deleteBlockId, // Include the deleted blockId
         updatedRows,
       };
 
@@ -303,6 +258,7 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       }
     }
   };
+
 
 
   // Memoized function to handle outside clicks on the dropdown
@@ -1163,9 +1119,6 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
         if (client && connected) {
           const message = {
             type: 'ROW_MOVE',
-            botJobId: currentInstruction.botJobId,
-            blockId: currentInstruction.blockId,
-            blockName: currentInstruction.blockName,
             updatedRows: updatedRows,
           };
 
