@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client';
 import './index.css';
 import reportWebVitals from './reportWebVitals';
 import GridItem from './components/GridItem';
-import instructionsMockData from './components/instructionsMockData';
+import instructionsMockData, { botJobMockData } from './components/instructionsMockData';
 import Navigable from './components/Navigable';
 import NavigableBKP from './components/NavigableBKP';
 // import WebSocketComponent from './components/WebSocketComponent';
@@ -19,7 +19,8 @@ const root = ReactDOM.createRoot(
 );
 root.render(
   <React.StrictMode>
-    <GridItem data={instructionsMockData} />
+    {/* <GridItem data={[]} botJobData={botJobMockData} /> */}
+    <GridItem data={instructionsMockData} botJobData={botJobMockData} />
     {/* <WebSocketComponent></WebSocketComponent> */}
     {/* <Navigable dataHtml={dataHtml} /> */}
     {/* <NavigableBKP /> */}

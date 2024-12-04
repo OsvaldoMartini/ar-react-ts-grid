@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Client, IMessage } from "@stomp/stompjs";
-import { BlockLoopInstructionLoadDTO, UpdatedBlock } from './instructionsMockData';
+import { BlockLoopInstructionLoadDTO, BotJobData, UpdatedBlock } from './instructionsMockData';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd'; // Import from react-beautiful-dnd
 import './griditem.scss';
 
@@ -40,6 +40,7 @@ import AlertModal from './AlertModal';
 
 interface GridItemProps {
   data: BlockLoopInstructionLoadDTO[];
+  botJobData: BotJobData;
 }
 
 // Helper function to reorder items in an array based on drag-and-drop actions
@@ -89,7 +90,7 @@ const reassignInstructionOrderNumbersByBlock = (instructions: BlockLoopInstructi
   return updatedInstructions;
 };
 
-const GridItem: React.FC<GridItemProps> = ({ data }) => {
+const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
   // Use state to manage the instructions data
   const instructionRef = useRef<HTMLInputElement>(null);
   const blockRef = useRef<HTMLInputElement>(null);
@@ -97,6 +98,8 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   const [openDropdown, setOpenDropdown] = useState<number | null>(null);
   const [mockData, setMockData] = useState<boolean>(false);
   const [instructionsData, setInstructionsData] = useState<BlockLoopInstructionLoadDTO[]>(data);
+  const [botJob, setBotJob] = useState<BotJobData>(botJobData);
+  const [botJobLoaded, setBotJobLoaded] = useState<boolean>(false);
   const [socketPort, setSocketPort] = useState<number>(8080);
   const [groupedData, setGroupedData] = useState<{ [blockId: number]: { blockName: string; exportFile?: string; instructions: BlockLoopInstructionLoadDTO[] } }>({});
   const [isDataReordered, setIsDataReordered] = useState<boolean>(false);
@@ -118,11 +121,20 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   // Function to handle receiving data from JavaFX
   (window as any).receiveDataFromJava = function (jsonData: string, socketPort: number) {
     const data: BlockLoopInstructionLoadDTO[] = JSON.parse(jsonData);
+    const dataBotJob: BotJobData = JSON.parse(jsonData);
+
     if (data && data.length > 0) {
       setMockData(true);
       setIsDataReordered(false); // Reset this flag on new data load
       setInstructionsData(data);
+    } else {
+      if (dataBotJob) {
+        setMockData(true);
+        setIsDataReordered(false); // Reset this flag on new data load
+        setBotJob(dataBotJob);
+      }
     }
+
     setSocketPort(socketPort);
     // setAlertMessage("receiveDataFromJava Socket " + socketPort);
   };
@@ -433,6 +445,14 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
       setIsDataReordered(true);
     }
   }, [instructionsData, isDataReordered]);
+
+
+  useEffect(() => {
+    if (botJobLoaded && botJob && botJob.data == 0 && instructionsData.length === 0) {
+      // console.log(botJob.name);
+      setBotJobLoaded(true);
+    }
+  }, [botJob, instructionsData]);
 
 
 
@@ -758,7 +778,32 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
     setOpenDropdown(null);
   };
 
+  const handleNewStepAfter = (instructionId: number) => {
+    // WebSocket message for "INSERT_AFTER" with the selected instruction's details
+    const message = {
+      type: 'INSERT_AFTER',
+      botJobId: botJob.id,
+      botJobName: botJob.name,
+      blockId: -1,
+      blockName: "Default Block",
+      updatedRows: [], // Wrap the instructionDTO in an array
+    };
 
+    // Send WebSocket message
+    if (client && connected) {
+      try {
+        client.publish({
+          destination: '/app/row/insert-after', // Update based on your WebSocket endpoint configuration
+          body: JSON.stringify(message),
+        });
+
+        console.log('Sent insert after message:', message);
+      } catch (error) {
+        console.error('Error sending WebSocket message:', error);
+      }
+    }
+    setOpenDropdown(null);
+  };
 
 
   const handleInsertStepAfter = (instructionId: number) => {
@@ -1253,56 +1298,69 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
   };
 
 
-  // Function to remove an instruction by its ID and reassign order numbers within each block
   const handleRemoveInstruction = (instructionId: number) => {
-    // Find the blockId associated with the instructionId
+    // Find the instruction to remove
     const instructionToRemove = instructionsData.find(instruction => instruction.id === instructionId);
 
-    // If the instruction is not found, return early
     if (!instructionToRemove) return;
 
     const { botJobId, blockId, actions, parentId } = instructionToRemove;
 
-    // Define filtering logic based on actions type
-    const updatedData =
-      actions === "IF" || actions === "ELSE" || actions === "ENDIF"
-        ? instructionsData.filter(
-          (instruction) =>
-            instruction.blockId !== blockId ||
-            // instruction.id !== instructionId ||
-            (instruction.actions !== "IF" &&
-              instruction.actions !== "ELSE" &&
-              instruction.actions !== "ENDIF")
-        )
-        : instructionsData.filter(
-          (instruction) => instruction.id !== instructionId
-        );
+    // Filter instructionsData
+    const updatedData = actions === "IF" || actions === "ELSE" || actions === "ENDIF"
+      ? instructionsData.filter(
+        instruction =>
+          instruction.blockId !== blockId ||
+          (instruction.actions !== "IF" &&
+            instruction.actions !== "ELSE" &&
+            instruction.actions !== "ENDIF")
+      )
+      : instructionsData.filter(instruction => instruction.id !== instructionId);
 
+    // Reassign order numbers
     const reassignedData = reassignInstructionOrderNumbersByBlock(updatedData);
     setInstructionsData([...reassignedData]);
-    setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
 
-    // Send WebSocket message
-    if (client && connected) { // Assuming `client` is your STOMP client and `connected` is a boolean indicating the connection state
+    // Update groupedData based on the reassigned instructionsData
+    const newGroupedData = reassignedData.reduce((acc, instruction) => {
+      if (!acc[instruction.blockId]) {
+        acc[instruction.blockId] = {
+          blockName: instruction.blockName,
+          exportFile: instruction.exportFile,
+          instructions: [],
+        };
+      }
+      acc[instruction.blockId].instructions.push(instruction);
+      return acc;
+    }, {} as { [blockId: number]: { blockName: string; exportFile?: string; instructions: BlockLoopInstructionLoadDTO[] } });
+
+    setGroupedData(newGroupedData);
+
+    setIsDataReordered(false); // Allow for potential reordering logic
+
+    // Send WebSocket message if connected
+    if (client && connected) {
       const message = {
-        type: 'DELETE_INSTRUCTION',
-        instructionId: instructionId,
-        actions: actions,
-        parentId: parentId,
-        botJobId: botJobId, // Include the blockId in the message
-        blockId: blockId, // Include the blockId in the message
+        type: "DELETE_INSTRUCTION",
+        instructionId,
+        actions,
+        parentId,
+        botJobId,
+        blockId,
       };
 
-      // Publish the delete message to the WebSocket server
       client.publish({
-        destination: '/app/instruction/delete', // Destination to which you want to send the message (configured on the server)
+        destination: "/app/instruction/delete",
         body: JSON.stringify(message),
       });
 
       console.log(`Sent delete instruction message for instruction ID: ${instructionId} in block ID: ${blockId}`);
     }
+
+    // Close the dropdown
     setOpenDropdown(null);
   };
+
 
 
   // Function to remove a block by its blockId and reassign order numbers within each block
@@ -1766,280 +1824,314 @@ const GridItem: React.FC<GridItemProps> = ({ data }) => {
           imageClass={alertClass}
         />
       )}
-      <DragDropContext
-        onDragEnd={onDragEnd} // Define the onDragEnd handler to update the state when the dragging stops
+      <DragDropContext onDragEnd={onDragEnd} // Define the onDragEnd handler to update the state when the dragging stops
       >
-        {Object.entries(groupedData)
-          .sort(
-            ([, aBlockData], [, bBlockData]) =>
-              aBlockData.instructions[0].blockOrderNumber -
-              bBlockData.instructions[0].blockOrderNumber
-          )
-          .map(([blockId, blockData], index) => (
-            <div key={blockId} className="block">
-              {/* Block header with garbage, up, and down buttons */}
+
+        {
+          Object.keys(groupedData).length === 0 ? (
+            // Render default block if groupedData is empty
+            <div className="block">
               <div className="block-header">
-                <span className="block-order-number">
-                  #{blockData.instructions[0].blockOrderNumber}
-                </span>
-                {editingBlockId === Number(blockId) ? (
-                  <div className="edit-container">
-                    <input
-                      type="text"
-                      value={blockName}
-                      onChange={(e) => setBlockName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          handleSaveBlockName(Number(blockId)); // Trigger save when "Enter" is pressed
-                        }
-                      }}
-                      ref={blockRef} // Associate the ref with the input element
-                      className="edit-textbox"
-                    />
-                    <img
-                      src={saveImage}
-                      alt="save"
-                      className="save-button"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          handleSaveBlockName(Number(blockId)); // Trigger save when "Enter" is pressed
-                        }
-                      }}
-                      onClick={() => handleSaveBlockName(Number(blockId))}
-                    />
-                  </div>
-                ) : (
-                  <span className="block-name">{blockData.blockName}</span>
+                <span className="block-order-number">#1</span>
+                <span className="block-name">Default Block</span>
+                {botJob && botJob.id > 0 && (
+                  <span className="block-name">BotJob : {botJob.name}</span>
                 )}
-
-                <span className="block-count">
-                  ({blockData.instructions.length})
-                  {!mockData ? "-Moock Data" : ""}
-                </span>
-                {/* Show the export file or "No Export File" */}
-                <span className="block-export-file">
-                  {blockData.exportFile}
-                </span>
-                <div className="move-buttons">
-                  {index === 0 && (
-                    <img
-                      src={rollBackImage}
-                      alt=""
-                      className="rollback-button"
-                      onClick={() => handleRollbackBlock(Number(blockId))}
-                    />
-                  )}
-                  <img
-                    src={upImage}
-                    alt=""
-                    className="move-button"
-                    onClick={() => handleMoveBlockUp(Number(blockId))}
-                  />
-                  <img
-                    src={downImage}
-                    alt=""
-                    className="move-button"
-                    onClick={() => handleMoveBlockDown(Number(blockId))}
-                  />
-                  {/* Edit Block Name Button */}
-                  <img
-                    src={editImage}
-                    alt="edit"
-                    className="edit-button"
-                    onClick={() => handleEditBlock(Number(blockId), blockData.blockName)} // Edit block logic
-                  />
-                  {/* Edit Block Name Button */}
-                  <img
-                    src={excelImage}
-                    alt="excel"
-                    className="excel-button"
-                    onClick={() => handleExcelFileBlockName(Number(blockId), blockData.blockName, blockData.exportFile)} // Edit block logic
-                  />
-                  <img
-                    src={saveImage}
-                    alt="save"
-                    className="save-button"
-                    onClick={() => handleCreateComponent(Number(blockId))}
-                  />
-                  {index !== 0 && (
-                    <img
-                      src={crossImage}
-                      alt=""
-                      className="cross-button"
-                      onClick={() => handleRemoveBlock(Number(blockId))}
-                    />
-                  )}
-
-                </div>
               </div>
-              <Droppable droppableId={blockId} key={blockId}>
-                {(provided) => (
+              <div className="instructions-list">
+                {/* Add an empty line */}
+                <div
+                  id={`dropdown-${1}`} // Use unique ID for each dropdown
+                  ref={dropdownRef}
+                  className={`dropdown-menu ${dropdownPosition === 'above'
+                    ? 'dropdown-above'
+                    : ''
+                    }`}
+                >
                   <div
-                    className="instructions-list"
-                    ref={provided.innerRef}
-                    {...provided.droppableProps}
+                    onClick={() =>
+                      handleNewStepAfter(1)
+                    }
                   >
-                    {blockData.instructions.map((instruction, index) => {
-                      const isLastInstruction =
-                        index === blockData.instructions.length - 1;
-                      const isLastBlock =
-                        Number(blockId) === Object.keys(groupedData).length; // Check if this is the last block
+                    Insert New Step
+                  </div>
+                </div>
+                <div className="instruction-item"> </div>
+              </div>
+            </div>
+          ) : (
+            Object.entries(groupedData)
+              .sort(
+                ([, aBlockData], [, bBlockData]) =>
+                  aBlockData.instructions[0].blockOrderNumber -
+                  bBlockData.instructions[0].blockOrderNumber
+              )
+              .map(([blockId, blockData], index) => (
+                <div key={blockId} className="block">
+                  {/* Block header with garbage, up, and down buttons */}
+                  <div className="block-header">
+                    <span className="block-order-number">
+                      #{blockData.instructions[0].blockOrderNumber}
+                    </span>
+                    {editingBlockId === Number(blockId) ? (
+                      <div className="edit-container">
+                        <input
+                          type="text"
+                          value={blockName}
+                          onChange={(e) => setBlockName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              handleSaveBlockName(Number(blockId)); // Trigger save when "Enter" is pressed
+                            }
+                          }}
+                          ref={blockRef} // Associate the ref with the input element
+                          className="edit-textbox"
+                        />
+                        <img
+                          src={saveImage}
+                          alt="save"
+                          className="save-button"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              handleSaveBlockName(Number(blockId)); // Trigger save when "Enter" is pressed
+                            }
+                          }}
+                          onClick={() => handleSaveBlockName(Number(blockId))}
+                        />
+                      </div>
+                    ) : (
+                      <span className="block-name">{blockData.blockName}</span>
+                    )}
 
-                      return (
-                        <Draggable
-                          key={instruction.id}
-                          draggableId={instruction.id.toString()}
-                          index={index}
-                        >
-                          {(provided) => (
-                            <div
-                              ref={provided.innerRef}
-                              {...provided.draggableProps}
-                              {...provided.dragHandleProps}
-                              className={`instruction-item ${openDropdown === instruction.id ? 'dropdown-open' : ''
-                                } ${instruction.actions === 'IF' || instruction.actions === 'ELSE' || instruction.actions === 'ENDIF'
-                                  ? 'light-yellow-background'
-                                  : ''
-                                }`}
+                    <span className="block-count">
+                      ({blockData.instructions.length})
+                      {!mockData ? "-Moock Data" : ""}
+                    </span>
+                    {/* Show the export file or "No Export File" */}
+                    <span className="block-export-file">
+                      {blockData.exportFile}
+                    </span>
+                    <div className="move-buttons">
+                      {index === 0 && (
+                        <img
+                          src={rollBackImage}
+                          alt=""
+                          className="rollback-button"
+                          onClick={() => handleRollbackBlock(Number(blockId))}
+                        />
+                      )}
+                      <img
+                        src={upImage}
+                        alt=""
+                        className="move-button"
+                        onClick={() => handleMoveBlockUp(Number(blockId))}
+                      />
+                      <img
+                        src={downImage}
+                        alt=""
+                        className="move-button"
+                        onClick={() => handleMoveBlockDown(Number(blockId))}
+                      />
+                      {/* Edit Block Name Button */}
+                      <img
+                        src={editImage}
+                        alt="edit"
+                        className="edit-button"
+                        onClick={() => handleEditBlock(Number(blockId), blockData.blockName)} // Edit block logic
+                      />
+                      {/* Edit Block Name Button */}
+                      <img
+                        src={excelImage}
+                        alt="excel"
+                        className="excel-button"
+                        onClick={() => handleExcelFileBlockName(Number(blockId), blockData.blockName, blockData.exportFile)} // Edit block logic
+                      />
+                      <img
+                        src={saveImage}
+                        alt="save"
+                        className="save-button"
+                        onClick={() => handleCreateComponent(Number(blockId))}
+                      />
+                      {index !== 0 && (
+                        <img
+                          src={crossImage}
+                          alt=""
+                          className="cross-button"
+                          onClick={() => handleRemoveBlock(Number(blockId))}
+                        />
+                      )}
+
+                    </div>
+                  </div>
+                  <Droppable droppableId={blockId} key={blockId}>
+                    {(provided) => (
+                      <div
+                        className="instructions-list"
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                      >
+                        {blockData.instructions.map((instruction, index) => {
+                          const isLastInstruction =
+                            index === blockData.instructions.length - 1;
+                          const isLastBlock =
+                            Number(blockId) === Object.keys(groupedData).length; // Check if this is the last block
+
+                          return (
+                            <Draggable
+                              key={instruction.id}
+                              draggableId={instruction.id.toString()}
+                              index={index}
                             >
-                              {editingInstructionId === instruction.id ? (
-                                <div className="edit-container">
-                                  <input
-                                    type="text"
-                                    value={instructionName}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') {
-                                        handleSaveInstruction(instruction.id); // Trigger save when "Enter" is pressed
-                                      }
-                                    }}
-                                    onChange={(e) => {
-
-                                      console.log(e.target.value);
-                                      setInstructionName(e.target.value);
-                                    }}
-                                    ref={instructionRef} // Associate the ref with the input element
-                                    className="edit-textbox"
-                                  />
-                                  <img
-                                    src={saveImage}
-                                    alt="save"
-                                    className="save-button"
-                                    onClick={() =>
-                                      handleSaveInstruction(instruction.id)
-                                    } // Save instruction logic
-                                  />
-                                </div>
-                              ) : (
-                                <span className="instruction-line">
-                                  {getInstructionTypeElement(instruction)}
-                                  {instruction.refreshLoop && (
-                                    <img
-                                      src={refreshLoopImage}
-                                      alt="refresh"
-                                      className="refresh-image"
-                                    />
-                                  )}
-
-                                </span>
-
-
-                              )}
-                              {renderOperations(instruction, instructionsData)}
-                              <div className="options-column">
-                                <div className="move-buttons">
-                                  {renderEditButton(
-                                    instruction.actions,
-                                    editImage,
-                                    instruction
-                                  )}
-                                  {renderMoveButtons(instruction.actions, instruction.id)}
-                                  <img
-                                    src={crossImage}
-                                    alt=""
-                                    className="cross-button"
-                                    onClick={() =>
-                                      handleRemoveInstruction(instruction.id)
-                                    }
-                                  />
-                                </div>
-                              </div>
-
-                              {/* New column for dropdown menu */}
-                              <div className="dropdown-column">
-                                <img
-                                  src={menuDownImage}
-                                  className="dropdown-arrow"
-                                  alt=""
-                                  onClick={() =>
-                                    handleToggleDropdown(instruction.id)
-                                  }
-                                />
-
-                                {openDropdown === instruction.id && (
-                                  <div
-                                    id={`dropdown-${instruction.id}`} // Use unique ID for each dropdown
-                                    ref={dropdownRef}
-                                    className={`dropdown-menu ${dropdownPosition === 'above'
-                                      ? 'dropdown-above'
+                              {(provided) => (
+                                <div
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  {...provided.dragHandleProps}
+                                  className={`instruction-item ${openDropdown === instruction.id ? 'dropdown-open' : ''
+                                    } ${instruction.actions === 'IF' || instruction.actions === 'ELSE' || instruction.actions === 'ENDIF'
+                                      ? 'light-yellow-background'
                                       : ''
-                                      }`}
-                                  >
-                                    <div
-                                      onClick={() =>
-                                        handleInsertStepBefore(instruction.id)
-                                      }
-                                    >
-                                      Insert Step Before
-                                    </div>
-                                    <div
-                                      onClick={() =>
-                                        handleInsertStepAfter(instruction.id)
-                                      }
-                                    >
-                                      Insert Step After
-                                    </div>
-
-                                    {!isLastInstruction &&
-                                      (instruction.actions === "ENDIF" ||
-                                        (!["IF", "ELSE"].includes(instruction.actions) &&
-                                          !isBetweenIfAndEndIf(instruction.instructionOrderNumber, blockData.instructions))) && (
-                                        <div
-                                          onClick={() =>
-                                            handleSplitComponent(
-                                              instruction.id,
-                                              groupedData,
-                                              setGroupedData,
-                                              instructionsData
-                                            )
+                                    }`}
+                                >
+                                  {editingInstructionId === instruction.id ? (
+                                    <div className="edit-container">
+                                      <input
+                                        type="text"
+                                        value={instructionName}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            handleSaveInstruction(instruction.id); // Trigger save when "Enter" is pressed
                                           }
-                                        >
-                                          Split Component
-                                        </div>
-                                      )
-                                    }
+                                        }}
+                                        onChange={(e) => {
+
+                                          console.log(e.target.value);
+                                          setInstructionName(e.target.value);
+                                        }}
+                                        ref={instructionRef} // Associate the ref with the input element
+                                        className="edit-textbox"
+                                      />
+                                      <img
+                                        src={saveImage}
+                                        alt="save"
+                                        className="save-button"
+                                        onClick={() =>
+                                          handleSaveInstruction(instruction.id)
+                                        } // Save instruction logic
+                                      />
+                                    </div>
+                                  ) : (
+                                    <span className="instruction-line">
+                                      {getInstructionTypeElement(instruction)}
+                                      {instruction.refreshLoop && (
+                                        <img
+                                          src={refreshLoopImage}
+                                          alt="refresh"
+                                          className="refresh-image"
+                                        />
+                                      )}
+
+                                    </span>
 
 
-                                    <div
-                                      onClick={() =>
-                                        handleRemoveInstruction(instruction.id)
-                                      }
-                                    >
-                                      Delete
+                                  )}
+                                  {renderOperations(instruction, instructionsData)}
+                                  <div className="options-column">
+                                    <div className="move-buttons">
+                                      {renderEditButton(
+                                        instruction.actions,
+                                        editImage,
+                                        instruction
+                                      )}
+                                      {renderMoveButtons(instruction.actions, instruction.id)}
+                                      <img
+                                        src={crossImage}
+                                        alt=""
+                                        className="cross-button"
+                                        onClick={() =>
+                                          handleRemoveInstruction(instruction.id)
+                                        }
+                                      />
                                     </div>
                                   </div>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </Draggable>
-                      );
-                    })}
-                    {provided.placeholder}
-                  </div>
-                )}
-              </Droppable>
-            </div>
-          ))}
+
+                                  {/* New column for dropdown menu */}
+                                  <div className="dropdown-column">
+                                    <img
+                                      src={menuDownImage}
+                                      className="dropdown-arrow"
+                                      alt=""
+                                      onClick={() =>
+                                        handleToggleDropdown(instruction.id)
+                                      }
+                                    />
+
+                                    {openDropdown === instruction.id && (
+                                      <div
+                                        id={`dropdown-${instruction.id}`} // Use unique ID for each dropdown
+                                        ref={dropdownRef}
+                                        className={`dropdown-menu ${dropdownPosition === 'above'
+                                          ? 'dropdown-above'
+                                          : ''
+                                          }`}
+                                      >
+                                        <div
+                                          onClick={() =>
+                                            handleInsertStepBefore(instruction.id)
+                                          }
+                                        >
+                                          Insert Step Before
+                                        </div>
+                                        <div
+                                          onClick={() =>
+                                            handleInsertStepAfter(instruction.id)
+                                          }
+                                        >
+                                          Insert Step After
+                                        </div>
+
+                                        {!isLastInstruction &&
+                                          (instruction.actions === "ENDIF" ||
+                                            (!["IF", "ELSE"].includes(instruction.actions) &&
+                                              !isBetweenIfAndEndIf(instruction.instructionOrderNumber, blockData.instructions))) && (
+                                            <div
+                                              onClick={() =>
+                                                handleSplitComponent(
+                                                  instruction.id,
+                                                  groupedData,
+                                                  setGroupedData,
+                                                  instructionsData
+                                                )
+                                              }
+                                            >
+                                              Split Component
+                                            </div>
+                                          )
+                                        }
+
+
+                                        <div
+                                          onClick={() =>
+                                            handleRemoveInstruction(instruction.id)
+                                          }
+                                        >
+                                          Delete
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </Draggable>
+                          );
+                        })}
+                        {provided.placeholder}
+                      </div>
+                    )}
+                  </Droppable>
+                </div>
+              ))
+          )}
       </DragDropContext>
     </div>
   );
