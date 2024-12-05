@@ -780,13 +780,20 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
   const handleNewStepAfter = (instructionId: number) => {
     // WebSocket message for "INSERT_AFTER" with the selected instruction's details
+
+    // Create the InstructionDTO object with necessary details
+    const instructionDTO = {
+      botJobId: botJob.id,
+      instructionOrderNumber: 1,
+    };
+
     const message = {
       type: 'INSERT_AFTER',
       botJobId: botJob.id,
       botJobName: botJob.name,
       blockId: -1,
       blockName: "Default Block",
-      updatedRows: [], // Wrap the instructionDTO in an array
+      updatedRows: [instructionDTO], // Wrap the instructionDTO in an array
     };
 
     // Send WebSocket message
@@ -1304,7 +1311,14 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
     if (!instructionToRemove) return;
 
-    const { botJobId, blockId, actions, parentId } = instructionToRemove;
+    const { botJobId, botJobName, blockId, actions, parentId } = instructionToRemove;
+
+    setBotJob({
+      id: botJobId,
+      name: botJobName,
+      data: 0
+    });
+
 
     // Filter instructionsData
     const updatedData = actions === "IF" || actions === "ELSE" || actions === "ENDIF"
