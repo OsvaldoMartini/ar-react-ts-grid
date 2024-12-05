@@ -448,11 +448,11 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
 
   useEffect(() => {
-    if (botJobLoaded && botJob && botJob.data == 0 && instructionsData.length === 0) {
+    if (botJob && instructionsData.length === 0) {
       // console.log(botJob.name);
       setBotJobLoaded(true);
     }
-  }, [botJob, instructionsData]);
+  }, [botJob]);
 
 
 
@@ -1311,12 +1311,12 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
     if (!instructionToRemove) return;
 
-    const { botJobId, botJobName, blockId, actions, parentId } = instructionToRemove;
+    const { botJobId, botJobName, blockId, actions, parentId, id } = instructionToRemove;
 
     setBotJob({
       id: botJobId,
       name: botJobName,
-      data: 0
+      instructionId: id
     });
 
 
@@ -1901,6 +1901,9 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
                           ref={blockRef} // Associate the ref with the input element
                           className="edit-textbox"
                         />
+                        {/* <span className="block-order-number">
+                          (Id:   {blockData.instructions[0].blockId})
+                        </span> */}
                         <img
                           src={saveImage}
                           alt="save"
@@ -1915,6 +1918,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
                       </div>
                     ) : (
                       <span className="block-name">{blockData.blockName}</span>
+                      // <span className="block-name">{blockData.blockName} (Id:   {blockData.instructions[0].blockId})</span>
                     )}
 
                     <span className="block-count">
@@ -2143,11 +2147,11 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
                       </div>
                     )}
                   </Droppable>
-                </div>
+                </div >
               ))
           )}
-      </DragDropContext>
-    </div>
+      </DragDropContext >
+    </div >
   );
 
 };
