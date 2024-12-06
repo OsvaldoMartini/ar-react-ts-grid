@@ -950,7 +950,8 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     instructionId: number,
     groupedData: { [blockId: string]: { blockName: string; instructions: BlockLoopInstructionLoadDTO[] } },
     setGroupedData: (data: { [blockId: string]: { blockName: string; instructions: BlockLoopInstructionLoadDTO[] } }) => void,
-    instructionsData: BlockLoopInstructionLoadDTO[]
+    instructionsData: BlockLoopInstructionLoadDTO[],
+    isLastInstruction: boolean
   ) => {
     // Find the block and instruction related to the instructionId
     const blockToSplit = Object.values(groupedData).find((blockData) =>
@@ -959,9 +960,19 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
     if (!blockToSplit) return;
 
+    // If splitting at the last instruction, adjust instructionId to the previous instruction
+    const adjustedInstructionId = isLastInstruction
+      ? blockToSplit.instructions[blockToSplit.instructions.length - 2]?.id
+      : instructionId;
+
+    if (!adjustedInstructionId) {
+      console.log("Cannot determine the instruction to split at.");
+      return;
+    }
+
     // Find the selected instruction and its index in the block
     const selectedInstructionIndex = blockToSplit.instructions.findIndex(
-      (instruction) => instruction.id === instructionId
+      (instruction) => instruction.id === adjustedInstructionId
     );
 
     if (selectedInstructionIndex === -1) return;
@@ -1991,6 +2002,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
                         {blockData.instructions.map((instruction, index) => {
                           const isLastInstruction =
                             index === blockData.instructions.length - 1;
+                          const isJustOne = blockData.instructions.length === 1;
                           const isLastBlock =
                             Number(blockId) === Object.keys(groupedData).length; // Check if this is the last block
 
@@ -2108,17 +2120,18 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
                                           Insert Step After
                                         </div>
 
-                                        {!isLastInstruction &&
-                                          (instruction.actions === "ENDIF" ||
-                                            (!["IF", "ELSE"].includes(instruction.actions) &&
-                                              !isBetweenIfAndEndIf(instruction.instructionOrderNumber, blockData.instructions))) && (
+
+                                        {!isJustOne &&
+                                          ((!["IF", "ELSE", "ENDIF"].includes(instruction.actions) &&
+                                            !isBetweenIfAndEndIf(instruction.instructionOrderNumber, blockData.instructions))) && (
                                             <div
                                               onClick={() =>
                                                 handleSplitComponent(
                                                   instruction.id,
                                                   groupedData,
                                                   setGroupedData,
-                                                  instructionsData
+                                                  instructionsData,
+                                                  isLastInstruction
                                                 )
                                               }
                                             >
@@ -2126,6 +2139,8 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
                                             </div>
                                           )
                                         }
+
+
 
 
                                         <div
