@@ -6,6 +6,8 @@ import GridItem from './components/GridItem';
 import instructionsMockData, { botJobMockData } from './components/instructionsMockData';
 import Navigable from './components/Navigable';
 import NavigableBKP from './components/NavigableBKP';
+import ToggleActive from './components/ToggleActive';
+
 // import WebSocketComponent from './components/WebSocketComponent';
 
 
@@ -19,6 +21,7 @@ const root = ReactDOM.createRoot(
 );
 root.render(
   <React.StrictMode>
+    {/* <ToggleActive items={["Londssson", "Manchester",]} /> */}
     {/* <GridItem data={[]} botJobData={botJobMockData} /> */}
     <GridItem data={instructionsMockData} botJobData={botJobMockData} />
     {/* <WebSocketComponent></WebSocketComponent> */}

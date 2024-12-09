@@ -63,6 +63,8 @@
 .excel-button,
 .cross-button,
 .save-button,
+.active-button,
+.inactive-button,
 .brick-button {
   width: 15px; /* Decreased button size */
   height: 15px;
@@ -76,6 +78,10 @@
   }
 }
 
+// .active-button{
+//   width: 20px;
+//   height: 20px;
+// }
 
 .edit-container {
   display: inline-flex;  /* Make input and image inline */

@@ -33,6 +33,8 @@ import constructionImage from '../assets/construction.png';
 import forbiddenImage from '../assets/forbidden.png';
 import brickImage from '../assets/brick.png';
 import hiddenImage from '../assets/hidden-black.png';
+import activeImage from '../assets/active3.png';
+import inactiveImage from '../assets/inactive2.png';
 
 
 import AlertModal from './AlertModal';
@@ -54,13 +56,29 @@ const reorder = (list: any[], startIndex: number, endIndex: number) => {
 // Function to group data by blockId and sort instructions within each block
 const groupByBlock = (data: BlockLoopInstructionLoadDTO[]) => {
   const blocks = data.reduce((result, item) => {
-    const { blockId, blockName, exportFile } = item;
+    const { blockId, blockName, exportFile, blockActive, blockWait } = item;
+
+    // Initialize the block if it doesn't exist in the result
     if (!result[blockId]) {
-      result[blockId] = { blockName, instructions: [], exportFile: exportFile || "No Excel Export File" };  // Set exportFile
+      result[blockId] = {
+        blockName,
+        exportFile: exportFile || "No Excel Export File",
+        blockActive: blockActive ?? false, // Default to false if undefined
+        blockWait: blockWait ?? 0,        // Default to 0 if undefined
+        instructions: []
+      };
     }
+
+    // Add instruction to the corresponding block
     result[blockId].instructions.push(item);
     return result;
-  }, {} as Record<number, { blockName: string; exportFile?: string; instructions: BlockLoopInstructionLoadDTO[] }>);
+  }, {} as Record<number, {
+    blockName: string;
+    exportFile?: string;
+    blockActive: boolean;
+    blockWait: number;
+    instructions: BlockLoopInstructionLoadDTO[]
+  }>);
 
   // Sort each block's instructions by instructionOrderNumber
   Object.values(blocks).forEach(block => {
@@ -69,7 +87,6 @@ const groupByBlock = (data: BlockLoopInstructionLoadDTO[]) => {
 
   return blocks;
 };
-
 
 
 // Helper function to reassign instructionOrderNumber starting from 1 within each block
@@ -557,6 +574,59 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     }
   };
 
+  const handleBlockStatus = (blockId: number) => {
+    // Find the botJobId and current blockActive status from the instructionsData for the given blockId
+    const block = instructionsData.find(instruction => instruction.blockId === blockId);
+    const botJobId = block?.botJobId;
+    const currentBlockActive = block?.blockActive;
+
+    // Check if botJobId is found, if not handle the error
+    if (!botJobId) {
+      console.error(`botJobId not found for blockId: ${blockId}`);
+      return;
+    }
+
+    // Determine the new blockActive value (toggle)
+    const newBlockActive = !currentBlockActive;
+
+    // Update instructionsData with the new blockActive value
+    const updatedInstructions = instructionsData.map((instruction) => {
+      if (instruction.blockId === blockId) {
+        return { ...instruction, blockActive: newBlockActive }; // Toggle the blockActive value
+      }
+      return instruction;
+    });
+
+    // Update the instructionsData state
+    setInstructionsData(updatedInstructions);
+
+    // Recompute groupedData based on the updated instructionsData
+    const updatedGroupedData = groupByBlock(updatedInstructions);
+    setGroupedData(updatedGroupedData);
+
+    // Exit edit mode
+    setEditingBlockId(null);
+
+    // Send WebSocket message for blockActive update
+    if (client && connected) {
+      const message = {
+        type: 'BLOCK_STATUS',
+        botJobId: botJobId, // Include the botJobId in the message
+        blockId: blockId,
+        blockActive: newBlockActive, // Send the toggled blockActive value
+      };
+
+      try {
+        client.publish({
+          destination: '/app/block/update',
+          body: JSON.stringify(message),
+        });
+        console.log('Sent blockActive update message:', message);
+      } catch (error) {
+        console.error('Error sending WebSocket message:', error);
+      }
+    }
+  };
 
 
   const handleExcelFileBlockName = (blockId: number, blockName: string, exportFile?: string) => {
@@ -1895,6 +1965,21 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
                 <div key={blockId} className="block">
                   {/* Block header with garbage, up, and down buttons */}
                   <div className="block-header">
+                    {blockData.instructions[0].blockActive ? (
+                      <img src={activeImage}
+                        alt="Active"
+                        className="active-button"
+                        onClick={() =>
+                          handleBlockStatus(blockData.instructions[0].blockId)
+                        } />
+                    ) : (
+                      <img src={inactiveImage}
+                        alt="Inactive"
+                        className="inactive-button"
+                        onClick={() =>
+                          handleBlockStatus(blockData.instructions[0].blockId)
+                        } />
+                    )}
                     <span className="block-order-number">
                       #{blockData.instructions[0].blockOrderNumber}
                     </span>
