@@ -55,38 +55,50 @@ const reorder = (list: any[], startIndex: number, endIndex: number) => {
 
 // Function to group data by blockId and sort instructions within each block
 const groupByBlock = (data: BlockLoopInstructionLoadDTO[]) => {
-  const blocks = data.reduce((result, item) => {
-    const { blockId, blockName, exportFile, blockActive, blockWait } = item;
-
-    // Initialize the block if it doesn't exist in the result
-    if (!result[blockId]) {
-      result[blockId] = {
-        blockName,
-        exportFile: exportFile || "No Excel Export File",
-        blockActive: blockActive ?? false, // Default to false if undefined
-        blockWait: blockWait ?? 0,        // Default to 0 if undefined
-        instructions: []
-      };
-    }
-
-    // Add instruction to the corresponding block
-    result[blockId].instructions.push(item);
-    return result;
-  }, {} as Record<number, {
+  const blocks: {
+    blockOrderNumber: number;
     blockName: string;
     exportFile?: string;
     blockActive: boolean;
     blockWait: number;
-    instructions: BlockLoopInstructionLoadDTO[]
-  }>);
+    instructions: BlockLoopInstructionLoadDTO[];
+  }[] = [];
+
+  // Iterate through the data to group by blockId
+  data.forEach(item => {
+    const { blockId, blockName, blockOrderNumber, exportFile, blockActive, blockWait } = item;
+
+    // Find the block with the same blockId
+    let block = blocks.find(block => block.blockName === blockName && block.blockOrderNumber === blockOrderNumber);
+
+    // If the block doesn't exist, initialize it
+    if (!block) {
+      block = {
+        blockOrderNumber,
+        blockName,
+        exportFile: exportFile || "No Excel Export File",
+        blockActive: blockActive ?? false, // Default to false if undefined
+        blockWait: blockWait ?? 0,         // Default to 0 if undefined
+        instructions: [],
+      };
+      blocks.push(block); // Add new block
+    }
+
+    // Add the instruction to the block's instructions
+    block.instructions.push(item);
+  });
+
+  // Sort the blocks by blockOrderNumber in ascending order
+  blocks.sort((a, b) => a.blockOrderNumber - b.blockOrderNumber);
 
   // Sort each block's instructions by instructionOrderNumber
-  Object.values(blocks).forEach(block => {
+  blocks.forEach(block => {
     block.instructions.sort((a, b) => a.instructionOrderNumber - b.instructionOrderNumber);
   });
 
   return blocks;
 };
+
 
 
 // Helper function to reassign instructionOrderNumber starting from 1 within each block
