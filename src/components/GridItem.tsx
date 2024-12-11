@@ -56,17 +56,46 @@ const reorder = (list: any[], startIndex: number, endIndex: number) => {
 
 // Function to group data by blockId and sort instructions within each block
 const groupByBlock = (data: BlockLoopInstructionLoadDTO[]) => {
-  const blocks = data.reduce((result, item) => {
-    const { blockId, blockName, exportFile } = item;
-    if (!result[blockId]) {
-      result[blockId] = { blockName, instructions: [], exportFile: exportFile || "No Excel Export File" };  // Set exportFile
+  const blocks: {
+    blockId: number;
+    blockOrderNumber: number;
+    blockName: string;
+    exportFile?: string;
+    blockActive: boolean;
+    blockWait: number;
+    instructions: BlockLoopInstructionLoadDTO[];
+  }[] = [];
+
+  // Iterate through the data to group by blockId
+  data.forEach(item => {
+    const { blockId, blockName, blockOrderNumber, exportFile, blockActive, blockWait } = item;
+
+    // Find the block with the same blockId
+    let block = blocks.find(block => block.blockName === blockName && block.blockOrderNumber === blockOrderNumber);
+
+    // If the block doesn't exist, initialize it
+    if (!block) {
+      block = {
+        blockId,
+        blockOrderNumber,
+        blockName,
+        exportFile: exportFile || "No Excel Export File",
+        blockActive: blockActive ?? false, // Default to false if undefined
+        blockWait: blockWait ?? 0,         // Default to 0 if undefined
+        instructions: [],
+      };
+      blocks.push(block); // Add new block
     }
-    result[blockId].instructions.push(item);
-    return result;
-  }, {} as Record<number, { blockName: string; exportFile?: string; instructions: BlockLoopInstructionLoadDTO[] }>);
+
+    // Add the instruction to the block's instructions
+    block.instructions.push(item);
+  });
+
+  // Sort the blocks by blockOrderNumber in ascending order
+  blocks.sort((a, b) => a.blockOrderNumber - b.blockOrderNumber);
 
   // Sort each block's instructions by instructionOrderNumber
-  Object.values(blocks).forEach(block => {
+  blocks.forEach(block => {
     block.instructions.sort((a, b) => a.instructionOrderNumber - b.instructionOrderNumber);
   });
 
@@ -2020,11 +2049,11 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
             </div>
           ) : (
             Object.entries(groupedData)
-              .sort(
-                ([, aBlockData], [, bBlockData]) =>
-                  aBlockData.instructions[0].blockOrderNumber -
-                  bBlockData.instructions[0].blockOrderNumber
-              )
+              // .sort(
+              //   ([, aBlockData], [, bBlockData]) =>
+              //     aBlockData.instructions[0].blockOrderNumber -
+              //     bBlockData.instructions[0].blockOrderNumber
+              // )
               .map(([blockGroupIndex, blockData], index) => (
                 <div key={blockGroupIndex} className="block">
                   {/* Block header with garbage, up, and down buttons */}
