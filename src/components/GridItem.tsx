@@ -1561,42 +1561,22 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
   };
 
   const handleRollbackBlock = (blockId: number) => {
-    console.log(`Rollback action for block ID: ${blockId}`);
-
-    // Get the sorted blocks based on blockOrderNumber
-    const sortedBlocks = Object.entries(groupedData).sort(
-      ([, aBlockData], [, bBlockData]) =>
-        aBlockData.instructions[0].blockOrderNumber - bBlockData.instructions[0].blockOrderNumber
-    );
-
-    if (sortedBlocks.length === 0) {
-      setAlertImage(warningRedImage);
-      setAlertClass('construction-image');
-      setAlertMessage('No blocks available for rollback.');
-      return;
-    }
-
-    // Get the first block's blockId
-    const firstBlockId = sortedBlocks[0][1].blockId; // This accesses the first block's data
-
-    console.log(`First Block ID: ${firstBlockId}`);
-
     // Get the botJobId and blockName from the first instruction
-    const firstInstruction = instructionsData.find(instr => instr.blockId === firstBlockId);
+    const firstInstruction = instructionsData.find(instr => instr.blockId === blockId);
     const botJobId = firstInstruction ? firstInstruction.botJobId : null;
     const firstBlockName = firstInstruction ? firstInstruction.blockName : 'Unknown Block'; // Default to 'Unknown Block' if not found
 
     if (!botJobId) {
       setAlertImage(warningRedImage);
       setAlertClass('construction-image');
-      setAlertMessage(`No botJobId found for Block ID: ${firstBlockId}`);
+      setAlertMessage(`No botJobId found for Block ID: ${blockId}`);
       return; // Exit if no botJobId is found
     }
 
-    // Update all instructions to have blockId of firstBlockId and blockOrderNumber 1
+    // Update all instructions to have blockId  and blockOrderNumber 1
     const updatedData = instructionsData.map(instruction => ({
       ...instruction,
-      blockId: firstBlockId,
+      blockId: blockId,
       blockOrderNumber: 1,
     }));
 
@@ -1615,7 +1595,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
       const message = {
         type: 'BLOCK_ROLLBACK',
         botJobId: botJobId,
-        blockId: firstBlockId,
+        blockId: blockId,
         blockName: firstBlockName, // Pass the block name here
         instructions: reassignedData.map(instr => ({
           instructionId: instr.id,
