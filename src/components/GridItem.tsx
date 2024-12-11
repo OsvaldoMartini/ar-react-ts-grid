@@ -1984,7 +1984,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
                     <span className="block-order-number">
                       #{blockData.instructions[0].blockOrderNumber}
                     </span>
-                    {editingBlockId === Number(index) ? (
+                    {editingBlockId === Number(blockGroupIndex) ? (
                       <div className="edit-container">
                         <input
                           type="text"
