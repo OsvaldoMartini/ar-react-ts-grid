@@ -804,11 +804,13 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
   };
 
 
-  const handleInsertStepBefore = (instructionId: number) => {
+  const handleInsertStepBefore = (instructionId: number, instructions: BlockLoopInstructionLoadDTO[]) => {
     // Find the instruction based on the instructionId
-    const instruction = instructionsData.find(instruction => instruction.id === instructionId);
+    const instruction = instructions.find(instruction => instruction.id === instructionId);
 
     if (instruction) {
+
+      const isBetween = isBetweenIfAndEndIf(instruction.instructionOrderNumber, instructions);
 
       const botJobId = instruction.botJobId || null;
 
@@ -834,6 +836,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
         botJobId: botJobId,
         blockId: instruction.blockId,
         blockName: instruction.blockName,
+        isBetween: isBetween,
         updatedRows: [instructionDTO], // Wrap the instructionDTO in an array
       };
 
@@ -893,7 +896,8 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
   };
 
 
-  const handleInsertStepAfter = (instructionId: number) => {
+
+  const handleInsertElseIf = (instructionId: number) => {
     // Find the instruction based on the instructionId
     const instruction = instructionsData.find(instruction => instruction.id === instructionId);
 
@@ -919,10 +923,69 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
       // WebSocket message for "INSERT_AFTER" with the selected instruction's details
       const message = {
+        type: 'INSERT_ELSE_IF',
+        botJobId: botJobId,
+        blockId: instruction.blockId,
+        blockName: instruction.blockName,
+        updatedRows: [instructionDTO], // Wrap the instructionDTO in an array
+      };
+
+      // Send WebSocket message
+      if (client && connected) {
+        try {
+          client.publish({
+            destination: '/app/row/insert-after', // Update based on your WebSocket endpoint configuration
+            body: JSON.stringify(message),
+          });
+
+          console.log('Sent insert after message:', message);
+        } catch (error) {
+          console.log('Error sending WebSocket message:', error);
+        }
+      }
+    } else {
+      setAlertImage(warningRedImage);
+      setAlertClass('construction-image');
+      setAlertMessage(`Instruction with ID ${instructionId} not found.`);
+    }
+
+    setOpenDropdown(null);
+  };
+
+
+  const handleInsertStepAfter = (instructionId: number, instructions: BlockLoopInstructionLoadDTO[]) => {
+    // Find the instruction based on the instructionId
+    const instruction = instructions.find(instruction => instruction.id === instructionId);
+
+    if (instruction) {
+
+      const isBetween = isBetweenIfAndEndIf(instruction.instructionOrderNumber, instructions);
+
+      const botJobId = instruction.botJobId || null;
+
+      // If the instruction is found, use its name for the alert message
+      // setAlertMessage(`Inserting step after instruction: ${instruction.name}`);
+
+      // Create the InstructionDTO object with necessary details
+      const instructionDTO = {
+        botJobId: botJobId,
+        instructionId: instruction.id,
+        blockId: instruction.blockId,
+        blockOrderNumber: instruction.blockOrderNumber,
+        instructionOrderNumber: instruction.instructionOrderNumber,
+        instructionName: instruction.name,
+        operation: instruction.operation,
+        actions: instruction.actions,
+        parentId: instruction.parentId
+      };
+
+      // WebSocket message for "INSERT_AFTER" with the selected instruction's details
+      const message = {
         type: 'INSERT_AFTER',
         botJobId: botJobId,
         blockId: instruction.blockId,
         blockName: instruction.blockName,
+        isBetween: isBetween,
         updatedRows: [instructionDTO], // Wrap the instructionDTO in an array
       };
 
@@ -2195,14 +2258,14 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
                                       >
                                         <div
                                           onClick={() =>
-                                            handleInsertStepBefore(instruction.id)
+                                            handleInsertStepBefore(instruction.id, blockData.instructions)
                                           }
                                         >
                                           Insert Step Before
                                         </div>
                                         <div
                                           onClick={() =>
-                                            handleInsertStepAfter(instruction.id)
+                                            handleInsertStepAfter(instruction.id, blockData.instructions)
                                           }
                                         >
                                           Insert Step After
@@ -2226,13 +2289,24 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
                                               >
                                                 Split Component
                                               </div>
-                                              <div>
-                                                ElseIf
-                                              </div>
                                             </>
                                           )
                                         }
 
+                                        {!isJustOne &&
+                                          ((["IF", "ELSE", "ENDIF"].includes(instruction.actions) ||
+                                            isBetweenIfAndEndIf(instruction.instructionOrderNumber, blockData.instructions))) && (
+                                            <>
+                                              <div
+                                                onClick={() =>
+                                                  handleInsertElseIf(instruction.id)
+                                                }
+                                              >
+                                                Insert ElseIf
+                                              </div>
+                                            </>
+                                          )
+                                        }
 
 
 
