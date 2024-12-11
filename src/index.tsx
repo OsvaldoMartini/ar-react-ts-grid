@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client';
 import './index.css';
 import reportWebVitals from './reportWebVitals';
 import GridItem from './components/GridItem';
-import instructionsMockData, { botJobMockData } from './components/instructionsMockData';
+import instructionsMockData, { botJobMockData } from './components/instructionsMockData2';
 import Navigable from './components/Navigable';
 import NavigableBKP from './components/NavigableBKP';
 import ToggleActive from './components/ToggleActive';

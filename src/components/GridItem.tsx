@@ -31,6 +31,7 @@ import inputImage from "../assets/input_field.png";
 import outPutImage from "../assets/output1.png";
 import constructionImage from '../assets/construction.png';
 import forbiddenImage from '../assets/forbidden.png';
+import warningRedImage from '../assets/warning_red.png';
 import brickImage from '../assets/brick.png';
 import hiddenImage from '../assets/hidden-black.png';
 import activeImage from '../assets/active3.png';
@@ -56,6 +57,7 @@ const reorder = (list: any[], startIndex: number, endIndex: number) => {
 // Function to group data by blockId and sort instructions within each block
 const groupByBlock = (data: BlockLoopInstructionLoadDTO[]) => {
   const blocks: {
+    blockId: number;
     blockOrderNumber: number;
     blockName: string;
     exportFile?: string;
@@ -74,6 +76,7 @@ const groupByBlock = (data: BlockLoopInstructionLoadDTO[]) => {
     // If the block doesn't exist, initialize it
     if (!block) {
       block = {
+        blockId,
         blockOrderNumber,
         blockName,
         exportFile: exportFile || "No Excel Export File",
@@ -199,8 +202,9 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
       const instructionToMove = sourceInstructions[source.index];
 
       if (instructionToMove.name === "IF" || instructionToMove.name === "ELSE" || instructionToMove.name === "ENDIF") {
-        setAlertMessage('Moving "IF", "ELSE", or "ENDIF" is not allowed! Move the nested instructions instead.');
         setAlertImage(forbiddenImage);
+        setAlertClass('construction-image');
+        setAlertMessage('Moving "IF", "ELSE", or "ENDIF" is not allowed! Move the nested instructions instead.');
         return;
       }
 
@@ -236,9 +240,9 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
       const [movedInstruction] = sourceInstructions.splice(source.index, 1);
 
       if (movedInstruction.name === "IF" || movedInstruction.name === "ELSE" || movedInstruction.name === "ENDIF") {
-        setAlertMessage('Moving "IF", "ELSE", or "ENDIF" is not allowed outside their block!');
         setAlertImage(forbiddenImage);
         setAlertClass('construction-image');
+        setAlertMessage('Moving "IF", "ELSE", or "ENDIF" is not allowed outside their block!');
         return;
       }
 
@@ -344,7 +348,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
         });
         console.log('Sent row move message:', message);
       } catch (error) {
-        console.error('Error sending WebSocket message:', error);
+        console.log('Error sending WebSocket message:', error);
       }
     }
   };
@@ -389,8 +393,10 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
     // Handle STOMP errors
     stompClient.onStompError = (frame) => {
-      console.error("Broker reported error: " + frame.headers["message"]);
-      console.error("Additional details: " + frame.body);
+      setAlertImage(warningRedImage);
+      setAlertClass('construction-image');
+      setAlertMessage("Broker reported error: " + frame.headers["message"]);
+      setAlertMessage("Additional details: " + frame.body);
     };
 
     // Activate the connection
@@ -450,7 +456,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
         });
         console.log('Sent block order message:', message);
       } catch (error) {
-        console.error('Error sending WebSocket message:', error);
+        console.log('Error sending WebSocket message:', error);
       }
     }
   }, [updatedBlocks, client, connected]); // Triggered when updatedBlocks or connected changes
@@ -538,12 +544,22 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
   };
 
   const handleSaveBlockName = (blockId: number) => {
+    // Ensure instructionsData is available
+    if (!instructionsData || instructionsData.length === 0) {
+      setAlertImage(warningRedImage);
+      setAlertClass('construction-image');
+      setAlertMessage('Instructions data is empty or not available.');
+      return;
+    }
+
     // Find the botJobId from the instructionsData for the given blockId
     const botJobId = instructionsData.find(instruction => instruction.blockId === blockId)?.botJobId;
 
     // Check if botJobId is found, if not handle the error
     if (!botJobId) {
-      console.error(`botJobId not found for blockId: ${blockId}`);
+      setAlertImage(warningRedImage);
+      setAlertClass('construction-image');
+      setAlertMessage(`botJobId not found for blockId: ${blockId}`);
       return;
     }
 
@@ -581,10 +597,15 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
         });
         console.log('Sent block name update message:', message);
       } catch (error) {
-        console.error('Error sending WebSocket message:', error);
+        console.log('Error sending WebSocket message:', error);
       }
+    } else {
+      setAlertImage(warningRedImage);
+      setAlertClass('construction-image');
+      setAlertMessage('WebSocket client is not connected or available.');
     }
   };
+
 
   const handleBlockStatus = (blockId: number) => {
     // Find the botJobId and current blockActive status from the instructionsData for the given blockId
@@ -594,7 +615,9 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
     // Check if botJobId is found, if not handle the error
     if (!botJobId) {
-      console.error(`botJobId not found for blockId: ${blockId}`);
+      setAlertImage(warningRedImage);
+      setAlertClass('construction-image');
+      setAlertMessage(`botJobId not found for blockId: ${blockId}`);
       return;
     }
 
@@ -635,7 +658,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
         });
         console.log('Sent blockActive update message:', message);
       } catch (error) {
-        console.error('Error sending WebSocket message:', error);
+        console.log('Error sending WebSocket message:', error);
       }
     }
   };
@@ -647,7 +670,9 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
     // Check if botJobId is found, if not handle the error
     if (!botJobId) {
-      console.error(`botJobId not found for blockId: ${blockId}`);
+      setAlertImage(warningRedImage);
+      setAlertClass('construction-image');
+      setAlertMessage(`botJobId not found for blockId: ${blockId}`);
       return;
     }
 
@@ -668,7 +693,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
         });
         console.log('Sent block name update message:', message);
       } catch (error) {
-        console.error('Error sending WebSocket message:', error);
+        console.log('Error sending WebSocket message:', error);
       }
     }
   };
@@ -775,7 +800,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
         console.log('Sent block move message:', message);
       } catch (error) {
-        console.error('Error sending WebSocket message:', error);
+        console.log('Error sending WebSocket message:', error);
       }
     }
   };
@@ -851,11 +876,13 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
           console.log('Sent insert before message:', message);
         } catch (error) {
-          console.error('Error sending WebSocket message:', error);
+          console.log('Error sending WebSocket message:', error);
         }
       }
     } else {
-      console.error(`Instruction with ID ${instructionId} not found.`);
+      setAlertImage(warningRedImage);
+      setAlertClass('construction-image');
+      setAlertMessage(`Instruction with ID ${instructionId} not found.`);
     }
     setOpenDropdown(null);
   };
@@ -888,7 +915,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
         console.log('Sent insert after message:', message);
       } catch (error) {
-        console.error('Error sending WebSocket message:', error);
+        console.log('Error sending WebSocket message:', error);
       }
     }
     setOpenDropdown(null);
@@ -938,11 +965,13 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
           console.log('Sent insert after message:', message);
         } catch (error) {
-          console.error('Error sending WebSocket message:', error);
+          console.log('Error sending WebSocket message:', error);
         }
       }
     } else {
-      console.error(`Instruction with ID ${instructionId} not found.`);
+      setAlertImage(warningRedImage);
+      setAlertClass('construction-image');
+      setAlertMessage(`Instruction with ID ${instructionId} not found.`);
     }
 
     setOpenDropdown(null);
@@ -952,9 +981,9 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     setAlertMessage(null);
   };
 
-  const handleCreateComponent = (blockId: number) => {
+  const handleCreateComponent = (blockGroupIndex: number) => {
     // Access groupedData, setGroupedData, instructionsData, and preComponent from the component's scope
-    const blockToSplit = groupedData[blockId]; // Get the block directly by its blockId
+    const blockToSplit = groupedData[blockGroupIndex]; // Get the block directly by its blockId
 
     if (!blockToSplit) return; // Ensure the block exists
 
@@ -1254,12 +1283,10 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
         console.log('Sent block move message:', message);
       } catch (error) {
-        console.error('Error sending WebSocket message:', error);
+        console.log('Error sending WebSocket message:', error);
       }
     }
   };
-
-
 
 
 
@@ -1323,7 +1350,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
             console.log('Sent row move message:', message);
           } catch (error) {
-            console.error('Error sending WebSocket message:', error);
+            console.log('Error sending WebSocket message:', error);
           }
         }
       }
@@ -1390,7 +1417,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
             console.log('Sent row move message:', message);
           } catch (error) {
-            console.error('Error sending WebSocket message:', error);
+            console.log('Error sending WebSocket message:', error);
           }
         }
       }
@@ -1479,7 +1506,9 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     const removedBlockOrderNumber = blockInstruction ? blockInstruction.blockOrderNumber : null;
 
     if (!botJobId || removedBlockOrderNumber === null) {
-      console.error(`No botJobId or blockOrderNumber found for Block ID: ${blockId}`);
+      setAlertImage(warningRedImage);
+      setAlertClass('construction-image');
+      setAlertMessage(`No botJobId or blockOrderNumber found for Block ID: ${blockId}`);
       return; // Exit if no botJobId or blockOrderNumber is found
     }
 
@@ -1534,18 +1563,23 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
   const handleRollbackBlock = (blockId: number) => {
     console.log(`Rollback action for block ID: ${blockId}`);
 
-    // Get the first blockId after sorting
+    // Get the sorted blocks based on blockOrderNumber
     const sortedBlocks = Object.entries(groupedData).sort(
       ([, aBlockData], [, bBlockData]) =>
         aBlockData.instructions[0].blockOrderNumber - bBlockData.instructions[0].blockOrderNumber
     );
 
     if (sortedBlocks.length === 0) {
-      console.error('No blocks available for rollback.');
+      setAlertImage(warningRedImage);
+      setAlertClass('construction-image');
+      setAlertMessage('No blocks available for rollback.');
       return;
     }
 
-    const firstBlockId = Number(sortedBlocks[0][0]);
+    // Get the first block's blockId
+    const firstBlockId = sortedBlocks[0][1].blockId; // This accesses the first block's data
+
+    console.log(`First Block ID: ${firstBlockId}`);
 
     // Get the botJobId and blockName from the first instruction
     const firstInstruction = instructionsData.find(instr => instr.blockId === firstBlockId);
@@ -1553,7 +1587,9 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     const firstBlockName = firstInstruction ? firstInstruction.blockName : 'Unknown Block'; // Default to 'Unknown Block' if not found
 
     if (!botJobId) {
-      console.error(`No botJobId found for Block ID: ${firstBlockId}`);
+      setAlertImage(warningRedImage);
+      setAlertClass('construction-image');
+      setAlertMessage(`No botJobId found for Block ID: ${firstBlockId}`);
       return; // Exit if no botJobId is found
     }
 
@@ -1770,7 +1806,9 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     const instructionToUpdate = instructionsData.find(instruction => instruction.id === instructionId);
 
     if (!instructionToUpdate) {
-      console.error(`Instruction with ID ${instructionId} not found`);
+      setAlertImage(warningRedImage);
+      setAlertClass('construction-image');
+      setAlertMessage(`Instruction with ID ${instructionId} not found`);
       return;
     }
 
@@ -1829,7 +1867,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
         console.log('Sent instruction update message:', message);
       } catch (error) {
-        console.error('Error sending WebSocket message:', error);
+        console.log('Error sending WebSocket message:', error);
       }
     }
   };
@@ -1973,8 +2011,8 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
                   aBlockData.instructions[0].blockOrderNumber -
                   bBlockData.instructions[0].blockOrderNumber
               )
-              .map(([blockId, blockData], index) => (
-                <div key={blockId} className="block">
+              .map(([blockGroupIndex, blockData], index) => (
+                <div key={blockGroupIndex} className="block">
                   {/* Block header with garbage, up, and down buttons */}
                   <div className="block-header">
                     {blockData.instructions[0].blockActive ? (
@@ -1995,16 +2033,19 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
                     <span className="block-order-number">
                       #{blockData.instructions[0].blockOrderNumber}
                     </span>
-                    {editingBlockId === Number(blockId) ? (
+                    {editingBlockId === Number(index) ? (
                       <div className="edit-container">
                         <input
                           type="text"
                           value={blockName}
-                          onChange={(e) => setBlockName(e.target.value)}
                           onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              handleSaveBlockName(Number(blockId)); // Trigger save when "Enter" is pressed
+                            if (e.key === 'Enter') {
+                              handleSaveBlockName(Number(blockData.instructions[0].blockId)); // Trigger save when "Enter" is pressed
                             }
+                          }}
+                          onChange={(e) => {
+                            console.log(e.target.value);
+                            setBlockName(e.target.value);
                           }}
                           ref={blockRef} // Associate the ref with the input element
                           className="edit-textbox"
@@ -2018,10 +2059,10 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
                           className="save-button"
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
-                              handleSaveBlockName(Number(blockId)); // Trigger save when "Enter" is pressed
+                              handleSaveBlockName(Number(blockData.instructions[0].blockId));
                             }
                           }}
-                          onClick={() => handleSaveBlockName(Number(blockId))}
+                          onClick={() => handleSaveBlockName(Number(blockData.instructions[0].blockId))}
                         />
                       </div>
                     ) : (
@@ -2043,53 +2084,53 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
                           src={rollBackImage}
                           alt=""
                           className="rollback-button"
-                          onClick={() => handleRollbackBlock(Number(blockId))}
+                          onClick={() => handleRollbackBlock(Number(blockData.instructions[0].blockId))}
                         />
                       )}
                       <img
                         src={upImage}
                         alt=""
                         className="move-button"
-                        onClick={() => handleMoveBlockUp(Number(blockId))}
+                        onClick={() => handleMoveBlockUp(Number(blockData.instructions[0].blockId))}
                       />
                       <img
                         src={downImage}
                         alt=""
                         className="move-button"
-                        onClick={() => handleMoveBlockDown(Number(blockId))}
+                        onClick={() => handleMoveBlockDown(Number(blockData.instructions[0].blockId))}
                       />
                       {/* Edit Block Name Button */}
                       <img
                         src={editImage}
                         alt="edit"
                         className="edit-button"
-                        onClick={() => handleEditBlock(Number(blockId), blockData.blockName)} // Edit block logic
+                        onClick={() => handleEditBlock(Number(blockData.instructions[0].blockId), blockData.blockName)} // Edit block logic
                       />
                       {/* Edit Block Name Button */}
                       <img
                         src={excelImage}
                         alt="excel"
                         className="excel-button"
-                        onClick={() => handleExcelFileBlockName(Number(blockId), blockData.blockName, blockData.exportFile)} // Edit block logic
+                        onClick={() => handleExcelFileBlockName(Number(blockData.instructions[0].blockId), blockData.blockName, blockData.exportFile)} // Edit block logic
                       />
                       <img
                         src={saveImage}
                         alt="save"
                         className="save-button"
-                        onClick={() => handleCreateComponent(Number(blockId))}
+                        onClick={() => handleCreateComponent(Number(blockGroupIndex))}
                       />
                       {index !== 0 && (
                         <img
                           src={crossImage}
                           alt=""
                           className="cross-button"
-                          onClick={() => handleRemoveBlock(Number(blockId))}
+                          onClick={() => handleRemoveBlock(Number(blockData.instructions[0].blockId))}
                         />
                       )}
 
                     </div>
                   </div>
-                  <Droppable droppableId={blockId} key={blockId}>
+                  <Droppable droppableId={blockGroupIndex} key={blockData.instructions[0].blockId}>
                     {(provided) => (
                       <div
                         className="instructions-list"
@@ -2101,7 +2142,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
                             index === blockData.instructions.length - 1;
                           const isJustOne = blockData.instructions.length === 1;
                           const isLastBlock =
-                            Number(blockId) === Object.keys(groupedData).length; // Check if this is the last block
+                            Number(blockGroupIndex) === Object.keys(groupedData).length; // Check if this is the last block
 
                           return (
                             <Draggable
@@ -2131,7 +2172,6 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
                                           }
                                         }}
                                         onChange={(e) => {
-
                                           console.log(e.target.value);
                                           setInstructionName(e.target.value);
                                         }}
@@ -2221,19 +2261,24 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
                                         {!isJustOne &&
                                           ((!["IF", "ELSE", "ENDIF"].includes(instruction.actions) &&
                                             !isBetweenIfAndEndIf(instruction.instructionOrderNumber, blockData.instructions))) && (
-                                            <div
-                                              onClick={() =>
-                                                handleSplitComponent(
-                                                  instruction.id,
-                                                  groupedData,
-                                                  setGroupedData,
-                                                  instructionsData,
-                                                  isLastInstruction
-                                                )
-                                              }
-                                            >
-                                              Split Component
-                                            </div>
+                                            <>
+                                              <div
+                                                onClick={() =>
+                                                  handleSplitComponent(
+                                                    instruction.id,
+                                                    groupedData,
+                                                    setGroupedData,
+                                                    instructionsData,
+                                                    isLastInstruction
+                                                  )
+                                                }
+                                              >
+                                                Split Component
+                                              </div>
+                                              <div>
+                                                ElseIf
+                                              </div>
+                                            </>
                                           )
                                         }
 
