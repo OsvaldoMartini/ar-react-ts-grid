@@ -56,53 +56,22 @@ const reorder = (list: any[], startIndex: number, endIndex: number) => {
 
 // Function to group data by blockId and sort instructions within each block
 const groupByBlock = (data: BlockLoopInstructionLoadDTO[]) => {
-  const blocks: {
-    blockId: number;
-    blockOrderNumber: number;
-    blockName: string;
-    exportFile?: string;
-    blockActive: boolean;
-    blockWait: number;
-    instructions: BlockLoopInstructionLoadDTO[];
-  }[] = [];
-
-  // Iterate through the data to group by blockId
-  data.forEach(item => {
-    const { blockId, blockName, blockOrderNumber, exportFile, blockActive, blockWait } = item;
-
-    // Find the block with the same blockId
-    let block = blocks.find(block => block.blockName === blockName && block.blockOrderNumber === blockOrderNumber);
-
-    // If the block doesn't exist, initialize it
-    if (!block) {
-      block = {
-        blockId,
-        blockOrderNumber,
-        blockName,
-        exportFile: exportFile || "No Excel Export File",
-        blockActive: blockActive ?? false, // Default to false if undefined
-        blockWait: blockWait ?? 0,         // Default to 0 if undefined
-        instructions: [],
-      };
-      blocks.push(block); // Add new block
+  const blocks = data.reduce((result, item) => {
+    const { blockId, blockName, exportFile } = item;
+    if (!result[blockId]) {
+      result[blockId] = { blockName, instructions: [], exportFile: exportFile || "No Excel Export File" };  // Set exportFile
     }
-
-    // Add the instruction to the block's instructions
-    block.instructions.push(item);
-  });
-
-  // Sort the blocks by blockOrderNumber in ascending order
-  blocks.sort((a, b) => a.blockOrderNumber - b.blockOrderNumber);
+    result[blockId].instructions.push(item);
+    return result;
+  }, {} as Record<number, { blockName: string; exportFile?: string; instructions: BlockLoopInstructionLoadDTO[] }>);
 
   // Sort each block's instructions by instructionOrderNumber
-  blocks.forEach(block => {
+  Object.values(blocks).forEach(block => {
     block.instructions.sort((a, b) => a.instructionOrderNumber - b.instructionOrderNumber);
   });
 
   return blocks;
 };
-
-
 
 // Helper function to reassign instructionOrderNumber starting from 1 within each block
 const reassignInstructionOrderNumbersByBlock = (instructions: BlockLoopInstructionLoadDTO[]) => {
@@ -201,10 +170,10 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
       const instructionToMove = sourceInstructions[source.index];
 
-      if (instructionToMove.name === "IF" || instructionToMove.name === "ELSE" || instructionToMove.name === "ENDIF") {
+      if (instructionToMove.name === "IF" || instructionToMove.name === "ELSEIF" || instructionToMove.name === "ELSE" || instructionToMove.name === "ENDIF") {
         setAlertImage(forbiddenImage);
         setAlertClass('construction-image');
-        setAlertMessage('Moving "IF", "ELSE", or "ENDIF" is not allowed! Move the nested instructions instead.');
+        setAlertMessage('Moving "IF", "ELSEIF", "ELSE", or "ENDIF" is not allowed! Move the nested instructions instead.');
         return;
       }
 
@@ -239,10 +208,10 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
       // Remove the dragged instruction from source block
       const [movedInstruction] = sourceInstructions.splice(source.index, 1);
 
-      if (movedInstruction.name === "IF" || movedInstruction.name === "ELSE" || movedInstruction.name === "ENDIF") {
+      if (movedInstruction.name === "IF" || movedInstruction.name === "ELSEIF" || movedInstruction.name === "ELSE" || movedInstruction.name === "ENDIF") {
         setAlertImage(forbiddenImage);
         setAlertClass('construction-image');
-        setAlertMessage('Moving "IF", "ELSE", or "ENDIF" is not allowed outside their block!');
+        setAlertMessage('Moving "IF", "ELSEIF", "ELSE", or "ENDIF" is not allowed! Move the nested instructions instead.');
         return;
       }
 
@@ -704,35 +673,40 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
     const updatedData = [...data]; // Make a copy of the instructions data
 
-    const uniqueBlocks = Array.from(new Set(updatedData.map(instruction => instruction.blockId)));
+    // Create a map of blockId -> instructions to avoid nested loops
+    const blockMap = new Map<number, any[]>();
+
+    updatedData
+      .sort((a, b) => a.blockOrderNumber - b.blockOrderNumber) // Sort by blockOrderNumber
+      .forEach(instruction => {
+        if (!blockMap.has(instruction.blockId)) {
+          blockMap.set(instruction.blockId, []);
+        }
+        blockMap.get(instruction.blockId)?.push(instruction);
+      });
 
     const updatedBlocks: UpdatedBlock[] = []; // To track blocks with changed blockOrderNumber
 
-    uniqueBlocks.forEach((blockId, index) => {
+    // Iterate over the block map
+    Array.from(blockMap.keys()).forEach((blockId, index) => {
       const newOrderNumber = index + 1; // Start block order from 1
 
-      updatedData.forEach(instruction => {
-        if (instruction.blockId === blockId) {
-          // Check if blockOrderNumber is changing
-          if (instruction.blockOrderNumber !== newOrderNumber) {
-            // Track the updated block
-            updatedBlocks.push({
-              botJobId: instruction.botJobId || null, // Assuming botJobId is part of the instruction
-              blockId: instruction.blockId,
-              blockName: instruction.blockName,
-              blockOrderNumber: newOrderNumber,
-            });
-          }
-
-          // Update the blockOrderNumber
-          instruction.blockOrderNumber = newOrderNumber;
+      blockMap.get(blockId)?.forEach(instruction => {
+        if (instruction.blockOrderNumber !== newOrderNumber) {
+          updatedBlocks.push({
+            botJobId: instruction.botJobId || null,
+            blockId: instruction.blockId,
+            blockName: instruction.blockName,
+            blockOrderNumber: newOrderNumber,
+          });
         }
+        instruction.blockOrderNumber = newOrderNumber;
       });
     });
 
-    // Return updated data
     return { updatedData, updatedBlocks };
   };
+
 
 
   // Function to move a block up by swapping blockOrderNumbers
@@ -1120,6 +1094,39 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     return false;
   }
 
+  const getInstructionsBetweenIfAndEndIf = (currentOrderNumber: number, instructions: any[]): (number | null)[] => {
+    let ifFound = false;
+    let firstInstructionId: number | null = null;
+    let lastInstructionId: number | null = null;
+
+    for (const instr of instructions) {
+      if (instr.actions === "IF") {
+        ifFound = true; // Mark the start of the block
+      }
+
+      if (ifFound) {
+        // Track the first instruction inside the IF block
+        if (firstInstructionId === null) {
+          firstInstructionId = instr.instructionId;
+        }
+
+        lastInstructionId = instr.instructionId; // Keep updating the lastInstructionId
+
+        if (instr.instructionOrderNumber === currentOrderNumber) {
+          return [firstInstructionId, lastInstructionId]; // Return once currentOrderNumber is found
+        }
+      }
+
+      if (instr.actions === "ENDIF" && ifFound) {
+        return [firstInstructionId, lastInstructionId]; // Return once ENDIF is encountered
+      }
+    }
+
+    return [null, null]; // No instructions found between IF and ENDIF
+  };
+
+
+
   const handleSplitComponent = (
     instructionId: number,
     groupedData: { [blockId: string]: { blockName: string; instructions: BlockLoopInstructionLoadDTO[] } },
@@ -1504,14 +1511,10 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
 
     // Filter instructionsData
-    const updatedData = actions === "IF" || actions === "ELSE" || actions === "ENDIF"
+    const updatedData = actions === "IF" || actions === "ELSEIF" || actions === "ELSE" || actions === "ENDIF"
       ? instructionsData.filter(
         instruction =>
-          instruction.blockId !== blockId ||
-          (instruction.actions !== "IF" &&
-            instruction.actions !== "ELSE" &&
-            instruction.actions !== "ENDIF")
-      )
+          instruction.parentId !== parentId)
       : instructionsData.filter(instruction => instruction.id !== instructionId);
 
     // Reassign order numbers
@@ -1753,6 +1756,11 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
           text = instruction.name;
           imageClass = "goto-image";
           break;
+        case "ELSEIF":
+          imageSrc = ifElseImage;
+          text = instruction.name;
+          imageClass = "ifelse-image";
+          break;
         case "ELSE":
           imageSrc = elseImage;
           text = instruction.name;
@@ -1800,7 +1808,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
 
   const renderEditButton = (actionType: string, editImage: string, instruction: BlockLoopInstructionLoadDTO) => {
-    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "IF", "ELSE", "ENDIF", "PAUSE", "REFRESH", "REFRESH_LOOP"].includes(actionType)) {
+    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "IF", "ELSEIF", "ELSE", "ENDIF", "PAUSE", "REFRESH", "REFRESH_LOOP"].includes(actionType)) {
       return <span className="edit-button-space">&nbsp;</span>; // Render a space or an empty element
     }
 
@@ -1816,7 +1824,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
   // Function to render the move buttons based on the action type
   const renderMoveButtons = (actionType: string, instructionId: number) => {
-    if (["IF", "ELSE", "ENDIF"].includes(actionType)) {
+    if (["IF", "ELSEIF", "ELSE", "ENDIF"].includes(actionType)) {
       return null; // Don't render buttons for these action types
     }
 
@@ -2049,11 +2057,11 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
             </div>
           ) : (
             Object.entries(groupedData)
-              // .sort(
-              //   ([, aBlockData], [, bBlockData]) =>
-              //     aBlockData.instructions[0].blockOrderNumber -
-              //     bBlockData.instructions[0].blockOrderNumber
-              // )
+              .sort(
+                ([, aBlockData], [, bBlockData]) =>
+                  aBlockData.instructions[0].blockOrderNumber -
+                  bBlockData.instructions[0].blockOrderNumber
+              )
               .map(([blockGroupIndex, blockData], index) => (
                 <div key={blockGroupIndex} className="block">
                   {/* Block header with garbage, up, and down buttons */}
@@ -2199,7 +2207,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
                                   {...provided.draggableProps}
                                   {...provided.dragHandleProps}
                                   className={`instruction-item ${openDropdown === instruction.id ? 'dropdown-open' : ''
-                                    } ${instruction.actions === 'IF' || instruction.actions === 'ELSE' || instruction.actions === 'ENDIF'
+                                    } ${instruction.actions === 'IF' || instruction.actions === 'ELSEIF' || instruction.actions === 'ELSE' || instruction.actions === 'ENDIF'
                                       ? 'light-yellow-background'
                                       : ''
                                     }`}
@@ -2302,7 +2310,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
 
                                         {!isJustOne &&
-                                          ((!["IF", "ELSE", "ENDIF"].includes(instruction.actions) &&
+                                          ((!["IF", "ELSEIF", "ELSE", "ENDIF"].includes(instruction.actions) &&
                                             !isBetweenIfAndEndIf(instruction.instructionOrderNumber, blockData.instructions))) && (
                                             <>
                                               <div
@@ -2323,7 +2331,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
                                         }
 
                                         {!isJustOne &&
-                                          ((["IF", "ELSE", "ENDIF"].includes(instruction.actions) ||
+                                          ((["IF", "ELSEIF", "ELSE", "ENDIF"].includes(instruction.actions) ||
                                             isBetweenIfAndEndIf(instruction.instructionOrderNumber, blockData.instructions))) && (
                                             <>
                                               <div
