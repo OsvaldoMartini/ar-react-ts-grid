@@ -3,10 +3,18 @@ import ReactDOM from 'react-dom/client';
 import './index.css';
 import reportWebVitals from './reportWebVitals';
 import GridItem from './components/GridItem';
-import instructionsMockData, { botJobMockData } from './components/instructionsMockData2';
+import instructionsMockData, { botJobMockData } from './components/instructionsMockData3';
 import Navigable from './components/Navigable';
 import NavigableBKP from './components/NavigableBKP';
 import ToggleActive from './components/ToggleActive';
+import WebSocketComponent from './components/WebSocketComponent';
+import StompMessage from './components/StompMessage';
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+
+import PageOne from './pages/PageOne';
+import About from './pages/About';
+import Home from './pages/Home';
+import Menu from './pages/Menu';
 
 // import WebSocketComponent from './components/WebSocketComponent';
 
@@ -19,16 +27,29 @@ const dataHtml = [`<input class="iam-form-control ng-pristine ng-invalid ng-touc
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );
+
+
 root.render(
   <React.StrictMode>
     {/* <ToggleActive items={["Londssson", "Manchester",]} /> */}
     {/* <GridItem data={[]} botJobData={botJobMockData} /> */}
-    <GridItem data={instructionsMockData} botJobData={botJobMockData} />
+    {/* <GridItem data={instructionsMockData} botJobData={botJobMockData} /> */}
     {/* <WebSocketComponent></WebSocketComponent> */}
+    {/* <StompMessage /> */}
     {/* <Navigable dataHtml={dataHtml} /> */}
     {/* <NavigableBKP /> */}
+    <Router>
+      <Menu />
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/page1" element={<PageOne />} />
+        <Route path="/about" element={<About />} />
+      </Routes>
+    </Router>
   </React.StrictMode>
+
 );
+
 
 // If you want to start measuring performance in your app, pass a function
 // to log results (for example: reportWebVitals(console.log))
