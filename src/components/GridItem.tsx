@@ -70,6 +70,7 @@ const groupByBlock = (data: BlockLoopInstructionLoadDTO[]) => {
     block.instructions.sort((a, b) => a.instructionOrderNumber - b.instructionOrderNumber);
   });
 
+
   return blocks;
 };
 
@@ -351,13 +352,34 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
       console.log("Connected: " + frame);
       setConnected(true);
 
-      // Subscribe to a topic (e.g., "/topic/messages")
       stompClient.subscribe("/topic/messages", (message: IMessage) => {
-        if (message.body) {
-          setMessages((prevMessages) => [...prevMessages, message.body]);
-          console.log("Received message: ", message);
+        console.log("Received STOMP message:", message);
+        let body = message.body;
+
+        // Remove null character if it exists
+        if (body.endsWith('\u0000')) {
+          body = body.slice(0, -1);
+        }
+
+        console.log("Processed message body:", body);
+
+        if (body) {
+          try {
+            const parsedBody = JSON.parse(body); // Attempt JSON parsing
+            setMessages((prevMessages) => [...prevMessages, parsedBody]);
+            console.warn("Message Received:", messages);
+          } catch (e) {
+            console.warn("Non-JSON message received. Using raw body.");
+            setMessages((prevMessages) => [...prevMessages, body]);
+            setAlertImage(warningRedImage);
+            setAlertClass('construction-image');
+            setAlertMessage("Socket: " + messages);
+          }
+        } else {
+          console.error("Empty message body received.");
         }
       });
+
     };
 
     // Handle STOMP errors
@@ -438,18 +460,37 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
       // Reassign the instruction order numbers
       const reassignedData = reassignInstructionOrderNumbersByBlock([...instructionsData]);
 
+      const { updatedData, updatedBlocks } = correctBlockOrderNumbers(reassignedData);
       // Update instructionsData first
-      setInstructionsData(reassignedData);
-
+      setInstructionsData(updatedData);
       // Group the data and update groupedData
       const updatedGroupedData = groupByBlock(reassignedData);
       setGroupedData(updatedGroupedData);
+
+      // Trigger the `useEffect` to send WebSocket message
+      setUpdatedBlocks(updatedBlocks);
 
       // Set the flag to true to indicate that the data has been reordered
       setIsDataReordered(true);
     }
   }, [instructionsData, isDataReordered]);
 
+
+  // useEffect(() => {
+  //   //console.log("UseEffect -> instructionsData, isDataReordered");
+  //   if (isDataReordered && instructionsData.length > 0) {
+
+  //     // Update instructionsData first
+  //     setInstructionsData(instructionsData);
+
+  //     // Group the data and update groupedData
+  //     const updatedGroupedData = groupByBlock(instructionsData);
+  //     setGroupedData(updatedGroupedData);
+
+  //     // Set the flag to true to indicate that the data has been reordered
+  //     setIsDataReordered(true);
+  //   }
+  // }, [instructionsData, isDataReordered]);
 
   useEffect(() => {
     if (botJob && instructionsData.length === 0) {
@@ -460,21 +501,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
 
 
-  useEffect(() => {
-    //console.log("UseEffect -> instructionsData, isDataReordered");
-    if (isDataReordered && instructionsData.length > 0) {
 
-      // Update instructionsData first
-      setInstructionsData(instructionsData);
-
-      // Group the data and update groupedData
-      const updatedGroupedData = groupByBlock(instructionsData);
-      setGroupedData(updatedGroupedData);
-
-      // Set the flag to true to indicate that the data has been reordered
-      setIsDataReordered(true);
-    }
-  }, [instructionsData, isDataReordered]);
 
 
 
@@ -1060,7 +1087,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
       };
 
       const message = {
-        type: 'BLOCKS_COMPONENT',
+        type: 'RESPONSE_BACK',
         details: blockSplitDetails,
       };
 
