@@ -1773,6 +1773,11 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
           text = instruction.name;
           imageClass = "refresh-image";
           break;
+        case "LOOP":
+          imageSrc = refreshOnlyImage;
+          text = instruction.name;
+          imageClass = "refresh-image";
+          break;
         case "REFRESH_LOOP":
           imageSrc = refreshLoopImage;
           text = instruction.name;
@@ -1835,7 +1840,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
 
   const renderEditButton = (actionType: string, editImage: string, instruction: BlockLoopInstructionLoadDTO) => {
-    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "IF", "ELSEIF", "ELSE", "ENDIF", "PAUSE", "REFRESH", "REFRESH_LOOP"].includes(actionType)) {
+    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "IF", "ELSEIF", "ELSE", "ENDIF", "PAUSE", "REFRESH", "LOOP", "REFRESH_LOOP"].includes(actionType)) {
       return <span className="edit-button-space">&nbsp;</span>; // Render a space or an empty element
     }
 
@@ -1954,7 +1959,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     instruction: BlockLoopInstructionLoadDTO,
     allInstructions: BlockLoopInstructionLoadDTO[]
   ) => {
-    const validActions = ["SET", "GET", "CK", "E", "GOTO", "REFRESH_LOOP"];
+    const validActions = ["SET", "GET", "CK", "E", "GOTO", , "LOOP", "REFRESH_LOOP"];
 
     // Handle the "CK" action with special formatting for operation
     if (instruction.actions === "CK" && instruction.operation) {
@@ -2009,6 +2014,36 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
           <span style={{ color: "#FFA500" }}>{refreshValue}s</span> :{" "}
           <span style={{ color: "#0b5394" }}>Loop</span>{" "}
           <span style={{ color: "#FFA500" }}>{loopValue} times</span> :{" "}
+          <span style={{ color: "#0b5394" }}>Jump To Parent</span>{" "}
+          <span style={{ color: "#FFA500" }}>({instruction.parentId}){parentValue}</span>
+        </span>
+      );
+    }
+
+    // Handle "LOOP" operation with simplified details
+    if (instruction.actions === "LOOP" && instruction.operation) {
+      // Retrieve parentValue from allInstructions
+      const parentInstruction = allInstructions.find((item) => item.id === instruction.parentId);
+
+      // Validate parentInstruction
+      if (
+        parentInstruction &&
+        (parentInstruction.blockId !== instruction.blockId ||
+          parentInstruction.instructionOrderNumber >= instruction.instructionOrderNumber)
+      ) {
+        console.log(
+          `Invalid parent instruction for LOOP. Parent ID: ${instruction.parentId}, ` +
+          `Block ID: ${parentInstruction?.blockId}, Instruction Order Number: ${parentInstruction?.instructionOrderNumber}`
+        );
+        return null;
+      }
+
+      const parentValue = parentInstruction?.name || "Unknown";
+
+      return (
+        <span className="instruction-details">
+          <span style={{ color: "#0b5394" }}>Loop</span>{" "}
+          <span style={{ color: "#FFA500" }}>{instruction.operation} times</span> :{" "}
           <span style={{ color: "#0b5394" }}>Jump To Parent</span>{" "}
           <span style={{ color: "#FFA500" }}>({instruction.parentId}){parentValue}</span>
         </span>
