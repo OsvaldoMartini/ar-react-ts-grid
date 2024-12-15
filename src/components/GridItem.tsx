@@ -222,6 +222,14 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
       // Insert the moved instruction into destination block at the specified position
       destinationInstructions.splice(destination.index, 0, movedInstruction);
 
+      // Check if sourceInstructions is empty and movedInstruction.blockOrderNumber is 1
+      if (sourceInstructions.length === 0 && movedInstruction.blockOrderNumber === 1) {
+        // Set all destination instructions' blockOrderNumber to 1
+        destinationInstructions.forEach(instruction => {
+          instruction.blockOrderNumber = 1;
+        });
+      }
+
       // Reassign instructionOrderNumbers in source block
       const updatedSourceInstructions = sourceInstructions.map((instruction, index) => ({
         ...instruction,
@@ -256,31 +264,6 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
       if (updatedSourceInstructions.length === 0) {
         deleteBlockId = parseInt(sourceBlockId, 10); // Track the blockId to delete
         delete updatedGroupedData[sourceBlockId];
-
-        // Reorder blockOrderNumbers for remaining blocks in groupedData
-        let blockOrder = 1; // Start from 1, or adjust as needed
-        Object.keys(updatedGroupedData).forEach((blockKey) => {
-          const blockId = Number(blockKey); // Convert string key to number
-          const block = updatedGroupedData[blockId];
-          if (block) {
-            // Only update blockOrderNumber for each instruction inside this block
-            const updatedInstructions = block.instructions.map((instruction: any) => {
-              return {
-                ...instruction,
-                blockOrderNumber: blockOrder,  // Update blockOrderNumber in instruction
-              };
-            });
-
-            // Add the updated block with updated instructions to newUpdatedGroupedData
-            updatedGroupedData[blockId] = {
-              ...block,
-              instructions: updatedInstructions, // Replace the instructions with updated ones
-            };
-
-            blockOrder++; // Increment blockOrder for the next block
-          }
-        });
-
       }
     }
 
@@ -1920,6 +1903,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     });
 
     setInstructionsData(updatedInstructions);
+    setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
     setEditingInstructionId(null); // Exit edit mode
 
     const updatedInstruction = updatedInstructions.find(instruction => instruction.id === instructionId);
