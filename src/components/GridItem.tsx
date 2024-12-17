@@ -171,12 +171,89 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
       const instructionToMove = sourceInstructions[source.index];
 
-      if (instructionToMove.name === "IF" || instructionToMove.name === "ELSEIF" || instructionToMove.name === "ELSE" || instructionToMove.name === "ENDIF") {
-        setAlertImage(forbiddenImage);
-        setAlertClass('construction-image');
-        setAlertMessage('Moving "IF", "ELSEIF", "ELSE", or "ENDIF" is not allowed! Move the nested instructions instead.');
-        return;
+      // Find all the instructions whose parentId matches instructionToMove.id
+      const matchingInstructions = sourceInstructions
+        .map((instruction, index) => ({ index, instruction })) // Add index to each instruction
+        .filter(({ instruction }) => instruction.parentId === instructionToMove.parentId); // Filter by parentId matching
+
+      // Map to get a final list with the index and action (or any other data you need)
+      const parentList = matchingInstructions.map(({ index, instruction }) => ({
+        index,
+        action: instruction.actions, // Adjust this to any property you need
+      }));
+
+      // Check for invalid moves involving "IF", "ELSE", and "ENDIF"
+      if (instructionToMove.actions === "IF") {
+        // Prevent "IF" from being moved after "ELSE" or "ENDIF"
+        const isMoveForbidden = parentList.some(parent =>
+          (parent.action === "ELSE" || parent.action === "ENDIF") && destination.index >= parent.index
+        );
+
+        if (isMoveForbidden) {
+          setAlertImage(forbiddenImage);
+          setAlertClass('construction-image');
+          setAlertMessage(
+            `Moving "${instructionToMove.actions}" is not allowed! It cannot be placed after "ELSE" or "ENDIF".`
+          );
+          return;
+        }
       }
+
+      if (instructionToMove.actions === "ELSE") {
+        // Prevent "ELSE" from being moved after its corresponding "ENDIF"
+        const isMoveForbidden = parentList.some(parent =>
+          parent.action === "ENDIF" && destination.index >= parent.index
+        );
+
+        if (isMoveForbidden) {
+          setAlertImage(forbiddenImage);
+          setAlertClass('construction-image');
+          setAlertMessage(
+            `Moving "${instructionToMove.actions}" is not allowed! It cannot be placed after "ENDIF".`
+          );
+          return;
+        }
+      }
+
+      if (instructionToMove.actions === "ENDIF" || instructionToMove.actions === "ELSE") {
+        // Prevent "ENDIF" or "ELSE" from being moved before "IF" or another "ELSE"
+        const isMoveForbidden = parentList.some(parent =>
+          (parent.action === "IF" || parent.action === "ELSE") && destination.index <= parent.index
+        );
+
+        if (isMoveForbidden) {
+          setAlertImage(forbiddenImage);
+          setAlertClass('construction-image');
+          setAlertMessage(
+            `Moving "${instructionToMove.actions}" is not allowed! It cannot be placed before "IF" or "ELSE".`
+          );
+          return;
+        }
+      }
+
+
+
+      // else {
+      //   // Generic check for other instructions
+      //   if (instructionToMove.actions === "REFRESH_LOOP" || instructionToMove.actions === "LOOP") {
+      //     const isMoveForbidden = parentList.some(parent => destination.index <= parent.index);
+
+      //     if (isMoveForbidden) {
+      //       setAlertImage(forbiddenImage);
+      //       setAlertClass('construction-image');
+      //       setAlertMessage(`Moving "${instructionToMove.actions}" is not allowed before its Parent!`);
+      //       return;
+      //     }
+      //   }
+      // }
+
+
+      // if (instructionToMove.actions === "IF" || instructionToMove.actions === "ELSEIF" || instructionToMove.actions === "ELSE" || instructionToMove.actions === "ENDIF") {
+      //   setAlertImage(forbiddenImage);
+      //   setAlertClass('construction-image');
+      //   setAlertMessage(`Moving "${instructionToMove.actions}" is not allowed! Move the nested instructions instead.`);
+      //   return;
+      // }
 
       // Remove the dragged instruction from source block
       const [movedInstruction] = sourceInstructions.splice(source.index, 1);
@@ -209,10 +286,10 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
       // Remove the dragged instruction from source block
       const [movedInstruction] = sourceInstructions.splice(source.index, 1);
 
-      if (movedInstruction.name === "IF" || movedInstruction.name === "ELSEIF" || movedInstruction.name === "ELSE" || movedInstruction.name === "ENDIF") {
+      if (movedInstruction.actions === "REFRESH_LOOP" || movedInstruction.actions === "LOOP" || movedInstruction.actions === "IF" || movedInstruction.actions === "ELSEIF" || movedInstruction.actions === "ELSE" || movedInstruction.actions === "ENDIF") {
         setAlertImage(forbiddenImage);
         setAlertClass('construction-image');
-        setAlertMessage('Moving "IF", "ELSEIF", "ELSE", or "ENDIF" is not allowed! Move the nested instructions instead.');
+        setAlertMessage(`Moving "${movedInstruction.actions}" is not allowed Outside of a Block!`);
         return;
       }
 
@@ -636,6 +713,63 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
           body: JSON.stringify(message),
         });
         console.log('Sent blockActive update message:', message);
+      } catch (error) {
+        console.log('Error sending WebSocket message:', error);
+      }
+    }
+  };
+
+  const handleInstructionStatus = (instructionId: number) => {
+    // Find the botJobId and current instructionActive status for the given instructionId
+    const instruction = instructionsData.find(item => item.id === instructionId);
+    const botJobId = instruction?.botJobId;
+    const currentInstructionActive = instruction?.instructionActive; // Default to false if undefined
+
+    // Check if botJobId is found; handle the error
+    if (!botJobId) {
+      setAlertImage(warningRedImage);
+      setAlertClass('construction-image');
+      setAlertMessage(`botJobId not found for instructionId: ${instructionId}`);
+      return;
+    }
+
+    // Determine the new instructionActive value (toggle)
+    const newInstructionActive = !currentInstructionActive;
+
+    // Update instructionsData with the new instructionActive value
+    const updatedInstructions = instructionsData.map((item) => {
+      if (item.id === instructionId) {
+        return { ...item, instructionActive: newInstructionActive }; // Toggle instructionActive
+      }
+      return item;
+    });
+
+    // Update the instructionsData state
+    setInstructionsData(updatedInstructions);
+
+    // Recompute groupedData based on the updated instructionsData
+    const updatedGroupedData = groupByBlock(updatedInstructions);
+    setGroupedData(updatedGroupedData);
+
+    // Exit edit mode (if applicable)
+    setEditingBlockId(null);
+
+    // Send WebSocket message for instructionActive update
+    if (client && connected) {
+      const message = {
+        type: 'INSTRUCTION_STATUS',
+        botJobId: botJobId, // Include the botJobId in the message
+        blockId: instruction.blockId,
+        instructionId: instructionId,
+        instructionActive: newInstructionActive, // Send the toggled instructionActive value
+      };
+
+      try {
+        client.publish({
+          destination: '/app/instruction/update',
+          body: JSON.stringify(message),
+        });
+        console.log('Sent instructionActive update message:', message);
       } catch (error) {
         console.log('Error sending WebSocket message:', error);
       }
@@ -2308,6 +2442,21 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
                                     </div>
                                   ) : (
                                     <span className="instruction-line">
+                                      {instruction.instructionActive ? (
+                                        <img src={activeImage}
+                                          alt="Active"
+                                          className="active-button"
+                                          onClick={() =>
+                                            handleInstructionStatus(instruction.id)
+                                          } />
+                                      ) : (
+                                        <img src={inactiveImage}
+                                          alt="Inactive"
+                                          className="inactive-button"
+                                          onClick={() =>
+                                            handleInstructionStatus(instruction.id)
+                                          } />
+                                      )}
                                       {getInstructionTypeElement(instruction)}
                                       {instruction.refreshLoop && (
                                         <img
