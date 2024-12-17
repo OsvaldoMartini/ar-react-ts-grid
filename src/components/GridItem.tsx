@@ -1939,6 +1939,15 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     }
   };
 
+  const getBlockDetails = (blockId: number): [number | null, string] => {
+    const blockData = groupedData[blockId];
+    if (blockData) {
+      return [blockData.instructions[0]?.blockOrderNumber ?? null, blockData.blockName];
+    }
+    return [null, "Unknown"]; // Fallback values if blockId is not found
+  };
+
+
   const renderOperations = (
     instruction: BlockLoopInstructionLoadDTO,
     allInstructions: BlockLoopInstructionLoadDTO[]
@@ -1960,14 +1969,27 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
       }
     }
 
+
     // Special case for "GOTO" action - render only the operation without parentId or colon
     if (instruction.actions === "GOTO" && instruction.operation) {
+
+      // Guard against null parentId
+      const parentId = instruction.parentId;
+      const [blockOrderNumber, blockName] = parentId
+        ? getBlockDetails(parentId)
+        : ["N/A", "Unknown"]; // Fallback values if parentId is null
+
       return (
         <span className="instruction-details">
+          <span style={{ color: "#b163ff" }}>#{blockOrderNumber} {blockName}</span>{" "}
+          <span style={{ color: "blue" }}>Limit:</span>{" "}
           <span style={{ color: "#b163ff" }}>{instruction.operation}</span>
         </span>
       );
+
     }
+
+
 
     // Handle "REFRESH_LOOP" operation with simplified details
     if (instruction.actions === "REFRESH_LOOP" && instruction.operation) {
@@ -2290,6 +2312,13 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
                                       {instruction.refreshLoop && (
                                         <img
                                           src={refreshLoopImage}
+                                          alt="refresh"
+                                          className="refresh-image"
+                                        />
+                                      )}
+                                      {instruction.loopOnly && (
+                                        <img
+                                          src={refreshOnlyImage}
                                           alt="refresh"
                                           className="refresh-image"
                                         />

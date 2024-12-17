@@ -17,6 +17,7 @@ export interface BlockLoopInstructionLoadDTO {
   preComponent?: boolean;
   exportFile?: string;
   refreshLoop?: boolean;
+  loopOnly?: boolean;
 }
 
 // Define the message type for better type safety

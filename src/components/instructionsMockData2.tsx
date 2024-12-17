@@ -17,6 +17,7 @@ export interface BlockLoopInstructionLoadDTO {
   blockActive: boolean;
   blockWait: number;
   refreshLoop?: boolean;
+  loopOnly?: boolean;
 }
 
 // Define the message type for better type safety
