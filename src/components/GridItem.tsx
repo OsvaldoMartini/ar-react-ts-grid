@@ -882,23 +882,30 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     }
   };
 
-  const handleInstructionStatus = (instructionId: number) => {
-    // Find the botJobId and current instructionActive status for the given instructionId
-    const instruction = instructionsData.find(item => item.id === instructionId);
-    const botJobId = instruction?.botJobId;
-    const currentInstructionActive = instruction?.instructionActive; // Default to false if undefined
+  const handleInstructionStatus = (instructionId: number, instructions: BlockLoopInstructionLoadDTO[]) => {
+    // Find the instruction by ID
+    const instruction = instructions.find(item => item.id === instructionId);
 
-    // Check if botJobId is found; handle the error
-    if (!botJobId) {
+    // Validate the instruction exists
+    if (!instruction) {
       setAlertImage(warningRedImage);
       setAlertClass('construction-image');
-      setAlertMessageHeader(
-        `Error Bot Job not found`
-      );
+      setAlertMessageHeader('Error Instruction not found');
       setErrorFlag(true);
-      setAlertMessageBody(`botJobId not found for instructionId: ${instructionId}`);
+      setAlertMessageBody(`Instruction not found for instructionId: ${instructionId}`);
+      setAlertMessageFooter(`Instruction not found`);
       return;
     }
+
+    // Destructure properties from the found instruction
+    const { botJobId, instructionActive, actions, parentId } = instruction;
+
+    // Determine if the actions require updating by parentId
+    const conditionalActions = ["IF", "ELSEIF", "ELSE", "ENDIF"];
+    const shouldUpdateByParent = conditionalActions.includes(actions);
+
+    const currentInstructionActive = instructionActive; // Default to false if undefined
+
 
     // Determine the new instructionActive value (toggle)
     const newInstructionActive = !currentInstructionActive;
@@ -908,6 +915,12 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
       if (item.id === instructionId) {
         return { ...item, instructionActive: newInstructionActive }; // Toggle instructionActive
       }
+
+      if (shouldUpdateByParent && item.parentId === parentId) {
+        // Update all instructions with the same parentId
+        return { ...item, instructionActive: newInstructionActive };
+      }
+
       return item;
     });
 
@@ -929,6 +942,8 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
         blockId: instruction.blockId,
         instructionId: instructionId,
         instructionActive: newInstructionActive, // Send the toggled instructionActive value
+        parentId: parentId,
+        actions: actions
       };
 
       try {
@@ -2816,14 +2831,14 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
                                           alt="Active"
                                           className="active-button"
                                           onClick={() =>
-                                            handleInstructionStatus(instruction.id)
+                                            handleInstructionStatus(instruction.id, blockData.instructions)
                                           } />
                                       ) : (
                                         <img src={inactiveImage}
                                           alt="Inactive"
                                           className="inactive-button"
                                           onClick={() =>
-                                            handleInstructionStatus(instruction.id)
+                                            handleInstructionStatus(instruction.id, blockData.instructions)
                                           } />
                                       )}
                                       {getInstructionTypeElement(instruction)}

@@ -1,0 +1,57 @@
+.page-container {
+  h1 {
+    text-align: center;
+  }
+}
+
+.form-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: center;
+}
+
+.input-field,
+.select-field {
+  display: flex;
+  flex-direction: column;
+  max-width: 250px;
+  width: 100%;
+}
+
+.input-field input,
+.select-field select {
+  width: 100%;
+  max-width: 250px;
+}
+
+.clean-button-container {
+  display: flex;
+  flex-direction: column;
+  max-width: 250px;
+  width: 100%;
+  margin-top: 20px;
+  justify-content: center;
+  align-items: center;
+}
+
+.clean-button {
+  background: linear-gradient(45deg, #007bff, #0056b3);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.3s, transform 0.3s;
+  max-width: 250px;
+}
+
+.clean-button:hover {
+  background: linear-gradient(45deg, #0056b3, #007bff);
+}
+
+.clean-button:active {
+  background: linear-gradient(45deg, #ffcc00, #ff9900); /* Gradient when clicked */
+  transform: scale(0.95); /* Slight scale effect */
+}

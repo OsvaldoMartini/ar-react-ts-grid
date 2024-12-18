@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import './pageone.scss';  // Import the SCSS file
 
 const PageOne = () => {
   const [formData, setFormData] = useState({ name: '', surname: '' });
+  const [isClicked, setIsClicked] = useState(false); // Track button clicked state
 
   const handleNameChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const [name, surname] = event.target.value.split(' ');
@@ -29,42 +31,49 @@ const PageOne = () => {
     }
   };
 
+  const handleButtonMouseDown = () => {
+    setIsClicked(true); // Set clicked state to true
+  };
+
+  const handleButtonMouseUp = () => {
+    setTimeout(() => {
+      setIsClicked(false); // Set clicked state back to false after 2 seconds
+    }, 2000); // Delay 2 seconds before returning to original style
+  };
+
   return (
-    <div>
+    <div className="page-container">
       <h1>Page One</h1>
       <form>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', justifyContent: 'center' }}>
+        <div className="form-container">
           {/* First Name Field */}
-          <div style={{ display: 'flex', flexDirection: 'column', maxWidth: '250px', width: '100%' }}>
+          <div className="input-field">
             <span>First Name</span>
             <input
               type="text"
               name="name"
               value={formData.name}
               onChange={handleInputChange}
-              style={{ width: '100%', maxWidth: '250px' }}
             />
           </div>
 
           {/* Surname Field */}
-          <div style={{ display: 'flex', flexDirection: 'column', maxWidth: '250px', width: '100%' }}>
+          <div className="input-field">
             <span>Surname</span>
             <input
               type="text"
               name="surname"
               value={formData.surname}
               onChange={handleInputChange}
-              style={{ width: '100%', maxWidth: '250px' }}
             />
           </div>
 
           {/* Address Dropdown */}
-          <div style={{ display: 'flex', flexDirection: 'column', maxWidth: '250px', width: '100%' }}>
+          <div className="select-field">
             <span>Address</span>
             <select
               name="address"
               defaultValue=""
-              style={{ width: '100%', maxWidth: '250px' }}
             >
               <option value="" disabled>Select an address</option>
               <option value="address1">123 Main St</option>
@@ -76,13 +85,12 @@ const PageOne = () => {
           </div>
 
           {/* Name and Surname Dropdown */}
-          <div style={{ display: 'flex', flexDirection: 'column', maxWidth: '250px', width: '100%' }}>
+          <div className="select-field">
             <span>Name and Surname</span>
             <select
               name="names"
               defaultValue=""
               onChange={handleNameChange}
-              style={{ width: '100%', maxWidth: '250px' }}
             >
               <option value="" disabled>Select a name</option>
               <option value="John Doe">John Doe</option>
@@ -99,33 +107,13 @@ const PageOne = () => {
           </div>
 
           {/* Clean button below Name and Surname combo */}
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              maxWidth: '250px',
-              width: '100%',
-              marginTop: '20px',
-              justifyContent: 'center', // Center the button horizontally
-              alignItems: 'center', // Center horizontally within the div
-            }}
-          >
+          <div className="clean-button-container">
             <button
               type="button"
               onClick={handleClean}
-              style={{
-                backgroundColor: '#007BFF',
-                color: 'white',
-                border: 'none',
-                padding: '10px 20px',
-                borderRadius: '5px',
-                fontSize: '16px',
-                cursor: 'pointer',
-                transition: 'background-color 0.3s',
-                maxWidth: '250px',
-              }}
-              onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#0056b3'}
-              onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#007BFF'}
+              className={`clean-button ${isClicked ? 'clicked' : ''}`}
+              onMouseDown={handleButtonMouseDown}
+              onMouseUp={handleButtonMouseUp}
             >
               Clean
             </button>
