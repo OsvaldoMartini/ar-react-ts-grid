@@ -142,7 +142,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
     setSocketPort(socketPort);
     // setErrorFlag(true);
-    setAlertMessageBody("receiveDataFromJava Socket " + socketPort);
+    // setAlertMessageBody("receiveDataFromJava Socket " + socketPort);
   };
 
 
@@ -1134,7 +1134,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
       // If the instruction is found, use its name for the alert message
       // setErrorFlag(true);
-      setAlertMessageBody(`Inserting step before instruction: ${instruction.name}`);
+      // setAlertMessageBody(`Inserting step before instruction: ${instruction.name}`);
 
       // Create the InstructionDTO object with necessary details
       const instructionDTO = {
@@ -1230,7 +1230,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
       // If the instruction is found, use its name for the alert message
       // setErrorFlag(true);
-      setAlertMessageBody(`Inserting step after instruction: ${instruction.name}`);
+      // setAlertMessageBody(`Inserting step after instruction: ${instruction.name}`);
 
       // Create the InstructionDTO object with necessary details
       const instructionDTO = {
@@ -1293,7 +1293,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
       // If the instruction is found, use its name for the alert message
       // setErrorFlag(true);
-      setAlertMessageBody(`Inserting step after instruction: ${instruction.name}`);
+      // setAlertMessageBody(`Inserting step after instruction: ${instruction.name}`);
 
       // Create the InstructionDTO object with necessary details
       const instructionDTO = {
@@ -1582,50 +1582,8 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
     if (betweenLoops.length > 0) {
 
-
-      const betweenLoops = [
-        {
-          parentId: 1272,
-          parentName: "first page",
-          parentOrderNumber: 5,
-          parentRefreshLoop: true,
-          parentloopOnly: true,
-          childId: 1289,
-          childAction: "REFRESH_LOOP",
-          childOrderNumber: 9,
-        },
-        {
-          parentId: 1272,
-          parentName: "first page",
-          parentOrderNumber: 5,
-          parentRefreshLoop: true,
-          parentloopOnly: true,
-          childId: 1290,
-          childAction: "LOOP",
-          childOrderNumber: 10,
-        },
-        {
-          parentId: 1273,
-          parentName: "another",
-          parentOrderNumber: 6,
-          parentRefreshLoop: true,
-          parentloopOnly: true,
-          childId: 1291,
-          childAction: "LOOP",
-          childOrderNumber: 11,
-        }
-      ];
-
-      // The current instruction to check
-      const currentInstruction = {
-        instructionOrderNumber: 8, // Example order number
-      };
-
-
       // Map to track parentName and its corresponding actions
       const parentActionsMap: { [key: string]: { parentId: number, actions: string[] } } = {};
-
-
 
       // Loop through betweenLoops
       betweenLoops.forEach(({ parentOrderNumber, childOrderNumber, parentName, childAction, parentId }) => {
@@ -1657,21 +1615,21 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
         });
       }
 
-
-      setAlertImage(forbiddenImage);
-      setAlertClass('construction-image');
-      // Create the message by joining the results with new lines
-      setAlertMessageHeader(
-        `Error Split Component`
-      );
-      setErrorFlag(true);
-      setAlertMessageBody(
-        results
-      );
-      setAlertMessageFooter(
-        `Split Component is not allowed!"`
-      );
-      return;
+      if (results.length > 0) {
+        setAlertImage(forbiddenImage);
+        setAlertClass('construction-image');
+        setAlertMessageHeader(
+          `Error Split Component`
+        );
+        setErrorFlag(true);
+        setAlertMessageBody(
+          results
+        );
+        setAlertMessageFooter(
+          `Split Component is not allowed!"`
+        );
+        return;
+      }
 
     }
 
