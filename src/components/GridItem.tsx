@@ -2631,7 +2631,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
           onClose={closeAlert}
           imageSrc={alertImage}
           imageClass={alertClass}
-        // error={errorFlag}
+          error={errorFlag}
         />
       )}
       <DragDropContext onDragEnd={onDragEnd} // Define the onDragEnd handler to update the state when the dragging stops

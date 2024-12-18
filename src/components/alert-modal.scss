@@ -58,12 +58,23 @@
     }
 
     .alert-footer {
-      font-size: 0.8rem;  // Reduced font size for footer message
-      color: #999;
+      font-size: 0.9rem;  // Reduced font size for footer message
       margin-top: 8px;  // Reduced top margin for footer
       padding-top: 8px;  // Reduced padding for footer
       border-top: 1px solid #ddd;
+    
+      // No background color when error is true
+      &.error {
+        background-color: transparent;  // No background color for error
+        color: #f44336;  // Red text color for error
+      }
+    
+      &.success {
+        background-color: #2196F3;  // Blue background for success
+        color: white;  // White text color for success
+      }
     }
+    
 
     .close-btn {
       background-color: #4caf50;
@@ -78,20 +89,6 @@
       &:hover {
         background-color: #45a049;
       }
-    }
-  }
-
-  .complex-message-table {
-    width: 100%;
-    border-collapse: collapse;
-    
-    .complex-message-row {
-      display: table-row;
-    }
-
-    td {
-      padding: 8px;  // Reduced padding for better fitting
-      text-align: left;
     }
   }
 }
