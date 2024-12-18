@@ -3,52 +3,95 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  background-color: #fff;
-  padding: 20px;
-  border-radius: 8px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  background: linear-gradient(135deg, #f5f5f5, #ffffff);
+  padding: 20px;  // Reduced padding for compactness
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
   z-index: 1000;
-  width: 300px; // Set a width for consistent layout
+  width: 450px;  // Increased width for better text fitting
 
   .alert-content {
-    display: flex;
-    flex-direction: column;
+    display: grid;  // Use grid layout for better control over spacing
+    grid-template-columns: 1fr;  // Single column layout
+    grid-gap: 12px;  // Reduced gap between grid items
     align-items: center;
-    justify-content: center;
+    justify-items: center;
+    text-align: center;
+    padding: 0;  // Removed padding inside content to avoid excess space
 
     // Apply default styling for images if no class is provided
     img.default-image-class {
-      width: 100px;
+      width: 80px;
       height: auto;
-      margin-bottom: 20px;
+      margin-bottom: 12px;  // Reduced bottom margin for the image
     }
 
     // Additional styling if a specific image class is provided
     img.construction-image {
-      width: 100px;
+      width: 80px;
       height: auto;
-      margin-bottom: 20px;
+      margin-bottom: 12px;  // Reduced bottom margin for the image
     }
 
-    p {
-      font-size: 18px;
-      margin-bottom: 20px;
+    h3.alert-header {
+      font-size: 1.4rem;  // Reduced font size for header
+      font-weight: 600;
       color: #333;
-      text-align: center;
+      margin-bottom: 8px;  // Reduced margin for header
+      line-height: 1.3;  // Adjusted line height to minimize space
+    }
+
+    .alert-body {
+      font-size: 0.9rem;  // Reduced font size for body content
+      color: #555;
+      margin-bottom: 12px;  // Reduced bottom margin for body content
+      line-height: 1.4;
+      text-align: left;
+
+      // Render body as rows if it is an array
+      &.is-array {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;  // Reduced gap between array items
+      }
+    }
+
+    .alert-footer {
+      font-size: 0.8rem;  // Reduced font size for footer message
+      color: #999;
+      margin-top: 8px;  // Reduced top margin for footer
+      padding-top: 8px;  // Reduced padding for footer
+      border-top: 1px solid #ddd;
     }
 
     .close-btn {
-      background-color: #ff6347;
+      background-color: #4caf50;
       color: white;
-      padding: 10px 20px;
+      padding: 10px 20px;  // Adjusted padding for smaller text
       border: none;
-      border-radius: 4px;
+      border-radius: 8px;
       cursor: pointer;
       transition: background-color 0.3s ease;
+      margin-top: 12px;  // Reduced top margin for the button
 
       &:hover {
-        background-color: #e55342;
+        background-color: #45a049;
       }
+    }
+  }
+
+  .complex-message-table {
+    width: 100%;
+    border-collapse: collapse;
+    
+    .complex-message-row {
+      display: table-row;
+    }
+
+    td {
+      padding: 8px;  // Reduced padding for better fitting
+      text-align: left;
     }
   }
 }

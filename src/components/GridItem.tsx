@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Client, IMessage } from "@stomp/stompjs";
-import { BlockLoopInstructionLoadDTO, BotJobData, UpdatedBlock } from './instructionsMockData';
+import { BlockLoopInstructionLoadDTO, BotJobData, ComplexMessage, UpdatedBlock } from './instructionsMockData';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd'; // Import from react-beautiful-dnd
 import './griditem.scss';
 
@@ -110,15 +110,18 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
   const [messages, setMessages] = useState<string[]>([]);
   const [dropdownPosition, setDropdownPosition] = useState('below'); // Default to 'below'
   const [updatedBlocks, setUpdatedBlocks] = useState<UpdatedBlock[]>([]);
-  const [alertMessage, setAlertMessage] = useState<string | null>(null);
-  const [alertImage, setAlertImage] = useState(constructionImage);
-  const [alertClass, setAlertClass] = useState('construction-image')
   const [editingInstructionId, setEditingInstructionId] = useState<number | null>(null);
   const [instructionName, setInstructionName] = useState<string>('');
   const [editingBlockId, setEditingBlockId] = useState<number | null>(null);
   const [blockId, setBlockId] = useState<number | null>(null);
   const [blockName, setBlockName] = useState<string>('');
   const [showFilePickerModal, setShowFilePickerModal] = useState(false);
+  const [errorFlag, setErrorFlag] = useState<boolean>(false)
+  const [alertImage, setAlertImage] = useState(constructionImage);
+  const [alertClass, setAlertClass] = useState('construction-image')
+  const [alertMessageHeader, setAlertMessageHeader] = useState<string | null>(null);
+  const [alertMessageBody, setAlertMessageBody] = useState<string | ComplexMessage[]>([]);
+  const [alertMessageFooter, setAlertMessageFooter] = useState<string | null>(null);
 
   // Function to handle receiving data from JavaFX
   (window as any).receiveDataFromJava = function (jsonData: string, socketPort: number) {
@@ -138,7 +141,8 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     }
 
     setSocketPort(socketPort);
-    // setAlertMessage("receiveDataFromJava Socket " + socketPort);
+    // setErrorFlag(true);
+    setAlertMessageBody("receiveDataFromJava Socket " + socketPort);
   };
 
 
@@ -171,89 +175,198 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
       const instructionToMove = sourceInstructions[source.index];
 
-      // Find all the instructions whose parentId matches instructionToMove.id
-      const matchingInstructions = sourceInstructions
-        .map((instruction, index) => ({ index, instruction })) // Add index to each instruction
-        .filter(({ instruction }) => instruction.parentId === instructionToMove.parentId); // Filter by parentId matching
 
-      // Map to get a final list with the index and action (or any other data you need)
-      const parentList = matchingInstructions.map(({ index, instruction }) => ({
-        index,
-        action: instruction.actions, // Adjust this to any property you need
-      }));
+      if (instructionToMove.actions === "IF" || instructionToMove.actions === "ELSEIF" || instructionToMove.actions === "ELSE" || instructionToMove.actions === "ENDIF") {
 
-      // Check for invalid moves involving "IF", "ELSE", and "ENDIF"
-      if (instructionToMove.actions === "IF") {
+        // Find all the instructions whose parentId matches instructionToMove.parentId
+        const matchingInstructions = sourceInstructions
+          .map((instruction, index) => ({ index, instruction })) // Add index to each instruction
+          .filter(({ instruction }) => instruction.parentId === instructionToMove.parentId); // Filter by parentId matching
+
+        // Map to get a final list with the index and action (or any other data you need)
+        const parentList = matchingInstructions.map(({ index, instruction }) => ({
+          index,
+          action: instruction.actions, // Adjust this to any property you need
+        }));
+
+        // Check for invalid moves involving "IF", "ELSE", and "ENDIF"
+        if (instructionToMove.actions === "IF") {
+          // Prevent "IF" from being moved after "ELSE" or "ENDIF"
+          const isMoveForbidden = parentList.some(parent =>
+            (parent.action === "ELSE" || parent.action === "ENDIF") && destination.index >= parent.index
+          );
+
+          if (isMoveForbidden) {
+            setAlertImage(forbiddenImage);
+            setAlertClass('construction-image');
+            setAlertMessageHeader(
+              `Drag & Drop not Allowed`
+            );
+            setErrorFlag(true);
+            setErrorFlag(true);
+            setAlertMessageBody(
+              `Moving "${instructionToMove.actions}" is not allowed!"`
+            );
+            setAlertMessageFooter(
+              `It cannot be placed after "ELSE" or "ENDIF"`
+            );
+            return;
+          }
+        }
+
+        if (instructionToMove.actions === "ELSE") {
+          // Prevent "ELSE" from being moved after its corresponding "ENDIF"
+          const isMoveForbidden = parentList.some(parent =>
+            parent.action === "ENDIF" && destination.index >= parent.index
+          );
+
+          if (isMoveForbidden) {
+            setAlertImage(forbiddenImage);
+            setAlertClass('construction-image');
+            setAlertMessageHeader(
+              `Drag & Drop not Allowed`
+            );
+            setErrorFlag(true);
+            setErrorFlag(true);
+            setAlertMessageBody(
+              `Moving "${instructionToMove.actions}" is not allowed!"`
+            );
+            setAlertMessageFooter(
+              `It cannot be placed after "ENDIF"`
+            );
+            return;
+          }
+        }
+
+
+
+        if (instructionToMove.actions === "ELSE") {
+          // Prevent "ENDIF" or "ELSE" from being moved before "IF" or another "ELSE"
+          const isMoveForbidden = parentList.some(parent =>
+            (parent.action === "IF" || parent.action === "ELSEIF") && destination.index <= parent.index
+          );
+
+          if (isMoveForbidden) {
+            setAlertImage(forbiddenImage);
+            setAlertClass('construction-image');
+            setAlertMessageHeader(
+              `Drag & Drop not Allowed`
+            );
+            setErrorFlag(true);
+            setErrorFlag(true);
+            setAlertMessageBody(
+              `Moving "${instructionToMove.actions}" is not allowed!"`
+            );
+            setAlertMessageFooter(
+              ` It cannot be placed before "IF" or "ELSE"`
+            );
+            return;
+          }
+        }
+
+
+        if (instructionToMove.actions === "ENDIF") {
+          // Prevent "ENDIF" or "ELSE" from being moved before "IF" or another "ELSE"
+          const isMoveForbidden = parentList.some(parent =>
+            (parent.action === "IF" || parent.action === "ELSE") && destination.index <= parent.index
+          );
+
+          if (isMoveForbidden) {
+            setAlertImage(forbiddenImage);
+            setAlertClass('construction-image');
+            setAlertMessageHeader(
+              `Drag & Drop not Allowed`
+            );
+            setErrorFlag(true);
+            setAlertMessageBody(
+              `Moving "${instructionToMove.actions}" is not allowed!"`
+            );
+            setAlertMessageFooter(
+              `It cannot be placed before "IF" or "ELSE"`
+            );
+            return;
+          }
+        }
+
+
+      }
+
+      if (instructionToMove.refreshLoop || instructionToMove.loopOnly) {
+
+        // Find all the instructions whose parentId matches instructionToMove.id
+        const matchingInstructions = sourceInstructions
+          .map((instruction, index) => ({ index, instruction })) // Add index to each instruction
+          .filter(({ instruction }) => instruction.parentId === instructionToMove.id); // Filter by parentId matching
+
+        // Map to get a final list with the index and action (or any other data you need)
+        const parentList = matchingInstructions.map(({ index, instruction }) => ({
+          index,
+          action: instruction.actions, // Adjust this to any property you need
+        }));
+
+        // Check for invalid moves involving "refreshLoop" and "loopOnly"
         // Prevent "IF" from being moved after "ELSE" or "ENDIF"
         const isMoveForbidden = parentList.some(parent =>
-          (parent.action === "ELSE" || parent.action === "ENDIF") && destination.index >= parent.index
+          (parent.action === "REFRESH_LOOP" || parent.action === "LOOP") && destination.index >= parent.index
         );
 
         if (isMoveForbidden) {
           setAlertImage(forbiddenImage);
           setAlertClass('construction-image');
-          setAlertMessage(
-            `Moving "${instructionToMove.actions}" is not allowed! It cannot be placed after "ELSE" or "ENDIF".`
+          setAlertMessageHeader(
+            `Drag & Drop not Allowed`
           );
-          return;
-        }
-      }
-
-      if (instructionToMove.actions === "ELSE") {
-        // Prevent "ELSE" from being moved after its corresponding "ENDIF"
-        const isMoveForbidden = parentList.some(parent =>
-          parent.action === "ENDIF" && destination.index >= parent.index
-        );
-
-        if (isMoveForbidden) {
-          setAlertImage(forbiddenImage);
-          setAlertClass('construction-image');
-          setAlertMessage(
-            `Moving "${instructionToMove.actions}" is not allowed! It cannot be placed after "ENDIF".`
+          setErrorFlag(true);
+          setAlertMessageBody(
+            `Moving "${instructionToMove.name}" is not allowed!"`
           );
-          return;
-        }
-      }
-
-      if (instructionToMove.actions === "ENDIF" || instructionToMove.actions === "ELSE") {
-        // Prevent "ENDIF" or "ELSE" from being moved before "IF" or another "ELSE"
-        const isMoveForbidden = parentList.some(parent =>
-          (parent.action === "IF" || parent.action === "ELSE") && destination.index <= parent.index
-        );
-
-        if (isMoveForbidden) {
-          setAlertImage(forbiddenImage);
-          setAlertClass('construction-image');
-          setAlertMessage(
-            `Moving "${instructionToMove.actions}" is not allowed! It cannot be placed before "IF" or "ELSE".`
+          setAlertMessageFooter(
+            `It cannot be placed after "REFRESH_LOOP" or "LOOP"`
           );
           return;
         }
       }
 
 
+      if (instructionToMove.actions === "REFRESH_LOOP" || instructionToMove.actions === "LOOP") {
+        // Find all the instructions whose id matches instructionToMove.parentId
+        const matchingInstructions = sourceInstructions
+          .map((instruction, index) => ({ index, instruction })) // Add index to each instruction
+          .filter(({ instruction }) => instruction.id === instructionToMove.parentId); // Filter by parentId matching
 
-      // else {
-      //   // Generic check for other instructions
-      //   if (instructionToMove.actions === "REFRESH_LOOP" || instructionToMove.actions === "LOOP") {
-      //     const isMoveForbidden = parentList.some(parent => destination.index <= parent.index);
+        // Map to get a final list with the index, action, and additional properties
+        const parentList = matchingInstructions.map(({ index, instruction }) => ({
+          index,
+          name: instruction.name,
+          refreshLoop: instruction.refreshLoop, // Include refreshLoop
+          loopOnly: instruction.loopOnly,       // Include loopOnly
+        }));
 
-      //     if (isMoveForbidden) {
-      //       setAlertImage(forbiddenImage);
-      //       setAlertClass('construction-image');
-      //       setAlertMessage(`Moving "${instructionToMove.actions}" is not allowed before its Parent!`);
-      //       return;
-      //     }
-      //   }
-      // }
+        // Check for invalid moves involving "refreshLoop" and "loopOnly"
+        const forbiddenInstruction = parentList.find(parent =>
+          (parent.refreshLoop || parent.loopOnly) && destination.index <= parent.index
+        );
 
+        const isMoveForbidden = !!forbiddenInstruction; // Convert to boolean
 
-      // if (instructionToMove.actions === "IF" || instructionToMove.actions === "ELSEIF" || instructionToMove.actions === "ELSE" || instructionToMove.actions === "ENDIF") {
-      //   setAlertImage(forbiddenImage);
-      //   setAlertClass('construction-image');
-      //   setAlertMessage(`Moving "${instructionToMove.actions}" is not allowed! Move the nested instructions instead.`);
-      //   return;
-      // }
+        if (isMoveForbidden) {
+          setAlertImage(forbiddenImage);
+          setAlertClass('construction-image');
+          setAlertMessageHeader(
+            `Drag & Drop not Allowed`
+          );
+          setErrorFlag(true);
+          setAlertMessageBody(
+            `Moving "${instructionToMove.name}" is not allowed!"`
+          );
+          setAlertMessageFooter(
+            `It cannot be placed after "${forbiddenInstruction?.name}"`
+          );
+
+          return { isMoveForbidden, forbiddenInstruction }; // Return both values if needed
+        }
+
+      }
 
       // Remove the dragged instruction from source block
       const [movedInstruction] = sourceInstructions.splice(source.index, 1);
@@ -289,9 +402,33 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
       if (movedInstruction.actions === "REFRESH_LOOP" || movedInstruction.actions === "LOOP" || movedInstruction.actions === "IF" || movedInstruction.actions === "ELSEIF" || movedInstruction.actions === "ELSE" || movedInstruction.actions === "ENDIF") {
         setAlertImage(forbiddenImage);
         setAlertClass('construction-image');
-        setAlertMessage(`Moving "${movedInstruction.actions}" is not allowed Outside of a Block!`);
+        setAlertMessageHeader(
+          `Drag & Drop not Allowed`
+        );
+        setErrorFlag(true);
+        setAlertMessageBody(`Moving "${movedInstruction.actions}"!`);
+        setAlertMessageFooter(
+          `Is not allowed Outside of a Block"`
+        );
         return;
       }
+
+      if (movedInstruction.refreshLoop || movedInstruction.loopOnly) {
+
+        setAlertImage(forbiddenImage);
+        setAlertClass('construction-image');
+        setAlertMessageHeader(
+          `Drag & Drop not Allowed`
+        );
+        setErrorFlag(true);
+        setAlertMessageBody(`Moving "${movedInstruction.name}" is not allowed!`);
+        setAlertMessageFooter(
+          `It's attached to "REFRESH_LOOP" or "LOOP"!"`
+        );
+        return;
+
+      }
+
 
       // Update the blockId of the moved instruction
       movedInstruction.blockId = parseInt(destinationBlockId, 10);
@@ -394,7 +531,8 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
 
   useEffect(() => {
-    // setAlertMessage("useEffect Socket " + socketPort);
+    // setErrorFlag(true);
+    // setAlertMessageBody("useEffect Socket " + socketPort);
     // Create a STOMP client
     //console.log("UseEffect -> socketPort");
     const stompClient: Client = new Client({
@@ -429,14 +567,18 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
             setMessages((prevMessages) => [...prevMessages, parsedBody]);
             console.warn("Message Received:", messages);
           } catch (e) {
-            console.warn("Non-JSON message received. Using raw body.");
+            console.warn("Non-JSON message received. Using raw body");
             setMessages((prevMessages) => [...prevMessages, body]);
             setAlertImage(warningRedImage);
             setAlertClass('construction-image');
-            setAlertMessage("Socket: " + messages);
+            setAlertMessageHeader(
+              `Socket Error`
+            );
+            setErrorFlag(true);
+            setAlertMessageBody("Socket: " + messages);
           }
         } else {
-          console.error("Empty message body received.");
+          console.error("Empty message body received");
         }
       });
 
@@ -446,8 +588,13 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     stompClient.onStompError = (frame) => {
       setAlertImage(warningRedImage);
       setAlertClass('construction-image');
-      setAlertMessage("Broker reported error: " + frame.headers["message"]);
-      setAlertMessage("Additional details: " + frame.body);
+      setAlertMessageHeader(
+        `Socket Error`
+      );
+      setErrorFlag(true);
+      setAlertMessageBody("Broker reported error: " + frame.headers["message"]);
+      setErrorFlag(true);
+      setAlertMessageBody("Additional details: " + frame.body);
     };
 
     // Activate the connection
@@ -604,7 +751,11 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     if (!instructionsData || instructionsData.length === 0) {
       setAlertImage(warningRedImage);
       setAlertClass('construction-image');
-      setAlertMessage('Instructions data is empty or not available.');
+      setAlertMessageHeader(
+        `Error Save Block Name`
+      );
+      setErrorFlag(true);
+      setAlertMessageBody('Instructions data is empty or not available.');
       return;
     }
 
@@ -615,7 +766,11 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     if (!botJobId) {
       setAlertImage(warningRedImage);
       setAlertClass('construction-image');
-      setAlertMessage(`botJobId not found for blockId: ${blockId}`);
+      setAlertMessageHeader(
+        `Error Bot Job not found`
+      );
+      setErrorFlag(true);
+      setAlertMessageBody(`botJobId not found for blockId: ${blockId}`);
       return;
     }
 
@@ -658,7 +813,11 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     } else {
       setAlertImage(warningRedImage);
       setAlertClass('construction-image');
-      setAlertMessage('WebSocket client is not connected or available.');
+      setAlertMessageHeader(
+        `Error Socket`
+      );
+      setErrorFlag(true);
+      setAlertMessageBody('WebSocket client is not connected or available.');
     }
   };
 
@@ -673,7 +832,11 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     if (!botJobId) {
       setAlertImage(warningRedImage);
       setAlertClass('construction-image');
-      setAlertMessage(`botJobId not found for blockId: ${blockId}`);
+      setAlertMessageHeader(
+        `Error Bot Job not found`
+      );
+      setErrorFlag(true);
+      setAlertMessageBody(`botJobId not found for blockId: ${blockId}`);
       return;
     }
 
@@ -729,7 +892,11 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     if (!botJobId) {
       setAlertImage(warningRedImage);
       setAlertClass('construction-image');
-      setAlertMessage(`botJobId not found for instructionId: ${instructionId}`);
+      setAlertMessageHeader(
+        `Error Bot Job not found`
+      );
+      setErrorFlag(true);
+      setAlertMessageBody(`botJobId not found for instructionId: ${instructionId}`);
       return;
     }
 
@@ -785,7 +952,11 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     if (!botJobId) {
       setAlertImage(warningRedImage);
       setAlertClass('construction-image');
-      setAlertMessage(`botJobId not found for blockId: ${blockId}`);
+      setAlertMessageHeader(
+        `Error Bot Job not found`
+      );
+      setErrorFlag(true);
+      setAlertMessageBody(`botJobId not found for blockId: ${blockId}`);
       return;
     }
 
@@ -962,7 +1133,8 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
       const botJobId = instruction.botJobId || null;
 
       // If the instruction is found, use its name for the alert message
-      // setAlertMessage(`Inserting step before instruction: ${instruction.name}`);
+      // setErrorFlag(true);
+      setAlertMessageBody(`Inserting step before instruction: ${instruction.name}`);
 
       // Create the InstructionDTO object with necessary details
       const instructionDTO = {
@@ -1003,7 +1175,11 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     } else {
       setAlertImage(warningRedImage);
       setAlertClass('construction-image');
-      setAlertMessage(`Instruction with ID ${instructionId} not found.`);
+      setAlertMessageHeader(
+        `Error Instruction not found`
+      );
+      setErrorFlag(true);
+      setAlertMessageBody(`Instruction with ID ${instructionId} not found.`);
     }
     setOpenDropdown(null);
   };
@@ -1053,7 +1229,8 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
       const botJobId = instruction.botJobId || null;
 
       // If the instruction is found, use its name for the alert message
-      // setAlertMessage(`Inserting step after instruction: ${instruction.name}`);
+      // setErrorFlag(true);
+      setAlertMessageBody(`Inserting step after instruction: ${instruction.name}`);
 
       // Create the InstructionDTO object with necessary details
       const instructionDTO = {
@@ -1093,7 +1270,11 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     } else {
       setAlertImage(warningRedImage);
       setAlertClass('construction-image');
-      setAlertMessage(`Instruction with ID ${instructionId} not found.`);
+      setAlertMessageHeader(
+        `Error Instruction not found`
+      );
+      setErrorFlag(true);
+      setAlertMessageBody(`Instruction with ID ${instructionId} not found.`);
     }
 
     setOpenDropdown(null);
@@ -1111,7 +1292,8 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
       const botJobId = instruction.botJobId || null;
 
       // If the instruction is found, use its name for the alert message
-      // setAlertMessage(`Inserting step after instruction: ${instruction.name}`);
+      // setErrorFlag(true);
+      setAlertMessageBody(`Inserting step after instruction: ${instruction.name}`);
 
       // Create the InstructionDTO object with necessary details
       const instructionDTO = {
@@ -1152,14 +1334,21 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     } else {
       setAlertImage(warningRedImage);
       setAlertClass('construction-image');
-      setAlertMessage(`Instruction with ID ${instructionId} not found.`);
+      setAlertMessageHeader(
+        `Error Instruction not found`
+      );
+      setErrorFlag(true);
+      setAlertMessageBody(`Instruction with ID ${instructionId} not found.`);
     }
 
     setOpenDropdown(null);
   };
 
   const closeAlert = () => {
-    setAlertMessage(null);
+    setAlertMessageHeader(null);
+    setErrorFlag(true);
+    setAlertMessageBody([]);
+    setAlertMessageFooter(null);
   };
 
   const handleCreateComponent = (blockGroupIndex: number) => {
@@ -1238,6 +1427,113 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     return false;
   }
 
+  const getInstructionsLoops = (
+    instructions: BlockLoopInstructionLoadDTO[]
+  ): any[] => {
+    // Use getLoopsWithParents to get matching instructions
+    const matchingInstructions = getLoopsWithParents(instructions);
+
+    // Flatten all children into a single list with parent information
+    const allLoopBoundaries = matchingInstructions.flatMap(({ parentId, parentName, parentOrderNumber, parentRefreshLoop, parentloopOnly, children }) =>
+      children.map((child) => ({
+        parentId,
+        parentName,
+        parentOrderNumber,
+        parentRefreshLoop,
+        parentloopOnly,
+        childId: child.id,
+        childAction: child.action,
+        childOrderNumber: instructions.find((instr) => instr.id === child.id)?.instructionOrderNumber || -1,
+      }))
+    );
+
+    // // Initialize the results array
+    // const matchingResults: BlockLoopInstructionLoadDTO[] = [];
+
+    // for (const { parentId, childOrderNumber } of allLoopBoundaries) {
+    //   // Get the parent's instructionOrderNumber
+    //   const parentInstruction = instructions.find((instr) => instr.id === parentId);
+    //   if (!parentInstruction) continue;
+
+    //   const parentOrderNumber = parentInstruction.instructionOrderNumber;
+
+    //   // If the current order number is within the range, collect the matching instructions
+    //   if (
+    //     parentOrderNumber <= currentOrderNumber &&
+    //     currentOrderNumber <= childOrderNumber
+    //   ) {
+    //     // Add the parent instruction
+    //     matchingResults.push(parentInstruction);
+
+    //     // Add the child instructions
+    //     const childInstruction = instructions.find(
+    //       (instr) => instr.instructionOrderNumber === childOrderNumber
+    //     );
+    //     if (childInstruction) {
+    //       matchingResults.push(childInstruction);
+    //     }
+    //   }
+    // }
+
+    return allLoopBoundaries; // Return all matching instructions
+  };
+
+
+
+  const getLoopsWithParents = (
+    instructions: BlockLoopInstructionLoadDTO[]
+  ) => {
+    // Find all instructions where `refreshLoop` or `loopOnly` is true
+    const parentInstructions = instructions.filter(
+      (instr) => instr.refreshLoop || instr.loopOnly
+    );
+
+    // Find associated "REFRESH_LOOP" or "LOOP" instructions and map them to their parent
+    const loopInstructions = parentInstructions.map((parent) => {
+      // Find child instructions with `REFRESH_LOOP` or `LOOP` whose parentId matches the parent's id
+      const children = instructions.filter(
+        (instr) =>
+          instr.actions === "REFRESH_LOOP" ||
+          instr.actions === "LOOP" &&
+          instr.parentId === parent.id
+      );
+
+      return {
+        parentId: parent.id,
+        parentName: parent.name,
+        parentOrderNumber: parent.instructionOrderNumber,
+        parentRefreshLoop: parent.refreshLoop,
+        parentloopOnly: parent.loopOnly,
+        children: children.map((child) => ({
+          id: child.id,
+          name: child.name,
+          action: child.actions,
+        })),
+      };
+    });
+
+    return loopInstructions;
+  };
+
+
+
+  const isBetweenIfAndElse = (currentOrderNumber: number, instructions: BlockLoopInstructionLoadDTO[]) => {
+    let ifFound = false;
+
+    for (const instr of instructions) {
+      if (instr.actions === "IF") {
+        ifFound = true;
+      }
+      if (instr.instructionOrderNumber === currentOrderNumber && ifFound) {
+        return true; // The instruction is between IF and ENDIF
+      }
+      if (instr.actions === "ELSE" && ifFound) {
+        ifFound = false; // Reset once ENDIF is encountered
+      }
+    }
+    return false;
+  }
+
   const getInstructionsBetweenIfAndEndIf = (currentOrderNumber: number, instructions: any[]): (number | null)[] => {
     let ifFound = false;
     let firstInstructionId: number | null = null;
@@ -1278,6 +1574,107 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     instructionsData: BlockLoopInstructionLoadDTO[],
     isLastInstruction: boolean
   ) => {
+
+    // Find the current instruction
+    const currentInstruction = instructionsData.find((instruction) => instruction.id === instructionId);
+
+    const betweenLoops = getInstructionsLoops(instructionsData);
+
+    if (betweenLoops.length > 0) {
+
+
+      const betweenLoops = [
+        {
+          parentId: 1272,
+          parentName: "first page",
+          parentOrderNumber: 5,
+          parentRefreshLoop: true,
+          parentloopOnly: true,
+          childId: 1289,
+          childAction: "REFRESH_LOOP",
+          childOrderNumber: 9,
+        },
+        {
+          parentId: 1272,
+          parentName: "first page",
+          parentOrderNumber: 5,
+          parentRefreshLoop: true,
+          parentloopOnly: true,
+          childId: 1290,
+          childAction: "LOOP",
+          childOrderNumber: 10,
+        },
+        {
+          parentId: 1273,
+          parentName: "another",
+          parentOrderNumber: 6,
+          parentRefreshLoop: true,
+          parentloopOnly: true,
+          childId: 1291,
+          childAction: "LOOP",
+          childOrderNumber: 11,
+        }
+      ];
+
+      // The current instruction to check
+      const currentInstruction = {
+        instructionOrderNumber: 8, // Example order number
+      };
+
+
+      // Map to track parentName and its corresponding actions
+      const parentActionsMap: { [key: string]: { parentId: number, actions: string[] } } = {};
+
+
+
+      // Loop through betweenLoops
+      betweenLoops.forEach(({ parentOrderNumber, childOrderNumber, parentName, childAction, parentId }) => {
+        // Check if currentInstruction's order number is between parent and child order numbers
+        if (currentInstruction!.instructionOrderNumber >= parentOrderNumber && currentInstruction!.instructionOrderNumber <= childOrderNumber) {
+          // If the parentName is not already in the map, add it with the parentId and childAction
+          if (!parentActionsMap[parentName]) {
+            parentActionsMap[parentName] = { parentId, actions: [childAction] };
+          } else {
+            // If it's already there, add the childAction to the list if not already included
+            if (!parentActionsMap[parentName].actions.includes(childAction)) {
+              parentActionsMap[parentName].actions.push(childAction);
+            }
+          }
+        }
+      });
+
+      // Construct the final output array
+      const results: ComplexMessage[] = [];
+
+      for (const [parentName, { parentId, actions }] of Object.entries(parentActionsMap)) {
+        const actionsString = actions.join(',');
+
+        // Push the formatted data into the results array as a ConnectionInfo object
+        results.push({
+          parentNameWithId: `(${parentId})${parentName}`,
+          connectionLabel: "Connected to:",
+          actions: actionsString,
+        });
+      }
+
+
+      setAlertImage(forbiddenImage);
+      setAlertClass('construction-image');
+      // Create the message by joining the results with new lines
+      setAlertMessageHeader(
+        `Error Split Component`
+      );
+      setErrorFlag(true);
+      setAlertMessageBody(
+        results
+      );
+      setAlertMessageFooter(
+        `is not allowed!"`
+      );
+      return;
+
+    }
+
     // Find the block and instruction related to the instructionId
     const blockToSplit = Object.values(groupedData).find((blockData) =>
       blockData.instructions.some((instruction) => instruction.id === instructionId)
@@ -1291,7 +1688,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
       : instructionId;
 
     if (!adjustedInstructionId) {
-      console.log("Cannot determine the instruction to split at.");
+      console.log("Cannot determine the instruction to split at");
       return;
     }
 
@@ -1310,7 +1707,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     const subsequentInstructions = blockToSplit.instructions.slice(selectedInstructionIndex + 1);
 
     if (subsequentInstructions.length === 0) {
-      console.log("No instructions to split.");
+      console.log("No instructions to split");
       return;
     }
 
@@ -1718,7 +2115,11 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     if (!botJobId || removedBlockOrderNumber === null) {
       setAlertImage(warningRedImage);
       setAlertClass('construction-image');
-      setAlertMessage(`No botJobId or blockOrderNumber found for Block ID: ${blockId}`);
+      setAlertMessageHeader(
+        `Error Bot Job or Block Order Number`
+      );
+      setErrorFlag(true);
+      setAlertMessageBody(`No botJobId or blockOrderNumber found for Block ID: ${blockId}`);
       return; // Exit if no botJobId or blockOrderNumber is found
     }
 
@@ -1779,7 +2180,11 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     if (!botJobId) {
       setAlertImage(warningRedImage);
       setAlertClass('construction-image');
-      setAlertMessage(`No botJobId found for Block ID: ${blockId}`);
+      setAlertMessageHeader(
+        `Error Bot Job not found`
+      );
+      setErrorFlag(true);
+      setAlertMessageBody(`No botJobId found for Block ID: ${blockId}`);
       return; // Exit if no botJobId is found
     }
 
@@ -2008,7 +2413,11 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     if (!instructionToUpdate) {
       setAlertImage(warningRedImage);
       setAlertClass('construction-image');
-      setAlertMessage(`Instruction with ID ${instructionId} not found`);
+      setAlertMessageHeader(
+        `Error Instruction not found`
+      );
+      setErrorFlag(true);
+      setAlertMessageBody(`Instruction with ID ${instructionId} not found`);
       return;
     }
 
@@ -2214,17 +2623,19 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
   return (
     <div className="grid-container">
-      {alertMessage && (
+      {alertMessageBody && alertMessageBody.length > 0 && (
         <AlertModal
-          message={alertMessage}
+          header={alertMessageHeader || ''}
+          body={alertMessageBody || ''}
+          extraMsg={alertMessageFooter || ''}
           onClose={closeAlert}
-          imageSrc={alertImage}          // Pass the image source
+          imageSrc={alertImage}
           imageClass={alertClass}
+        // error={errorFlag}
         />
       )}
       <DragDropContext onDragEnd={onDragEnd} // Define the onDragEnd handler to update the state when the dragging stops
       >
-
         {
           Object.keys(groupedData).length === 0 ? (
             // Render default block if groupedData is empty
@@ -2555,8 +2966,8 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
                                         }
 
                                         {!isJustOne &&
-                                          ((["IF", "ELSEIF", "ELSE", "ENDIF"].includes(instruction.actions) ||
-                                            isBetweenIfAndEndIf(instruction.instructionOrderNumber, blockData.instructions))) && (
+                                          ((["IF", "ELSEIF", "ELSE"].includes(instruction.actions) ||
+                                            isBetweenIfAndElse(instruction.instructionOrderNumber, blockData.instructions))) && (
                                             <>
                                               <div
                                                 onClick={() =>
