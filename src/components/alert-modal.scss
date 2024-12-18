@@ -13,7 +13,7 @@
   .alert-content {
     display: grid;  // Use grid layout for better control over spacing
     grid-template-columns: 1fr;  // Single column layout
-    grid-gap: 12px;  // Reduced gap between grid items
+    grid-gap: 8px;  // Reduced gap between grid items (for compact layout)
     align-items: center;
     justify-items: center;
     text-align: center;
@@ -44,7 +44,7 @@
     .alert-body {
       font-size: 0.9rem;  // Reduced font size for body content
       color: #555;
-      margin-bottom: 12px;  // Reduced bottom margin for body content
+      margin-bottom: 8px;  // Reduced bottom margin for body content (minimized space)
       line-height: 1.4;
       text-align: left;
 
@@ -53,14 +53,14 @@
         display: flex;
         flex-direction: column;
         align-items: flex-start;
-        gap: 8px;  // Reduced gap between array items
+        gap: 6px;  // Reduced gap between array items
       }
     }
 
     .alert-footer {
       font-size: 0.9rem;  // Reduced font size for footer message
-      margin-top: 8px;  // Reduced top margin for footer
-      padding-top: 8px;  // Reduced padding for footer
+      margin-top: 6px;  // Reduced top margin for footer
+      padding-top: 6px;  // Reduced padding for footer
       border-top: 1px solid #ddd;
     
       // No background color when error is true
@@ -74,7 +74,6 @@
         color: white;  // White text color for success
       }
     }
-    
 
     .close-btn {
       background-color: #4caf50;

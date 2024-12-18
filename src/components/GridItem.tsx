@@ -1346,7 +1346,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
   const closeAlert = () => {
     setAlertMessageHeader(null);
-    setErrorFlag(true);
+    setErrorFlag(false);
     setAlertMessageBody([]);
     setAlertMessageFooter(null);
   };
@@ -1669,7 +1669,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
         results
       );
       setAlertMessageFooter(
-        `is not allowed!"`
+        `Split Component is not allowed!"`
       );
       return;
 
