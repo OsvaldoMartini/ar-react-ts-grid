@@ -1,9 +1,11 @@
 import GridItem from "../components/GridItem";
 import instructionsMockData, { botJobMockData } from "../components/instructionsMockData3";
+import ClothingType from "./ClothingType";
 
 const Home = () => (
   <div>
-    <GridItem data={instructionsMockData} botJobData={botJobMockData} />
+    <ClothingType />
+    {/* <GridItem data={instructionsMockData} botJobData={botJobMockData} /> */}
   </div>
 );
 

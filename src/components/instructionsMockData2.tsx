@@ -9,20 +9,28 @@ export interface BlockLoopInstructionLoadDTO {
   blockId: number;
   blockOrderNumber: number;
   blockName: string;
+  blockActive: boolean;
+  blockWait: number;
   actions: string;
+  instructionActive: boolean;
   parentId?: number;
   operation?: string;
   preComponent?: boolean;
   exportFile?: string;
-  blockActive: boolean;
-  blockWait: number;
   refreshLoop?: boolean;
   loopOnly?: boolean;
 }
 
+
 // Define the message type for better type safety
 export interface Message {
   body: string;
+}
+
+export interface ComplexMessage {
+  parentNameWithId: string; // Format: "(parentId)parentName"
+  connectionLabel: string;  // "Connected to:"
+  actions: string;          // A string of actions, separated by commas
 }
 
 export interface UpdatedBlock {

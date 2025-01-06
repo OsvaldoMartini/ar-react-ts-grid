@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Client, IMessage } from "@stomp/stompjs";
-import { BlockLoopInstructionLoadDTO, BotJobData, ComplexMessage, UpdatedBlock } from './instructionsMockData';
+import { BlockLoopInstructionLoadDTO, BotJobData, UpdatedBlock } from './instructionsMockData';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd'; // Import from react-beautiful-dnd
 import './griditem.scss';
 
@@ -92,7 +92,7 @@ const reassignInstructionOrderNumbersByBlock = (instructions: BlockLoopInstructi
   return updatedInstructions;
 };
 
-const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
+const GridDrag: React.FC<GridItemProps> = ({ data, botJobData }) => {
   // Use state to manage the instructions data
   const instructionRef = useRef<HTMLInputElement>(null);
   const blockRef = useRef<HTMLInputElement>(null);
@@ -116,11 +116,10 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
   const [blockId, setBlockId] = useState<number | null>(null);
   const [blockName, setBlockName] = useState<string>('');
   const [showFilePickerModal, setShowFilePickerModal] = useState(false);
-  const [errorFlag, setErrorFlag] = useState<boolean>(false)
   const [alertImage, setAlertImage] = useState(constructionImage);
   const [alertClass, setAlertClass] = useState('construction-image')
   const [alertMessageHeader, setAlertMessageHeader] = useState<string | null>(null);
-  const [alertMessageBody, setAlertMessageBody] = useState<string | ComplexMessage[]>([]);
+  const [alertMessageBody, setAlertMessageBody] = useState<string | null>(null);
   const [alertMessageFooter, setAlertMessageFooter] = useState<string | null>(null);
 
   // Function to handle receiving data from JavaFX
@@ -141,13 +140,14 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     }
 
     setSocketPort(socketPort);
-    // setErrorFlag(true);
     // setAlertMessageBody("receiveDataFromJava Socket " + socketPort);
   };
 
 
   // Drag-and-drop event handler
   const onDragEnd = (result: any) => {
+
+    setAlertMessageBody(result);
     const { destination, source } = result;
 
     // No destination (dropped outside a droppable area)
@@ -175,246 +175,11 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
       const instructionToMove = sourceInstructions[source.index];
 
-
-      if (instructionToMove.actions === "IF" || instructionToMove.actions === "ELSEIF" || instructionToMove.actions === "ELSE" || instructionToMove.actions === "ENDIF") {
-
-        // Find all the instructions whose parentId matches instructionToMove.parentId
-        const matchingInstructions = sourceInstructions
-          .map((instruction, index) => ({ index, instruction })) // Add index to each instruction
-          .filter(({ instruction }) => instruction.parentId === instructionToMove.parentId); // Filter by parentId matching
-
-        // Map to get a final list with the index and action (or any other data you need)
-        const parentList = matchingInstructions.map(({ index, instruction }) => ({
-          index,
-          action: instruction.actions, // Adjust this to any property you need
-        }));
-
-        // Check for invalid moves involving "IF", "ELSE", and "ENDIF"
-        if (instructionToMove.actions === "IF") {
-          // Prevent "IF" from being moved after "ELSE" or "ENDIF"
-          const isMoveForbidden = parentList.some(parent =>
-            (parent.action === "ELSEIF" || parent.action === "ELSE" || parent.action === "ENDIF") && destination.index >= parent.index
-          );
-
-          if (isMoveForbidden) {
-            setAlertImage(forbiddenImage);
-            setAlertClass('construction-image');
-            setAlertMessageHeader(
-              `Drag & Drop not Allowed`
-            );
-            setErrorFlag(true);
-            setErrorFlag(true);
-            setAlertMessageBody(
-              `Moving "${instructionToMove.actions}" is not allowed!"`
-            );
-            setAlertMessageFooter(
-              `It cannot be placed after "ELSEIF", "ELSE" or "ENDIF"`
-            );
-            return;
-          }
-        }
-
-        if (instructionToMove.actions === "ELSEIF") {
-          // Prevent "ELSE" from being moved after its corresponding "ENDIF"
-          const isMoveForbidden = parentList.some(parent =>
-            (parent.action === "ELSE" || parent.action === "ENDIF") && destination.index >= parent.index
-          );
-
-          if (isMoveForbidden) {
-            setAlertImage(forbiddenImage);
-            setAlertClass('construction-image');
-            setAlertMessageHeader(
-              `Drag & Drop not Allowed`
-            );
-            setErrorFlag(true);
-            setErrorFlag(true);
-            setAlertMessageBody(
-              `Moving "${instructionToMove.actions}" is not allowed!"`
-            );
-            setAlertMessageFooter(
-              `It cannot be placed after "ELSE" OR "ENDIF"`
-            );
-            return;
-          }
-        }
-
-        if (instructionToMove.actions === "ELSEIF") {
-          // Prevent "ELSE" from being moved after its corresponding "ENDIF"
-          const isMoveForbidden = parentList.some(parent =>
-            parent.action === "IF" && destination.index <= parent.index
-          );
-
-          if (isMoveForbidden) {
-            setAlertImage(forbiddenImage);
-            setAlertClass('construction-image');
-            setAlertMessageHeader(
-              `Drag & Drop not Allowed`
-            );
-            setErrorFlag(true);
-            setErrorFlag(true);
-            setAlertMessageBody(
-              `Moving "${instructionToMove.actions}" is not allowed!"`
-            );
-            setAlertMessageFooter(
-              `It cannot be placed before "IF"`
-            );
-            return;
-          }
-        }
-
-
-        if (instructionToMove.actions === "ELSE") {
-          // Prevent "ELSE" from being moved after its corresponding "ENDIF"
-          const isMoveForbidden = parentList.some(parent =>
-            parent.action === "ENDIF" && destination.index >= parent.index
-          );
-
-          if (isMoveForbidden) {
-            setAlertImage(forbiddenImage);
-            setAlertClass('construction-image');
-            setAlertMessageHeader(
-              `Drag & Drop not Allowed`
-            );
-            setErrorFlag(true);
-            setErrorFlag(true);
-            setAlertMessageBody(
-              `Moving "${instructionToMove.actions}" is not allowed!"`
-            );
-            setAlertMessageFooter(
-              `It cannot be placed after "ENDIF"`
-            );
-            return;
-          }
-        }
-
-
-
-        if (instructionToMove.actions === "ELSE") {
-          // Prevent "ENDIF" or "ELSE" from being moved before "IF" or another "ELSE"
-          const isMoveForbidden = parentList.some(parent =>
-            (parent.action === "IF" || parent.action === "ELSEIF") && destination.index <= parent.index
-          );
-
-          if (isMoveForbidden) {
-            setAlertImage(forbiddenImage);
-            setAlertClass('construction-image');
-            setAlertMessageHeader(
-              `Drag & Drop not Allowed`
-            );
-            setErrorFlag(true);
-            setErrorFlag(true);
-            setAlertMessageBody(
-              `Moving "${instructionToMove.actions}" is not allowed!"`
-            );
-            setAlertMessageFooter(
-              ` It cannot be placed before "IF" or "ELSEIF"`
-            );
-            return;
-          }
-        }
-
-
-        if (instructionToMove.actions === "ENDIF") {
-          // Prevent "ENDIF" or "ELSE" from being moved before "IF" or another "ELSE"
-          const isMoveForbidden = parentList.some(parent =>
-            (parent.action === "IF" || parent.action === "ELSE") && destination.index <= parent.index
-          );
-
-          if (isMoveForbidden) {
-            setAlertImage(forbiddenImage);
-            setAlertClass('construction-image');
-            setAlertMessageHeader(
-              `Drag & Drop not Allowed`
-            );
-            setErrorFlag(true);
-            setAlertMessageBody(
-              `Moving "${instructionToMove.actions}" is not allowed!"`
-            );
-            setAlertMessageFooter(
-              `It cannot be placed before "IF" or "ELSE"`
-            );
-            return;
-          }
-        }
-
-
-      }
-
-      if (instructionToMove.refreshLoop || instructionToMove.loopOnly) {
-
-        // Find all the instructions whose parentId matches instructionToMove.id
-        const matchingInstructions = sourceInstructions
-          .map((instruction, index) => ({ index, instruction })) // Add index to each instruction
-          .filter(({ instruction }) => instruction.parentId === instructionToMove.id); // Filter by parentId matching
-
-        // Map to get a final list with the index and action (or any other data you need)
-        const parentList = matchingInstructions.map(({ index, instruction }) => ({
-          index,
-          action: instruction.actions, // Adjust this to any property you need
-        }));
-
-        // Check for invalid moves involving "refreshLoop" and "loopOnly"
-        // Prevent "IF" from being moved after "ELSE" or "ENDIF"
-        const isMoveForbidden = parentList.some(parent =>
-          (parent.action === "REFRESH_LOOP" || parent.action === "LOOP") && destination.index >= parent.index
-        );
-
-        if (isMoveForbidden) {
-          setAlertImage(forbiddenImage);
-          setAlertClass('construction-image');
-          setAlertMessageHeader(
-            `Drag & Drop not Allowed`
-          );
-          setErrorFlag(true);
-          setAlertMessageBody(
-            `Moving "${instructionToMove.name}" is not allowed!"`
-          );
-          setAlertMessageFooter(
-            `It cannot be placed after "REFRESH_LOOP" or "LOOP"`
-          );
-          return;
-        }
-      }
-
-
-      if (instructionToMove.actions === "REFRESH_LOOP" || instructionToMove.actions === "LOOP") {
-        // Find all the instructions whose id matches instructionToMove.parentId
-        const matchingInstructions = sourceInstructions
-          .map((instruction, index) => ({ index, instruction })) // Add index to each instruction
-          .filter(({ instruction }) => instruction.id === instructionToMove.parentId); // Filter by parentId matching
-
-        // Map to get a final list with the index, action, and additional properties
-        const parentList = matchingInstructions.map(({ index, instruction }) => ({
-          index,
-          name: instruction.name,
-          refreshLoop: instruction.refreshLoop, // Include refreshLoop
-          loopOnly: instruction.loopOnly,       // Include loopOnly
-        }));
-
-        // Check for invalid moves involving "refreshLoop" and "loopOnly"
-        const forbiddenInstruction = parentList.find(parent =>
-          (parent.refreshLoop || parent.loopOnly) && destination.index <= parent.index
-        );
-
-        const isMoveForbidden = !!forbiddenInstruction; // Convert to boolean
-
-        if (isMoveForbidden) {
-          setAlertImage(forbiddenImage);
-          setAlertClass('construction-image');
-          setAlertMessageHeader(
-            `Drag & Drop not Allowed`
-          );
-          setErrorFlag(true);
-          setAlertMessageBody(
-            `Moving "${instructionToMove.name}" is not allowed!"`
-          );
-          setAlertMessageFooter(
-            `It cannot be placed after "${forbiddenInstruction?.name}"`
-          );
-
-          return { isMoveForbidden, forbiddenInstruction }; // Return both values if needed
-        }
-
+      if (instructionToMove.name === "IF" || instructionToMove.name === "ELSEIF" || instructionToMove.name === "ELSE" || instructionToMove.name === "ENDIF") {
+        setAlertImage(forbiddenImage);
+        setAlertClass('construction-image');
+        setAlertMessageBody('Moving "IF", "ELSEIF", "ELSE", or "ENDIF" is not allowed! Move the nested instructions instead.');
+        return;
       }
 
       // Remove the dragged instruction from source block
@@ -448,36 +213,12 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
       // Remove the dragged instruction from source block
       const [movedInstruction] = sourceInstructions.splice(source.index, 1);
 
-      if (movedInstruction.actions === "REFRESH_LOOP" || movedInstruction.actions === "LOOP" || movedInstruction.actions === "IF" || movedInstruction.actions === "ELSEIF" || movedInstruction.actions === "ELSE" || movedInstruction.actions === "ENDIF") {
+      if (movedInstruction.name === "IF" || movedInstruction.name === "ELSEIF" || movedInstruction.name === "ELSE" || movedInstruction.name === "ENDIF") {
         setAlertImage(forbiddenImage);
         setAlertClass('construction-image');
-        setAlertMessageHeader(
-          `Drag & Drop not Allowed`
-        );
-        setErrorFlag(true);
-        setAlertMessageBody(`Moving "${movedInstruction.actions}"!`);
-        setAlertMessageFooter(
-          `Is not allowed Outside of a Block"`
-        );
+        setAlertMessageBody('Moving "IF", "ELSEIF", "ELSE", or "ENDIF" is not allowed! Move the nested instructions instead.');
         return;
       }
-
-      if (movedInstruction.refreshLoop || movedInstruction.loopOnly) {
-
-        setAlertImage(forbiddenImage);
-        setAlertClass('construction-image');
-        setAlertMessageHeader(
-          `Drag & Drop not Allowed`
-        );
-        setErrorFlag(true);
-        setAlertMessageBody(`Moving "${movedInstruction.name}" is not allowed!`);
-        setAlertMessageFooter(
-          `It's attached to "REFRESH_LOOP" or "LOOP"!"`
-        );
-        return;
-
-      }
-
 
       // Update the blockId of the moved instruction
       movedInstruction.blockId = parseInt(destinationBlockId, 10);
@@ -580,7 +321,6 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
 
   useEffect(() => {
-    // setErrorFlag(true);
     // setAlertMessageBody("useEffect Socket " + socketPort);
     // Create a STOMP client
     //console.log("UseEffect -> socketPort");
@@ -616,18 +356,14 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
             setMessages((prevMessages) => [...prevMessages, parsedBody]);
             console.warn("Message Received:", messages);
           } catch (e) {
-            console.warn("Non-JSON message received. Using raw body");
+            console.warn("Non-JSON message received. Using raw body.");
             setMessages((prevMessages) => [...prevMessages, body]);
             setAlertImage(warningRedImage);
             setAlertClass('construction-image');
-            setAlertMessageHeader(
-              `Socket Error`
-            );
-            setErrorFlag(true);
             setAlertMessageBody("Socket: " + messages);
           }
         } else {
-          console.error("Empty message body received");
+          console.error("Empty message body received.");
         }
       });
 
@@ -637,12 +373,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     stompClient.onStompError = (frame) => {
       setAlertImage(warningRedImage);
       setAlertClass('construction-image');
-      setAlertMessageHeader(
-        `Socket Error`
-      );
-      setErrorFlag(true);
       setAlertMessageBody("Broker reported error: " + frame.headers["message"]);
-      setErrorFlag(true);
       setAlertMessageBody("Additional details: " + frame.body);
     };
 
@@ -800,10 +531,6 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     if (!instructionsData || instructionsData.length === 0) {
       setAlertImage(warningRedImage);
       setAlertClass('construction-image');
-      setAlertMessageHeader(
-        `Error Save Block Name`
-      );
-      setErrorFlag(true);
       setAlertMessageBody('Instructions data is empty or not available.');
       return;
     }
@@ -815,10 +542,6 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     if (!botJobId) {
       setAlertImage(warningRedImage);
       setAlertClass('construction-image');
-      setAlertMessageHeader(
-        `Error Bot Job not found`
-      );
-      setErrorFlag(true);
       setAlertMessageBody(`botJobId not found for blockId: ${blockId}`);
       return;
     }
@@ -862,10 +585,6 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     } else {
       setAlertImage(warningRedImage);
       setAlertClass('construction-image');
-      setAlertMessageHeader(
-        `Error Socket`
-      );
-      setErrorFlag(true);
       setAlertMessageBody('WebSocket client is not connected or available.');
     }
   };
@@ -881,10 +600,6 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     if (!botJobId) {
       setAlertImage(warningRedImage);
       setAlertClass('construction-image');
-      setAlertMessageHeader(
-        `Error Bot Job not found`
-      );
-      setErrorFlag(true);
       setAlertMessageBody(`botJobId not found for blockId: ${blockId}`);
       return;
     }
@@ -931,82 +646,6 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     }
   };
 
-  const handleInstructionStatus = (instructionId: number, instructions: BlockLoopInstructionLoadDTO[]) => {
-    // Find the instruction by ID
-    const instruction = instructions.find(item => item.id === instructionId);
-
-    // Validate the instruction exists
-    if (!instruction) {
-      setAlertImage(warningRedImage);
-      setAlertClass('construction-image');
-      setAlertMessageHeader('Error Instruction not found');
-      setErrorFlag(true);
-      setAlertMessageBody(`Instruction not found for instructionId: ${instructionId}`);
-      setAlertMessageFooter(`Instruction not found`);
-      return;
-    }
-
-    // Destructure properties from the found instruction
-    const { botJobId, instructionActive, actions, parentId } = instruction;
-
-    // Determine if the actions require updating by parentId
-    const conditionalActions = ["IF", "ELSEIF", "ELSE", "ENDIF"];
-    const shouldUpdateByParent = conditionalActions.includes(actions);
-
-    const currentInstructionActive = instructionActive; // Default to false if undefined
-
-
-    // Determine the new instructionActive value (toggle)
-    const newInstructionActive = !currentInstructionActive;
-
-    // Update instructionsData with the new instructionActive value
-    const updatedInstructions = instructionsData.map((item) => {
-      if (item.id === instructionId) {
-        return { ...item, instructionActive: newInstructionActive }; // Toggle instructionActive
-      }
-
-      if (shouldUpdateByParent && item.parentId === parentId) {
-        // Update all instructions with the same parentId
-        return { ...item, instructionActive: newInstructionActive };
-      }
-
-      return item;
-    });
-
-    // Update the instructionsData state
-    setInstructionsData(updatedInstructions);
-
-    // Recompute groupedData based on the updated instructionsData
-    const updatedGroupedData = groupByBlock(updatedInstructions);
-    setGroupedData(updatedGroupedData);
-
-    // Exit edit mode (if applicable)
-    setEditingBlockId(null);
-
-    // Send WebSocket message for instructionActive update
-    if (client && connected) {
-      const message = {
-        type: 'INSTRUCTION_STATUS',
-        botJobId: botJobId, // Include the botJobId in the message
-        blockId: instruction.blockId,
-        instructionId: instructionId,
-        instructionActive: newInstructionActive, // Send the toggled instructionActive value
-        parentId: parentId,
-        actions: actions
-      };
-
-      try {
-        client.publish({
-          destination: '/app/instruction/update',
-          body: JSON.stringify(message),
-        });
-        console.log('Sent instructionActive update message:', message);
-      } catch (error) {
-        console.log('Error sending WebSocket message:', error);
-      }
-    }
-  };
-
 
   const handleExcelFileBlockName = (blockId: number, blockName: string, exportFile?: string) => {
     // Find the botJobId from the instructionsData for the given blockId
@@ -1016,10 +655,6 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     if (!botJobId) {
       setAlertImage(warningRedImage);
       setAlertClass('construction-image');
-      setAlertMessageHeader(
-        `Error Bot Job not found`
-      );
-      setErrorFlag(true);
       setAlertMessageBody(`botJobId not found for blockId: ${blockId}`);
       return;
     }
@@ -1192,12 +827,11 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
     if (instruction) {
 
-      const { isBetween } = isBetweenIfAndEndIf(instruction.instructionOrderNumber, instructions);
+      const isBetween = isBetweenIfAndEndIf(instruction.instructionOrderNumber, instructions);
 
       const botJobId = instruction.botJobId || null;
 
       // If the instruction is found, use its name for the alert message
-      // setErrorFlag(true);
       // setAlertMessageBody(`Inserting step before instruction: ${instruction.name}`);
 
       // Create the InstructionDTO object with necessary details
@@ -1239,10 +873,6 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     } else {
       setAlertImage(warningRedImage);
       setAlertClass('construction-image');
-      setAlertMessageHeader(
-        `Error Instruction not found`
-      );
-      setErrorFlag(true);
       setAlertMessageBody(`Instruction with ID ${instructionId} not found.`);
     }
     setOpenDropdown(null);
@@ -1284,21 +914,16 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
 
 
-  const handleInsertElseIf = (instructionId: number, instructions: BlockLoopInstructionLoadDTO[]) => {
+  const handleInsertElseIf = (instructionId: number) => {
     // Find the instruction based on the instructionId
-    const instruction = instructions.find(instruction => instruction.id === instructionId);
+    const instruction = instructionsData.find(instruction => instruction.id === instructionId);
 
     if (instruction) {
-
-      const { isBetween, parentId } = isBetweenIfAndEndIf(instruction.instructionOrderNumber, instructions);
 
       const botJobId = instruction.botJobId || null;
 
       // If the instruction is found, use its name for the alert message
-      // setErrorFlag(true);
-      // setAlertMessageBody(`Inserting step before instruction: ${instruction.name}`);
-
-      const typeInsert = instruction.actions === "ELSE" ? "INSERT_BEFORE_ELSEIF" : "INSERT_AFTER_ELSEIF";
+      // setAlertMessageBody(`Inserting step after instruction: ${instruction.name}`);
 
       // Create the InstructionDTO object with necessary details
       const instructionDTO = {
@@ -1307,19 +932,18 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
         blockId: instruction.blockId,
         blockOrderNumber: instruction.blockOrderNumber,
         instructionOrderNumber: instruction.instructionOrderNumber,
-        instructionName: "ELSEIF",
-        operation: "ELSEIF",
-        actions: "ELSEIF",
-        parentId: parentId
+        instructionName: instruction.name,
+        operation: instruction.operation,
+        actions: instruction.actions,
+        parentId: instruction.parentId
       };
 
-      // WebSocket message for "INSERT_BEFORE" with the selected instruction's details
+      // WebSocket message for "INSERT_AFTER" with the selected instruction's details
       const message = {
-        type: typeInsert,
+        type: 'INSERT_ELSE_IF',
         botJobId: botJobId,
         blockId: instruction.blockId,
         blockName: instruction.blockName,
-        isBetween: isBetween,
         updatedRows: [instructionDTO], // Wrap the instructionDTO in an array
       };
 
@@ -1339,10 +963,6 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     } else {
       setAlertImage(warningRedImage);
       setAlertClass('construction-image');
-      setAlertMessageHeader(
-        `Error Instruction not found`
-      );
-      setErrorFlag(true);
       setAlertMessageBody(`Instruction with ID ${instructionId} not found.`);
     }
 
@@ -1356,12 +976,11 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
     if (instruction) {
 
-      const { isBetween } = isBetweenIfAndEndIf(instruction.instructionOrderNumber, instructions);
+      const isBetween = isBetweenIfAndEndIf(instruction.instructionOrderNumber, instructions);
 
       const botJobId = instruction.botJobId || null;
 
       // If the instruction is found, use its name for the alert message
-      // setErrorFlag(true);
       // setAlertMessageBody(`Inserting step after instruction: ${instruction.name}`);
 
       // Create the InstructionDTO object with necessary details
@@ -1403,10 +1022,6 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     } else {
       setAlertImage(warningRedImage);
       setAlertClass('construction-image');
-      setAlertMessageHeader(
-        `Error Instruction not found`
-      );
-      setErrorFlag(true);
       setAlertMessageBody(`Instruction with ID ${instructionId} not found.`);
     }
 
@@ -1414,10 +1029,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
   };
 
   const closeAlert = () => {
-    setAlertMessageHeader(null);
-    setErrorFlag(false);
-    setAlertMessageBody([]);
-    setAlertMessageFooter(null);
+    setAlertMessageBody(null);
   };
 
   const handleCreateComponent = (blockGroupIndex: number) => {
@@ -1478,145 +1090,8 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
   };
 
 
-  const isBetweenIfAndEndIf = (
-    currentOrderNumber: number,
-    instructions: BlockLoopInstructionLoadDTO[]
-  ): { isBetween: boolean; parentId: number | null } => {
-    let ifFound = false;
-    let parentId: number | null = null;
 
-    for (const instr of instructions) {
-      if (instr.actions === "IF") {
-        ifFound = true;
-        parentId = instr.parentId !== undefined ? instr.parentId : null; // Convert undefined to null
-      }
-      if (instr.instructionOrderNumber === currentOrderNumber && ifFound) {
-        return { isBetween: true, parentId }; // Return the result and the parentId
-      }
-      if (instr.actions === "ENDIF" && ifFound) {
-        ifFound = false; // Reset once ENDIF is encountered
-        parentId = null; // Reset parentId
-      }
-    }
-    return { isBetween: false, parentId: null }; // Return false if not between IF and ENDIF
-  };
-
-
-
-  const getInstructionsLoops = (blockId: number,
-    instructions: BlockLoopInstructionLoadDTO[]
-  ): any[] => {
-    // Use getLoopsWithParents to get matching instructions
-    const matchingInstructions = getLoopsWithParents(blockId, instructions);
-
-    // Flatten all children into a single list with parent information
-    const allLoopBoundaries = matchingInstructions.flatMap(({ parentId, parentName, parentOrderNumber, parentRefreshLoop, parentloopOnly, children }) =>
-      children.map((child) => ({
-        parentId,
-        parentName,
-        parentOrderNumber,
-        parentRefreshLoop,
-        parentloopOnly,
-        childId: child.id,
-        childAction: child.action,
-        childOrderNumber: instructions.find((instr) => instr.id === child.id)?.instructionOrderNumber || -1,
-      }))
-    );
-
-    // // Initialize the results array
-    // const matchingResults: BlockLoopInstructionLoadDTO[] = [];
-
-    // for (const { parentId, childOrderNumber } of allLoopBoundaries) {
-    //   // Get the parent's instructionOrderNumber
-    //   const parentInstruction = instructions.find((instr) => instr.id === parentId);
-    //   if (!parentInstruction) continue;
-
-    //   const parentOrderNumber = parentInstruction.instructionOrderNumber;
-
-    //   // If the current order number is within the range, collect the matching instructions
-    //   if (
-    //     parentOrderNumber <= currentOrderNumber &&
-    //     currentOrderNumber <= childOrderNumber
-    //   ) {
-    //     // Add the parent instruction
-    //     matchingResults.push(parentInstruction);
-
-    //     // Add the child instructions
-    //     const childInstruction = instructions.find(
-    //       (instr) => instr.instructionOrderNumber === childOrderNumber
-    //     );
-    //     if (childInstruction) {
-    //       matchingResults.push(childInstruction);
-    //     }
-    //   }
-    // }
-
-    return allLoopBoundaries; // Return all matching instructions
-  };
-
-
-
-  const getLoopsWithParents = (blockId: number,
-    instructions: BlockLoopInstructionLoadDTO[]
-  ) => {
-    // Find all instructions where `refreshLoop` or `loopOnly` is true
-    const parentInstructions = instructions.filter(
-      (instr) => instr.blockId === blockId && (instr.refreshLoop || instr.loopOnly)
-    );
-
-    // Find associated "REFRESH_LOOP" or "LOOP" instructions and map them to their parent
-    const loopInstructions = parentInstructions.map((parent) => {
-      // Find child instructions with `REFRESH_LOOP` or `LOOP` whose parentId matches the parent's id
-      const children = instructions.filter(
-        (instr) =>
-          (instr.actions === "REFRESH_LOOP" ||
-            instr.actions === "LOOP") &&
-          instr.parentId === parent.id
-      );
-
-      return {
-        parentId: parent.id,
-        parentName: parent.name,
-        parentOrderNumber: parent.instructionOrderNumber,
-        parentRefreshLoop: parent.refreshLoop,
-        parentloopOnly: parent.loopOnly,
-        parentBlockId: parent.blockId,
-        children: children.map((child) => ({
-          id: child.id,
-          name: child.name,
-          action: child.actions,
-        })),
-      };
-    });
-
-    return loopInstructions;
-  };
-
-
-  const isBetweenIfAndElseExcluded = (currentOrderNumber: number, instructions: BlockLoopInstructionLoadDTO[]) => {
-    let ifFound = false;
-
-    for (const instr of instructions) {
-      if (instr.actions === "IF") {
-        ifFound = true;
-        continue; // Skip further checks for the current "IF" instruction
-      }
-
-      if (ifFound && instr.actions === "ELSE") {
-        ifFound = false; // Reset when "ELSE" is found
-        continue; // Skip further checks for the current "ELSE" instruction
-      }
-
-      if (ifFound && instr.instructionOrderNumber === currentOrderNumber) {
-        return true; // The instruction is between IF and ELSE, excluding them
-      }
-    }
-    return false;
-  };
-
-
-
-  const isBetweenIfAndElse = (currentOrderNumber: number, instructions: BlockLoopInstructionLoadDTO[]) => {
+  const isBetweenIfAndEndIf = (currentOrderNumber: number, instructions: BlockLoopInstructionLoadDTO[]) => {
     let ifFound = false;
 
     for (const instr of instructions) {
@@ -1626,7 +1101,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
       if (instr.instructionOrderNumber === currentOrderNumber && ifFound) {
         return true; // The instruction is between IF and ENDIF
       }
-      if (instr.actions === "ELSE" && ifFound) {
+      if (instr.actions === "ENDIF" && ifFound) {
         ifFound = false; // Reset once ENDIF is encountered
       }
     }
@@ -1673,7 +1148,6 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     instructionsData: BlockLoopInstructionLoadDTO[],
     isLastInstruction: boolean
   ) => {
-
     // Find the block and instruction related to the instructionId
     const blockToSplit = Object.values(groupedData).find((blockData) =>
       blockData.instructions.some((instruction) => instruction.id === instructionId)
@@ -1687,7 +1161,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
       : instructionId;
 
     if (!adjustedInstructionId) {
-      console.log("Cannot determine the instruction to split at");
+      console.log("Cannot determine the instruction to split at.");
       return;
     }
 
@@ -1702,76 +1176,13 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     const blockOrderNumber = blockToSplit.instructions[0].blockOrderNumber;
     const blockId = blockToSplit.instructions[0].blockId;
 
-
-
-
     // Find all subsequent instructions in the same block
     const subsequentInstructions = blockToSplit.instructions.slice(selectedInstructionIndex + 1);
 
     if (subsequentInstructions.length === 0) {
-      console.log("No instructions to split");
+      console.log("No instructions to split.");
       return;
     }
-
-
-    // Find the current instruction
-    const currentInstruction = instructionsData.find((instruction) => instruction.id === instructionId);
-
-    const betweenLoops = getInstructionsLoops(blockId, instructionsData);
-
-    if (betweenLoops.length > 0) {
-
-      // Map to track parentName and its corresponding actions
-      const parentActionsMap: { [key: string]: { parentId: number, actions: string[] } } = {};
-
-      // Loop through betweenLoops
-      betweenLoops.forEach(({ parentOrderNumber, childOrderNumber, parentName, childAction, parentId }) => {
-        // Check if currentInstruction's order number is between parent and child order numbers
-        if (currentInstruction!.instructionOrderNumber >= parentOrderNumber && currentInstruction!.instructionOrderNumber <= childOrderNumber) {
-          // If the parentName is not already in the map, add it with the parentId and childAction
-          if (!parentActionsMap[parentName]) {
-            parentActionsMap[parentName] = { parentId, actions: [childAction] };
-          } else {
-            // If it's already there, add the childAction to the list if not already included
-            if (!parentActionsMap[parentName].actions.includes(childAction)) {
-              parentActionsMap[parentName].actions.push(childAction);
-            }
-          }
-        }
-      });
-
-      // Construct the final output array
-      const results: ComplexMessage[] = [];
-
-      for (const [parentName, { parentId, actions }] of Object.entries(parentActionsMap)) {
-        const actionsString = actions.join(',');
-
-        // Push the formatted data into the results array as a ConnectionInfo object
-        results.push({
-          parentNameWithId: `(${parentId})${parentName}`,
-          connectionLabel: "Connected to:",
-          actions: actionsString,
-        });
-      }
-
-      if (results.length > 0) {
-        setAlertImage(forbiddenImage);
-        setAlertClass('construction-image');
-        setAlertMessageHeader(
-          `Error Split Component`
-        );
-        setErrorFlag(true);
-        setAlertMessageBody(
-          results
-        );
-        setAlertMessageFooter(
-          `Split Component is not allowed!"`
-        );
-        return;
-      }
-
-    }
-
 
     // Create a new block with subsequent instructions, preserving the crescent order
     // Find the maximum blockId from the entire instructionsData
@@ -1853,7 +1264,6 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
           blockId: newBlockId,
           blockName: newBlock.blockName,
           blockOrderNumber: newBlock.blockOrderNumber,
-          active: true,
           instructions: newBlock.instructions.map(instruction => ({
             instructionId: instruction.id,
             blockId: instruction.blockId,
@@ -2115,7 +1525,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
 
     // Filter instructionsData
-    const updatedData = actions === "IF" || actions === "ELSE" || actions === "ENDIF"
+    const updatedData = actions === "IF" || actions === "ELSEIF" || actions === "ELSE" || actions === "ENDIF"
       ? instructionsData.filter(
         instruction =>
           instruction.parentId !== parentId)
@@ -2178,10 +1588,6 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     if (!botJobId || removedBlockOrderNumber === null) {
       setAlertImage(warningRedImage);
       setAlertClass('construction-image');
-      setAlertMessageHeader(
-        `Error Bot Job or Block Order Number`
-      );
-      setErrorFlag(true);
       setAlertMessageBody(`No botJobId or blockOrderNumber found for Block ID: ${blockId}`);
       return; // Exit if no botJobId or blockOrderNumber is found
     }
@@ -2243,10 +1649,6 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     if (!botJobId) {
       setAlertImage(warningRedImage);
       setAlertClass('construction-image');
-      setAlertMessageHeader(
-        `Error Bot Job not found`
-      );
-      setErrorFlag(true);
       setAlertMessageBody(`No botJobId found for Block ID: ${blockId}`);
       return; // Exit if no botJobId is found
     }
@@ -2476,10 +1878,6 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     if (!instructionToUpdate) {
       setAlertImage(warningRedImage);
       setAlertClass('construction-image');
-      setAlertMessageHeader(
-        `Error Instruction not found`
-      );
-      setErrorFlag(true);
       setAlertMessageBody(`Instruction with ID ${instructionId} not found`);
       return;
     }
@@ -2545,15 +1943,6 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     }
   };
 
-  const getBlockDetails = (blockId: number): [number | null, string] => {
-    const blockData = groupedData[blockId];
-    if (blockData) {
-      return [blockData.instructions[0]?.blockOrderNumber ?? null, blockData.blockName];
-    }
-    return [null, "Unknown"]; // Fallback values if blockId is not found
-  };
-
-
   const renderOperations = (
     instruction: BlockLoopInstructionLoadDTO,
     allInstructions: BlockLoopInstructionLoadDTO[]
@@ -2575,27 +1964,14 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
       }
     }
 
-
     // Special case for "GOTO" action - render only the operation without parentId or colon
     if (instruction.actions === "GOTO" && instruction.operation) {
-
-      // Guard against null parentId
-      const parentId = instruction.parentId;
-      const [blockOrderNumber, blockName] = parentId
-        ? getBlockDetails(parentId)
-        : ["N/A", "Unknown"]; // Fallback values if parentId is null
-
       return (
         <span className="instruction-details">
-          <span style={{ color: "#b163ff" }}>#{blockOrderNumber} {blockName}</span>{" "}
-          <span style={{ color: "blue" }}>Limit:</span>{" "}
           <span style={{ color: "#b163ff" }}>{instruction.operation}</span>
         </span>
       );
-
     }
-
-
 
     // Handle "REFRESH_LOOP" operation with simplified details
     if (instruction.actions === "REFRESH_LOOP" && instruction.operation) {
@@ -2683,10 +2059,9 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     return <span className="instruction-details">&nbsp;</span>;
   };
 
-
   return (
     <div className="grid-container">
-      {alertMessageBody && alertMessageBody.length > 0 && (
+      {alertMessageBody && (
         <AlertModal
           header={alertMessageHeader || ''}
           body={alertMessageBody || ''}
@@ -2694,384 +2069,103 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
           onClose={closeAlert}
           imageSrc={alertImage}
           imageClass={alertClass}
-          error={errorFlag}
+          error={false}
         />
       )}
-      <DragDropContext onDragEnd={onDragEnd} // Define the onDragEnd handler to update the state when the dragging stops
-      >
-        {
-          Object.keys(groupedData).length === 0 ? (
-            // Render default block if groupedData is empty
-            <div className="block">
-              <div className="block-header">
-                <span className="block-order-number">#1</span>
-                <span className="block-name">Default Block</span>
-                {botJob && botJob.id > 0 && (
-                  <span className="block-name">BotJob : {botJob.name}</span>
-                )}
-              </div>
-              <div className="instructions-list">
-                {/* Add an empty line */}
-                <div
-                  id={`dropdown-${1}`} // Use unique ID for each dropdown
-                  ref={dropdownRef}
-                  className={`dropdown-menu ${dropdownPosition === 'above'
-                    ? 'dropdown-above'
-                    : ''
-                    }`}
-                >
-                  <div
-                    onClick={() =>
-                      handleNewStepAfter(1)
-                    }
-                  >
-                    Insert New Step
+      <DragDropContext onDragEnd={onDragEnd}>
+        {/* Ensure a unique droppableId for each droppable */}
+        <Droppable droppableId="blockHeaders" direction="vertical">
+          {(provided) => (
+            <div
+              ref={provided.innerRef}
+              {...provided.droppableProps}
+              className="droppable-container"
+            >
+              {Object.keys(groupedData).length === 0 ? (
+                <div className="block">
+                  <div className="block-header">
+                    <span className="block-order-number">#1</span>
+                    <span className="block-name">Default Block</span>
+                    {botJob && botJob.id > 0 && (
+                      <span className="block-name">BotJob : {botJob.name}</span>
+                    )}
+                  </div>
+                  <div className="instructions-list">
+                    <div id={`dropdown-${1}`} ref={dropdownRef} className={`dropdown-menu ${dropdownPosition === 'above' ? 'dropdown-above' : ''}`}>
+                      <div onClick={() => handleNewStepAfter(1)}>Insert New Step</div>
+                    </div>
+                    <div className="instruction-item"> </div>
                   </div>
                 </div>
-                <div className="instruction-item"> </div>
-              </div>
-            </div>
-          ) : (
-            Object.entries(groupedData)
-              .sort(
-                ([, aBlockData], [, bBlockData]) =>
-                  aBlockData.instructions[0].blockOrderNumber -
-                  bBlockData.instructions[0].blockOrderNumber
-              )
-              .map(([blockGroupIndex, blockData], index) => (
-                <div key={blockGroupIndex} className="block">
-                  {/* Block header with garbage, up, and down buttons */}
-                  <div className="block-header">
-                    {blockData.instructions[0].blockActive ? (
-                      <img src={activeImage}
-                        alt="Active"
-                        className="active-button"
-                        onClick={() =>
-                          handleBlockStatus(blockData.instructions[0].blockId)
-                        } />
-                    ) : (
-                      <img src={inactiveImage}
-                        alt="Inactive"
-                        className="inactive-button"
-                        onClick={() =>
-                          handleBlockStatus(blockData.instructions[0].blockId)
-                        } />
-                    )}
-                    <span className="block-order-number">
-                      #{blockData.instructions[0].blockOrderNumber}
-                    </span>
-                    {editingBlockId === Number(blockGroupIndex) ? (
-                      <div className="edit-container">
-                        <input
-                          type="text"
-                          value={blockName}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              handleSaveBlockName(Number(blockData.instructions[0].blockId)); // Trigger save when "Enter" is pressed
-                            }
-                          }}
-                          onChange={(e) => {
-                            console.log(e.target.value);
-                            setBlockName(e.target.value);
-                          }}
-                          ref={blockRef} // Associate the ref with the input element
-                          className="edit-textbox"
-                        />
-                        {/* <span className="block-order-number">
-                          (Id:   {blockData.instructions[0].blockId})
-                        </span> */}
-                        <img
-                          src={saveImage}
-                          alt="save"
-                          className="save-button"
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              handleSaveBlockName(Number(blockData.instructions[0].blockId));
-                            }
-                          }}
-                          onClick={() => handleSaveBlockName(Number(blockData.instructions[0].blockId))}
-                        />
-                      </div>
-                    ) : (
-                      // <span className="block-name">{blockData.blockName}</span>
-                      <span className="block-name">{blockData.blockName} (Id:   {blockData.instructions[0].blockId})</span>
-                    )}
+              ) : (
+                Object.entries(groupedData)
+                  .sort(([, aBlockData], [, bBlockData]) =>
+                    aBlockData.instructions[0].blockOrderNumber - bBlockData.instructions[0].blockOrderNumber
+                  )
+                  .map(([blockGroupIndex, blockData], index) => (
+                    <Draggable key={blockGroupIndex} draggableId={blockGroupIndex} index={index}>
+                      {(provided) => (
+                        <div
+                          className="block"
+                          ref={provided.innerRef}
+                          {...provided.draggableProps}
+                          {...provided.dragHandleProps}
+                        >
+                          <div className="block-header" {...provided.dragHandleProps}>
+                            {blockData.instructions[0].blockActive ? (
+                              <img src={activeImage} alt="Active" className="active-button" onClick={() => handleBlockStatus(blockData.instructions[0].blockId)} />
+                            ) : (
+                              <img src={inactiveImage} alt="Inactive" className="inactive-button" onClick={() => handleBlockStatus(blockData.instructions[0].blockId)} />
+                            )}
+                            <span className="block-order-number">#{blockData.instructions[0].blockOrderNumber}</span>
+                            <span className="block-name">{blockData.blockName}</span>
+                            <span className="block-count">({blockData.instructions.length})</span>
+                          </div>
 
-                    <span className="block-count">
-                      ({blockData.instructions.length})
-                      {!mockData ? "-Moock Data" : ""}
-                    </span>
-                    {/* Show the export file or "No Export File" */}
-                    <span className="block-export-file">
-                      {blockData.exportFile}
-                    </span>
-                    <div className="move-buttons">
-                      {index === 0 && (
-                        <img
-                          src={rollBackImage}
-                          alt=""
-                          className="rollback-button"
-                          onClick={() => handleRollbackBlock(Number(blockData.instructions[0].blockId))}
-                        />
-                      )}
-                      <img
-                        src={upImage}
-                        alt=""
-                        className="move-button"
-                        onClick={() => handleMoveBlockUp(Number(blockData.instructions[0].blockId))}
-                      />
-                      <img
-                        src={downImage}
-                        alt=""
-                        className="move-button"
-                        onClick={() => handleMoveBlockDown(Number(blockData.instructions[0].blockId))}
-                      />
-                      {/* Edit Block Name Button */}
-                      <img
-                        src={editImage}
-                        alt="edit"
-                        className="edit-button"
-                        onClick={() => handleEditBlock(Number(blockData.instructions[0].blockId), blockData.blockName)} // Edit block logic
-                      />
-                      {/* Edit Block Name Button */}
-                      <img
-                        src={excelImage}
-                        alt="excel"
-                        className="excel-button"
-                        onClick={() => handleExcelFileBlockName(Number(blockData.instructions[0].blockId), blockData.blockName, blockData.exportFile)} // Edit block logic
-                      />
-                      <img
-                        src={saveImage}
-                        alt="save"
-                        className="save-button"
-                        onClick={() => handleCreateComponent(Number(blockData.instructions[0].blockId))}
-                      />
-                      {index !== 0 && (
-                        <img
-                          src={crossImage}
-                          alt=""
-                          className="cross-button"
-                          onClick={() => handleRemoveBlock(Number(blockData.instructions[0].blockId))}
-                        />
-                      )}
-
-                    </div>
-                  </div>
-                  <Droppable droppableId={blockGroupIndex} key={blockData.instructions[0].blockId}>
-                    {(provided) => (
-                      <div
-                        className="instructions-list"
-                        ref={provided.innerRef}
-                        {...provided.droppableProps}
-                      >
-                        {blockData.instructions.map((instruction, index) => {
-                          const isLastInstruction =
-                            index === blockData.instructions.length - 1;
-                          const isJustOne = blockData.instructions.length === 1;
-                          const isLastBlock =
-                            Number(blockGroupIndex) === Object.keys(groupedData).length; // Check if this is the last block
-
-                          return (
-                            <Draggable
-                              key={instruction.id}
-                              draggableId={instruction.id.toString()}
-                              index={index}
-                            >
-                              {(provided) => (
-                                <div
-                                  ref={provided.innerRef}
-                                  {...provided.draggableProps}
-                                  {...provided.dragHandleProps}
-                                  className={`instruction-item ${openDropdown === instruction.id ? 'dropdown-open' : ''
-                                    } ${instruction.actions === 'IF' || instruction.actions === 'ELSEIF' || instruction.actions === 'ELSE' || instruction.actions === 'ENDIF'
-                                      ? 'light-yellow-background'
-                                      : ''
-                                    }`}
-                                >
-                                  {editingInstructionId === instruction.id ? (
-                                    <div className="edit-container">
-                                      <input
-                                        type="text"
-                                        value={instructionName}
-                                        onKeyDown={(e) => {
-                                          if (e.key === 'Enter') {
-                                            handleSaveInstruction(instruction.id); // Trigger save when "Enter" is pressed
-                                          }
-                                        }}
-                                        onChange={(e) => {
-                                          console.log(e.target.value);
-                                          setInstructionName(e.target.value);
-                                        }}
-                                        ref={instructionRef} // Associate the ref with the input element
-                                        className="edit-textbox"
-                                      />
-                                      <img
-                                        src={saveImage}
-                                        alt="save"
-                                        className="save-button"
-                                        onClick={() =>
-                                          handleSaveInstruction(instruction.id)
-                                        } // Save instruction logic
-                                      />
-                                    </div>
-                                  ) : (
-                                    <span className="instruction-line">
-                                      <span>({instruction.id})</span>
-                                      {instruction.instructionActive ? (
-                                        <img src={activeImage}
-                                          alt="Active"
-                                          className="active-button"
-                                          onClick={() =>
-                                            handleInstructionStatus(instruction.id, blockData.instructions)
-                                          } />
-                                      ) : (
-                                        <img src={inactiveImage}
-                                          alt="Inactive"
-                                          className="inactive-button"
-                                          onClick={() =>
-                                            handleInstructionStatus(instruction.id, blockData.instructions)
-                                          } />
-                                      )}
-                                      {getInstructionTypeElement(instruction)}
-                                      {instruction.refreshLoop && (
-                                        <img
-                                          src={refreshLoopImage}
-                                          alt="refresh"
-                                          className="refresh-image"
-                                        />
-                                      )}
-                                      {instruction.loopOnly && (
-                                        <img
-                                          src={refreshOnlyImage}
-                                          alt="refresh"
-                                          className="refresh-image"
-                                        />
-                                      )}
-
-                                    </span>
-
-
-                                  )}
-                                  {renderOperations(instruction, instructionsData)}
-                                  <div className="options-column">
-                                    <div className="move-buttons">
-                                      {renderEditButton(
-                                        instruction.actions,
-                                        editImage,
-                                        instruction
-                                      )}
-                                      {renderMoveButtons(instruction.actions, instruction.id)}
-                                      <img
-                                        src={crossImage}
-                                        alt=""
-                                        className="cross-button"
-                                        onClick={() =>
-                                          handleRemoveInstruction(instruction.id)
-                                        }
-                                      />
-                                    </div>
-                                  </div>
-
-                                  {/* New column for dropdown menu */}
-                                  <div className="dropdown-column">
-                                    <img
-                                      src={menuDownImage}
-                                      className="dropdown-arrow"
-                                      alt=""
-                                      onClick={() =>
-                                        handleToggleDropdown(instruction.id)
-                                      }
-                                    />
-
-                                    {openDropdown === instruction.id && (
+                          {/* Instructions (Droppable for instructions) */}
+                          <Droppable droppableId={`block-${blockGroupIndex}-instructions`} direction="vertical">
+                            {(provided) => (
+                              <div
+                                className="instructions-list"
+                                ref={provided.innerRef}
+                                {...provided.droppableProps}
+                              >
+                                {blockData.instructions.map((instruction, index) => (
+                                  <Draggable key={instruction.id} draggableId={instruction.id.toString()} index={index}>
+                                    {(provided) => (
                                       <div
-                                        id={`dropdown-${instruction.id}`} // Use unique ID for each dropdown
-                                        ref={dropdownRef}
-                                        className={`dropdown-menu ${dropdownPosition === 'above'
-                                          ? 'dropdown-above'
-                                          : ''
-                                          }`}
+                                        ref={provided.innerRef}
+                                        {...provided.draggableProps}
+                                        {...provided.dragHandleProps}
+                                        className="instruction-item"
                                       >
-                                        <div
-                                          onClick={() =>
-                                            handleInsertStepBefore(instruction.id, blockData.instructions)
-                                          }
-                                        >
-                                          Insert Step Before
-                                        </div>
-                                        <div
-                                          onClick={() =>
-                                            handleInsertStepAfter(instruction.id, blockData.instructions)
-                                          }
-                                        >
-                                          Insert Step After
-                                        </div>
-
-
-                                        {!isJustOne &&
-                                          ((!["IF", "ELSEIF", "ELSE", "ENDIF"].includes(instruction.actions) &&
-                                            !isBetweenIfAndEndIf(instruction.instructionOrderNumber, blockData.instructions))) && (
-                                            <>
-                                              <div
-                                                onClick={() =>
-                                                  handleSplitComponent(
-                                                    instruction.id,
-                                                    groupedData,
-                                                    setGroupedData,
-                                                    instructionsData,
-                                                    isLastInstruction
-                                                  )
-                                                }
-                                              >
-                                                Split Component
-                                              </div>
-                                            </>
-                                          )
-                                        }
-
-                                        {
-                                          ((["IF", "ELSEIF"].includes(instruction.actions) ||
-                                            isBetweenIfAndElseExcluded(instruction.instructionOrderNumber, blockData.instructions))) && (
-                                            <>
-                                              <div
-                                                onClick={() =>
-                                                  handleInsertElseIf(instruction.id, blockData.instructions)
-                                                }
-                                              >
-                                                Insert ElseIf
-                                              </div>
-                                            </>
-                                          )
-                                        }
-
-
-
-                                        <div
-                                          onClick={() =>
-                                            handleRemoveInstruction(instruction.id)
-                                          }
-                                        >
-                                          Delete
-                                        </div>
+                                        {/* Instruction Content */}
+                                        {instruction.name}
                                       </div>
                                     )}
-                                  </div>
-                                </div>
-                              )}
-                            </Draggable>
-                          );
-                        })}
-                        {provided.placeholder}
-                      </div>
-                    )}
-                  </Droppable>
-                </div >
-              ))
+                                  </Draggable>
+                                ))}
+                                {provided.placeholder}
+                              </div>
+                            )}
+                          </Droppable>
+                        </div>
+                      )}
+                    </Draggable>
+                  ))
+              )}
+              {provided.placeholder}
+            </div>
           )}
-      </DragDropContext >
-    </div >
+        </Droppable>
+      </DragDropContext>
+
+    </div>
   );
+
+
+
 
 };
 
-export default GridItem;
+export default GridDrag;

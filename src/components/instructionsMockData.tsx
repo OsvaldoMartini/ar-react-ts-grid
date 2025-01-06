@@ -12,6 +12,7 @@ export interface BlockLoopInstructionLoadDTO {
   blockActive: boolean;
   blockWait: number;
   actions: string;
+  instructionActive: boolean;
   parentId?: number;
   operation?: string;
   preComponent?: boolean;
@@ -23,6 +24,12 @@ export interface BlockLoopInstructionLoadDTO {
 // Define the message type for better type safety
 export interface Message {
   body: string;
+}
+
+export interface ComplexMessage {
+  parentNameWithId: string; // Format: "(parentId)parentName"
+  connectionLabel: string;  // "Connected to:"
+  actions: string;          // A string of actions, separated by commas
 }
 
 export interface UpdatedBlock {

@@ -9,21 +9,30 @@ export interface BlockLoopInstructionLoadDTO {
   blockId: number;
   blockOrderNumber: number;
   blockName: string;
+  blockActive: boolean;
+  blockWait: number;
   actions: string;
+  instructionActive: boolean;
   parentId?: number;
   operation?: string;
   preComponent?: boolean;
   exportFile?: string;
-  blockActive: boolean;
-  blockWait: number;
   refreshLoop?: boolean;
   loopOnly?: boolean;
 }
+
 
 // Define the message type for better type safety
 export interface Message {
   body: string;
 }
+
+export interface ComplexMessage {
+  parentNameWithId: string; // Format: "(parentId)parentName"
+  connectionLabel: string;  // "Connected to:"
+  actions: string;          // A string of actions, separated by commas
+}
+
 
 export interface UpdatedBlock {
   botJobId: number | null;  // Adjust the type based on actual data (use `null` if it's nullable)
@@ -51,239 +60,176 @@ export interface BotJobData {
 }
 
 const instructionsMockData2: BlockLoopInstructionLoadDTO[] = [
-  // {
-  //   "id": 1259,
-  //   "botJobId": 1002,
-  //   "botJobName": "FlatFox",
-  //   "instructionOrderNumber": 1,
-  //   "actions": "C",
-  //   "name": "termination",
-  //   "description": "loop desc",
-  //   "parentId": 0,
-  //   "blockId": 1050,
-  //   "blockOrderNumber": 1,
-  //   "blockName": "Termination",
-  //   "blockActive": true,
-  //   "blockWait": 3,
-  //   "refreshLoop": false
-  // },
-  // {
-  //   "id": 1098,
-  //   "botJobId": 1002,
-  //   "botJobName": "FlatFox",
-  //   "instructionOrderNumber": 2,
-  //   "actions": "H",
-  //   "name": "Wait 5second(s)",
-  //   "description": "Waiting action",
-  //   "operation": "",
-  //   "parentId": 0,
-  //   "blockId": 1050,
-  //   "blockOrderNumber": 1,
-  //   "blockName": "Termination",
-  //   "blockActive": true,
-  //   "blockWait": 3,
-  //   "refreshLoop": false
-  // },
-  // {
-  //   "id": 1263,
-  //   "botJobId": 1002,
-  //   "botJobName": "FlatFox",
-  //   "instructionOrderNumber": 1,
-  //   "actions": "C",
-  //   "name": "advertise",
-  //   "description": "loop desc",
-  //   "parentId": 0,
-  //   "blockId": 1053,
-  //   "blockOrderNumber": 2,
-  //   "blockName": "Advertise",
-  //   "blockActive": true,
-  //   "blockWait": 3,
-  //   "refreshLoop": false
-  // },
-  // {
-  //   "id": 1096,
-  //   "botJobId": 1002,
-  //   "botJobName": "FlatFox",
-  //   "instructionOrderNumber": 2,
-  //   "actions": "H",
-  //   "name": "Wait 5second(s)",
-  //   "description": "Waiting action",
-  //   "operation": "",
-  //   "parentId": 0,
-  //   "blockId": 1053,
-  //   "blockOrderNumber": 2,
-  //   "blockName": "Advertise",
-  //   "blockActive": true,
-  //   "blockWait": 3,
-  //   "refreshLoop": false
-  // },
-  // {
-  //   "id": 1264,
-  //   "botJobId": 1002,
-  //   "botJobName": "FlatFox",
-  //   "instructionOrderNumber": 3,
-  //   "actions": "C",
-  //   "name": "about us",
-  //   "description": "loop desc",
-  //   "parentId": 0,
-  //   "blockId": 1053,
-  //   "blockOrderNumber": 2,
-  //   "blockName": "Advertise",
-  //   "blockActive": true,
-  //   "blockWait": 3,
-  //   "refreshLoop": false
-  // },
-  // {
-  //   "id": 1194,
-  //   "botJobId": 1002,
-  //   "botJobName": "FlatFox",
-  //   "instructionOrderNumber": 1,
-  //   "actions": "IF",
-  //   "name": "IF",
-  //   "description": "IF",
-  //   "operation": "IF",
-  //   "parentId": 1194,
-  //   "blockId": 1051,
-  //   "blockOrderNumber": 3,
-  //   "blockName": "Search Field",
-  //   "blockActive": true,
-  //   "blockWait": 3,
-  //   "refreshLoop": false
-  // },
-  // {
-  //   "id": 1269,
-  //   "botJobId": 1002,
-  //   "botJobName": "FlatFox",
-  //   "instructionOrderNumber": 2,
-  //   "actions": "REFRESH",
-  //   "name": "Refresh",
-  //   "description": "Refresh",
-  //   "operation": "",
-  //   "parentId": 0,
-  //   "blockId": 1051,
-  //   "blockOrderNumber": 3,
-  //   "blockName": "Search Field",
-  //   "blockActive": true,
-  //   "blockWait": 3,
-  //   "refreshLoop": false
-  // },
-  // {
-  //   "id": 1265,
-  //   "botJobId": 1002,
-  //   "botJobName": "FlatFox",
-  //   "instructionOrderNumber": 3,
-  //   "actions": "I:city-name",
-  //   "name": "city-name",
-  //   "description": "loop desc",
-  //   "parentId": 0,
-  //   "blockId": 1051,
-  //   "blockOrderNumber": 3,
-  //   "blockName": "Search Field",
-  //   "blockActive": true,
-  //   "blockWait": 3,
-  //   "refreshLoop": true
-  // },
-  // {
-  //   "id": 1195,
-  //   "botJobId": 1002,
-  //   "botJobName": "FlatFox",
-  //   "instructionOrderNumber": 4,
-  //   "actions": "ELSE",
-  //   "name": "ELSE",
-  //   "description": "ELSE",
-  //   "operation": "ELSE",
-  //   "parentId": 1194,
-  //   "blockId": 1051,
-  //   "blockOrderNumber": 3,
-  //   "blockName": "Search Field",
-  //   "blockActive": true,
-  //   "blockWait": 3,
-  //   "refreshLoop": false
-  // },
-  // {
-  //   "id": 1268,
-  //   "botJobId": 1002,
-  //   "botJobName": "FlatFox",
-  //   "instructionOrderNumber": 5,
-  //   "actions": "LOOP",
-  //   "name": "Loop",
-  //   "description": "Loop",
-  //   "operation": "5",
-  //   "parentId": 1264,
-  //   "blockId": 1051,
-  //   "blockOrderNumber": 3,
-  //   "blockName": "Search Field",
-  //   "blockActive": true,
-  //   "blockWait": 3,
-  //   "refreshLoop": false
-  // },
-  // {
-  //   "id": 1266,
-  //   "botJobId": 1002,
-  //   "botJobName": "FlatFox",
-  //   "instructionOrderNumber": 6,
-  //   "actions": "GOTO",
-  //   "name": "GOTO",
-  //   "description": "GOTO",
-  //   "operation": "2# Advertise",
-  //   "parentId": 1053,
-  //   "blockId": 1051,
-  //   "blockOrderNumber": 3,
-  //   "blockName": "Search Field",
-  //   "blockActive": true,
-  //   "blockWait": 3,
-  //   "refreshLoop": false
-  // },
-  // {
-  //   "id": 1196,
-  //   "botJobId": 1002,
-  //   "botJobName": "FlatFox",
-  //   "instructionOrderNumber": 7,
-  //   "actions": "ENDIF",
-  //   "name": "ENDIF",
-  //   "description": "ENDIF",
-  //   "operation": "ENDIF",
-  //   "parentId": 1194,
-  //   "blockId": 1051,
-  //   "blockOrderNumber": 3,
-  //   "blockName": "Search Field",
-  //   "blockActive": true,
-  //   "blockWait": 3,
-  //   "refreshLoop": false
-  // },
-  // {
-  //   "id": 1267,
-  //   "botJobId": 1002,
-  //   "botJobName": "FlatFox",
-  //   "instructionOrderNumber": 8,
-  //   "actions": "REFRESH_LOOP",
-  //   "name": "Refresh Loop",
-  //   "description": "Refresh Loop",
-  //   "operation": "5:5",
-  //   "parentId": 1265,
-  //   "blockId": 1051,
-  //   "blockOrderNumber": 3,
-  //   "blockName": "Search Field",
-  //   "blockActive": true,
-  //   "blockWait": 3,
-  //   "refreshLoop": false
-  // },
-  // {
-  //   "id": 1097,
-  //   "botJobId": 1002,
-  //   "botJobName": "FlatFox",
-  //   "instructionOrderNumber": 9,
-  //   "actions": "C",
-  //   "name": "Home Flat Fox",
-  //   "description": "loop desc",
-  //   "parentId": 0,
-  //   "blockId": 1051,
-  //   "blockOrderNumber": 3,
-  //   "blockName": "Search Field",
-  //   "blockActive": true,
-  //   "blockWait": 3,
-  //   "refreshLoop": false
-  // }
+  {
+    "id": 1002,
+    "botJobId": 1001,
+    "botJobName": "FlatFox",
+    "instructionOrderNumber": 1,
+    "actions": "I:city-name",
+    "name": "city-name",
+    "description": "loop desc",
+    "parentId": 0,
+    "blockId": 1001,
+    "blockOrderNumber": 1,
+    "blockName": "Default Block",
+    "blockActive": true,
+    "instructionActive": true,
+    "blockWait": 3,
+    "loopOnly": true
+  },
+  {
+    "id": 1007,
+    "botJobId": 1001,
+    "botJobName": "FlatFox",
+    "instructionOrderNumber": 2,
+    "actions": "IF",
+    "name": "IF",
+    "description": "IF",
+    "operation": "IF",
+    "parentId": 1007,
+    "blockId": 1001,
+    "blockOrderNumber": 1,
+    "blockName": "Default Block",
+    "blockActive": true,
+    "instructionActive": true,
+    "blockWait": 3
+  },
+  {
+    "id": 1003,
+    "botJobId": 1001,
+    "botJobName": "FlatFox",
+    "instructionOrderNumber": 3,
+    "actions": "SET",
+    "name": "SetValue",
+    "description": "SetValue",
+    "operation": "city-name:Lugano",
+    "parentId": 1002,
+    "blockId": 1001,
+    "blockOrderNumber": 1,
+    "blockName": "Default Block",
+    "blockActive": true,
+    "instructionActive": true,
+    "blockWait": 3
+  },
+  {
+    "id": 1012,
+    "botJobId": 1001,
+    "botJobName": "FlatFox",
+    "instructionOrderNumber": 4,
+    "actions": "GET",
+    "name": "GetValue",
+    "description": "GetValue",
+    "operation": "city-name:$CITY-NAME",
+    "parentId": 1002,
+    "blockId": 1001,
+    "blockOrderNumber": 1,
+    "blockName": "Default Block",
+    "blockActive": true,
+    "instructionActive": true,
+    "blockWait": 3
+  },
+  {
+    "id": 1004,
+    "botJobId": 1001,
+    "botJobName": "FlatFox",
+    "instructionOrderNumber": 5,
+    "actions": "CK",
+    "name": "Check",
+    "description": "Check Value",
+    "operation": "$city-name:\u003d:Lugano",
+    "parentId": 1002,
+    "blockId": 1001,
+    "blockOrderNumber": 1,
+    "blockName": "Default Block",
+    "blockActive": true,
+    "instructionActive": true,
+    "blockWait": 3
+  },
+  {
+    "id": 1008,
+    "botJobId": 1001,
+    "botJobName": "FlatFox",
+    "instructionOrderNumber": 6,
+    "actions": "ELSE",
+    "name": "ELSE",
+    "description": "ELSE",
+    "operation": "ELSE",
+    "parentId": 1007,
+    "blockId": 1001,
+    "blockOrderNumber": 1,
+    "blockName": "Default Block",
+    "blockActive": true,
+    "instructionActive": true,
+    "blockWait": 3
+  },
+  {
+    "id": 1011,
+    "botJobId": 1001,
+    "botJobName": "FlatFox",
+    "instructionOrderNumber": 7,
+    "actions": "LOOP",
+    "name": "LOOP",
+    "description": "LOOP",
+    "operation": "5",
+    "parentId": 1002,
+    "blockId": 1001,
+    "blockOrderNumber": 1,
+    "blockName": "Default Block",
+    "blockActive": true,
+    "instructionActive": true,
+    "blockWait": 3
+  },
+  {
+    "id": 1010,
+    "botJobId": 1001,
+    "botJobName": "FlatFox",
+    "instructionOrderNumber": 8,
+    "actions": "H",
+    "name": "Wait 2second(s)",
+    "description": "Waiting action",
+    "operation": "",
+    "parentId": 0,
+    "blockId": 1001,
+    "blockOrderNumber": 1,
+    "blockName": "Default Block",
+    "blockActive": true,
+    "instructionActive": true,
+    "blockWait": 3
+  },
+  {
+    "id": 1009,
+    "botJobId": 1001,
+    "botJobName": "FlatFox",
+    "instructionOrderNumber": 9,
+    "actions": "ENDIF",
+    "name": "ENDIF",
+    "description": "ENDIF",
+    "operation": "ENDIF",
+    "parentId": 1007,
+    "blockId": 1001,
+    "blockOrderNumber": 1,
+    "blockName": "Default Block",
+    "blockActive": true,
+    "instructionActive": true,
+    "blockWait": 3
+  },
+  {
+    "id": 1001,
+    "botJobId": 1001,
+    "botJobName": "FlatFox",
+    "instructionOrderNumber": 10,
+    "actions": "P",
+    "name": "Screenshot Browser",
+    "description": "Screenshot Browser",
+    "operation": "",
+    "parentId": 0,
+    "blockId": 1001,
+    "blockOrderNumber": 1,
+    "blockName": "Default Block",
+    "blockActive": true,
+    "instructionActive": true,
+    "blockWait": 3
+  }
 ];
 
 export default instructionsMockData2;

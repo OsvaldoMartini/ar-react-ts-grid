@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Client, IMessage } from "@stomp/stompjs";
+import responseTestDTO from "./MessageTypes";
 
 interface BlockLoopInstructionLoadDTO {
   botJobId: number;
@@ -16,7 +17,7 @@ interface BlockLoopInstructionLoadDTO {
 const WebSocketComponent = () => {
   const [instructions, setInstructions] = useState<BlockLoopInstructionLoadDTO[]>([]);
   const [connected, setConnected] = useState(false);
-  const [messageToSend, setMessageToSend] = useState(""); // State to store the message to send
+  const [messageToSend, setMessageToSend] = useState(JSON.stringify(responseTestDTO)); // State to store the message to send
   const [receivedMessages, setReceivedMessages] = useState<string[]>([]); // State to store received messages
   const [client, setClient] = useState<Client | null>(null); // Store the stomp client
 
@@ -71,7 +72,7 @@ const WebSocketComponent = () => {
         body: messageToSend, // Send the message typed in the textbox
       });
       console.log("Sent message: ", messageToSend);
-      setMessageToSend(""); // Clear the input after sending
+      // setMessageToSend(""); // Clear the input after sending
     }
   };
 

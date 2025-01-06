@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client';
 import './index.css';
 import reportWebVitals from './reportWebVitals';
 import GridItem from './components/GridItem';
-import instructionsMockData, { botJobMockData } from './components/instructionsMockData3';
+import instructionsMockData, { botJobMockData } from './components/instructionsMockData';
 import Navigable from './components/Navigable';
 import NavigableBKP from './components/NavigableBKP';
 import ToggleActive from './components/ToggleActive';
@@ -15,6 +15,8 @@ import PageOne from './pages/PageOne';
 import About from './pages/About';
 import Home from './pages/Home';
 import Menu from './pages/Menu';
+import GridDrag from './components/GridDrag2';
+import MyComponent from './components/MyComponent';
 
 // import WebSocketComponent from './components/WebSocketComponent';
 
@@ -33,19 +35,21 @@ root.render(
   <React.StrictMode>
     {/* <ToggleActive items={["Londssson", "Manchester",]} /> */}
     {/* <GridItem data={[]} botJobData={botJobMockData} /> */}
-    {/* <GridItem data={instructionsMockData} botJobData={botJobMockData} /> */}
+    {/* <GridDrag data={instructionsMockData} botJobData={botJobMockData} /> */}
+    {/* <MyComponent /> */}
+    <GridItem data={instructionsMockData} botJobData={botJobMockData} />
     {/* <WebSocketComponent></WebSocketComponent> */}
     {/* <StompMessage /> */}
     {/* <Navigable dataHtml={dataHtml} /> */}
     {/* <NavigableBKP /> */}
-    <Router>
+    {/* <Router>
       <Menu />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/page1" element={<PageOne />} />
         <Route path="/about" element={<About />} />
       </Routes>
-    </Router>
+    </Router> */}
   </React.StrictMode>
 
 );

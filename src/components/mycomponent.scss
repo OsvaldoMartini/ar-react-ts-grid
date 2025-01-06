@@ -1,0 +1,26 @@
+.droppable {
+  padding: 10px;
+  background-color: #f4f4f4;
+  border-radius: 5px;
+  margin: 10px 0;
+}
+
+.draggable-item {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  background-color: #fff;
+  border: 1px solid #ccc;
+  margin-bottom: 10px;
+  border-radius: 5px;
+}
+
+.draggable-item img {
+  width: 50px;
+  height: 50px;
+  margin-right: 10px;
+}
+
+.quote-text p {
+  margin: 0;
+}
