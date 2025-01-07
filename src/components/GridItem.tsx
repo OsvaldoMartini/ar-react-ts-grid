@@ -1192,7 +1192,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
     if (instruction) {
 
-      const { isBetween } = isBetweenIfAndEndIf(instruction.instructionOrderNumber, instructions);
+      const isBetween = isBetweenIfAndEndIf(instruction.instructionOrderNumber, instructions);
 
       const botJobId = instruction.botJobId || null;
 
@@ -1290,7 +1290,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
     if (instruction) {
 
-      const { isBetween, parentId } = isBetweenIfAndEndIf(instruction.instructionOrderNumber, instructions);
+      const { isBetween, parentId } = isBetweenCondition(instruction.instructionOrderNumber, instructions);
 
       const botJobId = instruction.botJobId || null;
 
@@ -1356,7 +1356,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
     if (instruction) {
 
-      const { isBetween } = isBetweenIfAndEndIf(instruction.instructionOrderNumber, instructions);
+      const isBetween = isBetweenIfAndEndIf(instruction.instructionOrderNumber, instructions);
 
       const botJobId = instruction.botJobId || null;
 
@@ -1478,7 +1478,25 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
   };
 
 
-  const isBetweenIfAndEndIf = (
+  const isBetweenIfAndEndIf = (currentOrderNumber: number, instructions: BlockLoopInstructionLoadDTO[]) => {
+    let ifFound = false;
+
+    for (const instr of instructions) {
+      if (instr.actions === "IF") {
+        ifFound = true;
+      }
+      if (instr.instructionOrderNumber === currentOrderNumber && ifFound) {
+        return true; // The instruction is between IF and ENDIF
+      }
+      if (instr.actions === "ENDIF" && ifFound) {
+        ifFound = false; // Reset once ENDIF is encountered
+      }
+    }
+    return false;
+  }
+
+
+  const isBetweenCondition = (
     currentOrderNumber: number,
     instructions: BlockLoopInstructionLoadDTO[]
   ): { isBetween: boolean; parentId: number | null } => {
@@ -2793,8 +2811,8 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
                         />
                       </div>
                     ) : (
-                      // <span className="block-name">{blockData.blockName}</span>
-                      <span className="block-name">{blockData.blockName} (Id:   {blockData.instructions[0].blockId})</span>
+                      <span className="block-name">{blockData.blockName}</span>
+                      //<span className="block-name">{blockData.blockName} (Id:   {blockData.instructions[0].blockId})</span>
                     )}
 
                     <span className="block-count">
@@ -2916,7 +2934,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
                                     </div>
                                   ) : (
                                     <span className="instruction-line">
-                                      <span>({instruction.id})</span>
+                                      {/* <span>({instruction.id})</span> */}
                                       {instruction.instructionActive ? (
                                         <img src={activeImage}
                                           alt="Active"
