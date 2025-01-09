@@ -881,9 +881,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     if (!botJobId) {
       setAlertImage(warningRedImage);
       setAlertClass('construction-image');
-      setAlertMessageHeader(
-        `Error Bot Job not found`
-      );
+      setAlertMessageHeader(`Error Bot Job not found`);
       setErrorFlag(true);
       setAlertMessageBody(`botJobId not found for blockId: ${blockId}`);
       return;
@@ -892,10 +890,14 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     // Determine the new blockActive value (toggle)
     const newBlockActive = !currentBlockActive;
 
-    // Update instructionsData with the new blockActive value
+    // Update instructionsData with the new blockActive and instructionActive values
     const updatedInstructions = instructionsData.map((instruction) => {
       if (instruction.blockId === blockId) {
-        return { ...instruction, blockActive: newBlockActive }; // Toggle the blockActive value
+        return {
+          ...instruction,
+          blockActive: newBlockActive, // Toggle the blockActive value
+          instructionActive: newBlockActive // Update instructionActive to match the new blockActive value
+        };
       }
       return instruction;
     });
@@ -1258,9 +1260,10 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     };
 
     const message = {
-      type: 'INSERT_AFTER',
+      type: 'INSERT_NEW',
       botJobId: botJob.id,
       botJobName: botJob.name,
+      blockOrderNumber: 1,
       blockId: -1,
       blockName: "Default Block",
       updatedRows: [instructionDTO], // Wrap the instructionDTO in an array
@@ -1282,6 +1285,68 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     setOpenDropdown(null);
   };
 
+
+
+  const handleEditSpecialOper = (instructionId: number, instructions: BlockLoopInstructionLoadDTO[]) => {
+    // Find the instruction based on the instructionId
+    const instruction = instructions.find(instruction => instruction.id === instructionId);
+
+    if (instruction) {
+
+      const botJobId = instruction.botJobId || null;
+
+      // If the instruction is found, use its name for the alert message
+      // setErrorFlag(true);
+      // setAlertMessageBody(`Inserting step before instruction: ${instruction.name}`);
+
+
+      // Create the InstructionDTO object with necessary details
+      const instructionDTO = {
+        botJobId: botJobId,
+        instructionId: instruction.id,
+        blockId: instruction.blockId,
+        blockOrderNumber: instruction.blockOrderNumber,
+        instructionOrderNumber: instruction.instructionOrderNumber,
+        instructionName: instruction.name,
+        operation: instruction.operation,
+        actions: instruction.actions,
+        parentId: instruction.parentId
+      };
+
+      // WebSocket message for "INSERT_BEFORE" with the selected instruction's details
+      const message = {
+        type: "EDIT_OPERATION",
+        botJobId: botJobId,
+        blockId: instruction.blockId,
+        blockName: instruction.blockName,
+        updatedRows: [instructionDTO], // Wrap the instructionDTO in an array
+      };
+
+      // Send WebSocket message
+      if (client && connected) {
+        try {
+          client.publish({
+            destination: '/app/row/edit-operation', // Update based on your WebSocket endpoint configuration
+            body: JSON.stringify(message),
+          });
+
+          console.log('Sent insert after message:', message);
+        } catch (error) {
+          console.log('Error sending WebSocket message:', error);
+        }
+      }
+    } else {
+      setAlertImage(warningRedImage);
+      setAlertClass('construction-image');
+      setAlertMessageHeader(
+        `Error Instruction not found`
+      );
+      setErrorFlag(true);
+      setAlertMessageBody(`Instruction with ID ${instructionId} not found.`);
+    }
+
+    setOpenDropdown(null);
+  };
 
 
   const handleInsertElseIf = (instructionId: number, instructions: BlockLoopInstructionLoadDTO[]) => {
@@ -2358,7 +2423,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
           break;
         case "C":
           imageSrc = clickImage;
-          text = instruction.name;
+          text = `(${instruction.id})${instruction.name}`;
           imageClass = "click-image";
           break;
         case "H":
@@ -2413,7 +2478,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
           break;
         default:
           imageSrc = null; // No image for other types
-          text = instruction.id + "-" + instruction.name || null;
+          text = `(${instruction.id})${instruction.name}` || null;
           isActionBold = true; // Set bold for actions
       }
     }
@@ -2442,8 +2507,27 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
   };
 
 
-  const renderEditButton = (actionType: string, editImage: string, instruction: BlockLoopInstructionLoadDTO) => {
+
+  const editableSpecialOperations = (actionType: string) => {
+    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "PAUSE", "REFRESH", "LOOP", "REFRESH_LOOP"].includes(actionType)) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+
+  const allSpecialOperations = (actionType: string) => {
     if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "IF", "ELSEIF", "ELSE", "ENDIF", "PAUSE", "REFRESH", "LOOP", "REFRESH_LOOP"].includes(actionType)) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+
+  const renderEditButton = (actionType: string, editImage: string, instruction: BlockLoopInstructionLoadDTO) => {
+    if (allSpecialOperations(actionType)) {
       return <span className="edit-button-space">&nbsp;</span>; // Render a space or an empty element
     }
 
@@ -3047,6 +3131,21 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
                                           )
                                         }
 
+
+                                        {
+                                          (editableSpecialOperations(instruction.actions)) && (
+                                            <>
+                                              <div
+                                                onClick={() =>
+                                                  handleEditSpecialOper(instruction.id, blockData.instructions)
+                                                }
+                                              >
+                                                Edit Operation
+                                              </div>
+                                            </>
+                                          )
+                                        }
+
                                         {
                                           ((["IF", "ELSEIF"].includes(instruction.actions) ||
                                             isBetweenIfAndElseExcluded(instruction.instructionOrderNumber, blockData.instructions))) && (
@@ -3061,8 +3160,6 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
                                             </>
                                           )
                                         }
-
-
 
                                         <div
                                           onClick={() =>
