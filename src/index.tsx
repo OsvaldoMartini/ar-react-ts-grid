@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import reportWebVitals from './reportWebVitals';
 import GridItem from './components/GridItem';
-import instructionsMockData, { botJobMockData } from './components/instructionsMockData';
+import instructionsMockData, { botJobMockData } from './components/instructionsMockData4';
 import Navigable from './components/Navigable';
 import NavigableBKP from './components/NavigableBKP';
 import ToggleActive from './components/ToggleActive';
@@ -11,12 +11,12 @@ import WebSocketComponent from './components/WebSocketComponent';
 import StompMessage from './components/StompMessage';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 
-import PageOne from './pages/PageOne';
 import About from './pages/About';
 import Home from './pages/Home';
 import Menu from './pages/Menu';
 import GridDrag from './components/GridDrag2';
 import MyComponent from './components/MyComponent';
+import PageOne from './pages/PageOne';
 
 // import WebSocketComponent from './components/WebSocketComponent';
 
@@ -31,6 +31,10 @@ const root = ReactDOM.createRoot(
 );
 
 
+// Dynamically import the PageOne component from the remote MFE
+// const PageOne = lazy(() => import('pageoneMFE/PageOne')); // This will load the PageOne component from the MFE
+
+
 root.render(
   <React.StrictMode>
     {/* <ToggleActive items={["Londssson", "Manchester",]} /> */}
@@ -38,17 +42,19 @@ root.render(
     {/* <GridDrag data={instructionsMockData} botJobData={botJobMockData} /> */}
     {/* <MyComponent /> */}
     <GridItem data={instructionsMockData} botJobData={botJobMockData} />
-    {/* <WebSocketComponent></WebSocketComponent> */}
+    {/* <WebSocketComponent></WebSocketComponent>
     {/* <StompMessage /> */}
     {/* <Navigable dataHtml={dataHtml} /> */}
     {/* <NavigableBKP /> */}
     {/* <Router>
       <Menu />
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/page1" element={<PageOne />} />
-        <Route path="/about" element={<About />} />
-      </Routes>
+      <Suspense fallback={<div>Loading...</div>}>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/page1" element={<PageOne />} />
+          <Route path="/about" element={<About />} />
+        </Routes>
+      </Suspense>
     </Router> */}
   </React.StrictMode>
 
