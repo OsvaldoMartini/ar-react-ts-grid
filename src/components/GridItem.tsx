@@ -124,6 +124,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
   const [alertMessageBody, setAlertMessageBody] = useState<string | ComplexMessage[]>([]);
   const [alertMessageFooter, setAlertMessageFooter] = useState<string | null>(null);
   const [alertDismissed, setAlertDismissed] = useState(false);
+  const [reconnectAttempts, setReconnectAttempts] = useState(0); // Track attempts
 
   // Function to handle receiving data from JavaFX
   (window as any).receiveDataFromJava = function (jsonData: string, socketPort: number) {
@@ -589,84 +590,137 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     }
   }, [lastMessages]);
 
+
+  // WebSocket connection effect
   useEffect(() => {
-    if (errorFlag && !alertDismissed) return;
+    if (errorFlag && !alertDismissed) return; // Wait for modal to be dismissed
 
-    // Create a WebSocket connection
-    const ws = new WebSocket(`ws://localhost:${socketPort}/websocket`);
+    let ws: WebSocket | null = null;
+    let attempts = reconnectAttempts; // Use local variable for attempts
 
-    ws.onopen = () => {
-      console.log("WebSocket connected");
-      setConnected(true);
+    const createWebSocket = async () => {
+      try {
+        ws = new WebSocket(`ws://localhost:${socketPort}/websocket`);
 
-      // Send an initial subscription message or handshake if needed
-      const subscriptionMessage: WebSocketMessage = {
-        type: "echo",
-        body: "subscribe",
-      };
-      ws.send(JSON.stringify(subscriptionMessage));
-    };
+        ws.onopen = () => {
+          console.log("WebSocket connected");
+          setConnected(true);
+          setReconnectAttempts(0); // Reset attempts on successful connection
 
-    ws.onmessage = (event: MessageEvent) => {
-      console.log("WebSocket message received:", event.data);
+          // Close the alert modal when connected
+          setErrorFlag(false);
+          setAlertDismissed(true);
+          setAlertMessageHeader("");
+          setAlertMessageBody("");
 
-      let body = event.data;
-
-      // Remove null character if it exists
-      if (body.endsWith("\u0000")) {
-        body = body.slice(0, -1);
-      }
-
-      console.log("Processed message body:", body);
-
-      if (body) {
-        try {
-          // Parse the JSON message body
-          const parsedBody = JSON.parse(body);
-
-          // Update the ref and the state only when necessary
-          const updatedMessages = [...lastMessagesRef.current, parsedBody];
-          if (updatedMessages.length <= 5) {
-            setLastMessages(updatedMessages);
+          // Try to send the subscription message
+          try {
+            const subscriptionMessage = {
+              type: "echo",
+              body: "subscribe",
+            };
+            ws?.send(JSON.stringify(subscriptionMessage));
+          } catch (sendError) {
+            console.error("Failed to send subscription message:", sendError);
+            setAlertMessageHeader("WebSocket Error");
+            setErrorFlag(true);
+            setAlertMessageBody("Failed to send subscription message.");
           }
-          console.log("Message Received:", parsedBody);
-        } catch (e) {
-          // Handle non-JSON messages
-          console.warn("Non-JSON message received:", body);
+        };
 
-          const updatedMessages = [...lastMessagesRef.current, body];
-          if (updatedMessages.length <= 5) {
-            setLastMessages(updatedMessages);
+        ws.onmessage = (event: MessageEvent) => {
+          console.log("WebSocket message received:", event.data);
+          let body = event.data;
+
+          // Remove null character if it exists
+          if (body.endsWith("\u0000")) {
+            body = body.slice(0, -1);
           }
 
+          if (body) {
+            try {
+              const parsedBody = JSON.parse(body);
+              const updatedMessages = [...lastMessagesRef.current, parsedBody];
+              if (updatedMessages.length <= 5) {
+                setLastMessages(updatedMessages);
+              }
+
+              if (body.includes("cannot be processed")) {
+
+                const parsedObject = JSON.parse(body);
+                setAlertImage(warningRedImage);
+                setAlertMessageHeader("Action Error");
+                setErrorFlag(true);
+                setAlertMessageBody(parsedObject.body);
+                setAlertMessageFooter(parsedObject.footer);
+                setAlertClass('construction-image');
+              }
+
+            } catch (parseError) {
+              console.warn("Non-JSON message received:", body);
+              const updatedMessages = [...lastMessagesRef.current, body];
+              if (updatedMessages.length <= 5) {
+                setLastMessages(updatedMessages);
+              }
+              setAlertImage(warningRedImage);
+              setAlertMessageHeader("WebSocket Error");
+              setErrorFlag(true);
+              setAlertMessageBody(`WebSocket: ${body}`);
+            }
+          }
+        };
+
+        ws.onerror = (error: Event) => {
+          console.error("WebSocket error:", error);
+          setAlertImage(warningRedImage);
           setAlertMessageHeader("WebSocket Error");
           setErrorFlag(true);
-          setAlertMessageBody("WebSocket: " + body);
-        }
-      } else {
-        console.error("Empty message body received");
+          setAlertMessageBody(
+            `WebSocket connection failed. ${reconnectAttempts} - Attempt.`
+          );
+        };
+
+        ws.onclose = () => {
+          console.log("WebSocket connection closed");
+          setConnected(false);
+
+          if (attempts < 10) {
+            attempts++;
+            setReconnectAttempts(attempts);
+            setAlertImage(warningRedImage);
+            console.log(`Reconnecting attempt ${attempts}...`);
+            setAlertMessageBody(`${attempts} - Attempt to reconnect.`);
+            createWebSocket(); // Retry connection
+          } else {
+            setAlertImage(warningRedImage);
+            setAlertMessageHeader("WebSocket Error");
+            setErrorFlag(true);
+            setAlertMessageBody("10 Attempts to Reconnect with the WebSocket.");
+            setAlertMessageFooter("Please restart the Web Scanner or contact the Administrator.");
+          }
+        };
+
+        setWebSocket(ws);
+      } catch (initError) {
+        console.error("Failed to initialize WebSocket:", initError);
+        setAlertImage(warningRedImage);
+        setAlertMessageHeader("WebSocket Initialization Error");
+        setErrorFlag(true);
+        setAlertMessageBody("Failed to initialize WebSocket connection.");
       }
     };
 
-    ws.onerror = (error: Event) => {
-      console.error("WebSocket error:", error);
-      setAlertMessageHeader("WebSocket Error");
-      setErrorFlag(true);
-      setAlertMessageBody("An error occurred with the WebSocket connection.");
-    };
+    createWebSocket();
 
-    ws.onclose = () => {
-      console.log("WebSocket connection closed");
-      setConnected(false);
-    };
-
-    setWebSocket(ws);
-
-    // Cleanup on component unmount
+    // Cleanup on component unmount or dependency change
     return () => {
-      console.log("Cleaning up WebSocket...");
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.close();
+      try {
+        console.log("Cleaning up WebSocket...");
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.close();
+        }
+      } catch (cleanupError) {
+        console.error("Error during WebSocket cleanup:", cleanupError);
       }
     };
   }, [socketPort, alertDismissed]);
@@ -796,7 +850,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
   };
 
   const handleClose = () => {
-    setAlertDismissed(true); // Trigger a re-execution of the effect
+    setAlertDismissed(true); // Trigger re-execution of the effect
     setErrorFlag(false); // Reset error flag
     setAlertMessageHeader('');
     setAlertMessageBody('');
@@ -1139,7 +1193,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     if (webSocket && connected) {
       const message = {
         type: 'BLOCK_MOVE',
-        updatedBlocks: updatedBlocks,
+        body: updatedBlocks,
       };
 
       try {
@@ -1507,7 +1561,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
       const message = {
         type: 'RESPONSE_BACK',
-        body: blockSplitDetails,
+        details: blockSplitDetails,
       };
 
       webSocket.send(JSON.stringify(message));
@@ -2004,7 +2058,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     if (webSocket && connected) {
       const message = {
         type: 'BLOCK_MOVE',
-        updatedBlocks: updatedBlocks,
+        body: updatedBlocks,
       };
 
       try {

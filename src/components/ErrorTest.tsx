@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import AlertModal from './AlertModal';
+import React, { useState, useEffect, useRef } from "react";
+import AlertModal from "./AlertModal";
 
 const ErrorTest: React.FC = () => {
   const [socketPort] = useState(8080); // Example port
@@ -10,8 +10,8 @@ const ErrorTest: React.FC = () => {
 
   const [alertDismissed, setAlertDismissed] = useState(false);
   const [errorFlag, setErrorFlag] = useState(false);
-  const [alertMessageHeader, setAlertMessageHeader] = useState('');
-  const [alertMessageBody, setAlertMessageBody] = useState('');
+  const [alertMessageHeader, setAlertMessageHeader] = useState("");
+  const [alertMessageBody, setAlertMessageBody] = useState("");
   const [reconnectAttempts, setReconnectAttempts] = useState(0); // Track attempts
 
   // WebSocket connection effect
@@ -30,6 +30,12 @@ const ErrorTest: React.FC = () => {
           setConnected(true);
           setReconnectAttempts(0); // Reset attempts on successful connection
 
+          // Close the alert modal when connected
+          setErrorFlag(false);
+          setAlertDismissed(true);
+          setAlertMessageHeader("");
+          setAlertMessageBody("");
+
           // Try to send the subscription message
           try {
             const subscriptionMessage = {
@@ -46,29 +52,59 @@ const ErrorTest: React.FC = () => {
         };
 
         ws.onmessage = (event: MessageEvent) => {
-          // ... (existing message handling logic)
+          console.log("WebSocket message received:", event.data);
+          let body = event.data;
+
+          // Remove null character if it exists
+          if (body.endsWith("\u0000")) {
+            body = body.slice(0, -1);
+          }
+
+          if (body) {
+            try {
+              const parsedBody = JSON.parse(body);
+              const updatedMessages = [...lastMessagesRef.current, parsedBody];
+              if (updatedMessages.length <= 5) {
+                setLastMessages(updatedMessages);
+              }
+            } catch (parseError) {
+              console.warn("Non-JSON message received:", body);
+              const updatedMessages = [...lastMessagesRef.current, body];
+              if (updatedMessages.length <= 5) {
+                setLastMessages(updatedMessages);
+              }
+              setAlertMessageHeader("WebSocket Error");
+              setErrorFlag(true);
+              setAlertMessageBody(`WebSocket: ${body}`);
+            }
+          }
         };
 
         ws.onerror = (error: Event) => {
           console.error("WebSocket error:", error);
           setAlertMessageHeader("WebSocket Error");
           setErrorFlag(true);
-          setAlertMessageBody("An error occurred with the WebSocket connection.");
+          setAlertMessageBody(
+            `WebSocket connection failed. ${reconnectAttempts} - Attempt.`
+          );
         };
 
         ws.onclose = () => {
           console.log("WebSocket connection closed");
           setConnected(false);
 
-          if (attempts < 10) { // Attempt reconnection up to 10 times
+          if (attempts < 10) {
             attempts++;
             setReconnectAttempts(attempts);
             console.log(`Reconnecting attempt ${attempts}...`);
+            setAlertMessageBody(`${attempts} - Attempt to reconnect.`);
             createWebSocket(); // Retry connection
           } else {
             setAlertMessageHeader("WebSocket Error");
             setErrorFlag(true);
-            setAlertMessageBody("Failed to connect to WebSocket. Please Contact the Administrator.");
+            setAlertMessageBody(
+              "10 Attempts to Reconnect with the WebSocket.\nPlease contact the Administrator."
+            );
           }
         };
 
@@ -99,8 +135,8 @@ const ErrorTest: React.FC = () => {
   const handleClose = () => {
     setAlertDismissed(true); // Trigger re-execution of the effect
     setErrorFlag(false); // Reset error flag
-    setAlertMessageHeader('');
-    setAlertMessageBody('');
+    setAlertMessageHeader("");
+    setAlertMessageBody("");
   };
 
   return (

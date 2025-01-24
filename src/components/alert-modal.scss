@@ -55,6 +55,20 @@
         align-items: flex-start;
         gap: 6px;  // Reduced gap between array items
       }
+
+      // No background color when error is true
+      &.error {
+        background-color: transparent; /* No background color for error */
+        color: #0D47A1; /* Dark blue text color */
+        font-weight: bold; /* Bold text */
+    }
+    
+      &.success {
+        background-color: transparent; /* No background color for error */
+        color: #0D47A1; /* Dark blue text color */
+        font-weight: bold; /* Bold text */
+      }
+
     }
 
     .alert-footer {
@@ -70,8 +84,9 @@
       }
     
       &.success {
-        background-color: #2196F3;  // Blue background for success
-        color: white;  // White text color for success
+        background-color: transparent; /* No background color for error */
+        color: #0D47A1; /* Dark blue text color */
+        font-weight: bold; /* Bold text */
       }
     }
 

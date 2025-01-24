@@ -31,7 +31,7 @@ const AlertModal: React.FC<AlertModalProps> = ({ header, body, extraMsg, onClose
         </div>
       );
     }
-    return <p className="alert-body">{body}</p>;
+    return <p className={`alert-body ${error ? 'error' : 'success'}`}>{body}</p>;
   };
 
   return (

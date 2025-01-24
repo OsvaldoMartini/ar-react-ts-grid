@@ -40,10 +40,10 @@ root.render(
     {/* <GridItem data={[]} botJobData={botJobMockData} /> */}
     {/* <GridDrag data={instructionsMockData} botJobData={botJobMockData} /> */}
     {/* <MyComponent /> */}
-    <ErrorTest></ErrorTest>
+    {/* <ErrorTest></ErrorTest> */}
     {/* |<WebSocketComponentClient2></WebSocketComponentClient2> */}
     {/* <WebSocketComponent></WebSocketComponent> */}
-    {/* <GridItem data={instructionsMockData} botJobData={botJobMockData} /> */}
+    <GridItem data={instructionsMockData} botJobData={botJobMockData} />
     {/* <WebSocketComponent></WebSocketComponent> */}
     {/* <StompMessage /> */}
     {/* <Navigable dataHtml={dataHtml} /> */}
