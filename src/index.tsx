@@ -3,11 +3,11 @@ import ReactDOM from 'react-dom/client';
 import './index.css';
 import reportWebVitals from './reportWebVitals';
 import GridItem from './components/GridItem';
-import instructionsMockData, { botJobMockData } from './components/instructionsMockData';
+import instructionsMockData, { botJobMockData } from './components/instructionsMockData5';
 import Navigable from './components/Navigable';
 import NavigableBKP from './components/NavigableBKP';
 import ToggleActive from './components/ToggleActive';
-import WebSocketComponent from './components/WebSocketComponent';
+import WebSocketComponent from './components/StompSocketComponent';
 import StompMessage from './components/StompMessage';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 
@@ -17,6 +17,9 @@ import Home from './pages/Home';
 import Menu from './pages/Menu';
 import GridDrag from './components/GridDrag2';
 import MyComponent from './components/MyComponent';
+import WebSocketComponentClient from './components/WebSocketClient';
+import WebSocketComponentClient2 from './components/WebSocketComponentClient2';
+import ErrorTest from './components/ErrorTest';
 
 // import WebSocketComponent from './components/WebSocketComponent';
 
@@ -37,7 +40,10 @@ root.render(
     {/* <GridItem data={[]} botJobData={botJobMockData} /> */}
     {/* <GridDrag data={instructionsMockData} botJobData={botJobMockData} /> */}
     {/* <MyComponent /> */}
-    <GridItem data={instructionsMockData} botJobData={botJobMockData} />
+    <ErrorTest></ErrorTest>
+    {/* |<WebSocketComponentClient2></WebSocketComponentClient2> */}
+    {/* <WebSocketComponent></WebSocketComponent> */}
+    {/* <GridItem data={instructionsMockData} botJobData={botJobMockData} /> */}
     {/* <WebSocketComponent></WebSocketComponent> */}
     {/* <StompMessage /> */}
     {/* <Navigable dataHtml={dataHtml} /> */}

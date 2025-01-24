@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from "react";
 
-const WebSocketComponent = () => {
+const WebSocketComponentClient = () => {
   const [socket, setSocket] = useState<WebSocket | null>(null);
   const [messages, setMessages] = useState<string[]>([]);
   const [name, setName] = useState("");
 
   useEffect(() => {
     // Connect to the WebSocket server
-    const ws = new WebSocket("ws://localhost:9090");
+    const ws = new WebSocket('ws://localhost:8080/websocket');
 
     ws.onopen = () => {
       console.log("Connected to WebSocket server");
@@ -68,4 +68,4 @@ const WebSocketComponent = () => {
   );
 };
 
-export default WebSocketComponent;
+export default WebSocketComponentClient;

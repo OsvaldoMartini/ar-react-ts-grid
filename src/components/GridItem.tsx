@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Client, IMessage } from "@stomp/stompjs";
-import { BlockLoopInstructionLoadDTO, BotJobData, ComplexMessage, UpdatedBlock } from './instructionsMockData';
+import { BlockLoopInstructionLoadDTO, BotJobData, ComplexMessage, UpdatedBlock, WebSocketMessage } from './instructionsMockData';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd'; // Import from react-beautiful-dnd
 import './griditem.scss';
 
@@ -105,9 +105,10 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
   const [socketPort, setSocketPort] = useState<number>(8080);
   const [groupedData, setGroupedData] = useState<{ [blockId: number]: { blockName: string; exportFile?: string; instructions: BlockLoopInstructionLoadDTO[] } }>({});
   const [isDataReordered, setIsDataReordered] = useState<boolean>(false);
-  const [client, setClient] = useState<Client | null>(null);
+  const [webSocket, setWebSocket] = useState<WebSocket | null>(null);
+  // const [client, setClient] = useState<Client | null>(null);
   const [connected, setConnected] = useState(false);
-  const [messages, setMessages] = useState<string[]>([]);
+  const [lastMessages, setLastMessages] = useState<any[]>([]);
   const [dropdownPosition, setDropdownPosition] = useState('below'); // Default to 'below'
   const [updatedBlocks, setUpdatedBlocks] = useState<UpdatedBlock[]>([]);
   const [editingInstructionId, setEditingInstructionId] = useState<number | null>(null);
@@ -122,6 +123,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
   const [alertMessageHeader, setAlertMessageHeader] = useState<string | null>(null);
   const [alertMessageBody, setAlertMessageBody] = useState<string | ComplexMessage[]>([]);
   const [alertMessageFooter, setAlertMessageFooter] = useState<string | null>(null);
+  const [alertDismissed, setAlertDismissed] = useState(false);
 
   // Function to handle receiving data from JavaFX
   (window as any).receiveDataFromJava = function (jsonData: string, socketPort: number) {
@@ -543,7 +545,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     setIsDataReordered(false); // To trigger reordering logic if needed
 
     // Send WebSocket message with the updated instructions
-    if (client && connected) {
+    if (webSocket && connected) {
       const updatedRows = updatedInstructionsData.map(instruction => ({
         blockId: instruction.blockId,
         instructionId: instruction.id,
@@ -558,10 +560,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
       };
 
       try {
-        client.publish({
-          destination: '/app/row/move',
-          body: JSON.stringify(message),
-        });
+        webSocket.send(JSON.stringify(message));
         console.log('Sent row move message:', message);
       } catch (error) {
         console.log('Error sending WebSocket message:', error);
@@ -578,83 +577,99 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
   }, [dropdownRef]);
 
 
+  // Use a ref to store messages and avoid unnecessary re-renders
+  const lastMessagesRef = useRef<any[]>([]);
+  lastMessagesRef.current = lastMessages;
 
   useEffect(() => {
-    // setErrorFlag(true);
-    // setAlertMessageBody("useEffect Socket " + socketPort);
-    // Create a STOMP client
-    //console.log("UseEffect -> socketPort");
-    const stompClient: Client = new Client({
-      brokerURL: `ws://localhost:${socketPort}/websocket`, // Your WebSocket URL
-      reconnectDelay: 5000, // Try reconnecting after 5 seconds if the connection fails
-      heartbeatIncoming: 4000, // Heartbeat configuration
-      heartbeatOutgoing: 4000,
-      debug: (str: string) => {
-        console.log("STOMP: " + str);
-      },
-    });
+    if (lastMessages.length > 0 && lastMessages.length < 5) {
+      console.log("Last 5 Messages: " + JSON.stringify(lastMessages));
+    } else if (lastMessages.length >= 5) {
+      setLastMessages([]); // Only clear messages if the array has 5 or more items
+    }
+  }, [lastMessages]);
 
-    // Handle connection success
-    stompClient.onConnect = (frame) => {
-      console.log("Connected: " + frame);
+  useEffect(() => {
+    if (errorFlag && !alertDismissed) return;
+
+    // Create a WebSocket connection
+    const ws = new WebSocket(`ws://localhost:${socketPort}/websocket`);
+
+    ws.onopen = () => {
+      console.log("WebSocket connected");
       setConnected(true);
 
-      stompClient.subscribe("/topic/messages", (message: IMessage) => {
-        console.log("Received STOMP message:", message);
-        let body = message.body;
+      // Send an initial subscription message or handshake if needed
+      const subscriptionMessage: WebSocketMessage = {
+        type: "echo",
+        body: "subscribe",
+      };
+      ws.send(JSON.stringify(subscriptionMessage));
+    };
 
-        // Remove null character if it exists
-        if (body.endsWith('\u0000')) {
-          body = body.slice(0, -1);
-        }
+    ws.onmessage = (event: MessageEvent) => {
+      console.log("WebSocket message received:", event.data);
 
-        console.log("Processed message body:", body);
+      let body = event.data;
 
-        if (body) {
-          try {
-            const parsedBody = JSON.parse(body); // Attempt JSON parsing
-            setMessages((prevMessages) => [...prevMessages, parsedBody]);
-            console.warn("Message Received:", messages);
-          } catch (e) {
-            console.warn("Non-JSON message received. Using raw body");
-            setMessages((prevMessages) => [...prevMessages, body]);
-            setAlertImage(warningRedImage);
-            setAlertClass('construction-image');
-            setAlertMessageHeader(
-              `Socket Error`
-            );
-            setErrorFlag(true);
-            setAlertMessageBody("Socket: " + messages);
+      // Remove null character if it exists
+      if (body.endsWith("\u0000")) {
+        body = body.slice(0, -1);
+      }
+
+      console.log("Processed message body:", body);
+
+      if (body) {
+        try {
+          // Parse the JSON message body
+          const parsedBody = JSON.parse(body);
+
+          // Update the ref and the state only when necessary
+          const updatedMessages = [...lastMessagesRef.current, parsedBody];
+          if (updatedMessages.length <= 5) {
+            setLastMessages(updatedMessages);
           }
-        } else {
-          console.error("Empty message body received");
+          console.log("Message Received:", parsedBody);
+        } catch (e) {
+          // Handle non-JSON messages
+          console.warn("Non-JSON message received:", body);
+
+          const updatedMessages = [...lastMessagesRef.current, body];
+          if (updatedMessages.length <= 5) {
+            setLastMessages(updatedMessages);
+          }
+
+          setAlertMessageHeader("WebSocket Error");
+          setErrorFlag(true);
+          setAlertMessageBody("WebSocket: " + body);
         }
-      });
-
+      } else {
+        console.error("Empty message body received");
+      }
     };
 
-    // Handle STOMP errors
-    stompClient.onStompError = (frame) => {
-      setAlertImage(warningRedImage);
-      setAlertClass('construction-image');
-      setAlertMessageHeader(
-        `Socket Error`
-      );
+    ws.onerror = (error: Event) => {
+      console.error("WebSocket error:", error);
+      setAlertMessageHeader("WebSocket Error");
       setErrorFlag(true);
-      setAlertMessageBody("Broker reported error: " + frame.headers["message"]);
-      setErrorFlag(true);
-      setAlertMessageBody("Additional details: " + frame.body);
+      setAlertMessageBody("An error occurred with the WebSocket connection.");
     };
 
-    // Activate the connection
-    stompClient.activate();
-    setClient(stompClient);
+    ws.onclose = () => {
+      console.log("WebSocket connection closed");
+      setConnected(false);
+    };
 
-    // Cleanup when component unmounts
+    setWebSocket(ws);
+
+    // Cleanup on component unmount
     return () => {
-      stompClient.deactivate();
+      console.log("Cleaning up WebSocket...");
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.close();
+      }
     };
-  }, [socketPort]);
+  }, [socketPort, alertDismissed]);
 
   useEffect(() => {
     //console.log("UseEffect -> editingInstructionId");
@@ -680,33 +695,23 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     }
   }, [connected]);
 
-  useEffect(() => {
-    //console.log("UseEffect -> messages");Splir
-    if (messages && messages.length > 0) {
-      console.log("Messages: " + messages);
-    }
-
-  }, [messages]);
 
   useEffect(() => {
     //console.log("UseEffect -> updatedBlocks, client, connected");
-    if (updatedBlocks.length > 0 && client && connected) {
+    if (updatedBlocks.length > 0 && webSocket && connected) {
       const message = {
         type: 'BLOCK_ORDER',
         updatedBlocks: updatedBlocks,
       };
 
       try {
-        client.publish({
-          destination: '/app/block/order', // WebSocket destination
-          body: JSON.stringify(message),
-        });
+        webSocket.send(JSON.stringify(message));
         console.log('Sent block order message:', message);
       } catch (error) {
         console.log('Error sending WebSocket message:', error);
       }
     }
-  }, [updatedBlocks, client, connected]); // Triggered when updatedBlocks or connected changes
+  }, [updatedBlocks, webSocket, connected]); // Triggered when updatedBlocks or connected changes
 
   useEffect(() => {
     //console.log("UseEffect -> instructionsData, isDataReordered");
@@ -756,11 +761,6 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
   }, [botJob]);
 
 
-
-
-
-
-
   // Add the event listener to detect clicks outside the dropdown
   useEffect(() => {
     //console.log("UseEffect -> handleClickOutside");
@@ -793,6 +793,13 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
   const handleEditBlock = (blockId: number, currentBlockName: string) => {
     setEditingBlockId(blockId);
     setBlockName(currentBlockName);
+  };
+
+  const handleClose = () => {
+    setAlertDismissed(true); // Trigger a re-execution of the effect
+    setErrorFlag(false); // Reset error flag
+    setAlertMessageHeader('');
+    setAlertMessageBody('');
   };
 
   const handleSaveBlockName = (blockId: number) => {
@@ -842,7 +849,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     setEditingBlockId(null);
 
     // Send WebSocket message for block name update
-    if (client && connected) {
+    if (webSocket && connected) {
       const message = {
         type: 'BLOCK_UPDATE',
         botJobId: botJobId,  // Include the botJobId in the message
@@ -851,10 +858,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
       };
 
       try {
-        client.publish({
-          destination: '/app/block/update',
-          body: JSON.stringify(message),
-        });
+        webSocket.send(JSON.stringify(message));
         console.log('Sent block name update message:', message);
       } catch (error) {
         console.log('Error sending WebSocket message:', error);
@@ -913,7 +917,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     setEditingBlockId(null);
 
     // Send WebSocket message for blockActive update
-    if (client && connected) {
+    if (webSocket && connected) {
       const message = {
         type: 'BLOCK_STATUS',
         botJobId: botJobId, // Include the botJobId in the message
@@ -922,10 +926,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
       };
 
       try {
-        client.publish({
-          destination: '/app/block/update',
-          body: JSON.stringify(message),
-        });
+        webSocket.send(JSON.stringify(message));
         console.log('Sent blockActive update message:', message);
       } catch (error) {
         console.log('Error sending WebSocket message:', error);
@@ -986,7 +987,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     setEditingBlockId(null);
 
     // Send WebSocket message for instructionActive update
-    if (client && connected) {
+    if (webSocket && connected) {
       const message = {
         type: 'INSTRUCTION_STATUS',
         botJobId: botJobId, // Include the botJobId in the message
@@ -998,10 +999,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
       };
 
       try {
-        client.publish({
-          destination: '/app/instruction/update',
-          body: JSON.stringify(message),
-        });
+        webSocket.send(JSON.stringify(message));
         console.log('Sent instructionActive update message:', message);
       } catch (error) {
         console.log('Error sending WebSocket message:', error);
@@ -1027,7 +1025,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     }
 
     // Send WebSocket message for block name update
-    if (client && connected) {
+    if (webSocket && connected) {
       const message = {
         type: 'BLOCK_EXCEL_FILE',
         botJobId: botJobId,  // Include the botJobId in the message
@@ -1037,10 +1035,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
       };
 
       try {
-        client.publish({
-          destination: '/app/block/excel',
-          body: JSON.stringify(message),
-        });
+        webSocket.send(JSON.stringify(message));
         console.log('Sent block name update message:', message);
       } catch (error) {
         console.log('Error sending WebSocket message:', error);
@@ -1141,17 +1136,14 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
 
     // Send WebSocket message with the block swap details
-    if (client && connected) {
+    if (webSocket && connected) {
       const message = {
         type: 'BLOCK_MOVE',
         updatedBlocks: updatedBlocks,
       };
 
       try {
-        client.publish({
-          destination: '/app/block/move', // Update based on your WebSocket endpoint configuration
-          body: JSON.stringify(message),
-        });
+        webSocket.send(JSON.stringify(message));
 
         console.log('Sent block move message:', message);
       } catch (error) {
@@ -1226,12 +1218,9 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
       };
 
       // Send WebSocket message
-      if (client && connected) {
+      if (webSocket && connected) {
         try {
-          client.publish({
-            destination: '/app/row/insert-before', // Update based on your WebSocket endpoint configuration
-            body: JSON.stringify(message),
-          });
+          webSocket.send(JSON.stringify(message));
 
           console.log('Sent insert before message:', message);
         } catch (error) {
@@ -1270,12 +1259,9 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     };
 
     // Send WebSocket message
-    if (client && connected) {
+    if (webSocket && connected) {
       try {
-        client.publish({
-          destination: '/app/row/insert-after', // Update based on your WebSocket endpoint configuration
-          body: JSON.stringify(message),
-        });
+        webSocket.send(JSON.stringify(message));
 
         console.log('Sent insert after message:', message);
       } catch (error) {
@@ -1323,12 +1309,10 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
       };
 
       // Send WebSocket message
-      if (client && connected) {
+      if (webSocket && connected) {
         try {
-          client.publish({
-            destination: '/app/row/edit-operation', // Update based on your WebSocket endpoint configuration
-            body: JSON.stringify(message),
-          });
+
+          webSocket.send(JSON.stringify(message));
 
           console.log('Sent insert after message:', message);
         } catch (error) {
@@ -1389,12 +1373,9 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
       };
 
       // Send WebSocket message
-      if (client && connected) {
+      if (webSocket && connected) {
         try {
-          client.publish({
-            destination: '/app/row/insert-after', // Update based on your WebSocket endpoint configuration
-            body: JSON.stringify(message),
-          });
+          webSocket.send(JSON.stringify(message));
 
           console.log('Sent insert after message:', message);
         } catch (error) {
@@ -1453,12 +1434,10 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
       };
 
       // Send WebSocket message
-      if (client && connected) {
+      if (webSocket && connected) {
         try {
-          client.publish({
-            destination: '/app/row/insert-after', // Update based on your WebSocket endpoint configuration
-            body: JSON.stringify(message),
-          });
+          webSocket.send(JSON.stringify(message),
+          );
 
           console.log('Sent insert after message:', message);
         } catch (error) {
@@ -1510,7 +1489,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     };
 
     // Send WebSocket message with block split details
-    if (client && connected) {
+    if (webSocket && connected) {
       const blockSplitDetails = {
         newBlock: {
           botJobId: botJobId,
@@ -1528,13 +1507,10 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
       const message = {
         type: 'RESPONSE_BACK',
-        details: blockSplitDetails,
+        body: blockSplitDetails,
       };
 
-      client.publish({
-        destination: '/app/block/component', // Adjust the WebSocket destination if necessary
-        body: JSON.stringify(message),
-      });
+      webSocket.send(JSON.stringify(message));
 
       console.log('Sent block split message:', message);
     }
@@ -1918,7 +1894,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     console.log("Split component created with new block:", newBlock);
 
     // Send WebSocket message with block split details, including newBlock
-    if (client && connected) {
+    if (webSocket && connected) {
       const blockSplitDetails = {
         originalBlock: {
           blockId: blockId,
@@ -1959,13 +1935,12 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
       const message = {
         type: 'BLOCKS_SPLITTER',
-        details: blockSplitDetails,
+        body: blockSplitDetails,
       };
 
-      client.publish({
-        destination: '/app/block/split', // Adjust the WebSocket destination if necessary
-        body: JSON.stringify(message),
-      });
+      webSocket.send(
+        JSON.stringify(message),
+      );
 
       console.log('Sent block split message:', message);
     }
@@ -2026,17 +2001,15 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
 
     // Send WebSocket message with the updated blocks list
-    if (client && connected) {
+    if (webSocket && connected) {
       const message = {
         type: 'BLOCK_MOVE',
         updatedBlocks: updatedBlocks,
       };
 
       try {
-        client.publish({
-          destination: '/app/block/move', // Update based on your WebSocket endpoint configuration
-          body: JSON.stringify(message),
-        });
+        webSocket.send(
+          JSON.stringify(message));
 
         console.log('Sent block move message:', message);
       } catch (error) {
@@ -2093,17 +2066,15 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
         setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
 
         // Send WebSocket message with the row swap details
-        if (client && connected) {
+        if (webSocket && connected) {
           const message = {
             type: 'ROW_MOVE',
             updatedRows: updatedRows,
           };
 
           try {
-            client.publish({
-              destination: '/app/row/move', // Update based on your WebSocket endpoint configuration
-              body: JSON.stringify(message),
-            });
+            webSocket.send(JSON.stringify(message),
+            );
 
             console.log('Sent row move message:', message);
           } catch (error) {
@@ -2160,17 +2131,15 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
         setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
 
         // Send WebSocket message with the row swap details
-        if (client && connected) {
+        if (webSocket && connected) {
           const message = {
             type: 'ROW_MOVE',
             updatedRows: updatedRows,
           };
 
           try {
-            client.publish({
-              destination: '/app/row/move', // Update based on your WebSocket endpoint configuration
-              body: JSON.stringify(message),
-            });
+            webSocket.send(JSON.stringify(message),
+            );
 
             console.log('Sent row move message:', message);
           } catch (error) {
@@ -2226,7 +2195,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     setIsDataReordered(false); // Allow for potential reordering logic
 
     // Send WebSocket message if connected
-    if (client && connected) {
+    if (webSocket && connected) {
       const message = {
         type: "DELETE_INSTRUCTION",
         instructionId,
@@ -2236,10 +2205,9 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
         blockId,
       };
 
-      client.publish({
-        destination: "/app/instruction/delete",
-        body: JSON.stringify(message),
-      });
+      webSocket.send(
+        JSON.stringify(message),
+      );
 
       console.log(`Sent delete instruction message for instruction ID: ${instructionId} in block ID: ${blockId}`);
     }
@@ -2300,7 +2268,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     });
 
     // Send WebSocket message
-    if (client && connected) {
+    if (webSocket && connected) {
       const message = {
         type: 'DELETE_BLOCK',
         blockId: blockId,
@@ -2308,10 +2276,9 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
         updatedBlocks: blocksToUpdate, // Include the list of updated blocks
       };
 
-      client.publish({
-        destination: '/app/block/delete',
-        body: JSON.stringify(message),
-      });
+      webSocket.send(
+        JSON.stringify(message),
+      );
 
       console.log(`Sent delete block message for Block ID: ${blockId} with updated blocks:`, message);
     }
@@ -2352,7 +2319,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
 
     // Send WebSocket message to inform about the rollback
-    if (client && connected) {
+    if (webSocket && connected) {
       const message = {
         type: 'BLOCK_ROLLBACK',
         botJobId: botJobId,
@@ -2366,10 +2333,9 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
         })),
       };
 
-      client.publish({
-        destination: '/app/block/rollback',
-        body: JSON.stringify(message),
-      });
+      webSocket.send(
+        JSON.stringify(message),
+      );
 
       console.log('Sent block rollback message:', message);
     }
@@ -2617,7 +2583,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     const updatedInstruction = updatedInstructions.find(instruction => instruction.id === instructionId);
 
     // Send WebSocket message with the updated instruction
-    if (client && connected && updatedInstruction) {
+    if (webSocket && connected && updatedInstruction) {
       const message = {
         type: 'ROW_UPDATE',
         botJobId: botJobId,
@@ -2635,10 +2601,8 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
       };
 
       try {
-        client.publish({
-          destination: '/app/instruction/update', // WebSocket destination
-          body: JSON.stringify(message),
-        });
+        webSocket.send(
+          JSON.stringify(message));
 
         console.log('Sent instruction update message:', message);
       } catch (error) {
@@ -2793,7 +2757,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
           header={alertMessageHeader || ''}
           body={alertMessageBody || ''}
           extraMsg={alertMessageFooter || ''}
-          onClose={closeAlert}
+          onClose={handleClose}
           imageSrc={alertImage}
           imageClass={alertClass}
           error={errorFlag}

@@ -22,9 +22,9 @@ export interface BlockLoopInstructionLoadDTO {
 }
 
 
-// Define the message type for better type safety
-export interface Message {
-  body: string;
+export interface WebSocketMessage {
+  type: string;
+  body: any;
 }
 
 export interface ComplexMessage {
