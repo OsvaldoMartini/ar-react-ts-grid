@@ -1,0 +1,33 @@
+.articlestatus {
+  padding: 2px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 14.85px;
+
+  &.new {
+    color: var(--color-text-link);
+    background: var(--color-base-blue-5);
+  }
+
+  &.draft {
+    color: black;
+    background: var(--color-base-gray-11);
+  }
+
+  &.inactive {  // Removed extra space
+    color: var(--color-text-error);
+    background: var(--color-bg-error-light);
+  }
+
+  &.active {
+    color: var(--color-text-success);
+    background: var(--color-bg-success-light);
+  }
+}
+
+.articleError {
+  text-align: center;
+  border: 1px solid var(--color-base-gray-11);
+  padding: 8px; // Fixed invalid padding
+  font-size: var(--size-font-5);
+}
