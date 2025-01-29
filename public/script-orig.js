@@ -65,19 +65,27 @@
     if (element === document.body) {
       return "/html/" + element.tagName.toLowerCase();
     }
-    var className = element.className
+
+    // Ensure className is a string; otherwise, set it as an empty string
+    var className = (
+      typeof element.className === "string" ? element.className : ""
+    )
       .split(" ")
       .filter(function (cls) {
-        return !/\\d/.test(cls);
+        return !/\d/.test(cls);
       })
       .join(".");
+
     var tagName = element.tagName.toLowerCase();
     var ix = 0;
     var siblings = element.parentNode.childNodes;
+
     for (var i = 0; i < siblings.length; i++) {
       var sibling = siblings[i];
+
       if (sibling === element) {
         var path = getMartiniCustomXPath(element.parentNode) + "/" + tagName;
+
         if (className) {
           path += '[contains(@class, "' + className + '")]';
         } else {
@@ -85,12 +93,15 @@
         }
         return path;
       }
+
       if (sibling.nodeType === 1 && sibling.tagName === element.tagName) {
         ix++;
       }
     }
+
     return "";
   }
+
   function showMartiniTooltip(event) {
     var elementBelowTooltip = document.elementFromPoint(
       event.clientX,
@@ -117,42 +128,125 @@
     event.preventDefault();
     event.stopPropagation();
     tooltip.style.display = "none";
+
     var elementBelowTooltip = document.elementFromPoint(
       event.clientX,
       event.clientY
     );
     tooltip.style.display = "block";
-    console.log(elementBelowTooltip);
-    var xpath = getMartiniXPath(elementBelowTooltip);
-    var absoluteXPath = getMartiniAbsoluteXPath(elementBelowTooltip);
-    var customXPath = getMartiniCustomXPath(elementBelowTooltip);
-    var iFrameXPath = "TO DO";
-    window.currentXPath = xpath;
-    window.currentAbsoluteXPath = absoluteXPath;
-    window.customXPath = customXPath;
-    window.iFrameXPath = iFrameXPath;
-    window.attribId = elementBelowTooltip.id || "";
-    window.attribName = elementBelowTooltip.name || "";
-    window.tagName = elementBelowTooltip.tagName.toLowerCase();
-    window.coords = elementBelowTooltip.getBoundingClientRect();
-    window.coords = window.coords.left + "," + window.coords.top;
-    console.log("tagName ", window.tagName);
-    console.log("xpath ", window.xpath);
-    console.log("absoluteXPath ", window.absoluteXPath);
-    console.log("currentXPath ", window.currentXPath);
-    console.log("customXPath ", window.customXPath);
-    console.log("iFrameXPath ", window.iFrameXPath);
+    cleanOldValues();
+
+    if (elementBelowTooltip.tagName.toLowerCase() === "iframe") {
+      // If the clicked element is an iframe, get the iframe's XPath
+      var iframeXPath = getMartiniXPath(elementBelowTooltip);
+      window.iFrameXPath = iframeXPath;
+
+      // Get the document inside the iframe
+      var iframeDocument =
+        elementBelowTooltip.contentDocument ||
+        elementBelowTooltip.contentWindow.document;
+
+      // Get all elements inside the iframe
+      var iframeElements = iframeDocument.querySelectorAll("*");
+
+      // Initialize an array to store the iframe elements' information
+      var iframeElementInfo = [];
+
+      // Loop through each element inside the iframe and log its XPath, coordinates, and handle input values
+      iframeElements.forEach(function (elementInsideIframe) {
+        // Get the XPath of the current element
+        var iframeElementXPath = getMartiniXPath(elementInsideIframe);
+
+        // Get the coordinates of the element inside the iframe
+        var elementCoordinates = elementInsideIframe.getBoundingClientRect();
+        var elementCoords = {
+          left: elementCoordinates.left,
+          top: elementCoordinates.top,
+          right: elementCoordinates.right,
+          bottom: elementCoordinates.bottom,
+          width: elementCoordinates.width,
+          height: elementCoordinates.height,
+        };
+
+        // Extract text content (or input value if applicable)
+        var someText = "";
+        if (
+          elementInsideIframe.tagName.toLowerCase() === "input" ||
+          elementInsideIframe.tagName.toLowerCase() === "textarea"
+        ) {
+          someText = elementInsideIframe.value || "";
+        } else {
+          someText = elementInsideIframe.textContent.trim() || "";
+        }
+
+        // Create an object to store the information about the element
+        var elementInfo = {
+          tagName: elementInsideIframe.tagName.toLowerCase(),
+          xpath: iframeElementXPath,
+          coordinates: elementCoords,
+          text: someText,
+        };
+
+        // Push the element's info to the iframeElementInfo array
+        iframeElementInfo.push(elementInfo);
+      });
+
+      // Return the list of iframe elements with their tagName, XPath, and coordinates
+      console.log("iFrameXPath", window.iFrameXPath);
+      console.log("List of iframe elements:", iframeElementInfo);
+      window.iframeElements = iframeElementInfo;
+    } else {
+      // If the clicked element is not an iframe, get the regular XPath
+      // Store attributes of the clicked element
+      window.attribId = elementBelowTooltip.id || "";
+      window.attribName = elementBelowTooltip.name || "";
+      window.tagName = elementBelowTooltip.tagName.toLowerCase();
+      window.coords = elementBelowTooltip.getBoundingClientRect();
+      window.coords = window.coords.left + "," + window.coords.top;
+
+      // Extract text content (or input value if applicable)
+      if (
+        elementBelowTooltip.tagName.toLowerCase() === "input" ||
+        elementBelowTooltip.tagName.toLowerCase() === "textarea"
+      ) {
+        window.text = elementBelowTooltip.value || "";
+      } else {
+        window.text = elementBelowTooltip.textContent.trim() || "";
+      }
+
+      var xpath = getMartiniXPath(elementBelowTooltip);
+      var absoluteXPath = getMartiniAbsoluteXPath(elementBelowTooltip);
+      var customXPath = getMartiniCustomXPath(elementBelowTooltip);
+
+      window.currentXPath = xpath;
+      window.currentAbsoluteXPath = absoluteXPath;
+      window.customXPath = customXPath;
+
+      console.log("tagName", window.tagName);
+      console.log("Current XPath:", window.currentXPath);
+      console.log("Absolute XPath:", absoluteXPath);
+      console.log("Custom XPath:", customXPath);
+      console.log("Extracted Text:", window.text);
+    }
   }
-  window.currentXPath = "";
-  window.currentAbsoluteXPath = "";
-  window.customXPath = "";
-  window.iFrameXPath = "";
-  window.attribId = "";
-  window.attribName = "";
-  window.tagName = "";
-  window.coords = "";
-  window.tagNameTemp = "";
-  window.coordsTemp = "";
+
+  function cleanOldValues() {
+    window.iFrameXPath = "";
+    window.iframeElements = [];
+    window.currentXPath = "";
+    window.currentAbsoluteXPath = "";
+    window.customXPath = "";
+    window.attribId = "";
+    window.attribName = "";
+    window.tagName = "";
+    window.coords = "";
+    window.tagNameTemp = "";
+    window.coordsTemp = "";
+    window.text = "";
+  }
+
+  cleanOldValues();
+
   document.addEventListener("mouseover", showMartiniTooltip);
   //                document.addEventListener('mouseout', hideMartiniTooltip);
   document.addEventListener("click", handleMartiniClick);

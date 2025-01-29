@@ -121,32 +121,60 @@
   function handleMartiniClick(event) {
     event.preventDefault();
     event.stopPropagation();
+
     tooltip.style.display = "none";
+
     var elementBelowTooltip = document.elementFromPoint(
       event.clientX,
       event.clientY
     );
-    tooltip.style.display = "block";
-    console.log(elementBelowTooltip);
-    if (elementBelowTooltip.tagName.toLowerCase() === "iframe") {
-      // If the clicked element is an iframe, get the iframe's XPath
-      var iframeXPath = getMartiniXPath(elementBelowTooltip);
-      window.iFrameXPath = iframeXPath;
-      console.log("Iframe XPath:", iframeXPath);
-    } else {
-      var xpath = getMartiniXPath(elementBelowTooltip);
-      var absoluteXPath = getMartiniAbsoluteXPath(elementBelowTooltip);
-      var customXPath = getMartiniCustomXPath(elementBelowTooltip);
-      window.currentXPath = xpath;
-      window.currentAbsoluteXPath = absoluteXPath;
-      window.customXPath = customXPath;
-      console.log("Element XPath:", xpath);
+
+    // Edge may return `null` in some cases, so retry with `msGetPointerCapture`
+    if (!elementBelowTooltip && event.pointerId) {
+      event.target.msGetPointerCapture(event.pointerId);
+      elementBelowTooltip = document.elementFromPoint(
+        event.clientX,
+        event.clientY
+      );
     }
+
+    tooltip.style.display = "block";
+    console.log("Clicked Element:", elementBelowTooltip);
+
+    if (!elementBelowTooltip) {
+      console.warn("No element detected under the pointer.");
+      return;
+    }
+
+    if (elementBelowTooltip.tagName.toLowerCase() === "iframe") {
+      try {
+        var iframeXPath = getMartiniXPath(elementBelowTooltip);
+        window.iFrameXPath = iframeXPath;
+        console.log("Iframe XPath:", iframeXPath);
+      } catch (error) {
+        console.error("Error processing iframe:", error);
+      }
+    } else {
+      try {
+        var xpath = getMartiniXPath(elementBelowTooltip);
+        var absoluteXPath = getMartiniAbsoluteXPath(elementBelowTooltip);
+        var customXPath = getMartiniCustomXPath(elementBelowTooltip);
+
+        window.currentXPath = xpath;
+        window.currentAbsoluteXPath = absoluteXPath;
+        window.customXPath = customXPath;
+
+        console.log("Element XPath:", xpath);
+      } catch (error) {
+        console.error("Error processing XPath:", error);
+      }
+    }
+
     window.attribId = elementBelowTooltip.id || "";
     window.attribName = elementBelowTooltip.name || "";
     window.tagName = elementBelowTooltip.tagName.toLowerCase();
-    window.coords = elementBelowTooltip.getBoundingClientRect();
-    window.coords = window.coords.left + "," + window.coords.top;
+    let coords = elementBelowTooltip.getBoundingClientRect();
+    window.coords = `${coords.left},${coords.top}`;
   }
 
   window.currentXPath = "";
