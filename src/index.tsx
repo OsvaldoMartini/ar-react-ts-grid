@@ -43,19 +43,19 @@ root.render(
     {/* <ErrorTest></ErrorTest> */}
     {/* |<WebSocketComponentClient2></WebSocketComponentClient2> */}
     {/* <WebSocketComponent></WebSocketComponent> */}
-    <GridItem data={instructionsMockData} botJobData={botJobMockData} />
+    {/* <GridItem data={instructionsMockData} botJobData={botJobMockData} /> */}
     {/* <WebSocketComponent></WebSocketComponent> */}
     {/* <StompMessage /> */}
     {/* <Navigable dataHtml={dataHtml} /> */}
     {/* <NavigableBKP /> */}
-    {/* <Router>
+    <Router>
       <Menu />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/page1" element={<PageOne />} />
         <Route path="/about" element={<About />} />
       </Routes>
-    </Router> */}
+    </Router>
   </React.StrictMode>
 
 );
