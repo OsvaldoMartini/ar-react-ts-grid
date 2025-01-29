@@ -1590,7 +1590,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
       };
 
       const message = {
-        type: 'RESPONSE_BACK',
+        type: "BLOCKS_COMPONENT",  //'RESPONSE_BACK' for tests,
         details: blockSplitDetails,
       };
 
