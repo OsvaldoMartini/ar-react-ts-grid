@@ -583,10 +583,12 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
   lastMessagesRef.current = lastMessages;
 
   useEffect(() => {
-    if (lastMessages.length > 0 && lastMessages.length < 5) {
-      console.log("Last 5 Messages: " + JSON.stringify(lastMessages));
-    } else if (lastMessages.length >= 5) {
-      setLastMessages([]); // Only clear messages if the array has 5 or more items
+    if (lastMessages.length > 0) {
+      console.log("Last Messages: " + JSON.stringify(lastMessages));
+    }
+
+    if (lastMessages.length > 5) {
+      setLastMessages((prevMessages) => prevMessages.slice(1)); // Remove the first message
     }
   }, [lastMessages]);
 
@@ -629,43 +631,71 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
         };
 
         ws.onmessage = (event: MessageEvent) => {
-          console.log("WebSocket message received:", event.data);
-          let body = event.data;
+          // console.log("WebSocket message received:", event.data);
+          let receivedMessage = event.data;
 
           // Remove null character if it exists
-          if (body.endsWith("\u0000")) {
-            body = body.slice(0, -1);
+          if (receivedMessage.endsWith("\u0000")) {
+            receivedMessage = receivedMessage.slice(0, -1);
           }
 
-          if (body) {
+          if (receivedMessage) {
             try {
-              const parsedBody = JSON.parse(body);
-              const updatedMessages = [...lastMessagesRef.current, parsedBody];
+              const parsedObject = JSON.parse(receivedMessage);
+              const updatedMessages = [...lastMessagesRef.current, parsedObject.body];
               if (updatedMessages.length <= 5) {
                 setLastMessages(updatedMessages);
               }
 
-              if (body.includes("cannot be processed")) {
+              if (parsedObject.body.includes("data_updated")) {
+                try {
 
-                const parsedObject = JSON.parse(body);
+
+                  // Ensure footerData is always an array if possible
+                  const footerData = typeof parsedObject.footer === "string"
+                    ? JSON.parse(parsedObject.footer)
+                    : parsedObject.footer;
+
+                  if (footerData && Array.isArray(footerData)) {
+                    setInstructionsData(footerData);
+                    setIsDataReordered(false);
+                  } else {
+                    console.error("Parsed footer is not an array:", footerData);
+                    setErrorFlag(true);
+                    setAlertMessageHeader("Data Error");
+                    setAlertMessageBody("Received data_updated event, but footer is not a valid array.");
+                  }
+                } catch (parseError) {
+                  console.error("Error parsing data_updated message:", parseError);
+                  setErrorFlag(true);
+                  setAlertMessageHeader("Parsing Error");
+                  setAlertMessageBody("Failed to parse data_updated message.");
+                }
+              }
+
+
+              if (parsedObject.body.includes("cannot be processed") || (parsedObject.footer && parsedObject.footer.includes("cannot be processed"))) {
+
                 setAlertImage(warningRedImage);
                 setAlertMessageHeader("Action Error");
                 setErrorFlag(true);
                 setAlertMessageBody(parsedObject.body);
-                setAlertMessageFooter(parsedObject.footer);
+                if (parsedObject.footer) {
+                  setAlertMessageFooter(parsedObject.footer);
+                }
                 setAlertClass('construction-image');
               }
 
             } catch (parseError) {
-              console.warn("Non-JSON message received:", body);
-              const updatedMessages = [...lastMessagesRef.current, body];
+              console.warn("Non-JSON message received:", receivedMessage);
+              const updatedMessages = [...lastMessagesRef.current, receivedMessage];
               if (updatedMessages.length <= 5) {
                 setLastMessages(updatedMessages);
               }
               setAlertImage(warningRedImage);
               setAlertMessageHeader("WebSocket Error");
               setErrorFlag(true);
-              setAlertMessageBody(`WebSocket: ${body}`);
+              setAlertMessageBody(`WebSocket: ${receivedMessage}`);
             }
           }
         };
@@ -1193,7 +1223,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     if (webSocket && connected) {
       const message = {
         type: 'BLOCK_MOVE',
-        body: updatedBlocks,
+        updatedBlocks: updatedBlocks,
       };
 
       try {
@@ -1989,7 +2019,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
       const message = {
         type: 'BLOCKS_SPLITTER',
-        body: blockSplitDetails,
+        details: blockSplitDetails,
       };
 
       webSocket.send(
@@ -2058,7 +2088,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     if (webSocket && connected) {
       const message = {
         type: 'BLOCK_MOVE',
-        body: updatedBlocks,
+        updatedBlocks: updatedBlocks,
       };
 
       try {
