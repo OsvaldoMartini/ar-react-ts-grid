@@ -134,8 +134,10 @@
     var coordsString = coordsTemp.left + "," + coordsTemp.top;
     var xPathTemp = getMartiniXPath(elementBelowTooltip);
 
+    var someText = getSomeText(tagNameTemp, elementBelowTooltip);
+
     // Store tagName and coordinates in the Map
-    elementInfoMap.set(tagNameTemp, `${coordsString};${xPathTemp}`);
+    elementInfoMap.set(tagNameTemp, `${coordsString};${xPathTemp};${someText}`);
 
     // Display the tooltip
     tooltip.textContent =
@@ -180,11 +182,11 @@
       // If the clicked element is an iframe, get the iframe's XPath
       var iframeXPath = getMartiniXPath(elementBelowTooltip);
 
-      allElementInfo.push(`iFrame:${iframeXPath};`);
+      allElementInfo.push(`clicked-iFrame:${iframeXPath};`);
 
       // Format the string and push it to the array
       elementInfoMap.forEach((value, key) => {
-        allElementInfo.push(`Coord:${key};${value};`);
+        allElementInfo.push(`clicked-Coord:${key};${value};`);
       });
 
       // Get the document inside the iframe
@@ -206,43 +208,13 @@
         // Convert the tagName to lowercase for comparison to avoid case sensitivity issues
         var tagName = elementInsideIframe.tagName.toLowerCase();
 
-        var someText = "";
-
         // Convert the tagName to lowercase for comparison to avoid case sensitivity issues
         var tagName = elementInsideIframe.tagName.toLowerCase();
 
-        // Check for input, textarea, select, or button elements
-        if (
-          tagName === "input" ||
-          tagName === "textarea" ||
-          tagName === "select" ||
-          tagName === "button"
-        ) {
-          // If the element is an input or textarea, get its value
-          someText =
-            elementInsideIframe.value.trim() ||
-            elementInsideIframe.placeholder.trim() ||
-            "";
-        } else if (tagName === "option") {
-          // Handle <option> elements specifically
-          someText = elementInsideIframe.textContent.trim() || "";
-        } else if (
-          tagName === "html" ||
-          tagName === "body" ||
-          tagName === "script"
-        ) {
-          // Handle <option> elements specifically
-          someText = "";
-        } else {
-          // For other elements, get textContent or innerText as a fallback for better compatibility
-          someText =
-            elementInsideIframe.textContent.trim() ||
-            elementInsideIframe.innerText.trim() ||
-            "";
-        }
+        var someText = getSomeText(tagName, elementInsideIframe);
 
         // Create a string with the element's information
-        var elementInfoString = `tagName:${elementInsideIframe.tagName.toLowerCase()};xpath:${iframeElementXPath};text:${someText}`;
+        var elementInfoString = `iFrame-Child:${elementInsideIframe.tagName.toLowerCase()};xpath:${iframeElementXPath};text:${someText}`;
 
         // Push the string with element's info to the allElementInfo array
         allElementInfo.push(elementInfoString);
@@ -287,17 +259,51 @@
       });
 
       // Create a tagName /  xpath / text
-      var elementInfoTags = `tagName:${tagName.toLowerCase()};xpath:${xpath};text:${someText}`;
+      var elementInfoTags = `clicked-tagName:${tagName.toLowerCase()};xpath:${xpath};text:${someText}`;
       allElementInfo.push(elementInfoTags);
       // Create a tagName /  xpath / text
-      var elementInfoExtra1 = `attribId:${attribId};attribName:${attribName};coords:${coords}`;
+      var elementInfoExtra1 = `clicked-attribId:${attribId};attribName:${attribName};coords:${coords}`;
       allElementInfo.push(elementInfoExtra1);
-      var elementInfoExtra2 = `absoluteXPath:${absoluteXPath};customXPath:${customXPath};`;
+      var elementInfoExtra2 = `clicked-absoluteXPath:${absoluteXPath};customXPath:${customXPath};`;
       allElementInfo.push(elementInfoExtra2);
 
       console.log("List of elements:", allElementInfo);
       window.allElementInfo = allElementInfo;
     }
+  }
+
+  function getSomeText(tagName, elementInsideIframe) {
+    var someText = "";
+    // Check for input, textarea, select, or button elements
+    if (
+      tagName === "input" ||
+      tagName === "textarea" ||
+      tagName === "select" ||
+      tagName === "button"
+    ) {
+      // If the element is an input or textarea, get its value
+      someText =
+        elementInsideIframe.value.trim() ||
+        elementInsideIframe.placeholder.trim() ||
+        "";
+    } else if (tagName === "option") {
+      // Handle <option> elements specifically
+      someText = elementInsideIframe.textContent.trim() || "";
+    } else if (
+      tagName === "html" ||
+      tagName === "body" ||
+      tagName === "script"
+    ) {
+      // Handle <option> elements specifically
+      someText = "";
+    } else {
+      // For other elements, get textContent or innerText as a fallback for better compatibility
+      someText =
+        elementInsideIframe.textContent.trim() ||
+        elementInsideIframe.innerText.trim() ||
+        "";
+    }
+    return someText;
   }
 
   function cleanOldValues() {
