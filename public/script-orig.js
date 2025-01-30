@@ -157,17 +157,6 @@
         // Get the XPath of the current element
         var iframeElementXPath = getMartiniXPath(elementInsideIframe);
 
-        // Get the coordinates of the element inside the iframe
-        var elementCoordinates = elementInsideIframe.getBoundingClientRect();
-        var elementCoords = {
-          left: elementCoordinates.left,
-          top: elementCoordinates.top,
-          right: elementCoordinates.right,
-          bottom: elementCoordinates.bottom,
-          width: elementCoordinates.width,
-          height: elementCoordinates.height,
-        };
-
         // Extract text content (or input value if applicable)
         var someText = "";
         if (
@@ -179,19 +168,14 @@
           someText = elementInsideIframe.textContent.trim() || "";
         }
 
-        // Create an object to store the information about the element
-        var elementInfo = {
-          tagName: elementInsideIframe.tagName.toLowerCase(),
-          xpath: iframeElementXPath,
-          coordinates: elementCoords,
-          text: someText,
-        };
+        // Create a string with the element's information
+        var elementInfoString = `tagName:${elementInsideIframe.tagName.toLowerCase()};xpath:${iframeElementXPath};text:${someText}`;
 
-        // Push the element's info to the iframeElementInfo array
-        iframeElementInfo.push(elementInfo);
+        // Push the string with element's info to the iframeElementInfo array
+        iframeElementInfo.push(elementInfoString);
       });
 
-      // Return the list of iframe elements with their tagName, XPath, and coordinates
+      // Return the list of iframe elements with their tagName, XPath, and text content
       console.log("iFrameXPath", window.iFrameXPath);
       console.log("List of iframe elements:", iframeElementInfo);
       window.iframeElements = iframeElementInfo;
