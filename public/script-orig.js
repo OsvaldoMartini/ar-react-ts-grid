@@ -283,12 +283,16 @@
     ) {
       // If the element is an input or textarea, get its value
       someText =
-        elementInsideIframe.value.trim() ||
-        elementInsideIframe.placeholder.trim() ||
+        (elementInsideIframe.value && elementInsideIframe.value.trim()) ||
+        (elementInsideIframe.placeholder &&
+          elementInsideIframe.placeholder.trim()) ||
         "";
     } else if (tagName === "option") {
       // Handle <option> elements specifically
-      someText = elementInsideIframe.textContent.trim() || "";
+      someText =
+        (elementInsideIframe.textContent &&
+          elementInsideIframe.textContent.trim()) ||
+        "";
     } else if (
       tagName === "html" ||
       tagName === "body" ||
@@ -299,8 +303,10 @@
     } else {
       // For other elements, get textContent or innerText as a fallback for better compatibility
       someText =
-        elementInsideIframe.textContent.trim() ||
-        elementInsideIframe.innerText.trim() ||
+        (elementInsideIframe.textContent &&
+          elementInsideIframe.textContent.trim()) ||
+        (elementInsideIframe.innerText &&
+          elementInsideIframe.innerText.trim()) ||
         "";
     }
     return someText;
