@@ -159,13 +159,43 @@
 
         // Extract text content (or input value if applicable)
         var someText = "";
+
+        // Convert the tagName to lowercase for comparison to avoid case sensitivity issues
+        var tagName = elementInsideIframe.tagName.toLowerCase();
+
+        var someText = "";
+
+        // Convert the tagName to lowercase for comparison to avoid case sensitivity issues
+        var tagName = elementInsideIframe.tagName.toLowerCase();
+
+        // Check for input, textarea, select, or button elements
         if (
-          elementInsideIframe.tagName.toLowerCase() === "input" ||
-          elementInsideIframe.tagName.toLowerCase() === "textarea"
+          tagName === "input" ||
+          tagName === "textarea" ||
+          tagName === "select" ||
+          tagName === "button"
         ) {
-          someText = elementInsideIframe.value || "";
-        } else {
+          // If the element is an input or textarea, get its value
+          someText =
+            elementInsideIframe.value.trim() ||
+            elementInsideIframe.placeholder.trim() ||
+            "";
+        } else if (tagName === "option") {
+          // Handle <option> elements specifically
           someText = elementInsideIframe.textContent.trim() || "";
+        } else if (
+          tagName === "html" ||
+          tagName === "body" ||
+          tagName === "script"
+        ) {
+          // Handle <option> elements specifically
+          someText = "";
+        } else {
+          // For other elements, get textContent or innerText as a fallback for better compatibility
+          someText =
+            elementInsideIframe.textContent.trim() ||
+            elementInsideIframe.innerText.trim() ||
+            "";
         }
 
         // Create a string with the element's information
