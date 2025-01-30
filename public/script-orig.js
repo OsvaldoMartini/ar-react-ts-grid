@@ -13,6 +13,10 @@
   tooltip.style.zIndex = "10000"; // Higher z-index
   tooltip.style.display = "none";
   document.body.appendChild(tooltip);
+
+  var elementInfoMap = new Map();
+  var allElementInfo = [];
+
   function getMartiniAbsoluteXPath(element) {
     if (element === document.body) {
       return "/html/" + element.tagName.toLowerCase();
@@ -102,16 +106,44 @@
     return "";
   }
 
+  var lastHoveredIsIframe = null; // Keep track of the last hovered element type
+
   function showMartiniTooltip(event) {
     var elementBelowTooltip = document.elementFromPoint(
       event.clientX,
       event.clientY
     );
-    window.tagNameTemp = elementBelowTooltip.tagName.toLowerCase();
-    window.coordsTemp = elementBelowTooltip.getBoundingClientRect();
-    window.coordsTemp = window.coordsTemp.left + "," + window.coordsTemp.top;
+    if (!elementBelowTooltip || elementBelowTooltip === tooltip) {
+      return;
+    }
+
+    var isIframe = elementBelowTooltip.tagName.toLowerCase() === "iframe";
+
+    // Reset only if switching between iframe and non-iframe elements
+    if (lastHoveredIsIframe !== isIframe) {
+      console.clear();
+      elementInfoMap.clear();
+      allElementInfo = [];
+    }
+
+    lastHoveredIsIframe = isIframe; // Update last hovered element type
+
+    // Get the tag name and coordinates of the element
+    var tagNameTemp = elementBelowTooltip.tagName.toLowerCase();
+    var coordsTemp = elementBelowTooltip.getBoundingClientRect();
+    var coordsString = coordsTemp.left + "," + coordsTemp.top;
+    var xPathTemp = getMartiniXPath(elementBelowTooltip);
+
+    // Store tagName and coordinates in the Map
+    elementInfoMap.set(tagNameTemp, `${coordsString};${xPathTemp}`);
+
+    // Display the tooltip
     tooltip.textContent =
-      window.tagNameTemp + "-Coordinates:(" + window.coordsTemp + ")";
+      (isIframe ? "[Iframe] " : "") +
+      tagNameTemp +
+      "-Coordinates:(" +
+      coordsString +
+      ")";
     var tooltipWidth = tooltip.offsetWidth;
     var tooltipHeight = tooltip.offsetHeight;
     var left = event.pageX - tooltipWidth / 2;
@@ -120,14 +152,20 @@
     tooltip.style.left = left + "px";
     tooltip.style.top = top + "px";
     tooltip.style.display = "block";
+
+    console.log("Element Info:", elementInfoMap);
   }
+
   function hideMartiniTooltip() {
     tooltip.style.display = "none";
   }
+
   function handleMartiniClick(event) {
     event.preventDefault();
     event.stopPropagation();
     tooltip.style.display = "none";
+
+    allElementInfo = [];
 
     var elementBelowTooltip = document.elementFromPoint(
       event.clientX,
@@ -137,9 +175,17 @@
     cleanOldValues();
 
     if (elementBelowTooltip.tagName.toLowerCase() === "iframe") {
+      // Initialize an array to store the iframe elements' information
+
       // If the clicked element is an iframe, get the iframe's XPath
       var iframeXPath = getMartiniXPath(elementBelowTooltip);
-      window.iFrameXPath = iframeXPath;
+
+      allElementInfo.push(`iFrame:${iframeXPath};`);
+
+      // Format the string and push it to the array
+      elementInfoMap.forEach((value, key) => {
+        allElementInfo.push(`Coord:${key};${value};`);
+      });
 
       // Get the document inside the iframe
       var iframeDocument =
@@ -148,9 +194,6 @@
 
       // Get all elements inside the iframe
       var iframeElements = iframeDocument.querySelectorAll("*");
-
-      // Initialize an array to store the iframe elements' information
-      var iframeElementInfo = [];
 
       // Loop through each element inside the iframe and log its XPath, coordinates, and handle input values
       iframeElements.forEach(function (elementInsideIframe) {
@@ -201,62 +244,64 @@
         // Create a string with the element's information
         var elementInfoString = `tagName:${elementInsideIframe.tagName.toLowerCase()};xpath:${iframeElementXPath};text:${someText}`;
 
-        // Push the string with element's info to the iframeElementInfo array
-        iframeElementInfo.push(elementInfoString);
+        // Push the string with element's info to the allElementInfo array
+        allElementInfo.push(elementInfoString);
       });
 
       // Return the list of iframe elements with their tagName, XPath, and text content
-      console.log("iFrameXPath", window.iFrameXPath);
-      console.log("List of iframe elements:", iframeElementInfo);
-      window.iframeElements = iframeElementInfo;
+      console.log("List of iframe elements:", allElementInfo);
+      window.allElementInfo = allElementInfo;
     } else {
+      // Format the string and push it to the array
+      elementInfoMap.forEach((value, key) => {
+        allElementInfo.push(`Coord:${key};${value};`);
+      });
+
       // If the clicked element is not an iframe, get the regular XPath
-      // Store attributes of the clicked element
-      window.attribId = elementBelowTooltip.id || "";
-      window.attribName = elementBelowTooltip.name || "";
-      window.tagName = elementBelowTooltip.tagName.toLowerCase();
-      window.coords = elementBelowTooltip.getBoundingClientRect();
-      window.coords = window.coords.left + "," + window.coords.top;
+      var tagName = elementBelowTooltip.tagName.toLowerCase();
+      var xpath = getMartiniXPath(elementBelowTooltip);
+
+      var absoluteXPath = getMartiniAbsoluteXPath(elementBelowTooltip);
+      var customXPath = getMartiniCustomXPath(elementBelowTooltip);
+
+      var attribId = elementBelowTooltip.id || "";
+      var attribName = elementBelowTooltip.name || "";
+      var coords = elementBelowTooltip.getBoundingClientRect();
+      coords = coords.left + "," + coords.top;
+
+      var someText = "";
 
       // Extract text content (or input value if applicable)
       if (
         elementBelowTooltip.tagName.toLowerCase() === "input" ||
         elementBelowTooltip.tagName.toLowerCase() === "textarea"
       ) {
-        window.text = elementBelowTooltip.value || "";
+        someText = elementBelowTooltip.value || "";
       } else {
-        window.text = elementBelowTooltip.textContent.trim() || "";
+        someText = elementBelowTooltip.textContent.trim() || "";
       }
 
-      var xpath = getMartiniXPath(elementBelowTooltip);
-      var absoluteXPath = getMartiniAbsoluteXPath(elementBelowTooltip);
-      var customXPath = getMartiniCustomXPath(elementBelowTooltip);
+      // Format the string and push it to the array
+      elementInfoMap.forEach((value, key) => {
+        allElementInfo.push(`Coord:${key};${value};`);
+      });
 
-      window.currentXPath = xpath;
-      window.currentAbsoluteXPath = absoluteXPath;
-      window.customXPath = customXPath;
+      // Create a tagName /  xpath / text
+      var elementInfoTags = `tagName:${tagName.toLowerCase()};xpath:${xpath};text:${someText}`;
+      allElementInfo.push(elementInfoTags);
+      // Create a tagName /  xpath / text
+      var elementInfoExtra1 = `attribId:${attribId};attribName:${attribName};coords:${coords}`;
+      allElementInfo.push(elementInfoExtra1);
+      var elementInfoExtra2 = `absoluteXPath:${absoluteXPath};customXPath:${customXPath};`;
+      allElementInfo.push(elementInfoExtra2);
 
-      console.log("tagName", window.tagName);
-      console.log("Current XPath:", window.currentXPath);
-      console.log("Absolute XPath:", absoluteXPath);
-      console.log("Custom XPath:", customXPath);
-      console.log("Extracted Text:", window.text);
+      console.log("List of elements:", allElementInfo);
+      window.allElementInfo = allElementInfo;
     }
   }
 
   function cleanOldValues() {
-    window.iFrameXPath = "";
-    window.iframeElements = [];
-    window.currentXPath = "";
-    window.currentAbsoluteXPath = "";
-    window.customXPath = "";
-    window.attribId = "";
-    window.attribName = "";
-    window.tagName = "";
-    window.coords = "";
-    window.tagNameTemp = "";
-    window.coordsTemp = "";
-    window.text = "";
+    window.allElementInfo = [];
   }
 
   cleanOldValues();
