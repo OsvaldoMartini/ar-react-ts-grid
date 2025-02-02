@@ -1,4 +1,4 @@
-(function () {
+(function (targetOriginURL, trustedOriginURL) {
   var tooltip = document.createElement("div");
   tooltip.id = "Martini-Is-Awesome";
   tooltip.style.position = "absolute";
@@ -108,11 +108,15 @@
 
   var lastHoveredIsIframe = null; // Keep track of the last hovered element type
 
+  let lastHoveredElement = null; // Keep track of the previously hovered element
+
   function showMartiniTooltip(event) {
     var elementBelowTooltip = document.elementFromPoint(
       event.clientX,
       event.clientY
     );
+
+    // Do nothing if the hovered element is the tooltip itself
     if (!elementBelowTooltip || elementBelowTooltip === tooltip) {
       return;
     }
@@ -128,24 +132,37 @@
 
     lastHoveredIsIframe = isIframe; // Update last hovered element type
 
-    // Get the tag name and coordinates of the element
+    // Get the tag name of the element
     var tagNameTemp = elementBelowTooltip.tagName.toLowerCase();
-    var coordsTemp = elementBelowTooltip.getBoundingClientRect();
-    var coordsString = coordsTemp.left + "," + coordsTemp.top;
-    var xPathTemp = getMartiniXPath(elementBelowTooltip);
 
-    var someText = getSomeText(tagNameTemp, elementBelowTooltip);
+    // Get the text content of the element (if it has text)
+    var someText = elementBelowTooltip.textContent.trim();
+    if (someText === "") {
+      someText = "No text content";
+    }
 
-    // Store tagName and coordinates in the Map
-    elementInfoMap.set(tagNameTemp, `${coordsString};${xPathTemp};${someText}`);
+    // If it's an iframe, get the number of elements inside the iframe
+    var iframeDetails = "";
+    if (isIframe) {
+      var iframeDocument =
+        elementBelowTooltip.contentDocument ||
+        elementBelowTooltip.contentWindow.document;
+      var iframeElementsCount = iframeDocument
+        ? iframeDocument.body.getElementsByTagName("*").length
+        : 0;
+      iframeDetails = `Elements inside iframe: ${iframeElementsCount}`;
+    }
 
-    // Display the tooltip
+    // Store tagName and other details in the Map
+    elementInfoMap.set(tagNameTemp, `${someText}; ${iframeDetails}`);
+
+    // Display the tooltip with TagName and Text (and iframe details if applicable)
     tooltip.textContent =
       (isIframe ? "[Iframe] " : "") +
       tagNameTemp +
-      "-Coordinates:(" +
-      coordsString +
-      ")";
+      (isIframe ? ` - ${iframeDetails}` : "") +
+      (someText ? " - Text: " + someText : "");
+
     var tooltipWidth = tooltip.offsetWidth;
     var tooltipHeight = tooltip.offsetHeight;
     var left = event.pageX - tooltipWidth / 2;
@@ -154,6 +171,18 @@
     tooltip.style.left = left + "px";
     tooltip.style.top = top + "px";
     tooltip.style.display = "block";
+
+    // Highlight the hovered element
+    if (lastHoveredElement !== elementBelowTooltip) {
+      // Remove highlight from the previous element if any
+      if (lastHoveredElement) {
+        lastHoveredElement.style.outline = ""; // Remove the previous highlight
+      }
+      // Add a border to highlight the current element
+      elementBelowTooltip.style.outline = "3px solid red"; // Highlight the element
+
+      lastHoveredElement = elementBelowTooltip; // Update the last hovered element
+    }
 
     console.log("Element Info:", elementInfoMap);
   }
@@ -326,4 +355,11 @@
     //                    document.removeEventListener('mouseout', hideMartiniTooltip);
     document.removeEventListener("click", handleMartiniClick);
   };
-})();
+
+  window.postMessage({ type: "myMessage", data: "some data" }, targetOriginURL);
+
+  window.addEventListener("message", function (event) {
+    if (event.origin !== trustedOriginURL) return; // check the origin
+    console.log(event.data);
+  });
+})("http://localhost:3000/", "http://localhost:3000/");
