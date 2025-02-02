@@ -206,7 +206,7 @@
       : "No Text<br>";
 
     // Set the tooltip content with line breaks
-    tooltip.innerHTML = tooltipContent;
+    tooltip.innerHTML = tagNameTemp;
 
     // Position the tooltip near the mouse cursor
     var tooltipWidth = tooltip.offsetWidth;
@@ -364,6 +364,7 @@
       window.allElementInfo = allElementInfo;
 
       // Show the tooltip with the element details
+      // tooltip.innerHTML = `${tagName} <br> ${someText}`;
       tooltip.innerHTML = `${tagName} <br> ${someText}`;
       var tooltipWidth = tooltip.offsetWidth;
       var tooltipHeight = tooltip.offsetHeight;
@@ -487,16 +488,20 @@
     };
 
     // Extract text content directly from the element (in case it has no children)
-    let elementText = element.textContent.trim();
-    if (elementText) {
-      result.text.add(elementText); // Using .add() instead of .push() for Set
+    if (element.textContent) {
+      let elementText = element.textContent.trim();
+      if (elementText) {
+        result.text.add(elementText); // Using .add() instead of .push() for Set
+      }
     }
 
     // Extract label text from input placeholders and other form-related data
     element.querySelectorAll("label").forEach((label) => {
-      let labelText = label.textContent.trim();
-      if (labelText) {
-        result.labels.add(labelText); // Using .add() for Set to ensure uniqueness
+      if (label.textContent) {
+        let labelText = label.textContent.trim();
+        if (labelText) {
+          result.labels.add(labelText); // Using .add() for Set to ensure uniqueness
+        }
       }
 
       // Handle associated input fields (if the label has a 'for' attribute)
@@ -537,26 +542,32 @@
 
     textExtractors.forEach((tagName) => {
       element.querySelectorAll(tagName).forEach((childElement) => {
-        let elemText = childElement.textContent.trim();
-        if (elemText) {
-          result.text.add(elemText); // Using .add() for Set to ensure uniqueness
+        if (childElement.textContent) {
+          let elemText = childElement.textContent.trim();
+          if (elemText) {
+            result.text.add(elemText); // Using .add() for Set to ensure uniqueness
+          }
         }
       });
     });
 
     // Extract text from <a> tags (links)
     element.querySelectorAll("a").forEach((link) => {
-      let linkText = link.textContent.trim();
-      if (linkText) {
-        result.text.add(linkText); // Using .add() for Set to ensure uniqueness
+      if (link.textContent) {
+        let linkText = link.textContent.trim();
+        if (linkText) {
+          result.text.add(linkText); // Using .add() for Set to ensure uniqueness
+        }
       }
     });
 
     // Extract iframe titles and nested content
     element.querySelectorAll("iframe").forEach((iframe) => {
-      let title = iframe.getAttribute("title")?.trim();
-      if (title) {
-        result.titles.add(title); // Using .add() for Set to ensure uniqueness
+      if (iframe.getAttribute("title")) {
+        let title = iframe.getAttribute("title")?.trim();
+        if (title) {
+          result.titles.add(title); // Using .add() for Set to ensure uniqueness
+        }
       }
 
       try {
