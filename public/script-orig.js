@@ -119,8 +119,14 @@
       event.clientY
     );
 
-    // Do nothing if the hovered element is the tooltip itself
-    if (!elementBelowTooltip || elementBelowTooltip === tooltip) {
+    // Do nothing if the hovered element is the tooltip itself or an excluded tag (html, body, main)
+    if (
+      !elementBelowTooltip ||
+      elementBelowTooltip === tooltip ||
+      ["html", "body", "main"].includes(
+        elementBelowTooltip.tagName.toLowerCase()
+      )
+    ) {
       return;
     }
 
@@ -284,6 +290,12 @@
     } else {
       // If the clicked element is not an iframe, gather its regular information
       var tagName = elementBelowTooltip.tagName.toLowerCase();
+
+      // Avoid main, body, and html tags
+      if (["html", "body", "main"].includes(tagName)) {
+        return; // Don't proceed if it's one of these elements
+      }
+
       var xpath = getMartiniXPath(elementBelowTooltip);
       var absoluteXPath = getMartiniAbsoluteXPath(elementBelowTooltip);
       var customXPath = getMartiniCustomXPath(elementBelowTooltip);
@@ -414,5 +426,5 @@
     if (event.origin !== trustedOriginURL) return; // check the origin
     console.log(event.data);
   });
-})(arguments[0], arguments[1]);
-// })("http://localhost:3000/", "http://localhost:3000/");
+  // })(arguments[0], arguments[1]);
+})("http://localhost:3000/", "http://localhost:3000/");
