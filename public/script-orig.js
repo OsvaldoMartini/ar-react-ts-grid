@@ -480,60 +480,104 @@
   }
 
   function extractTextFromHTML(element) {
-    let result = {
-      titles: [],
-      text: [],
-      labels: [],
+    const result = {
+      text: new Set(), // Using Set to avoid duplicate text
+      labels: new Set(), // Using Set to avoid duplicate labels
+      titles: new Set(), // Using Set to avoid duplicate titles
     };
 
-    // If the input is a string, parse it as HTML
-    let doc;
-    if (typeof element === "string") {
-      const parser = new DOMParser();
-      doc = parser.parseFromString(element, "text/html");
-    } else {
-      doc = element;
+    // Extract text content directly from the element (in case it has no children)
+    let elementText = element.textContent.trim();
+    if (elementText) {
+      result.text.add(elementText); // Using .add() instead of .push() for Set
     }
 
-    // Extract h1, h2, h3, etc.
-    doc.querySelectorAll("h1, h2, h3, h4, h5, h6").forEach((h) => {
-      result.titles.push(h.textContent.trim());
-    });
+    // Extract label text from input placeholders and other form-related data
+    element.querySelectorAll("label").forEach((label) => {
+      let labelText = label.textContent.trim();
+      if (labelText) {
+        result.labels.add(labelText); // Using .add() for Set to ensure uniqueness
+      }
 
-    // Extract text from p elements
-    doc.querySelectorAll("p").forEach((p) => {
-      let textContent = p.textContent.trim();
-      if (textContent) {
-        result.text.push(textContent);
+      // Handle associated input fields (if the label has a 'for' attribute)
+      let forAttribute = label.getAttribute("for");
+      if (forAttribute) {
+        let associatedInput = element.querySelector(`#${forAttribute}`);
+        if (associatedInput) {
+          // Check if it's an input field or textarea and extract value or placeholder
+          let inputValue = associatedInput.value?.trim();
+          let inputPlaceholder = associatedInput.placeholder?.trim();
+          if (inputValue) {
+            result.text.add(inputValue); // Using .add() for Set to ensure uniqueness
+          } else if (inputPlaceholder) {
+            result.text.add(inputPlaceholder); // Fallback to placeholder
+          }
+        }
       }
     });
 
-    // Extract label text from input placeholders
-    doc.querySelectorAll("input[placeholder]").forEach((input) => {
-      result.labels.push(input.getAttribute("placeholder").trim());
+    // Extract text from common block and inline elements
+    const textExtractors = [
+      "p",
+      "h1",
+      "h2",
+      "h3",
+      "h4",
+      "h5",
+      "h6",
+      "li",
+      "span",
+      "div",
+      "strong",
+      "em",
+      "b",
+      "i",
+      "blockquote",
+    ];
+
+    textExtractors.forEach((tagName) => {
+      element.querySelectorAll(tagName).forEach((childElement) => {
+        let elemText = childElement.textContent.trim();
+        if (elemText) {
+          result.text.add(elemText); // Using .add() for Set to ensure uniqueness
+        }
+      });
+    });
+
+    // Extract text from <a> tags (links)
+    element.querySelectorAll("a").forEach((link) => {
+      let linkText = link.textContent.trim();
+      if (linkText) {
+        result.text.add(linkText); // Using .add() for Set to ensure uniqueness
+      }
     });
 
     // Extract iframe titles and nested content
-    doc.querySelectorAll("iframe").forEach((iframe) => {
+    element.querySelectorAll("iframe").forEach((iframe) => {
       let title = iframe.getAttribute("title")?.trim();
       if (title) {
-        result.titles.push(title);
+        result.titles.add(title); // Using .add() for Set to ensure uniqueness
       }
 
       try {
         let iframeDoc =
           iframe.contentDocument ||
           new DOMParser().parseFromString(iframe.srcdoc || "", "text/html");
-        let iframeContent = extractTextFromHTML(iframeDoc);
-        result.titles.push(...iframeContent.titles);
-        result.text.push(...iframeContent.text);
-        result.labels.push(...iframeContent.labels);
+        let iframeContent = extractTextFromHTML(iframeDoc); // Here we assume iframeDoc is an element.
+        iframeContent.titles.forEach((title) => result.titles.add(title));
+        iframeContent.text.forEach((text) => result.text.add(text));
+        iframeContent.labels.forEach((label) => result.labels.add(label));
       } catch (e) {
         console.warn("Could not access iframe content", e);
       }
     });
 
-    return result;
+    // Convert Sets to arrays before returning to maintain previous structure
+    return {
+      text: Array.from(result.text),
+      labels: Array.from(result.labels),
+      titles: Array.from(result.titles),
+    };
   }
 
   function cleanOldValues() {
