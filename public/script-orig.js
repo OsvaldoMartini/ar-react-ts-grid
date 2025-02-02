@@ -203,140 +203,154 @@
     event.stopPropagation();
     tooltip.style.display = "none";
 
-    if (iframeDocument !== null) {
-      // Format the iframe details to match the tooltip style
-      var iframeDetails = `Elements inside iframe: ${iframeElementsCount}`;
-
-      // Display the tooltip with the iframe details
-      tooltip.innerHTML = `[Iframe] <br> ${iframeDetails}`;
-
-      // Position the tooltip near the mouse cursor (same as in showMartiniTooltip)
-      var tooltipWidth = tooltip.offsetWidth;
-      var tooltipHeight = tooltip.offsetHeight;
-      var left = event.pageX - tooltipWidth / 2;
-      var top = event.pageY - tooltipHeight / 2;
-
-      tooltip.style.left = left + "px";
-      tooltip.style.top = top + "px";
-      tooltip.style.display = "block";
-    } else {
-      // Display a message indicating no iframe was hovered over
-      tooltip.innerHTML = "No iframe hovered.";
-
-      // Position the tooltip near the mouse cursor
-      var tooltipWidth = tooltip.offsetWidth;
-      var tooltipHeight = tooltip.offsetHeight;
-      var left = event.pageX - tooltipWidth / 2;
-      var top = event.pageY - tooltipHeight / 2;
-
-      tooltip.style.left = left + "px";
-      tooltip.style.top = top + "px";
-      tooltip.style.display = "block";
-    }
-
-    allElementInfo = [];
-
+    // Determine the element below the tooltip (mouse position)
     var elementBelowTooltip = document.elementFromPoint(
       event.clientX,
       event.clientY
     );
-    tooltip.style.display = "block";
-    cleanOldValues();
 
-    if (elementBelowTooltip.tagName.toLowerCase() === "iframe") {
-      // Initialize an array to store the iframe elements' information
+    // Hide the tooltip
+    tooltip.style.display = "none";
 
-      // If the clicked element is an iframe, get the iframe's XPath
-      var iframeXPath = getMartiniXPath(elementBelowTooltip);
-
-      allElementInfo.push(`clicked-iFrame:${iframeXPath};`);
-
-      // Format the string and push it to the array
-      elementInfoMap.forEach((value, key) => {
-        allElementInfo.push(`clicked-Coord:${key};${value};`);
-      });
-
+    // If the element below the tooltip is an iframe
+    if (
+      elementBelowTooltip &&
+      elementBelowTooltip.tagName.toLowerCase() === "iframe"
+    ) {
       // Get the document inside the iframe
       var iframeDocument =
         elementBelowTooltip.contentDocument ||
         elementBelowTooltip.contentWindow.document;
 
-      // Get all elements inside the iframe
-      var iframeElements = iframeDocument.querySelectorAll("*");
+      // If the iframe document is valid
+      if (iframeDocument) {
+        // Format the iframe details
+        var iframeDetails = `Elements inside iframe: ${
+          iframeDocument.body.getElementsByTagName("*").length
+        }`;
 
-      // Loop through each element inside the iframe and log its XPath, coordinates, and handle input values
-      iframeElements.forEach(function (elementInsideIframe) {
-        // Get the XPath of the current element
-        var iframeElementXPath = getMartiniXPath(elementInsideIframe);
+        // Display the tooltip with iframe details
+        tooltip.innerHTML = `[Iframe] <br> ${iframeDetails}`;
 
-        // Extract text content (or input value if applicable)
-        var someText = "";
+        // Position the tooltip near the mouse cursor
+        var tooltipWidth = tooltip.offsetWidth;
+        var tooltipHeight = tooltip.offsetHeight;
+        var left = event.pageX - tooltipWidth / 2;
+        var top = event.pageY - tooltipHeight / 2;
 
-        // Convert the tagName to lowercase for comparison to avoid case sensitivity issues
-        var tagName = elementInsideIframe.tagName.toLowerCase();
+        tooltip.style.left = left + "px";
+        tooltip.style.top = top + "px";
+        tooltip.style.display = "block";
 
-        // Convert the tagName to lowercase for comparison to avoid case sensitivity issues
-        var tagName = elementInsideIframe.tagName.toLowerCase();
+        // Initialize an array to store the iframe element information
+        allElementInfo = [];
 
-        var someText = getSomeText(tagName, elementInsideIframe);
+        // Get the XPath of the clicked iframe
+        var iframeXPath = getMartiniXPath(elementBelowTooltip);
+        allElementInfo.push(`clicked-iFrame:${iframeXPath};`);
 
-        // Create a string with the element's information
-        var elementInfoString = `iFrame-Child:${elementInsideIframe.tagName.toLowerCase()};xpath:${iframeElementXPath};text:${someText}`;
+        // Push additional element info (excluding "Coord" if necessary)
+        limitMapCharacters(elementInfoMap, "clicked-Coord");
 
-        // Push the string with element's info to the allElementInfo array
-        allElementInfo.push(elementInfoString);
-      });
+        // Get all elements inside the iframe and log their details
+        var iframeElements = iframeDocument.querySelectorAll("*");
+        iframeElements.forEach(function (elementInsideIframe) {
+          var iframeElementXPath = getMartiniXPath(elementInsideIframe);
+          var someText = getSomeText(
+            elementInsideIframe.tagName.toLowerCase(),
+            elementInsideIframe
+          );
 
-      // Return the list of iframe elements with their tagName, XPath, and text content
-      console.log("List of iframe elements:", allElementInfo);
-      window.allElementInfo = allElementInfo;
+          var elementInfoString = `iFrame-Child:${elementInsideIframe.tagName.toLowerCase()};xpath:${iframeElementXPath};text:${someText}`;
+          allElementInfo.push(elementInfoString);
+        });
+
+        // Log the list of iframe elements
+        console.log("List of iframe elements:", allElementInfo);
+        window.allElementInfo = allElementInfo;
+      } else {
+        tooltip.innerHTML = "No iframe document found.";
+
+        // Position the tooltip near the mouse cursor
+        var tooltipWidth = tooltip.offsetWidth;
+        var tooltipHeight = tooltip.offsetHeight;
+        var left = event.pageX - tooltipWidth / 2;
+        var top = event.pageY - tooltipHeight / 2;
+
+        tooltip.style.left = left + "px";
+        tooltip.style.top = top + "px";
+        tooltip.style.display = "block";
+      }
     } else {
-      // Format the string and push it to the array
-      elementInfoMap.forEach((value, key) => {
-        allElementInfo.push(`Coord:${key};${value};`);
-      });
-
-      // If the clicked element is not an iframe, get the regular XPath
+      // If the clicked element is not an iframe, gather its regular information
       var tagName = elementBelowTooltip.tagName.toLowerCase();
       var xpath = getMartiniXPath(elementBelowTooltip);
-
       var absoluteXPath = getMartiniAbsoluteXPath(elementBelowTooltip);
       var customXPath = getMartiniCustomXPath(elementBelowTooltip);
 
       var attribId = elementBelowTooltip.id || "";
       var attribName = elementBelowTooltip.name || "";
       var coords = elementBelowTooltip.getBoundingClientRect();
-      coords = coords.left + "," + coords.top;
+      coords = `${coords.left},${coords.top}`;
 
-      var someText = "";
-
-      // Extract text content (or input value if applicable)
+      var someText = elementBelowTooltip.textContent.trim() || "";
       if (
         elementBelowTooltip.tagName.toLowerCase() === "input" ||
         elementBelowTooltip.tagName.toLowerCase() === "textarea"
       ) {
         someText = elementBelowTooltip.value || "";
-      } else {
-        someText = elementBelowTooltip.textContent.trim() || "";
       }
 
-      // Format the string and push it to the array
-      elementInfoMap.forEach((value, key) => {
-        allElementInfo.push(`Coord:${key};${value};`);
-      });
+      // Format and push regular element information to the array
+      limitMapCharacters(elementInfoMap, "Coord");
 
-      // Create a tagName /  xpath / text
-      var elementInfoTags = `clicked-tagName:${tagName.toLowerCase()};xpath:${xpath};text:${someText}`;
+      var elementInfoTags = `clicked-tagName:${tagName};xpath:${xpath};text:${someText}`;
       allElementInfo.push(elementInfoTags);
-      // Create a tagName /  xpath / text
+
       var elementInfoExtra1 = `clicked-attribId:${attribId};attribName:${attribName};coords:${coords}`;
       allElementInfo.push(elementInfoExtra1);
+
       var elementInfoExtra2 = `clicked-absoluteXPath:${absoluteXPath};customXPath:${customXPath};`;
       allElementInfo.push(elementInfoExtra2);
 
       console.log("List of elements:", allElementInfo);
       window.allElementInfo = allElementInfo;
+
+      // Show the tooltip with the element details
+      tooltip.innerHTML = `${tagName} <br> ${someText}`;
+      var tooltipWidth = tooltip.offsetWidth;
+      var tooltipHeight = tooltip.offsetHeight;
+      var left = event.pageX - tooltipWidth / 2;
+      var top = event.pageY - tooltipHeight / 2;
+
+      tooltip.style.left = left + "px";
+      tooltip.style.top = top + "px";
+      tooltip.style.display = "block";
     }
+  }
+
+  function limitMapCharacters(elementInfoMap, coordText) {
+    elementInfoMap.forEach((value, key) => {
+      let modifiedValue = value;
+
+      // Check if the key is "html" or value length is greater than 400
+      if (key === "html" || value.length > 400) {
+        // Truncate the value to 150 characters and add "..."
+        if (value.length > 150) {
+          modifiedValue = value.substring(0, 150) + "...";
+        }
+
+        // If the length exceeds 400 characters, break the value into multiple lines
+        if (value.length > 400) {
+          const firstPart = value.substring(0, 150);
+          const secondPart = value.substring(150);
+          modifiedValue = `${firstPart}<br>...${secondPart}`;
+        }
+      }
+
+      // Push the formatted value and key to the array
+      allElementInfo.push(`${coordText}:${key};${modifiedValue};`);
+    });
   }
 
   function getSomeText(tagName, elementInsideIframe) {
@@ -394,10 +408,11 @@
     document.removeEventListener("click", handleMartiniClick);
   };
 
-  window.postMessage({ type: "myMessage", data: "some data" }, targetOriginURL);
+  // window.postMessage({ type: "myMessage", data: "some data" }, targetOriginURL);
 
   window.addEventListener("message", function (event) {
     if (event.origin !== trustedOriginURL) return; // check the origin
     console.log(event.data);
   });
-})("http://localhost:3000/", "http://localhost:3000/");
+})(arguments[0], arguments[1]);
+// })("http://localhost:3000/", "http://localhost:3000/");
