@@ -109,6 +109,9 @@
   var lastHoveredIsIframe = null; // Keep track of the last hovered element type
 
   let lastHoveredElement = null; // Keep track of the previously hovered element
+  // Declare global variables to store iframe details
+  var iframeDocument = null;
+  var iframeElementsCount = 0;
 
   function showMartiniTooltip(event) {
     var elementBelowTooltip = document.elementFromPoint(
@@ -144,10 +147,10 @@
     // If it's an iframe, get the number of elements inside the iframe
     var iframeDetails = "";
     if (isIframe) {
-      var iframeDocument =
+      iframeDocument =
         elementBelowTooltip.contentDocument ||
         elementBelowTooltip.contentWindow.document;
-      var iframeElementsCount = iframeDocument
+      iframeElementsCount = iframeDocument
         ? iframeDocument.body.getElementsByTagName("*").length
         : 0;
       iframeDetails = `Elements inside iframe: ${iframeElementsCount}`;
@@ -156,13 +159,17 @@
     // Store tagName and other details in the Map
     elementInfoMap.set(tagNameTemp, `${someText}; ${iframeDetails}`);
 
-    // Display the tooltip with TagName and Text (and iframe details if applicable)
-    tooltip.textContent =
-      (isIframe ? "[Iframe] " : "") +
-      tagNameTemp +
-      (isIframe ? ` - ${iframeDetails}` : "") +
-      (someText ? " - Text: " + someText : "");
+    // Format the tooltip content to make it more readable
+    var tooltipContent = "";
+    tooltipContent += isIframe ? "[Iframe] <br>" : "";
+    tooltipContent += `Tag Name: ${tagNameTemp}<br>`;
+    tooltipContent += isIframe ? `- ${iframeDetails}<br>` : "";
+    tooltipContent += someText ? `- Text: ${someText}<br>` : "No Text<br>";
 
+    // Set the tooltip content with line breaks
+    tooltip.innerHTML = tooltipContent;
+
+    // Position the tooltip near the mouse cursor
     var tooltipWidth = tooltip.offsetWidth;
     var tooltipHeight = tooltip.offsetHeight;
     var left = event.pageX - tooltipWidth / 2;
@@ -195,6 +202,37 @@
     event.preventDefault();
     event.stopPropagation();
     tooltip.style.display = "none";
+
+    if (iframeDocument !== null) {
+      // Format the iframe details to match the tooltip style
+      var iframeDetails = `Elements inside iframe: ${iframeElementsCount}`;
+
+      // Display the tooltip with the iframe details
+      tooltip.innerHTML = `[Iframe] <br> ${iframeDetails}`;
+
+      // Position the tooltip near the mouse cursor (same as in showMartiniTooltip)
+      var tooltipWidth = tooltip.offsetWidth;
+      var tooltipHeight = tooltip.offsetHeight;
+      var left = event.pageX - tooltipWidth / 2;
+      var top = event.pageY - tooltipHeight / 2;
+
+      tooltip.style.left = left + "px";
+      tooltip.style.top = top + "px";
+      tooltip.style.display = "block";
+    } else {
+      // Display a message indicating no iframe was hovered over
+      tooltip.innerHTML = "No iframe hovered.";
+
+      // Position the tooltip near the mouse cursor
+      var tooltipWidth = tooltip.offsetWidth;
+      var tooltipHeight = tooltip.offsetHeight;
+      var left = event.pageX - tooltipWidth / 2;
+      var top = event.pageY - tooltipHeight / 2;
+
+      tooltip.style.left = left + "px";
+      tooltip.style.top = top + "px";
+      tooltip.style.display = "block";
+    }
 
     allElementInfo = [];
 
