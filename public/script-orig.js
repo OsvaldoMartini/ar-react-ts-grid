@@ -419,20 +419,22 @@
     elementInfoMap.forEach((value, key) => {
       let modifiedValue = value;
 
-      // Check if the key is "html" or value length is greater than 400
-      if (key === "html" || value.length > 400) {
-        // Truncate the value to 150 characters and add "..."
-        if (value.length > 150) {
-          modifiedValue = value.substring(0, 150) + "...";
-        }
+      // TO DO  REDUCE ONLY THE TEXT FIELD
 
-        // If the length exceeds 400 characters, break the value into multiple lines
-        if (value.length > 400) {
-          const firstPart = value.substring(0, 150);
-          const secondPart = value.substring(150);
-          modifiedValue = `${firstPart}<br>...${secondPart}`;
-        }
-      }
+      // // Check if the key is "html" or value length is greater than 400
+      // if (key === "html" || value.length > 400) {
+      //   // Truncate the value to 150 characters and add "..."
+      //   if (value.length > 150) {
+      //     modifiedValue = value.substring(0, 150) + "...";
+      //   }
+
+      //   // If the length exceeds 400 characters, break the value into multiple lines
+      //   if (value.length > 400) {
+      //     const firstPart = value.substring(0, 150);
+      //     const secondPart = value.substring(150);
+      //     modifiedValue = `${firstPart}<br>...${secondPart}`;
+      //   }
+      // }
 
       // Push the formatted value and key to the array
       allElementInfo.push(`${coordText}:${modifiedValue}`);
