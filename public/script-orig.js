@@ -379,12 +379,12 @@
 
   function getElementIdentity(element) {
     var xpath = getMartiniXPath(element);
-    var absoluteXPath = null;
+    var absoluteXPath = "";
     try {
       // console.log("element", element);
       absoluteXPath = getMartiniAbsoluteXPath(element);
     } catch (error) {}
-    var customXPath = null;
+    var customXPath = "";
     try {
       customXPath = getMartiniCustomXPath(element);
     } catch (error) {}
