@@ -230,7 +230,7 @@
       lastHoveredElement = elementBelowTooltip; // Update the last hovered element
     }
 
-    console.log("Element Info:", elementInfoMap);
+    // console.log("Element Info:", elementInfoMap);
   }
 
   function hideMartiniTooltip() {
@@ -381,7 +381,7 @@
     var xpath = getMartiniXPath(element);
     var absoluteXPath = null;
     try {
-      console.log("element", element);
+      // console.log("element", element);
       absoluteXPath = getMartiniAbsoluteXPath(element);
     } catch (error) {}
     var customXPath = null;
