@@ -237,204 +237,144 @@
     tooltip.style.display = "none";
   }
 
-  // function handleMartiniClick(event) {
-  //   event.preventDefault();
-  //   event.stopPropagation();
-  //   tooltip.style.display = "none";
-
-  //   // Determine the element below the tooltip (mouse position)
-  //   var elementBelowTooltip = document.elementFromPoint(
-  //     event.clientX,
-  //     event.clientY
-  //   );
-
-  //   // Hide the tooltip
-  //   tooltip.style.display = "none";
-
-  //   // If the element below the tooltip is an iframe
-  //   if (
-  //     elementBelowTooltip &&
-  //     elementBelowTooltip.tagName.toLowerCase() === "iframe"
-  //   ) {
-  //     // Get the document inside the iframe
-  //     var iframeDocument =
-  //       elementBelowTooltip.contentDocument ||
-  //       elementBelowTooltip.contentWindow.document;
-
-  //     // If the iframe document is valid
-  //     if (iframeDocument) {
-  //       // Format the iframe details
-  //       var iframeDetails = `Elements inside iframe: ${
-  //         iframeDocument.body.getElementsByTagName("*").length
-  //       }`;
-
-  //       // Display the tooltip with iframe details
-  //       tooltip.innerHTML = `[Iframe] <br> ${iframeDetails}`;
-
-  //       // Position the tooltip near the mouse cursor
-  //       var tooltipWidth = tooltip.offsetWidth;
-  //       var tooltipHeight = tooltip.offsetHeight;
-  //       var left = event.pageX - tooltipWidth / 2;
-  //       var top = event.pageY - tooltipHeight / 2;
-
-  //       tooltip.style.left = left + "px";
-  //       tooltip.style.top = top + "px";
-  //       tooltip.style.display = "block";
-
-  //       // Initialize an array to store the iframe element information
-  //       allElementInfo = [];
-
-  //       const {
-  //         xpath,
-  //         absoluteXPath,
-  //         customXPath,
-  //         attribId,
-  //         attribName,
-  //         coords,
-  //         someText,
-  //       } = getElementIdentity(elementBelowTooltip);
-
-  //       var elementInfoString = `${elementBelowTooltip.tagName.toLowerCase()};xpath:${xpath};text:${someText};attribId:${attribId};attribName:${attribName};coords:${coords};absoluteXPath:${absoluteXPath};customXPath:${customXPath};`;
-
-  //       allElementInfo.push(`clicked-iFrame:${elementInfoString};`);
-
-  //       // limitMapCharacters(elementInfoMap, "clicked-tagName");
-
-  //       // Get all elements inside the iframe and log their details
-  //       var iframeElements = iframeDocument.querySelectorAll("*");
-  //       iframeElements.forEach(function (elementInsideIframe) {
-  //         const {
-  //           xpath,
-  //           absoluteXPath,
-  //           customXPath,
-  //           attribId,
-  //           attribName,
-  //           coords,
-  //           someText,
-  //         } = getElementIdentity(elementInsideIframe);
-
-  //         var elementInfoString = `iFrame-Child:${elementInsideIframe.tagName.toLowerCase()};xpath:${xpath};text:${someText};attribId:${attribId};attribName:${attribName};coords:${coords};absoluteXPath:${absoluteXPath};customXPath:${customXPath};`;
-
-  //         allElementInfo.push(elementInfoString);
-  //       });
-
-  //       // Log the list of iframe elements
-  //       console.log("List of iframe elements:", allElementInfo);
-  //       window.allElementInfo = allElementInfo;
-  //     } else {
-  //       tooltip.innerHTML = "No iframe document found.";
-
-  //       // Position the tooltip near the mouse cursor
-  //       var tooltipWidth = tooltip.offsetWidth;
-  //       var tooltipHeight = tooltip.offsetHeight;
-  //       var left = event.pageX - tooltipWidth / 2;
-  //       var top = event.pageY - tooltipHeight / 2;
-
-  //       tooltip.style.left = left + "px";
-  //       tooltip.style.top = top + "px";
-  //       tooltip.style.display = "block";
-  //     }
-  //   } else {
-  //     // If the clicked element is not an iframe, gather its regular information
-  //     var tagName = elementBelowTooltip.tagName.toLowerCase();
-
-  //     // Avoid main, body, and html tags
-  //     if (["html", "body", "main"].includes(tagName)) {
-  //       return; // Don't proceed if it's one of these elements
-  //     }
-
-  //     // Format and push regular element information to the array
-  //     limitMapCharacters(elementInfoMap, "tagName-found");
-
-  //     const {
-  //       xpath,
-  //       absoluteXPath,
-  //       customXPath,
-  //       attribId,
-  //       attribName,
-  //       coords,
-  //       someText,
-  //     } = getElementIdentity(elementBelowTooltip);
-
-  //     var elementInfoString = `clicked:${elementBelowTooltip.tagName.toLowerCase()};xpath:${xpath};text:${someText};attribId:${attribId};attribName:${attribName};coords:${coords};absoluteXPath:${absoluteXPath};customXPath:${customXPath};`;
-
-  //     allElementInfo.push(elementInfoString);
-
-  //     console.log("List of elements:", allElementInfo);
-  //     window.allElementInfo = allElementInfo;
-
-  //     // Show the tooltip with the element details
-  //     // tooltip.innerHTML = `${tagName} <br> ${someText}`;
-  //     tooltip.innerHTML = `${tagName} <br> ${someText}`;
-  //     var tooltipWidth = tooltip.offsetWidth;
-  //     var tooltipHeight = tooltip.offsetHeight;
-  //     var left = event.pageX - tooltipWidth / 2;
-  //     var top = event.pageY - tooltipHeight / 2;
-
-  //     tooltip.style.left = left + "px";
-  //     tooltip.style.top = top + "px";
-  //     tooltip.style.display = "block";
-  //   }
-  // }
-
   function handleMartiniClick(event) {
     event.preventDefault();
     event.stopPropagation();
     tooltip.style.display = "none";
 
-    let elementBelow = document.elementFromPoint(event.clientX, event.clientY);
+    // Determine the element below the tooltip (mouse position)
+    var elementBelowTooltip = document.elementFromPoint(
+      event.clientX,
+      event.clientY
+    );
 
+    // Hide the tooltip
+    tooltip.style.display = "none";
+
+    // If the element below the tooltip is an iframe
     if (
-      !elementBelow ||
-      ["html", "body", "main"].includes(elementBelow.tagName.toLowerCase())
+      elementBelowTooltip &&
+      elementBelowTooltip.tagName.toLowerCase() === "iframe"
     ) {
-      return;
-    }
+      // Get the document inside the iframe
+      var iframeDocument =
+        elementBelowTooltip.contentDocument ||
+        elementBelowTooltip.contentWindow.document;
 
-    let allElementInfo = [];
+      // If the iframe document is valid
+      if (iframeDocument) {
+        // Format the iframe details
+        var iframeDetails = `Elements inside iframe: ${
+          iframeDocument.body.getElementsByTagName("*").length
+        }`;
 
-    // Function to display tooltip
-    function showTooltip(content) {
-      tooltip.innerHTML = content;
-      tooltip.style.left = `${event.pageX - tooltip.offsetWidth / 2}px`;
-      tooltip.style.top = `${event.pageY - tooltip.offsetHeight / 2}px`;
-      tooltip.style.display = "block";
-    }
+        // Display the tooltip with iframe details
+        tooltip.innerHTML = `[Iframe] <br> ${iframeDetails}`;
 
-    if (elementBelow.tagName.toLowerCase() === "iframe") {
-      let iframeDoc =
-        elementBelow.contentDocument || elementBelow.contentWindow.document;
+        // Position the tooltip near the mouse cursor
+        var tooltipWidth = tooltip.offsetWidth;
+        var tooltipHeight = tooltip.offsetHeight;
+        var left = event.pageX - tooltipWidth / 2;
+        var top = event.pageY - tooltipHeight / 2;
 
-      if (iframeDoc) {
-        let iframeElements = iframeDoc.querySelectorAll("*");
-        allElementInfo.push(
-          `clicked-iFrame:${formatElementInfo(elementBelow)}`
-        );
+        tooltip.style.left = left + "px";
+        tooltip.style.top = top + "px";
+        tooltip.style.display = "block";
 
-        iframeElements.forEach((element) => {
-          allElementInfo.push(`iFrame-Child:${formatElementInfo(element)}`);
+        // Initialize an array to store the iframe element information
+        allElementInfo = [];
+
+        const {
+          xpath,
+          absoluteXPath,
+          customXPath,
+          attribId,
+          attribName,
+          coords,
+          someText,
+        } = getElementIdentity(elementBelowTooltip);
+
+        var elementInfoString = `${elementBelowTooltip.tagName.toLowerCase()};xpath:${xpath};text:${someText};attribId:${attribId};attribName:${attribName};coords:${coords};absoluteXPath:${absoluteXPath};customXPath:${customXPath};`;
+
+        allElementInfo.push(`clicked-iFrame:${elementInfoString};`);
+
+        // limitMapCharacters(elementInfoMap, "clicked-tagName");
+
+        // Get all elements inside the iframe and log their details
+        var iframeElements = iframeDocument.querySelectorAll("*");
+        iframeElements.forEach(function (elementInsideIframe) {
+          const {
+            xpath,
+            absoluteXPath,
+            customXPath,
+            attribId,
+            attribName,
+            coords,
+            someText,
+          } = getElementIdentity(elementInsideIframe);
+
+          var elementInfoString = `iFrame-Child:${elementInsideIframe.tagName.toLowerCase()};xpath:${xpath};text:${someText};attribId:${attribId};attribName:${attribName};coords:${coords};absoluteXPath:${absoluteXPath};customXPath:${customXPath};`;
+
+          allElementInfo.push(elementInfoString);
         });
 
+        // Log the list of iframe elements
         console.log("List of iframe elements:", allElementInfo);
         window.allElementInfo = allElementInfo;
-        showTooltip(
-          `[Iframe] <br> Elements inside iframe: ${iframeElements.length}`
-        );
       } else {
-        showTooltip("No iframe document found.");
+        tooltip.innerHTML = "No iframe document found.";
+
+        // Position the tooltip near the mouse cursor
+        var tooltipWidth = tooltip.offsetWidth;
+        var tooltipHeight = tooltip.offsetHeight;
+        var left = event.pageX - tooltipWidth / 2;
+        var top = event.pageY - tooltipHeight / 2;
+
+        tooltip.style.left = left + "px";
+        tooltip.style.top = top + "px";
+        tooltip.style.display = "block";
       }
     } else {
-      allElementInfo.push(`clicked:${formatElementInfo(elementBelow)}`);
+      // If the clicked element is not an iframe, gather its regular information
+      var tagName = elementBelowTooltip.tagName.toLowerCase();
+
+      // Avoid main, body, and html tags
+      if (["html", "body", "main"].includes(tagName)) {
+        return; // Don't proceed if it's one of these elements
+      }
+
+      // Format and push regular element information to the array
+      limitMapCharacters(elementInfoMap, "tagName-found");
+
+      const {
+        xpath,
+        absoluteXPath,
+        customXPath,
+        attribId,
+        attribName,
+        coords,
+        someText,
+      } = getElementIdentity(elementBelowTooltip);
+
+      var elementInfoString = `clicked:${elementBelowTooltip.tagName.toLowerCase()};xpath:${xpath};text:${someText};attribId:${attribId};attribName:${attribName};coords:${coords};absoluteXPath:${absoluteXPath};customXPath:${customXPath};`;
+
+      allElementInfo.push(elementInfoString);
+
       console.log("List of elements:", allElementInfo);
       window.allElementInfo = allElementInfo;
-      showTooltip(
-        `${elementBelow.tagName.toLowerCase()} <br> ${
-          getElementIdentity(elementBelow).someText
-        }`
-      );
-    }
 
-    window.removeClickListener();
+      // Show the tooltip with the element details
+      // tooltip.innerHTML = `${tagName} <br> ${someText}`;
+      tooltip.innerHTML = `${tagName} <br> ${someText}`;
+      var tooltipWidth = tooltip.offsetWidth;
+      var tooltipHeight = tooltip.offsetHeight;
+      var left = event.pageX - tooltipWidth / 2;
+      var top = event.pageY - tooltipHeight / 2;
+
+      tooltip.style.left = left + "px";
+      tooltip.style.top = top + "px";
+      tooltip.style.display = "block";
+    }
   }
 
   function getElementIdentity(element) {
@@ -659,33 +599,18 @@
 
   cleanOldValues();
 
-  // Utility function to extract element information
-  function formatElementInfo(element) {
-    const {
-      xpath,
-      absoluteXPath,
-      customXPath,
-      attribId,
-      attribName,
-      coords,
-      someText,
-    } = getElementIdentity(element);
-    return `${element.tagName.toLowerCase()};xpath:${xpath};text:${someText};attribId:${attribId};attribName:${attribName};coords:${coords};absoluteXPath:${absoluteXPath};customXPath:${customXPath};`;
-  }
-
   document.addEventListener("mouseover", showMartiniTooltip);
   //                document.addEventListener('mouseout', hideMartiniTooltip);
   document.addEventListener("click", handleMartiniClick);
-
-  // Function to remove event listeners
   window.removeClickListener = function () {
     document.removeEventListener("mouseover", showMartiniTooltip);
+    //                    document.removeEventListener('mouseout', hideMartiniTooltip);
     document.removeEventListener("click", handleMartiniClick);
-    document.removeEventListener("messageMartini", postMessage);
   };
-  window.postMessage({ type: "myMessage", data: "some data" }, targetOriginURL);
 
-  window.addEventListener("messageMartini", function (event) {
+  // window.postMessage({ type: "myMessage", data: "some data" }, targetOriginURL);
+
+  window.addEventListener("message", function (event) {
     if (event.origin !== trustedOriginURL) return; // check the origin
     console.log(event.data);
   });
