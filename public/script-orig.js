@@ -2,7 +2,8 @@
   var tooltip = document.createElement("div");
   tooltip.id = "Martini-Is-Awesome";
   tooltip.style.position = "absolute";
-  tooltip.style.backgroundColor = "rgba(255, 165, 0, 0.5)"; // Slightly opaque light orange
+  // tooltip.style.backgroundColor = "rgba(255, 165, 0, 0.5)"; // Slightly opaque light orange
+  tooltip.style.backgroundColor = "rgba(0, 0, 0, 0)"; // Full transparency
   tooltip.style.border = "1px solid #ccc";
   tooltip.style.padding = "10px";
   tooltip.style.borderRadius = "5px";
@@ -375,6 +376,17 @@
       tooltip.style.top = top + "px";
       tooltip.style.display = "block";
     }
+
+    window.removeClickListener();
+
+    // Remove the tooltip from the page and delete the reference after 5 seconds
+    setTimeout(() => {
+      if (tooltip) {
+        tooltip.remove(); // Completely remove the tooltip from the DOM
+        tooltip = null; // Clear the reference to free memory
+        console.log("Tooltip completely removed.");
+      }
+    }, 5000);
   }
 
   function getElementIdentity(element) {
@@ -598,6 +610,21 @@
   }
 
   cleanOldValues();
+
+  window.removeClickListener = function () {
+    document.removeEventListener("mouseover", showMartiniTooltip);
+    //                    document.removeEventListener('mouseout', hideMartiniTooltip);
+    document.removeEventListener("click", handleMartiniClick);
+
+    // Remove the tooltip from the page and delete the reference after 5 seconds
+    setTimeout(() => {
+      if (tooltip) {
+        tooltip.remove(); // Completely remove the tooltip from the DOM
+        tooltip = null; // Clear the reference to free memory
+        console.log("Tooltip completely removed.");
+      }
+    }, 5000);
+  };
 
   document.addEventListener("mouseover", showMartiniTooltip);
   //                document.addEventListener('mouseout', hideMartiniTooltip);
