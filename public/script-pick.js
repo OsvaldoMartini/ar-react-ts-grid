@@ -377,8 +377,9 @@
       tooltip.style.display = "block";
     }
 
-    window.removeClickListener();
+    window.removePickListener();
 
+    // Remove the tooltip from the page and delete the reference after 5 seconds
     // Remove the tooltip from the page and delete the reference after 5 seconds
     setTimeout(() => {
       if (tooltip) {
@@ -386,7 +387,19 @@
         tooltip = null; // Clear the reference to free memory
         console.log("Tooltip completely removed.");
       }
-    }, 5000);
+
+      if (lastHoveredElement || elementBelowTooltip) {
+        // Remove highlight from the previous element if any
+        if (lastHoveredElement) {
+          lastHoveredElement.style.outline = ""; // Remove the previous highlight
+        }
+
+        // Remove highlight from the previous element if any
+        if (elementBelowTooltip) {
+          elementBelowTooltip.style.outline = ""; // Remove the previous highlight
+        }
+      }
+    }, 3000);
   }
 
   function getElementIdentity(element) {
@@ -611,10 +624,11 @@
 
   cleanOldValues();
 
-  window.removeClickListener = function () {
+  window.removePickListener = function () {
     document.removeEventListener("mouseover", showMartiniTooltip);
     //                    document.removeEventListener('mouseout', hideMartiniTooltip);
     document.removeEventListener("click", handleMartiniClick);
+    console.log("revertCloneInjections");
 
     // Remove the tooltip from the page and delete the reference after 5 seconds
     setTimeout(() => {
@@ -623,13 +637,25 @@
         tooltip = null; // Clear the reference to free memory
         console.log("Tooltip completely removed.");
       }
-    }, 5000);
+
+      if (lastHoveredElement || elementBelowTooltip) {
+        // Remove highlight from the previous element if any
+        if (lastHoveredElement) {
+          lastHoveredElement.style.outline = ""; // Remove the previous highlight
+        }
+
+        // Remove highlight from the previous element if any
+        if (elementBelowTooltip) {
+          elementBelowTooltip.style.outline = ""; // Remove the previous highlight
+        }
+      }
+    }, 3000);
   };
 
   document.addEventListener("mouseover", showMartiniTooltip);
   //                document.addEventListener('mouseout', hideMartiniTooltip);
   document.addEventListener("click", handleMartiniClick);
-  window.removeClickListener = function () {
+  window.removePickListener = function () {
     document.removeEventListener("mouseover", showMartiniTooltip);
     //                    document.removeEventListener('mouseout', hideMartiniTooltip);
     document.removeEventListener("click", handleMartiniClick);

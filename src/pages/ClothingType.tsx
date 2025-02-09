@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import "./clothing_type.scss";
+import { Card } from "@mui/material";
 
 interface ClothingType {
   id: string;
@@ -42,6 +43,10 @@ const ClothingType: React.FC = () => {
   return (
     <div className="app-container">
       <div className="dropdown-container">
+        <div className="column">
+          <Card />
+        </div>
+
         <div className="column">
           <h3>Clothes for Horses</h3>
           <select onChange={handleHorseClothingChange} value={selectedHorseClothing}>

@@ -3,6 +3,7 @@ import { Client, IMessage } from "@stomp/stompjs";
 import { BlockLoopInstructionLoadDTO, BotJobData, ComplexMessage, UpdatedBlock, WebSocketMessage } from './instructionsMockData';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd'; // Import from react-beautiful-dnd
 import './griditem.scss';
+import './card.scss';
 
 import setValueImage from '../assets/setValueBtn3.png';
 import getValueImage from '../assets/getValueBtn3.png';
@@ -39,6 +40,7 @@ import inactiveImage from '../assets/inactive2.png';
 
 
 import AlertModal from './AlertModal';
+import { productsConfig } from './productsConfig';
 
 
 interface GridItemProps {
@@ -624,9 +626,9 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
             ws?.send(JSON.stringify(subscriptionMessage));
           } catch (sendError) {
             console.error("Failed to send subscription message:", sendError);
-            setAlertMessageHeader("WebSocket Error");
-            setErrorFlag(true);
-            setAlertMessageBody("Failed to send subscription message.");
+            // setAlertMessageHeader("WebSocket Error");
+            // setErrorFlag(true);
+            // setAlertMessageBody("Failed to send subscription message.");
           }
         };
 
@@ -702,12 +704,12 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
         ws.onerror = (error: Event) => {
           console.error("WebSocket error:", error);
-          setAlertImage(warningRedImage);
-          setAlertMessageHeader("WebSocket Error");
-          setErrorFlag(true);
-          setAlertMessageBody(
-            `WebSocket connection failed. ${reconnectAttempts} - Attempt.`
-          );
+          // setAlertImage(warningRedImage);
+          // setAlertMessageHeader("WebSocket Error");
+          // setErrorFlag(true);
+          // setAlertMessageBody(
+          //   `WebSocket connection failed. ${reconnectAttempts} - Attempt.`
+          // );
         };
 
         ws.onclose = () => {
@@ -2836,7 +2838,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
   return (
     <div className="grid-container">
-      {alertMessageBody && alertMessageBody.length > 0 && (
+      {/* {alertMessageBody && alertMessageBody.length > 0 && (
         <AlertModal
           header={alertMessageHeader || ''}
           body={alertMessageBody || ''}
@@ -2846,7 +2848,40 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
           imageClass={alertClass}
           error={errorFlag}
         />
-      )}
+      )} */}
+
+
+      <div className="w3-row w3-padding w3-border w3-gray" style={{ margin: 'auto', height: '56vh' }}>
+        <h2 className="text-xl font-bold">Card Title</h2>
+        <div className="w3-card">
+          <p>w3-card</p>
+          <p>w3-card</p>
+          <p>w3-card</p>
+        </div>
+      </div>
+
+
+      {/* <div className="card-container">
+        {productsConfig.map((productConf) => (
+          <div className="card">
+            <div className="content">
+              <div className="contentBx">
+                <h2>{productConf.name}</h2>
+                <p>{productConf.longDescription}</p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div> */}
+
+      <div className="w-3/4 h-96 bg-white p-6 rounded-lg shadow-lg">
+        <h2 className="text-xl font-bold mb-4">Card Title</h2>
+        <div className="w-full h-3/4 border-2 border-solid border-[#FF1F7F]">
+          Hello
+        </div>
+      </div>
+
+
       <DragDropContext onDragEnd={onDragEnd} // Define the onDragEnd handler to update the state when the dragging stops
       >
         {
