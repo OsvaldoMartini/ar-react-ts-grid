@@ -44,7 +44,7 @@ root.render(
     {/* <ErrorTest></ErrorTest> */}
     {/* |<WebSocketComponentClient2></WebSocketComponentClient2> */}
     {/* <WebSocketComponent></WebSocketComponent> */}
-    <Card />
+    {/* <Card /> */}
     <GridItem data={instructionsMockData} botJobData={botJobMockData} />
     {/* <WebSocketComponent></WebSocketComponent> */}
     {/* <StompMessage /> */}
