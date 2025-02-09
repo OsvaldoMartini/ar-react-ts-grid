@@ -3,7 +3,6 @@ import { Client, IMessage } from "@stomp/stompjs";
 import { BlockLoopInstructionLoadDTO, BotJobData, ComplexMessage, UpdatedBlock, WebSocketMessage } from './instructionsMockData';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd'; // Import from react-beautiful-dnd
 import './griditem.scss';
-import './card.scss';
 
 import setValueImage from '../assets/setValueBtn3.png';
 import getValueImage from '../assets/getValueBtn3.png';
@@ -40,7 +39,6 @@ import inactiveImage from '../assets/inactive2.png';
 
 
 import AlertModal from './AlertModal';
-import { productsConfig } from './productsConfig';
 
 
 interface GridItemProps {
@@ -626,9 +624,9 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
             ws?.send(JSON.stringify(subscriptionMessage));
           } catch (sendError) {
             console.error("Failed to send subscription message:", sendError);
-            // setAlertMessageHeader("WebSocket Error");
-            // setErrorFlag(true);
-            // setAlertMessageBody("Failed to send subscription message.");
+            setAlertMessageHeader("WebSocket Error");
+            setErrorFlag(true);
+            setAlertMessageBody("Failed to send subscription message.");
           }
         };
 
@@ -704,12 +702,12 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
         ws.onerror = (error: Event) => {
           console.error("WebSocket error:", error);
-          // setAlertImage(warningRedImage);
-          // setAlertMessageHeader("WebSocket Error");
-          // setErrorFlag(true);
-          // setAlertMessageBody(
-          //   `WebSocket connection failed. ${reconnectAttempts} - Attempt.`
-          // );
+          setAlertImage(warningRedImage);
+          setAlertMessageHeader("WebSocket Error");
+          setErrorFlag(true);
+          setAlertMessageBody(
+            `WebSocket connection failed. ${reconnectAttempts} - Attempt.`
+          );
         };
 
         ws.onclose = () => {
@@ -1550,9 +1548,9 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     setAlertMessageFooter(null);
   };
 
-  const handleCreateComponent = (blockGroupIndex: number) => {
+  const handleCreateComponent = (blockGroupId: number) => {
     // Access groupedData, setGroupedData, instructionsData, and preComponent from the component's scope
-    const blockToSplit = groupedData[blockGroupIndex]; // Get the block directly by its blockId
+    const blockToSplit = groupedData[blockGroupId]; // Get the block directly by its blockId
 
     if (!blockToSplit) return; // Ensure the block exists
 
@@ -1562,13 +1560,13 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     const botJobId = blockToSplit.instructions[0]?.botJobId || null; // Retrieve botJobId from the first instruction
 
     const newBlock = {
-      id: blockId,
+      id: blockGroupId,
       blockName: `${blockToSplit.blockName}`, // Same name as the current block
       blockOrderNumber: blockOrderNumber, // Assign the new block order number
       botJobId: botJobId, // Preserve the botJobId in the new instructions
       instructions: blockToSplit.instructions.map((instruction, index) => ({
         ...instruction,
-        blockId: blockId, // Assign new block ID to the instructions
+        blockId: blockGroupId, // Assign new block ID to the instructions
         blockOrderNumber: -1, // Assign new block order number to the instructions
         instructionOrderNumber: index + 1, // Reassign instructionOrderNumber starting from 1 within the new block
       })),
@@ -1576,7 +1574,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
     // Send WebSocket message with block split details
     if (webSocket && connected) {
-      const blockSplitDetails = {
+      const blockComnponent = {
         newBlock: {
           botJobId: botJobId,
           blockId: newBlock.id,
@@ -1584,7 +1582,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
           blockOrderNumber: newBlock.blockOrderNumber,
           instructions: newBlock.instructions.map(instruction => ({
             instructionId: instruction.id,
-            blockId: blockId, // Use newBlockId here
+            blockId: newBlock.id,
             blockOrderNumber: newBlock.blockOrderNumber,
             instructionOrderNumber: instruction.instructionOrderNumber,
           })),
@@ -1593,12 +1591,12 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
       const message = {
         type: "BLOCKS_COMPONENT",  //'RESPONSE_BACK' for tests,
-        details: blockSplitDetails,
+        details: blockComnponent,
       };
 
       webSocket.send(JSON.stringify(message));
 
-      console.log('Sent block split message:', message);
+      console.log('Sent create component:', message);
     }
 
     setOpenDropdown(null);
@@ -2838,7 +2836,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
   return (
     <div className="grid-container">
-      {/* {alertMessageBody && alertMessageBody.length > 0 && (
+      {alertMessageBody && alertMessageBody.length > 0 && (
         <AlertModal
           header={alertMessageHeader || ''}
           body={alertMessageBody || ''}
@@ -2848,40 +2846,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
           imageClass={alertClass}
           error={errorFlag}
         />
-      )} */}
-
-
-      <div className="w3-row w3-padding w3-border w3-gray" style={{ margin: 'auto', height: '56vh' }}>
-        <h2 className="text-xl font-bold">Card Title</h2>
-        <div className="w3-card">
-          <p>w3-card</p>
-          <p>w3-card</p>
-          <p>w3-card</p>
-        </div>
-      </div>
-
-
-      {/* <div className="card-container">
-        {productsConfig.map((productConf) => (
-          <div className="card">
-            <div className="content">
-              <div className="contentBx">
-                <h2>{productConf.name}</h2>
-                <p>{productConf.longDescription}</p>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div> */}
-
-      <div className="w-3/4 h-96 bg-white p-6 rounded-lg shadow-lg">
-        <h2 className="text-xl font-bold mb-4">Card Title</h2>
-        <div className="w-full h-3/4 border-2 border-solid border-[#FF1F7F]">
-          Hello
-        </div>
-      </div>
-
-
+      )}
       <DragDropContext onDragEnd={onDragEnd} // Define the onDragEnd handler to update the state when the dragging stops
       >
         {
