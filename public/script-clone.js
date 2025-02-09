@@ -130,6 +130,158 @@
     }
   }
 
+  function getSomeText(tagName, element) {
+    let someText = "";
+
+    if (["input", "textarea", "select", "button"].includes(tagName)) {
+      const extractedText = extractTextFromHTML(element || "");
+      someText = [
+        ...extractedText.titles,
+        ...extractedText.text,
+        ...extractedText.labels,
+      ]
+        .join("; ")
+        .trim();
+    } else if (["option", "label", "a"].includes(tagName)) {
+      const extractedText = extractTextFromHTML(element || "");
+      someText = [
+        ...extractedText.titles,
+        ...extractedText.text,
+        ...extractedText.labels,
+      ]
+        .join("; ")
+        .trim();
+    } else if (!["html", "body", "script"].includes(tagName)) {
+      const extractedText = extractTextFromHTML(element || "");
+      someText = [
+        ...extractedText.titles,
+        ...extractedText.text,
+        ...extractedText.labels,
+      ]
+        .join("; ")
+        .trim();
+    }
+
+    someText = someText
+      .split(";")
+      .map((text) => text.trim())
+      .filter(Boolean)
+      .join(";"); // Clean up sequential text
+
+    return someText;
+  }
+
+  function extractTextFromHTML(element) {
+    const result = {
+      text: new Set(), // Using Set to avoid duplicate text
+      labels: new Set(), // Using Set to avoid duplicate labels
+      titles: new Set(), // Using Set to avoid duplicate titles
+    };
+
+    // Extract text content directly from the element (in case it has no children)
+    if (element.textContent) {
+      let elementText = element.textContent.trim();
+      if (elementText) {
+        result.text.add(elementText); // Using .add() instead of .push() for Set
+      }
+    }
+
+    // Extract label text from input placeholders and other form-related data
+    element.querySelectorAll("label").forEach((label) => {
+      if (label.textContent) {
+        let labelText = label.textContent.trim();
+        if (labelText) {
+          result.labels.add(labelText); // Using .add() for Set to ensure uniqueness
+        }
+      }
+
+      // Handle associated input fields (if the label has a 'for' attribute)
+      let forAttribute = label.getAttribute("for");
+      if (forAttribute) {
+        let associatedInput = element.querySelector(`#${forAttribute}`);
+        if (associatedInput) {
+          // Check if it's an input field or textarea and extract value or placeholder
+          let inputValue = associatedInput.value?.trim();
+          let inputPlaceholder = associatedInput.placeholder?.trim();
+          if (inputValue) {
+            result.text.add(inputValue); // Using .add() for Set to ensure uniqueness
+          } else if (inputPlaceholder) {
+            result.text.add(inputPlaceholder); // Fallback to placeholder
+          }
+        }
+      }
+    });
+
+    // Extract text from common block and inline elements
+    const textExtractors = [
+      "p",
+      "h1",
+      "h2",
+      "h3",
+      "h4",
+      "h5",
+      "h6",
+      "li",
+      "span",
+      "div",
+      "strong",
+      "em",
+      "b",
+      "i",
+      "blockquote",
+    ];
+
+    textExtractors.forEach((tagName) => {
+      element.querySelectorAll(tagName).forEach((childElement) => {
+        if (childElement.textContent) {
+          let elemText = childElement.textContent.trim();
+          if (elemText) {
+            result.text.add(elemText); // Using .add() for Set to ensure uniqueness
+          }
+        }
+      });
+    });
+
+    // Extract text from <a> tags (links)
+    element.querySelectorAll("a").forEach((link) => {
+      if (link.textContent) {
+        let linkText = link.textContent.trim();
+        if (linkText) {
+          result.text.add(linkText); // Using .add() for Set to ensure uniqueness
+        }
+      }
+    });
+
+    // Extract iframe titles and nested content
+    element.querySelectorAll("iframe").forEach((iframe) => {
+      if (iframe.getAttribute("title")) {
+        let title = iframe.getAttribute("title")?.trim();
+        if (title) {
+          result.titles.add(title); // Using .add() for Set to ensure uniqueness
+        }
+      }
+
+      try {
+        let iframeDoc =
+          iframe.contentDocument ||
+          new DOMParser().parseFromString(iframe.srcdoc || "", "text/html");
+        let iframeContent = extractTextFromHTML(iframeDoc); // Here we assume iframeDoc is an element.
+        iframeContent.titles.forEach((title) => result.titles.add(title));
+        iframeContent.text.forEach((text) => result.text.add(text));
+        iframeContent.labels.forEach((label) => result.labels.add(label));
+      } catch (e) {
+        console.warn("Could not access iframe content", e);
+      }
+    });
+
+    // Convert Sets to arrays before returning to maintain previous structure
+    return {
+      text: Array.from(result.text),
+      labels: Array.from(result.labels),
+      titles: Array.from(result.titles),
+    };
+  }
+
   function hideMartiniTooltip() {
     tooltip.style.display = "none";
   }
@@ -146,6 +298,12 @@
     var xpath = getMartiniXPath(elementBelowTooltip);
     var absoluteXPath = getMartiniAbsoluteXPath(elementBelowTooltip);
     var customXPath = getMartiniCustomXPath(elementBelowTooltip);
+
+    var someText = getSomeText(
+      elementBelowTooltip.tagName.toLowerCase(),
+      elementBelowTooltip
+    );
+
     window.currentXPath = xpath;
     window.currentAbsoluteXPath = absoluteXPath;
     window.customXPath = customXPath;
@@ -154,6 +312,7 @@
     window.tagName = elementBelowTooltip.tagName.toLowerCase();
     window.coords = elementBelowTooltip.getBoundingClientRect();
     window.coords = window.coords.left + "," + window.coords.top;
+    window.someText = someText;
 
     // Remove the tooltip from the page and delete the reference after 5 seconds
     setTimeout(() => {
@@ -166,7 +325,9 @@
       window.tagName = "";
       window.coords = "";
       window.coords = "";
+      window.someText = "";
       console.log("elementBelowTooltip", elementBelowTooltip);
+      // revertCloneInjections();
     }, 2000);
   }
   window.currentXPath = "";
@@ -178,14 +339,30 @@
   window.coords = "";
   window.tagNameTemp = "";
   window.coordsTemp = "";
+  window.someText = "";
   document.addEventListener("mouseover", showMartiniTooltip);
   document.addEventListener("click", handleMartiniClick);
 
   window.revertCloneInjections = function () {
+    alert("revertCloneInjections");
+
     document.removeEventListener("mouseover", showMartiniTooltip);
     document.removeEventListener("click", handleMartiniClick);
     console.log("revertCloneInjections");
+
+    // Remove the tooltip from the page and delete the reference after 5 seconds
+    setTimeout(() => {
+      removeElements();
+    }, 1000);
   };
+
+  function removeElements() {
+    if (tooltip) {
+      tooltip.remove(); // Completely remove the tooltip from the DOM
+      tooltip = null; // Clear the reference to free memory
+      console.log("Tooltip completely removed.");
+    }
+  }
 
   // window.postMessage({ type: "myMessage", data: "some data" }, targetOriginURL);
 

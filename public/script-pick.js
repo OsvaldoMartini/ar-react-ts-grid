@@ -377,7 +377,7 @@
       tooltip.style.display = "block";
     }
 
-    window.removePickListener();
+    window.revertPickInjections();
 
     // Remove the tooltip from the page and delete the reference after 5 seconds
     // Remove the tooltip from the page and delete the reference after 5 seconds
@@ -624,42 +624,35 @@
 
   cleanOldValues();
 
-  window.removePickListener = function () {
+  window.revertPickInjections = function () {
+    alert("revertPickInjections");
+
     document.removeEventListener("mouseover", showMartiniTooltip);
-    //                    document.removeEventListener('mouseout', hideMartiniTooltip);
     document.removeEventListener("click", handleMartiniClick);
-    console.log("revertCloneInjections");
+    console.log("revertPickInjections");
 
     // Remove the tooltip from the page and delete the reference after 5 seconds
     setTimeout(() => {
-      if (tooltip) {
-        tooltip.remove(); // Completely remove the tooltip from the DOM
-        tooltip = null; // Clear the reference to free memory
-        console.log("Tooltip completely removed.");
-      }
-
-      if (lastHoveredElement || elementBelowTooltip) {
-        // Remove highlight from the previous element if any
-        if (lastHoveredElement) {
-          lastHoveredElement.style.outline = ""; // Remove the previous highlight
-        }
-
-        // Remove highlight from the previous element if any
-        if (elementBelowTooltip) {
-          elementBelowTooltip.style.outline = ""; // Remove the previous highlight
-        }
-      }
-    }, 3000);
+      removeElements();
+    }, 1000);
   };
+
+  function removeElements() {
+    // Remove highlight from the previous element if any
+    if (lastHoveredElement) {
+      lastHoveredElement.style.outline = ""; // Remove the previous highlight
+    }
+
+    if (tooltip) {
+      tooltip.remove(); // Completely remove the tooltip from the DOM
+      tooltip = null; // Clear the reference to free memory
+      console.log("Tooltip completely removed.");
+    }
+  }
 
   document.addEventListener("mouseover", showMartiniTooltip);
   //                document.addEventListener('mouseout', hideMartiniTooltip);
   document.addEventListener("click", handleMartiniClick);
-  window.removePickListener = function () {
-    document.removeEventListener("mouseover", showMartiniTooltip);
-    //                    document.removeEventListener('mouseout', hideMartiniTooltip);
-    document.removeEventListener("click", handleMartiniClick);
-  };
 
   // window.postMessage({ type: "myMessage", data: "some data" }, targetOriginURL);
 
