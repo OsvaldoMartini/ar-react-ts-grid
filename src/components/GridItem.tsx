@@ -102,7 +102,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
   const [instructionsData, setInstructionsData] = useState<BlockLoopInstructionLoadDTO[]>(data);
   const [botJob, setBotJob] = useState<BotJobData>(botJobData);
   const [botJobLoaded, setBotJobLoaded] = useState<boolean>(false);
-  const [socketPort, setSocketPort] = useState<number>(8080);
+  const [socketPort, setSocketPort] = useState<number>(8181);
   const [groupedData, setGroupedData] = useState<{ [blockId: number]: { blockName: string; exportFile?: string; instructions: BlockLoopInstructionLoadDTO[] } }>({});
   const [isDataReordered, setIsDataReordered] = useState<boolean>(false);
   const [webSocket, setWebSocket] = useState<WebSocket | null>(null);
@@ -714,7 +714,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
           console.log("WebSocket connection closed");
           setConnected(false);
 
-          if (attempts < 10) {
+          if (attempts < 100) {
             attempts++;
             setReconnectAttempts(attempts);
             setAlertImage(warningRedImage);
@@ -722,11 +722,11 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
             setAlertMessageBody(`${attempts} - Attempt to reconnect.`);
             createWebSocket(); // Retry connection
           } else {
-            setAlertImage(warningRedImage);
-            setAlertMessageHeader("WebSocket Error");
-            setErrorFlag(true);
-            setAlertMessageBody("10 Attempts to Reconnect with the WebSocket.");
-            setAlertMessageFooter("Please restart the Web Scanner or contact the Administrator.");
+            // setAlertImage(warningRedImage);
+            // setAlertMessageHeader("WebSocket Error");
+            // setErrorFlag(true);
+            // setAlertMessageBody("100 Attempts to Reconnect with the WebSocket.");
+            // setAlertMessageFooter("Please restart the Web Scanner or contact the Administrator.");
           }
         };
 
