@@ -1550,21 +1550,23 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
   const handleCreateComponent = (blockGroupId: number) => {
     // Access groupedData, setGroupedData, instructionsData, and preComponent from the component's scope
-    const blockToSplit = groupedData[blockGroupId]; // Get the block directly by its blockId
+    const blockCompent = groupedData[blockGroupId]; // Get the block directly by its blockId
 
-    if (!blockToSplit) return; // Ensure the block exists
+    if (!blockCompent) return; // Ensure the block exists
 
     // Get the block order
-    const blockOrderNumber = blockToSplit.instructions[0].blockOrderNumber;
+    const blockOrderNumber = blockCompent.instructions[0].blockOrderNumber;
 
-    const botJobId = blockToSplit.instructions[0]?.botJobId || null; // Retrieve botJobId from the first instruction
+    const botJobId = blockCompent.instructions[0]?.botJobId || null; // Retrieve botJobId from the first instruction
+    const homeBankingId = blockCompent.instructions[0]?.homeBankingId || null; // Retrieve botJobId from the first instruction
 
     const newBlock = {
+      homeBankingId: homeBankingId,
       id: blockGroupId,
-      blockName: `${blockToSplit.blockName}`, // Same name as the current block
+      blockName: `${blockCompent.blockName}`, // Same name as the current block
       blockOrderNumber: blockOrderNumber, // Assign the new block order number
       botJobId: botJobId, // Preserve the botJobId in the new instructions
-      instructions: blockToSplit.instructions.map((instruction, index) => ({
+      instructions: blockCompent.instructions.map((instruction, index) => ({
         ...instruction,
         blockId: blockGroupId, // Assign new block ID to the instructions
         blockOrderNumber: -1, // Assign new block order number to the instructions
@@ -1576,6 +1578,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     if (webSocket && connected) {
       const blockComnponent = {
         newBlock: {
+          homeBankingId: homeBankingId,
           botJobId: botJobId,
           blockId: newBlock.id,
           blockName: newBlock.blockName,

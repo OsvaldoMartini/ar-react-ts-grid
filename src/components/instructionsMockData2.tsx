@@ -1,5 +1,6 @@
 // Sample data (mocketData)
 export interface BlockLoopInstructionLoadDTO {
+  homeBankingId: number;
   botJobId: number;
   botJobName: string;
   id: number;
