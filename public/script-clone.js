@@ -570,26 +570,27 @@
     // window.revertCloneInjections();
 
     // Remove the tooltip from the page and delete the reference after 5 seconds
-    // Remove the tooltip from the page and delete the reference after 5 seconds
-    // setTimeout(() => {
-    //   if (tooltip) {
-    //     tooltip.remove(); // Completely remove the tooltip from the DOM
-    //     tooltip = null; // Clear the reference to free memory
-    //     console.log("Tooltip completely removed.");
-    //   }
+    setTimeout(() => {
+      window.allElementInfo = [];
 
-    //   if (lastHoveredElement || elementBelowTooltip) {
-    //     // Remove highlight from the previous element if any
-    //     if (lastHoveredElement) {
-    //       lastHoveredElement.style.outline = ""; // Remove the previous highlight
-    //     }
+      // if (tooltip) {
+      //   tooltip.remove(); // Completely remove the tooltip from the DOM
+      //   tooltip = null; // Clear the reference to free memory
+      //   console.log("Tooltip completely removed.");
+      // }
 
-    //     // Remove highlight from the previous element if any
-    //     if (elementBelowTooltip) {
-    //       elementBelowTooltip.style.outline = ""; // Remove the previous highlight
-    //     }
-    //   }
-    // }, 3000);
+      // if (lastHoveredElement || elementBelowTooltip) {
+      //   // Remove highlight from the previous element if any
+      //   if (lastHoveredElement) {
+      //     lastHoveredElement.style.outline = ""; // Remove the previous highlight
+      //   }
+
+      //   // Remove highlight from the previous element if any
+      //   if (elementBelowTooltip) {
+      //     elementBelowTooltip.style.outline = ""; // Remove the previous highlight
+      //   }
+      // }
+    }, 2000);
   }
 
   document.addEventListener("mouseover", showMartiniTooltip);
@@ -622,5 +623,5 @@
     if (event.origin !== trustedOriginURL) return; // check the origin
     console.log(event.data);
   });
-})(arguments[0], arguments[1]);
-// })("http://localhost:3000/", "http://localhost:3000/");
+  // })(arguments[0], arguments[1]);
+})("http://localhost:3000/", "http://localhost:3000/");
