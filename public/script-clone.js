@@ -552,6 +552,8 @@
       console.log("List of elements:", allElementInfo);
       window.allElementInfo = allElementInfo;
 
+      allElementInfo = [];
+
       // Show the tooltip with the element details
       // tooltip.innerHTML = `${tagName} <br> ${someText}`;
       tooltip.innerHTML = `${tagName} <br> ${someText}`;
