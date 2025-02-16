@@ -533,7 +533,7 @@
       }
 
       // Format and push regular element information to the array
-      limitMapCharacters(elementInfoMap, "tagName-found");
+      // limitMapCharacters(elementInfoMap, "tagName-found");
 
       const {
         xpath,
@@ -565,29 +565,29 @@
       tooltip.style.display = "block";
     }
 
-    window.revertCloneInjections();
+    // window.revertCloneInjections();
 
     // Remove the tooltip from the page and delete the reference after 5 seconds
     // Remove the tooltip from the page and delete the reference after 5 seconds
-    setTimeout(() => {
-      if (tooltip) {
-        tooltip.remove(); // Completely remove the tooltip from the DOM
-        tooltip = null; // Clear the reference to free memory
-        console.log("Tooltip completely removed.");
-      }
+    // setTimeout(() => {
+    //   if (tooltip) {
+    //     tooltip.remove(); // Completely remove the tooltip from the DOM
+    //     tooltip = null; // Clear the reference to free memory
+    //     console.log("Tooltip completely removed.");
+    //   }
 
-      if (lastHoveredElement || elementBelowTooltip) {
-        // Remove highlight from the previous element if any
-        if (lastHoveredElement) {
-          lastHoveredElement.style.outline = ""; // Remove the previous highlight
-        }
+    //   if (lastHoveredElement || elementBelowTooltip) {
+    //     // Remove highlight from the previous element if any
+    //     if (lastHoveredElement) {
+    //       lastHoveredElement.style.outline = ""; // Remove the previous highlight
+    //     }
 
-        // Remove highlight from the previous element if any
-        if (elementBelowTooltip) {
-          elementBelowTooltip.style.outline = ""; // Remove the previous highlight
-        }
-      }
-    }, 3000);
+    //     // Remove highlight from the previous element if any
+    //     if (elementBelowTooltip) {
+    //       elementBelowTooltip.style.outline = ""; // Remove the previous highlight
+    //     }
+    //   }
+    // }, 3000);
   }
 
   document.addEventListener("mouseover", showMartiniTooltip);
