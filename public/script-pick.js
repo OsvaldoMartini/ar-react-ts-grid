@@ -107,47 +107,6 @@
     return "";
   }
 
-  function getMartiniCustomCSSSelectors(element) {
-    if (!(element instanceof Element)) return [];
-
-    let selectors = [];
-    let tagName = element.tagName.toLowerCase();
-
-    // ID selector
-    if (element.id) {
-      selectors.push(`#${element.id}`);
-    }
-
-    // Class selectors
-    let classList = Array.from(element.classList).filter(
-      (cls) => !/\d/.test(cls)
-    );
-    if (classList.length) {
-      selectors.push(`${tagName}.${classList.join(".")}`);
-    }
-
-    // Attribute selectors
-    Array.from(element.attributes).forEach((attr) => {
-      if (attr.name !== "class" && attr.name !== "id") {
-        selectors.push(`${tagName}[${attr.name}="${attr.value}"]`);
-      }
-    });
-
-    // nth-child selector
-    let parent = element.parentNode;
-    if (parent) {
-      let children = Array.from(parent.children).filter(
-        (child) => child.tagName === element.tagName
-      );
-      if (children.length > 1) {
-        let index = children.indexOf(element) + 1;
-        selectors.push(`${tagName}:nth-of-type(${index})`);
-      }
-    }
-
-    return selectors;
-  }
-
   var lastHoveredIsIframe = null; // Keep track of the last hovered element type
 
   let lastHoveredElement = null; // Keep track of the previously hovered element
@@ -452,7 +411,7 @@
     } catch (error) {}
     var customXPath = "";
     try {
-      customXPath = getMartiniCustomCSSSelectors(element);
+      customXPath = getMartiniCustomXPath(element);
     } catch (error) {}
 
     var attribId = element.id || "";
@@ -702,5 +661,5 @@
     if (event.origin !== trustedOriginURL) return; // check the origin
     console.log(event.data);
   });
-  // })(arguments[0], arguments[1]);
-})("http://localhost:3000/", "http://localhost:3000/");
+})(arguments[0], arguments[1]);
+// })("http://localhost:3000/", "http://localhost:3000/");
