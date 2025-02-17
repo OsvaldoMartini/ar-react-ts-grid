@@ -52,22 +52,36 @@
       }
     });
 
-    let ix = 0;
-    const siblings = element.parentNode.childNodes;
-
-    for (let i = 0; i < siblings.length; i++) {
-      const sibling = siblings[i];
-
-      if (sibling === element) {
-        const parentLocators = getElementLocators(element.parentNode);
-        parentLocators.forEach((parentPath) => {
-          locators.push(`${parentPath}/${tagName}[${ix + 1}]`);
+    // Handle iframe elements
+    if (element.ownerDocument !== document) {
+      try {
+        const iframe = element.ownerDocument.defaultView.frameElement;
+        const iframeLocators = getElementLocators(iframe);
+        iframeLocators.forEach((iframePath) => {
+          locators.push(`${iframePath}//${tagName}`);
         });
-        break;
+      } catch (error) {
+        console.error("Error getting locators for iframe element:", error);
       }
+    } else {
+      // Handle regular elements
+      let ix = 0;
+      const siblings = element.parentNode.childNodes;
 
-      if (sibling.nodeType === 1 && sibling.tagName === element.tagName) {
-        ix++;
+      for (let i = 0; i < siblings.length; i++) {
+        const sibling = siblings[i];
+
+        if (sibling === element) {
+          const parentLocators = getElementLocators(element.parentNode);
+          parentLocators.forEach((parentPath) => {
+            locators.push(`${parentPath}/${tagName}[${ix + 1}]`);
+          });
+          break;
+        }
+
+        if (sibling.nodeType === 1 && sibling.tagName === element.tagName) {
+          ix++;
+        }
       }
     }
 
@@ -436,8 +450,27 @@
   function getElementAttributes(element) {
     const attributes = [];
 
-    for (const attr of element.attributes) {
-      attributes.push(`${attr.name}="${attr.value}"`);
+    try {
+      for (const attr of element.attributes) {
+        attributes.push(`${attr.name}="${attr.value}"`);
+      }
+    } catch (error) {
+      // If accessing attributes directly fails (likely due to cross-origin restrictions)
+      // Attempt to get attributes using JavaScript execution within the iframe's context
+      const iframe = element.ownerDocument.defaultView.frameElement;
+      if (iframe) {
+        const iframeWindow = iframe.contentWindow;
+        iframeWindow.document.addEventListener("DOMContentLoaded", () => {
+          const iframeElement = iframeWindow.document.querySelector(
+            `#${element.id}`
+          ); // Adjust selector as needed
+          if (iframeElement) {
+            for (const attr of iframeElement.attributes) {
+              attributes.push(`${attr.name}="${attr.value}"`);
+            }
+          }
+        });
+      }
     }
 
     return attributes;
