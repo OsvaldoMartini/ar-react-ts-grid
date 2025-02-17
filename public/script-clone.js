@@ -57,11 +57,99 @@
   function getElementAttributes(element) {
     const attributes = [];
 
-    for (const attr of element.attributes) {
-      attributes.push(`${attr.name}="${attr.value}"`);
+    try {
+      for (const attr of element.attributes) {
+        attributes.push(`${attr.name}="${attr.value}"`);
+      }
+    } catch (error) {
+      // If accessing attributes directly fails (likely due to cross-origin restrictions)
+      // Attempt to get attributes using JavaScript execution within the iframe's context
+      const iframe = element.ownerDocument.defaultView.frameElement;
+      if (iframe) {
+        const iframeWindow = iframe.contentWindow;
+        iframeWindow.document.addEventListener("DOMContentLoaded", () => {
+          const iframeElement = iframeWindow.document.querySelector(
+            `#${element.id}`
+          ); // Adjust selector as needed
+          if (iframeElement) {
+            for (const attr of iframeElement.attributes) {
+              attributes.push(`${attr.name}="${attr.value}"`);
+            }
+          }
+        });
+      }
     }
 
     return attributes;
+  }
+  function getElementLocators(element) {
+    const locators = [];
+
+    if (element === document.body) {
+      locators.push("/html/" + element.tagName.toLowerCase());
+      return locators;
+    }
+
+    const tagName = element.tagName.toLowerCase();
+    const id = element.id ? `#${element.id}` : "";
+    const className = (
+      typeof element.className === "string" ? element.className : ""
+    )
+      .split(" ")
+      .filter((cls) => !/\d/.test(cls))
+      .join(".");
+
+    if (id) {
+      locators.push(id);
+    }
+
+    if (className) {
+      locators.push(`//${tagName}[contains(@class, '${className}')]`);
+    }
+
+    // Check for other attributes (e.g., 'data-*' attributes)
+    const attributes = Array.from(element.attributes);
+    attributes.forEach((attr) => {
+      if (attr.name !== "class" && attr.name !== "id") {
+        // Exclude class and id
+        locators.push(`${tagName}[@${attr.name}="${attr.value}"]`);
+      }
+    });
+
+    // Handle iframe elements
+    if (element.ownerDocument !== document) {
+      try {
+        const iframe = element.ownerDocument.defaultView.frameElement;
+        const iframeLocators = getElementLocators(iframe);
+        iframeLocators.forEach((iframePath) => {
+          locators.push(`${iframePath}//${tagName}`);
+        });
+      } catch (error) {
+        console.error("Error getting locators for iframe element:", error);
+      }
+    } else {
+      // Handle regular elements
+      let ix = 0;
+      const siblings = element.parentNode.childNodes;
+
+      for (let i = 0; i < siblings.length; i++) {
+        const sibling = siblings[i];
+
+        if (sibling === element) {
+          const parentLocators = getElementLocators(element.parentNode);
+          parentLocators.forEach((parentPath) => {
+            locators.push(`${parentPath}/${tagName}[${ix + 1}]`);
+          });
+          break;
+        }
+
+        if (sibling.nodeType === 1 && sibling.tagName === element.tagName) {
+          ix++;
+        }
+      }
+    }
+
+    return locators;
   }
   function getMartiniXPath(element) {
     if (element === document.body) {
@@ -623,5 +711,5 @@
     if (event.origin !== trustedOriginURL) return; // check the origin
     console.log(event.data);
   });
-  // })(arguments[0], arguments[1]);
-})("http://localhost:3000/", "http://localhost:3000/");
+})(arguments[0], arguments[1]);
+// })("http://localhost:3000/", "http://localhost:3000/");
