@@ -1,6 +1,174 @@
 (function (targetOriginURL, trustedOriginURL, searchTerms) {
   var elementInfoMap = new Map();
   var allElementInfo = [];
+  let elementsTagName = [];
+  let elementsSelector = [];
+
+  function handleSearchTermsMartini(searchTerms) {
+    // Create a Map to store element info with XPath as the key
+    var elementInfoMap = new Map();
+
+    // Collect elements based on search terms
+    searchTerms.forEach((attribute) => {
+      elementsTagName.push(
+        ...Array.from(document.getElementsByTagName(attribute))
+      );
+    });
+
+    searchTerms.forEach((attribute) => {
+      elementsSelector.push(
+        ...Array.from(document.querySelectorAll("[" + attribute + "]"))
+      );
+    });
+
+    elementsTagName.forEach((node) => {
+      // Avoid processing main, body, and html tags
+      if (
+        ["html", "body", "main", "script", "meta", "head"].includes(
+          node.tagName.toLowerCase()
+        )
+      ) {
+        return;
+      }
+
+      // Check if the element is an iframe
+      if (node.tagName.toLowerCase() === "iframe") {
+        try {
+          // Access the iframe's contentDocument
+          const iframeDocument =
+            node.contentDocument || node.contentWindow.document;
+
+          // If iframe's contentDocument is accessible, process its elements
+          if (iframeDocument) {
+            console.log(`Processing iframe: ${node.src}`);
+            handleSearchTermsMartiniInIframe(
+              iframeDocument,
+              searchTerms,
+              elementInfoMap
+            );
+          }
+        } catch (e) {
+          console.error("Error accessing iframe content:", e);
+        }
+        return;
+      }
+
+      // Process the element and gather identity details
+      const {
+        xpath,
+        allAttributes,
+        customXPath,
+        attribId,
+        attribName,
+        coords,
+        someText,
+      } = getElementIdentity(node);
+
+      // Construct the element info string
+      var elementInfoString = `${node.tagName.toLowerCase()};xpath:${xpath};text:${someText};attribId:${attribId};attribName:${attribName};coords:${coords};allAttributes:${allAttributes};customXPath:${customXPath};`;
+
+      // highlightElementsSequentially(elementsToProcess);
+      // Store the element information in the Map with XPath as the key
+      elementInfoMap.set(xpath, elementInfoString);
+    });
+
+    // Process each element in the main document
+    elementsSelector.forEach((node) => {
+      // Avoid processing main, body, and html tags
+      if (
+        ["html", "body", "main", "script", "meta", "head"].includes(
+          node.tagName.toLowerCase()
+        )
+      ) {
+        return;
+      }
+
+      // Check if the element is an iframe
+      if (node.tagName.toLowerCase() === "iframe") {
+        try {
+          // Access the iframe's contentDocument
+          const iframeDocument =
+            node.contentDocument || node.contentWindow.document;
+
+          // If iframe's contentDocument is accessible, process its elements
+          if (iframeDocument) {
+            console.log(`Processing iframe: ${node.src}`);
+            handleSearchTermsMartiniInIframe(
+              iframeDocument,
+              searchTerms,
+              elementInfoMap
+            );
+          }
+        } catch (e) {
+          console.error("Error accessing iframe content:", e);
+        }
+        return;
+      }
+
+      // Process the element and gather identity details
+      const {
+        xpath,
+        allAttributes,
+        customXPath,
+        attribId,
+        attribName,
+        coords,
+        someText,
+      } = getElementIdentity(node);
+
+      // Construct the element info string
+      var elementInfoString = `${node.tagName.toLowerCase()};xpath:${xpath};text:${someText};attribId:${attribId};attribName:${attribName};coords:${coords};allAttributes:${allAttributes};customXPath:${customXPath};`;
+
+      // highlightElementsSequentially(elementsToProcess);
+      // Store the element information in the Map with XPath as the key
+      elementInfoMap.set(xpath, elementInfoString);
+    });
+
+    limitMapCharacters(elementInfoMap, "tagName-found");
+
+    // window.allElementInfo = elementInfoMap; // Save to global for further use
+    // Optionally, log the entire Map of element information
+    console.log("All element info stored in Map:", window.allElementInfo);
+    return window.allElementInfo;
+  }
+
+  // Helper function to handle elements inside an iframe
+  function handleSearchTermsMartiniInIframe(
+    iframeDocument,
+    searchTerms,
+    elementInfoMap
+  ) {
+    let iframeElementsToProcess = [];
+
+    // Collect elements inside the iframe based on search terms
+    searchTerms.forEach((attribute) => {
+      iframeElementsToProcess.push(
+        ...Array.from(iframeDocument.querySelectorAll("[" + attribute + "]"))
+      );
+    });
+
+    // Process each element inside the iframe
+    iframeElementsToProcess.forEach((element) => {
+      // Avoid processing main, body, and html tags
+      if (["html", "body", "main"].includes(element.tagName.toLowerCase())) {
+        return;
+      }
+
+      const {
+        xpath,
+        allAttributes,
+        customXPath,
+        attribId,
+        attribName,
+        coords,
+        someText,
+      } = getElementIdentity(element);
+
+      let elementInfoString = `found:${element.tagName.toLowerCase()};xpath:${xpath};text:${someText};attribId:${attribId};attribName:${attribName};coords:${coords};allAttributes:${allAttributes};customXPath:${customXPath};`;
+
+      elementInfoMap.set(xpath, elementInfoString);
+    });
+  }
 
   function highlightElementsSequentially(elements) {
     let previousElement = null; // Variable to store the previously highlighted element
@@ -43,113 +211,6 @@
 
   // Call the function to highlight elements sequentially
   // highlightElementsSequentially();
-  function handleGertElements(searchTerms) {
-    // Create a Map to store element info with XPath as the key
-    var elementInfoMap = new Map();
-
-    // Collect elements based on search terms
-    let elementsToProcess = [];
-    searchTerms.forEach((attribute) => {
-      elementsToProcess.push(
-        ...Array.from(document.querySelectorAll("[" + attribute + "]"))
-      );
-    });
-
-    // Process each element in the main document
-    elementsToProcess.forEach((node) => {
-      // Avoid processing main, body, and html tags
-      if (
-        ["html", "body", "main", "script", "meta", "head"].includes(
-          node.tagName.toLowerCase()
-        )
-      ) {
-        return;
-      }
-
-      highlightElementsSequentially(node);
-
-      // Check if the element is an iframe
-      if (node.tagName.toLowerCase() === "iframe") {
-        try {
-          // Access the iframe's contentDocument
-          const iframeDocument =
-            node.contentDocument || node.contentWindow.document;
-
-          // If iframe's contentDocument is accessible, process its elements
-          if (iframeDocument) {
-            console.log(`Processing iframe: ${node.src}`);
-            handleGertElementsInIframe(
-              iframeDocument,
-              searchTerms,
-              elementInfoMap
-            );
-          }
-        } catch (e) {
-          console.error("Error accessing iframe content:", e);
-        }
-        return;
-      }
-
-      // Process the element and gather identity details
-      const {
-        xpath,
-        allAttributes,
-        customXPath,
-        attribId,
-        attribName,
-        coords,
-        someText,
-      } = getElementIdentity(node);
-
-      // Construct the element info string
-      var elementInfoString = `${node.tagName.toLowerCase()};xpath:${xpath};text:${someText};attribId:${attribId};attribName:${attribName};coords:${coords};allAttributes:${allAttributes};customXPath:${customXPath};`;
-
-      // Store the element information in the Map with XPath as the key
-      elementInfoMap.set(xpath, elementInfoString);
-    });
-
-    // Optionally, log the entire Map of element information
-    console.log("All element info stored in Map:", elementInfoMap);
-    window.elementInfoMap = elementInfoMap; // Save to global for further use
-  }
-
-  // Helper function to handle elements inside an iframe
-  function handleGertElementsInIframe(
-    iframeDocument,
-    searchTerms,
-    elementInfoMap
-  ) {
-    let iframeElementsToProcess = [];
-
-    // Collect elements inside the iframe based on search terms
-    searchTerms.forEach((attribute) => {
-      iframeElementsToProcess.push(
-        ...Array.from(iframeDocument.querySelectorAll("[" + attribute + "]"))
-      );
-    });
-
-    // Process each element inside the iframe
-    iframeElementsToProcess.forEach((element) => {
-      // Avoid processing main, body, and html tags
-      if (["html", "body", "main"].includes(element.tagName.toLowerCase())) {
-        return;
-      }
-
-      const {
-        xpath,
-        allAttributes,
-        customXPath,
-        attribId,
-        attribName,
-        coords,
-        someText,
-      } = getElementIdentity(element);
-
-      let elementInfoString = `found:${element.tagName.toLowerCase()};xpath:${xpath};text:${someText};attribId:${attribId};attribName:${attribName};coords:${coords};allAttributes:${allAttributes};customXPath:${customXPath};`;
-
-      elementInfoMap.set(xpath, elementInfoString);
-    });
-  }
 
   function getElementLocators(element) {
     const locators = [];
@@ -244,47 +305,6 @@
     }
     return "";
   }
-  function getMartiniCustomXPath(element) {
-    if (element === document.body) {
-      return "/html/" + element.tagName.toLowerCase();
-    }
-
-    // Ensure className is a string; otherwise, set it as an empty string
-    var className = (
-      typeof element.className === "string" ? element.className : ""
-    )
-      .split(" ")
-      .filter(function (cls) {
-        return !/\d/.test(cls);
-      })
-      .join(".");
-
-    var tagName = element.tagName.toLowerCase();
-    var ix = 0;
-    var siblings = element.parentNode.childNodes;
-
-    for (var i = 0; i < siblings.length; i++) {
-      var sibling = siblings[i];
-
-      if (sibling === element) {
-        var path = getMartiniCustomXPath(element.parentNode) + "/" + tagName;
-
-        if (className) {
-          path += '[contains(@class, "' + className + '")]';
-        } else {
-          path += "[" + (ix + 1) + "]";
-        }
-        return path;
-      }
-
-      if (sibling.nodeType === 1 && sibling.tagName === element.tagName) {
-        ix++;
-      }
-    }
-
-    return "";
-  }
-
   function getElementAttributes(element) {
     const attributes = [];
 
@@ -350,32 +370,6 @@
       coords,
       someText,
     };
-  }
-
-  function limitMapCharacters(elementInfoMap, coordText) {
-    elementInfoMap.forEach((value, key) => {
-      let modifiedValue = value;
-
-      // TO DO  REDUCE ONLY THE TEXT FIELD
-
-      // // Check if the key is "html" or value length is greater than 400
-      // if (key === "html" || value.length > 400) {
-      //   // Truncate the value to 150 characters and add "..."
-      //   if (value.length > 150) {
-      //     modifiedValue = value.substring(0, 150) + "...";
-      //   }
-
-      //   // If the length exceeds 400 characters, break the value into multiple lines
-      //   if (value.length > 400) {
-      //     const firstPart = value.substring(0, 150);
-      //     const secondPart = value.substring(150);
-      //     modifiedValue = `${firstPart}<br>...${secondPart}`;
-      //   }
-      // }
-
-      // Push the formatted value and key to the array
-      allElementInfo.push(`${coordText}:${modifiedValue}`);
-    });
   }
 
   function getSomeText(tagName, element) {
@@ -530,6 +524,14 @@
     };
   }
 
+  function limitMapCharacters(elementInfoMap, coordText) {
+    elementInfoMap.forEach((value, key) => {
+      let modifiedValue = value;
+      // Push the formatted value and key to the array
+      window.allElementInfo.push(`${coordText}:${modifiedValue}`);
+    });
+  }
+
   function cleanOldValues() {
     window.allElementInfo = [];
   }
@@ -545,8 +547,6 @@
       window.allElementInfo = [];
     }, 1000);
   };
-
-  handleGertElements(searchTerms);
 
   // window.postMessage({ type: "myMessage", data: "some data" }, targetOriginURL);
   window.addEventListener("message", function (event) {
@@ -600,10 +600,23 @@
   // highlightElementsSequentially();
 
   // Example usage:
-  // handleGertElements(["id", "name"]); // Search for elements with attributes "data-test", "id", or "name"
+  // handleSearchTermsMartini(["data-test"]);
 
-  // Example usage:
-  // handleGertElements(["data-test"]); // Change "data-test" to any attribute you want to search
+  // document.addEventListener("DOMContentLoaded", () => {
+  //   searchTerms.forEach((attribute) => {
+  //     console.log("attribute", attribute);
+  //     elementsTagName.push(
+  //       ...Array.from(document.getElementsByTagName(attribute))
+  //     );
+  //   });
+  //   console.log(elementsTagName); // Check if inputs are found
+  // });
 
-  // })(arguments[0], arguments[1], arguments[2]);
-})("http://localhost:3000/", "http://localhost:3000/", ["iframe"]);
+  handleSearchTermsMartini(searchTerms);
+})(arguments[0], arguments[1], arguments[2]);
+// })("http://localhost:3000/", "http://localhost:3000/", [
+//   "div",
+//   "id",
+//   "name",
+//   "input",
+// ]);

@@ -660,6 +660,8 @@
     // Remove the tooltip from the page and delete the reference after 5 seconds
     setTimeout(() => {
       window.allElementInfo = [];
+      elementInfoMap.clear();
+      allElementInfo = [];
 
       // if (tooltip) {
       //   tooltip.remove(); // Completely remove the tooltip from the DOM
@@ -678,7 +680,7 @@
       //     elementBelowTooltip.style.outline = ""; // Remove the previous highlight
       //   }
       // }
-    }, 2000);
+    }, 1000);
   }
 
   document.addEventListener("mouseover", showMartiniTooltip);
@@ -711,5 +713,9 @@
     if (event.origin !== trustedOriginURL) return; // check the origin
     console.log(event.data);
   });
-})(arguments[0], arguments[1]);
-// })("http://localhost:3000/", "http://localhost:3000/");
+
+  if (targetOriginURL) {
+    console.log("targetOriginURL", targetOriginURL);
+  }
+  // })(arguments[0], arguments[1]);
+})("http://localhost:3000/", "http://localhost:3000/");

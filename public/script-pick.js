@@ -735,5 +735,5 @@
     if (event.origin !== trustedOriginURL) return; // check the origin
     console.log(event.data);
   });
-})(arguments[0], arguments[1]);
-// })("http://localhost:3000/", "http://localhost:3000/");
+  // })(arguments[0], arguments[1]);
+})("http://localhost:3000/", "http://localhost:3000/");
