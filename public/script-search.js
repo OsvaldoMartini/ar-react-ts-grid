@@ -1,4 +1,4 @@
-(function (targetOriginURL, trustedOriginURL, searchTerms) {
+(function (targetOriginURL, trustedOriginURL, searchTerms, hiddenFields) {
   var elementInfoMap = new Map();
   // var elementInfoSubmit = new Map();
   let elementsTagName = [];
@@ -427,13 +427,18 @@
 
   function getElementIdentity(element) {
     // Allow <input type="hidden"> but exclude all other hidden elements
-    if (
-      (element.offsetWidth === 0 ||
-        element.offsetHeight === 0 ||
-        window.getComputedStyle(element).visibility === "hidden") &&
-      !(element.tagName.toLowerCase() === "input" && element.type === "hidden")
-    ) {
-      return null; // Ignore all hidden elements except <input type="hidden">
+    if (!hiddenFields) {
+      if (
+        (element.offsetWidth === 0 ||
+          element.offsetHeight === 0 ||
+          window.getComputedStyle(element).visibility === "hidden") &&
+        !(
+          element.tagName.toLowerCase() === "input" &&
+          element.type.toLowerCase() === "hidden"
+        )
+      ) {
+        return null; // Ignore all hidden elements except <input type="hidden">
+      }
     }
 
     var xpath = getMartiniXPath(element);
@@ -734,11 +739,12 @@
 
   handleSearchTermsMartini(searchTerms);
   // handleSearchTermsMartini(["allWithText"]);
-})(arguments[0], arguments[1], arguments[2]);
+})(arguments[0], arguments[1], arguments[2], arguments[3]);
 // })("http://localhost:3000/", "http://localhost:3000/", [
 //   "allWithText",
 //   "div",
 //   "id",
 //   "name",
 //   "input",
-// ]);
+// ],
+// true);
