@@ -2652,9 +2652,14 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
         if (instruction.actions.includes(":")) {
           const actionParts = instruction.actions.split(":"); // Split into parts
-          if (actionParts.length >= 2) {
-            actionParts[1] = updatedName; // Replace the name part
+          if (actionParts.length > 2) {
+            actionParts[2] = updatedName; // Replace the name part
             updatedActions = actionParts.join(":"); // Reassemble the updated actions
+          } else {
+            if (actionParts.length == 2) {
+              actionParts[1] = updatedName; // Replace the name part
+              updatedActions = actionParts.join(":"); // Reassemble the updated actions
+            }
           }
         }
 
