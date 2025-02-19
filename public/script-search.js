@@ -70,7 +70,9 @@
 
             // highlightElementsSequentially(elementsToProcess);
             // Store the element information in the Map with XPath as the key
-            elementInfoMap.set(xpath, elementInfoString);
+            if (!elementInfoMap.has(xpath)) {
+              elementInfoMap.set(xpath, elementInfoString);
+            }
           }
         }
       });
@@ -140,7 +142,9 @@
 
           // highlightElementsSequentially(elementsToProcess);
           // Store the element information in the Map with XPath as the key
-          elementInfoMap.set(xpath, elementInfoString);
+          if (!elementInfoMap.has(xpath)) {
+            elementInfoMap.set(xpath, elementInfoString);
+          }
         }
       });
 
@@ -195,7 +199,9 @@
 
           // highlightElementsSequentially(elementsToProcess);
           // Store the element information in the Map with XPath as the key
-          elementInfoMap.set(xpath, elementInfoString);
+          if (!elementInfoMap.has(xpath)) {
+            elementInfoMap.set(xpath, elementInfoString);
+          }
         }
       });
     }
@@ -248,7 +254,9 @@
 
         let elementInfoString = `found:${element.tagName.toLowerCase()};xpath:${xpath};text:${someText};attribId:${attribId};attribName:${attribName};coords:${coords};allAttributes:${allAttributes};customXPath:${customXPath};`;
 
-        elementInfoMap.set(xpath, elementInfoString);
+        if (!elementInfoMap.has(xpath)) {
+          elementInfoMap.set(xpath, elementInfoString);
+        }
       }
     });
   }
