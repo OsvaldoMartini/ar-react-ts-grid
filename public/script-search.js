@@ -1,6 +1,6 @@
 (function (targetOriginURL, trustedOriginURL, searchTerms) {
   var elementInfoMap = new Map();
-  var elementInfoSubmit = new Map();
+  // var elementInfoSubmit = new Map();
   let elementsTagName = [];
   let elementsSelector = [];
   let allElementsPage = [];
@@ -208,9 +208,9 @@
 
     limitMapCharacters(elementInfoMap, "tagName-found");
 
-    if (elementInfoSubmit && elementInfoSubmit.length > 0) {
-      limitMapCharacters(elementInfoSubmit, "submit-found");
-    }
+    // if (elementInfoSubmit && elementInfoSubmit.length > 0) {
+    //   limitMapCharacters(elementInfoSubmit, "submit-found");
+    // }
     // window.allElementInfo = elementInfoMap; // Save to global for further use
     // Optionally, log the entire Map of element information
     console.log("All element info stored in Map:", window.allElementInfo);
@@ -426,12 +426,14 @@
   }
 
   function getElementIdentity(element) {
+    // Allow <input type="hidden"> but exclude all other hidden elements
     if (
-      element.offsetWidth === 0 ||
-      element.offsetHeight === 0 ||
-      window.getComputedStyle(element).visibility === "hidden"
+      (element.offsetWidth === 0 ||
+        element.offsetHeight === 0 ||
+        window.getComputedStyle(element).visibility === "hidden") &&
+      !(element.tagName.toLowerCase() === "input" && element.type === "hidden")
     ) {
-      return null; // Ignore hidden elements
+      return null; // Ignore all hidden elements except <input type="hidden">
     }
 
     var xpath = getMartiniXPath(element);
@@ -460,20 +462,20 @@
 
     var someText = getSomeText(element.tagName.toLowerCase(), element);
 
-    // If element is an input with type submit OR a button with type submit
-    if (
-      (element.tagName.toLowerCase() === "input" &&
-        element.type === "submit") ||
-      (element.tagName.toLowerCase() === "button" &&
-        (element.type === "submit" || !element.type)) // Default button type is "submit" if not set
-    ) {
-      var elementInfoString = `${element.tagName.toLowerCase()};xpath:${xpath};text:${someText};attribId:${attribId};attribName:${attribName};coords:${coords};allAttributes:${allAttributes};customXPath:${customXPath};`;
+    // // If element is an input with type submit OR a button with type submit
+    // if (
+    //   (element.tagName.toLowerCase() === "input" &&
+    //     element.type === "submit") ||
+    //   (element.tagName.toLowerCase() === "button" &&
+    //     (element.type === "submit" || !element.type)) // Default button type is "submit" if not set
+    // ) {
+    //   var elementInfoString = `${element.tagName.toLowerCase()};xpath:${xpath};text:${someText};attribId:${attribId};attribName:${attribName};coords:${coords};allAttributes:${allAttributes};customXPath:${customXPath};`;
 
-      // Add to global Map without repetition
-      if (!elementInfoSubmit.has(xpath)) {
-        elementInfoSubmit.set(xpath, elementInfoString);
-      }
-    }
+    //   // Add to global Map without repetition
+    //   if (!elementInfoSubmit.has(xpath)) {
+    //     elementInfoSubmit.set(xpath, elementInfoString);
+    //   }
+    // }
 
     return {
       xpath,
