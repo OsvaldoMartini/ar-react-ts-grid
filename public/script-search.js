@@ -22,7 +22,7 @@
       allElementsPage.forEach((node) => {
         // Avoid processing main, body, and html tags
         if (
-          ["html", "body", "main", "script", "meta", "head"].includes(
+          ["html", "body", "main", "script", "meta", "head", "style"].includes(
             node.tagName.toLowerCase()
           )
         ) {
@@ -90,7 +90,7 @@
       elementsTagName.forEach((node) => {
         // Avoid processing main, body, and html tags
         if (
-          ["html", "body", "main", "script", "meta", "head"].includes(
+          ["html", "body", "main", "script", "meta", "head", "style"].includes(
             node.tagName.toLowerCase()
           )
         ) {
@@ -142,7 +142,7 @@
       elementsSelector.forEach((node) => {
         // Avoid processing main, body, and html tags
         if (
-          ["html", "body", "main", "script", "meta", "head"].includes(
+          ["html", "body", "main", "script", "meta", "head", "style"].includes(
             node.tagName.toLowerCase()
           )
         ) {
@@ -607,8 +607,12 @@
 
   window.revertSearchjections = function () {
     // alert("revertPickInjections");
-    document.removeEventListener("click", handleMartiniClick);
-    console.log("revertPickInjections");
+    console.log("revertSearchjections");
+    elementInfoMap.clear();
+    allElementInfo = [];
+    elementsTagName = [];
+    elementsSelector = [];
+    allElementsPage = [];
 
     setTimeout(() => {
       window.allElementInfo = [];
@@ -680,6 +684,7 @@
   // });
 
   handleSearchTermsMartini(searchTerms);
+  // handleSearchTermsMartini(["allWithText"]);
 })(arguments[0], arguments[1], arguments[2]);
 // })("http://localhost:3000/", "http://localhost:3000/", [
 //   "allWithText",
