@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import "./clothing_type.scss";
 import { Card } from "@mui/material";
+import FilterComponent from "./FilterComponent"; // Import FilterComponent
+import FilterButton from "./FilterButton";
 
 // Define the ClothingType interface
 interface ClothingType {
@@ -100,6 +102,13 @@ const ClothingType: React.FC = () => {
           />
         </div>
       </div>
+
+      <FilterButton onClick={function (): void {
+        throw new Error("Function not implemented.");
+      }} />
+
+      {/* Use FilterComponent */}
+      <FilterComponent />
 
       <div className="iframe-container">
         {/* Reuse the ClothingDetailsIframe for horse and dog */}
