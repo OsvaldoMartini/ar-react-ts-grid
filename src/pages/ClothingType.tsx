@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import "./clothing_type.scss";
 import { Card } from "@mui/material";
 
+// Define the ClothingType interface
 interface ClothingType {
   id: string;
   name: string;
@@ -38,6 +39,30 @@ const ClothingType: React.FC = () => {
 
   const handleDogInfoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setDogInfo(event.target.value);
+  };
+
+  // A reusable iframe component to reduce redundancy
+  const ClothingDetailsIframe = ({
+    title,
+    selectedClothingId,
+    clothingTypes,
+    additionalInfo,
+    onInfoChange,
+  }: {
+    title: string;
+    selectedClothingId: string;
+    clothingTypes: ClothingType[];
+    additionalInfo: string;
+    onInfoChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  }) => {
+    const selectedClothing = clothingTypes.find((item) => item.id === selectedClothingId);
+    return (
+      <iframe
+        title={title}
+        srcDoc={`<h1>${title}</h1><p>${selectedClothing?.description}</p><p>${additionalInfo}</p><input type='text' placeholder='Add more info' value='${additionalInfo}' oninput='this.value=${additionalInfo}' />`}
+        className="iframe"
+      ></iframe>
+    );
   };
 
   return (
@@ -77,23 +102,22 @@ const ClothingType: React.FC = () => {
       </div>
 
       <div className="iframe-container">
-        {/* Horse Details iframe */}
-        <iframe
+        {/* Reuse the ClothingDetailsIframe for horse and dog */}
+        <ClothingDetailsIframe
           title="Horse Details"
-          srcDoc={`<h1>Horses</h1><p>${clothingTypes.find(
-            (item) => item.id === selectedHorseClothing
-          )?.description} for horses.</p><p>${horseInfo}</p><input type='text' placeholder='Add more info about horses' value='${horseInfo}'  />`}
-          className="iframe"
-        ></iframe>
+          selectedClothingId={selectedHorseClothing}
+          clothingTypes={clothingTypes}
+          additionalInfo={horseInfo}
+          onInfoChange={handleHorseInfoChange}
+        />
 
-        {/* Dog Details iframe */}
-        <iframe
+        <ClothingDetailsIframe
           title="Dog Details"
-          srcDoc={`<h1>Dogs</h1><p>${clothingTypes.find(
-            (item) => item.id === selectedDogClothing
-          )?.description} for dogs.</p><p>${dogInfo}</p><input type='text' placeholder='Add more info about dogs' value='${dogInfo}' />`}
-          className="iframe"
-        ></iframe>
+          selectedClothingId={selectedDogClothing}
+          clothingTypes={clothingTypes}
+          additionalInfo={dogInfo}
+          onInfoChange={handleDogInfoChange}
+        />
 
         {/* Input Page iframe */}
         <iframe
