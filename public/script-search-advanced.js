@@ -11,7 +11,12 @@ function startCollectingElements() {
   martiniSearchTerm(searchTerms);
 }
 
-function collectIframeElements(doc, searchTerms, collectionFound) {
+function collectIframeElements(
+  doc,
+  searchTerms,
+  collectionFound,
+  isIframeChild = false
+) {
   // Collect elements from the current document
   searchTerms.forEach((selector) => {
     collectionFound.push(...Array.from(doc.querySelectorAll(selector)));
@@ -42,8 +47,24 @@ function collectIframeElements(doc, searchTerms, collectionFound) {
       console.log(`Processing iframe: ${iframeInfo}`);
 
       if (iframeDocument && iframeDocument.body) {
-        collectIframeElements(iframeDocument, searchTerms, collectionFound);
-        sendDataToIframe(iframe, collectionFound); // Send data to iframe
+        // If iframe is parent
+        if (!isIframeChild) {
+          collectIframeElements(
+            iframeDocument,
+            searchTerms,
+            collectionFound,
+            true
+          );
+          sendDataToIframe(iframe, collectionFound, true); // Send data to iframe parent
+        } else {
+          collectIframeElements(
+            iframeDocument,
+            searchTerms,
+            collectionFound,
+            false
+          ); // Search inside iframe recursively
+          sendDataToIframe(iframe, collectionFound, false); // Send data to iframe child
+        }
       } else {
         console.warn(`Skipping cross-origin iframe: ${iframe.src}`);
       }
@@ -98,7 +119,7 @@ function martiniSearchTerm(searchTerms) {
 }
 
 // Function to send serializable data to iframe
-function sendDataToIframe(iframe, collectionFound) {
+function sendDataToIframe(iframe, collectionFound, isIframeChild) {
   try {
     const iframeWindow = iframe.contentWindow; // Get iframe's window object
 
@@ -106,12 +127,15 @@ function sendDataToIframe(iframe, collectionFound) {
     const serializableData = collectionFound.map((node) => {
       const { xpath, attribId, attribName, coords, someText, allAttributes } =
         getElementIdentity(node) || {}; // Fallback to empty object
+
       return { xpath, attribId, attribName, coords, someText, allAttributes };
     });
 
+    const messageType = isIframeChild ? "iFrame-Child" : "iFrame-Found";
+
     iframeWindow.postMessage(
       {
-        type: "elementsData", // Message type
+        type: messageType, // Message type for iFrame parent or child
         data: serializableData, // Send serializable data to iframe
       },
       window.trustedOriginURL
@@ -125,7 +149,6 @@ function sendDataToIframe(iframe, collectionFound) {
 window.addEventListener("message", function (event) {
   if (event.origin !== window.trustedOriginURL) {
     // Use dynamic trusted origin URL
-    // console.warn("Message origin is not trusted.");
     return;
   }
 
