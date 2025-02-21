@@ -8,13 +8,15 @@ window.trustedOriginURL = "http://localhost:3000/";
 
 function startCollectingElements() {
   var searchTerms = ["button", "input", "a", "div"]; // Add relevant selectors
-  martiniSearchTerm(searchTerms);
+  let elementInfoMap = new Map(); // Initialize the map to store element information
+  martiniSearchTerm(searchTerms, elementInfoMap); // Pass the map to the martini search term function
 }
 
 function collectIframeElements(
   doc,
   searchTerms,
   collectionFound,
+  elementInfoMap, // Pass elementInfoMap as a parameter
   isIframeChild = false
 ) {
   // Collect elements from the current document
@@ -47,24 +49,15 @@ function collectIframeElements(
       console.log(`Processing iframe: ${iframeInfo}`);
 
       if (iframeDocument && iframeDocument.body) {
-        // If iframe is parent
-        if (!isIframeChild) {
-          collectIframeElements(
-            iframeDocument,
-            searchTerms,
-            collectionFound,
-            true
-          );
-          sendDataToIframe(iframe, collectionFound, true); // Send data to iframe parent
-        } else {
-          collectIframeElements(
-            iframeDocument,
-            searchTerms,
-            collectionFound,
-            false
-          ); // Search inside iframe recursively
-          sendDataToIframe(iframe, collectionFound, false); // Send data to iframe child
-        }
+        // Collect elements inside the iframe (nested iframe or not)
+        collectIframeElements(
+          iframeDocument,
+          searchTerms,
+          collectionFound,
+          elementInfoMap, // Pass elementInfoMap to iframe
+          true // Mark as iframe (whether nested or not)
+        );
+        sendDataToIframe(iframe, collectionFound, elementInfoMap, true); // Send data to iframe (nested or top-level)
       } else {
         console.warn(`Skipping cross-origin iframe: ${iframe.src}`);
       }
@@ -75,15 +68,8 @@ function collectIframeElements(
       );
     }
   });
-}
 
-function martiniSearchTerm(searchTerms) {
-  let elementInfoMap = new Map();
-  let collectionFound = [];
-
-  // Start searching from the main document
-  collectIframeElements(document, searchTerms, collectionFound);
-
+  // After collecting iframe elements, collect element identities for the parent document
   collectionFound.forEach((node) => {
     if (
       ["html", "body", "main", "script", "meta", "head", "style"].includes(
@@ -107,11 +93,22 @@ function martiniSearchTerm(searchTerms) {
 
       let elementInfoString = `${node.tagName.toLowerCase()};xpath:${xpath};text:${someText};attribId:${attribId};attribName:${attribName};coords:${coords};allAttributes:${allAttributes};customXPath:${customXPath};`;
 
-      if (!elementInfoMap.has(xpath)) {
-        elementInfoMap.set(xpath, elementInfoString);
+      // Modify based on whether it's an iframe or not
+      if (!isIframeChild) {
+        elementInfoMap.set(xpath, "tagName-Found;" + elementInfoString); // For non-iframe elements
+      } else {
+        const messageType = isIframeChild ? "iFrame-Child" : "iFrame-Found";
+        elementInfoMap.set(xpath, messageType + ";" + elementInfoString); // For iframe elements
       }
     }
   });
+}
+
+function martiniSearchTerm(searchTerms, elementInfoMap) {
+  let collectionFound = [];
+
+  // Start searching from the main document
+  collectIframeElements(document, searchTerms, collectionFound, elementInfoMap);
 
   console.log("All element info stored in Map:", elementInfoMap);
 
@@ -119,7 +116,12 @@ function martiniSearchTerm(searchTerms) {
 }
 
 // Function to send serializable data to iframe
-function sendDataToIframe(iframe, collectionFound, isIframeChild) {
+function sendDataToIframe(
+  iframe,
+  collectionFound,
+  elementInfoMap,
+  isIframeChild
+) {
   try {
     const iframeWindow = iframe.contentWindow; // Get iframe's window object
 
@@ -137,6 +139,7 @@ function sendDataToIframe(iframe, collectionFound, isIframeChild) {
       {
         type: messageType, // Message type for iFrame parent or child
         data: serializableData, // Send serializable data to iframe
+        elementInfoMap: Array.from(elementInfoMap.entries()), // Send the map as an array of entries
       },
       window.trustedOriginURL
     ); // Use the dynamic trusted origin URL
