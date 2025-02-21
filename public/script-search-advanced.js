@@ -6,58 +6,107 @@ window.onload = function () {
 // For testing, set trustedOriginURL locally
 window.trustedOriginURL = "http://localhost:3000/";
 
-function startCollectingElements() {
-  var searchTerms = ["button", "input", "a", "div"]; // Add relevant selectors
-  let elementInfoMap = new Map(); // Initialize the map to store element information
-  martiniSearchTerm(searchTerms, elementInfoMap); // Pass the map to the martini search term function
-}
-
-function collectIframeElements(
-  doc,
-  searchTerms,
-  collectionFound,
-  elementInfoMap, // Pass elementInfoMap as a parameter
-  isIframeChild = false
-) {
-  // Collect elements from the current document
+// Function to collect general elements based on search terms
+function collectElements(doc, searchTerms, collectionFound, elementInfoMap) {
+  // Collect elements from the current document using the provided search terms
   searchTerms.forEach((selector) => {
     collectionFound.push(...Array.from(doc.querySelectorAll(selector)));
   });
 
+  // After collecting, process element identities for the parent document
+  collectionFound.forEach((node) => {
+    if (
+      ["html", "body", "main", "script", "meta", "head", "style"].includes(
+        node.tagName.toLowerCase()
+      )
+    ) {
+      return;
+    }
+
+    const elementIdentity = getElementIdentity(node);
+    if (elementIdentity) {
+      elementInfoMap.set(
+        elementIdentity.xpath,
+        `tagName-Found;${elementInfoString(node, elementIdentity)}`
+      );
+    }
+  });
+}
+
+// Function to collect iframe elements recursively
+function collectIframeElements(
+  doc,
+  collectionFound,
+  elementInfoMap,
+  isIframeChild = false
+) {
   // Iterate over iframes and search inside them recursively
   doc.querySelectorAll("iframe").forEach((iframe) => {
     try {
       const iframeDocument =
         iframe.contentDocument || iframe.contentWindow.document;
 
-      // Log iframe information
-      let iframeInfo = iframe.src ? `src: ${iframe.src}` : `No src provided`;
+      if (iframeDocument) {
+        const elementXPath = getMartiniXPath(iframe); // Get the XPath of the iframe
+        const iframeDetails = `Elements inside iframe: ${
+          iframeDocument.body
+            ? iframeDocument.body.querySelectorAll("*").length
+            : 0
+        }`;
 
-      // Try to find the iframe's title or other useful information if src is null
-      if (!iframe.src) {
-        if (iframe.title) {
-          iframeInfo = `title: ${iframe.title}`;
-        } else if (iframe.id) {
-          iframeInfo = `id: ${iframe.id}`;
-        } else if (iframe.name) {
-          iframeInfo = `name: ${iframe.name}`;
-        } else {
-          iframeInfo = `No title, id, or name available`;
+        console.log(
+          `iFrame Found: ${
+            iframe.src ||
+            iframe.title ||
+            iframe.id ||
+            iframe.name ||
+            "No description"
+          }; ${iframeDetails}`
+        );
+
+        // Store the iframe details in the elementInfoMap
+        elementInfoMap.set(
+          elementXPath,
+          `xpath:${elementXPath};text:${
+            iframe.src ||
+            iframe.title ||
+            iframe.id ||
+            iframe.name ||
+            "No description"
+          };${iframeDetails}`
+        );
+
+        const elementIdentity = getElementIdentity(iframe);
+        if (elementIdentity) {
+          elementInfoMap.set(
+            elementIdentity.xpath,
+            `iFrame-Found;${elementInfoString(iframe, elementIdentity)}`
+          );
         }
-      }
 
-      console.log(`Processing iframe: ${iframeInfo}`);
+        // Collect all elements inside the iframe
+        iframeDocument
+          .querySelectorAll("*")
+          .forEach(function (elementInsideIframe) {
+            const elementIdentity = getElementIdentity(elementInsideIframe);
+            if (elementIdentity) {
+              elementInfoMap.set(
+                elementIdentity.xpath,
+                `iFrame-Child;${elementInfoString(
+                  elementInsideIframe,
+                  elementIdentity
+                )}`
+              );
+            }
+          });
 
-      if (iframeDocument && iframeDocument.body) {
-        // Collect elements inside the iframe (nested iframe or not)
+        // If the iframe contains nested iframes, recursively collect them
         collectIframeElements(
           iframeDocument,
-          searchTerms,
           collectionFound,
-          elementInfoMap, // Pass elementInfoMap to iframe
-          true // Mark as iframe (whether nested or not)
+          elementInfoMap,
+          true
         );
-        sendDataToIframe(iframe, collectionFound, elementInfoMap, true); // Send data to iframe (nested or top-level)
       } else {
         console.warn(`Skipping cross-origin iframe: ${iframe.src}`);
       }
@@ -68,54 +117,39 @@ function collectIframeElements(
       );
     }
   });
+}
 
-  // After collecting iframe elements, collect element identities for the parent document
-  collectionFound.forEach((node) => {
-    if (
-      ["html", "body", "main", "script", "meta", "head", "style"].includes(
-        node.tagName.toLowerCase()
-      )
-    ) {
-      return;
-    }
+// Function to initialize the collection process
+function startCollectingElements() {
+  const searchTerms = ["button", "input", "a", "div"]; // Define elements to search for
+  let elementInfoMap = new Map(); // Initialize the map to store element information
+  let collectionFound = [];
 
-    const elementIdentity = getElementIdentity(node); // This function is now defined
-    if (elementIdentity) {
-      const {
-        xpath,
-        allAttributes,
-        customXPath,
-        attribId,
-        attribName,
-        coords,
-        someText,
-      } = elementIdentity || {}; // Add fallback to empty object if elementIdentity is null
+  // First, collect iframe elements
+  collectIframeElements(document, collectionFound, elementInfoMap);
 
-      let elementInfoString = `${node.tagName.toLowerCase()};xpath:${xpath};text:${someText};attribId:${attribId};attribName:${attribName};coords:${coords};allAttributes:${allAttributes};customXPath:${customXPath};`;
+  // Then, collect general elements based on search terms
+  collectElements(document, searchTerms, collectionFound, elementInfoMap);
 
-      // Modify based on whether it's an iframe or not
-      if (!isIframeChild) {
-        elementInfoMap.set(xpath, "tagName-Found;" + elementInfoString); // For non-iframe elements
-      } else {
-        const messageType = isIframeChild ? "iFrame-Child" : "iFrame-Found";
-        elementInfoMap.set(xpath, messageType + ";" + elementInfoString); // For iframe elements
-      }
-    }
-  });
+  console.log("All element info stored in Map:", elementInfoMap);
+  return elementInfoMap;
 }
 
 function martiniSearchTerm(searchTerms, elementInfoMap) {
   let collectionFound = [];
 
-  // Start searching from the main document
+  // Collect elements from the current document using the provided search terms
+  searchTerms.forEach((selector) => {
+    collectionFound.push(...Array.from(document.querySelectorAll(selector)));
+  });
+
+  // Iterate over iframes and search inside them recursively
   collectIframeElements(document, searchTerms, collectionFound, elementInfoMap);
 
   console.log("All element info stored in Map:", elementInfoMap);
-
   return elementInfoMap;
 }
 
-// Function to send serializable data to iframe
 function sendDataToIframe(
   iframe,
   collectionFound,
@@ -125,11 +159,10 @@ function sendDataToIframe(
   try {
     const iframeWindow = iframe.contentWindow; // Get iframe's window object
 
-    // Create a new array with only serializable data (no DOM elements)
+    // Create serializable data (exclude DOM elements)
     const serializableData = collectionFound.map((node) => {
       const { xpath, attribId, attribName, coords, someText, allAttributes } =
         getElementIdentity(node) || {}; // Fallback to empty object
-
       return { xpath, attribId, attribName, coords, someText, allAttributes };
     });
 
@@ -138,53 +171,50 @@ function sendDataToIframe(
     iframeWindow.postMessage(
       {
         type: messageType, // Message type for iFrame parent or child
-        data: serializableData, // Send serializable data to iframe
-        elementInfoMap: Array.from(elementInfoMap.entries()), // Send the map as an array of entries
+        data: serializableData, // Send serializable data
+        elementInfoMap: Array.from(elementInfoMap.entries()), // Send map as array
       },
       window.trustedOriginURL
-    ); // Use the dynamic trusted origin URL
+    ); // Send message to iframe with trusted origin
   } catch (error) {
     console.error("Error sending data to iframe:", error);
   }
 }
 
-// Listen for messages in the iframe
+// Event listener to handle incoming messages from iframes
 window.addEventListener("message", function (event) {
   if (event.origin !== window.trustedOriginURL) {
-    // Use dynamic trusted origin URL
-    return;
+    return; // Ignore messages from untrusted origins
   }
 
-  // Handle the received data
   console.log("Received message data:", event.data);
 
   if (event.data.type === "elementsData") {
-    // Process the received element data
-    const elementData = event.data.data;
+    const elementData = event.data.data; // Process received element data
     console.log("Element data from parent:", elementData);
-    // You can process the elementData here...
   }
 });
 
-// Helper function to get element identity
+// Helper function to extract element identity
 function getElementIdentity(element) {
   if (
     element.offsetWidth === 0 ||
     element.offsetHeight === 0 ||
     window.getComputedStyle(element).visibility === "hidden"
   ) {
-    return null;
+    return null; // Skip hidden or non-visible elements
   }
 
-  let xpath = getMartiniXPath(element);
-  let allAttributes = Array.from(element.attributes)
+  const xpath = getMartiniXPath(element);
+  const allAttributes = Array.from(element.attributes)
     .map((attr) => `${attr.name}="${attr.value}"`)
     .join(";");
-  let attribId = element.id || "";
-  let attribName = element.name || "";
-  let coords = element.getBoundingClientRect();
-  coords = `${coords.left},${coords.top}`;
-  let someText =
+  const attribId = element.id || "";
+  const attribName = element.name || "";
+  const coords = `${element.getBoundingClientRect().left},${
+    element.getBoundingClientRect().top
+  }`;
+  const someText =
     element.textContent.trim() ||
     (element.tagName.toLowerCase() === "input" ? element.value || "" : "");
 
@@ -203,7 +233,7 @@ function getElementIdentity(element) {
 function getMartiniXPath(element) {
   if (element === document.body) return "/html/body";
   let ix = 0;
-  let siblings = element.parentNode ? element.parentNode.childNodes : [];
+  const siblings = element.parentNode ? element.parentNode.childNodes : [];
   for (let i = 0; i < siblings.length; i++) {
     let sibling = siblings[i];
     if (sibling.nodeType === 1 && sibling.tagName === element.tagName) {
@@ -221,4 +251,15 @@ function getMartiniXPath(element) {
     }
   }
   return "";
+}
+
+// Helper function to generate element information string
+function elementInfoString(element, identity) {
+  return `${element.tagName.toLowerCase()};xpath:${identity.xpath};text:${
+    identity.someText
+  };attribId:${identity.attribId};attribName:${identity.attribName};coords:${
+    identity.coords
+  };allAttributes:${identity.allAttributes};customXPath:${
+    identity.customXPath
+  };`;
 }
