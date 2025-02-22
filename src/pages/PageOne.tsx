@@ -41,6 +41,8 @@ const PageOne = () => {
     }, 2000); // Delay 2 seconds before returning to original style
   };
 
+  console.log("Loading...PAGE ONE")
+
   return (
     <div className="page-container">
       <h1>Page One</h1>
