@@ -1,6 +1,6 @@
 (function (searchTerms, hiddenFields, socketPort) {
-  let ws = null;
-  let attempts = 0; // Initialize attempts
+  let attempts = 0;
+  wSocket = null;
   window.searchTerms = [];
   var pageFullyLoaded = false;
   var elementInfoMap = new Map();
@@ -9,9 +9,9 @@
 
   function connectWebSocket() {
     try {
-      ws = new WebSocket(`ws://localhost:${socketPort}/websocket`);
+      wSocket = new WebSocket(`ws://localhost:${socketPort}/websocket`);
 
-      ws.onopen = () => {
+      wSocket.onopen = () => {
         console.log("WebSocket connected");
         attempts = 0; // Reset attempts on successful connection
 
@@ -20,7 +20,7 @@
             type: "echo",
             body: "subscribe",
           };
-          ws.send(JSON.stringify(subscriptionMessage));
+          wSocket.send(JSON.stringify(subscriptionMessage));
         } catch (sendError) {
           console.error("Failed to send subscription message:", sendError);
         }
@@ -29,7 +29,7 @@
         startCollectingElements(searchTerms);
       };
 
-      ws.onmessage = (event) => {
+      wSocket.onmessage = (event) => {
         let receivedMessage = event.data;
 
         if (receivedMessage.endsWith("\u0000")) {
@@ -59,11 +59,11 @@
         }
       };
 
-      ws.onerror = (error) => {
+      wSocket.onerror = (error) => {
         console.error("WebSocket error:", error);
       };
 
-      ws.onclose = () => {
+      wSocket.onclose = () => {
         console.log("WebSocket connection closed");
 
         if (attempts < 100) {
@@ -79,14 +79,12 @@
     }
   }
 
-  connectWebSocket();
-
   // Optionally, expose a cleanup function
   window.cleanupWebSocket = () => {
     try {
       console.log("Cleaning up WebSocket...");
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.close();
+      if (wSocket && wSocket.readyState === WebSocket.OPEN) {
+        wSocket.close();
       }
     } catch (cleanupError) {
       console.error("Error during WebSocket cleanup:", cleanupError);
@@ -106,7 +104,9 @@
         ].includes(eventName) ||
         ["complete", "interactive"].includes(document.readyState)
       ) {
-        startCollectingElements(window.searchTerms);
+        console.log("searchTerms", window.searchTerms);
+        connectWebSocket();
+        // startCollectingElements(window.searchTerms);
       }
     }
     pageFullyLoaded = true;
@@ -125,20 +125,20 @@
     });
 
     // After collecting, process element identities for the parent document
-    collectionFound.forEach((node) => {
+    collectionFound.forEach((element) => {
       if (
         ["html", "body", "main", "script", "meta", "head", "style"].includes(
-          node.tagName.toLowerCase()
+          element.tagName.toLowerCase()
         )
       ) {
         return;
       }
 
-      const elementIdentity = getElementIdentity(node);
+      const elementIdentity = getElementIdentity(element);
       if (elementIdentity) {
         elementInfoMap.set(
           elementIdentity.xpath,
-          `tagName-Found;${elementInfoString(node, elementIdentity)}`
+          elementDTO("tagName-Found", element, elementIdentity)
         );
       }
     });
@@ -192,17 +192,17 @@
         "No description"
       }; ${iframeDetails}`
     );
-    // Store the iframe details in the elementInfoMap
-    elementInfoMap.set(
-      xPathIFrame,
-      `xpath:${xPathIFrame};text:${
-        iframe.src ||
-        iframe.title ||
-        iframe.id ||
-        iframe.name ||
-        "No description"
-      };${iframeDetails}`
-    );
+    // // Store the iframe details in the elementInfoMap
+    // elementInfoMap.set(
+    //   xPathIFrame,
+    //   `xpath:${xPathIFrame};text:${
+    //     iframe.src ||
+    //     iframe.title ||
+    //     iframe.id ||
+    //     iframe.name ||
+    //     "No description"
+    //   };${iframeDetails}`
+    // );
   };
 
   // Function to collect iframe elements recursively
@@ -213,87 +213,52 @@
     isIframeChild = false
   ) {
     doc.querySelectorAll("iframe").forEach((iframe) => {
-      try {
-        let iframeDocument =
-          iframe.contentDocument || iframe.contentWindow.document;
+      // try {
+      let iframeDocument =
+        iframe.contentDocument || iframe.contentWindow.document;
 
-        try {
-          console.log(
-            "Iframe origin:",
-            new URL(iframe.src, window.location.origin).origin
+      try {
+        console.log(
+          "Iframe origin:",
+          new URL(iframe.src, window.location.origin).origin
+        );
+        console.log("Parent origin:", window.location.origin);
+      } catch (e) {
+        console.warn("Cross-origin access denied for iframe:", iframe.src);
+      }
+
+      if (iframe) {
+        let iframeParsed = null;
+        let srcDocElements = null;
+
+        const xPathIFrame = getMartiniXPath(iframe); // Get the XPath of the iframe
+
+        const elementIdentity = getElementIdentity(iframe);
+        if (elementIdentity) {
+          elementInfoMap.set(
+            elementIdentity.xpath,
+            elementDTO("iFrame-Found", iframe, elementIdentity)
           );
-          console.log("Parent origin:", window.location.origin);
-        } catch (e) {
-          console.warn("Cross-origin access denied for iframe:", iframe.src);
         }
 
-        if (iframe) {
-          let iframeParsed = null;
-          let srcDocElements = null;
+        const parser = new DOMParser();
 
-          const xPathIFrame = getMartiniXPath(iframe); // Get the XPath of the iframe
+        if (iframe.srcdoc) {
+          iframeParsed = parser.parseFromString(iframe.srcdoc, "text/html");
 
-          const elementIdentity = getElementIdentity(iframe);
-          if (elementIdentity) {
-            elementInfoMap.set(
-              elementIdentity.xpath,
-              `iFrame-Found;${elementInfoString(iframe, elementIdentity)}`
-            );
-          }
+          // Select all elements inside the parsed document
+          srcDocElements = iframeParsed.querySelectorAll("*");
+        }
 
-          const parser = new DOMParser();
+        if (iframe.src) {
+          const srcElements = fetchAndParseIframeContent(iframe);
+          if (srcElements) {
+            // console.log("Fetched Elements:", srcElements);
 
-          if (iframe.srcdoc) {
-            iframeParsed = parser.parseFromString(iframe.srcdoc, "text/html");
+            iFrameDetails(iframe, xPathIFrame, srcElements.length);
 
-            // Select all elements inside the parsed document
-            srcDocElements = iframeParsed.querySelectorAll("*");
-          }
-
-          if (iframe.src) {
-            const srcElements = fetchAndParseIframeContent(iframe);
-            if (srcElements) {
-              // console.log("Fetched Elements:", srcElements);
-
-              iFrameDetails(iframe, xPathIFrame, srcElements.length);
-
-              srcElements.forEach(function (element) {
-                const elementIdentity = getElementIdentity(element);
-                // console.log(
-                //   "elementIdentity.xpath",
-                //   `${xPathIFrame}${elementIdentity?.xpath}`
-                // );
-                if (elementIdentity) {
-                  elementInfoMap.set(
-                    `${xPathIFrame}${elementIdentity?.xpath}`,
-                    `iFrame-Child;${elementInfoString(
-                      element,
-                      elementIdentity
-                    )}`
-                  );
-                }
-              });
-            }
-          }
-
-          // Collect all elements inside the iframe
-          if (!iframe.src) {
-            iFrameDetails(
-              iframe,
-              xPathIFrame,
-              srcDocElements
-                ? srcDocElements.length
-                : iframeDocument
-                ? iframeDocument.querySelectorAll("*").length
-                : 0
-            );
-          }
-
-          iframeDocument
-            .querySelectorAll("*")
-            .forEach(function (elementInsideIframe) {
-              const elementIdentity = getElementIdentity(elementInsideIframe);
-
+            srcElements.forEach(function (element) {
+              const elementIdentity = getElementIdentity(element);
               // console.log(
               //   "elementIdentity.xpath",
               //   `${xPathIFrame}${elementIdentity?.xpath}`
@@ -301,20 +266,31 @@
               if (elementIdentity) {
                 elementInfoMap.set(
                   `${xPathIFrame}${elementIdentity?.xpath}`,
-                  `iFrame-Child;${elementInfoString(
-                    elementInsideIframe,
-                    elementIdentity
-                  )}`
+                  elementDTO("iFrame-Child", element, elementIdentity)
                 );
               }
             });
+          }
+        }
 
-          // Loop through all the elements and extract their properties
-          srcDocElements?.forEach(function (element) {
-            const elementType = element.tagName; // Get the tag name of the element
-            const elementContent = element.textContent.trim(); // Get the text content of the element
+        // Collect all elements inside the iframe
+        if (!iframe.src) {
+          iFrameDetails(
+            iframe,
+            xPathIFrame,
+            srcDocElements
+              ? srcDocElements.length
+              : iframeDocument
+              ? iframeDocument.querySelectorAll("*").length
+              : 0
+          );
+        }
 
-            const elementIdentity = getElementIdentity(element);
+        iframeDocument
+          .querySelectorAll("*")
+          .forEach(function (elementInsideIframe) {
+            const elementIdentity = getElementIdentity(elementInsideIframe);
+
             // console.log(
             //   "elementIdentity.xpath",
             //   `${xPathIFrame}${elementIdentity?.xpath}`
@@ -322,32 +298,47 @@
             if (elementIdentity) {
               elementInfoMap.set(
                 `${xPathIFrame}${elementIdentity?.xpath}`,
-                `iFrame-Child;${elementInfoString(element, elementIdentity)}`
+                elementDTO("iFrame-Child", elementInsideIframe, elementIdentity)
               );
             }
           });
 
-          // Process iframe content depending on the presence of srcdoc
-          if (iframeParsed) {
-            processIframeElements(iframeParsed, xPathIFrame);
+        // Loop through all the elements and extract their properties
+        srcDocElements?.forEach(function (element) {
+          const elementIdentity = getElementIdentity(element);
+          // console.log(
+          //   "elementIdentity.xpath",
+          //   `${xPathIFrame}${elementIdentity?.xpath}`
+          // );
+          if (elementIdentity) {
+            elementInfoMap.set(
+              `${xPathIFrame}${elementIdentity?.xpath}`,
+              elementDTO("iFrame-Child", element, elementIdentity)
+            );
           }
+        });
 
-          // If the iframe contains nested iframes, recursively collect them
-          collectIframeElements(
-            iframeDocument,
-            collectionFound,
-            elementInfoMap,
-            true
-          );
-        } else {
-          console.warn(`Skipping cross-origin iframe: ${iframe.src}`);
+        // Process iframe content depending on the presence of srcdoc
+        if (iframeParsed) {
+          processIframeElements(iframeParsed, xPathIFrame);
         }
-      } catch (e) {
-        console.error(
-          `Error accessing iframe: ${iframe.src || "Unknown iframe"}`,
-          e
+
+        // If the iframe contains nested iframes, recursively collect them
+        collectIframeElements(
+          iframeDocument,
+          collectionFound,
+          elementInfoMap,
+          true
         );
+      } else {
+        console.warn(`Skipping cross-origin iframe: ${iframe.src}`);
       }
+      // } catch (e) {
+      //   console.error(
+      //     `Error accessing iframe: ${iframe.src || "Unknown iframe"}`,
+      //     e
+      //   );
+      // }
     });
   };
 
@@ -365,10 +356,7 @@
         if (elementIdentity) {
           elementInfoMap.set(
             `${xPathIFrame}${elementIdentity?.xpath}`,
-            `iFrame-Child;${elementInfoString(
-              elementInsideIframe,
-              elementIdentity
-            )}`
+            elementDTO("iFrame-Child", elementInsideIframe, elementIdentity)
           );
         }
       });
@@ -382,7 +370,6 @@
     let elementInfoMap = new Map(); // Initialize the map to store element information
     let collectionFound = [];
 
-    console.log("searchTerms", window.searchTerms);
     // First, collect iframe elements
     collectIframeElements(document, collectionFound, elementInfoMap);
 
@@ -392,15 +379,17 @@
     window.allElementInfo = [];
     limitMapCharacters(elementInfoMap);
     console.log("All element info stored in Map:", allElementInfo);
+    elementInfoMap.clear();
 
-    // WebSocket Message Sending Logic
-    if (window.webSocket && window.webSocket.readyState === WebSocket.OPEN) {
+    console.log("WebSocket readyState:", wSocket.readyState);
+
+    if (wSocket && wSocket.readyState === WebSocket.OPEN) {
       const message = {
-        type: "RESPONSE_BACK",
+        type: "SEARCH_TOOL",
         details: allElementInfo, // Send allElementInfo
       };
-      window.webSocket.send(JSON.stringify(message));
-      console.log("Sent RESPONSE_BACK:", message);
+      wSocket.send(JSON.stringify(message));
+      console.log("Sent SEARCH_TOOL:", message);
     } else {
       console.warn("WebSocket is not open. Cannot send message.");
     }
@@ -421,9 +410,10 @@
       }
     }
     const xpath = getMartiniXPath(element);
-    const allAttributes = Array.from(element.attributes)
-      .map((attr) => `${attr.name}="${attr.value}"`)
-      .join(";");
+    const attributeData = Array.from(element.attributes).map((attr) => ({
+      name: attr.name,
+      value: attr.value,
+    }));
     const attribId = element.id || "";
     const attribName = element.name || "";
     const coords = `${element.getBoundingClientRect().left.toFixed(2)},${element
@@ -435,7 +425,7 @@
 
     return {
       xpath,
-      allAttributes,
+      attributeData,
       customXPath: "",
       attribId,
       attribName,
@@ -474,9 +464,27 @@
       identity.someText
     };attribId:${identity.attribId};attribName:${identity.attribName};coords:${
       identity.coords
-    };allAttributes:${identity.allAttributes};customXPath:${
+    };attributeData:${identity.attributeData};customXPath:${
       identity.customXPath
     };`;
+  };
+
+  const elementDTO = function elementDTO(typeElement, element, identity) {
+    return {
+      typeElement: typeElement,
+      tagName: element.tagName.toLowerCase(),
+      xPath: identity.xPath ?? "",
+      text: identity.text ?? "",
+      attribId: identity.attribId ?? "",
+      attribName: identity.attribName ?? "",
+      coords: identity.coords ?? "",
+      attributeData: identity.attributeData ?? "",
+      customXPath: identity.customXPath ?? "",
+      iFrameXPath: identity.iFrameXPath ?? "",
+      attributeValue: identity.attributeValue ?? "",
+      attributeType: identity.attributeType ?? "",
+      searchAttributeValue: identity.searchAttributeValue ?? "",
+    };
   };
 
   function limitMapCharacters(elementInfoMap, coordText) {
@@ -528,7 +536,8 @@
     window.attachEvent?.("onload", () => init("onload"));
   }
 
-  startCollectingElements(searchTerms);
+  // connectWebSocket();
+  // startCollectingElements(searchTerms);
   // init("Initiate");
   // })(arguments[0], arguments[1]);
 })(["div"], true, 8181);
