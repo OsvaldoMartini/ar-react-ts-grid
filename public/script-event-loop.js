@@ -103,7 +103,7 @@
           console.warn("Cross-origin access denied for iframe:", iframe.src);
         }
 
-        if (iframeDocument) {
+        if (iframe) {
           const xPathIFrame = getMartiniXPath(iframe); // Get the XPath of the iframe
           const iframeDetails = `Elements inside iframe: ${
             iframeDocument.body
