@@ -213,52 +213,84 @@
     isIframeChild = false
   ) {
     doc.querySelectorAll("iframe").forEach((iframe) => {
-      // try {
-      let iframeDocument =
-        iframe.contentDocument || iframe.contentWindow.document;
-
       try {
-        console.log(
-          "Iframe origin:",
-          new URL(iframe.src, window.location.origin).origin
-        );
-        console.log("Parent origin:", window.location.origin);
-      } catch (e) {
-        console.warn("Cross-origin access denied for iframe:", iframe.src);
-      }
+        let iframeDocument =
+          iframe.contentDocument || iframe.contentWindow.document;
 
-      if (iframe) {
-        let iframeParsed = null;
-        let srcDocElements = null;
-
-        const xPathIFrame = getMartiniXPath(iframe); // Get the XPath of the iframe
-
-        const elementIdentity = getElementIdentity(iframe);
-        if (elementIdentity) {
-          elementInfoMap.set(
-            elementIdentity.xpath,
-            elementDTO("iFrame-Found", iframe, elementIdentity)
+        try {
+          console.log(
+            "Iframe origin:",
+            new URL(iframe.src, window.location.origin).origin
           );
+          console.log("Parent origin:", window.location.origin);
+        } catch (e) {
+          console.warn("Cross-origin access denied for iframe:", iframe.src);
         }
 
-        const parser = new DOMParser();
+        if (iframe) {
+          let iframeParsed = null;
+          let srcDocElements = null;
 
-        if (iframe.srcdoc) {
-          iframeParsed = parser.parseFromString(iframe.srcdoc, "text/html");
+          const xPathIFrame = getMartiniXPath(iframe); // Get the XPath of the iframe
 
-          // Select all elements inside the parsed document
-          srcDocElements = iframeParsed.querySelectorAll("*");
-        }
+          const elementIdentity = getElementIdentity(iframe);
+          if (elementIdentity) {
+            elementInfoMap.set(
+              elementIdentity.xpath,
+              elementDTO("iFrame-Found", iframe, elementIdentity)
+            );
+          }
 
-        if (iframe.src) {
-          const srcElements = fetchAndParseIframeContent(iframe);
-          if (srcElements) {
-            // console.log("Fetched Elements:", srcElements);
+          const parser = new DOMParser();
 
-            iFrameDetails(iframe, xPathIFrame, srcElements.length);
+          if (iframe.srcdoc) {
+            iframeParsed = parser.parseFromString(iframe.srcdoc, "text/html");
 
-            srcElements.forEach(function (element) {
-              const elementIdentity = getElementIdentity(element);
+            // Select all elements inside the parsed document
+            srcDocElements = iframeParsed.querySelectorAll("*");
+          }
+
+          if (iframe.src) {
+            const srcElements = fetchAndParseIframeContent(iframe);
+            if (srcElements) {
+              // console.log("Fetched Elements:", srcElements);
+
+              iFrameDetails(iframe, xPathIFrame, srcElements.length);
+
+              srcElements.forEach(function (element) {
+                const elementIdentity = getElementIdentity(element);
+                // console.log(
+                //   "elementIdentity.xpath",
+                //   `${xPathIFrame}${elementIdentity?.xpath}`
+                // );
+                if (elementIdentity) {
+                  elementInfoMap.set(
+                    `${xPathIFrame}${elementIdentity?.xpath}`,
+                    elementDTO("iFrame-Child", element, elementIdentity)
+                  );
+                }
+              });
+            }
+          }
+
+          // Collect all elements inside the iframe
+          if (!iframe.src) {
+            iFrameDetails(
+              iframe,
+              xPathIFrame,
+              srcDocElements
+                ? srcDocElements.length
+                : iframeDocument
+                ? iframeDocument.querySelectorAll("*").length
+                : 0
+            );
+          }
+
+          iframeDocument
+            .querySelectorAll("*")
+            .forEach(function (elementInsideIframe) {
+              const elementIdentity = getElementIdentity(elementInsideIframe);
+
               // console.log(
               //   "elementIdentity.xpath",
               //   `${xPathIFrame}${elementIdentity?.xpath}`
@@ -266,31 +298,18 @@
               if (elementIdentity) {
                 elementInfoMap.set(
                   `${xPathIFrame}${elementIdentity?.xpath}`,
-                  elementDTO("iFrame-Child", element, elementIdentity)
+                  elementDTO(
+                    "iFrame-Child",
+                    elementInsideIframe,
+                    elementIdentity
+                  )
                 );
               }
             });
-          }
-        }
 
-        // Collect all elements inside the iframe
-        if (!iframe.src) {
-          iFrameDetails(
-            iframe,
-            xPathIFrame,
-            srcDocElements
-              ? srcDocElements.length
-              : iframeDocument
-              ? iframeDocument.querySelectorAll("*").length
-              : 0
-          );
-        }
-
-        iframeDocument
-          .querySelectorAll("*")
-          .forEach(function (elementInsideIframe) {
-            const elementIdentity = getElementIdentity(elementInsideIframe);
-
+          // Loop through all the elements and extract their properties
+          srcDocElements?.forEach(function (element) {
+            const elementIdentity = getElementIdentity(element);
             // console.log(
             //   "elementIdentity.xpath",
             //   `${xPathIFrame}${elementIdentity?.xpath}`
@@ -298,47 +317,32 @@
             if (elementIdentity) {
               elementInfoMap.set(
                 `${xPathIFrame}${elementIdentity?.xpath}`,
-                elementDTO("iFrame-Child", elementInsideIframe, elementIdentity)
+                elementDTO("iFrame-Child", element, elementIdentity)
               );
             }
           });
 
-        // Loop through all the elements and extract their properties
-        srcDocElements?.forEach(function (element) {
-          const elementIdentity = getElementIdentity(element);
-          // console.log(
-          //   "elementIdentity.xpath",
-          //   `${xPathIFrame}${elementIdentity?.xpath}`
-          // );
-          if (elementIdentity) {
-            elementInfoMap.set(
-              `${xPathIFrame}${elementIdentity?.xpath}`,
-              elementDTO("iFrame-Child", element, elementIdentity)
-            );
+          // Process iframe content depending on the presence of srcdoc
+          if (iframeParsed) {
+            processIframeElements(iframeParsed, xPathIFrame);
           }
-        });
 
-        // Process iframe content depending on the presence of srcdoc
-        if (iframeParsed) {
-          processIframeElements(iframeParsed, xPathIFrame);
+          // If the iframe contains nested iframes, recursively collect them
+          collectIframeElements(
+            iframeDocument,
+            collectionFound,
+            elementInfoMap,
+            true
+          );
+        } else {
+          console.warn(`Skipping cross-origin iframe: ${iframe.src}`);
         }
-
-        // If the iframe contains nested iframes, recursively collect them
-        collectIframeElements(
-          iframeDocument,
-          collectionFound,
-          elementInfoMap,
-          true
+      } catch (e) {
+        console.error(
+          `Error accessing iframe: ${iframe.src || "Unknown iframe"}`,
+          e
         );
-      } else {
-        console.warn(`Skipping cross-origin iframe: ${iframe.src}`);
       }
-      // } catch (e) {
-      //   console.error(
-      //     `Error accessing iframe: ${iframe.src || "Unknown iframe"}`,
-      //     e
-      //   );
-      // }
     });
   };
 
