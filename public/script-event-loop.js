@@ -84,13 +84,17 @@
     doc.querySelectorAll("iframe").forEach((iframe) => {
       try {
         let iframeDocument;
+        let iframeParsed1;
+        let iframeParsed2;
         if (iframe.srcdoc) {
           iframeDocument = iframe.contentDocument;
-          // const parser = new DOMParser();
-          // iframeDocument = parser.parseFromString(iframe.srcdoc, "text/html");
+          const parser = new DOMParser();
+          iframeParsed1 = parser.parseFromString(iframe.srcdoc, "text/html");
         } else {
           iframeDocument =
             iframe.contentDocument || iframe.contentWindow.document;
+          const parser = new DOMParser();
+          iframeParsed2 = parser.parseFromString(iframeDocument, "text/html");
         }
 
         try {
@@ -143,6 +147,66 @@
 
           // Collect all elements inside the iframe
           iframeDocument
+            .querySelectorAll("*")
+            .forEach(function (elementInsideIframe) {
+              const elementIdentity = getElementIdentity(elementInsideIframe);
+
+              console.log(
+                "elementIdentity.xpath",
+                `${xPathIFrame}${elementIdentity?.xpath}`
+              );
+              if (elementIdentity) {
+                elementInfoMap.set(
+                  `${xPathIFrame}${elementIdentity?.xpath}`,
+                  `iFrame-Child;${elementInfoString(
+                    elementInsideIframe,
+                    elementIdentity
+                  )}`
+                );
+              }
+            });
+
+          iframeDocument?.body
+            .querySelectorAll("*")
+            .forEach(function (elementInsideIframe) {
+              const elementIdentity = getElementIdentity(elementInsideIframe);
+
+              console.log(
+                "elementIdentity.xpath",
+                `${xPathIFrame}${elementIdentity?.xpath}`
+              );
+              if (elementIdentity) {
+                elementInfoMap.set(
+                  `${xPathIFrame}${elementIdentity?.xpath}`,
+                  `iFrame-Child;${elementInfoString(
+                    elementInsideIframe,
+                    elementIdentity
+                  )}`
+                );
+              }
+            });
+
+          iframeParsed1.body
+            .querySelectorAll("*")
+            .forEach(function (elementInsideIframe) {
+              const elementIdentity = getElementIdentity(elementInsideIframe);
+
+              console.log(
+                "elementIdentity.xpath",
+                `${xPathIFrame}${elementIdentity?.xpath}`
+              );
+              if (elementIdentity) {
+                elementInfoMap.set(
+                  `${xPathIFrame}${elementIdentity?.xpath}`,
+                  `iFrame-Child;${elementInfoString(
+                    elementInsideIframe,
+                    elementIdentity
+                  )}`
+                );
+              }
+            });
+
+          iframeParsed2.body
             .querySelectorAll("*")
             .forEach(function (elementInsideIframe) {
               const elementIdentity = getElementIdentity(elementInsideIframe);
