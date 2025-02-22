@@ -621,7 +621,7 @@
       }
 
       // Format and push regular element information to the array
-      // limitMapCharacters(elementInfoMap, "tagName-found");
+      // limitMapCharacters(elementInfoMap, "tagName-Found");
 
       const {
         xpath,
