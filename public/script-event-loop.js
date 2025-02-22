@@ -321,72 +321,7 @@
     return elementInfoMap;
   };
 
-  const martiniSearchTerm = function martiniSearchTerm(
-    searchTerms,
-    elementInfoMap
-  ) {
-    let collectionFound = [];
-
-    // Collect elements from the current document using the provided search terms
-    searchTerms.forEach((selector) => {
-      collectionFound.push(...Array.from(document.querySelectorAll(selector)));
-    });
-
-    // Iterate over iframes and search inside them recursively
-    collectIframeElements(
-      document,
-      searchTerms,
-      collectionFound,
-      elementInfoMap
-    );
-
-    console.log("All element info stored in Map:", elementInfoMap);
-    return elementInfoMap;
-  };
-
-  const sendDataToIframe = function sendDataToIframe(
-    iframe,
-    collectionFound,
-    elementInfoMap,
-    isIframeChild
-  ) {
-    try {
-      const iframeWindow = iframe.contentWindow; // Get iframe's window object
-
-      // Create serializable data (exclude DOM elements)
-      const serializableData = collectionFound.map((node) => {
-        const { xpath, attribId, attribName, coords, someText, allAttributes } =
-          getElementIdentity(node) || {}; // Fallback to empty object
-        return { xpath, attribId, attribName, coords, someText, allAttributes };
-      });
-
-      const messageType = isIframeChild ? "iFrame-Child" : "iFrame-Found";
-
-      iframeWindow.postMessage(
-        {
-          type: messageType, // Message type for iFrame parent or child
-          data: serializableData, // Send serializable data
-          elementInfoMap: Array.from(elementInfoMap.entries()), // Send map as array
-        },
-        window.trustedOriginURL
-      ); // Send message to iframe with trusted origin
-    } catch (error) {
-      console.error("Error sending data to iframe:", error);
-    }
-  };
-
-  // Helper function to extract element identity
   const getElementIdentity = function getElementIdentity(element) {
-    // if (
-    //   element.offsetWidth === 0 ||
-    //   element.offsetHeight === 0 ||
-    //   window.getComputedStyle(element).visibility === "hidden" ||
-    //   !element.offsetWidth || // Safeguard against undefined
-    //   !element.offsetHeight
-    // ) {
-    //   return null; // Skip hidden or non-visible elements
-    // }
-
     const xpath = getMartiniXPath(element);
     const allAttributes = Array.from(element.attributes)
       .map((attr) => `${attr.name}="${attr.value}"`)
