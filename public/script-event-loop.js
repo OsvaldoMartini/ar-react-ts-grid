@@ -1,4 +1,4 @@
-(function (targetOriginURL, trustedOriginURL, searchTerms, hiddenFields) {
+(function (searchTerms, hiddenFields) {
   var pageFullyLoaded = false;
   var elementInfoMap = new Map();
   // var elementInfoSubmit = new Map();
@@ -98,10 +98,10 @@
       const srcElements = parsedDocument.querySelectorAll("*");
       console.log(`srcElements Total: <${srcElements.length}>`);
 
-      srcElements.forEach((element) => {
-        console.log(`Element: <${element.tagName}>`);
-        console.log("Text Content:", element.textContent.trim());
-      });
+      // srcElements.forEach((element) => {
+      //   console.log(`Element: <${element.tagName}>`);
+      //   console.log("Text Content:", element.textContent.trim());
+      // });
 
       return srcElements; // Return the NodeList
     } catch (error) {
@@ -410,12 +410,7 @@
     }
   }
 
-  checkEdgeTrackingPrevention();
-
-  // })(arguments[0], arguments[1], arguments[2], arguments[3]);
-})(
-  "http://localhost:3000/",
-  "http://localhost:3000/",
-  ["button", "input", "a", "div"],
-  false
-);
+  // checkEdgeTrackingPrevention();
+  // init("Initiate");
+})(arguments[0], arguments[1]);
+// })(["button", "input", "a", "div"], false);
