@@ -1,45 +1,115 @@
-(function (searchTerms, hiddenFields) {
+(function (searchTerms, hiddenFields, socketPort) {
+  let ws = null;
+  let attempts = 0; // Initialize attempts
+  window.searchTerms = [];
   var pageFullyLoaded = false;
   var elementInfoMap = new Map();
   // var elementInfoSubmit = new Map();
-  var allElementInfo = [];
+  window.allElementInfo = [];
+
+  function connectWebSocket() {
+    try {
+      ws = new WebSocket(`ws://localhost:${socketPort}/websocket`);
+
+      ws.onopen = () => {
+        console.log("WebSocket connected");
+        attempts = 0; // Reset attempts on successful connection
+
+        try {
+          const subscriptionMessage = {
+            type: "echo",
+            body: "subscribe",
+          };
+          ws.send(JSON.stringify(subscriptionMessage));
+        } catch (sendError) {
+          console.error("Failed to send subscription message:", sendError);
+        }
+
+        // Call startCollectingElements AFTER WebSocket is open
+        startCollectingElements(searchTerms);
+      };
+
+      ws.onmessage = (event) => {
+        let receivedMessage = event.data;
+
+        if (receivedMessage.endsWith("\u0000")) {
+          receivedMessage = receivedMessage.slice(0, -1);
+        }
+
+        if (receivedMessage) {
+          try {
+            const parsedObject = JSON.parse(receivedMessage);
+            console.log("WebSocket message received:", parsedObject);
+
+            // Process parsedObject.body and parsedObject.footer here
+            if (parsedObject.body.includes("data_updated")) {
+              //Handle data update
+            }
+
+            if (
+              parsedObject.body.includes("cannot be processed") ||
+              (parsedObject.footer &&
+                parsedObject.footer.includes("cannot be processed"))
+            ) {
+              //Handle cannot be processed
+            }
+          } catch (parseError) {
+            console.warn("Non-JSON message received:", receivedMessage);
+          }
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error("WebSocket error:", error);
+      };
+
+      ws.onclose = () => {
+        console.log("WebSocket connection closed");
+
+        if (attempts < 100) {
+          attempts++;
+          console.log(`Reconnecting attempt ${attempts}...`);
+          connectWebSocket(); // Retry connection
+        } else {
+          console.log("100 Attempts to Reconnect with the WebSocket.");
+        }
+      };
+    } catch (initError) {
+      console.error("Failed to initialize WebSocket:", initError);
+    }
+  }
+
+  connectWebSocket();
+
+  // Optionally, expose a cleanup function
+  window.cleanupWebSocket = () => {
+    try {
+      console.log("Cleaning up WebSocket...");
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.close();
+      }
+    } catch (cleanupError) {
+      console.error("Error during WebSocket cleanup:", cleanupError);
+    }
+  };
 
   function init(eventName) {
     if (pageFullyLoaded) {
       console.log("Event Name", eventName);
       if (
-        eventName === "DOMContentLoaded" ||
-        eventName === "onreadystatechange" ||
-        eventName === "load" ||
-        eventName === "onload"
+        [
+          "DOMContentLoaded",
+          "onreadystatechange",
+          "load",
+          "onload",
+          "Direct Execution",
+        ].includes(eventName) ||
+        ["complete", "interactive"].includes(document.readyState)
       ) {
-        elementInfoMap = startCollectingElements(searchTerms);
-
-        limitMapCharacters(elementInfoMap);
-        console.log("All element info stored in Map:", allElementInfo);
+        startCollectingElements(window.searchTerms);
       }
     }
-    {
-      pageFullyLoaded = true;
-    }
-  }
-
-  if (
-    document.readyState === "complete" ||
-    document.readyState === "interactive"
-  ) {
-    setTimeout(() => init("Direct Execution"), 0); // Ensures it runs after the event loop
-  } else if (document.addEventListener) {
-    document.addEventListener("DOMContentLoaded", () =>
-      setTimeout(() => init("DOMContentLoaded"), 0)
-    );
-    window.addEventListener("load", () => init("load"));
-  } else if (document.attachEvent) {
-    document.attachEvent("onreadystatechange", function () {
-      if (document.readyState === "complete")
-        setTimeout(() => init("onreadystatechange"), 0);
-    });
-    window.attachEvent("onload", () => init("onload"));
+    pageFullyLoaded = true;
   }
 
   // Function to collect general elements based on search terms
@@ -183,16 +253,16 @@
           if (iframe.src) {
             const srcElements = fetchAndParseIframeContent(iframe);
             if (srcElements) {
-              console.log("Fetched Elements:", srcElements);
+              // console.log("Fetched Elements:", srcElements);
 
               iFrameDetails(iframe, xPathIFrame, srcElements.length);
 
               srcElements.forEach(function (element) {
                 const elementIdentity = getElementIdentity(element);
-                console.log(
-                  "elementIdentity.xpath",
-                  `${xPathIFrame}${elementIdentity?.xpath}`
-                );
+                // console.log(
+                //   "elementIdentity.xpath",
+                //   `${xPathIFrame}${elementIdentity?.xpath}`
+                // );
                 if (elementIdentity) {
                   elementInfoMap.set(
                     `${xPathIFrame}${elementIdentity?.xpath}`,
@@ -224,10 +294,10 @@
             .forEach(function (elementInsideIframe) {
               const elementIdentity = getElementIdentity(elementInsideIframe);
 
-              console.log(
-                "elementIdentity.xpath",
-                `${xPathIFrame}${elementIdentity?.xpath}`
-              );
+              // console.log(
+              //   "elementIdentity.xpath",
+              //   `${xPathIFrame}${elementIdentity?.xpath}`
+              // );
               if (elementIdentity) {
                 elementInfoMap.set(
                   `${xPathIFrame}${elementIdentity?.xpath}`,
@@ -245,10 +315,10 @@
             const elementContent = element.textContent.trim(); // Get the text content of the element
 
             const elementIdentity = getElementIdentity(element);
-            console.log(
-              "elementIdentity.xpath",
-              `${xPathIFrame}${elementIdentity?.xpath}`
-            );
+            // console.log(
+            //   "elementIdentity.xpath",
+            //   `${xPathIFrame}${elementIdentity?.xpath}`
+            // );
             if (elementIdentity) {
               elementInfoMap.set(
                 `${xPathIFrame}${elementIdentity?.xpath}`,
@@ -288,10 +358,10 @@
       .forEach(function (elementInsideIframe) {
         const elementIdentity = getElementIdentity(elementInsideIframe);
 
-        console.log(
-          "elementIdentity.xpath",
-          `${xPathIFrame}${elementIdentity?.xpath}`
-        );
+        // console.log(
+        //   "elementIdentity.xpath",
+        //   `${xPathIFrame}${elementIdentity?.xpath}`
+        // );
         if (elementIdentity) {
           elementInfoMap.set(
             `${xPathIFrame}${elementIdentity?.xpath}`,
@@ -312,16 +382,44 @@
     let elementInfoMap = new Map(); // Initialize the map to store element information
     let collectionFound = [];
 
+    console.log("searchTerms", window.searchTerms);
     // First, collect iframe elements
     collectIframeElements(document, collectionFound, elementInfoMap);
 
     // Then, collect general elements based on search terms
     collectElements(document, searchTerms, collectionFound, elementInfoMap);
 
-    return elementInfoMap;
+    window.allElementInfo = [];
+    limitMapCharacters(elementInfoMap);
+    console.log("All element info stored in Map:", allElementInfo);
+
+    // WebSocket Message Sending Logic
+    if (window.webSocket && window.webSocket.readyState === WebSocket.OPEN) {
+      const message = {
+        type: "RESPONSE_BACK",
+        details: allElementInfo, // Send allElementInfo
+      };
+      window.webSocket.send(JSON.stringify(message));
+      console.log("Sent RESPONSE_BACK:", message);
+    } else {
+      console.warn("WebSocket is not open. Cannot send message.");
+    }
   };
 
   const getElementIdentity = function getElementIdentity(element) {
+    if (!hiddenFields) {
+      if (
+        (element.offsetWidth === 0 ||
+          element.offsetHeight === 0 ||
+          window.getComputedStyle(element).visibility === "hidden") &&
+        !(
+          element.tagName.toLowerCase() === "input" &&
+          element.type.toLowerCase() === "hidden"
+        )
+      ) {
+        return null; // Ignore all hidden elements except <input type="hidden">
+      }
+    }
     const xpath = getMartiniXPath(element);
     const allAttributes = Array.from(element.attributes)
       .map((attr) => `${attr.name}="${attr.value}"`)
@@ -384,7 +482,7 @@
   function limitMapCharacters(elementInfoMap, coordText) {
     elementInfoMap.forEach((value, key) => {
       let modifiedValue = value;
-      allElementInfo.push(modifiedValue);
+      window.allElementInfo.push(modifiedValue);
     });
   }
 
@@ -410,7 +508,27 @@
     }
   }
 
-  // checkEdgeTrackingPrevention();
+  checkEdgeTrackingPrevention();
+
+  // MOVE EVENT LISTENERS OUTSIDE
+  if (
+    document.readyState === "complete" ||
+    document.readyState === "interactive"
+  ) {
+    setTimeout(() => init("Direct Execution"), 0);
+  } else {
+    document.addEventListener("DOMContentLoaded", () =>
+      setTimeout(() => init("DOMContentLoaded"), 0)
+    );
+    window.addEventListener("load", () => init("load"));
+    document.attachEvent?.("onreadystatechange", function () {
+      if (document.readyState === "complete")
+        setTimeout(() => init("onreadystatechange"), 0);
+    });
+    window.attachEvent?.("onload", () => init("onload"));
+  }
+
+  startCollectingElements(searchTerms);
   // init("Initiate");
-})(arguments[0], arguments[1]);
-// })(["button", "input", "a", "div"], false);
+  // })(arguments[0], arguments[1]);
+})(["div"], true, 8181);
