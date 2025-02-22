@@ -83,19 +83,8 @@
   ) {
     doc.querySelectorAll("iframe").forEach((iframe) => {
       try {
-        let iframeDocument;
-        let iframeParsed1;
-        let iframeParsed2;
-        if (iframe.srcdoc) {
-          iframeDocument = iframe.contentDocument;
-          const parser = new DOMParser();
-          iframeParsed1 = parser.parseFromString(iframe.srcdoc, "text/html");
-        } else {
-          iframeDocument =
-            iframe.contentDocument || iframe.contentWindow.document;
-          const parser = new DOMParser();
-          iframeParsed2 = parser.parseFromString(iframeDocument, "text/html");
-        }
+        let iframeDocument =
+          iframe.contentDocument || iframe.contentWindow.document;
 
         try {
           console.log(
@@ -110,9 +99,7 @@
         if (iframe) {
           const xPathIFrame = getMartiniXPath(iframe); // Get the XPath of the iframe
           const iframeDetails = `Elements inside iframe: ${
-            iframeDocument.body
-              ? iframeDocument.body.querySelectorAll("*").length
-              : 0
+            iframeDocument ? iframeDocument.querySelectorAll("*").length : 0
           }`;
 
           console.log(
@@ -124,7 +111,6 @@
               "No description"
             }; ${iframeDetails}`
           );
-
           // Store the iframe details in the elementInfoMap
           elementInfoMap.set(
             xPathIFrame,
@@ -166,11 +152,20 @@
               }
             });
 
-          iframeDocument?.body
-            .querySelectorAll("*")
-            .forEach(function (elementInsideIframe) {
-              const elementIdentity = getElementIdentity(elementInsideIframe);
+          let iframeParsed = null;
+          const parser = new DOMParser();
+          if (iframe.srcdoc) {
+            iframeParsed = parser.parseFromString(iframe.srcdoc, "text/html");
 
+            // Select all elements inside the parsed document
+            const allElements = iframeParsed.querySelectorAll("*");
+
+            // Loop through all the elements and extract their properties
+            allElements.forEach(function (element) {
+              const elementType = element.tagName; // Get the tag name of the element
+              const elementContent = element.textContent.trim(); // Get the text content of the element
+
+              const elementIdentity = getElementIdentity(element);
               console.log(
                 "elementIdentity.xpath",
                 `${xPathIFrame}${elementIdentity?.xpath}`
@@ -178,53 +173,16 @@
               if (elementIdentity) {
                 elementInfoMap.set(
                   `${xPathIFrame}${elementIdentity?.xpath}`,
-                  `iFrame-Child;${elementInfoString(
-                    elementInsideIframe,
-                    elementIdentity
-                  )}`
+                  `iFrame-Child;${elementInfoString(element, elementIdentity)}`
                 );
               }
             });
+          }
 
-          iframeParsed1.body
-            .querySelectorAll("*")
-            .forEach(function (elementInsideIframe) {
-              const elementIdentity = getElementIdentity(elementInsideIframe);
-
-              console.log(
-                "elementIdentity.xpath",
-                `${xPathIFrame}${elementIdentity?.xpath}`
-              );
-              if (elementIdentity) {
-                elementInfoMap.set(
-                  `${xPathIFrame}${elementIdentity?.xpath}`,
-                  `iFrame-Child;${elementInfoString(
-                    elementInsideIframe,
-                    elementIdentity
-                  )}`
-                );
-              }
-            });
-
-          iframeParsed2.body
-            .querySelectorAll("*")
-            .forEach(function (elementInsideIframe) {
-              const elementIdentity = getElementIdentity(elementInsideIframe);
-
-              console.log(
-                "elementIdentity.xpath",
-                `${xPathIFrame}${elementIdentity?.xpath}`
-              );
-              if (elementIdentity) {
-                elementInfoMap.set(
-                  `${xPathIFrame}${elementIdentity?.xpath}`,
-                  `iFrame-Child;${elementInfoString(
-                    elementInsideIframe,
-                    elementIdentity
-                  )}`
-                );
-              }
-            });
+          // Process iframe content depending on the presence of srcdoc
+          if (iframeParsed) {
+            processIframeElements(iframeParsed, xPathIFrame);
+          }
 
           // If the iframe contains nested iframes, recursively collect them
           collectIframeElements(
@@ -243,6 +201,29 @@
         );
       }
     });
+  };
+
+  const processIframeElements = function (iframeDocument, xPathIFrame) {
+    // Collect all elements inside the iframe
+    iframeDocument
+      .querySelectorAll("*")
+      .forEach(function (elementInsideIframe) {
+        const elementIdentity = getElementIdentity(elementInsideIframe);
+
+        console.log(
+          "elementIdentity.xpath",
+          `${xPathIFrame}${elementIdentity?.xpath}`
+        );
+        if (elementIdentity) {
+          elementInfoMap.set(
+            `${xPathIFrame}${elementIdentity?.xpath}`,
+            `iFrame-Child;${elementInfoString(
+              elementInsideIframe,
+              elementIdentity
+            )}`
+          );
+        }
+      });
   };
 
   // Function to initialize the collection process
@@ -318,13 +299,15 @@
 
   // Helper function to extract element identity
   const getElementIdentity = function getElementIdentity(element) {
-    if (
-      element.offsetWidth === 0 ||
-      element.offsetHeight === 0 ||
-      window.getComputedStyle(element).visibility === "hidden"
-    ) {
-      return null; // Skip hidden or non-visible elements
-    }
+    // if (
+    //   element.offsetWidth === 0 ||
+    //   element.offsetHeight === 0 ||
+    //   window.getComputedStyle(element).visibility === "hidden" ||
+    //   !element.offsetWidth || // Safeguard against undefined
+    //   !element.offsetHeight
+    // ) {
+    //   return null; // Skip hidden or non-visible elements
+    // }
 
     const xpath = getMartiniXPath(element);
     const allAttributes = Array.from(element.attributes)
