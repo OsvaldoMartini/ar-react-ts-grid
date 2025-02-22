@@ -74,6 +74,67 @@
     });
   };
 
+  function fetchAndParseIframeContent(iframe) {
+    if (!iframe.src) return null;
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("GET", iframe.src, false); // 'false' makes the request synchronous
+
+    try {
+      xhr.send();
+
+      if (xhr.status !== 200) {
+        console.error("Error fetching the iframe content:", xhr.status);
+        return null;
+      }
+
+      const htmlContent = xhr.responseText;
+
+      // Parse the HTML content
+      const parser = new DOMParser();
+      const parsedDocument = parser.parseFromString(htmlContent, "text/html");
+
+      // Get all elements inside the parsed document
+      const srcElements = parsedDocument.querySelectorAll("*");
+      console.log(`srcElements Total: <${srcElements.length}>`);
+
+      srcElements.forEach((element) => {
+        console.log(`Element: <${element.tagName}>`);
+        console.log("Text Content:", element.textContent.trim());
+      });
+
+      return srcElements; // Return the NodeList
+    } catch (error) {
+      console.error("Error fetching the iframe content:", error);
+      return null;
+    }
+  }
+
+  const iFrameDetails = function iFrameDetails(iframe, xPathIFrame, childSize) {
+    const iframeDetails = `Elements inside iframe: ${childSize}`;
+
+    console.log(
+      `iFrame Found: ${
+        iframe.src ||
+        iframe.title ||
+        iframe.id ||
+        iframe.name ||
+        "No description"
+      }; ${iframeDetails}`
+    );
+    // Store the iframe details in the elementInfoMap
+    elementInfoMap.set(
+      xPathIFrame,
+      `xpath:${xPathIFrame};text:${
+        iframe.src ||
+        iframe.title ||
+        iframe.id ||
+        iframe.name ||
+        "No description"
+      };${iframeDetails}`
+    );
+  };
+
   // Function to collect iframe elements recursively
   const collectIframeElements = function collectIframeElements(
     doc,
@@ -99,73 +160,8 @@
         if (iframe) {
           let iframeParsed = null;
           let srcDocElements = null;
-          let srcElements = null;
-          const parser = new DOMParser();
-          if (iframe.srcdoc) {
-            iframeParsed = parser.parseFromString(iframe.srcdoc, "text/html");
-
-            // Select all elements inside the parsed document
-            srcDocElements = iframeParsed.querySelectorAll("*");
-          }
-
-          if (iframe.src) {
-            fetch(iframe.src)
-              .then((response) => response.text()) // Get the HTML content
-              .then((htmlContent) => {
-                // Use DOMParser to parse the HTML into a document
-                const parser = new DOMParser();
-                const parsedDocument = parser.parseFromString(
-                  htmlContent,
-                  "text/html"
-                );
-
-                // Now, you can query the elements inside the parsed document
-                srcElements = parsedDocument.querySelectorAll("*");
-
-                console.log(`srcElements Total: <${srcElements.length}>`);
-
-                srcElements.forEach((element) => {
-                  console.log(`Element: <${element.tagName}>`);
-                  console.log("Text Content:", element.textContent.trim());
-                });
-              })
-              .catch((error) => {
-                console.error("Error fetching the iframe content:", error);
-              });
-          }
 
           const xPathIFrame = getMartiniXPath(iframe); // Get the XPath of the iframe
-
-          const iframeDetails = `Elements inside iframe: ${
-            srcDocElements
-              ? srcDocElements.length
-              : srcElements
-              ? srcElements.length
-              : iframeDocument
-              ? iframeDocument.querySelectorAll("*").length
-              : 0
-          }`;
-
-          console.log(
-            `iFrame Found: ${
-              iframe.src ||
-              iframe.title ||
-              iframe.id ||
-              iframe.name ||
-              "No description"
-            }; ${iframeDetails}`
-          );
-          // Store the iframe details in the elementInfoMap
-          elementInfoMap.set(
-            xPathIFrame,
-            `xpath:${xPathIFrame};text:${
-              iframe.src ||
-              iframe.title ||
-              iframe.id ||
-              iframe.name ||
-              "No description"
-            };${iframeDetails}`
-          );
 
           const elementIdentity = getElementIdentity(iframe);
           if (elementIdentity) {
@@ -175,7 +171,54 @@
             );
           }
 
+          const parser = new DOMParser();
+
+          if (iframe.srcdoc) {
+            iframeParsed = parser.parseFromString(iframe.srcdoc, "text/html");
+
+            // Select all elements inside the parsed document
+            srcDocElements = iframeParsed.querySelectorAll("*");
+          }
+
+          if (iframe.src) {
+            const srcElements = fetchAndParseIframeContent(iframe);
+            if (srcElements) {
+              console.log("Fetched Elements:", srcElements);
+
+              iFrameDetails(iframe, xPathIFrame, srcElements.length);
+
+              srcElements.forEach(function (element) {
+                const elementIdentity = getElementIdentity(element);
+                console.log(
+                  "elementIdentity.xpath",
+                  `${xPathIFrame}${elementIdentity?.xpath}`
+                );
+                if (elementIdentity) {
+                  elementInfoMap.set(
+                    `${xPathIFrame}${elementIdentity?.xpath}`,
+                    `iFrame-Child;${elementInfoString(
+                      element,
+                      elementIdentity
+                    )}`
+                  );
+                }
+              });
+            }
+          }
+
           // Collect all elements inside the iframe
+          if (!iframe.src) {
+            iFrameDetails(
+              iframe,
+              xPathIFrame,
+              srcDocElements
+                ? srcDocElements.length
+                : iframeDocument
+                ? iframeDocument.querySelectorAll("*").length
+                : 0
+            );
+          }
+
           iframeDocument
             .querySelectorAll("*")
             .forEach(function (elementInsideIframe) {
@@ -198,23 +241,6 @@
 
           // Loop through all the elements and extract their properties
           srcDocElements?.forEach(function (element) {
-            const elementType = element.tagName; // Get the tag name of the element
-            const elementContent = element.textContent.trim(); // Get the text content of the element
-
-            const elementIdentity = getElementIdentity(element);
-            console.log(
-              "elementIdentity.xpath",
-              `${xPathIFrame}${elementIdentity?.xpath}`
-            );
-            if (elementIdentity) {
-              elementInfoMap.set(
-                `${xPathIFrame}${elementIdentity?.xpath}`,
-                `iFrame-Child;${elementInfoString(element, elementIdentity)}`
-              );
-            }
-          });
-
-          srcElements?.forEach(function (element) {
             const elementType = element.tagName; // Get the tag name of the element
             const elementContent = element.textContent.trim(); // Get the text content of the element
 
