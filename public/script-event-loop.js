@@ -1,5 +1,6 @@
 (function (targetOriginURL, trustedOriginURL, searchTerms, hiddenFields) {
   var pageFullyLoaded = false;
+  var elementInfoMap = new Map();
   // var elementInfoSubmit = new Map();
   var allElementInfo = [];
 
@@ -12,7 +13,6 @@
         eventName === "load" ||
         eventName === "onload"
       ) {
-        console.log("Page fully loaded. Collecting elements...");
         elementInfoMap = startCollectingElements(searchTerms);
 
         limitMapCharacters(elementInfoMap);
@@ -84,20 +84,27 @@
     doc.querySelectorAll("iframe").forEach((iframe) => {
       try {
         let iframeDocument;
-
         if (iframe.srcdoc) {
-          // Parse the srcdoc content into an actual HTML document
-          const parser = new DOMParser();
-          iframeDocument = parser.parseFromString(iframe.srcdoc, "text/html");
+          iframeDocument = iframe.contentDocument;
+          // const parser = new DOMParser();
+          // iframeDocument = parser.parseFromString(iframe.srcdoc, "text/html");
         } else {
           iframeDocument =
             iframe.contentDocument || iframe.contentWindow.document;
         }
 
-        // Process the iframe content (whether srcdoc or loaded from a URL)
+        try {
+          console.log(
+            "Iframe origin:",
+            new URL(iframe.src, window.location.origin).origin
+          );
+          console.log("Parent origin:", window.location.origin);
+        } catch (e) {
+          console.warn("Cross-origin access denied for iframe:", iframe.src);
+        }
+
         if (iframeDocument) {
-          // Now you can process the iframe's content just like any other document
-          const elementXPath = getMartiniXPath(iframe); // Get the XPath of the iframe
+          const xPathIFrame = getMartiniXPath(iframe); // Get the XPath of the iframe
           const iframeDetails = `Elements inside iframe: ${
             iframeDocument.body
               ? iframeDocument.body.querySelectorAll("*").length
@@ -116,8 +123,8 @@
 
           // Store the iframe details in the elementInfoMap
           elementInfoMap.set(
-            elementXPath,
-            `xpath:${elementXPath};text:${
+            xPathIFrame,
+            `xpath:${xPathIFrame};text:${
               iframe.src ||
               iframe.title ||
               iframe.id ||
@@ -139,9 +146,14 @@
             .querySelectorAll("*")
             .forEach(function (elementInsideIframe) {
               const elementIdentity = getElementIdentity(elementInsideIframe);
+
+              console.log(
+                "elementIdentity.xpath",
+                `${xPathIFrame}${elementIdentity?.xpath}`
+              );
               if (elementIdentity) {
                 elementInfoMap.set(
-                  elementIdentity.xpath,
+                  `${xPathIFrame}${elementIdentity?.xpath}`,
                   `iFrame-Child;${elementInfoString(
                     elementInsideIframe,
                     elementIdentity
@@ -158,7 +170,7 @@
             true
           );
         } else {
-          console.warn(`Skipping iframe: ${iframe.src}`);
+          console.warn(`Skipping cross-origin iframe: ${iframe.src}`);
         }
       } catch (e) {
         console.error(
