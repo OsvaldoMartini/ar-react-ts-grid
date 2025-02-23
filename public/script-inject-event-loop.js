@@ -1,14 +1,21 @@
-(function (searchTerms, hiddenFields, socketPort) {
-  var attempts = 0;
-  var wSocket = null;
-  var pageFullyLoaded = false;
+(function initSearchTerms(searchTerms, hiddenFields, socketPort) {
+  let attempts = 0;
+  let maxAttempts = 100;
+  let wSocket = null;
+  let pageFullyLoaded = false;
   window.elementInfoMap = new Map();
-  window.searchTerms = ["button", "input", "a"];
+  window.searchTerms = ["button", "input", "a", "select"];
   window.allElementInfo = [];
   // var elementInfoSubmit = new Map();
 
   function connectWebSocket() {
+    if (attempts >= maxAttempts) {
+      console.error("Reached maximum reconnection attempts. Stopping.");
+      return;
+    }
+
     try {
+      console.log(`Attempt ${attempts + 1} to connect to WebSocket...`);
       wSocket = new WebSocket(`ws://localhost:${socketPort}/websocket`);
 
       wSocket.onopen = () => {
@@ -61,17 +68,20 @@
 
       wSocket.onerror = (error) => {
         console.error("WebSocket error:", error);
+        // connectWebSocket(); // Retry connection
       };
 
       wSocket.onclose = () => {
         console.log("WebSocket connection closed");
 
-        if (attempts < 100) {
+        if (attempts < maxAttempts) {
           attempts++;
           console.log(`Reconnecting attempt ${attempts}...`);
           connectWebSocket(); // Retry connection
         } else {
-          console.log("100 Attempts to Reconnect with the WebSocket.");
+          console.log(
+            `${maxAttempts} Attempts to Reconnect with the WebSocket.`
+          );
         }
       };
     } catch (initError) {
@@ -462,11 +472,7 @@
       console.log("WebSocket readyState:", wSocket.readyState);
     }
 
-    if (
-      wSocket &&
-      wSocket.readyState === WebSocket.OPEN &&
-      window.allElementInfo.length > 0
-    ) {
+    if (wSocket && wSocket.readyState === WebSocket.OPEN) {
       const message = {
         type: "SEARCH_TOOL",
         details: window.allElementInfo, // Send allElementInfo
@@ -474,7 +480,7 @@
       wSocket.send(JSON.stringify(message));
       console.log("Sent SEARCH_TOOL:", message);
     } else {
-      console.warn("WebSocket is not open. Cannot send message.");
+      connectWebSocket(); // Retry connection
     }
   };
 
@@ -657,6 +663,14 @@
   }
 
   function extractTextFromHTML(element) {
+    // If element is invalid or empty, return an empty result
+    if (!element || element === " ") {
+      return {
+        text: [],
+        labels: [],
+        titles: [],
+      };
+    }
     const result = {
       text: new Set(), // Using Set to avoid duplicate text
       labels: new Set(), // Using Set to avoid duplicate labels
@@ -812,6 +826,7 @@
   connectWebSocket();
   // startCollectingElements(window.searchTerms);
   // init("Initiate");
+  // window.initSearchTerms = null; // Invalidating the function
 })(arguments[0], arguments[1], arguments[2]);
 // })([], false, 8181);
 // })(["with name"], false, 8181);

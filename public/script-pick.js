@@ -1,4 +1,4 @@
-(function pickTerms(
+(function (
   targetOriginURL,
   trustedOriginURL,
   searchTerms,
@@ -1067,5 +1067,5 @@
   });
 
   window.pickTerms = null; // Invalidating the function
-})(arguments[0], arguments[1], arguments[2], arguments[3]);
+})(arguments[0], arguments[1], arguments[2], arguments[3], arguments[4]);
 // })("http://localhost:3000/", "http://localhost:3000/", ["*"], false, 8181);

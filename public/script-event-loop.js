@@ -473,9 +473,10 @@
       };
       wSocket.send(JSON.stringify(message));
       console.log("Sent SEARCH_TOOL:", message);
-    } else {
-      console.warn("WebSocket is not open. Cannot send message.");
     }
+    // else {
+    //   console.warn("WebSocket is not open. Cannot send message.");
+    // }
   };
 
   const getElementIdentity = function getElementIdentity(element) {
@@ -657,6 +658,14 @@
   }
 
   function extractTextFromHTML(element) {
+    // If element is invalid or empty, return an empty result
+    if (!element || element === " ") {
+      return {
+        text: [],
+        labels: [],
+        titles: [],
+      };
+    }
     const result = {
       text: new Set(), // Using Set to avoid duplicate text
       labels: new Set(), // Using Set to avoid duplicate labels
@@ -812,9 +821,10 @@
   // connectWebSocket();
   // startCollectingElements(window.searchTerms);
   // init("Initiate");
-  // })(arguments[0], arguments[1], arguments[2]);
-  // })([], false, 8181);
-  // })(["with name"], false, 8181);
-  // })(["input", "button", "a"], false, 8181);
-  // })(["*"], false, 8181);
-})(["button"], false, 8181);
+  // window.initSearchTerms = null;
+})(arguments[0], arguments[1], arguments[2]);
+// })([], false, 8181);
+// })(["with name"], false, 8181);
+// })(["input", "button", "a"], false, 8181);
+// })(["*"], false, 8181);
+// })(["button"], false, 8181);
