@@ -121,7 +121,14 @@
   ) {
     // Collect elements from the current document using the provided search terms
     searchTerms.forEach((selector) => {
-      collectionFound.push(...Array.from(doc.querySelectorAll(selector)));
+      if (selector.includes("with id")) {
+        foundElements = foundElements.filter((el) => el.hasAttribute("id"));
+      } // If search term includes "with name", filter only elements that have a "name" attribute
+      else if (selector.includes("with name")) {
+        foundElements = foundElements.filter((el) => el.hasAttribute("name"));
+      } else {
+        collectionFound.push(...Array.from(doc.querySelectorAll(selector)));
+      }
     });
 
     // After collecting, process element identities for the parent document
@@ -135,11 +142,21 @@
       }
 
       const elementIdentity = getElementIdentity(element);
-      if (elementIdentity) {
-        elementInfoMap.set(
-          elementIdentity.xPath,
-          elementDTO("tagName-Found", element, elementIdentity)
-        );
+
+      if (searchTerms.includes("allWithText")) {
+        if ((elementIdentity, someText.length > 0)) {
+          elementInfoMap.set(
+            elementIdentity.xPath,
+            elementDTO("tagName-Found", element, elementIdentity)
+          );
+        }
+      } else {
+        if (elementIdentity) {
+          elementInfoMap.set(
+            elementIdentity.xPath,
+            elementDTO("tagName-Found", element, elementIdentity)
+          );
+        }
       }
     });
   };
