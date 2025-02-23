@@ -417,7 +417,7 @@
         return null; // Ignore all hidden elements except <input type="hidden">
       }
     }
-    const xpath = getMartiniXPath(element);
+    const xPath = getMartiniXPath(element);
     const attributeData = Array.from(element.attributes).map((attr) => ({
       name: attr.name,
       value: attr.value,
@@ -432,7 +432,7 @@
       (element.tagName.toLowerCase() === "input" ? element.value || "" : "");
 
     return {
-      xpath,
+      xPath,
       attributeData,
       customXPath: "",
       attribId,
