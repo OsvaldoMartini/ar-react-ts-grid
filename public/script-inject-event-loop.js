@@ -1,11 +1,11 @@
 (function (searchTerms, hiddenFields, socketPort) {
+  var attempts = 0;
   var wSocket = null;
-  var socketPort = socketPort;
   var elementInfoMap = new Map();
   var pageFullyLoaded = false;
-  var hiddenFields = false;
-  window.searchTerms = ["button", "input", "a", "div"];
-  var allElementInfo = [];
+  window.searchTerms = ["button", "input", "a"];
+  window.allElementInfo = [];
+  // var elementInfoSubmit = new Map();
 
   function connectWebSocket() {
     try {
@@ -104,7 +104,9 @@
         ].includes(eventName) ||
         ["complete", "interactive"].includes(document.readyState)
       ) {
-        startCollectingElements(window.searchTerms);
+        console.log("searchTerms", window.searchTerms);
+        connectWebSocket();
+        // startCollectingElements(window.searchTerms);
       }
     }
     pageFullyLoaded = true;
@@ -135,7 +137,7 @@
       const elementIdentity = getElementIdentity(element);
       if (elementIdentity) {
         elementInfoMap.set(
-          elementIdentity.xpath,
+          elementIdentity.xPath,
           elementDTO("tagName-Found", element, elementIdentity)
         );
       }
@@ -234,7 +236,7 @@
           const elementIdentity = getElementIdentity(iframe);
           if (elementIdentity) {
             elementInfoMap.set(
-              elementIdentity.xpath,
+              elementIdentity.xPath,
               elementDTO("iFrame-Found", iframe, elementIdentity)
             );
           }
@@ -258,7 +260,7 @@
               srcElements.forEach(function (element) {
                 const elementIdentity = getElementIdentity(element);
                 // console.log(
-                //   "elementIdentity.xpath",
+                //   "elementIdentity.xPath",
                 //   `${xPathIFrame}${elementIdentity?.xpath}`
                 // );
                 if (elementIdentity) {
@@ -290,7 +292,7 @@
               const elementIdentity = getElementIdentity(elementInsideIframe);
 
               // console.log(
-              //   "elementIdentity.xpath",
+              //   "elementIdentity.xPath",
               //   `${xPathIFrame}${elementIdentity?.xpath}`
               // );
               if (elementIdentity) {
@@ -309,7 +311,7 @@
           srcDocElements?.forEach(function (element) {
             const elementIdentity = getElementIdentity(element);
             // console.log(
-            //   "elementIdentity.xpath",
+            //   "elementIdentity.xPath",
             //   `${xPathIFrame}${elementIdentity?.xpath}`
             // );
             if (elementIdentity) {
@@ -352,7 +354,7 @@
         const elementIdentity = getElementIdentity(elementInsideIframe);
 
         // console.log(
-        //   "elementIdentity.xpath",
+        //   "elementIdentity.xPath",
         //   `${xPathIFrame}${elementIdentity?.xpath}`
         // );
         if (elementIdentity) {
@@ -417,7 +419,7 @@
         return null; // Ignore all hidden elements except <input type="hidden">
       }
     }
-    const xpath = getMartiniXPath(element);
+    const xPath = getMartiniXPath(element);
     const attributeData = Array.from(element.attributes).map((attr) => ({
       name: attr.name,
       value: attr.value,
@@ -427,12 +429,14 @@
     const coords = `${element.getBoundingClientRect().left.toFixed(2)},${element
       .getBoundingClientRect()
       .top.toFixed(2)}`;
-    const someText =
-      element.textContent.trim() ||
-      (element.tagName.toLowerCase() === "input" ? element.value || "" : "");
+    const someText = getSomeText(
+      element.tagName.toLowerCase(),
+      attributeData,
+      element
+    );
 
     return {
-      xpath,
+      xPath,
       attributeData,
       customXPath: "",
       attribId,
@@ -482,7 +486,7 @@
       typeElement: typeElement,
       tagName: element.tagName.toLowerCase(),
       xPath: identity.xPath ?? "",
-      text: identity.text ?? "",
+      someText: identity.someText ?? "",
       attribId: identity.attribId ?? "",
       attribName: identity.attribName ?? "",
       coords: identity.coords ?? "",
@@ -500,6 +504,197 @@
       let modifiedValue = value;
       window.allElementInfo.push(modifiedValue);
     });
+  }
+
+  function getSomeText(tagName, attributeData, element) {
+    let textSet = new Set();
+    let textResult = "";
+
+    if (["input", "textarea", "select", "button"].includes(tagName)) {
+      const extractedText = extractTextFromHTML(element || "");
+      textResult = [
+        ...extractedText.titles,
+        ...extractedText.text,
+        ...extractedText.labels,
+      ]
+        .join("; ")
+        .trim();
+    } else if (["option", "label", "a"].includes(tagName)) {
+      const extractedText = extractTextFromHTML(element || "");
+      textResult = [
+        ...extractedText.titles,
+        ...extractedText.text,
+        ...extractedText.labels,
+      ]
+        .join("; ")
+        .trim();
+    } else if (!["html", "body", "script"].includes(tagName)) {
+      const extractedText = extractTextFromHTML(element || "");
+      textResult = [
+        ...extractedText.titles,
+        ...extractedText.text,
+        ...extractedText.labels,
+      ]
+        .join("; ")
+        .trim();
+    }
+
+    // Now, extract text from attributes AFTER processing the element
+    // Now, extract text from attributes AFTER processing the element
+    attributeData.forEach((attr) => {
+      const trimmedValue = attr.value.trim();
+
+      if (trimmedValue) {
+        // Process only if value is not empty
+        if (
+          attr.name === "placeholder" ||
+          attr.name === "label" ||
+          attr.name === "name" ||
+          attr.name === "title" ||
+          attr.name === "id"
+        ) {
+          textSet.add(trimmedValue);
+        }
+      }
+    });
+
+    // Continue processing srcdoc separately
+    attributeData.forEach((attr) => {
+      if (attr.name === "srcdoc") {
+        try {
+          const doc = new DOMParser().parseFromString(attr.value, "text/html");
+          const extractedText = extractTextFromHTML(doc.body);
+          [
+            ...extractedText.titles,
+            ...extractedText.text,
+            ...extractedText.labels,
+          ].forEach((text) => textSet.add(text.trim()));
+        } catch (e) {
+          console.warn("Error parsing srcdoc:", e);
+        }
+      }
+    });
+
+    // Add the extracted text from the element to the set to avoid duplicates
+    textResult
+      .split(";")
+      .map((text) => text.trim())
+      .filter(Boolean)
+      .forEach((text) => textSet.add(text));
+
+    // Return a clean, unique, and deduplicated string
+    return Array.from(textSet).join("; ");
+  }
+
+  function extractTextFromHTML(element) {
+    const result = {
+      text: new Set(), // Using Set to avoid duplicate text
+      labels: new Set(), // Using Set to avoid duplicate labels
+      titles: new Set(), // Using Set to avoid duplicate titles
+    };
+
+    // Extract text content directly from the element (in case it has no children)
+    if (element.textContent) {
+      let elementText = element.textContent.trim();
+      if (elementText) {
+        result.text.add(elementText); // Using .add() instead of .push() for Set
+      }
+    }
+
+    // Extract label text from input placeholders and other form-related data
+    element.querySelectorAll("label").forEach((label) => {
+      if (label.textContent) {
+        let labelText = label.textContent.trim();
+        if (labelText) {
+          result.labels.add(labelText); // Using .add() for Set to ensure uniqueness
+        }
+      }
+
+      // Handle associated input fields (if the label has a 'for' attribute)
+      let forAttribute = label.getAttribute("for");
+      if (forAttribute) {
+        let associatedInput = element.querySelector(`#${forAttribute}`);
+        if (associatedInput) {
+          // Check if it's an input field or textarea and extract value or placeholder
+          let inputValue = associatedInput.value?.trim();
+          let inputPlaceholder = associatedInput.placeholder?.trim();
+          if (inputValue) {
+            result.text.add(inputValue); // Using .add() for Set to ensure uniqueness
+          } else if (inputPlaceholder) {
+            result.text.add(inputPlaceholder); // Fallback to placeholder
+          }
+        }
+      }
+    });
+
+    // Extract text from common block and inline elements
+    const textExtractors = [
+      "p",
+      "h1",
+      "h2",
+      "h3",
+      "h4",
+      "h5",
+      "h6",
+      "li",
+      "span",
+      "div",
+      "strong",
+      "em",
+      "b",
+      "i",
+      "blockquote",
+    ];
+
+    textExtractors.forEach((tagName) => {
+      element.querySelectorAll(tagName).forEach((childElement) => {
+        if (childElement.textContent) {
+          let elemText = childElement.textContent.trim();
+          if (elemText) {
+            result.text.add(elemText); // Using .add() for Set to ensure uniqueness
+          }
+        }
+      });
+    });
+
+    // Extract text from <a> tags (links)
+    element.querySelectorAll("a").forEach((link) => {
+      if (link.textContent) {
+        let linkText = link.textContent.trim();
+        if (linkText) {
+          result.text.add(linkText); // Using .add() for Set to ensure uniqueness
+        }
+      }
+    });
+
+    // Extract iframe titles and nested content
+    element.querySelectorAll("iframe").forEach((iframe) => {
+      if (iframe.getAttribute("title")) {
+        let title = iframe.getAttribute("title")?.trim();
+        if (title) {
+          result.titles.add(title); // Using .add() for Set to ensure uniqueness
+        }
+      }
+
+      try {
+        let iframeDoc =
+          iframe.contentDocument ||
+          new DOMParser().parseFromString(iframe.srcdoc || "", "text/html");
+        let iframeContent = extractTextFromHTML(iframeDoc); // Here we assume iframeDoc is an element.
+        iframeContent.titles.forEach((title) => result.titles.add(title));
+        iframeContent.text.forEach((text) => result.text.add(text));
+        iframeContent.labels.forEach((label) => result.labels.add(label));
+      } catch (e) {
+        console.warn("Could not access iframe content", e);
+      }
+    });
+
+    // Convert Sets to arrays before returning to maintain previous structure
+    return {
+      text: Array.from(result.text),
+      labels: Array.from(result.labels),
+      titles: Array.from(result.titles),
+    };
   }
 
   // Event listener to handle incoming messages from iframes
