@@ -548,4 +548,4 @@
   // startCollectingElements(window.searchTerms);
   // init("Initiate");
 })(arguments[0], arguments[1], arguments[2]);
-// })(["div"], false, 8181);
+// })(["input", "button", "a"], false, 8181);

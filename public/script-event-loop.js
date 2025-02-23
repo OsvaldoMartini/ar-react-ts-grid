@@ -1,6 +1,6 @@
 (function (searchTerms, hiddenFields, socketPort) {
   let attempts = 0;
-  wSocket = null;
+  var wSocket = null;
   window.searchTerms = [];
   var pageFullyLoaded = false;
   var elementInfoMap = new Map();
@@ -382,15 +382,19 @@
 
     window.allElementInfo = [];
     limitMapCharacters(elementInfoMap);
-    console.log("All element info stored in Map:", allElementInfo);
+    console.log("All element info stored in Map:", window.allElementInfo);
     elementInfoMap.clear();
 
     console.log("WebSocket readyState:", wSocket.readyState);
 
-    if (wSocket && wSocket.readyState === WebSocket.OPEN) {
+    if (
+      wSocket &&
+      wSocket.readyState === WebSocket.OPEN &&
+      window.allElementInfo.length > 0
+    ) {
       const message = {
         type: "SEARCH_TOOL",
-        details: allElementInfo, // Send allElementInfo
+        details: window.allElementInfo, // Send allElementInfo
       };
       wSocket.send(JSON.stringify(message));
       console.log("Sent SEARCH_TOOL:", message);
@@ -543,5 +547,5 @@
   // connectWebSocket();
   // startCollectingElements(searchTerms);
   // init("Initiate");
-  // })(arguments[0], arguments[1]);
-})(["div"], true, 8181);
+  // })(arguments[0], arguments[1], arguments[2]);
+})(["input", "button", "a"], false, 8181);

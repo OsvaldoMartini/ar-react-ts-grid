@@ -3,11 +3,13 @@ window.onload = function () {
   startCollectingElements();
 };
 
-// For testing, set trustedOriginURL locally
-window.trustedOriginURL = "http://localhost:3000/";
-
 // Function to collect general elements based on search terms
-function collectElements(doc, searchTerms, collectionFound, elementInfoMap) {
+const collectElements = function collectElements(
+  doc,
+  searchTerms,
+  collectionFound,
+  elementInfoMap
+) {
   // Collect elements from the current document using the provided search terms
   searchTerms.forEach((selector) => {
     collectionFound.push(...Array.from(doc.querySelectorAll(selector)));
@@ -31,10 +33,10 @@ function collectElements(doc, searchTerms, collectionFound, elementInfoMap) {
       );
     }
   });
-}
+};
 
 // Function to collect iframe elements recursively
-function collectIframeElements(
+const collectIframeElements = function collectIframeElements(
   doc,
   collectionFound,
   elementInfoMap,
@@ -117,10 +119,10 @@ function collectIframeElements(
       );
     }
   });
-}
+};
 
 // Function to initialize the collection process
-function startCollectingElements() {
+const startCollectingElements = function startCollectingElements() {
   const searchTerms = ["button", "input", "a", "div"]; // Define elements to search for
   let elementInfoMap = new Map(); // Initialize the map to store element information
   let collectionFound = [];
@@ -133,9 +135,12 @@ function startCollectingElements() {
 
   console.log("All element info stored in Map:", elementInfoMap);
   return elementInfoMap;
-}
+};
 
-function martiniSearchTerm(searchTerms, elementInfoMap) {
+const martiniSearchTerm = function martiniSearchTerm(
+  searchTerms,
+  elementInfoMap
+) {
   let collectionFound = [];
 
   // Collect elements from the current document using the provided search terms
@@ -148,9 +153,9 @@ function martiniSearchTerm(searchTerms, elementInfoMap) {
 
   console.log("All element info stored in Map:", elementInfoMap);
   return elementInfoMap;
-}
+};
 
-function sendDataToIframe(
+const sendDataToIframe = function sendDataToIframe(
   iframe,
   collectionFound,
   elementInfoMap,
@@ -179,24 +184,10 @@ function sendDataToIframe(
   } catch (error) {
     console.error("Error sending data to iframe:", error);
   }
-}
-
-// Event listener to handle incoming messages from iframes
-window.addEventListener("message", function (event) {
-  if (event.origin !== window.trustedOriginURL) {
-    return; // Ignore messages from untrusted origins
-  }
-
-  console.log("Received message data:", event.data);
-
-  if (event.data.type === "elementsData") {
-    const elementData = event.data.data; // Process received element data
-    console.log("Element data from parent:", elementData);
-  }
-});
+};
 
 // Helper function to extract element identity
-function getElementIdentity(element) {
+const getElementIdentity = function getElementIdentity(element) {
   if (
     element.offsetWidth === 0 ||
     element.offsetHeight === 0 ||
@@ -227,10 +218,10 @@ function getElementIdentity(element) {
     coords,
     someText,
   };
-}
+};
 
 // Helper function to generate a unique XPath for an element
-function getMartiniXPath(element) {
+const getMartiniXPath = function getMartiniXPath(element) {
   if (element === document.body) return "/html/body";
   let ix = 0;
   const siblings = element.parentNode ? element.parentNode.childNodes : [];
@@ -251,10 +242,10 @@ function getMartiniXPath(element) {
     }
   }
   return "";
-}
+};
 
 // Helper function to generate element information string
-function elementInfoString(element, identity) {
+const elementInfoString = function elementInfoString(element, identity) {
   return `${element.tagName.toLowerCase()};xpath:${identity.xpath};text:${
     identity.someText
   };attribId:${identity.attribId};attribName:${identity.attribName};coords:${
@@ -262,4 +253,21 @@ function elementInfoString(element, identity) {
   };allAttributes:${identity.allAttributes};customXPath:${
     identity.customXPath
   };`;
-}
+};
+
+// Event listener to handle incoming messages from iframes
+window.addEventListener("message", function (event) {
+  if (event.origin !== window.trustedOriginURL) {
+    return; // Ignore messages from untrusted origins
+  }
+
+  console.log("Received message data:", event.data);
+
+  if (event.data.type === "elementsData") {
+    const elementData = event.data.data; // Process received element data
+    console.log("Element data from parent:", elementData);
+  }
+});
+
+// For testing, set trustedOriginURL locally
+window.trustedOriginURL = "http://localhost:3000/";
