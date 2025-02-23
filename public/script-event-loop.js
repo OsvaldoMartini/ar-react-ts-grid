@@ -1,8 +1,8 @@
 (function (searchTerms, hiddenFields, socketPort) {
   var attempts = 0;
   var wSocket = null;
-  var elementInfoMap = new Map();
   var pageFullyLoaded = false;
+  window.elementInfoMap = new Map();
   window.searchTerms = ["button", "input", "a"];
   window.allElementInfo = [];
   // var elementInfoSubmit = new Map();
@@ -116,20 +116,30 @@
   const collectElements = function collectElements(
     doc,
     searchTerms,
-    collectionFound,
-    elementInfoMap
+    collectionFound
   ) {
     // Collect elements from the current document using the provided search terms
-    searchTerms.forEach((selector) => {
-      if (selector.includes("with id")) {
-        foundElements = foundElements.filter((el) => el.hasAttribute("id"));
-      } // If search term includes "with name", filter only elements that have a "name" attribute
-      else if (selector.includes("with name")) {
-        foundElements = foundElements.filter((el) => el.hasAttribute("name"));
-      } else {
-        collectionFound.push(...Array.from(doc.querySelectorAll(selector)));
-      }
-    });
+    if (searchTerms.length > 0) {
+      searchTerms.forEach((selector) => {
+        // If search term includes "with id", filter only elements that have an "id" attribute
+        if (selector.includes("with id")) {
+          collectionFound.push(...Array.from(doc.querySelectorAll("[id]")));
+        } // If search term includes "with id", filter only elements that have an "id" attribute
+        else if (selector.includes("with name")) {
+          foundElements = Array.from(doc.querySelectorAll("[name]"));
+          collectionFound.push(...Array.from(doc.querySelectorAll("[name]")));
+        } else {
+          collectionFound.push(...Array.from(doc.querySelectorAll(selector)));
+        }
+      });
+    } else {
+      // Collect all elements except iframes
+      collectionFound.push(
+        ...Array.from(doc.querySelectorAll("*")).filter(
+          (el) => el.tagName.toLowerCase() !== "iframe"
+        )
+      );
+    }
 
     // After collecting, process element identities for the parent document
     collectionFound.forEach((element) => {
@@ -142,24 +152,61 @@
       }
 
       const elementIdentity = getElementIdentity(element);
-
-      if (searchTerms.includes("allWithText")) {
-        if ((elementIdentity, someText.length > 0)) {
-          elementInfoMap.set(
-            elementIdentity.xPath,
-            elementDTO("tagName-Found", element, elementIdentity)
-          );
-        }
-      } else {
-        if (elementIdentity) {
-          elementInfoMap.set(
-            elementIdentity.xPath,
-            elementDTO("tagName-Found", element, elementIdentity)
-          );
-        }
+      if (elementIdentity) {
+        filterSearchTerms(
+          "tagName-Found",
+          elementIdentity.xPath,
+          elementIdentity,
+          searchTerms
+        );
       }
     });
   };
+
+  function filterSearchTerms(
+    typeDTO,
+    referXPath,
+    elementIdentity,
+    searchTerms
+  ) {
+    if (searchTerms.length === 0) {
+      // If no search terms, directly add the element
+      window.elementInfoMap.set(
+        referXPath,
+        elementDTO(typeDTO, elementIdentity)
+      );
+      return;
+    }
+    // Iterate through search terms and apply corresponding checks
+    searchTerms.forEach((term) => {
+      let matches = false;
+
+      if (
+        term.includes("with id") &&
+        elementIdentity.attributeData.some((attr) => attr.name === "id")
+      ) {
+        matches = true;
+      } else if (
+        term.includes("with name") &&
+        elementIdentity.attributeData.some((attr) => attr.name === "name")
+      ) {
+        matches = true;
+      } else if (
+        term.includes("allWithText") &&
+        elementIdentity.someText.length > 0
+      ) {
+        matches = true;
+      }
+
+      // If a match is found, set the element in the map
+      if (matches) {
+        window.elementInfoMap.set(
+          referXPath,
+          elementDTO(typeDTO, elementIdentity)
+        );
+      }
+    });
+  }
 
   function fetchAndParseIframeContent(iframe) {
     if (!iframe.src) return null;
@@ -226,7 +273,6 @@
   const collectIframeElements = function collectIframeElements(
     doc,
     collectionFound,
-    elementInfoMap,
     isIframeChild = false
   ) {
     doc.querySelectorAll("iframe").forEach((iframe) => {
@@ -252,9 +298,11 @@
 
           const elementIdentity = getElementIdentity(iframe);
           if (elementIdentity) {
-            elementInfoMap.set(
+            filterSearchTerms(
+              "iFrame-Found",
               elementIdentity.xPath,
-              elementDTO("iFrame-Found", iframe, elementIdentity)
+              elementIdentity,
+              searchTerms
             );
           }
 
@@ -278,12 +326,15 @@
                 const elementIdentity = getElementIdentity(element);
                 // console.log(
                 //   "elementIdentity.xPath",
-                //   `${xPathIFrame}${elementIdentity?.xpath}`
+                //   `${xPathIFrame}${elementIdentity?.xPath}`
                 // );
                 if (elementIdentity) {
-                  elementInfoMap.set(
-                    `${xPathIFrame}${elementIdentity?.xpath}`,
-                    elementDTO("iFrame-Child", element, elementIdentity)
+                  elementIdentity.iFrameXPath = xPathIFrame;
+                  filterSearchTerms(
+                    "iFrame-Child",
+                    `${xPathIFrame}${elementIdentity?.xPath}`,
+                    elementIdentity,
+                    searchTerms
                   );
                 }
               });
@@ -310,16 +361,15 @@
 
               // console.log(
               //   "elementIdentity.xPath",
-              //   `${xPathIFrame}${elementIdentity?.xpath}`
+              //   `${xPathIFrame}${elementIdentity?.xPath}`
               // );
               if (elementIdentity) {
-                elementInfoMap.set(
-                  `${xPathIFrame}${elementIdentity?.xpath}`,
-                  elementDTO(
-                    "iFrame-Child",
-                    elementInsideIframe,
-                    elementIdentity
-                  )
+                elementIdentity.iFrameXPath = xPathIFrame;
+                filterSearchTerms(
+                  "iFrame-Child",
+                  `${xPathIFrame}${elementIdentity?.xPath}`,
+                  elementIdentity,
+                  searchTerms
                 );
               }
             });
@@ -329,12 +379,15 @@
             const elementIdentity = getElementIdentity(element);
             // console.log(
             //   "elementIdentity.xPath",
-            //   `${xPathIFrame}${elementIdentity?.xpath}`
+            //   `${xPathIFrame}${elementIdentity?.xPath}`
             // );
             if (elementIdentity) {
-              elementInfoMap.set(
-                `${xPathIFrame}${elementIdentity?.xpath}`,
-                elementDTO("iFrame-Child", element, elementIdentity)
+              elementIdentity.iFrameXPath = xPathIFrame;
+              filterSearchTerms(
+                "iFrame-Child",
+                `${xPathIFrame}${elementIdentity?.xPath}`,
+                elementIdentity,
+                searchTerms
               );
             }
           });
@@ -345,12 +398,7 @@
           }
 
           // If the iframe contains nested iframes, recursively collect them
-          collectIframeElements(
-            iframeDocument,
-            collectionFound,
-            elementInfoMap,
-            true
-          );
+          collectIframeElements(iframeDocument, collectionFound, true);
         } else {
           console.warn(`Skipping cross-origin iframe: ${iframe.src}`);
         }
@@ -372,12 +420,15 @@
 
         // console.log(
         //   "elementIdentity.xPath",
-        //   `${xPathIFrame}${elementIdentity?.xpath}`
+        //   `${xPathIFrame}${elementIdentity?.xPath}`
         // );
         if (elementIdentity) {
-          elementInfoMap.set(
-            `${xPathIFrame}${elementIdentity?.xpath}`,
-            elementDTO("iFrame-Child", elementInsideIframe, elementIdentity)
+          elementIdentity.iFrameXPath = xPathIFrame;
+          filterSearchTerms(
+            "iFrame-Child",
+            `${xPathIFrame}${elementIdentity?.xPath}`,
+            elementIdentity,
+            searchTerms
           );
         }
       });
@@ -388,7 +439,7 @@
     searchTerms
   ) {
     // const searchTerms = ["button", "input", "a", "div"]; // Define elements to search for
-    let elementInfoMap = new Map(); // Initialize the map to store element information
+    window.elementInfoMap = new Map(); // Initialize the map to store element information
     let collectionFound = [];
 
     // First, collect iframe elements
@@ -398,9 +449,9 @@
     collectElements(document, searchTerms, collectionFound, elementInfoMap);
 
     window.allElementInfo = [];
-    limitMapCharacters(elementInfoMap);
+    limitMapCharacters(window.elementInfoMap);
     console.log("All element info stored in Map:", window.allElementInfo);
-    elementInfoMap.clear();
+    window.elementInfoMap.clear();
 
     if (wSocket && wSocket.readyState) {
       console.log("WebSocket readyState:", wSocket.readyState);
@@ -437,6 +488,7 @@
       }
     }
     const xPath = getMartiniXPath(element);
+    const tagName = element.tagName.toLowerCase();
     const attributeData = Array.from(element.attributes).map((attr) => ({
       name: attr.name,
       value: attr.value,
@@ -446,14 +498,11 @@
     const coords = `${element.getBoundingClientRect().left.toFixed(2)},${element
       .getBoundingClientRect()
       .top.toFixed(2)}`;
-    const someText = getSomeText(
-      element.tagName.toLowerCase(),
-      attributeData,
-      element
-    );
+    const someText = getSomeText(tagName, attributeData, element);
 
     return {
       xPath,
+      tagName,
       attributeData,
       customXPath: "",
       attribId,
@@ -498,10 +547,10 @@
     };`;
   };
 
-  const elementDTO = function elementDTO(typeElement, element, identity) {
+  const elementDTO = function elementDTO(typeElement, identity) {
     return {
       typeElement: typeElement,
-      tagName: element.tagName.toLowerCase(),
+      tagName: identity.tagName ?? "No Tag Name Detected",
       xPath: identity.xPath ?? "",
       someText: identity.someText ?? "",
       attribId: identity.attribId ?? "",
@@ -516,7 +565,7 @@
     };
   };
 
-  function limitMapCharacters(elementInfoMap, coordText) {
+  function limitMapCharacters(elementInfoMap) {
     elementInfoMap.forEach((value, key) => {
       let modifiedValue = value;
       window.allElementInfo.push(modifiedValue);
@@ -759,4 +808,4 @@
   // startCollectingElements(window.searchTerms);
   // init("Initiate");
   // })(arguments[0], arguments[1], arguments[2]);
-})(["input", "button", "a"], false, 8181);
+})(["with name"], false, 8181);
