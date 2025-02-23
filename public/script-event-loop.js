@@ -169,7 +169,12 @@
     elementIdentity,
     searchTerms
   ) {
-    if (searchTerms.length === 0) {
+    if (
+      searchTerms.length === 0 ||
+      (!searchTerms.includes("with id") &&
+        !searchTerms.includes("with name") &&
+        !searchTerms.includes("allWithText"))
+    ) {
       // If no search terms, directly add the element
       window.elementInfoMap.set(
         referXPath,
@@ -808,4 +813,8 @@
   // startCollectingElements(window.searchTerms);
   // init("Initiate");
   // })(arguments[0], arguments[1], arguments[2]);
-})(["with name"], false, 8181);
+  // })([], false, 8181);
+  // })(["with name"], false, 8181);
+  // })(["input", "button", "a"], false, 8181);
+  // })(["*"], false, 8181);
+})(["button"], false, 8181);
