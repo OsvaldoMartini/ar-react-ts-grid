@@ -52,6 +52,7 @@ const PageOne = () => {
           <div className="input-field">
             <span>First Name</span>
             <input
+              id="firstName"
               type="text"
               name="name"
               value={formData.name}
@@ -63,6 +64,7 @@ const PageOne = () => {
           <div className="input-field">
             <span>Surname</span>
             <input
+              id="surName"
               type="text"
               name="surname"
               value={formData.surname}
@@ -74,6 +76,7 @@ const PageOne = () => {
           <div className="select-field">
             <span>Address</span>
             <select
+              id="seletAddress"
               name="address"
               defaultValue=""
             >
@@ -90,6 +93,7 @@ const PageOne = () => {
           <div className="select-field">
             <span>Name and Surname</span>
             <select
+              id="selectName"
               name="names"
               defaultValue=""
               onChange={handleNameChange}
@@ -111,6 +115,7 @@ const PageOne = () => {
           {/* Clean button below Name and Surname combo */}
           <div className="clean-button-container">
             <button
+              id="btnClean"
               type="button"
               onClick={handleClean}
               className={`clean-button ${isClicked ? 'clicked' : ''}`}

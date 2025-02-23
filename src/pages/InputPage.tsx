@@ -11,6 +11,7 @@ const InputPage: React.FC = () => {
     <div>
       <h1>Enter Details</h1>
       <input
+        name="inputDetails"
         type="text"
         placeholder="Type here..."
         value={inputValue}

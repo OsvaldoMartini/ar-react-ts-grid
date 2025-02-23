@@ -6,6 +6,7 @@ const FilterComponent: React.FC = () => {
     <div
       className="avq-text-primary avq-display-flex avq-align-items-center ng-star-inserted"
       test-id="web-banking-wealth-global-filter-applied-banklet.wealth-global-filter-applied.filter-name"
+      id="filterCompWeb-banking"
     >
       <MatIcon
         icon="filter_list" // Material icon name

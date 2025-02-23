@@ -8,6 +8,7 @@ interface FilterButtonProps {
 const FilterButton: React.FC<FilterButtonProps> = ({ onClick }) => {
   return (
     <Button
+      id="filterButton"
       onClick={onClick}
       color="primary"
       variant="text"

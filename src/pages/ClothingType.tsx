@@ -70,13 +70,17 @@ const ClothingType: React.FC = () => {
   return (
     <div className="app-container">
       <div className="dropdown-container">
-        <div className="column">
+        {/* <div className="column">
           <Card />
-        </div>
-
+        </div> */}
         <div className="column">
           <h3>Clothes for Horses</h3>
-          <select onChange={handleHorseClothingChange} value={selectedHorseClothing}>
+          <select
+            id="horse-clothing-select" // Added id attribute
+            name="horseClothing" // Added name attribute
+            onChange={handleHorseClothingChange}
+            value={selectedHorseClothing}
+          >
             {clothingTypes.map((item) => (
               <option key={item.id} value={item.id}>
                 {item.name}
