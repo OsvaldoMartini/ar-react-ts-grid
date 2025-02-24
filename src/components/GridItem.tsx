@@ -39,7 +39,7 @@ import inactiveImage from '../assets/inactive2.png';
 
 import AlertModal from './AlertModal';
 import { useWebSocket } from './useWebSocket';
-import AttributeData from './AttributeData';
+import AttributeDropdown from './AttributeDropdown';
 
 
 interface GridItemProps {
@@ -3363,7 +3363,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
                         </span>
 
                         <div>
-                          <AttributeData elementDTO={elementDTO} onChange={handleAttributeChange} />
+                          <AttributeDropdown elementDTO={elementDTO} onChange={handleAttributeChange} />
                         </div>
                         <div className="options-column">
                           <div className="move-buttons">
