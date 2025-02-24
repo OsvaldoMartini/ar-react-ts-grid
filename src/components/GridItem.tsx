@@ -39,6 +39,7 @@ import inactiveImage from '../assets/inactive2.png';
 
 
 import AlertModal from './AlertModal';
+import { useWebSocket } from './useWebSocket';
 
 
 interface GridItemProps {
@@ -125,9 +126,14 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
   const [botJobLoaded, setBotJobLoaded] = useState<boolean>(false);
   const [socketPort, setSocketPort] = useState<number>(8181);
   const [isDataReordered, setIsDataReordered] = useState<boolean>(false);
-  const [webSocket, setWebSocket] = useState<WebSocket | null>(null);
+  // const [webSocket, setWebSocket] = useState<WebSocket | null>(null);
+
+  // const [socketPort, setSocketPort] = useState(8181);
+  const { webSocket, connected, reconnectAttempts } = useWebSocket(socketPort);
+
+
   // const [client, setClient] = useState<Client | null>(null);
-  const [connected, setConnected] = useState(false);
+  // const [connected, setConnected] = useState(false);
   const [lastMessages, setLastMessages] = useState<any[]>([]);
   const [dropdownPosition, setDropdownPosition] = useState('below'); // Default to 'below'
   const [updatedBlocks, setUpdatedBlocks] = useState<UpdatedBlock[]>([]);
@@ -144,7 +150,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
   const [alertMessageBody, setAlertMessageBody] = useState<string | ComplexMessage[]>([]);
   const [alertMessageFooter, setAlertMessageFooter] = useState<string | null>(null);
   const [alertDismissed, setAlertDismissed] = useState(false);
-  const [reconnectAttempts, setReconnectAttempts] = useState(0); // Track attempts
+  // const [reconnectAttempts, setReconnectAttempts] = useState(0); // Track attempts
 
   // Function to handle receiving data from JavaFX
   (window as any).receiveDataFromJava = function (jsonData: string, socketPort: number) {
@@ -614,166 +620,166 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
 
 
   // WebSocket connection effect
-  useEffect(() => {
-    if (errorFlag && !alertDismissed) return; // Wait for modal to be dismissed
+  // useEffect(() => {
+  //   if (errorFlag && !alertDismissed) return; // Wait for modal to be dismissed
 
-    let ws: WebSocket | null = null;
-    let attempts = reconnectAttempts; // Use local variable for attempts
+  //   let ws: WebSocket | null = null;
+  //   let attempts = reconnectAttempts; // Use local variable for attempts
 
-    const createWebSocket = async () => {
-      try {
-        ws = new WebSocket(`ws://localhost:${socketPort}/websocket`);
+  //   const createWebSocket = async () => {
+  //     try {
+  //       ws = new WebSocket(`ws://localhost:${socketPort}/websocket`);
 
-        ws.onopen = () => {
-          console.log("WebSocket connected");
-          setConnected(true);
-          setReconnectAttempts(0); // Reset attempts on successful connection
+  //       ws.onopen = () => {
+  //         console.log("WebSocket connected");
+  //         setConnected(true);
+  //         setReconnectAttempts(0); // Reset attempts on successful connection
 
-          // Close the alert modal when connected
-          setErrorFlag(false);
-          setAlertDismissed(true);
-          setAlertMessageHeader("");
-          setAlertMessageBody("");
+  //         // Close the alert modal when connected
+  //         setErrorFlag(false);
+  //         setAlertDismissed(true);
+  //         setAlertMessageHeader("");
+  //         setAlertMessageBody("");
 
-          // Try to send the subscription message
-          try {
-            const subscriptionMessage = {
-              type: "echo",
-              body: "subscribe",
-            };
-            ws?.send(JSON.stringify(subscriptionMessage));
-          } catch (sendError) {
-            console.error("Failed to send subscription message:", sendError);
-            setAlertMessageHeader("WebSocket Error");
-            setErrorFlag(true);
-            setAlertMessageBody("Failed to send subscription message.");
-          }
-        };
+  //         // Try to send the subscription message
+  //         try {
+  //           const subscriptionMessage = {
+  //             type: "echo",
+  //             body: "subscribe",
+  //           };
+  //           ws?.send(JSON.stringify(subscriptionMessage));
+  //         } catch (sendError) {
+  //           console.error("Failed to send subscription message:", sendError);
+  //           setAlertMessageHeader("WebSocket Error");
+  //           setErrorFlag(true);
+  //           setAlertMessageBody("Failed to send subscription message.");
+  //         }
+  //       };
 
-        ws.onmessage = (event: MessageEvent) => {
-          // console.log("WebSocket message received:", event.data);
-          let receivedMessage = event.data;
+  //       ws.onmessage = (event: MessageEvent) => {
+  //         // console.log("WebSocket message received:", event.data);
+  //         let receivedMessage = event.data;
 
-          // Remove null character if it exists
-          if (receivedMessage.endsWith("\u0000")) {
-            receivedMessage = receivedMessage.slice(0, -1);
-          }
+  //         // Remove null character if it exists
+  //         if (receivedMessage.endsWith("\u0000")) {
+  //           receivedMessage = receivedMessage.slice(0, -1);
+  //         }
 
-          if (receivedMessage) {
-            try {
-              const parsedObject = JSON.parse(receivedMessage);
-              const updatedMessages = [...lastMessagesRef.current, parsedObject.body];
-              if (updatedMessages.length <= 5) {
-                setLastMessages(updatedMessages);
-              }
+  //         if (receivedMessage) {
+  //           try {
+  //             const parsedObject = JSON.parse(receivedMessage);
+  //             const updatedMessages = [...lastMessagesRef.current, parsedObject.body];
+  //             if (updatedMessages.length <= 5) {
+  //               setLastMessages(updatedMessages);
+  //             }
 
-              if (parsedObject.body.includes("data_updated")) {
-                try {
-
-
-                  // Ensure footerData is always an array if possible
-                  const footerData = typeof parsedObject.footer === "string"
-                    ? JSON.parse(parsedObject.footer)
-                    : parsedObject.footer;
-
-                  if (footerData && Array.isArray(footerData)) {
-                    setInstructionsData(footerData);
-                    setIsDataReordered(false);
-                  } else {
-                    console.error("Parsed footer is not an array:", footerData);
-                    setErrorFlag(true);
-                    setAlertMessageHeader("Data Error");
-                    setAlertMessageBody("Received data_updated event, but footer is not a valid array.");
-                  }
-                } catch (parseError) {
-                  console.error("Error parsing data_updated message:", parseError);
-                  setErrorFlag(true);
-                  setAlertMessageHeader("Parsing Error");
-                  setAlertMessageBody("Failed to parse data_updated message.");
-                }
-              }
+  //             if (parsedObject.body.includes("data_updated")) {
+  //               try {
 
 
-              if (parsedObject.body.includes("cannot be processed") || (parsedObject.footer && parsedObject.footer.includes("cannot be processed"))) {
+  //                 // Ensure footerData is always an array if possible
+  //                 const footerData = typeof parsedObject.footer === "string"
+  //                   ? JSON.parse(parsedObject.footer)
+  //                   : parsedObject.footer;
 
-                setAlertImage(warningRedImage);
-                setAlertMessageHeader("Action Error");
-                setErrorFlag(true);
-                setAlertMessageBody(parsedObject.body);
-                if (parsedObject.footer) {
-                  setAlertMessageFooter(parsedObject.footer);
-                }
-                setAlertClass('construction-image');
-              }
+  //                 if (footerData && Array.isArray(footerData)) {
+  //                   setInstructionsData(footerData);
+  //                   setIsDataReordered(false);
+  //                 } else {
+  //                   console.error("Parsed footer is not an array:", footerData);
+  //                   setErrorFlag(true);
+  //                   setAlertMessageHeader("Data Error");
+  //                   setAlertMessageBody("Received data_updated event, but footer is not a valid array.");
+  //                 }
+  //               } catch (parseError) {
+  //                 console.error("Error parsing data_updated message:", parseError);
+  //                 setErrorFlag(true);
+  //                 setAlertMessageHeader("Parsing Error");
+  //                 setAlertMessageBody("Failed to parse data_updated message.");
+  //               }
+  //             }
 
-            } catch (parseError) {
-              console.warn("Non-JSON message received:", receivedMessage);
-              const updatedMessages = [...lastMessagesRef.current, receivedMessage];
-              if (updatedMessages.length <= 5) {
-                setLastMessages(updatedMessages);
-              }
-              setAlertImage(warningRedImage);
-              setAlertMessageHeader("WebSocket Error");
-              setErrorFlag(true);
-              setAlertMessageBody(`WebSocket: ${receivedMessage}`);
-            }
-          }
-        };
 
-        ws.onerror = (error: Event) => {
-          console.error("WebSocket error:", error);
-          setAlertImage(warningRedImage);
-          setAlertMessageHeader("WebSocket Error");
-          setErrorFlag(true);
-          setAlertMessageBody(
-            `WebSocket connection failed. ${reconnectAttempts} - Attempt.`
-          );
-        };
+  //             if (parsedObject.body.includes("cannot be processed") || (parsedObject.footer && parsedObject.footer.includes("cannot be processed"))) {
 
-        ws.onclose = () => {
-          console.log("WebSocket connection closed");
-          setConnected(false);
+  //               setAlertImage(warningRedImage);
+  //               setAlertMessageHeader("Action Error");
+  //               setErrorFlag(true);
+  //               setAlertMessageBody(parsedObject.body);
+  //               if (parsedObject.footer) {
+  //                 setAlertMessageFooter(parsedObject.footer);
+  //               }
+  //               setAlertClass('construction-image');
+  //             }
 
-          if (attempts < 100) {
-            attempts++;
-            setReconnectAttempts(attempts);
-            setAlertImage(warningRedImage);
-            console.log(`Reconnecting attempt ${attempts}...`);
-            setAlertMessageBody(`${attempts} - Attempt to reconnect.`);
-            createWebSocket(); // Retry connection
-          } else {
-            // setAlertImage(warningRedImage);
-            // setAlertMessageHeader("WebSocket Error");
-            // setErrorFlag(true);
-            // setAlertMessageBody("100 Attempts to Reconnect with the WebSocket.");
-            // setAlertMessageFooter("Please restart the Web Scanner or contact the Administrator.");
-          }
-        };
+  //           } catch (parseError) {
+  //             console.warn("Non-JSON message received:", receivedMessage);
+  //             const updatedMessages = [...lastMessagesRef.current, receivedMessage];
+  //             if (updatedMessages.length <= 5) {
+  //               setLastMessages(updatedMessages);
+  //             }
+  //             setAlertImage(warningRedImage);
+  //             setAlertMessageHeader("WebSocket Error");
+  //             setErrorFlag(true);
+  //             setAlertMessageBody(`WebSocket: ${receivedMessage}`);
+  //           }
+  //         }
+  //       };
 
-        setWebSocket(ws);
-      } catch (initError) {
-        console.error("Failed to initialize WebSocket:", initError);
-        setAlertImage(warningRedImage);
-        setAlertMessageHeader("WebSocket Initialization Error");
-        setErrorFlag(true);
-        setAlertMessageBody("Failed to initialize WebSocket connection.");
-      }
-    };
+  //       ws.onerror = (error: Event) => {
+  //         console.error("WebSocket error:", error);
+  //         setAlertImage(warningRedImage);
+  //         setAlertMessageHeader("WebSocket Error");
+  //         setErrorFlag(true);
+  //         setAlertMessageBody(
+  //           `WebSocket connection failed. ${reconnectAttempts} - Attempt.`
+  //         );
+  //       };
 
-    createWebSocket();
+  //       ws.onclose = () => {
+  //         console.log("WebSocket connection closed");
+  //         setConnected(false);
 
-    // Cleanup on component unmount or dependency change
-    return () => {
-      try {
-        console.log("Cleaning up WebSocket...");
-        if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.close();
-        }
-      } catch (cleanupError) {
-        console.error("Error during WebSocket cleanup:", cleanupError);
-      }
-    };
-  }, [socketPort, alertDismissed]);
+  //         if (attempts < 100) {
+  //           attempts++;
+  //           setReconnectAttempts(attempts);
+  //           setAlertImage(warningRedImage);
+  //           console.log(`Reconnecting attempt ${attempts}...`);
+  //           setAlertMessageBody(`${attempts} - Attempt to reconnect.`);
+  //           createWebSocket(); // Retry connection
+  //         } else {
+  //           // setAlertImage(warningRedImage);
+  //           // setAlertMessageHeader("WebSocket Error");
+  //           // setErrorFlag(true);
+  //           // setAlertMessageBody("100 Attempts to Reconnect with the WebSocket.");
+  //           // setAlertMessageFooter("Please restart the Web Scanner or contact the Administrator.");
+  //         }
+  //       };
+
+  //       setWebSocket(ws);
+  //     } catch (initError) {
+  //       console.error("Failed to initialize WebSocket:", initError);
+  //       setAlertImage(warningRedImage);
+  //       setAlertMessageHeader("WebSocket Initialization Error");
+  //       setErrorFlag(true);
+  //       setAlertMessageBody("Failed to initialize WebSocket connection.");
+  //     }
+  //   };
+
+  //   createWebSocket();
+
+  //   // Cleanup on component unmount or dependency change
+  //   return () => {
+  //     try {
+  //       console.log("Cleaning up WebSocket...");
+  //       if (ws && ws.readyState === WebSocket.OPEN) {
+  //         ws.close();
+  //       }
+  //     } catch (cleanupError) {
+  //       console.error("Error during WebSocket cleanup:", cleanupError);
+  //     }
+  //   };
+  // }, [socketPort, alertDismissed]);
 
   useEffect(() => {
     //console.log("UseEffect -> editingInstructionId");
