@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Client, IMessage } from "@stomp/stompjs";
-import { BlockLoopInstructionLoadDTO, BotJobData, ComplexMessage, UpdatedBlock, WebSocketMessage } from './instructionsMockData';
+import { AttributeData, BlockLoopInstructionLoadDTO, BotJobData, ComplexMessage, ElementDTO, UpdatedBlock, WebSocketMessage } from './instructionsMockData';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd'; // Import from react-beautiful-dnd
 import './griditem.scss';
 
@@ -43,6 +43,7 @@ import AlertModal from './AlertModal';
 
 interface GridItemProps {
   data: BlockLoopInstructionLoadDTO[];
+  dataDTO: ElementDTO[];
   botJobData: BotJobData;
 }
 
@@ -74,6 +75,23 @@ const groupByBlock = (data: BlockLoopInstructionLoadDTO[]) => {
   return blocks;
 };
 
+// Function to group data by typeElement and sort elements within each type
+const groupByTypeElement = (data: ElementDTO[]) => {
+  const groupedElements = data.reduce((result, item) => {
+    const { typeElement } = item;
+
+    if (!result[typeElement]) {
+      result[typeElement] = { typeElement, elements: [] };
+    }
+
+    result[typeElement].elements.push(item);
+    return result;
+  }, {} as Record<string, { typeElement: string; elements: ElementDTO[] }>);
+
+  return groupedElements;
+};
+
+
 // Helper function to reassign instructionOrderNumber starting from 1 within each block
 const reassignInstructionOrderNumbersByBlock = (instructions: BlockLoopInstructionLoadDTO[]) => {
   // Group instructions by blockId
@@ -92,7 +110,7 @@ const reassignInstructionOrderNumbersByBlock = (instructions: BlockLoopInstructi
   return updatedInstructions;
 };
 
-const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
+const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
   // Use state to manage the instructions data
   const instructionRef = useRef<HTMLInputElement>(null);
   const blockRef = useRef<HTMLInputElement>(null);
@@ -100,10 +118,12 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
   const [openDropdown, setOpenDropdown] = useState<number | null>(null);
   const [mockData, setMockData] = useState<boolean>(false);
   const [instructionsData, setInstructionsData] = useState<BlockLoopInstructionLoadDTO[]>(data);
+  const [elementDTO, setElementDTO] = useState<ElementDTO[]>(dataDTO);
+  const [elementGrouped, setElementGrouped] = useState<{ [typeElement: string]: { typeElement: string; elements: ElementDTO[]; } }>({});
+  const [groupedData, setGroupedData] = useState<{ [blockId: number]: { blockName: string; exportFile?: string; instructions: BlockLoopInstructionLoadDTO[] } }>({});
   const [botJob, setBotJob] = useState<BotJobData>(botJobData);
   const [botJobLoaded, setBotJobLoaded] = useState<boolean>(false);
   const [socketPort, setSocketPort] = useState<number>(8181);
-  const [groupedData, setGroupedData] = useState<{ [blockId: number]: { blockName: string; exportFile?: string; instructions: BlockLoopInstructionLoadDTO[] } }>({});
   const [isDataReordered, setIsDataReordered] = useState<boolean>(false);
   const [webSocket, setWebSocket] = useState<WebSocket | null>(null);
   // const [client, setClient] = useState<Client | null>(null);
@@ -811,6 +831,11 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
       // Group the data and update groupedData
       const updatedGroupedData = groupByBlock(reassignedData);
       setGroupedData(updatedGroupedData);
+
+
+      // Group the data and update groupedData
+      const elementsGroupedData = groupByTypeElement(elementDTO);
+      setElementGrouped(elementsGroupedData);
 
       // Trigger the `useEffect` to send WebSocket message
       setUpdatedBlocks(updatedBlocks);
@@ -1547,6 +1572,59 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
     setAlertMessageBody([]);
     setAlertMessageFooter(null);
   };
+
+
+  const handleCreateElementDTO = (elementDTO: ElementDTO) => {
+    console.log("handleCreateElementDTO:", elementDTO)
+
+    // Send WebSocket message with block split details
+    if (webSocket && connected) {
+      const message = {
+        type: "NEW_ELEMENT_DTO",
+        details: [elementDTO],
+      };
+
+      webSocket.send(JSON.stringify(message));
+
+      console.log('Sent create element DTO:', message);
+    }
+  }
+  const handleRemoveElementDTO = (elementDTO: ElementDTO) => {
+    console.log("handleRemoveElementDTO:", elementDTO)
+
+    // Send WebSocket message with block split details
+    if (webSocket && connected) {
+      const message = {
+        type: "RESPONSE_BACK",  //'RESPONSE_BACK' for tests,
+        details: [elementDTO],
+      };
+
+      webSocket.send(JSON.stringify(message));
+
+      console.log('Sent create element DTO:', message);
+    }
+
+  }
+
+  const renderAttributes = (attributesData: AttributeData[], onChange?: (value: string) => void) => (
+    <div className="attributes-dropdown-wrapper">
+      <select
+        className="attributes-dropdown"
+        onChange={(e) => onChange?.(e.target.value)}
+      >
+        {attributesData.length === 0 ? (
+          <option value="-1">no attributes</option>
+        ) : (
+          attributesData.map((attribute, index) => (
+            <option key={index} value={attribute.value}>
+              {attribute.name}
+            </option>
+          ))
+        )}
+      </select>
+    </div>
+  );
+
 
   const handleCreateComponent = (blockGroupId: number) => {
     // Access groupedData, setGroupedData, instructionsData, and preComponent from the component's scope
@@ -2842,6 +2920,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
   };
 
 
+
   return (
     <div className="grid-container">
       {alertMessageBody && alertMessageBody.length > 0 && (
@@ -3240,8 +3319,56 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobData }) => {
               ))
           )}
       </DragDropContext >
+
+      <div className="grid-container">
+        {elementDTO && elementDTO.length > 0 && (
+          Object.keys(elementGrouped).length === 0 ? (
+            <div className="block">
+              <div className="block-header">
+                <span className="block-order-number">#1</span>
+                <span className="block-name">Default Type Element</span>
+              </div>
+              <div className="instructions-list">
+                <div id={`dropdown-${1}`} ref={dropdownRef} className={`dropdown-menu ${dropdownPosition === 'above' ? 'dropdown-above' : ''}`}>
+                  <div onClick={() => handleNewStepAfter(1)}>Insert New Element</div>
+                </div>
+                <div className="instruction-item"> </div>
+              </div>
+            </div>
+          ) : (
+            Object.entries(elementGrouped)
+              .map(([typeElement, elementData], index) => (
+                <div key={typeElement} className="block">
+                  <div className="block-header">
+                    <span className="block-order-number">#{index + 1}</span>
+                    <span className="block-name">{typeElement}</span>
+                    <span className="block-count">({elementData.elements.length})</span>
+                  </div>
+                  <div className="instructions-list">
+                    {elementData.elements.map((element, i) => (
+                      <div key={i} className="instruction-item">
+                        <span className="instruction-line">
+                          {element.tagName} - {element.xPath}
+                        </span>
+                        {renderAttributes(element.attributeData)}
+                        <div className="options-column">
+                          <div className="move-buttons">
+                            <img src={saveImage} alt="save" className="save-button" onClick={() => handleCreateElementDTO(element)} />
+                            <img src={crossImage} alt="" className="cross-button" onClick={() => handleRemoveElementDTO(element)} />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))
+          )
+        )}
+      </div>
+
     </div >
   );
+
 
 };
 

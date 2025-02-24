@@ -22,6 +22,7 @@ export interface BlockLoopInstructionLoadDTO {
   loopOnly?: boolean;
 }
 
+
 export interface ElementDTO {
   typeElement: string;
   tagName: string;
@@ -48,11 +49,13 @@ export interface WebSocketMessage {
   body: any;
 }
 
+
 export interface ComplexMessage {
   parentNameWithId: string; // Format: "(parentId)parentName"
   connectionLabel: string;  // "Connected to:"
   actions: string;          // A string of actions, separated by commas
 }
+
 
 export interface UpdatedBlock {
   botJobId: number | null;  // Adjust the type based on actual data (use `null` if it's nullable)
@@ -88,11 +91,7 @@ export const elementsDTOMockData: ElementDTO[] = [
     "attribId": "submit",
     "attribName": "submitBtn",
     "coords": "100,200",
-    "attributeData": [
-      { "name": "id", "value": "submit" },
-      { "name": "title", "value": "Click to submit the form" },
-      { "name": "aria-label", "value": "Submit button" }
-    ],
+    "attributeData": [],
     "customXPath": "//button[contains(text(),'Submit')]",
     "iFrameXPath": "",
     "attributeValue": "enabled",
@@ -107,11 +106,7 @@ export const elementsDTOMockData: ElementDTO[] = [
     "attribId": "userInput",
     "attribName": "username",
     "coords": "150,250",
-    "attributeData": [
-      { "name": "id", "value": "username" },
-      { "name": "placeholder", "value": "Enter username" },
-      { "name": "maxlength", "value": "50" }
-    ],
+    "attributeData": [],
     "customXPath": "//input[@placeholder='Enter username']",
     "iFrameXPath": "",
     "attributeValue": "text",
@@ -126,11 +121,7 @@ export const elementsDTOMockData: ElementDTO[] = [
     "attribId": "password",
     "attribName": "passwordInput",
     "coords": "150,280",
-    "attributeData": [
-      { "name": "id", "value": "password" },
-      { "name": "placeholder", "value": "Enter password" },
-      { "name": "autocomplete", "value": "off" }
-    ],
+    "attributeData": [],
     "customXPath": "//input[@name='password']",
     "iFrameXPath": "",
     "attributeValue": "password",
@@ -145,11 +136,7 @@ export const elementsDTOMockData: ElementDTO[] = [
     "attribId": "",
     "attribName": "errorDiv",
     "coords": "160,300",
-    "attributeData": [
-      { "name": "class", "value": "alert alert-danger" },
-      { "name": "role", "value": "alert" },
-      { "name": "aria-live", "value": "assertive" }
-    ],
+    "attributeData": [],
     "customXPath": "//div[contains(text(),'Error')]",
     "iFrameXPath": "",
     "attributeValue": "visible",
@@ -164,10 +151,7 @@ export const elementsDTOMockData: ElementDTO[] = [
     "attribId": "",
     "attribName": "forgotPwd",
     "coords": "170,320",
-    "attributeData": [
-      { "name": "href", "value": "/forgot-password" },
-      { "name": "title", "value": "Go to forgot password page" }
-    ],
+    "attributeData": [],
     "customXPath": "//a[contains(text(),'Forgot')]",
     "iFrameXPath": "",
     "attributeValue": "link",
@@ -182,10 +166,7 @@ export const elementsDTOMockData: ElementDTO[] = [
     "attribId": "",
     "attribName": "usernameLabel",
     "coords": "100,200",
-    "attributeData": [
-      { "name": "for", "value": "username" },
-      { "name": "class", "value": "form-label" }
-    ],
+    "attributeData": [],
     "customXPath": "//label[contains(text(),'Username')]",
     "iFrameXPath": "",
     "attributeValue": "text",
@@ -200,11 +181,7 @@ export const elementsDTOMockData: ElementDTO[] = [
     "attribId": "countrySelect",
     "attribName": "country",
     "coords": "200,350",
-    "attributeData": [
-      { "name": "id", "value": "country" },
-      { "name": "name", "value": "country" },
-      { "name": "aria-label", "value": "Select country" }
-    ],
+    "attributeData": [],
     "customXPath": "//select[@name='country']",
     "iFrameXPath": "",
     "attributeValue": "dropdown",
@@ -219,10 +196,7 @@ export const elementsDTOMockData: ElementDTO[] = [
     "attribId": "",
     "attribName": "usOption",
     "coords": "210,360",
-    "attributeData": [
-      { "name": "value", "value": "US" },
-      { "name": "selected", "value": "true" }
-    ],
+    "attributeData": [],
     "customXPath": "//option[contains(text(),'United States')]",
     "iFrameXPath": "",
     "attributeValue": "selected",
@@ -237,11 +211,7 @@ export const elementsDTOMockData: ElementDTO[] = [
     "attribId": "agree",
     "attribName": "agreeCheck",
     "coords": "220,370",
-    "attributeData": [
-      { "name": "id", "value": "agree" },
-      { "name": "name", "value": "agree" },
-      { "name": "checked", "value": "false" }
-    ],
+    "attributeData": [],
     "customXPath": "//input[@name='agree']",
     "iFrameXPath": "",
     "attributeValue": "checked",
@@ -256,10 +226,7 @@ export const elementsDTOMockData: ElementDTO[] = [
     "attribId": "male",
     "attribName": "genderRadio",
     "coords": "230,380",
-    "attributeData": [
-      { "name": "value", "value": "male" },
-      { "name": "checked", "value": "true" }
-    ],
+    "attributeData": [],
     "customXPath": "//input[@value='male']",
     "iFrameXPath": "",
     "attributeValue": "selected",
@@ -274,12 +241,7 @@ export const elementsDTOMockData: ElementDTO[] = [
     "attribId": "comments",
     "attribName": "commentsTextArea",
     "coords": "240,390",
-    "attributeData": [
-      { "name": "id", "value": "comments" },
-      { "name": "placeholder", "value": "Enter your comments" },
-      { "name": "rows", "value": "4" },
-      { "name": "cols", "value": "50" }
-    ],
+    "attributeData": [],
     "customXPath": "//textarea[@name='comments']",
     "iFrameXPath": "",
     "attributeValue": "text",
@@ -294,10 +256,7 @@ export const elementsDTOMockData: ElementDTO[] = [
     "attribId": "",
     "attribName": "helpTooltip",
     "coords": "250,400",
-    "attributeData": [
-      { "name": "class", "value": "tooltip-text" },
-      { "name": "aria-describedby", "value": "help" }
-    ],
+    "attributeData": [],
     "customXPath": "//span[contains(text(),'Help')]",
     "iFrameXPath": "",
     "attributeValue": "visible",
@@ -312,10 +271,7 @@ export const elementsDTOMockData: ElementDTO[] = [
     "attribId": "dataTable",
     "attribName": "dataTable",
     "coords": "260,410",
-    "attributeData": [
-      { "name": "id", "value": "dataTable" },
-      { "name": "class", "value": "table-striped" }
-    ],
+    "attributeData": [],
     "customXPath": "//table[contains(@class,'data-table')]",
     "iFrameXPath": "",
     "attributeValue": "structure",
@@ -330,9 +286,7 @@ export const elementsDTOMockData: ElementDTO[] = [
     "attribId": "",
     "attribName": "tableRow",
     "coords": "270,420",
-    "attributeData": [
-      { "name": "class", "value": "row1" }
-    ],
+    "attributeData": [],
     "customXPath": "//tr[contains(@class,'row1')]",
     "iFrameXPath": "",
     "attributeValue": "row",
@@ -347,10 +301,8 @@ export const elementsDTOMockData: ElementDTO[] = [
     "attribId": "",
     "attribName": "tableCell",
     "coords": "280,430",
-    "attributeData": [
-      { "name": "class", "value": "column1" }
-    ],
-    "customXPath": "//td[contains(text(),'Cell Data')]",
+    "attributeData": [],
+    "customXPath": "//td[contains(@class,'column1')]",
     "iFrameXPath": "",
     "attributeValue": "text",
     "attributeType": "string",

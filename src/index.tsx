@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client';
 import './index.css';
 import reportWebVitals from './reportWebVitals';
 import GridItem from './components/GridItem';
-import instructionsMockData, { botJobMockData } from './components/instructionsMockData5';
+import instructionsMockData, { botJobMockData, elementsDTOMockData } from './components/instructionsMockData5';
 import Navigable from './components/Navigable';
 import NavigableBKP from './components/NavigableBKP';
 import ToggleActive from './components/ToggleActive';
@@ -45,19 +45,19 @@ root.render(
     {/* |<WebSocketComponentClient2></WebSocketComponentClient2> */}
     {/* <WebSocketComponent></WebSocketComponent> */}
     {/* <Card /> */}
-    {/* <GridItem data={instructionsMockData} botJobData={botJobMockData} /> */}
+    <GridItem data={instructionsMockData} dataDTO={elementsDTOMockData} botJobData={botJobMockData} />
     {/* <WebSocketComponent></WebSocketComponent> */}
     {/* <StompMessage /> */}
     {/* <Navigable dataHtml={dataHtml} /> */}
     {/* <NavigableBKP /> */}
-    <Router>
+    {/* <Router>
       <Menu />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/page1" element={<PageOne />} />
         <Route path="/about" element={<About />} />
       </Routes>
-    </Router>
+    </Router> */}
   </React.StrictMode>
 
 );

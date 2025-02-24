@@ -268,9 +268,42 @@
   display: inline-block; /* Ensure the span behaves as a block but allows space for the next element */
 }
 
+.attributes-dropdown {
+  font-weight: bold; /* Make the text bold */
+  margin-right: 3px; /* Add a 3px gap after the span */
+  display: inline-block; /* Ensure the span behaves as a block but allows space for the next element */
+  padding: 6px 12px; /* Add padding inside the dropdown for better readability */
+  border-radius: 4px; /* Round the corners of the dropdown */
+  border: 1px solid #ccc; /* Subtle border */
+  background-color: #f9f9f9; /* Light background */
+  font-size: 14px; /* Adjust font size */
+  transition: all 0.3s ease; /* Smooth transition for interactions */
+}
+
+.attributes-dropdown:hover {
+  border-color: #888; /* Slightly change border color on hover */
+  background-color: #f0f0f0; /* Lighter background on hover */
+}
+
+.attributes-dropdown option {
+  padding: 8px 12px; /* Add padding inside options for better clickability */
+  background-color: #fff; /* White background for options */
+}
+
+.attributes-dropdown option:hover {
+  background-color: #e0e0e0; /* Add hover effect to options */
+}
+
+.attributes-dropdown-wrapper {
+  display: inline-block;
+  margin: 8px 0; /* Add margin for spacing around the dropdown */
+}
+
+
 .light-yellow-background {
   background-color: #ffffe0; /* Light yellow color */
 }
+
 
 /* Dropdown arrow styling */
 .dropdown-column {
