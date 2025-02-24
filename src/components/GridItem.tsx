@@ -1595,7 +1595,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
     // Send WebSocket message with block split details
     if (webSocket && connected) {
       const message = {
-        type: "RESPONSE_BACK",  //'RESPONSE_BACK' for tests,
+        type: "DEL_ELEMENT_DTO",
         details: [elementDTO],
       };
 
@@ -1671,7 +1671,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
       };
 
       const message = {
-        type: "BLOCKS_COMPONENT",  //'RESPONSE_BACK' for tests,
+        type: "BLOCKS_COMPONENT",
         details: blockComnponent,
       };
 
