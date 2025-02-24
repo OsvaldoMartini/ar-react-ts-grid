@@ -5,18 +5,22 @@ const AttributeDropdown: React.FC<{ elementDTO: ElementDTO; onChange?: (value: s
   elementDTO,
   onChange,
 }) => {
-  const [selectedAttribute, setSelectedAttribute] = useState<string | null>(() => {
-    if (elementDTO?.attributeData?.length) {
-      return elementDTO.attributeData[0].value; // Default to the first attribute
-    }
-    return elementDTO?.attributeValue || null; // Fallback
-  });
+  const findBestAttribute = () => {
+    if (!elementDTO?.attributeData?.length) return elementDTO?.attributeValue || null;
+
+    const attributeMap = new Map(elementDTO.attributeData.map(attr => [attr.name.toLowerCase(), attr.value]));
+
+    return attributeMap.get("id") ||
+      attributeMap.get("name") ||
+      attributeMap.get("type") ||
+      elementDTO.attributeData[0].value; // Default to the first available attribute
+  };
+
+  const [selectedAttribute, setSelectedAttribute] = useState<string | null>(findBestAttribute);
 
   useEffect(() => {
-    if (!selectedAttribute && elementDTO?.attributeData?.length) {
-      setSelectedAttribute(elementDTO.attributeData[0].value);
-    }
-  }, [elementDTO.attributeData, selectedAttribute]);
+    setSelectedAttribute(findBestAttribute());
+  }, [elementDTO.attributeData]);
 
   if (!elementDTO || !Array.isArray(elementDTO.attributeData)) {
     return <div>Error: Invalid element data</div>;
