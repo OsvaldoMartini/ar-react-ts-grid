@@ -79,15 +79,15 @@ const groupByBlock = (data: BlockLoopInstructionLoadDTO[]) => {
 // Function to group data by typeElement and sort elements within each type
 const groupByTypeElement = (data: ElementDTO[]) => {
   const groupedElements = data.reduce((result, item) => {
-    const { typeElement } = item;
+    const { tagName } = item;
 
-    if (!result[typeElement]) {
-      result[typeElement] = { typeElement, elements: [] };
+    if (!result[tagName]) {
+      result[tagName] = { tagName, elements: [] };
     }
 
-    result[typeElement].elements.push(item);
+    result[tagName].elements.push(item);
     return result;
-  }, {} as Record<string, { typeElement: string; elements: ElementDTO[] }>);
+  }, {} as Record<string, { tagName: string; elements: ElementDTO[] }>);
 
   return groupedElements;
 };
@@ -120,11 +120,12 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
   const [mockData, setMockData] = useState<boolean>(false);
   const [instructionsData, setInstructionsData] = useState<BlockLoopInstructionLoadDTO[]>(data);
   const [elementDTO, setElementDTO] = useState<ElementDTO[]>(dataDTO);
-  const [elementGrouped, setElementGrouped] = useState<{ [typeElement: string]: { typeElement: string; elements: ElementDTO[]; } }>({});
+  const [elementGrouped, setElementGrouped] = useState<{ [tagName: string]: { tagName: string; elements: ElementDTO[]; } }>({});
   const [groupedData, setGroupedData] = useState<{ [blockId: number]: { blockName: string; exportFile?: string; instructions: BlockLoopInstructionLoadDTO[] } }>({});
   const [botJob, setBotJob] = useState<BotJobData>(botJobData);
   const [botJobLoaded, setBotJobLoaded] = useState<boolean>(false);
   const [isDataReordered, setIsDataReordered] = useState<boolean>(false);
+  const [isElementGrouped, setIsElementGrouped] = useState<boolean>(false);
 
   // Using the custom WebSocket hook
   const [socketPort, setSocketPort] = useState<number>(8181);
@@ -787,28 +788,29 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
       const lastMessage = messages[messages.length - 1];
       console.log('RECEIVED -> Last WebSocket message ', lastMessage);
       try {
-        const parsedMessage = JSON.parse(lastMessage)
+        const parsedMessage = JSON.parse(lastMessage);
 
         const bodyData = typeof parsedMessage.body === "string"
           ? JSON.parse(parsedMessage.body)
           : parsedMessage.body;
 
         if (bodyData.type === "updateInstructions") {
-          // setInstructionsData(footerData);
-          // setIsDataReordered(false);
+          // ... handle updateInstructions ...
         } else if (bodyData.sessionId === "scannerDestDTO") {
           // Ensure detailsData is always an array if possible
           const detailsData = Array.isArray(bodyData.details) ? bodyData.details : [];
+
+          // Update elementDTO first
           setElementDTO(detailsData);
+          // Then, set isElementGrouped to false, triggering the useEffect
+          setIsElementGrouped(false);
         }
 
       } catch (error) {
         console.error("Error parsing WebSocket message:", error);
       }
     }
-  }, [messages]); // Reacts only when `messages` updates
-
-
+  }, [messages]);
 
 
   useEffect(() => {
@@ -863,11 +865,11 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
 
 
   useEffect(() => {
-    if (elementDTO && elementDTO.length > 0) {
-      // Ensure detailsData is always an array if possible
+    if (!isElementGrouped && elementDTO && elementDTO.length > 0) {
       setElementGrouped(groupByTypeElement(elementDTO));
+      setIsElementGrouped(true);
     }
-  }, [elementDTO]);
+  }, [elementDTO, isElementGrouped]);
 
 
 
@@ -3330,7 +3332,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
       </DragDropContext >
 
       <div className="grid-container">
-        {elementDTO && elementDTO.length > 0 && (
+        {(
           Object.keys(elementGrouped).length === 0 ? (
             <div className="block">
               <div className="block-header">
