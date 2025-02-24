@@ -479,8 +479,6 @@
       };
       wSocket.send(JSON.stringify(message));
       console.log("Sent SEARCH_TOOL:", message);
-    } else {
-      connectWebSocket(); // Retry connection
     }
   };
 
