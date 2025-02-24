@@ -128,7 +128,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
 
   // Using the custom WebSocket hook
   const [socketPort, setSocketPort] = useState<number>(8181);
-  const { webSocket, connected, reconnectAttempts, messages, error } = useWebSocket(socketPort, 'martiniElementDTO');
+  const { webSocket, connected, reconnectAttempts, messages, error } = useWebSocket(socketPort, 'scannerDestDTO');
 
 
   // const [client, setClient] = useState<Client | null>(null);
@@ -785,12 +785,22 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
     if (messages.length > 0) {
       const lastMessage = messages[messages.length - 1];
       console.log('RECEIVED -> Last WebSocket message ', lastMessage);
-
       try {
-        const parsedMessage = JSON.parse(lastMessage);
-        if (parsedMessage.type === "updateInstructions") {
-          setInstructionsData(parsedMessage.data);
+        const parsedMessage = JSON.parse(lastMessage)
+
+        const bodyData = typeof parsedMessage.body === "string"
+          ? JSON.parse(parsedMessage.body)
+          : parsedMessage.body;
+
+        if (bodyData.type === "updateInstructions") {
+          // setInstructionsData(footerData);
+          // setIsDataReordered(false);
+        } else if (bodyData.sessionId === "scannerDestDTO") {
+          // Ensure detailsData is always an array if possible
+          const detailsData = Array.isArray(bodyData.details) ? bodyData.details : [];
+          setElementDTO(detailsData);
         }
+
       } catch (error) {
         console.error("Error parsing WebSocket message:", error);
       }
@@ -841,7 +851,6 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
 
       setInstructionsData(updatedData);
       setGroupedData(groupByBlock(reassignedData));
-      setElementGrouped(groupByTypeElement(elementDTO));
 
       if (JSON.stringify(updatedBlocks) !== JSON.stringify(updatedBlocks)) {
         setUpdatedBlocks(updatedBlocks);
@@ -850,6 +859,15 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
       setIsDataReordered(true);
     }
   }, [instructionsData, isDataReordered]);
+
+
+  useEffect(() => {
+    if (elementDTO && elementDTO.length > 0) {
+      // Ensure detailsData is always an array if possible
+      setElementGrouped(groupByTypeElement(elementDTO));
+    }
+  }, [elementDTO]);
+
 
 
   useEffect(() => {
@@ -1573,6 +1591,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
 
     const message = {
       type: "NEW_ELEMENT_DTO",
+      sessionId: "unknow",
       details: [elementDTO],
     };
 
@@ -1594,6 +1613,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
 
     const message = {
       type: "DEL_ELEMENT_DTO",
+      sessionId: "unknoww",
       details: [elementDTO],
     };
 

@@ -1,4 +1,4 @@
-(function (searchTerms, hiddenFields, socketPort) {
+(function (searchTerms, hiddenFields, socketPort, sessionId, sessionDest) {
   let attempts = 0;
   let maxAttempts = 100;
   let wSocket = null;
@@ -6,6 +6,8 @@
   window.elementInfoMap = new Map();
   window.searchTerms = ["button", "input", "a", "select"];
   window.allElementInfo = [];
+  window.sessionId = sessionId;
+  window.sessionDest = sessionDest;
   // var elementInfoSubmit = new Map();
 
   function connectWebSocket() {
@@ -17,16 +19,17 @@
     try {
       console.log(`Attempt ${attempts + 1} to connect to WebSocket...`);
       wSocket = new WebSocket(
-        `ws://localhost:${socketPort}/websocket?sessionId=martiniElementDTO`
+        `ws://localhost:${socketPort}/websocket?sessionId=${window.sessionId}`
       );
 
       wSocket.onopen = () => {
-        console.log("WebSocket connected");
+        console.log(`WebSocket connected for session: ${window.sessionId}`);
         attempts = 0; // Reset attempts on successful connection
 
         try {
           const subscriptionMessage = {
             type: "echo",
+            sessionId: window.sessionId,
             body: "subscribe",
           };
           wSocket.send(JSON.stringify(subscriptionMessage));
@@ -35,7 +38,7 @@
         }
 
         // Call startCollectingElements AFTER WebSocket is open
-        startCollectingElements(searchTerms);
+        startCollectingElements(window.searchTerms);
       };
 
       wSocket.onmessage = (event) => {
@@ -477,6 +480,7 @@
     if (wSocket && wSocket.readyState === WebSocket.OPEN) {
       const message = {
         type: "SEARCH_TOOL",
+        sessionId: window.sessionDest,
         details: window.allElementInfo, // Send allElementInfo
       };
       wSocket.send(JSON.stringify(message));
@@ -827,9 +831,9 @@
   // startCollectingElements(window.searchTerms);
   // init("Initiate");
   // window.initSearchTerms = null; // Invalidating the function
-})(arguments[0], arguments[1], arguments[2]);
-// })([], false, 8181);
-// })(["with name"], false, 8181);
-// })(["input", "button", "a"], false, 8181);
-// })(["*"], false, 8181);
-// })(["button"], false, 8181);
+})(arguments[0], arguments[1], arguments[2], arguments[3], arguments[4]);
+// })([], false, 8181, "searchTermsId", "scannerDestDTO");
+// })(["with name"], false, 8181, "searchTermsId", "scannerDestDTO");
+// })(["input", "button", "a"], false, 8181, "searchTermsId", "scannerDestDTO");
+// })(["*"], false, 8181, "searchTermsId", "scannerDestDTO");
+// })(["button"], false, 8181, "searchTermsId", "scannerDestDTO");
