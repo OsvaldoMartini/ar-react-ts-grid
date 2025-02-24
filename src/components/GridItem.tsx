@@ -3332,52 +3332,38 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
       </DragDropContext >
 
       <div className="grid-container">
-        {(
-          Object.keys(elementGrouped).length === 0 ? (
-            <div className="block">
-              <div className="block-header">
-                <span className="block-order-number">#1</span>
-                <span className="block-name">Default Type Element</span>
-              </div>
-              <div className="instructions-list">
-                <div id={`dropdown-${1}`} ref={dropdownRef} className={`dropdown-menu ${dropdownPosition === 'above' ? 'dropdown-above' : ''}`}>
-                  <div onClick={() => handleNewStepAfter(1)}>Insert New Element</div>
+        {
+          Object.keys(elementGrouped).length > 0 &&
+          Object.entries(elementGrouped)
+            .map(([typeElement, elementData], index) => (
+              <div key={typeElement} className="block">
+                <div className="block-header">
+                  <span className="block-order-number">#{index + 1}</span>
+                  <span className="block-name">{typeElement}</span>
+                  <span className="block-count">({elementData.elements.length})</span>
                 </div>
-                <div className="instruction-item"> </div>
-              </div>
-            </div>
-          ) : (
-            Object.entries(elementGrouped)
-              .map(([typeElement, elementData], index) => (
-                <div key={typeElement} className="block">
-                  <div className="block-header">
-                    <span className="block-order-number">#{index + 1}</span>
-                    <span className="block-name">{typeElement}</span>
-                    <span className="block-count">({elementData.elements.length})</span>
-                  </div>
-                  <div className="instructions-list">
-                    {elementData.elements.map((elementDTO, i) => (
-                      <div key={i} className="instruction-item">
-                        <span className="instruction-line">
-                          {elementDTO.tagName}
-                        </span>
+                <div className="instructions-list">
+                  {elementData.elements.map((elementDTO, i) => (
+                    <div key={i} className="instruction-item">
+                      <span className="instruction-line">
+                        {elementDTO.tagName}
+                      </span>
 
-                        <div>
-                          <AttributeDropdown elementDTO={elementDTO} onChange={handleAttributeChange} />
-                        </div>
-                        <div className="options-column">
-                          <div className="move-buttons">
-                            <img src={saveImage} alt="save" className="save-button" onClick={() => handleCreateElementDTO(elementDTO)} />
-                            <img src={crossImage} alt="" className="cross-button" onClick={() => handleRemoveElementDTO(elementDTO)} />
-                          </div>
+                      <div>
+                        <AttributeDropdown elementDTO={elementDTO} onChange={handleAttributeChange} />
+                      </div>
+                      <div className="options-column">
+                        <div className="move-buttons">
+                          <img src={saveImage} alt="save" className="save-button" onClick={() => handleCreateElementDTO(elementDTO)} />
+                          <img src={crossImage} alt="" className="cross-button" onClick={() => handleRemoveElementDTO(elementDTO)} />
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ))}
                 </div>
-              ))
-          )
-        )}
+              </div>
+            ))
+        }
       </div>
 
     </div >
