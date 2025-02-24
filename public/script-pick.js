@@ -18,7 +18,7 @@
   tooltip.style.fontFamily = "Arial, sans-serif";
   tooltip.style.fontSize = "14px";
   tooltip.style.color = "#333";
-  tooltip.style.zIndex = "10000"; // Higher z-index
+  tooltip.style.zIndex = "10000";
   tooltip.style.display = "none";
   document.body.appendChild(tooltip);
 
@@ -119,13 +119,15 @@
     }
 
     if (wSocket && wSocket.readyState === WebSocket.OPEN) {
-      const message = {
-        type: "SEARCH_TOOL",
-        details: window.allElementInfo, // Send allElementInfo
-      };
-      wSocket.send(JSON.stringify(message));
-      console.log("Sent SEARCH_TOOL:", message);
-      window.elementInfoMap.clear();
+      if (window.allElementInfo.length > 0) {
+        const message = {
+          type: "SEARCH_TOOL",
+          details: window.allElementInfo, // Send allElementInfo
+        };
+        wSocket.send(JSON.stringify(message));
+        console.log("Sent SEARCH_TOOL:", message);
+        window.elementInfoMap.clear();
+      }
     } else {
       console.warn("WebSocket is not open. Cannot send message.");
     }
@@ -304,9 +306,13 @@
   const collectIframeElements = function collectIframeElements(
     doc,
     collectionFound,
-    isIframeChild = false
+    isIframeChild = false,
+    iframe
   ) {
-    doc.querySelectorAll("iframe").forEach((iframe) => {
+    console.log("isIframe");
+
+    if (iframe) {
+      //doc.querySelectorAll("iframe").forEach((iframe) => {
       try {
         let iframeDocument =
           iframe.contentDocument || iframe.contentWindow.document;
@@ -439,7 +445,7 @@
           e
         );
       }
-    });
+    }
   };
 
   const processIframeElements = function (iframeDocument, xPathIFrame) {
@@ -1001,6 +1007,7 @@
         return; // Don't proceed if it's one of these elements
       }
 
+      // window.elementInfoMap.clear();
       const elementIdentity = getElementIdentity(elementBelowTooltip);
       // Store tagName and other details in the Map
       if (elementIdentity) {
@@ -1025,29 +1032,30 @@
 
     sendingData();
 
-    window.revertPickInjections();
+    // window.revertPickInjections();
 
     // Remove the tooltip from the page and delete the reference after 5 seconds
     setTimeout(() => {
       window.allElementInfo = [];
       window.elementInfoMap.clear();
-      if (tooltip) {
-        tooltip.remove(); // Completely remove the tooltip from the DOM
-        tooltip = null; // Clear the reference to free memory
-        console.log("Tooltip completely removed.");
-      }
 
-      if (lastHoveredElement || elementBelowTooltip) {
-        // Remove highlight from the previous element if any
-        if (lastHoveredElement) {
-          lastHoveredElement.style.outline = ""; // Remove the previous highlight
-        }
+      // if (tooltip) {
+      //   tooltip.remove(); // Completely remove the tooltip from the DOM
+      //   tooltip = null; // Clear the reference to free memory
+      //   console.log("Tooltip completely removed.");
+      // }
 
-        // Remove highlight from the previous element if any
-        if (elementBelowTooltip) {
-          elementBelowTooltip.style.outline = ""; // Remove the previous highlight
-        }
-      }
+      // if (lastHoveredElement || elementBelowTooltip) {
+      //   // Remove highlight from the previous element if any
+      //   if (lastHoveredElement) {
+      //     lastHoveredElement.style.outline = ""; // Remove the previous highlight
+      //   }
+
+      //   // Remove highlight from the previous element if any
+      //   if (elementBelowTooltip) {
+      //     elementBelowTooltip.style.outline = ""; // Remove the previous highlight
+      //   }
+      // }
     }, 1000);
   }
 
