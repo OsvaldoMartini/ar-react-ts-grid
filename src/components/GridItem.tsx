@@ -2946,7 +2946,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
       <DragDropContext onDragEnd={onDragEnd} // Define the onDragEnd handler to update the state when the dragging stops
       >
         {
-          Object.keys(groupedData).length === 0 ? (
+          Object.keys(groupedData).length === 0 && Object.keys(elementGrouped).length === 0 ? (
             // Render default block if groupedData is empty
             <div className="block">
               <div className="block-header">
