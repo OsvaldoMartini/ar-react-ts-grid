@@ -128,7 +128,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
 
   // Using the custom WebSocket hook
   const [socketPort, setSocketPort] = useState<number>(8181);
-  const { webSocket, connected, reconnectAttempts, messages, error } = useWebSocket(socketPort);
+  const { webSocket, connected, reconnectAttempts, messages, error } = useWebSocket(socketPort, 'martiniElementDTO');
 
 
   // const [client, setClient] = useState<Client | null>(null);
@@ -1585,25 +1585,25 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
   };
 
   const handleRemoveElementDTO = (elementDTO: ElementDTO) => {
-    console.log("handleRemoveElementDTO:", elementDTO)
+    console.log("handleCreateElementDTO:", elementDTO);
 
-    // Send WebSocket message with block split details
-    if (webSocket && connected) {
-      const message = {
-        type: "DEL_ELEMENT_DTO",
-        details: [elementDTO],
-      };
-
-      try {
-        webSocket.send(JSON.stringify(message));
-        console.log('Sent DELETE element DTO:', message);
-      } catch (error) {
-        console.log('Error sending WebSocket message:', error);
-      }
-
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
+      console.warn("🚨 WebSocket is not connected. Cannot send message.");
+      return;
     }
 
-  }
+    const message = {
+      type: "DEL_ELEMENT_DTO",
+      details: [elementDTO],
+    };
+
+    try {
+      webSocket.send(JSON.stringify(message));
+      console.log('📤 Sent create element DTO:', message);
+    } catch (error) {
+      console.error('❌ Error sending WebSocket message:', error);
+    }
+  };
 
   const renderAttributes = (attributesData: AttributeData[], onChange?: (value: string) => void) => (
     <div className="attributes-dropdown-wrapper">

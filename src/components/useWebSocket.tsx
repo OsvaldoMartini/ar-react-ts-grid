@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 
-export const useWebSocket = (socketPort: number) => {
+export const useWebSocket = (socketPort: number, sessionId: string) => {
   const [webSocket, setWebSocket] = useState<WebSocket | null>(null);
   const [connected, setConnected] = useState(false);
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
@@ -11,10 +11,10 @@ export const useWebSocket = (socketPort: number) => {
   const connectWebSocket = () => {
     if (webSocket) return; // Prevent multiple instances
 
-    const ws = new WebSocket(`ws://localhost:${socketPort}/websocket`);
+    const ws = new WebSocket(`ws://localhost:${socketPort}/websocket?sessionId=${sessionId}`);
 
     ws.onopen = () => {
-      console.log('✅ WebSocket connected');
+      console.log(`✅ WebSocket connected for session: ${sessionId}`);
       setConnected(true);
       setReconnectAttempts(0);
       setWebSocket(ws);
@@ -59,7 +59,7 @@ export const useWebSocket = (socketPort: number) => {
         clearTimeout(reconnectTimeout.current);
       }
     };
-  }, [socketPort]); // Re-run effect only when port changes
+  }, [socketPort, sessionId]); // Re-run effect if port or sessionId changes
 
   return { webSocket, connected, reconnectAttempts, messages, error };
 };
