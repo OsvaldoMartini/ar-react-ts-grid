@@ -124,10 +124,10 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
   const [groupedData, setGroupedData] = useState<{ [blockId: number]: { blockName: string; exportFile?: string; instructions: BlockLoopInstructionLoadDTO[] } }>({});
   const [botJob, setBotJob] = useState<BotJobData>(botJobData);
   const [botJobLoaded, setBotJobLoaded] = useState<boolean>(false);
-  const [socketPort, setSocketPort] = useState<number>(8181);
   const [isDataReordered, setIsDataReordered] = useState<boolean>(false);
 
   // Using the custom WebSocket hook
+  const [socketPort, setSocketPort] = useState<number>(8181);
   const { webSocket, connected, reconnectAttempts, messages, error } = useWebSocket(socketPort);
 
 
@@ -781,36 +781,22 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
   // }, [socketPort, alertDismissed]);
 
 
-  // You can now use `webSocket`, `connected`, `reconnectAttempts`, `messages`, and `error` in your component
   useEffect(() => {
-    if (connected) {
-      console.log('WebSocket connected');
-    } else {
-      console.log('WebSocket disconnected');
-    }
-
     if (messages.length > 0) {
-
       const lastMessage = messages[messages.length - 1];
-      console.log('Last message RECEIVED :', lastMessage);
+      console.log('RECEIVED -> Last WebSocket message ', lastMessage);
 
       try {
         const parsedMessage = JSON.parse(lastMessage);
-
         if (parsedMessage.type === "updateInstructions") {
-          // Assuming parsedMessage.data contains the new instructions
           setInstructionsData(parsedMessage.data);
-          console.log('Instructions updated from WebSocket:', parsedMessage.data);
         }
       } catch (error) {
         console.error("Error parsing WebSocket message:", error);
       }
     }
+  }, [messages]); // Reacts only when `messages` updates
 
-    if (error) {
-      console.error('WebSocket Error:', error);
-    }
-  }, [connected, messages, error]);
 
 
 
@@ -829,46 +815,38 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
   }, [editingBlockId]);
 
   useEffect(() => {
-    //console.log("UseEffect -> updatedBlocks, client, connected");
     if (updatedBlocks.length > 0 && webSocket && connected) {
       const message = {
         type: 'BLOCK_ORDER',
         updatedBlocks: updatedBlocks,
       };
 
-      try {
-        webSocket.send(JSON.stringify(message));
-        console.log('Sent block order message:', message);
-      } catch (error) {
-        console.log('Error sending WebSocket message:', error);
+      if (webSocket.readyState === WebSocket.OPEN) {
+        try {
+          webSocket.send(JSON.stringify(message));
+          console.log('Sent block order message:', message);
+        } catch (error) {
+          console.error('Error sending WebSocket message:', error);
+        }
       }
     }
-  }, [updatedBlocks, webSocket, connected]); // Triggered when updatedBlocks or connected changes
+  }, [updatedBlocks]); // Remove unnecessary dependencies
 
   useEffect(() => {
-    //console.log("UseEffect -> instructionsData, isDataReordered");
     if (!isDataReordered && instructionsData.length > 0) {
       console.log("Reassigning instruction order numbers");
 
-      // Reassign the instruction order numbers
       const reassignedData = reassignInstructionOrderNumbersByBlock([...instructionsData]);
-
       const { updatedData, updatedBlocks } = correctBlockOrderNumbers(reassignedData);
-      // Update instructionsData first
+
       setInstructionsData(updatedData);
-      // Group the data and update groupedData
-      const updatedGroupedData = groupByBlock(reassignedData);
-      setGroupedData(updatedGroupedData);
+      setGroupedData(groupByBlock(reassignedData));
+      setElementGrouped(groupByTypeElement(elementDTO));
 
+      if (JSON.stringify(updatedBlocks) !== JSON.stringify(updatedBlocks)) {
+        setUpdatedBlocks(updatedBlocks);
+      }
 
-      // Group the data and update groupedData
-      const elementsGroupedData = groupByTypeElement(elementDTO);
-      setElementGrouped(elementsGroupedData);
-
-      // Trigger the `useEffect` to send WebSocket message
-      setUpdatedBlocks(updatedBlocks);
-
-      // Set the flag to true to indicate that the data has been reordered
       setIsDataReordered(true);
     }
   }, [instructionsData, isDataReordered]);
@@ -1586,23 +1564,26 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
 
 
   const handleCreateElementDTO = (elementDTO: ElementDTO) => {
-    console.log("handleCreateElementDTO:", elementDTO)
+    console.log("handleCreateElementDTO:", elementDTO);
 
-    // Send WebSocket message with block split details
-    if (webSocket && connected) {
-      const message = {
-        type: "NEW_ELEMENT_DTO",
-        details: [elementDTO],
-      };
-
-      try {
-        webSocket.send(JSON.stringify(message));
-        console.log('Sent create element DTO:', message);
-      } catch (error) {
-        console.log('Error sending WebSocket message:', error);
-      }
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
+      console.warn("🚨 WebSocket is not connected. Cannot send message.");
+      return;
     }
-  }
+
+    const message = {
+      type: "NEW_ELEMENT_DTO",
+      details: [elementDTO],
+    };
+
+    try {
+      webSocket.send(JSON.stringify(message));
+      console.log('📤 Sent create element DTO:', message);
+    } catch (error) {
+      console.error('❌ Error sending WebSocket message:', error);
+    }
+  };
+
   const handleRemoveElementDTO = (elementDTO: ElementDTO) => {
     console.log("handleRemoveElementDTO:", elementDTO)
 

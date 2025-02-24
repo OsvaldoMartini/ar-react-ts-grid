@@ -1,72 +1,65 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 export const useWebSocket = (socketPort: number) => {
   const [webSocket, setWebSocket] = useState<WebSocket | null>(null);
   const [connected, setConnected] = useState(false);
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
-  const [messages, setMessages] = useState<string[]>([]); // Store received messages
-  const [error, setError] = useState<string | null>(null); // Store errors
+  const [messages, setMessages] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const reconnectTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  const connectWebSocket = () => {
+    if (webSocket) return; // Prevent multiple instances
+
+    const ws = new WebSocket(`ws://localhost:${socketPort}/websocket`);
+
+    ws.onopen = () => {
+      console.log('✅ WebSocket connected');
+      setConnected(true);
+      setReconnectAttempts(0);
+      setWebSocket(ws);
+    };
+
+    ws.onmessage = (event) => {
+      setMessages((prev) => [...prev, event.data]);
+    };
+
+    ws.onerror = () => {
+      console.error('❌ WebSocket error');
+      setError('WebSocket encountered an error');
+    };
+
+    ws.onclose = () => {
+      console.warn('⚠️ WebSocket closed');
+      setConnected(false);
+      setWebSocket(null);
+
+      if (reconnectAttempts < 5) {
+        const delay = Math.min(2000 * reconnectAttempts, 10000); // Exponential backoff
+        console.log(`🔄 Attempting to reconnect in ${delay / 1000} seconds...`);
+
+        reconnectTimeout.current = setTimeout(() => {
+          setReconnectAttempts((prev) => prev + 1);
+          connectWebSocket(); // Retry connection
+        }, delay);
+      } else {
+        setError('❌ Max reconnect attempts reached.');
+      }
+    };
+  };
 
   useEffect(() => {
-    let ws: WebSocket | null = null;
+    connectWebSocket(); // Establish the initial connection
 
-    const createWebSocket = () => {
-      try {
-        // Initialize WebSocket connection
-        ws = new WebSocket(`ws://localhost:${socketPort}/websocket`);
-
-        ws.onopen = () => {
-          console.log('WebSocket connected');
-          setConnected(true);
-          setReconnectAttempts(0); // Reset attempts on successful connection
-          setError(null);
-        };
-
-        ws.onmessage = (event) => {
-          // Handle incoming WebSocket messages here
-          // console.log('Received message:', event.data);
-          setMessages((prevMessages) => [...prevMessages, event.data]); // Add new message to state
-        };
-
-        ws.onerror = (error) => {
-          // console.error('WebSocket error:', error);
-          setConnected(false);
-          setError('WebSocket error: ' + error); // Store the error message
-        };
-
-        ws.onclose = () => {
-          console.log('WebSocket closed');
-          setConnected(false);
-
-          // Retry connection if not maxed out
-          if (reconnectAttempts < 100) {
-            setReconnectAttempts((prev) => prev + 1);
-            // console.log(`Reconnecting attempt ${reconnectAttempts + 1}...`);
-            setError(`Reconnecting attempt ${reconnectAttempts + 1}...`);
-            createWebSocket(); // Retry connection
-          } else {
-            // console.error('Max reconnect attempts reached.');
-            setError('Max reconnect attempts reached.');
-          }
-        };
-
-        // Set the WebSocket state
-        setWebSocket(ws);
-      } catch (error) {
-        // console.error('Failed to initialize WebSocket:', error);
-        setError('Failed to initialize WebSocket: ' + error);
-      }
-    };
-
-    createWebSocket();
-
-    // Cleanup function to close WebSocket connection on unmount
     return () => {
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.close();
+      if (webSocket) {
+        webSocket.close();
+      }
+      if (reconnectTimeout.current) {
+        clearTimeout(reconnectTimeout.current);
       }
     };
-  }, [socketPort, reconnectAttempts]);
+  }, [socketPort]); // Re-run effect only when port changes
 
   return { webSocket, connected, reconnectAttempts, messages, error };
 };
