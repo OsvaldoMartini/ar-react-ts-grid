@@ -126,15 +126,14 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
   const [botJobLoaded, setBotJobLoaded] = useState<boolean>(false);
   const [socketPort, setSocketPort] = useState<number>(8181);
   const [isDataReordered, setIsDataReordered] = useState<boolean>(false);
-  // const [webSocket, setWebSocket] = useState<WebSocket | null>(null);
 
-  // const [socketPort, setSocketPort] = useState(8181);
-  const { webSocket, connected, reconnectAttempts } = useWebSocket(socketPort);
+  // Using the custom WebSocket hook
+  const { webSocket, connected, reconnectAttempts, messages, error } = useWebSocket(socketPort);
 
 
   // const [client, setClient] = useState<Client | null>(null);
   // const [connected, setConnected] = useState(false);
-  const [lastMessages, setLastMessages] = useState<any[]>([]);
+  // const [lastMessages, setLastMessages] = useState<any[]>([]);
   const [dropdownPosition, setDropdownPosition] = useState('below'); // Default to 'below'
   const [updatedBlocks, setUpdatedBlocks] = useState<UpdatedBlock[]>([]);
   const [editingInstructionId, setEditingInstructionId] = useState<number | null>(null);
@@ -605,18 +604,18 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
 
 
   // Use a ref to store messages and avoid unnecessary re-renders
-  const lastMessagesRef = useRef<any[]>([]);
-  lastMessagesRef.current = lastMessages;
+  // const lastMessagesRef = useRef<any[]>([]);
+  // lastMessagesRef.current = lastMessages;
 
-  useEffect(() => {
-    if (lastMessages.length > 0) {
-      console.log("Last Messages: " + JSON.stringify(lastMessages));
-    }
+  // useEffect(() => {
+  //   if (lastMessages.length > 0) {
+  //     console.log("Last Messages: " + JSON.stringify(lastMessages));
+  //   }
 
-    if (lastMessages.length > 5) {
-      setLastMessages((prevMessages) => prevMessages.slice(1)); // Remove the first message
-    }
-  }, [lastMessages]);
+  //   if (lastMessages.length > 5) {
+  //     setLastMessages((prevMessages) => prevMessages.slice(1)); // Remove the first message
+  //   }
+  // }, [lastMessages]);
 
 
   // WebSocket connection effect
@@ -781,6 +780,40 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
   //   };
   // }, [socketPort, alertDismissed]);
 
+
+  // You can now use `webSocket`, `connected`, `reconnectAttempts`, `messages`, and `error` in your component
+  useEffect(() => {
+    if (connected) {
+      console.log('WebSocket connected');
+    } else {
+      console.log('WebSocket disconnected');
+    }
+
+    if (messages.length > 0) {
+
+      const lastMessage = messages[messages.length - 1];
+      console.log('Last message RECEIVED :', lastMessage);
+
+      try {
+        const parsedMessage = JSON.parse(lastMessage);
+
+        if (parsedMessage.type === "updateInstructions") {
+          // Assuming parsedMessage.data contains the new instructions
+          setInstructionsData(parsedMessage.data);
+          console.log('Instructions updated from WebSocket:', parsedMessage.data);
+        }
+      } catch (error) {
+        console.error("Error parsing WebSocket message:", error);
+      }
+    }
+
+    if (error) {
+      console.error('WebSocket Error:', error);
+    }
+  }, [connected, messages, error]);
+
+
+
   useEffect(() => {
     //console.log("UseEffect -> editingInstructionId");
     if (editingInstructionId && instructionRef.current) {
@@ -794,17 +827,6 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
       blockRef.current.focus();
     }
   }, [editingBlockId]);
-
-  useEffect(() => {
-    //console.log("UseEffect -> connected");
-    if (connected) {
-      // Assuming correctBlockOrderNumbers sets updatedBlocks based on some logic
-      const { updatedData, updatedBlocks } = correctBlockOrderNumbers(instructionsData);
-      setInstructionsData(updatedData);
-      setUpdatedBlocks(updatedBlocks);  // Trigger the `useEffect` to send WebSocket message
-    }
-  }, [connected]);
-
 
   useEffect(() => {
     //console.log("UseEffect -> updatedBlocks, client, connected");
@@ -851,22 +873,6 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
     }
   }, [instructionsData, isDataReordered]);
 
-
-  // useEffect(() => {
-  //   //console.log("UseEffect -> instructionsData, isDataReordered");
-  //   if (isDataReordered && instructionsData.length > 0) {
-
-  //     // Update instructionsData first
-  //     setInstructionsData(instructionsData);
-
-  //     // Group the data and update groupedData
-  //     const updatedGroupedData = groupByBlock(instructionsData);
-  //     setGroupedData(updatedGroupedData);
-
-  //     // Set the flag to true to indicate that the data has been reordered
-  //     setIsDataReordered(true);
-  //   }
-  // }, [instructionsData, isDataReordered]);
 
   useEffect(() => {
     if (botJob && instructionsData.length === 0) {
@@ -1551,8 +1557,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
       // Send WebSocket message
       if (webSocket && connected) {
         try {
-          webSocket.send(JSON.stringify(message),
-          );
+          webSocket.send(JSON.stringify(message));
 
           console.log('Sent insert after message:', message);
         } catch (error) {
@@ -1590,9 +1595,12 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
         details: [elementDTO],
       };
 
-      webSocket.send(JSON.stringify(message));
-
-      console.log('Sent create element DTO:', message);
+      try {
+        webSocket.send(JSON.stringify(message));
+        console.log('Sent create element DTO:', message);
+      } catch (error) {
+        console.log('Error sending WebSocket message:', error);
+      }
     }
   }
   const handleRemoveElementDTO = (elementDTO: ElementDTO) => {
@@ -1605,9 +1613,13 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
         details: [elementDTO],
       };
 
-      webSocket.send(JSON.stringify(message));
+      try {
+        webSocket.send(JSON.stringify(message));
+        console.log('Sent DELETE element DTO:', message);
+      } catch (error) {
+        console.log('Error sending WebSocket message:', error);
+      }
 
-      console.log('Sent create element DTO:', message);
     }
 
   }
@@ -1681,9 +1693,14 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
         details: blockComnponent,
       };
 
-      webSocket.send(JSON.stringify(message));
+      try {
+        webSocket.send(JSON.stringify(message));
+        console.log('Sent create component:', message);
+      } catch (error) {
+        console.log('Error sending WebSocket message:', error);
+      }
 
-      console.log('Sent create component:', message);
+
     }
 
     setOpenDropdown(null);

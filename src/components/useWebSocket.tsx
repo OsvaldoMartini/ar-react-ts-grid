@@ -4,6 +4,8 @@ export const useWebSocket = (socketPort: number) => {
   const [webSocket, setWebSocket] = useState<WebSocket | null>(null);
   const [connected, setConnected] = useState(false);
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
+  const [messages, setMessages] = useState<string[]>([]); // Store received messages
+  const [error, setError] = useState<string | null>(null); // Store errors
 
   useEffect(() => {
     let ws: WebSocket | null = null;
@@ -17,16 +19,19 @@ export const useWebSocket = (socketPort: number) => {
           console.log('WebSocket connected');
           setConnected(true);
           setReconnectAttempts(0); // Reset attempts on successful connection
+          setError(null);
         };
 
         ws.onmessage = (event) => {
           // Handle incoming WebSocket messages here
-          console.log('Received message:', event.data);
+          // console.log('Received message:', event.data);
+          setMessages((prevMessages) => [...prevMessages, event.data]); // Add new message to state
         };
 
         ws.onerror = (error) => {
-          console.error('WebSocket error:', error);
+          // console.error('WebSocket error:', error);
           setConnected(false);
+          setError('WebSocket error: ' + error); // Store the error message
         };
 
         ws.onclose = () => {
@@ -36,17 +41,20 @@ export const useWebSocket = (socketPort: number) => {
           // Retry connection if not maxed out
           if (reconnectAttempts < 100) {
             setReconnectAttempts((prev) => prev + 1);
-            console.log(`Reconnecting attempt ${reconnectAttempts + 1}...`);
+            // console.log(`Reconnecting attempt ${reconnectAttempts + 1}...`);
+            setError(`Reconnecting attempt ${reconnectAttempts + 1}...`);
             createWebSocket(); // Retry connection
           } else {
-            console.error('Max reconnect attempts reached.');
+            // console.error('Max reconnect attempts reached.');
+            setError('Max reconnect attempts reached.');
           }
         };
 
         // Set the WebSocket state
         setWebSocket(ws);
       } catch (error) {
-        console.error('Failed to initialize WebSocket:', error);
+        // console.error('Failed to initialize WebSocket:', error);
+        setError('Failed to initialize WebSocket: ' + error);
       }
     };
 
@@ -60,5 +68,5 @@ export const useWebSocket = (socketPort: number) => {
     };
   }, [socketPort, reconnectAttempts]);
 
-  return { webSocket, connected, reconnectAttempts };
+  return { webSocket, connected, reconnectAttempts, messages, error };
 };
