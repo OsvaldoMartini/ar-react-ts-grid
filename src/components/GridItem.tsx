@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Client, IMessage } from "@stomp/stompjs";
-import { AttributeData, BlockLoopInstructionLoadDTO, BotJobData, ComplexMessage, ElementDTO, UpdatedBlock, WebSocketMessage } from './instructionsMockData';
+import { BlockLoopInstructionLoadDTO, BotJobData, ComplexMessage, ElementDTO, UpdatedBlock } from './instructionsMockData';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd'; // Import from react-beautiful-dnd
 import './griditem.scss';
 
@@ -40,6 +39,7 @@ import inactiveImage from '../assets/inactive2.png';
 
 import AlertModal from './AlertModal';
 import { useWebSocket } from './useWebSocket';
+import AttributeData from './AttributeData';
 
 
 interface GridItemProps {
@@ -149,6 +149,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
   const [alertMessageBody, setAlertMessageBody] = useState<string | ComplexMessage[]>([]);
   const [alertMessageFooter, setAlertMessageFooter] = useState<string | null>(null);
   const [alertDismissed, setAlertDismissed] = useState(false);
+  const [selectedAttribute, setSelectedAttribute] = useState<string | null>(null);
   // const [reconnectAttempts, setReconnectAttempts] = useState(0); // Track attempts
 
   // Function to handle receiving data from JavaFX
@@ -1625,25 +1626,9 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
     }
   };
 
-  const renderAttributes = (attributesData: AttributeData[], onChange?: (value: string) => void) => (
-    <div className="attributes-dropdown-wrapper">
-      <select
-        className="attributes-dropdown"
-        onChange={(e) => onChange?.(e.target.value)}
-      >
-        {attributesData.length === 0 ? (
-          <option value="-1">no attributes</option>
-        ) : (
-          attributesData.map((attribute, index) => (
-            <option key={index} value={attribute.value}>
-              {attribute.name}
-            </option>
-          ))
-        )}
-      </select>
-    </div>
-  );
-
+  const handleAttributeChange = (value: string) => {
+    console.log('Selected attribute:', value);
+  };
 
   const handleCreateComponent = (blockGroupId: number) => {
     // Access groupedData, setGroupedData, instructionsData, and preComponent from the component's scope
@@ -3369,16 +3354,19 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
                     <span className="block-count">({elementData.elements.length})</span>
                   </div>
                   <div className="instructions-list">
-                    {elementData.elements.map((element, i) => (
+                    {elementData.elements.map((elementDTO, i) => (
                       <div key={i} className="instruction-item">
                         <span className="instruction-line">
-                          {element.tagName} - {element.xPath}
+                          {elementDTO.tagName}
                         </span>
-                        {renderAttributes(element.attributeData)}
+
+                        <div>
+                          <AttributeData elementDTO={elementDTO} onChange={handleAttributeChange} />
+                        </div>
                         <div className="options-column">
                           <div className="move-buttons">
-                            <img src={saveImage} alt="save" className="save-button" onClick={() => handleCreateElementDTO(element)} />
-                            <img src={crossImage} alt="" className="cross-button" onClick={() => handleRemoveElementDTO(element)} />
+                            <img src={saveImage} alt="save" className="save-button" onClick={() => handleCreateElementDTO(elementDTO)} />
+                            <img src={crossImage} alt="" className="cross-button" onClick={() => handleRemoveElementDTO(elementDTO)} />
                           </div>
                         </div>
                       </div>
