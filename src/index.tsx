@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import reportWebVitals from './reportWebVitals';
-import instructionsMockData, { botJobMockData, elementsDTOMockData } from './components/instructionsMockData5';
+import instructionsMockData, { botJobMockData, elementsDTOMockData } from './components/instructionsMockData';
 import GridItemScann from './components/GridItemScann';
 import GridItem from './components/GridItem';
 import { BlockLoopInstructionLoadDTO, BotJobData, ComplexMessage, ElementDTO } from './components/instructionsMockData5';

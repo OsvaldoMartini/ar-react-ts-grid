@@ -60,49 +60,84 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ dataDTO, socketPort, sess
 
   return (
     <div className="grid-container">
-      <div className="pagination-controls">
-        <label>Rows per page: </label>
-        <select value={rowsPerPage} onChange={(e) => { setRowsPerPage(Number(e.target.value)); setCurrentPage(1); }}>
-          <option value={5}>5</option>
-          <option value={10}>10</option>
-          <option value={20}>20</option>
-          <option value={50}>50</option>
-        </select>
-      </div>
       {paginatedData.length === 0 ? (
         <div className="block">
           <div className="block-header">Scanned Web Elements</div>
+          <div className="no-data-message">No data found</div>
         </div>
       ) : (
-        paginatedData.map(([typeElement, elementData], index) => (
-          <div key={typeElement} className="block">
-            <div className="block-header">
-              <span className="block-order-number">#{index + 1}</span>
-              <span className="block-name">{typeElement}</span>
-              <span className="block-count">({elementData.elements.length})</span>
-            </div>
-            <div className="instructions-list">
-              {elementData.elements.map((elementDTO, i) => (
-                <div key={i} className="instruction-item">
-                  <span className="instruction-line">{elementDTO.tagName}</span>
-                  <div><AttributeDropdown elementDTO={elementDTO} onChange={() => { }} /></div>
-                  <div className="options-column">
-                    <img src={saveImage} alt="save" className="save-button" onClick={() => handleCreateElementDTO(elementDTO)} />
-                    <img src={crossImage} alt="" className="cross-button" onClick={() => handleRemoveElementDTO(elementDTO)} />
-                  </div>
-                </div>
-              ))}
-            </div>
+        <>
+          <div className="pagination-controls">
+            <label>Rows per page: </label>
+            <select
+              value={rowsPerPage}
+              onChange={(e) => {
+                setRowsPerPage(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+            >
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+            </select>
           </div>
-        ))
+          {paginatedData.map(([typeElement, elementData], index) => (
+            <div key={typeElement} className="block">
+              <div className="block-header">
+                <span className="block-order-number">#{index + 1}</span>
+                <span className="block-name">{typeElement}</span>
+                <span className="block-count">({elementData.elements.length})</span>
+              </div>
+              <div className="instructions-list">
+                {elementData.elements.map((elementDTO, i) => (
+                  <div key={i} className="instruction-item">
+                    <span className="instruction-line">{elementDTO.tagName}</span>
+                    <div>
+                      <AttributeDropdown elementDTO={elementDTO} onChange={() => { }} />
+                    </div>
+                    <div className="options-column">
+                      <img
+                        src={saveImage}
+                        alt="save"
+                        className="save-button"
+                        onClick={() => handleCreateElementDTO(elementDTO)}
+                      />
+                      <img
+                        src={crossImage}
+                        alt=""
+                        className="cross-button"
+                        onClick={() => handleRemoveElementDTO(elementDTO)}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+          <div className="pagination-controls">
+            <button
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage((prev) => prev - 1)}
+            >
+              Prev
+            </button>
+            <span>
+              {" "}
+              Page {currentPage} of {totalPages}{" "}
+            </span>
+            <button
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage((prev) => prev + 1)}
+            >
+              Next
+            </button>
+          </div>
+        </>
       )}
-      <div className="pagination-controls">
-        <button disabled={currentPage === 1} onClick={() => setCurrentPage((prev) => prev - 1)}>Prev</button>
-        <span> Page {currentPage} of {totalPages} </span>
-        <button disabled={currentPage === totalPages} onClick={() => setCurrentPage((prev) => prev + 1)}>Next</button>
-      </div>
     </div>
   );
+
 };
 
 export default GridItemScann;
