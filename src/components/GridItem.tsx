@@ -39,13 +39,13 @@ import inactiveImage from '../assets/inactive2.png';
 
 import AlertModal from './AlertModal';
 import { useWebSocket } from './useWebSocket';
-import AttributeDropdown from './AttributeDropdown';
-
 
 interface GridItemProps {
   data: BlockLoopInstructionLoadDTO[];
-  dataDTO: ElementDTO[];
-  botJobData: BotJobData;
+  botJobLoad: BotJobData;
+  socketPort: number;
+  sessionId: string;
+  operationId: string;
 }
 
 // Helper function to reorder items in an array based on drag-and-drop actions
@@ -76,22 +76,6 @@ const groupByBlock = (data: BlockLoopInstructionLoadDTO[]) => {
   return blocks;
 };
 
-// Function to group data by typeElement and sort elements within each type
-const groupByTypeElement = (data: ElementDTO[]) => {
-  const groupedElements = data.reduce((result, item) => {
-    const { tagName } = item;
-
-    if (!result[tagName]) {
-      result[tagName] = { tagName, elements: [] };
-    }
-
-    result[tagName].elements.push(item);
-    return result;
-  }, {} as Record<string, { tagName: string; elements: ElementDTO[] }>);
-
-  return groupedElements;
-};
-
 
 // Helper function to reassign instructionOrderNumber starting from 1 within each block
 const reassignInstructionOrderNumbersByBlock = (instructions: BlockLoopInstructionLoadDTO[]) => {
@@ -111,26 +95,22 @@ const reassignInstructionOrderNumbersByBlock = (instructions: BlockLoopInstructi
   return updatedInstructions;
 };
 
-const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
+const GridItem: React.FC<GridItemProps> = ({ data, botJobLoad, socketPort, sessionId, operationId }) => {
+  // Using the custom WebSocket hook
+  const { webSocket, connected, reconnectAttempts, messages, error } = useWebSocket(socketPort, sessionId);
+
+  const [instructionsData, setInstructionsData] = useState<BlockLoopInstructionLoadDTO[]>(data);
+  const [botJobData, setBotJobData] = useState<BotJobData>(botJobLoad);
+
+
   // Use state to manage the instructions data
   const instructionRef = useRef<HTMLInputElement>(null);
   const blockRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [openDropdown, setOpenDropdown] = useState<number | null>(null);
   const [mockData, setMockData] = useState<boolean>(false);
-  const [instructionsData, setInstructionsData] = useState<BlockLoopInstructionLoadDTO[]>(data);
-  const [elementDTO, setElementDTO] = useState<ElementDTO[]>(dataDTO);
-  const [elementGrouped, setElementGrouped] = useState<{ [tagName: string]: { tagName: string; elements: ElementDTO[]; } }>({});
   const [groupedData, setGroupedData] = useState<{ [blockId: number]: { blockName: string; exportFile?: string; instructions: BlockLoopInstructionLoadDTO[] } }>({});
-  const [botJob, setBotJob] = useState<BotJobData>(botJobData);
-  const [botJobLoaded, setBotJobLoaded] = useState<boolean>(false);
   const [isDataReordered, setIsDataReordered] = useState<boolean>(false);
-  const [isElementGrouped, setIsElementGrouped] = useState<boolean>(false);
-
-  // Using the custom WebSocket hook
-  const [socketPort, setSocketPort] = useState<number>(8181);
-  const { webSocket, connected, reconnectAttempts, messages, error } = useWebSocket(socketPort, 'scannerDestDTO');
-
 
   // const [client, setClient] = useState<Client | null>(null);
   // const [connected, setConnected] = useState(false);
@@ -140,9 +120,8 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
   const [editingInstructionId, setEditingInstructionId] = useState<number | null>(null);
   const [instructionName, setInstructionName] = useState<string>('');
   const [editingBlockId, setEditingBlockId] = useState<number | null>(null);
-  const [blockId, setBlockId] = useState<number | null>(null);
   const [blockName, setBlockName] = useState<string>('');
-  const [showFilePickerModal, setShowFilePickerModal] = useState(false);
+
   const [errorFlag, setErrorFlag] = useState<boolean>(false)
   const [alertImage, setAlertImage] = useState(constructionImage);
   const [alertClass, setAlertClass] = useState('construction-image')
@@ -150,30 +129,28 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
   const [alertMessageBody, setAlertMessageBody] = useState<string | ComplexMessage[]>([]);
   const [alertMessageFooter, setAlertMessageFooter] = useState<string | null>(null);
   const [alertDismissed, setAlertDismissed] = useState(false);
-  const [selectedAttribute, setSelectedAttribute] = useState<string | null>(null);
-  // const [reconnectAttempts, setReconnectAttempts] = useState(0); // Track attempts
 
-  // Function to handle receiving data from JavaFX
-  (window as any).receiveDataFromJava = function (jsonData: string, socketPort: number) {
-    const data: BlockLoopInstructionLoadDTO[] = JSON.parse(jsonData);
-    const dataBotJob: BotJobData = JSON.parse(jsonData);
+  // // Function to handle receiving data from JavaFX
+  // (window as any).receiveDataFromJava = function (jsonData: string, socketPort: number) {
+  //   const data: BlockLoopInstructionLoadDTO[] = JSON.parse(jsonData);
+  //   const dataBotJob: BotJobData = JSON.parse(jsonData);
 
-    if (data && data.length > 0) {
-      setMockData(true);
-      setIsDataReordered(false); // Reset this flag on new data load
-      setInstructionsData(data);
-    } else {
-      if (dataBotJob) {
-        setMockData(true);
-        setIsDataReordered(false); // Reset this flag on new data load
-        setBotJob(dataBotJob);
-      }
-    }
+  //   if (data && data.length > 0) {
+  //     setMockData(true);
+  //     setIsDataReordered(false); // Reset this flag on new data load
+  //     setInstructionsData(data);
+  //   } else {
+  //     if (dataBotJob) {
+  //       setMockData(true);
+  //       setIsDataReordered(false); // Reset this flag on new data load
+  //       setBotJob(dataBotJob);
+  //     }
+  //   }
 
-    setSocketPort(socketPort);
-    // setErrorFlag(true);
-    // setAlertMessageBody("receiveDataFromJava Socket " + socketPort);
-  };
+  //   setSocketPort(socketPort);
+  //   // setErrorFlag(true);
+  //   // setAlertMessageBody("receiveDataFromJava Socket " + socketPort);
+  // };
 
 
   // Drag-and-drop event handler
@@ -787,6 +764,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
     if (messages.length > 0) {
       const lastMessage = messages[messages.length - 1];
       console.log('RECEIVED -> Last WebSocket message ', lastMessage);
+
       try {
         const parsedMessage = JSON.parse(lastMessage);
 
@@ -794,16 +772,12 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
           ? JSON.parse(parsedMessage.body)
           : parsedMessage.body;
 
-        if (bodyData.type === "updateInstructions") {
+        if (bodyData.type === "updateInstructions" && bodyData.sessionId === sessionId) {
           // ... handle updateInstructions ...
-        } else if (bodyData.sessionId === "scannerDestDTO") {
-          // Ensure detailsData is always an array if possible
-          const detailsData = Array.isArray(bodyData.details) ? bodyData.details : [];
+          if (bodyData.operatioId === operationId) {
+            console.log()
 
-          // Update elementDTO first
-          setElementDTO(detailsData);
-          // Then, set isElementGrouped to false, triggering the useEffect
-          setIsElementGrouped(false);
+          }
         }
 
       } catch (error) {
@@ -862,23 +836,6 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
       setIsDataReordered(true);
     }
   }, [instructionsData, isDataReordered]);
-
-
-  useEffect(() => {
-    if (!isElementGrouped && elementDTO && elementDTO.length > 0) {
-      setElementGrouped(groupByTypeElement(elementDTO));
-      setIsElementGrouped(true);
-    }
-  }, [elementDTO, isElementGrouped]);
-
-
-
-  useEffect(() => {
-    if (botJob && instructionsData.length === 0) {
-      // console.log(botJob.name);
-      setBotJobLoaded(true);
-    }
-  }, [botJob]);
 
 
   // Add the event listener to detect clicks outside the dropdown
@@ -1364,14 +1321,14 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
 
     // Create the InstructionDTO object with necessary details
     const instructionDTO = {
-      botJobId: botJob.id,
+      botJobId: botJobData.id,
       instructionOrderNumber: 1,
     };
 
     const message = {
       type: 'INSERT_NEW',
-      botJobId: botJob.id,
-      botJobName: botJob.name,
+      botJobId: botJobData.id,
+      botJobName: botJobData.name,
       blockOrderNumber: 1,
       blockId: -1,
       blockName: "Default Block",
@@ -2335,7 +2292,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
 
     const { botJobId, botJobName, blockId, actions, parentId, id } = instructionToRemove;
 
-    setBotJob({
+    setBotJobData({
       id: botJobId,
       name: botJobName,
       instructionId: id
@@ -2948,14 +2905,14 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
       <DragDropContext onDragEnd={onDragEnd} // Define the onDragEnd handler to update the state when the dragging stops
       >
         {
-          Object.keys(groupedData).length === 0 && Object.keys(elementGrouped).length === 0 ? (
+          Object.keys(groupedData).length === 0 ? (
             // Render default block if groupedData is empty
             <div className="block">
               <div className="block-header">
                 <span className="block-order-number">#1</span>
                 <span className="block-name">Default Block</span>
-                {botJob && botJob.id > 0 && (
-                  <span className="block-name">BotJob : {botJob.name}</span>
+                {botJobData && botJobData.id > 0 && (
+                  <span className="block-name">BotJob : {botJobData.name}</span>
                 )}
               </div>
               <div className="instructions-list">
@@ -3331,44 +3288,9 @@ const GridItem: React.FC<GridItemProps> = ({ data, dataDTO, botJobData }) => {
           )}
       </DragDropContext >
 
-      <div className="grid-container">
-        {
-          Object.keys(elementGrouped).length > 0 &&
-          Object.entries(elementGrouped)
-            .map(([typeElement, elementData], index) => (
-              <div key={typeElement} className="block">
-                <div className="block-header">
-                  <span className="block-order-number">#{index + 1}</span>
-                  <span className="block-name">{typeElement}</span>
-                  <span className="block-count">({elementData.elements.length})</span>
-                </div>
-                <div className="instructions-list">
-                  {elementData.elements.map((elementDTO, i) => (
-                    <div key={i} className="instruction-item">
-                      <span className="instruction-line">
-                        {elementDTO.tagName}
-                      </span>
-
-                      <div>
-                        <AttributeDropdown elementDTO={elementDTO} onChange={handleAttributeChange} />
-                      </div>
-                      <div className="options-column">
-                        <div className="move-buttons">
-                          <img src={saveImage} alt="save" className="save-button" onClick={() => handleCreateElementDTO(elementDTO)} />
-                          <img src={crossImage} alt="" className="cross-button" onClick={() => handleRemoveElementDTO(elementDTO)} />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))
-        }
-      </div>
 
     </div >
   );
-
 
 };
 

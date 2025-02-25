@@ -2,7 +2,7 @@
 
 // Extend the Window interface to include receiveDataFromJava and javaBridge
 export interface Window {
-  receiveDataFromJava: (jsonDataA: string, sessionIdName:string, isElementDTO: boolean, socketPort: number) => void;
+  receiveDataFromJava: (jsonDataA: string, socketPort: number, sessionIdFromJava: string) => void;
   javaBridge?: {
     sendDataToJava: (data: string) => void;
   };

@@ -1,69 +1,107 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import reportWebVitals from './reportWebVitals';
+import instructionsMockData, { botJobMockData, elementsDTOMockData } from './components/instructionsMockData5';
+import GridItemScann from './components/GridItemScann';
 import GridItem from './components/GridItem';
-import instructionsMockData, { botJobMockData, elementsDTOMockData } from './components/instructionsMockData';
-import Navigable from './components/Navigable';
-import NavigableBKP from './components/NavigableBKP';
-import ToggleActive from './components/ToggleActive';
-import WebSocketComponent from './components/StompSocketComponent';
-import StompMessage from './components/StompMessage';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { BlockLoopInstructionLoadDTO, BotJobData, ComplexMessage, ElementDTO } from './components/instructionsMockData5';
+import AlertModal from './components/AlertModal';
+import constructionImage from './assets/construction.png';
 
-import PageOne from './pages/PageOne';
-import About from './pages/About';
-import Home from './pages/Home';
-import Menu from './pages/Menu';
-import GridDrag from './components/GridDrag2';
-import MyComponent from './components/MyComponent';
-import WebSocketComponentClient from './components/WebSocketClient';
-import WebSocketComponentClient2 from './components/WebSocketComponentClient2';
-import ErrorTest from './components/ErrorTest';
-import { Card } from '@mui/material';
+// Initialize the root
+const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
 
-// import WebSocketComponent from './components/WebSocketComponent';
-
-
-// The HTML string to be passed as dataHtml
-const dataHtml = [`<input class="iam-form-control ng-pristine ng-invalid ng-touched" name="username" type="text" id="username" placeholder="" autocapitalize="off" spellcheck="false">`,
-  `<input class="iam-form-control ng-untouched ng-pristine ng-invalid" name="password" type="password" id="password" placeholder="" autocapitalize="off" spellcheck="false">`];
+const App: React.FC = () => {
+  const [instructionsData, setInstructionsData] = useState<BlockLoopInstructionLoadDTO[]>(instructionsMockData);
+  const [elementDTO, setElementDTO] = useState<ElementDTO[]>(elementsDTOMockData);
+  const [botJobData, setBotJobData] = useState<BotJobData>(botJobMockData);
+  const [socketPort, setSocketPort] = useState<number>(8181);
+  const [sessionId, setSessionId] = useState<string>("scannerDestDTO"); // scannerDestDTO / botJobTasks / Default session 
+  const [errorFlag, setErrorFlag] = useState<boolean>(false)
+  const [alertImage, setAlertImage] = useState(constructionImage);
+  const [alertClass, setAlertClass] = useState('construction-image')
+  const [alertMessageHeader, setAlertMessageHeader] = useState<string | null>(null);
+  const [alertMessageBody, setAlertMessageBody] = useState<string | ComplexMessage[]>([]);
+  const [alertMessageFooter, setAlertMessageFooter] = useState<string | null>(null);
+  const [alertDismissed, setAlertDismissed] = useState(false);
 
 
-const root = ReactDOM.createRoot(
-  document.getElementById('root') as HTMLElement
-);
+  const handleClose = () => {
+    setAlertDismissed(true); // Trigger re-execution of the effect
+    setErrorFlag(false); // Reset error flag
+    setAlertMessageHeader('');
+    setAlertMessageBody('');
+  };
+
+  useEffect(() => {
+    // Define the function for receiving JavaFX data
+    (window as any).receiveDataFromJava = (jsonData: string, socketPort: number, sessionIdFromJava: string) => {
+      try {
+        console.log("sessionIdFromJava", sessionIdFromJava);
+
+        const dataLoad = JSON.parse(jsonData);
+
+        setSocketPort(socketPort);
+        setSessionId(sessionIdFromJava);
+
+        // Check if it's BlockLoopInstructionLoadDTO
+        if (Array.isArray(dataLoad) && dataLoad.length > 0 && sessionIdFromJava === "botJobTasks") {
+          setInstructionsData(dataLoad as BlockLoopInstructionLoadDTO[]);
+          // setAlertMessageHeader("DATA  BlockLoopInstructionLoadDTO " + dataLoad.length);
+          // setAlertMessageBody("ReceiveDataFromJava Socket " + socketPort + " - " + sessionIdFromJava);
+        }
+        // Check if it's ElementDTO
+        else if (Array.isArray(dataLoad) && dataLoad.length > 0 && sessionIdFromJava === "scannerDestDTO") {
+          setElementDTO(dataLoad as ElementDTO[]);
+          // setAlertMessageHeader("DATA  ElementDTO " + dataLoad.length);
+          // setAlertMessageBody("ReceiveDataFromJava Socket " + socketPort + " - " + sessionIdFromJava);
+        } else {
+          console.error('Unknown data format');
+        }
+
+      } catch (error) {
+        console.error('Error parsing jsonData:', error);
+      }
+    };
+  }, []);
 
 
-root.render(
-  <React.StrictMode>
-    {/* <ToggleActive items={["Londssson", "Manchester",]} /> */}
-    {/* <GridItem data={[]} botJobData={botJobMockData} /> */}
-    {/* <GridDrag data={instructionsMockData} botJobData={botJobMockData} /> */}
-    {/* <MyComponent /> */}
-    {/* <ErrorTest></ErrorTest> */}
-    {/* |<WebSocketComponentClient2></WebSocketComponentClient2> */}
-    {/* <WebSocketComponent></WebSocketComponent> */}
-    {/* <Card /> */}
-    <GridItem data={instructionsMockData} dataDTO={elementsDTOMockData} botJobData={botJobMockData} />
-    {/* <WebSocketComponent></WebSocketComponent> */}
-    {/* <StompMessage /> */}
-    {/* <Navigable dataHtml={dataHtml} /> */}
-    {/* <NavigableBKP /> */}
-    {/* <Router>
-      <Menu />
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/page1" element={<PageOne />} />
-        <Route path="/about" element={<About />} />
-      </Routes>
-    </Router> */}
-  </React.StrictMode>
+  // useEffect(() => {
 
-);
+  //   if (sessionId) {
+  //     setAlertMessageHeader("DATA  ElementDTO " + elementDTO.length);
+  //     setAlertMessageBody("DATA  InstructionLoadDTO " + instructionsData.length);
+  //     setAlertMessageFooter("ReceiveDataFromJava Socket " + socketPort + " - " + sessionId);
+  //   }
 
+  // }, [sessionId]);
 
-// If you want to start measuring performance in your app, pass a function
-// to log results (for example: reportWebVitals(console.log))
-// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
+  return (
+    <React.StrictMode>
+      {alertMessageBody && alertMessageBody.length > 0 && (
+        <AlertModal
+          header={alertMessageHeader || ''}
+          body={alertMessageBody || ''}
+          extraMsg={alertMessageFooter || ''}
+          onClose={handleClose}
+          imageSrc={alertImage}
+          imageClass={alertClass}
+          error={errorFlag}
+        />
+      )}
+      {sessionId && sessionId === "botJobTasks" && (
+        <GridItem data={instructionsData} botJobLoad={botJobData} socketPort={socketPort} sessionId={sessionId} operationId="" />
+      )}
+      {sessionId && sessionId === "scannerDestDTO" && (
+        <GridItemScann dataDTO={elementDTO} socketPort={socketPort} sessionId={sessionId} operationId="" />
+      )}
+    </React.StrictMode>
+  );
+};
+
+// Render the App component
+root.render(<App />);
+
+// Report web vitals
 reportWebVitals();
