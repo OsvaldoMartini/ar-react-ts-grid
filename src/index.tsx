@@ -17,7 +17,7 @@ const App: React.FC = () => {
   const [elementDTO, setElementDTO] = useState<ElementDTO[]>(elementsDTOMockData);
   const [botJobData, setBotJobData] = useState<BotJobData>(botJobMockData);
   const [socketPort, setSocketPort] = useState<number>(8181);
-  const [sessionId, setSessionId] = useState<string>("scannerDestDTO"); // scannerDestDTO / botJobTasks / Default session 
+  const [sessionId, setSessionId] = useState<string>(""); // scannerDestDTO / botJobTasks / Default session 
   const [errorFlag, setErrorFlag] = useState<boolean>(false)
   const [alertImage, setAlertImage] = useState(constructionImage);
   const [alertClass, setAlertClass] = useState('construction-image')
