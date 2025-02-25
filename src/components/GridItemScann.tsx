@@ -114,7 +114,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ dataDTO, socketPort, sess
 
     try {
       webSocket.send(JSON.stringify(message));
-      console.log('📤 Sent create element DTO:', message);
+      console.log('📤 Sent CREATE element DTO:', message);
     } catch (error) {
       console.error('❌ Error sending WebSocket message:', error);
     }
@@ -137,10 +137,33 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ dataDTO, socketPort, sess
 
     try {
       webSocket.send(JSON.stringify(message));
-      console.log('📤 Sent create element DTO:', message);
+      console.log('📤 Sent DELETE element DTO:', message);
     } catch (error) {
       console.error('❌ Error sending WebSocket message:', error);
     }
+  };
+
+  const handleSendDetailsDTO = (elementDTO: ElementDTO) => {
+    console.log("handleSendDetailsDTO:", elementDTO);
+
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
+      console.warn("🚨 WebSocket is not connected. Cannot send message.");
+      return;
+    }
+
+    const message = {
+      type: "DETAILS_ELEMENT_DTO",
+      sessionId: "unknow",
+      details: [elementDTO],
+    };
+
+    try {
+      webSocket.send(JSON.stringify(message));
+      console.log('📤 Sent DETAILS element DTO:', message);
+    } catch (error) {
+      console.error('❌ Error sending WebSocket message:', error);
+    }
+
   };
 
   const handleAttributeChange = (value: string) => {
@@ -191,7 +214,13 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ dataDTO, socketPort, sess
               </div>
               <div className="instructions-list">
                 {elementData.elements.map((elementDTO, i) => (
-                  <div key={i} className="instruction-item">
+                  <div
+                    key={i}
+                    className="instruction-item"
+                    onClick={() => {
+                      handleSendDetailsDTO(elementDTO);
+                    }}
+                  >
                     <span className="instruction-line">{elementDTO.tagName}</span>
                     <div>
                       <AttributeDropdown elementDTO={elementDTO} onChange={handleAttributeChange} />
@@ -237,7 +266,6 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ dataDTO, socketPort, sess
       )}
     </div>
   );
-
 };
 
 export default GridItemScann;
