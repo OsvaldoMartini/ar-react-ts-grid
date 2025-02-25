@@ -17,7 +17,7 @@ const App: React.FC = () => {
   const [elementDTO, setElementDTO] = useState<ElementDTO[]>(elementsDTOMockData);
   const [botJobData, setBotJobData] = useState<BotJobData>(botJobMockData);
   const [socketPort, setSocketPort] = useState<number>(8181);
-  const [sessionId, setSessionId] = useState<string>(""); // scannerDestDTO / botJobTasks / Default session 
+  const [sessionId, setSessionId] = useState<string>(""); // (SENDER: scannerTool) -> scannerGrid /  (SENDER: insertTool) -> botJobTasks  
   const [errorFlag, setErrorFlag] = useState<boolean>(false)
   const [alertImage, setAlertImage] = useState(constructionImage);
   const [alertClass, setAlertClass] = useState('construction-image')
@@ -52,7 +52,7 @@ const App: React.FC = () => {
           // setAlertMessageBody("ReceiveDataFromJava Socket " + socketPort + " - " + sessionIdFromJava);
         }
         // Check if it's ElementDTO
-        else if (Array.isArray(dataLoad) && dataLoad.length > 0 && sessionIdFromJava === "scannerDestDTO") {
+        else if (Array.isArray(dataLoad) && dataLoad.length > 0 && sessionIdFromJava === "scannerGrid") {
           setElementDTO(dataLoad as ElementDTO[]);
           // setAlertMessageHeader("DATA  ElementDTO " + dataLoad.length);
           // setAlertMessageBody("ReceiveDataFromJava Socket " + socketPort + " - " + sessionIdFromJava);
@@ -93,7 +93,7 @@ const App: React.FC = () => {
       {sessionId && sessionId === "botJobTasks" && (
         <GridItem data={instructionsData} botJobLoad={botJobData} socketPort={socketPort} sessionId={sessionId} operationId="" />
       )}
-      {sessionId && sessionId === "scannerDestDTO" && (
+      {sessionId && sessionId === "scannerGrid" && (
         <GridItemScann dataDTO={elementDTO} socketPort={socketPort} sessionId={sessionId} operationId="" />
       )}
     </React.StrictMode>

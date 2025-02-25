@@ -17,7 +17,7 @@ interface GridItemScannProps {
   operationId: string;
 }
 
-const groupByTypeElement = (data: ElementDTO[]) => {
+const groupByTagName = (data: ElementDTO[]) => {
   return data.reduce((result, item) => {
     const { tagName } = item;
     if (!result[tagName]) {
@@ -28,8 +28,9 @@ const groupByTypeElement = (data: ElementDTO[]) => {
   }, {} as Record<string, { tagName: string; elements: ElementDTO[] }>);
 };
 
-const GridItemScann: React.FC<GridItemScannProps> = ({ dataDTO, socketPort, sessionId }) => {
-  const { webSocket, messages } = useWebSocket(socketPort, sessionId);
+const GridItemScann: React.FC<GridItemScannProps> = ({ dataDTO, socketPort, sessionId, operationId }) => {
+  // Using the custom WebSocket hook
+  const { webSocket, connected, reconnectAttempts, messages, error } = useWebSocket(socketPort, sessionId);
 
   const [elementDTO, setElementDTO] = useState<ElementDTO[]>(dataDTO);
   const [elementGrouped, setElementGrouped] = useState<Record<string, { tagName: string; elements: ElementDTO[] }>>({});
@@ -38,28 +39,127 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ dataDTO, socketPort, sess
   const [rowsPerPage, setRowsPerPage] = useState<number>(10);
   const [currentPage, setCurrentPage] = useState<number>(1);
 
+
+
+  const [errorFlag, setErrorFlag] = useState<boolean>(false)
+  const [alertImage, setAlertImage] = useState(constructionImage);
+  const [alertClass, setAlertClass] = useState('construction-image')
+  const [alertMessageHeader, setAlertMessageHeader] = useState<string | null>(null);
+  const [alertMessageBody, setAlertMessageBody] = useState<string | ComplexMessage[]>([]);
+  const [alertMessageFooter, setAlertMessageFooter] = useState<string | null>(null);
+  const [alertDismissed, setAlertDismissed] = useState(false);
+
+
+
   useEffect(() => {
-    if (!isElementGrouped && elementDTO.length > 0) {
-      setElementGrouped(groupByTypeElement(elementDTO));
+    if (messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      console.log('RECEIVED -> Last WebSocket message ', lastMessage);
+      try {
+        const parsedMessage = JSON.parse(lastMessage);
+
+        const bodyData = typeof parsedMessage.body === "string"
+          ? JSON.parse(parsedMessage.body)
+          : parsedMessage.body;
+
+        if (bodyData.type === "updateInstructions") {
+          // ... handle updateInstructions ...
+        } else if (bodyData.sessionId === "scannerGrid" && bodyData.operationId === "searchTerms") {
+          // Ensure detailsData is always an array if possible
+          const detailsData = Array.isArray(bodyData.details) ? bodyData.details : [];
+
+          // Update elementDTO first
+          setElementDTO(detailsData);
+          // Then, set isElementGrouped to false, triggering the useEffect
+          setIsElementGrouped(false);
+        }
+
+      } catch (error) {
+        console.error("Error parsing WebSocket message:", error);
+      }
+    }
+  }, [messages]);
+
+  useEffect(() => {
+    if (!isElementGrouped && elementDTO && elementDTO.length > 0) {
+      setElementGrouped(groupByTagName(elementDTO));
       setIsElementGrouped(true);
     }
   }, [elementDTO, isElementGrouped]);
+
+
+  const handleClose = () => {
+    setAlertDismissed(true); // Trigger re-execution of the effect
+    setErrorFlag(false); // Reset error flag
+    setAlertMessageHeader('');
+    setAlertMessageBody('');
+  };
 
   const totalPages = Math.ceil(Object.keys(elementGrouped).length / rowsPerPage);
   const paginatedData = Object.entries(elementGrouped).slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
 
   const handleCreateElementDTO = (elementDTO: ElementDTO) => {
-    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) return;
-    webSocket.send(JSON.stringify({ type: "NEW_ELEMENT_DTO", sessionId: "unknown", details: [elementDTO] }));
+    console.log("handleCreateElementDTO:", elementDTO);
+
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
+      console.warn("🚨 WebSocket is not connected. Cannot send message.");
+      return;
+    }
+
+    const message = {
+      type: "NEW_ELEMENT_DTO",
+      sessionId: "unknow",
+      details: [elementDTO],
+    };
+
+    try {
+      webSocket.send(JSON.stringify(message));
+      console.log('📤 Sent create element DTO:', message);
+    } catch (error) {
+      console.error('❌ Error sending WebSocket message:', error);
+    }
+
   };
 
   const handleRemoveElementDTO = (elementDTO: ElementDTO) => {
-    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) return;
-    webSocket.send(JSON.stringify({ type: "DEL_ELEMENT_DTO", sessionId: "unknown", details: [elementDTO] }));
+    console.log("handleCreateElementDTO:", elementDTO);
+
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
+      console.warn("🚨 WebSocket is not connected. Cannot send message.");
+      return;
+    }
+
+    const message = {
+      type: "DEL_ELEMENT_DTO",
+      sessionId: "unknoww",
+      details: [elementDTO],
+    };
+
+    try {
+      webSocket.send(JSON.stringify(message));
+      console.log('📤 Sent create element DTO:', message);
+    } catch (error) {
+      console.error('❌ Error sending WebSocket message:', error);
+    }
+  };
+
+  const handleAttributeChange = (value: string) => {
+    console.log('Selected attribute:', value);
   };
 
   return (
     <div className="grid-container">
+      {alertMessageBody && alertMessageBody.length > 0 && (
+        <AlertModal
+          header={alertMessageHeader || ''}
+          body={alertMessageBody || ''}
+          extraMsg={alertMessageFooter || ''}
+          onClose={handleClose}
+          imageSrc={alertImage}
+          imageClass={alertClass}
+          error={errorFlag}
+        />
+      )}
       {paginatedData.length === 0 ? (
         <div className="block">
           <div className="block-header">Scanned Web Elements</div>
@@ -94,7 +194,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ dataDTO, socketPort, sess
                   <div key={i} className="instruction-item">
                     <span className="instruction-line">{elementDTO.tagName}</span>
                     <div>
-                      <AttributeDropdown elementDTO={elementDTO} onChange={() => { }} />
+                      <AttributeDropdown elementDTO={elementDTO} onChange={handleAttributeChange} />
                     </div>
                     <div className="options-column">
                       <img
