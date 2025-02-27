@@ -5,9 +5,10 @@ import reportWebVitals from './reportWebVitals';
 import instructionsMockData, { botJobMockData, elementsDTOMockData } from './components/instructionsMockData';
 import GridItemScann from './components/GridItemScann';
 import GridItem from './components/GridItem';
-import { BlockLoopInstructionLoadDTO, BotJobData, ComplexMessage, ElementDTO } from './components/instructionsMockData5';
+import { BlockLoopInstructionLoadDTO, BotJobData, ComplexMessage, ElementDTO } from './components/instructionsMockData';
 import AlertModal from './components/AlertModal';
 import constructionImage from './assets/construction.png';
+import GridItemComp from './components/GridItemComp';
 
 // Initialize the root
 const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
@@ -17,7 +18,7 @@ const App: React.FC = () => {
   const [elementDTO, setElementDTO] = useState<ElementDTO[]>(elementsDTOMockData);
   const [botJobData, setBotJobData] = useState<BotJobData>(botJobMockData);
   const [socketPort, setSocketPort] = useState<number>(8181);
-  const [sessionId, setSessionId] = useState<string>(""); // (SENDER: scannerTool) -> scannerGrid /  (SENDER: insertTool) -> botJobTasks  
+  const [sessionId, setSessionId] = useState<string>(""); // (SENDER: scannerTool) -> scannerGrid  -> componentTasks /  (SENDER: insertTool) -> botJobTasks  
   const [errorFlag, setErrorFlag] = useState<boolean>(false)
   const [alertImage, setAlertImage] = useState(constructionImage);
   const [alertClass, setAlertClass] = useState('construction-image')
@@ -90,8 +91,11 @@ const App: React.FC = () => {
           error={errorFlag}
         />
       )}
-      {sessionId && sessionId === "botJobTasks" && (
+      {sessionId && (sessionId === "botJobTasks") && (
         <GridItem data={instructionsData} botJobLoad={botJobData} socketPort={socketPort} sessionId={sessionId} operationId="" />
+      )}
+      {sessionId && (sessionId == "componentTasks") && (
+        <GridItemComp data={instructionsData} botJobLoad={botJobData} socketPort={socketPort} sessionId={sessionId} operationId="" />
       )}
       {sessionId && sessionId === "scannerGrid" && (
         <GridItemScann dataDTO={elementDTO} socketPort={socketPort} sessionId={sessionId} operationId="" />

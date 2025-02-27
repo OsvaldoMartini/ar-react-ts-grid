@@ -62,9 +62,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ dataDTO, socketPort, sess
           ? JSON.parse(parsedMessage.body)
           : parsedMessage.body;
 
-        if (bodyData.type === "updateInstructions") {
-          // ... handle updateInstructions ...
-        } else if (bodyData.sessionId === "scannerGrid" && bodyData.operationId === "searchTerms") {
+        if (bodyData.sessionId === "scannerGrid" && bodyData.operationId === "searchTerms") {
           // Ensure detailsData is always an array if possible
           const detailsData = Array.isArray(bodyData.details) ? bodyData.details : [];
 
