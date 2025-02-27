@@ -131,29 +131,6 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingId, data, botJobLoad, so
   const [alertMessageFooter, setAlertMessageFooter] = useState<string | null>(null);
   const [alertDismissed, setAlertDismissed] = useState(false);
 
-  // // Function to handle receiving data from JavaFX
-  // (window as any).receiveDataFromJava = function (jsonData: string, socketPort: number) {
-  //   const data: BlockLoopInstructionLoadDTO[] = JSON.parse(jsonData);
-  //   const dataBotJob: BotJobData = JSON.parse(jsonData);
-
-  //   if (data && data.length > 0) {
-  //     setMockData(true);
-  //     setIsDataReordered(false); // Reset this flag on new data load
-  //     setInstructionsData(data);
-  //   } else {
-  //     if (dataBotJob) {
-  //       setMockData(true);
-  //       setIsDataReordered(false); // Reset this flag on new data load
-  //       setBotJob(dataBotJob);
-  //     }
-  //   }
-
-  //   setSocketPort(socketPort);
-  //   // setErrorFlag(true);
-  //   // setAlertMessageBody("receiveDataFromJava Socket " + socketPort);
-  // };
-
-
   // Drag-and-drop event handler
   const onDragEnd = (result: any) => {
     const { destination, source } = result;
@@ -583,6 +560,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingId, data, botJobLoad, so
       setOpenDropdown(null); // Close the dropdown if clicked outside
     }
   }, [dropdownRef]);
+
 
   useEffect(() => {
     if (messages.length > 0) {
