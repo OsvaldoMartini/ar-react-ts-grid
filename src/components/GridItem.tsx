@@ -41,7 +41,7 @@ import AlertModal from './AlertModal';
 import { useWebSocket } from './useWebSocket';
 
 interface GridItemProps {
-  homeBankingId?: number;
+  homeBankingId: number;
   data: BlockLoopInstructionLoadDTO[];
   botJobLoad: BotJobData;
   socketPort: number;
@@ -592,7 +592,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingId, data, botJobLoad, so
       try {
         const parsedMessage = JSON.parse(lastMessage);
 
-        if (parsedMessage.operationId === "updateInstructions") {
+        if (parsedMessage.sessionId === "botJobTasks" && parsedMessage.operationId === "updateInstructions") {
 
           const bodyData = typeof parsedMessage.body === "string"
             ? JSON.parse(parsedMessage.body)
@@ -2761,6 +2761,9 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingId, data, botJobLoad, so
                   </div>
                 </div>
                 <div className="instruction-item"> </div>
+                <div className="block">
+                  <div className="no-data-message">No data found</div>
+                </div>
               </div>
             </div>
           ) : (
@@ -2831,7 +2834,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingId, data, botJobLoad, so
 
                     <span className="block-count">
                       ({blockData.instructions.length})
-                      {!mockData ? "-Moock Data" : ""}
+                      {/* {mockData ? "-Moock Data" : ""} */}
                     </span>
                     {/* Show the export file or "No Export File" */}
                     <span className="block-export-file">

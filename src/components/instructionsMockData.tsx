@@ -22,6 +22,30 @@ export interface BlockLoopInstructionLoadDTO {
   loopOnly?: boolean;
 }
 
+
+export interface ComponentsInstructionsDTO {
+  homeBankingId: number;
+  botJobId: number;
+  botJobName: string;
+  id: number;
+  instructionOrderNumber: number;
+  name: string;
+  description: string;
+  blockId: number;
+  blockOrderNumber: number;
+  blockName: string;
+  blockActive: boolean;
+  blockWait: number;
+  actions: string;
+  instructionActive: boolean;
+  parentId?: number;
+  operation?: string;
+  preComponent?: boolean;
+  exportFile?: string;
+  refreshLoop?: boolean;
+  loopOnly?: boolean;
+}
+
 export interface ElementDTO {
   typeElement: string;
   tagName: string;

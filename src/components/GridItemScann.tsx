@@ -188,7 +188,10 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
       {paginatedData.length === 0 ? (
         <div className="block">
           <div className="block-header">Scanned Web Elements</div>
-          <div className="no-data-message">No data found</div>
+          <div className="instruction-item"> </div>
+          <div className="block">
+            <div className="no-data-message">No data found</div>
+          </div>
         </div>
       ) : (
         <>
