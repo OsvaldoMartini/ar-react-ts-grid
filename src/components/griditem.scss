@@ -31,6 +31,11 @@
   height: 20px; /* Set a fixed height */
 
   &.color-component {
+    background-color: #c3d3d9   !important;
+    color: #0b5394; 
+  }
+
+  &.color-component {
     background-color: #add8e6   !important;
     color: #0b5394; 
   }
@@ -49,7 +54,7 @@
 
 /* Block Name Span */
 .block-header .block-count {
-  width: 200px; /* Set width of block name to 100px */
+  width: 50px; /* Set width of block name to 100px */
   white-space: nowrap; /* Prevent text wrapping */
   overflow: hidden; /* Hide overflow */
   text-overflow: ellipsis; /* Add ellipsis if text is too long */
@@ -107,7 +112,7 @@
   font-size: 7px;
   display: inline-block;
   color: white;
-  padding: 5px 14px 0px 0px;
+  padding: 5px 12px 0px 0px;
   vertical-align: text-top;
 }
 
@@ -284,7 +289,7 @@
   border-radius: 4px; /* Round the corners of the dropdown */
   border: 1px solid #ccc; /* Subtle border */
   background-color: #f9f9f9; /* Light background */
-  font-size: 14px; /* Adjust font size */
+  font-size: 12px; /* Adjust font size */
   transition: all 0.3s ease; /* Smooth transition for interactions */
 }
 
@@ -376,10 +381,13 @@
 
 
 .block-export-file {
-  font-size: 14px;
+  font-size: 12px; // Decrease font size
   color: #888;
   margin-left: 10px;
   font-style: italic;
+  white-space: nowrap; // Prevent text from wrapping
+  overflow: hidden;
+  text-overflow: ellipsis; // Add "..." if the text is too long
 }
 
 
@@ -402,7 +410,7 @@
   justify-content: center;
   gap: 15px;
   margin-top: 20px;
-  font-size: 14px;
+  font-size: 12px;
 
   label {
     font-weight: bold;
@@ -413,7 +421,7 @@
     padding: 8px 12px;
     border-radius: 5px;
     border: 1px solid #ccc;
-    font-size: 14px;
+    font-size: 12px;
     background-color: white;
     cursor: pointer;
     transition: border-color 0.3s ease, box-shadow 0.3s ease;
@@ -437,7 +445,7 @@
     border-radius: 5px;
     cursor: pointer;
     transition: background-color 0.3s ease, transform 0.2s ease;
-    font-size: 14px;
+    font-size: 12px;
     font-weight: bold;
 
     &:hover {
