@@ -18,6 +18,7 @@ const App: React.FC = () => {
   const [elementDTO, setElementDTO] = useState<ElementDTO[]>(elementsDTOMockData);
   const [botJobData, setBotJobData] = useState<BotJobData>(botJobMockData);
   const [socketPort, setSocketPort] = useState<number>(8181);
+  const [homeBanking, setHomeBanking] = useState<number>(0);
   const [sessionId, setSessionId] = useState<string>(""); // (SENDER: scannerTool) -> scannerGrid  -> componentTasks /  (SENDER: insertTool) -> botJobTasks  
   const [errorFlag, setErrorFlag] = useState<boolean>(false)
   const [alertImage, setAlertImage] = useState(constructionImage);
@@ -37,7 +38,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     // Define the function for receiving JavaFX data
-    (window as any).receiveDataFromJava = (jsonData: string, socketPort: number, sessionIdFromJava: string) => {
+    (window as any).receiveDataFromJava = (jsonData: string, socketPort: number, sessionIdFromJava: string, homeBanking: number) => {
       try {
         console.log("sessionIdFromJava", sessionIdFromJava);
 
@@ -45,6 +46,7 @@ const App: React.FC = () => {
 
         setSocketPort(socketPort);
         setSessionId(sessionIdFromJava);
+        setHomeBanking(homeBanking);
 
         // Check if it's BlockLoopInstructionLoadDTO
         if (Array.isArray(dataLoad) && dataLoad.length > 0 && (sessionIdFromJava === "botJobTasks" || sessionIdFromJava === "componentTasks")) {
@@ -92,13 +94,13 @@ const App: React.FC = () => {
         />
       )}
       {sessionId && (sessionId === "botJobTasks") && (
-        <GridItem data={instructionsData} botJobLoad={botJobData} socketPort={socketPort} sessionId={sessionId} operationId="" />
+        <GridItem homeBankingId={homeBanking} data={instructionsData} botJobLoad={botJobData} socketPort={socketPort} sessionId={sessionId} operationId="" />
       )}
       {sessionId && (sessionId == "componentTasks") && (
-        <GridItemComp data={instructionsData} botJobLoad={botJobData} socketPort={socketPort} sessionId={sessionId} operationId="" />
+        <GridItemComp homeBankingId={homeBanking} data={instructionsData} botJobLoad={botJobData} socketPort={socketPort} sessionId={sessionId} operationId="" />
       )}
       {sessionId && sessionId === "scannerGrid" && (
-        <GridItemScann dataDTO={elementDTO} socketPort={socketPort} sessionId={sessionId} operationId="" />
+        <GridItemScann homeBankingId={homeBanking} dataDTO={elementDTO} socketPort={socketPort} sessionId={sessionId} operationId="" />
       )}
     </React.StrictMode>
   );

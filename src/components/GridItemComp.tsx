@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { BlockLoopInstructionLoadDTO, BotJobData, ComplexMessage, ElementDTO, UpdatedBlock } from './instructionsMockData';
+import { BlockLoopInstructionLoadDTO, BotJobData, ComplexMessage, UpdatedBlock } from './instructionsMockData';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd'; // Import from react-beautiful-dnd
 import './griditem.scss';
 
@@ -41,6 +41,7 @@ import AlertModal from './AlertModal';
 import { useWebSocket } from './useWebSocket';
 
 interface GridItemCompProps {
+  homeBankingId: number;
   data: BlockLoopInstructionLoadDTO[];
   botJobLoad: BotJobData;
   socketPort: number;
@@ -95,7 +96,7 @@ const reassignInstructionOrderNumbersByBlock = (instructions: BlockLoopInstructi
   return updatedInstructions;
 };
 
-const GridItemComp: React.FC<GridItemCompProps> = ({ data, botJobLoad, socketPort, sessionId, operationId }) => {
+const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJobLoad, socketPort, sessionId, operationId }) => {
   // Using the custom WebSocket hook
   const { webSocket, connected, reconnectAttempts, messages, error } = useWebSocket(socketPort, sessionId);
 
@@ -129,29 +130,6 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ data, botJobLoad, socketPor
   const [alertMessageBody, setAlertMessageBody] = useState<string | ComplexMessage[]>([]);
   const [alertMessageFooter, setAlertMessageFooter] = useState<string | null>(null);
   const [alertDismissed, setAlertDismissed] = useState(false);
-
-  // // Function to handle receiving data from JavaFX
-  // (window as any).receiveDataFromJava = function (jsonData: string, socketPort: number) {
-  //   const data: BlockLoopInstructionLoadDTO[] = JSON.parse(jsonData);
-  //   const dataBotJob: BotJobData = JSON.parse(jsonData);
-
-  //   if (data && data.length > 0) {
-  //     setMockData(true);
-  //     setIsDataReordered(false); // Reset this flag on new data load
-  //     setInstructionsData(data);
-  //   } else {
-  //     if (dataBotJob) {
-  //       setMockData(true);
-  //       setIsDataReordered(false); // Reset this flag on new data load
-  //       setBotJob(dataBotJob);
-  //     }
-  //   }
-
-  //   setSocketPort(socketPort);
-  //   // setErrorFlag(true);
-  //   // setAlertMessageBody("receiveDataFromJava Socket " + socketPort);
-  // };
-
 
   // Drag-and-drop event handler
   const onDragEnd = (result: any) => {
@@ -561,6 +539,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ data, botJobLoad, socketPor
         type: 'ROW_MOVE',
         botJobId,
         deleteBlockId,
+        homeBankingId: homeBankingId,
         sessionId: "componentTasks",
         updatedRows,
       };
@@ -633,6 +612,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ data, botJobLoad, socketPor
       const message = {
         type: 'BLOCK_ORDER',
         botJobId: updatedBlocks[0].botJobId,
+        homeBankingId: homeBankingId,
         sessionId: "componentTasks",
         updatedBlocks: updatedBlocks,
       };
@@ -761,6 +741,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ data, botJobLoad, socketPor
         botJobId: botJobId,  // Include the botJobId in the message
         blockId: blockId,
         blockName: blockName, // Send the updated block name
+        homeBankingId: homeBankingId,
         sessionId: "componentTasks"
       };
 
@@ -829,6 +810,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ data, botJobLoad, socketPor
         type: 'BLOCK_STATUS',
         botJobId: botJobId, // Include the botJobId in the message
         blockId: blockId,
+        homeBankingId: homeBankingId,
         sessionId: "componentTasks",
         blockActive: newBlockActive, // Send the toggled blockActive value
       };
@@ -904,6 +886,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ data, botJobLoad, socketPor
         instructionActive: newInstructionActive, // Send the toggled instructionActive value
         parentId: parentId,
         actions: actions,
+        homeBankingId: homeBankingId,
         sessionId: "componentTasks"
       };
 
@@ -941,6 +924,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ data, botJobLoad, socketPor
         blockId: blockId,
         blockName: blockName, // Send the updated block name
         exportFile: exportFile,
+        homeBankingId: homeBankingId,
         sessionId: "componentTasks"
       };
 
@@ -1052,6 +1036,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ data, botJobLoad, socketPor
       const message = {
         type: 'BLOCK_MOVE',
         botJobId: updatedBlocks[0].botJobId,
+        homeBankingId: homeBankingId,
         sessionId: "componentTasks",
         updatedBlocks: updatedBlocks,
       };
@@ -1128,6 +1113,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ data, botJobLoad, socketPor
         blockId: instruction.blockId,
         blockName: instruction.blockName,
         isBetween: isBetween,
+        homeBankingId: homeBankingId,
         sessionId: "componentTasks",
         updatedRows: [instructionDTO], // Wrap the instructionDTO in an array
       };
@@ -1170,6 +1156,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ data, botJobLoad, socketPor
       blockOrderNumber: 1,
       blockId: -1,
       blockName: "Default Block",
+      homeBankingId: homeBankingId,
       sessionId: "componentTasks",
       updatedRows: [instructionDTO], // Wrap the instructionDTO in an array
     };
@@ -1221,6 +1208,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ data, botJobLoad, socketPor
         botJobId: botJobId,
         blockId: instruction.blockId,
         blockName: instruction.blockName,
+        homeBankingId: homeBankingId,
         sessionId: "componentTasks",
         updatedRows: [instructionDTO], // Wrap the instructionDTO in an array
       };
@@ -1286,6 +1274,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ data, botJobLoad, socketPor
         blockId: instruction.blockId,
         blockName: instruction.blockName,
         isBetween: isBetween,
+        homeBankingId: homeBankingId,
         sessionId: "componentTasks",
         updatedRows: [instructionDTO], // Wrap the instructionDTO in an array
       };
@@ -1348,6 +1337,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ data, botJobLoad, socketPor
         blockId: instruction.blockId,
         blockName: instruction.blockName,
         isBetween: isBetween,
+        homeBankingId: homeBankingId,
         sessionId: "componentTasks",
         updatedRows: [instructionDTO], // Wrap the instructionDTO in an array
       };
@@ -1799,6 +1789,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ data, botJobLoad, socketPor
       const message = {
         type: 'BLOCKS_SPLITTER',
         botJobId: botJobId,
+        homeBankingId: homeBankingId,
         sessionId: "componentTasks",
         details: blockSplitDetails,
       };
@@ -1870,6 +1861,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ data, botJobLoad, socketPor
       const message = {
         type: 'BLOCK_MOVE',
         botJobId: updatedBlocks[0].botJobId,
+        homeBankingId: homeBankingId,
         sessionId: "componentTasks",
         updatedBlocks: updatedBlocks,
       };
@@ -1937,6 +1929,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ data, botJobLoad, socketPor
           const message = {
             type: 'ROW_MOVE',
             botJobId: currentInstruction.botJobId,
+            homeBankingId: homeBankingId,
             sessionId: "componentTasks",
             updatedRows: updatedRows,
           };
@@ -2004,6 +1997,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ data, botJobLoad, socketPor
           const message = {
             type: 'ROW_MOVE',
             botJobId: currentInstruction.botJobId,
+            homeBankingId: homeBankingId,
             sessionId: "componentTasks",
             updatedRows: updatedRows,
           };
@@ -2074,6 +2068,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ data, botJobLoad, socketPor
         parentId,
         botJobId,
         blockId,
+        homeBankingId: homeBankingId,
         sessionId: "componentTasks"
       };
 
@@ -2146,6 +2141,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ data, botJobLoad, socketPor
         blockId: blockId,
         botJobId: botJobId,
         updatedBlocks: blocksToUpdate, // Include the list of updated blocks
+        homeBankingId: homeBankingId,
         sessionId: "componentTasks"
       };
 
@@ -2198,6 +2194,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ data, botJobLoad, socketPor
         botJobId: botJobId,
         blockId: blockId,
         blockName: firstBlockName, // Pass the block name here
+        homeBankingId: homeBankingId,
         sessionId: "componentTasks",
         instructions: reassignedData.map(instr => ({
           instructionId: instr.id,
@@ -2468,6 +2465,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ data, botJobLoad, socketPor
         botJobId: botJobId,
         blockId: blockId,
         blockName: blockName,
+        homeBankingId: homeBankingId,
         sessionId: "componentTasks",
         updatedRows: [{
           instructionId: instructionId,
@@ -2650,7 +2648,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ data, botJobLoad, socketPor
           Object.keys(groupedData).length === 0 ? (
             // Render default block if groupedData is empty
             <div className="block">
-              <div className="block-header-comp">
+              <div className="block-header">
                 <span className="block-order-number">#1</span>
                 <span className="block-name">Components Created</span>
 
@@ -2670,7 +2668,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ data, botJobLoad, socketPor
               .map(([blockGroupIndex, blockData], index) => (
                 <div key={blockGroupIndex} className="block">
                   {/* Block header with garbage, up, and down buttons */}
-                  <div className="block-header">
+                  <div className={`block-header ${sessionId === "componentTasks" ? "color-component" : ""}`}>
                     {blockData.instructions[0].blockActive ? (
                       <img src={activeImage}
                         alt="Active"
@@ -2769,14 +2767,14 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ data, botJobLoad, socketPor
                         className="excel-button"
                         onClick={() => handleExcelFileBlockName(Number(blockData.instructions[0].blockId), blockData.blockName, blockData.exportFile)} // Edit block logic
                       />
-                      {index !== 0 && (
-                        <img
-                          src={crossImage}
-                          alt=""
-                          className="cross-button"
-                          onClick={() => handleRemoveBlock(Number(blockData.instructions[0].blockId))}
-                        />
-                      )}
+
+                      <img
+                        src={crossImage}
+                        alt=""
+                        className="cross-button"
+                        onClick={() => handleRemoveBlock(Number(blockData.instructions[0].blockId))}
+                      />
+
 
                     </div>
                   </div>

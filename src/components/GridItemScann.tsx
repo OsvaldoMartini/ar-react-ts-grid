@@ -11,6 +11,7 @@ import { useWebSocket } from './useWebSocket';
 import AttributeDropdown from './AttributeDropdown';
 
 interface GridItemScannProps {
+  homeBankingId: number;
   dataDTO: ElementDTO[];
   socketPort: number;
   sessionId: string;
@@ -28,7 +29,7 @@ const groupByTagName = (data: ElementDTO[]) => {
   }, {} as Record<string, { tagName: string; elements: ElementDTO[] }>);
 };
 
-const GridItemScann: React.FC<GridItemScannProps> = ({ dataDTO, socketPort, sessionId, operationId }) => {
+const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, socketPort, sessionId, operationId }) => {
   // Using the custom WebSocket hook
   const { webSocket, connected, reconnectAttempts, messages, error } = useWebSocket(socketPort, sessionId);
 
@@ -106,6 +107,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ dataDTO, socketPort, sess
 
     const message = {
       type: "NEW_ELEMENT_DTO",
+      homeBankingId: homeBankingId,
       sessionId: "unknow",
       details: [elementDTO],
     };
@@ -129,6 +131,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ dataDTO, socketPort, sess
 
     const message = {
       type: "DEL_ELEMENT_DTO",
+      homeBankingId: homeBankingId,
       sessionId: "unknoww",
       details: [elementDTO],
     };
@@ -151,6 +154,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ dataDTO, socketPort, sess
 
     const message = {
       type: "DETAILS_ELEMENT_DTO",
+      homeBankingId: homeBankingId,
       sessionId: "unknow",
       details: [elementDTO],
     };

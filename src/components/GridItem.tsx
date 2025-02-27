@@ -41,6 +41,7 @@ import AlertModal from './AlertModal';
 import { useWebSocket } from './useWebSocket';
 
 interface GridItemProps {
+  homeBankingId?: number;
   data: BlockLoopInstructionLoadDTO[];
   botJobLoad: BotJobData;
   socketPort: number;
@@ -95,7 +96,7 @@ const reassignInstructionOrderNumbersByBlock = (instructions: BlockLoopInstructi
   return updatedInstructions;
 };
 
-const GridItem: React.FC<GridItemProps> = ({ data, botJobLoad, socketPort, sessionId, operationId }) => {
+const GridItem: React.FC<GridItemProps> = ({ homeBankingId, data, botJobLoad, socketPort, sessionId, operationId }) => {
   // Using the custom WebSocket hook
   const { webSocket, connected, reconnectAttempts, messages, error } = useWebSocket(socketPort, sessionId);
 
@@ -561,6 +562,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobLoad, socketPort, sessi
         type: 'ROW_MOVE',
         botJobId,
         deleteBlockId,
+        homeBankingId: homeBankingId,
         sessionId: "botJobTasks",
         updatedRows,
       };
@@ -581,185 +583,6 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobLoad, socketPort, sessi
       setOpenDropdown(null); // Close the dropdown if clicked outside
     }
   }, [dropdownRef]);
-
-
-  // Use a ref to store messages and avoid unnecessary re-renders
-  // const lastMessagesRef = useRef<any[]>([]);
-  // lastMessagesRef.current = lastMessages;
-
-  // useEffect(() => {
-  //   if (lastMessages.length > 0) {
-  //     console.log("Last Messages: " + JSON.stringify(lastMessages));
-  //   }
-
-  //   if (lastMessages.length > 5) {
-  //     setLastMessages((prevMessages) => prevMessages.slice(1)); // Remove the first message
-  //   }
-  // }, [lastMessages]);
-
-
-  // WebSocket connection effect
-  // useEffect(() => {
-  //   if (errorFlag && !alertDismissed) return; // Wait for modal to be dismissed
-
-  //   let ws: WebSocket | null = null;
-  //   let attempts = reconnectAttempts; // Use local variable for attempts
-
-  //   const createWebSocket = async () => {
-  //     try {
-  //       ws = new WebSocket(`ws://localhost:${socketPort}/websocket`);
-
-  //       ws.onopen = () => {
-  //         console.log("WebSocket connected");
-  //         setConnected(true);
-  //         setReconnectAttempts(0); // Reset attempts on successful connection
-
-  //         // Close the alert modal when connected
-  //         setErrorFlag(false);
-  //         setAlertDismissed(true);
-  //         setAlertMessageHeader("");
-  //         setAlertMessageBody("");
-
-  //         // Try to send the subscription message
-  //         try {
-  //           const subscriptionMessage = {
-  //             type: "echo",
-  //             body: "subscribe",
-  //           };
-  //           ws?.send(JSON.stringify(subscriptionMessage));
-  //         } catch (sendError) {
-  //           console.error("Failed to send subscription message:", sendError);
-  //           setAlertMessageHeader("WebSocket Error");
-  //           setErrorFlag(true);
-  //           setAlertMessageBody("Failed to send subscription message.");
-  //         }
-  //       };
-
-  //       ws.onmessage = (event: MessageEvent) => {
-  //         // console.log("WebSocket message received:", event.data);
-  //         let receivedMessage = event.data;
-
-  //         // Remove null character if it exists
-  //         if (receivedMessage.endsWith("\u0000")) {
-  //           receivedMessage = receivedMessage.slice(0, -1);
-  //         }
-
-  //         if (receivedMessage) {
-  //           try {
-  //             const parsedObject = JSON.parse(receivedMessage);
-  //             const updatedMessages = [...lastMessagesRef.current, parsedObject.body];
-  //             if (updatedMessages.length <= 5) {
-  //               setLastMessages(updatedMessages);
-  //             }
-
-  //             if (parsedObject.body.includes("data_updated")) {
-  //               try {
-
-
-  //                 // Ensure footerData is always an array if possible
-  //                 const footerData = typeof parsedObject.footer === "string"
-  //                   ? JSON.parse(parsedObject.footer)
-  //                   : parsedObject.footer;
-
-  //                 if (footerData && Array.isArray(footerData)) {
-  //                   setInstructionsData(footerData);
-  //                   setIsDataReordered(false);
-  //                 } else {
-  //                   console.error("Parsed footer is not an array:", footerData);
-  //                   setErrorFlag(true);
-  //                   setAlertMessageHeader("Data Error");
-  //                   setAlertMessageBody("Received data_updated event, but footer is not a valid array.");
-  //                 }
-  //               } catch (parseError) {
-  //                 console.error("Error parsing data_updated message:", parseError);
-  //                 setErrorFlag(true);
-  //                 setAlertMessageHeader("Parsing Error");
-  //                 setAlertMessageBody("Failed to parse data_updated message.");
-  //               }
-  //             }
-
-
-  //             if (parsedObject.body.includes("cannot be processed") || (parsedObject.footer && parsedObject.footer.includes("cannot be processed"))) {
-
-  //               setAlertImage(warningRedImage);
-  //               setAlertMessageHeader("Action Error");
-  //               setErrorFlag(true);
-  //               setAlertMessageBody(parsedObject.body);
-  //               if (parsedObject.footer) {
-  //                 setAlertMessageFooter(parsedObject.footer);
-  //               }
-  //               setAlertClass('construction-image');
-  //             }
-
-  //           } catch (parseError) {
-  //             console.warn("Non-JSON message received:", receivedMessage);
-  //             const updatedMessages = [...lastMessagesRef.current, receivedMessage];
-  //             if (updatedMessages.length <= 5) {
-  //               setLastMessages(updatedMessages);
-  //             }
-  //             setAlertImage(warningRedImage);
-  //             setAlertMessageHeader("WebSocket Error");
-  //             setErrorFlag(true);
-  //             setAlertMessageBody(`WebSocket: ${receivedMessage}`);
-  //           }
-  //         }
-  //       };
-
-  //       ws.onerror = (error: Event) => {
-  //         console.error("WebSocket error:", error);
-  //         setAlertImage(warningRedImage);
-  //         setAlertMessageHeader("WebSocket Error");
-  //         setErrorFlag(true);
-  //         setAlertMessageBody(
-  //           `WebSocket connection failed. ${reconnectAttempts} - Attempt.`
-  //         );
-  //       };
-
-  //       ws.onclose = () => {
-  //         console.log("WebSocket connection closed");
-  //         setConnected(false);
-
-  //         if (attempts < 100) {
-  //           attempts++;
-  //           setReconnectAttempts(attempts);
-  //           setAlertImage(warningRedImage);
-  //           console.log(`Reconnecting attempt ${attempts}...`);
-  //           setAlertMessageBody(`${attempts} - Attempt to reconnect.`);
-  //           createWebSocket(); // Retry connection
-  //         } else {
-  //           // setAlertImage(warningRedImage);
-  //           // setAlertMessageHeader("WebSocket Error");
-  //           // setErrorFlag(true);
-  //           // setAlertMessageBody("100 Attempts to Reconnect with the WebSocket.");
-  //           // setAlertMessageFooter("Please restart the Web Scanner or contact the Administrator.");
-  //         }
-  //       };
-
-  //       setWebSocket(ws);
-  //     } catch (initError) {
-  //       console.error("Failed to initialize WebSocket:", initError);
-  //       setAlertImage(warningRedImage);
-  //       setAlertMessageHeader("WebSocket Initialization Error");
-  //       setErrorFlag(true);
-  //       setAlertMessageBody("Failed to initialize WebSocket connection.");
-  //     }
-  //   };
-
-  //   createWebSocket();
-
-  //   // Cleanup on component unmount or dependency change
-  //   return () => {
-  //     try {
-  //       console.log("Cleaning up WebSocket...");
-  //       if (ws && ws.readyState === WebSocket.OPEN) {
-  //         ws.close();
-  //       }
-  //     } catch (cleanupError) {
-  //       console.error("Error during WebSocket cleanup:", cleanupError);
-  //     }
-  //   };
-  // }, [socketPort, alertDismissed]);
-
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -811,6 +634,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobLoad, socketPort, sessi
       const message = {
         type: 'BLOCK_ORDER',
         botJobId: updatedBlocks[0].botJobId,
+        homeBankingId: homeBankingId,
         sessionId: "botJobTasks",
         updatedBlocks: updatedBlocks,
       };
@@ -939,6 +763,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobLoad, socketPort, sessi
         botJobId: botJobId,  // Include the botJobId in the message
         blockId: blockId,
         blockName: blockName, // Send the updated block name
+        homeBankingId: homeBankingId,
         sessionId: "botJobTasks"
       };
 
@@ -1007,6 +832,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobLoad, socketPort, sessi
         type: 'BLOCK_STATUS',
         botJobId: botJobId, // Include the botJobId in the message
         blockId: blockId,
+        homeBankingId: homeBankingId,
         sessionId: "botJobTasks",
         blockActive: newBlockActive, // Send the toggled blockActive value
       };
@@ -1082,6 +908,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobLoad, socketPort, sessi
         instructionActive: newInstructionActive, // Send the toggled instructionActive value
         parentId: parentId,
         actions: actions,
+        homeBankingId: homeBankingId,
         sessionId: "botJobTasks"
       };
 
@@ -1119,6 +946,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobLoad, socketPort, sessi
         blockId: blockId,
         blockName: blockName, // Send the updated block name
         exportFile: exportFile,
+        homeBankingId: homeBankingId,
         sessionId: "botJobTasks"
       };
 
@@ -1230,6 +1058,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobLoad, socketPort, sessi
       const message = {
         type: 'BLOCK_MOVE',
         botJobId: updatedBlocks[0].botJobId,
+        homeBankingId: homeBankingId,
         sessionId: "botJobTasks",
         updatedBlocks: updatedBlocks,
       };
@@ -1306,6 +1135,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobLoad, socketPort, sessi
         blockId: instruction.blockId,
         blockName: instruction.blockName,
         isBetween: isBetween,
+        homeBankingId: homeBankingId,
         sessionId: "botJobTasks",
         updatedRows: [instructionDTO], // Wrap the instructionDTO in an array
       };
@@ -1348,6 +1178,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobLoad, socketPort, sessi
       blockOrderNumber: 1,
       blockId: -1,
       blockName: "Default Block",
+      homeBankingId: homeBankingId,
       sessionId: "botJobTasks",
       updatedRows: [instructionDTO], // Wrap the instructionDTO in an array
     };
@@ -1399,6 +1230,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobLoad, socketPort, sessi
         botJobId: botJobId,
         blockId: instruction.blockId,
         blockName: instruction.blockName,
+        homeBankingId: homeBankingId,
         sessionId: "botJobTasks",
         updatedRows: [instructionDTO], // Wrap the instructionDTO in an array
       };
@@ -1464,6 +1296,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobLoad, socketPort, sessi
         blockId: instruction.blockId,
         blockName: instruction.blockName,
         isBetween: isBetween,
+        homeBankingId: homeBankingId,
         sessionId: "botJobTasks",
         updatedRows: [instructionDTO], // Wrap the instructionDTO in an array
       };
@@ -1526,6 +1359,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobLoad, socketPort, sessi
         blockId: instruction.blockId,
         blockName: instruction.blockName,
         isBetween: isBetween,
+        homeBankingId: homeBankingId,
         sessionId: "botJobTasks",
         updatedRows: [instructionDTO], // Wrap the instructionDTO in an array
       };
@@ -1570,7 +1404,6 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobLoad, socketPort, sessi
     const blockOrderNumber = blockCompent.instructions[0].blockOrderNumber;
 
     const botJobId = blockCompent.instructions[0]?.botJobId || null; // Retrieve botJobId from the first instruction
-    const homeBankingId = blockCompent.instructions[0]?.homeBankingId || null; // Retrieve botJobId from the first instruction
 
     const newBlock = {
       homeBankingId: homeBankingId,
@@ -1606,8 +1439,8 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobLoad, socketPort, sessi
 
       const message = {
         type: "BLOCKS_COMPONENT",
-        homeBankingId: homeBankingId,
         botJobId: botJobId,
+        homeBankingId: homeBankingId,
         sessionId: "componentTasks",
         details: blockComnponent,
       };
@@ -2043,6 +1876,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobLoad, socketPort, sessi
       const message = {
         type: 'BLOCKS_SPLITTER',
         botJobId: botJobId,
+        homeBankingId: homeBankingId,
         sessionId: "botJobTasks",
         details: blockSplitDetails,
       };
@@ -2114,6 +1948,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobLoad, socketPort, sessi
       const message = {
         type: 'BLOCK_MOVE',
         botJobId: updatedBlocks[0].botJobId,
+        homeBankingId: homeBankingId,
         sessionId: "botJobTasks",
         updatedBlocks: updatedBlocks,
       };
@@ -2181,6 +2016,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobLoad, socketPort, sessi
           const message = {
             type: 'ROW_MOVE',
             botJobId: currentInstruction.botJobId,
+            homeBankingId: homeBankingId,
             sessionId: "botJobTasks",
             updatedRows: updatedRows,
           };
@@ -2248,6 +2084,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobLoad, socketPort, sessi
           const message = {
             type: 'ROW_MOVE',
             botJobId: currentInstruction.botJobId,
+            homeBankingId: homeBankingId,
             sessionId: "botJobTasks",
             updatedRows: updatedRows,
           };
@@ -2318,6 +2155,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobLoad, socketPort, sessi
         parentId,
         botJobId,
         blockId,
+        homeBankingId: homeBankingId,
         sessionId: "botJobTasks"
       };
 
@@ -2390,6 +2228,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobLoad, socketPort, sessi
         blockId: blockId,
         botJobId: botJobId,
         updatedBlocks: blocksToUpdate, // Include the list of updated blocks
+        homeBankingId: homeBankingId,
         sessionId: "botJobTasks"
       };
 
@@ -2442,6 +2281,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobLoad, socketPort, sessi
         botJobId: botJobId,
         blockId: blockId,
         blockName: firstBlockName, // Pass the block name here
+        homeBankingId: homeBankingId,
         sessionId: "botJobTasks",
         instructions: reassignedData.map(instr => ({
           instructionId: instr.id,
@@ -2712,6 +2552,7 @@ const GridItem: React.FC<GridItemProps> = ({ data, botJobLoad, socketPort, sessi
         botJobId: botJobId,
         blockId: blockId,
         blockName: blockName,
+        homeBankingId: homeBankingId,
         sessionId: "botJobTasks",
         updatedRows: [{
           instructionId: instructionId,
