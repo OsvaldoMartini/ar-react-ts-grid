@@ -31,6 +31,22 @@
   height: 20px; /* Set a fixed height */
 }
 
+/* Block Header */
+.block-header-comp {
+  display: flex;
+  align-items: center;
+  gap: 8px; /* Decreased gap */
+  padding: 8px; /* Reduced padding */
+  background-color: #EF7824; /* Dark blue background */
+  color: white; /* White text */
+  font-size: 1em; /* Decreased font size */
+  font-weight: bold; /* Bold text */
+  border-radius: 8px; /* Smaller rounded corners */
+  margin: 0;
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.4); /* Slightly smaller shadow */
+  height: 20px; /* Set a fixed height */
+}
+
 /* Block Name Span */
 .block-header .block-name {
   width: 200px; /* Set width of block name to 100px */

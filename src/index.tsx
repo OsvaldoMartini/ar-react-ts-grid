@@ -47,7 +47,7 @@ const App: React.FC = () => {
         setSessionId(sessionIdFromJava);
 
         // Check if it's BlockLoopInstructionLoadDTO
-        if (Array.isArray(dataLoad) && dataLoad.length > 0 && sessionIdFromJava === "botJobTasks") {
+        if (Array.isArray(dataLoad) && dataLoad.length > 0 && (sessionIdFromJava === "botJobTasks" || sessionIdFromJava === "componentTasks")) {
           setInstructionsData(dataLoad as BlockLoopInstructionLoadDTO[]);
           // setAlertMessageHeader("DATA  BlockLoopInstructionLoadDTO " + dataLoad.length);
           // setAlertMessageBody("ReceiveDataFromJava Socket " + socketPort + " - " + sessionIdFromJava);

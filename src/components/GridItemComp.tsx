@@ -2650,31 +2650,13 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ data, botJobLoad, socketPor
           Object.keys(groupedData).length === 0 ? (
             // Render default block if groupedData is empty
             <div className="block">
-              <div className="block-header">
+              <div className="block-header-comp">
                 <span className="block-order-number">#1</span>
-                <span className="block-name">Default Block</span>
-                {botJobData && botJobData.id > 0 && (
-                  <span className="block-name">BotJob : {botJobData.name}</span>
-                )}
+                <span className="block-name">Components Created</span>
+
               </div>
               <div className="instructions-list">
                 {/* Add an empty line */}
-                <div
-                  id={`dropdown-${1}`} // Use unique ID for each dropdown
-                  ref={dropdownRef}
-                  className={`dropdown-menu ${dropdownPosition === 'above'
-                    ? 'dropdown-above'
-                    : ''
-                    }`}
-                >
-                  <div
-                    onClick={() =>
-                      handleNewStepAfter(1)
-                    }
-                  >
-                    Insert New Step
-                  </div>
-                </div>
                 <div className="instruction-item"> </div>
               </div>
             </div>
