@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { BlockLoopInstructionLoadDTO, BotJobData, ComplexMessage, UpdatedBlock } from './instructionsMockData';
+import { BotJobData, ComplexMessage, ComponentsInstructionsDTO, UpdatedBlock } from './instructionsMockData';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd'; // Import from react-beautiful-dnd
 import './griditem.scss';
 
@@ -35,6 +35,7 @@ import brickImage from '../assets/brick.png';
 import hiddenImage from '../assets/hidden-black.png';
 import activeImage from '../assets/active3.png';
 import inactiveImage from '../assets/inactive2.png';
+import ArrowLeft from '../assets/ArrowLeft.png';
 
 
 import AlertModal from './AlertModal';
@@ -42,7 +43,7 @@ import { useWebSocket } from './useWebSocket';
 
 interface GridItemCompProps {
   homeBankingId: number;
-  data: BlockLoopInstructionLoadDTO[];
+  dataComp: ComponentsInstructionsDTO[];
   botJobLoad: BotJobData;
   socketPort: number;
   sessionId: string;
@@ -58,7 +59,7 @@ const reorder = (list: any[], startIndex: number, endIndex: number) => {
 };
 
 // Function to group data by blockId and sort instructions within each block
-const groupByBlock = (data: BlockLoopInstructionLoadDTO[]) => {
+const groupByBlock = (data: ComponentsInstructionsDTO[]) => {
   const blocks = data.reduce((result, item) => {
     const { blockId, blockName, exportFile } = item;
     if (!result[blockId]) {
@@ -66,7 +67,7 @@ const groupByBlock = (data: BlockLoopInstructionLoadDTO[]) => {
     }
     result[blockId].instructions.push(item);
     return result;
-  }, {} as Record<number, { blockName: string; exportFile?: string; instructions: BlockLoopInstructionLoadDTO[] }>);
+  }, {} as Record<number, { blockName: string; exportFile?: string; instructions: ComponentsInstructionsDTO[] }>);
 
   // Sort each block's instructions by instructionOrderNumber
   Object.values(blocks).forEach(block => {
@@ -79,12 +80,12 @@ const groupByBlock = (data: BlockLoopInstructionLoadDTO[]) => {
 
 
 // Helper function to reassign instructionOrderNumber starting from 1 within each block
-const reassignInstructionOrderNumbersByBlock = (instructions: BlockLoopInstructionLoadDTO[]) => {
+const reassignInstructionOrderNumbersByBlock = (instructions: ComponentsInstructionsDTO[]) => {
   // Group instructions by blockId
   const grouped = groupByBlock(instructions);
 
   // Iterate over each block and reassign instructionOrderNumbers
-  const updatedInstructions: BlockLoopInstructionLoadDTO[] = [];
+  const updatedInstructions: ComponentsInstructionsDTO[] = [];
   Object.entries(grouped).forEach(([blockId, blockData]) => {
     const reassignedInstructions = blockData.instructions.map((instruction, index) => ({
       ...instruction,
@@ -96,11 +97,11 @@ const reassignInstructionOrderNumbersByBlock = (instructions: BlockLoopInstructi
   return updatedInstructions;
 };
 
-const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJobLoad, socketPort, sessionId, operationId }) => {
+const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, dataComp, botJobLoad, socketPort, sessionId, operationId }) => {
   // Using the custom WebSocket hook
   const { webSocket, connected, reconnectAttempts, messages, error } = useWebSocket(socketPort, sessionId);
 
-  const [instructionsData, setInstructionsData] = useState<BlockLoopInstructionLoadDTO[]>(data);
+  const [componentsData, setComponentsData] = useState<ComponentsInstructionsDTO[]>(dataComp);
   const [botJobData, setBotJobData] = useState<BotJobData>(botJobLoad);
 
 
@@ -110,7 +111,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [openDropdown, setOpenDropdown] = useState<number | null>(null);
   const [mockData, setMockData] = useState<boolean>(false);
-  const [groupedData, setGroupedData] = useState<{ [blockId: number]: { blockName: string; exportFile?: string; instructions: BlockLoopInstructionLoadDTO[] } }>({});
+  const [groupedData, setGroupedData] = useState<{ [blockId: number]: { blockName: string; exportFile?: string; instructions: ComponentsInstructionsDTO[] } }>({});
   const [isDataReordered, setIsDataReordered] = useState<boolean>(false);
 
   // const [client, setClient] = useState<Client | null>(null);
@@ -518,12 +519,12 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
     // Update state with the new grouped data, ensuring no empty blocks
     setGroupedData(updatedGroupedData);
 
-    // Flatten updatedGroupedData into instructionsData array, excluding empty blocks
+    // Flatten updatedGroupedData into componentsData array, excluding empty blocks
     const updatedInstructionsData = Object.values(updatedGroupedData)
       .flatMap(block => block.instructions);
 
-    // Update instructionsData state
-    setInstructionsData(updatedInstructionsData);
+    // Update componentsData state
+    setComponentsData(updatedInstructionsData);
 
     setIsDataReordered(false); // To trigger reordering logic if needed
 
@@ -570,7 +571,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
       try {
         const parsedMessage = JSON.parse(lastMessage);
 
-        if (parsedMessage.operationId === "updateInstructions") {
+        if (parsedMessage.sessionId === "componentTasks" && parsedMessage.operationId === "componentsUpdate") {
 
           const bodyData = typeof parsedMessage.body === "string"
             ? JSON.parse(parsedMessage.body)
@@ -580,7 +581,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
           // Ensure detailsData is always an array if possible
           const detailsData = Array.isArray(bodyData) ? bodyData : [];
 
-          setInstructionsData(detailsData);
+          setComponentsData(detailsData);
           setIsDataReordered(false); // To trigger reordering logic if needed
 
 
@@ -629,13 +630,13 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
   }, [updatedBlocks]); // Remove unnecessary dependencies
 
   useEffect(() => {
-    if (!isDataReordered && instructionsData.length > 0) {
+    if (!isDataReordered && componentsData.length > 0) {
       console.log("Reassigning instruction order numbers");
 
-      const reassignedData = reassignInstructionOrderNumbersByBlock([...instructionsData]);
+      const reassignedData = reassignInstructionOrderNumbersByBlock([...componentsData]);
       const { updatedData, updatedBlocks } = correctBlockOrderNumbers(reassignedData);
 
-      setInstructionsData(updatedData);
+      setComponentsData(updatedData);
       setGroupedData(groupByBlock(reassignedData));
 
       if (JSON.stringify(updatedBlocks) !== JSON.stringify(updatedBlocks)) {
@@ -644,7 +645,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
 
       setIsDataReordered(true);
     }
-  }, [instructionsData, isDataReordered]);
+  }, [componentsData, isDataReordered]);
 
 
   // Add the event listener to detect clicks outside the dropdown
@@ -689,8 +690,8 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
   };
 
   const handleSaveBlockName = (blockId: number) => {
-    // Ensure instructionsData is available
-    if (!instructionsData || instructionsData.length === 0) {
+    // Ensure componentsData is available
+    if (!componentsData || componentsData.length === 0) {
       setAlertImage(warningRedImage);
       setAlertClass('construction-image');
       setAlertMessageHeader(
@@ -701,8 +702,8 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
       return;
     }
 
-    // Find the botJobId from the instructionsData for the given blockId
-    const botJobId = instructionsData.find(instruction => instruction.blockId === blockId)?.botJobId;
+    // Find the botJobId from the componentsData for the given blockId
+    const botJobId = componentsData.find(instruction => instruction.blockId === blockId)?.botJobId;
 
     // Check if botJobId is found, if not handle the error
     if (!botJobId) {
@@ -716,18 +717,18 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
       return;
     }
 
-    // Update instructionsData with the new block name
-    const updatedInstructions = instructionsData.map((instruction) => {
+    // Update componentsData with the new block name
+    const updatedInstructions = componentsData.map((instruction) => {
       if (instruction.blockId === blockId) {
         return { ...instruction, blockName: blockName }; // Update the block name
       }
       return instruction;
     });
 
-    // Update the instructionsData state
-    setInstructionsData(updatedInstructions);
+    // Update the componentsData state
+    setComponentsData(updatedInstructions);
 
-    // Recompute groupedData based on the updated instructionsData
+    // Recompute groupedData based on the updated componentsData
     const updatedGroupedData = groupByBlock(updatedInstructions);
     setGroupedData(updatedGroupedData);
 
@@ -764,8 +765,8 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
 
 
   const handleBlockStatus = (blockId: number) => {
-    // Find the botJobId and current blockActive status from the instructionsData for the given blockId
-    const block = instructionsData.find(instruction => instruction.blockId === blockId);
+    // Find the botJobId and current blockActive status from the componentsData for the given blockId
+    const block = componentsData.find(instruction => instruction.blockId === blockId);
     const botJobId = block?.botJobId;
     const currentBlockActive = block?.blockActive;
 
@@ -782,8 +783,8 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
     // Determine the new blockActive value (toggle)
     const newBlockActive = !currentBlockActive;
 
-    // Update instructionsData with the new blockActive and instructionActive values
-    const updatedInstructions = instructionsData.map((instruction) => {
+    // Update componentsData with the new blockActive and instructionActive values
+    const updatedInstructions = componentsData.map((instruction) => {
       if (instruction.blockId === blockId) {
         return {
           ...instruction,
@@ -794,10 +795,10 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
       return instruction;
     });
 
-    // Update the instructionsData state
-    setInstructionsData(updatedInstructions);
+    // Update the componentsData state
+    setComponentsData(updatedInstructions);
 
-    // Recompute groupedData based on the updated instructionsData
+    // Recompute groupedData based on the updated componentsData
     const updatedGroupedData = groupByBlock(updatedInstructions);
     setGroupedData(updatedGroupedData);
 
@@ -824,7 +825,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
     }
   };
 
-  const handleInstructionStatus = (instructionId: number, instructions: BlockLoopInstructionLoadDTO[]) => {
+  const handleInstructionStatus = (instructionId: number, instructions: ComponentsInstructionsDTO[]) => {
     // Find the instruction by ID
     const instruction = instructions.find(item => item.id === instructionId);
 
@@ -852,8 +853,8 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
     // Determine the new instructionActive value (toggle)
     const newInstructionActive = !currentInstructionActive;
 
-    // Update instructionsData with the new instructionActive value
-    const updatedInstructions = instructionsData.map((item) => {
+    // Update componentsData with the new instructionActive value
+    const updatedInstructions = componentsData.map((item) => {
       if (item.id === instructionId) {
         return { ...item, instructionActive: newInstructionActive }; // Toggle instructionActive
       }
@@ -866,10 +867,10 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
       return item;
     });
 
-    // Update the instructionsData state
-    setInstructionsData(updatedInstructions);
+    // Update the componentsData state
+    setComponentsData(updatedInstructions);
 
-    // Recompute groupedData based on the updated instructionsData
+    // Recompute groupedData based on the updated componentsData
     const updatedGroupedData = groupByBlock(updatedInstructions);
     setGroupedData(updatedGroupedData);
 
@@ -899,10 +900,71 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
     }
   };
 
+  const handleComponentInjection = (blockGroupId: number) => {
+    // Access groupedData, setGroupedData, instructionsData, and preComponent from the component's scope
+    const blockCompent = groupedData[blockGroupId]; // Get the block directly by its blockId
+
+    if (!blockCompent) return; // Ensure the block exists
+
+    // Get the block order
+    const blockOrderNumber = blockCompent.instructions[0].blockOrderNumber;
+
+    const botJobId = blockCompent.instructions[0]?.botJobId || null; // Retrieve botJobId from the first instruction
+
+    const newBlock = {
+      homeBankingId: homeBankingId,
+      id: blockGroupId,
+      blockName: `${blockCompent.blockName}`, // Same name as the current block
+      blockOrderNumber: blockOrderNumber, // Assign the new block order number
+      botJobId: botJobId, // Preserve the botJobId in the new instructions
+      instructions: blockCompent.instructions.map((instruction, index) => ({
+        ...instruction,
+        blockId: blockGroupId, // Assign new block ID to the instructions
+        blockOrderNumber: -1, // Assign new block order number to the instructions
+        instructionOrderNumber: index + 1, // Reassign instructionOrderNumber starting from 1 within the new block
+      })),
+    };
+
+    // Send WebSocket message with block split details
+    if (webSocket && connected) {
+      const blockComnponent = {
+        newBlock: {
+          homeBankingId: homeBankingId,
+          botJobId: botJobId,
+          blockId: newBlock.id,
+          blockName: newBlock.blockName,
+          blockOrderNumber: newBlock.blockOrderNumber,
+          instructions: newBlock.instructions.map(instruction => ({
+            instructionId: instruction.id,
+            blockId: newBlock.id,
+            blockOrderNumber: newBlock.blockOrderNumber,
+            instructionOrderNumber: instruction.instructionOrderNumber,
+          })),
+        },
+      };
+
+      const message = {
+        type: "COMPONENT_INJECT",
+        botJobId: botJobId,
+        homeBankingId: homeBankingId,
+        sessionId: "botJobTasks",
+        details: blockComnponent,
+      };
+
+      try {
+        webSocket.send(JSON.stringify(message));
+        console.log('Sent create component:', message);
+      } catch (error) {
+        console.log('Error sending WebSocket message:', error);
+      }
+    }
+    setOpenDropdown(null);
+  };
+
 
   const handleExcelFileBlockName = (blockId: number, blockName: string, exportFile?: string) => {
-    // Find the botJobId from the instructionsData for the given blockId
-    const botJobId = instructionsData.find(instruction => instruction.blockId === blockId)?.botJobId;
+    // Find the botJobId from the componentsData for the given blockId
+    const botJobId = componentsData.find(instruction => instruction.blockId === blockId)?.botJobId;
 
     // Check if botJobId is found, if not handle the error
     if (!botJobId) {
@@ -982,7 +1044,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
   // Function to move a block up by swapping blockOrderNumbers
   const handleMoveBlockUp = (blockId: number) => {
     console.log("handleMoveBlockUp");
-    const updatedData = [...instructionsData];
+    const updatedData = [...componentsData];
 
     // Find all instructions that belong to the current block
     const currentBlockInstructions = updatedData.filter(instruction => instruction.blockId === blockId);
@@ -1028,7 +1090,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
       }
     });
 
-    setInstructionsData([...updatedData]); // Make sure to use a copy
+    setComponentsData([...updatedData]); // Make sure to use a copy
     setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
 
     // Send WebSocket message with the block swap details
@@ -1079,7 +1141,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
   };
 
 
-  const handleInsertStepBefore = (instructionId: number, instructions: BlockLoopInstructionLoadDTO[]) => {
+  const handleInsertStepBefore = (instructionId: number, instructions: ComponentsInstructionsDTO[]) => {
     // Find the instruction based on the instructionId
     const instruction = instructions.find(instruction => instruction.id === instructionId);
 
@@ -1176,7 +1238,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
 
 
 
-  const handleEditSpecialOper = (instructionId: number, instructions: BlockLoopInstructionLoadDTO[]) => {
+  const handleEditSpecialOper = (instructionId: number, instructions: ComponentsInstructionsDTO[]) => {
     // Find the instruction based on the instructionId
     const instruction = instructions.find(instruction => instruction.id === instructionId);
 
@@ -1238,7 +1300,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
   };
 
 
-  const handleInsertElseIf = (instructionId: number, instructions: BlockLoopInstructionLoadDTO[]) => {
+  const handleInsertElseIf = (instructionId: number, instructions: ComponentsInstructionsDTO[]) => {
     // Find the instruction based on the instructionId
     const instruction = instructions.find(instruction => instruction.id === instructionId);
 
@@ -1303,7 +1365,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
   };
 
 
-  const handleInsertStepAfter = (instructionId: number, instructions: BlockLoopInstructionLoadDTO[]) => {
+  const handleInsertStepAfter = (instructionId: number, instructions: ComponentsInstructionsDTO[]) => {
     // Find the instruction based on the instructionId
     const instruction = instructions.find(instruction => instruction.id === instructionId);
 
@@ -1372,7 +1434,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
     setAlertMessageFooter(null);
   };
 
-  const isBetweenIfAndEndIf = (currentOrderNumber: number, instructions: BlockLoopInstructionLoadDTO[]) => {
+  const isBetweenIfAndEndIf = (currentOrderNumber: number, instructions: ComponentsInstructionsDTO[]) => {
     let ifFound = false;
 
     for (const instr of instructions) {
@@ -1392,7 +1454,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
 
   const isBetweenCondition = (
     currentOrderNumber: number,
-    instructions: BlockLoopInstructionLoadDTO[]
+    instructions: ComponentsInstructionsDTO[]
   ): { isBetween: boolean; parentId: number | null } => {
     let ifFound = false;
     let parentId: number | null = null;
@@ -1416,7 +1478,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
 
 
   const getInstructionsLoops = (blockId: number,
-    instructions: BlockLoopInstructionLoadDTO[]
+    instructions: ComponentsInstructionsDTO[]
   ): any[] => {
     // Use getLoopsWithParents to get matching instructions
     const matchingInstructions = getLoopsWithParents(blockId, instructions);
@@ -1436,7 +1498,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
     );
 
     // // Initialize the results array
-    // const matchingResults: BlockLoopInstructionLoadDTO[] = [];
+    // const matchingResults: ComponentsInstructionsDTO[] = [];
 
     // for (const { parentId, childOrderNumber } of allLoopBoundaries) {
     //   // Get the parent's instructionOrderNumber
@@ -1469,7 +1531,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
 
 
   const getLoopsWithParents = (blockId: number,
-    instructions: BlockLoopInstructionLoadDTO[]
+    instructions: ComponentsInstructionsDTO[]
   ) => {
     // Find all instructions where `refreshLoop` or `loopOnly` is true
     const parentInstructions = instructions.filter(
@@ -1505,7 +1567,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
   };
 
 
-  const isBetweenIfAndElseExcluded = (currentOrderNumber: number, instructions: BlockLoopInstructionLoadDTO[]) => {
+  const isBetweenIfAndElseExcluded = (currentOrderNumber: number, instructions: ComponentsInstructionsDTO[]) => {
     let ifFound = false;
 
     for (const instr of instructions) {
@@ -1528,7 +1590,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
 
 
 
-  const isBetweenIfAndElse = (currentOrderNumber: number, instructions: BlockLoopInstructionLoadDTO[]) => {
+  const isBetweenIfAndElse = (currentOrderNumber: number, instructions: ComponentsInstructionsDTO[]) => {
     let ifFound = false;
 
     for (const instr of instructions) {
@@ -1580,9 +1642,9 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
 
   const handleSplitComponent = (
     instructionId: number,
-    groupedData: { [blockId: string]: { blockName: string; instructions: BlockLoopInstructionLoadDTO[] } },
-    setGroupedData: (data: { [blockId: string]: { blockName: string; instructions: BlockLoopInstructionLoadDTO[] } }) => void,
-    instructionsData: BlockLoopInstructionLoadDTO[],
+    groupedData: { [blockId: string]: { blockName: string; instructions: ComponentsInstructionsDTO[] } },
+    setGroupedData: (data: { [blockId: string]: { blockName: string; instructions: ComponentsInstructionsDTO[] } }) => void,
+    componentsData: ComponentsInstructionsDTO[],
     isLastInstruction: boolean
   ) => {
 
@@ -1627,9 +1689,9 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
 
 
     // Find the current instruction
-    const currentInstruction = instructionsData.find((instruction) => instruction.id === instructionId);
+    const currentInstruction = componentsData.find((instruction) => instruction.id === instructionId);
 
-    const betweenLoops = getInstructionsLoops(blockId, instructionsData);
+    const betweenLoops = getInstructionsLoops(blockId, componentsData);
 
     if (betweenLoops.length > 0) {
 
@@ -1686,8 +1748,8 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
 
 
     // Create a new block with subsequent instructions, preserving the crescent order
-    // Find the maximum blockId from the entire instructionsData
-    const maxBlockId = Math.max(...instructionsData.map(instruction => instruction.blockId));
+    // Find the maximum blockId from the entire componentsData
+    const maxBlockId = Math.max(...componentsData.map(instruction => instruction.blockId));
     const newBlockId = maxBlockId + 1; // Generate a unique block ID
 
     const newBlockOrderNumber = blockOrderNumber + 1; // Increment the current block's order number by 1
@@ -1730,15 +1792,15 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
         acc[key] = blockData;
       }
       return acc;
-    }, {} as { [blockId: string]: { blockName: string; instructions: BlockLoopInstructionLoadDTO[] } });
+    }, {} as { [blockId: string]: { blockName: string; instructions: ComponentsInstructionsDTO[] } });
 
     // Add the new block to the updated data
     updatedBlocks[newBlockId] = newBlock;
     updatedBlocks[blockId] = updatedBlock;
 
-    // Call setInstructionsData and setIsDataReordered BEFORE updating groupedData
+    // Call setComponentsData and setIsDataReordered BEFORE updating groupedData
     const updatedInstructions = Object.values(updatedBlocks).flatMap(block => block.instructions);
-    setInstructionsData([...reassignInstructionOrderNumbersByBlock(updatedInstructions)]);
+    setComponentsData([...reassignInstructionOrderNumbersByBlock(updatedInstructions)]);
     setIsDataReordered(false); // Trigger reorder logic
 
     // Set the updated grouped data (or pass it to your state management)
@@ -1807,7 +1869,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
 
   // Function to move a block down by swapping blockOrderNumbers
   const handleMoveBlockDown = (blockId: number) => {
-    const updatedData = [...instructionsData];
+    const updatedData = [...componentsData];
 
     // Find all instructions that belong to the current block
     const currentBlockInstructions = updatedData.filter(
@@ -1853,7 +1915,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
       }
     });
 
-    setInstructionsData([...updatedData]); // Update the state
+    setComponentsData([...updatedData]); // Update the state
     setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
 
     // Send WebSocket message with the updated blocks list
@@ -1881,7 +1943,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
 
   // Function to move an instruction down considering blockOrderNumber
   const handleMoveRowDown = (instructionId: number) => {
-    const updatedData = [...instructionsData];
+    const updatedData = [...componentsData];
     const instructionIndex = updatedData.findIndex(instruction => instruction.id === instructionId);
 
     // Ensure that the instruction exists
@@ -1921,7 +1983,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
         nextInstruction.instructionOrderNumber = tempOrderNumber;
 
         // Reassign the updatedData array and update the state
-        setInstructionsData([...reassignInstructionOrderNumbersByBlock(updatedData)]);
+        setComponentsData([...reassignInstructionOrderNumbersByBlock(updatedData)]);
         setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
 
         // Send WebSocket message with the row swap details
@@ -1950,7 +2012,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
 
   // Function to move an instruction up considering blockOrderNumber
   const handleMoveRowUp = (instructionId: number) => {
-    const updatedData = [...instructionsData];
+    const updatedData = [...componentsData];
     const instructionIndex = updatedData.findIndex(instruction => instruction.id === instructionId);
 
     // Ensure that the instruction exists
@@ -1989,7 +2051,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
         previousInstruction.instructionOrderNumber = tempOrderNumber;
 
         // Reassign the updatedData array
-        setInstructionsData([...reassignInstructionOrderNumbersByBlock(updatedData)]);
+        setComponentsData([...reassignInstructionOrderNumbersByBlock(updatedData)]);
         setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
 
         // Send WebSocket message with the row swap details
@@ -2018,7 +2080,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
 
   const handleRemoveInstruction = (instructionId: number) => {
     // Find the instruction to remove
-    const instructionToRemove = instructionsData.find(instruction => instruction.id === instructionId);
+    const instructionToRemove = componentsData.find(instruction => instruction.id === instructionId);
 
     if (!instructionToRemove) return;
 
@@ -2031,18 +2093,18 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
     });
 
 
-    // Filter instructionsData
+    // Filter componentsData
     const updatedData = actions === "IF" || actions === "ELSE" || actions === "ENDIF"
-      ? instructionsData.filter(
+      ? componentsData.filter(
         instruction =>
           instruction.parentId !== parentId)
-      : instructionsData.filter(instruction => instruction.id !== instructionId);
+      : componentsData.filter(instruction => instruction.id !== instructionId);
 
     // Reassign order numbers
     const reassignedData = reassignInstructionOrderNumbersByBlock(updatedData);
-    setInstructionsData([...reassignedData]);
+    setComponentsData([...reassignedData]);
 
-    // Update groupedData based on the reassigned instructionsData
+    // Update groupedData based on the reassigned componentsData
     const newGroupedData = reassignedData.reduce((acc, instruction) => {
       if (!acc[instruction.blockId]) {
         acc[instruction.blockId] = {
@@ -2053,7 +2115,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
       }
       acc[instruction.blockId].instructions.push(instruction);
       return acc;
-    }, {} as { [blockId: number]: { blockName: string; exportFile?: string; instructions: BlockLoopInstructionLoadDTO[] } });
+    }, {} as { [blockId: number]: { blockName: string; exportFile?: string; instructions: ComponentsInstructionsDTO[] } });
 
     setGroupedData(newGroupedData);
 
@@ -2089,7 +2151,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
   const handleRemoveBlock = (blockId: number) => {
 
     // Find the botJobId and blockOrderNumber associated with the blockId
-    const blockInstruction = instructionsData.find(instruction => instruction.blockId === blockId);
+    const blockInstruction = componentsData.find(instruction => instruction.blockId === blockId);
     const botJobId = blockInstruction ? blockInstruction.botJobId : null;
     const removedBlockOrderNumber = blockInstruction ? blockInstruction.blockOrderNumber : null;
 
@@ -2104,8 +2166,8 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
       return; // Exit if no botJobId or blockOrderNumber is found
     }
 
-    // Remove the block from instructionsData
-    const updatedData = instructionsData.filter(instruction => instruction.blockId !== blockId);
+    // Remove the block from componentsData
+    const updatedData = componentsData.filter(instruction => instruction.blockId !== blockId);
 
     // Update blockOrderNumber for blocks after the removed block
     const blocksToUpdateSet = new Set<number>();
@@ -2117,7 +2179,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
     });
 
     const reassignedData = reassignInstructionOrderNumbersByBlock(updatedData);
-    setInstructionsData([...reassignedData]);
+    setComponentsData([...reassignedData]);
     setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
 
     // Prepare list of updated blocks
@@ -2155,7 +2217,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
 
   const handleRollbackBlock = (blockId: number) => {
     // Get the botJobId and blockName from the first instruction
-    const firstInstruction = instructionsData.find(instr => instr.blockId === blockId);
+    const firstInstruction = componentsData.find(instr => instr.blockId === blockId);
     const botJobId = firstInstruction ? firstInstruction.botJobId : null;
     const firstBlockName = firstInstruction ? firstInstruction.blockName : 'Unknown Block'; // Default to 'Unknown Block' if not found
 
@@ -2171,7 +2233,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
     }
 
     // Update all instructions to have blockId  and blockOrderNumber 1
-    const updatedData = instructionsData.map(instruction => ({
+    const updatedData = componentsData.map(instruction => ({
       ...instruction,
       blockId: blockId,
       blockOrderNumber: 1,
@@ -2184,7 +2246,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
     }));
 
     // Update the state
-    setInstructionsData([...reassignedData]);
+    setComponentsData([...reassignedData]);
     setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
 
     // Send WebSocket message to inform about the rollback
@@ -2213,7 +2275,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
   };
 
 
-  const getInstructionTypeElement = (instruction: BlockLoopInstructionLoadDTO): JSX.Element | string | null => {
+  const getInstructionTypeElement = (instruction: ComponentsInstructionsDTO): JSX.Element | string | null => {
     let imageSrc: string | null = null;
     let text: string | null = null;
     let isActionBold = false;
@@ -2363,7 +2425,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
   }
 
 
-  const renderEditButton = (actionType: string, editImage: string, instruction: BlockLoopInstructionLoadDTO) => {
+  const renderEditButton = (actionType: string, editImage: string, instruction: ComponentsInstructionsDTO) => {
     if (allSpecialOperations(actionType)) {
       return <span className="edit-button-space">&nbsp;</span>; // Render a space or an empty element
     }
@@ -2403,14 +2465,14 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
   };
 
 
-  const handleEditInstruction = (instruction: BlockLoopInstructionLoadDTO) => {
+  const handleEditInstruction = (instruction: ComponentsInstructionsDTO) => {
     setEditingInstructionId(instruction.id);
     setInstructionName(instruction.name);
   };
 
   const handleSaveInstruction = (instructionId: number) => {
     // Find the instruction to get blockId and botJobId
-    const instructionToUpdate = instructionsData.find(instruction => instruction.id === instructionId);
+    const instructionToUpdate = componentsData.find(instruction => instruction.id === instructionId);
 
     if (!instructionToUpdate) {
       setAlertImage(warningRedImage);
@@ -2426,7 +2488,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
     const { blockId, blockName, blockOrderNumber, botJobId, instructionOrderNumber } = instructionToUpdate;
 
     // Update the instruction's name and actions
-    const updatedInstructions = instructionsData.map((instruction) => {
+    const updatedInstructions = componentsData.map((instruction) => {
       if (instruction.id === instructionId) {
         // Update the name
         const updatedName = instructionName;
@@ -2452,7 +2514,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
       return instruction;
     });
 
-    setInstructionsData(updatedInstructions);
+    setComponentsData(updatedInstructions);
     setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
     setEditingInstructionId(null); // Exit edit mode
 
@@ -2499,8 +2561,8 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
 
 
   const renderOperations = (
-    instruction: BlockLoopInstructionLoadDTO,
-    allInstructions: BlockLoopInstructionLoadDTO[]
+    instruction: ComponentsInstructionsDTO,
+    allInstructions: ComponentsInstructionsDTO[]
   ) => {
     const validActions = ["SET", "GET", "CK", "E", "GOTO", , "LOOP", "REFRESH_LOOP"];
 
@@ -2628,7 +2690,6 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
   };
 
 
-
   return (
     <div className="grid-container">
       {alertMessageBody && alertMessageBody.length > 0 && (
@@ -2648,14 +2709,16 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
           Object.keys(groupedData).length === 0 ? (
             // Render default block if groupedData is empty
             <div className="block">
-              <div className="block-header">
-                <span className="block-order-number">#1</span>
+              <div className={`block-header color-empty}`}>
+                <span className="block-order-number">#0</span>
                 <span className="block-name">Components Created</span>
-
               </div>
               <div className="instructions-list">
                 {/* Add an empty line */}
                 <div className="instruction-item"> </div>
+                <div className="block">
+                  <div className="no-data-message">No data found</div>
+                </div>
               </div>
             </div>
           ) : (
@@ -2668,7 +2731,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
               .map(([blockGroupIndex, blockData], index) => (
                 <div key={blockGroupIndex} className="block">
                   {/* Block header with garbage, up, and down buttons */}
-                  <div className={`block-header ${sessionId === "componentTasks" ? "color-component" : ""}`}>
+                  <div className={`block-header ${componentsData && componentsData.length > 0 ? "color-component" : "color-empty"}`}>
                     {blockData.instructions[0].blockActive ? (
                       <img src={activeImage}
                         alt="Active"
@@ -2684,6 +2747,14 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
                           handleBlockStatus(blockData.instructions[0].blockId)
                         } />
                     )}
+
+                    <img src={ArrowLeft}
+                      alt="ArrowLeft"
+                      className="arrow-left-button"
+                      onClick={() =>
+                        handleComponentInjection(Number(blockData.instructions[0].blockId))}
+                    />
+
                     <span className="block-order-number">
                       #{blockData.instructions[0].blockOrderNumber}
                     </span>
@@ -2726,7 +2797,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
 
                     <span className="block-count">
                       ({blockData.instructions.length})
-                      {!mockData ? "-Moock Data" : ""}
+                      {/* {mockData ? "-Moock Data" : ""} */}
                     </span>
                     {/* Show the export file or "No Export File" */}
                     <span className="block-export-file">
@@ -2767,7 +2838,6 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
                         className="excel-button"
                         onClick={() => handleExcelFileBlockName(Number(blockData.instructions[0].blockId), blockData.blockName, blockData.exportFile)} // Edit block logic
                       />
-
                       <img
                         src={crossImage}
                         alt=""
@@ -2873,7 +2943,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
 
 
                                   )}
-                                  {renderOperations(instruction, instructionsData)}
+                                  {renderOperations(instruction, componentsData)}
                                   <div className="options-column">
                                     <div className="move-buttons">
                                       {renderEditButton(
@@ -2939,7 +3009,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, data, botJob
                                                     instruction.id,
                                                     groupedData,
                                                     setGroupedData,
-                                                    instructionsData,
+                                                    componentsData,
                                                     isLastInstruction
                                                   )
                                                 }

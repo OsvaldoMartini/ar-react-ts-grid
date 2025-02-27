@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import reportWebVitals from './reportWebVitals';
-import instructionsMockData, { botJobMockData, elementsDTOMockData } from './components/instructionsMockData';
+import instructionsMockData, { botJobMockData, ComponentsInstructionsDTO, elementsDTOMockData } from './components/instructionsMockData';
 import GridItemScann from './components/GridItemScann';
 import GridItem from './components/GridItem';
 import { BlockLoopInstructionLoadDTO, BotJobData, ComplexMessage, ElementDTO } from './components/instructionsMockData';
@@ -14,7 +14,8 @@ import GridItemComp from './components/GridItemComp';
 const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
 
 const App: React.FC = () => {
-  const [instructionsData, setInstructionsData] = useState<BlockLoopInstructionLoadDTO[]>(instructionsMockData);
+  const [instructionsData, setInstructionsData] = useState<BlockLoopInstructionLoadDTO[]>([]);
+  const [componentsData, setComponentsData] = useState<ComponentsInstructionsDTO[]>([]);
   const [elementDTO, setElementDTO] = useState<ElementDTO[]>(elementsDTOMockData);
   const [botJobData, setBotJobData] = useState<BotJobData>(botJobMockData);
   const [socketPort, setSocketPort] = useState<number>(8181);
@@ -49,10 +50,12 @@ const App: React.FC = () => {
         setHomeBanking(homeBanking);
 
         // Check if it's BlockLoopInstructionLoadDTO
-        if (Array.isArray(dataLoad) && dataLoad.length > 0 && (sessionIdFromJava === "botJobTasks" || sessionIdFromJava === "componentTasks")) {
+        if (Array.isArray(dataLoad) && dataLoad.length > 0 && (sessionIdFromJava === "botJobTasks")) {
           setInstructionsData(dataLoad as BlockLoopInstructionLoadDTO[]);
           // setAlertMessageHeader("DATA  BlockLoopInstructionLoadDTO " + dataLoad.length);
           // setAlertMessageBody("ReceiveDataFromJava Socket " + socketPort + " - " + sessionIdFromJava);
+        } else if (Array.isArray(dataLoad) && dataLoad.length > 0 && (sessionIdFromJava === "componentTasks")) {
+          setComponentsData(dataLoad as BlockLoopInstructionLoadDTO[]);
         }
         // Check if it's ElementDTO
         else if (Array.isArray(dataLoad) && dataLoad.length > 0 && sessionIdFromJava === "scannerGrid") {
@@ -97,7 +100,7 @@ const App: React.FC = () => {
         <GridItem homeBankingId={homeBanking} data={instructionsData} botJobLoad={botJobData} socketPort={socketPort} sessionId={sessionId} operationId="" />
       )}
       {sessionId && (sessionId == "componentTasks") && (
-        <GridItemComp homeBankingId={homeBanking} data={instructionsData} botJobLoad={botJobData} socketPort={socketPort} sessionId={sessionId} operationId="" />
+        <GridItemComp homeBankingId={homeBanking} dataComp={componentsData} botJobLoad={botJobData} socketPort={socketPort} sessionId={sessionId} operationId="" />
       )}
       {sessionId && sessionId === "scannerGrid" && (
         <GridItemScann homeBankingId={homeBanking} dataDTO={elementDTO} socketPort={socketPort} sessionId={sessionId} operationId="" />
