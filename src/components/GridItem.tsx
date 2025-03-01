@@ -571,7 +571,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingId, data, socketPort, se
       try {
         const parsedMessage = JSON.parse(lastMessage);
 
-        if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "updateInstructions") {
+        if (homeBankingId === parsedMessage.homeBankingId && sessionId === parsedMessage.sessionId && parsedMessage.operationId === "updateInstructions") {
 
           const bodyData = typeof parsedMessage.body === "string"
             ? JSON.parse(parsedMessage.body)

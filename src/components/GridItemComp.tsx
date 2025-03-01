@@ -569,7 +569,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, dataComp, so
       try {
         const parsedMessage = JSON.parse(lastMessage);
 
-        if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "componentsUpdate") {
+        if (homeBankingId === parsedMessage.homeBankingId && sessionId === parsedMessage.sessionId && parsedMessage.operationId === "componentsUpdate") {
 
           const bodyData = typeof parsedMessage.body === "string"
             ? JSON.parse(parsedMessage.body)
