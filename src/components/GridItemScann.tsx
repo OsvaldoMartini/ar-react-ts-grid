@@ -15,7 +15,6 @@ interface GridItemScannProps {
   dataDTO: ElementDTO[];
   socketPort: number;
   sessionId: string;
-  operationId: string;
 }
 
 const groupByTagName = (data: ElementDTO[]) => {
@@ -29,7 +28,7 @@ const groupByTagName = (data: ElementDTO[]) => {
   }, {} as Record<string, { tagName: string; elements: ElementDTO[] }>);
 };
 
-const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, socketPort, sessionId, operationId }) => {
+const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, socketPort, sessionId }) => {
   // Using the custom WebSocket hook
   const { webSocket, connected, reconnectAttempts, messages, error } = useWebSocket(socketPort, sessionId);
 
@@ -51,7 +50,6 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
   const [alertDismissed, setAlertDismissed] = useState(false);
 
 
-
   useEffect(() => {
     if (messages.length > 0) {
       const lastMessage = messages[messages.length - 1];
@@ -63,7 +61,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
           ? JSON.parse(parsedMessage.body)
           : parsedMessage.body;
 
-        if (bodyData.sessionId === "scannerGrid" && bodyData.operationId === "searchTerms") {
+        if (sessionId === bodyData.sessionId && bodyData.operationId === "searchTerms") {
           // Ensure detailsData is always an array if possible
           const detailsData = Array.isArray(bodyData.details) ? bodyData.details : [];
 
