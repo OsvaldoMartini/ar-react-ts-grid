@@ -110,7 +110,7 @@ document.addEventListener("click", function (event) {
   }
 
   // Optionally alert the tag name of the clicked element and coordinates
-  alert(
-    `You clicked on a ${clickedElement.tagName} element at X: ${clickX}, Y: ${clickY}`
-  );
+  // alert(
+  //   `You clicked on a ${clickedElement.tagName} element at X: ${clickX}, Y: ${clickY}`
+  // );
 });
