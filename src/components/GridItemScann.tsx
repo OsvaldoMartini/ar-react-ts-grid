@@ -6,6 +6,11 @@ import crossImage from '../assets/cross.png';
 import saveImage from "../assets/save.png";
 import constructionImage from '../assets/construction.png';
 
+import clickImage from "../assets/click.png";
+import inputImage from "../assets/input_field.png";
+import outPutImage from "../assets/output1.png";
+
+
 import AlertModal from './AlertModal';
 import { useWebSocket } from './useWebSocket';
 import AttributeDropdown from './AttributeDropdown';
@@ -142,6 +147,92 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
     }
   };
 
+  const getElementBlockText = (typeElement: string): string => {
+    const lowerTag = typeElement.toLowerCase();
+
+    if (["input", "textarea"].includes(lowerTag)) {
+      return "Input Text";
+    }
+    if (lowerTag === "select") {
+      return "Select Text";
+    }
+    if (["button", "a"].includes(lowerTag)) {
+      return "Button/Link";
+    }
+
+    return typeElement; // Default to returning the tag name
+  };
+
+
+  const getInstructionElement = (instruction: ElementDTO): JSX.Element | string | null => {
+    let imageSrc: string | null = null;
+    let text: string | null = null;
+    let imageClass = "operations"; // Default class for images
+
+    // Set the image source based on the tag name
+    if (instruction.tagName === "input") {
+      imageSrc = inputImage;
+      imageClass = "input-image";
+    } else if (instruction.tagName === "button" || instruction.tagName === "a") {
+      imageSrc = clickImage;
+      imageClass = "click-image";
+    } else {
+      imageSrc = outPutImage;
+      imageClass = "output-image";
+    }
+
+    // Set the text based on the instruction properties
+    text = instruction.someText?.trim() ? instruction.someText : instruction.tagName;
+
+    // Return a combined image and text element if imageSrc exists, otherwise return just the text
+    return (
+      <div className="instruction-type">
+        {imageSrc && (
+          <>
+            <img src={imageSrc} alt="" className={imageClass} />
+            <span>{text}</span>
+          </>
+        )}
+        {!imageSrc && <span>{text}</span>}
+      </div>
+    );
+  };
+
+  const getInstructionTypeElement = (typeElement: string): JSX.Element | string | null => {
+    let imageSrc: string | null = null;
+    let text: string | null = null;
+    let imageClass = "operations"; // Default class for images
+
+    // Set the image source based on the tag name
+    if (typeElement === "input") {
+      imageSrc = inputImage;
+      imageClass = "input-image";
+    } else if (typeElement === "button" || typeElement === "a") {
+      imageSrc = clickImage;
+      imageClass = "click-image";
+    } else {
+      imageSrc = outPutImage;
+      imageClass = "output-image";
+    }
+
+    // Set the text based on the instruction properties
+    text = getElementBlockText(typeElement);
+
+    // Return a combined image and text element if imageSrc exists, otherwise return just the text
+    return (
+      <div className="instruction-type">
+        {imageSrc && (
+          <>
+            <img src={imageSrc} alt="" className={imageClass} />
+            <span>{text}</span>
+          </>
+        )}
+        {!imageSrc && <span>{text}</span>}
+      </div>
+    );
+  };
+
+
   const handleSendDetailsDTO = (elementDTO: ElementDTO) => {
     console.log("handleSendDetailsDTO:", elementDTO);
 
@@ -185,7 +276,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
       )}
       {paginatedData.length === 0 ? (
         <div className="block">
-          <div className="block-header">Scanned Web Elements</div>
+          <div className="block-header color-component2">Scanned Web Elements</div>
           <div className="instruction-item"> </div>
           <div className="block">
             <div className="no-data-message">No data found</div>
@@ -210,9 +301,9 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
           </div>
           {paginatedData.map(([typeElement, elementData], index) => (
             <div key={typeElement} className="block">
-              <div className="block-header">
+              <div className="block-header color-component1">
                 <span className="block-order-number">#{index + 1}</span>
-                <span className="block-name">{typeElement}</span>
+                <span className="block-name">{getInstructionTypeElement(typeElement)}</span>
                 <span className="block-count">({elementData.elements.length})</span>
               </div>
               <div className="instructions-list">
@@ -224,7 +315,8 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
                       handleSendDetailsDTO(elementDTO);
                     }}
                   >
-                    <span className="instruction-line">{elementDTO.tagName}</span>
+                    <span className="instruction-line">{getInstructionElement(elementDTO)}</span>
+                    {/* {getInstructionTypeElement(elementDTO)} */}
                     <div>
                       <AttributeDropdown elementDTO={elementDTO} onChange={handleAttributeChange} />
                     </div>

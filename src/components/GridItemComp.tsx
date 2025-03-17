@@ -2696,7 +2696,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, dataComp, so
           Object.keys(groupedData).length === 0 ? (
             // Render default block if groupedData is empty
             <div className="block">
-              <div className={`block-header color-component`}>
+              <div className={`block-header color-component2`}>
                 <span className="block-name">BotJob: {botJobName}</span>
                 <span className="block-order-number">(AR Web) No components were created yet</span>
               </div>
@@ -2718,7 +2718,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, dataComp, so
               .map(([blockGroupIndex, blockData], index) => (
                 <div key={blockGroupIndex} className="block">
                   {/* Block header with garbage, up, and down buttons */}
-                  <div className={`block-header ${componentsData && componentsData.length > 0 ? "color-component" : "color-component"}`}>
+                  <div className={`block-header ${componentsData && componentsData.length > 0 ? "color-component1" : "color-component2"}`}>
                     {blockData.instructions[0].blockActive ? (
                       <img src={activeImage}
                         alt="Active"
