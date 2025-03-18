@@ -28,8 +28,8 @@ const AttributeDropdown: React.FC<{ elementDTO: ElementDTO; onChange?: (value: s
 
   return (
     <div className="attributes-dropdown-wrapper">
-      <div style={{ display: "flex", alignItems: "center" }}>
-        <span style={{ color: "#b163ff", marginRight: "5px" }}># Attributes:</span>
+      <div style={{ display: "flex", alignItems: "center", whiteSpace: "nowrap" }}> {/* Added whiteSpace: "nowrap" */}
+        <span style={{ color: "#0b5394", marginRight: "5px" }}># Attributes:</span>
         <select
           className="attributes-dropdown"
           value={selectedAttribute || ""}
@@ -50,7 +50,7 @@ const AttributeDropdown: React.FC<{ elementDTO: ElementDTO; onChange?: (value: s
           )}
         </select>
         {selectedAttribute && (
-          <div style={{ marginLeft: "10px" }}>
+          <div style={{ marginLeft: "10px", maxWidth: "200px", overflowX: "auto", overflowY: "hidden", whiteSpace: "nowrap" }}>
             <span>Value:</span>
             <span
               style={{
