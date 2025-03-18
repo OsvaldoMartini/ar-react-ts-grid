@@ -59,6 +59,7 @@ const AttributeDropdown: React.FC<{ elementDTO: ElementDTO; onChange?: (value: s
                 padding: "5px",
                 borderRadius: "5px",
                 marginLeft: "5px",
+                minHeight: "30px",
               }}
             >
               {selectedAttribute}
