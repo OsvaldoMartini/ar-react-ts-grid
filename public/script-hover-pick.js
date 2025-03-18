@@ -8,7 +8,7 @@
 ) {
   var attempts = 0;
   var wSocket = null;
-  const coordinatesElement = document.createElement("div");
+  var coordinatesElement = document.createElement("div");
   coordinatesElement.id = "coordinates";
   coordinatesElement.style.position = "fixed"; // Fixed so it stays above all elements
   coordinatesElement.style.padding = "10px";
@@ -399,7 +399,7 @@
   }
 
   // Add event listener for mouse movement to update coordinates
-  document.addEventListener("mousemove", function (event) {
+  function showMartiniTooltip(event) {
     const x = event.clientX; // X position
     const y = event.clientY; // Y position
 
@@ -432,10 +432,9 @@
 
       lastHoveredElement = elementBelowTooltip; // Update the last hovered element
     }
-  });
+  }
 
-  // Add event listener for click event to intercept the click
-  document.addEventListener("click", function (event) {
+  function handleMartiniClick(event) {
     event.preventDefault(); // Prevent the default click action
     event.stopPropagation(); // Prevent the event from propagating upwards
     coordinatesElement.style.display = "none";
@@ -538,7 +537,7 @@
       window.allElementInfo = [];
       window.elementInfoMap.clear();
     }, 1000);
-  });
+  }
 
   function pushElement(element) {
     const elementIdentity = getElementIdentity(element);
@@ -563,6 +562,34 @@
 
   connectWebSocket();
 
+  window.revertHoverPickInjections = function () {
+    document.removeEventListener("mousemove", showMartiniTooltip);
+    document.removeEventListener("click", handleMartiniClick);
+    console.log("revertHoverPickInjections");
+
+    // Remove the tooltip from the page and delete the reference after 5 seconds
+    setTimeout(() => {
+      removeElements();
+      window.allElementInfo = [];
+    }, 1000);
+  };
+
+  function removeElements() {
+    // Remove highlight from the previous element if any
+    if (lastHoveredElement) {
+      lastHoveredElement.style.outline = ""; // Remove the previous highlight
+    }
+
+    if (coordinatesElement) {
+      coordinatesElement.remove(); // Completely remove the tooltip from the DOM
+      coordinatesElement = null; // Clear the reference to free memory
+      console.log("coordinatesElement completely removed.");
+    }
+  }
+
+  document.addEventListener("mousemove", showMartiniTooltip);
+  document.addEventListener("click", handleMartiniClick);
+
   window.postMessage({ type: "myMessage", data: "some data" }, targetOriginURL);
 
   window.addEventListener("message", function (event) {
@@ -571,5 +598,12 @@
   });
 
   // window.cloneTerms = null; // Invalidating the function
-  // })(arguments[0], arguments[1], arguments[2], arguments[3], arguments[4], arguments[5]);
+  // })(
+  //   arguments[0],
+  //   arguments[1],
+  //   arguments[2],
+  //   arguments[3],
+  //   arguments[4],
+  //   arguments[5]
+  // );
 })("http://localhost:3000/", "http://localhost:3000/", ["*"], false, 8181, 1);
