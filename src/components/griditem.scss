@@ -415,66 +415,90 @@
   text-align: center;
 }
 
-.pagination-controls {
+.controls-row {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 15px;
-  margin-top: 20px;
+  gap: 15px; /* Maintain the gap */
+  margin-top: 20px; /* Maintain the margin */
+  font-size: 12px; /* Maintain the font size */
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 15px; /* Maintain the gap */
+  font-size: 12px; /* Maintain the font size */
+}
+
+.pagination-controls label {
+  font-weight: bold;
+  color: #333;
+}
+
+.pagination-controls select {
+  padding: 8px 12px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
   font-size: 12px;
+  background-color: white;
+  cursor: pointer;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
 
-  label {
-    font-weight: bold;
-    color: #333;
-  }
+.pagination-controls select:hover {
+  border-color: #007bff;
+}
 
-  select {
-    padding: 8px 12px;
-    border-radius: 5px;
-    border: 1px solid #ccc;
-    font-size: 12px;
-    background-color: white;
-    cursor: pointer;
-    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+.pagination-controls select:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+}
 
-    &:hover {
-      border-color: #007bff;
-    }
+.pagination-controls button {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+  font-size: 12px;
+  font-weight: bold;
+}
 
-    &:focus {
-      outline: none;
-      border-color: #007bff;
-      box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
-    }
-  }
+.pagination-controls button:hover {
+  background-color: #0056b3;
+  transform: scale(1.05);
+}
 
-  button {
-    background-color: #007bff;
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: background-color 0.3s ease, transform 0.2s ease;
-    font-size: 12px;
-    font-weight: bold;
+.pagination-controls button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+  transform: none;
+}
 
-    &:hover {
-      background-color: #0056b3;
-      transform: scale(1.05);
-    }
+.pagination-controls span {
+  font-weight: bold;
+  color: #555;
+}
 
-    &:disabled {
-      background-color: #ccc;
-      cursor: not-allowed;
-      transform: none;
-    }
-  }
+.attributes-button {
+  background-color: #c3d3d9 !important; /* Use specified background color */
+  color: #0b5394; /* Use specified text color */
+  border: none;
+  padding: 8px 16px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+  font-size: 12px;
+  font-weight: bold;
+}
 
-  span {
-    font-weight: bold;
-    color: #555;
-  }
+.attributes-button:hover {
+  background-color: #a9bec7 !important; /* Slightly darker hover color */
+  transform: scale(1.05);
 }
 
 .no-data-message {
@@ -482,5 +506,16 @@
   color: #888;
   text-align: center;
   margin-top: 20px;
+}
+
+.toggle-section {
+  margin-bottom: 20px;
+}
+
+.toggle-button {
+  padding: 5px 10px;
+  cursor: pointer;
+  border: 1px solid #ccc;
+  border-radius: 3px;
 }
 

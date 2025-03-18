@@ -54,6 +54,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
   const [alertMessageBody, setAlertMessageBody] = useState<string | ComplexMessage[]>([]);
   const [alertMessageFooter, setAlertMessageFooter] = useState<string | null>(null);
   const [alertDismissed, setAlertDismissed] = useState(false);
+  const [showAttributes, setShowAttributes] = useState(true);
 
 
   useEffect(() => {
@@ -270,8 +271,11 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
     console.log('Selected attribute:', value);
   };
 
+
+
   return (
     <div className="grid-container">
+      {/* Alert Modal (as before) */}
       {alertMessageBody && alertMessageBody.length > 0 && (
         <AlertModal
           header={alertMessageHeader || ''}
@@ -283,7 +287,9 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
           error={errorFlag}
         />
       )}
+
       {paginatedData.length === 0 ? (
+        // No data message (as before)
         <div className="block">
           <div className="block-header color-component2">Scanned Web Elements</div>
           <div className="instruction-item"> </div>
@@ -293,22 +299,31 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
         </div>
       ) : (
         <>
-          <div className="pagination-controls">
-            <label>Rows per page: </label>
-            <select
-              value={rowsPerPage}
-              onChange={(e) => {
-                setRowsPerPage(Number(e.target.value));
-                setCurrentPage(1);
-              }}
-            >
-              <option value={5}>5</option>
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={50}>50</option>
-            </select>
+          {/* Toggle Button and Pagination Controls on the same row */}
+          <div className="controls-row">
+            <button className="attributes-button" onClick={() => setShowAttributes(!showAttributes)}>
+              {showAttributes ? 'Hide Attributes' : 'Show Attributes'}
+            </button>
+            <div className="pagination-controls">
+              {/* Pagination Controls (as before) */}
+              <label>Rows per page: </label>
+              <select
+                value={rowsPerPage}
+                onChange={(e) => {
+                  setRowsPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+              >
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+              </select>
+            </div>
           </div>
+
           {paginatedData.map(([typeElement, elementData], index) => (
+            // Paginated data mapping (as before)
             <div key={typeElement} className="block">
               <div className="block-header color-component1">
                 <span className="block-order-number">#{index + 1}</span>
@@ -317,31 +332,16 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
               </div>
               <div className="instructions-list">
                 {elementData.elements.map((elementDTO, i) => (
-                  <div
-                    key={i}
-                    className="instruction-item"
-                  // onClick={() => {
-                  //   handleSendDetailsDTO(elementDTO);
-                  // }}
-                  >
+                  <div key={i} className="instruction-item">
                     <span className="instruction-line">{getInstructionElement(elementDTO)}</span>
-                    {/* {getInstructionTypeElement(elementDTO)} */}
-                    <div>
-                      <AttributeDropdown elementDTO={elementDTO} onChange={handleAttributeChange} />
-                    </div>
+                    {showAttributes && ( // Conditionally render AttributeDropdown
+                      <div>
+                        <AttributeDropdown elementDTO={elementDTO} onChange={handleAttributeChange} />
+                      </div>
+                    )}
                     <div className="options-column">
-                      <img
-                        src={saveImage}
-                        alt="save"
-                        className="save-button"
-                        onClick={() => handleCreateElementDTO(elementDTO)}
-                      />
-                      <img
-                        src={crossImage}
-                        alt=""
-                        className="cross-button"
-                        onClick={() => handleRemoveElementDTO(elementDTO)}
-                      />
+                      <img src={saveImage} alt="save" className="save-button" onClick={() => handleCreateElementDTO(elementDTO)} />
+                      <img src={crossImage} alt="" className="cross-button" onClick={() => handleRemoveElementDTO(elementDTO)} />
                     </div>
                   </div>
                 ))}
@@ -349,20 +349,12 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
             </div>
           ))}
           <div className="pagination-controls">
-            <button
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage((prev) => prev - 1)}
-            >
+            {/* Pagination Controls (as before) */}
+            <button disabled={currentPage === 1} onClick={() => setCurrentPage((prev) => prev - 1)}>
               Prev
             </button>
-            <span>
-              {" "}
-              Page {currentPage} of {totalPages}{" "}
-            </span>
-            <button
-              disabled={currentPage === totalPages}
-              onClick={() => setCurrentPage((prev) => prev + 1)}
-            >
+            <span> Page {currentPage} of {totalPages} </span>
+            <button disabled={currentPage === totalPages} onClick={() => setCurrentPage((prev) => prev + 1)}>
               Next
             </button>
           </div>

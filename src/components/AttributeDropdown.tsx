@@ -54,8 +54,8 @@ const AttributeDropdown: React.FC<{ elementDTO: ElementDTO; onChange?: (value: s
             <span>Value:</span>
             <span
               style={{
-                color: "#ffffff",
-                backgroundColor: "#b163ff",
+                color: "#0b5394",
+                backgroundColor: "#c3d3d9",
                 padding: "5px",
                 borderRadius: "5px",
                 marginLeft: "5px",
