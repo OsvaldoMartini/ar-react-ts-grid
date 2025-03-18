@@ -333,15 +333,15 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
                 {elementData.elements.map((elementDTO, i) => (
                   <div key={i} className="instruction-item">
                     <span className="instruction-line">{getInstructionElement(elementDTO)}</span>
+                    <div className="options-column">
+                      <img src={saveImage} alt="save" className="save-button" onClick={() => handleCreateElementDTO(elementDTO)} />
+                      <img src={crossImage} alt="" className="cross-button" onClick={() => handleRemoveElementDTO(elementDTO)} />
+                    </div>
                     {showAttributes && ( // Conditionally render AttributeDropdown
                       <div>
                         <AttributeDropdown elementDTO={elementDTO} onChange={handleAttributeChange} />
                       </div>
                     )}
-                    <div className="options-column">
-                      <img src={saveImage} alt="save" className="save-button" onClick={() => handleCreateElementDTO(elementDTO)} />
-                      <img src={crossImage} alt="" className="cross-button" onClick={() => handleRemoveElementDTO(elementDTO)} />
-                    </div>
                   </div>
                 ))}
               </div>
