@@ -7,6 +7,7 @@ import saveImage from "../assets/save.png";
 import constructionImage from '../assets/construction.png';
 
 import clickImage from "../assets/click.png";
+import linkImage from "../assets/links-icon.png";
 import inputImage from "../assets/input_field.png";
 import outPutImage from "../assets/output1.png";
 
@@ -111,7 +112,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
     const message = {
       type: "NEW_ELEMENT_DTO",
       homeBankingId: homeBankingId,
-      sessionId: "unknow",
+      sessionId: "componentTasks",
       details: [elementDTO],
     };
 
@@ -135,7 +136,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
     const message = {
       type: "DEL_ELEMENT_DTO",
       homeBankingId: homeBankingId,
-      sessionId: "unknoww",
+      sessionId: "componentTasks",
       details: [elementDTO],
     };
 
@@ -156,10 +157,12 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
     if (lowerTag === "select") {
       return "Select Text";
     }
-    if (["button", "a"].includes(lowerTag)) {
-      return "Button/Link";
+    if (lowerTag === "button") {
+      return "Button";
     }
-
+    if (lowerTag === "a") {
+      return "Link";
+    }
     return typeElement; // Default to returning the tag name
   };
 
@@ -173,8 +176,11 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
     if (instruction.tagName === "input") {
       imageSrc = inputImage;
       imageClass = "input-image";
-    } else if (instruction.tagName === "button" || instruction.tagName === "a") {
+    } else if (instruction.tagName === "button") {
       imageSrc = clickImage;
+      imageClass = "click-image";
+    } else if (instruction.tagName === "a") {
+      imageSrc = linkImage;
       imageClass = "click-image";
     } else {
       imageSrc = outPutImage;
@@ -207,8 +213,11 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
     if (typeElement === "input") {
       imageSrc = inputImage;
       imageClass = "input-image";
-    } else if (typeElement === "button" || typeElement === "a") {
+    } else if (typeElement === "button") {
       imageSrc = clickImage;
+      imageClass = "click-image";
+    } else if (typeElement === "a") {
+      imageSrc = linkImage;
       imageClass = "click-image";
     } else {
       imageSrc = outPutImage;
@@ -311,9 +320,9 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
                   <div
                     key={i}
                     className="instruction-item"
-                    onClick={() => {
-                      handleSendDetailsDTO(elementDTO);
-                    }}
+                  // onClick={() => {
+                  //   handleSendDetailsDTO(elementDTO);
+                  // }}
                   >
                     <span className="instruction-line">{getInstructionElement(elementDTO)}</span>
                     {/* {getInstructionTypeElement(elementDTO)} */}
