@@ -418,17 +418,18 @@
 .controls-row {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 15px; /* Maintain the gap */
-  margin-top: 20px; /* Maintain the margin */
-  font-size: 12px; /* Maintain the font size */
+  justify-content: flex-start; /* Align button to the left */
+  gap: 15px;
+  margin-top: 20px;
+  font-size: 12px;
 }
 
 .pagination-controls {
   display: flex;
   align-items: center;
-  gap: 15px; /* Maintain the gap */
-  font-size: 12px; /* Maintain the font size */
+  justify-content: center; /* Center Rows per page */
+  gap: 15px;
+  font-size: 12px;
 }
 
 .pagination-controls label {
@@ -482,6 +483,32 @@
 .pagination-controls span {
   font-weight: bold;
   color: #555;
+}
+
+.attributes-button {
+  background-color: #c3d3d9 !important;
+  color: #0b5394;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.attributes-button:hover {
+  background-color: #a9bec7 !important;
+  transform: scale(1.05);
+}
+
+.controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  margin-top: 20px;
+  font-size: 12px;
 }
 
 .attributes-button {

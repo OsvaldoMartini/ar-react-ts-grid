@@ -305,7 +305,6 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
               {showAttributes ? 'Hide Attributes' : 'Show Attributes'}
             </button>
             <div className="pagination-controls">
-              {/* Pagination Controls (as before) */}
               <label>Rows per page: </label>
               <select
                 value={rowsPerPage}
@@ -349,7 +348,6 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
             </div>
           ))}
           <div className="pagination-controls">
-            {/* Pagination Controls (as before) */}
             <button disabled={currentPage === 1} onClick={() => setCurrentPage((prev) => prev - 1)}>
               Prev
             </button>
