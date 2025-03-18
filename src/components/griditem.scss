@@ -501,6 +501,38 @@
   transform: scale(1.05);
 }
 
+.attributes-dropdown-flex-container {
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.attributes-dropdown-label {
+  color: #0b5394;
+  margin-right: 5px;
+}
+
+.attribute-display-container {
+  margin-left: 10px;
+  max-width: 200px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+  min-height: 40px;
+}
+
+.attribute-display-value {
+  color: #0b5394;
+  background-color: #c3d3d9;
+  padding: 5px;
+  border-radius: 5px;
+  margin-left: 5px;
+}
+
+.attribute-display-value.overflow-active {
+  font-size: 40px;
+}
+
 .bottom-pagination-controls { /* New CSS rule */
   display: flex;
   align-items: center;

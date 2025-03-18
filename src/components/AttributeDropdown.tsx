@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { ElementDTO } from "./instructionsMockData"; // Adjust the import path
 
 const AttributeDropdown: React.FC<{ elementDTO: ElementDTO; onChange?: (value: string) => void }> = ({
@@ -17,10 +17,19 @@ const AttributeDropdown: React.FC<{ elementDTO: ElementDTO; onChange?: (value: s
   };
 
   const [selectedAttribute, setSelectedAttribute] = useState<string | null>(findBestAttribute);
+  const valueRef = useRef<HTMLSpanElement>(null);
+  const [overflowActive, setOverflowActive] = useState(false);
 
   useEffect(() => {
     setSelectedAttribute(findBestAttribute());
   }, [elementDTO.attributeData]);
+
+  useEffect(() => {
+    if (valueRef.current) {
+      const element = valueRef.current;
+      setOverflowActive(element.scrollWidth > element.clientWidth);
+    }
+  }, [selectedAttribute]);
 
   if (!elementDTO || !Array.isArray(elementDTO.attributeData)) {
     return <div>Error: Invalid element data</div>;
@@ -28,8 +37,8 @@ const AttributeDropdown: React.FC<{ elementDTO: ElementDTO; onChange?: (value: s
 
   return (
     <div className="attributes-dropdown-wrapper">
-      <div style={{ display: "flex", alignItems: "center", whiteSpace: "nowrap" }}> {/* Added whiteSpace: "nowrap" */}
-        <span style={{ color: "#0b5394", marginRight: "5px" }}># Attributes:</span>
+      <div className="attributes-dropdown-flex-container">
+        <span className="attributes-dropdown-label"># Attributes:</span>
         <select
           className="attributes-dropdown"
           value={selectedAttribute || ""}
@@ -50,17 +59,12 @@ const AttributeDropdown: React.FC<{ elementDTO: ElementDTO; onChange?: (value: s
           )}
         </select>
         {selectedAttribute && (
-          <div style={{ marginLeft: "10px", maxWidth: "200px", overflowX: "auto", overflowY: "hidden", whiteSpace: "nowrap" }}>
+          <div className="attribute-display-container">
             <span>Value:</span>
             <span
-              style={{
-                color: "#0b5394",
-                backgroundColor: "#c3d3d9",
-                padding: "5px",
-                borderRadius: "5px",
-                marginLeft: "5px",
-                minHeight: "30px",
-              }}
+              ref={valueRef}
+              className={`attribute-display-value ${overflowActive ? 'overflow-active' : ''
+                }`}
             >
               {selectedAttribute}
             </span>
