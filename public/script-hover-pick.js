@@ -2,12 +2,13 @@ const coordinatesElement = document.createElement("div");
 coordinatesElement.id = "coordinates";
 coordinatesElement.style.position = "fixed"; // Fixed so it stays above all elements
 coordinatesElement.style.padding = "10px";
-coordinatesElement.style.backgroundColor = "rgba(0, 0, 0, 0.4)";
+coordinatesElement.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
 coordinatesElement.style.color = "white";
 coordinatesElement.style.borderRadius = "5px";
 coordinatesElement.style.fontSize = "14px";
 coordinatesElement.style.zIndex = Number.MAX_SAFE_INTEGER; // Set zIndex to the maximum allowed value
-coordinatesElement.textContent = "X: 0, Y: 0";
+coordinatesElement.style.cursor = "pointer"; // Set cursor to hand (pointer)
+coordinatesElement.textContent = "X: 0nbsp;&nbsp;&nbsp;&nbsp;Y: 0";
 
 // Append the coordinates div to the body
 document.body.appendChild(coordinatesElement);
@@ -25,7 +26,7 @@ document.addEventListener("mousemove", function (event) {
   const elementHeight = coordinatesElement.offsetHeight;
 
   // Update the coordinates display
-  coordinatesElement.textContent = `X: ${x}, Y: ${y}`;
+  coordinatesElement.innerHTML = `X: ${x}&nbsp;&nbsp;&nbsp;&nbsp;Y: ${y}`;
 
   // Update the position of coordinatesElement to follow the cursor
   // Position the element such that the cursor is at the center of the element
@@ -104,9 +105,9 @@ document.addEventListener("click", function (event) {
       element.style.outline = "3px solid red"; // Example: Highlighting clickable elements inside the shadow root
     });
   } else {
-    console.log(
-      "No shadowRoot found for the clicked element or its ancestors."
-    );
+    // console.log(
+    //   "No shadowRoot found for the clicked element or its ancestors."
+    // );
   }
 
   // Optionally alert the tag name of the clicked element and coordinates
