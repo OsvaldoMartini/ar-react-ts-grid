@@ -50,7 +50,7 @@ const AttributeDropdown: React.FC<{ elementDTO: ElementDTO; onChange?: (value: s
           )}
         </select>
         {selectedAttribute && (
-          <div style={{ marginLeft: "10px" }}>
+          <div style={{ marginLeft: "10px", maxWidth: "200px", overflowX: "auto", overflowY: "hidden", whiteSpace: "nowrap" }}>
             <span>Value:</span>
             <span
               style={{
