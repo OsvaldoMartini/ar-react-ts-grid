@@ -8,6 +8,8 @@
 ) {
   var attempts = 0;
   var wSocket = null;
+  // Temporary storage for original styles
+  const originalStyles = new Map();
   var coordinatesElement = document.createElement("div");
   coordinatesElement.id = "coordinates";
   coordinatesElement.style.position = "fixed"; // Fixed so it stays above all elements
@@ -521,7 +523,6 @@
         // If clickable elements are found, perform your action (e.g., highlight them)
         clickableElements.forEach((element) => {
           pushElement(element);
-          element.style.outline = "3px solid red";
         });
       } else {
         // Commom Elementes
@@ -543,6 +544,12 @@
     const elementIdentity = getElementIdentity(element);
     // Store tagName and other details in the Map
     if (elementIdentity) {
+      if (!originalStyles.has(element)) {
+        // Store the original outline before changing it
+        originalStyles.set(element, element.style.outline);
+      }
+      element.style.outline = "3px solid red";
+
       window.elementInfoMap.set(
         elementIdentity.xPath,
         elementDTO("clicked", elementIdentity)
@@ -570,9 +577,18 @@
     // Remove the tooltip from the page and delete the reference after 5 seconds
     setTimeout(() => {
       removeElements();
+      restoreOriginalStyles();
       window.allElementInfo = [];
     }, 1000);
   };
+
+  // Function to restore the original outline
+  function restoreOriginalStyles() {
+    originalStyles.forEach((originalStyle, element) => {
+      element.style.outline = originalStyle; // Restore original outline
+    });
+    originalStyles.clear(); // Clear the stored styles
+  }
 
   function removeElements() {
     // Remove highlight from the previous element if any
