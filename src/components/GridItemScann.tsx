@@ -54,7 +54,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
   const [alertMessageBody, setAlertMessageBody] = useState<string | ComplexMessage[]>([]);
   const [alertMessageFooter, setAlertMessageFooter] = useState<string | null>(null);
   const [alertDismissed, setAlertDismissed] = useState(false);
-  const [showAttributes, setShowAttributes] = useState(true);
+  const [showAttributes, setShowAttributes] = useState(false);
 
 
   useEffect(() => {
@@ -335,7 +335,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
                     <span className="instruction-line">{getInstructionElement(elementDTO)}</span>
                     <div className="options-column">
                       <img src={saveImage} alt="save" className="save-button" onClick={() => handleCreateElementDTO(elementDTO)} />
-                      <img src={crossImage} alt="" className="cross-button" onClick={() => handleRemoveElementDTO(elementDTO)} />
+                      {/* <img src={crossImage} alt="" className="cross-button" onClick={() => handleRemoveElementDTO(elementDTO)} /> */}
                     </div>
                     {showAttributes && ( // Conditionally render AttributeDropdown
                       <div>
