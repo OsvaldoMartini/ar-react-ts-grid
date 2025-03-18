@@ -3,7 +3,8 @@
   trustedOriginURL,
   searchTerms,
   hiddenFields,
-  socketPort
+  socketPort,
+  homeBankingId
 ) {
   var attempts = 0;
   var wSocket = null;
@@ -122,8 +123,9 @@
       if (window.allElementInfo.length > 0) {
         const message = {
           type: "SEARCH_TOOL",
-          sessionId: "scannerGrid",
+          sessionId: `scannerGrid-${homeBankingId}`,
           operationId: "searchTerms",
+          homeBankingId: homeBankingId,
           details: window.allElementInfo, // Send allElementInfo
         };
         wSocket.send(JSON.stringify(message));
@@ -1246,5 +1248,5 @@
   });
 
   // window.pickTerms = null; // Invalidating the function
-  // })(arguments[0], arguments[1], arguments[2], arguments[3], arguments[4]);
-})("http://localhost:3000/", "http://localhost:3000/", ["*"], false, 8181);
+  // })(arguments[0], arguments[1], arguments[2], arguments[3], arguments[4], arguments[5]);
+})("http://localhost:3000/", "http://localhost:3000/", ["*"], false, 8181, 1);
