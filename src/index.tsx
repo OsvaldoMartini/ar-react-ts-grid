@@ -22,7 +22,7 @@ const App: React.FC = () => {
   const [botJobId, setBotJobId] = useState<number>(0);
   const [botJobName, setBotJobName] = useState<string>("");
   const [homeBanking, setHomeBanking] = useState<number>(0);
-  const [sessionId, setSessionId] = useState<string>(""); // (SENDER: scannerTool) -> scannerGrid  -> componentTasks-1 
+  const [sessionId, setSessionId] = useState<string>(""); // (SENDER: scannerTool) -> scannerGrid-1  -> componentTasks-1 
   const [errorFlag, setErrorFlag] = useState<boolean>(false)  //(SENDER: insertTool) -> botJobTasks-1  
   const [alertImage, setAlertImage] = useState(constructionImage);
   const [alertClass, setAlertClass] = useState('construction-image')
