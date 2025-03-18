@@ -418,7 +418,7 @@
 .controls-row {
   display: flex;
   align-items: center;
-  justify-content: flex-start; /* Align button to the left */
+  justify-content: flex-start;
   gap: 15px;
   margin-top: 20px;
   font-size: 12px;
@@ -427,7 +427,6 @@
 .pagination-controls {
   display: flex;
   align-items: center;
-  justify-content: center; /* Center Rows per page */
   gap: 15px;
   font-size: 12px;
 }
@@ -502,30 +501,13 @@
   transform: scale(1.05);
 }
 
-.controls-row {
+.bottom-pagination-controls { /* New CSS rule */
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: center; /* Center the bottom pagination */
   gap: 15px;
   margin-top: 20px;
   font-size: 12px;
-}
-
-.attributes-button {
-  background-color: #c3d3d9 !important; /* Use specified background color */
-  color: #0b5394; /* Use specified text color */
-  border: none;
-  padding: 8px 16px;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: background-color 0.3s ease, transform 0.2s ease;
-  font-size: 12px;
-  font-weight: bold;
-}
-
-.attributes-button:hover {
-  background-color: #a9bec7 !important; /* Slightly darker hover color */
-  transform: scale(1.05);
 }
 
 .no-data-message {
