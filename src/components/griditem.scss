@@ -235,7 +235,8 @@
 /* Instruction Item */
 .instruction-item {
   display: grid;
-  grid-template-columns: 250px auto minmax(120px, 1fr) auto;
+  // grid-template-columns: 250px auto minmax(120px, 1fr) auto;
+  grid-template-columns: 240px auto minmax(60px, 1fr) auto;
   // gap: 8px; /* Decreased gap */
   // padding: 8px; /* Decreased padding */
   background-color: #e0f7fa;
@@ -530,15 +531,31 @@
 
 
 .attribute-display-value {
+  max-width: none; 
   color: #0b5394;
   background-color: #c3d3d9;
   padding: 05px 5px 5px;
   border-radius: 5px;
   display: inline-block; /* Ensures proper alignment */
   overflow: hidden;
-  text-overflow: ellipsis; /* Shows "..." when text overflows */
+  // text-overflow: ellipsis; /* Shows "..." when text overflows */
+    text-overflow: clip; /* Prevents '...' */
   white-space: nowrap;
 }
+
+// .attribute-display-value {
+//   color: #0b5394;
+//   background-color: #c3d3d9;
+//   padding: 05px 5px 5px;
+//   border-radius: 5px;
+//   display: inline-block; /* Ensures proper alignment */
+//   max-width: 100%; /* Prevents exceeding the parent */
+//   white-space: nowrap; /* Keeps text in a single line */
+//   overflow-x: auto; /* Enables horizontal scrolling */
+//   text-overflow: clip; /* Prevents '...' */
+// }
+
+
 
 .attribute-display-value.overflow-active {
   overflow-x: auto; /* Enables horizontal scrolling when needed */
