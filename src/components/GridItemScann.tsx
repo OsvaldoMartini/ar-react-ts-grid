@@ -337,7 +337,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
                         <AttributeDropdown elementDTO={elementDTO} onChange={handleAttributeChange} />
                       </div>
                     ) : (
-                      <span>{"\u00A0".repeat(100)}</span> // 100 non-breaking spaces
+                      <span>{"\u00A0".repeat(20)}</span> // 100 non-breaking spaces
                     )}
                     <div className="options-column">
                       <img src={saveImage} alt="save" className="save-button" onClick={() => handleCreateElementDTO(elementDTO)} />

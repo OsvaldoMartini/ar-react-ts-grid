@@ -513,24 +513,37 @@
 }
 
 .attribute-display-container {
+  display: flex;  /* Keep items in a single line */
+  align-items: center;
   margin-left: 10px;
-  max-width: 200px;
+  max-width: 250px;
   overflow-x: auto;
   overflow-y: hidden;
   white-space: nowrap;
   min-height: 40px;
 }
 
+.attribute-label {
+  font-weight: bold;
+  margin-right: 5px; /* Space between label and value */
+}
+
+
 .attribute-display-value {
   color: #0b5394;
   background-color: #c3d3d9;
-  padding: 5px;
+  padding: 05px 5px 5px;
   border-radius: 5px;
-  margin-left: 5px;
+  display: inline-block; /* Ensures proper alignment */
+  overflow: hidden;
+  text-overflow: ellipsis; /* Shows "..." when text overflows */
+  white-space: nowrap;
 }
 
 .attribute-display-value.overflow-active {
-  font-size: 40px;
+  overflow-x: auto; /* Enables horizontal scrolling when needed */
+  display: block; /* Ensures it takes the correct space */
+  max-width: 100%; /* Prevents it from stretching beyond its container */
 }
 
 .bottom-pagination-controls { /* New CSS rule */

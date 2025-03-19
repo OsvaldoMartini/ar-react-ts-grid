@@ -60,11 +60,10 @@ const AttributeDropdown: React.FC<{ elementDTO: ElementDTO; onChange?: (value: s
         </select>
         {selectedAttribute && (
           <div className="attribute-display-container">
-            <span>Value:</span>
+            <span className="attribute-label">Value:</span>
             <span
               ref={valueRef}
-              className={`attribute-display-value ${overflowActive ? 'overflow-active' : ''
-                }`}
+              className={`attribute-display-value ${overflowActive ? "overflow-active" : ""}`}
             >
               {selectedAttribute}
             </span>
