@@ -322,7 +322,6 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
           </div>
 
           {paginatedData.map(([typeElement, elementData], index) => (
-            // Paginated data mapping (as before)
             <div key={typeElement} className="block">
               <div className="block-header color-component1">
                 <span className="block-order-number">#{index + 1}</span>
@@ -333,20 +332,23 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
                 {elementData.elements.map((elementDTO, i) => (
                   <div key={i} className="instruction-item">
                     <span className="instruction-line">{getInstructionElement(elementDTO)}</span>
-                    <div className="options-column">
-                      <img src={saveImage} alt="save" className="save-button" onClick={() => handleCreateElementDTO(elementDTO)} />
-                      {/* <img src={crossImage} alt="" className="cross-button" onClick={() => handleRemoveElementDTO(elementDTO)} /> */}
-                    </div>
-                    {showAttributes && ( // Conditionally render AttributeDropdown
+                    {showAttributes ? (
                       <div>
                         <AttributeDropdown elementDTO={elementDTO} onChange={handleAttributeChange} />
                       </div>
+                    ) : (
+                      <span>{"\u00A0".repeat(100)}</span> // 100 non-breaking spaces
                     )}
+                    <div className="options-column">
+                      <img src={saveImage} alt="save" className="save-button" onClick={() => handleCreateElementDTO(elementDTO)} />
+                      <img src={crossImage} alt="" className="cross-button" onClick={() => handleRemoveElementDTO(elementDTO)} />
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
           ))}
+
           <div className="bottom-pagination-controls"> {/* Changed class name here */}
             <button disabled={currentPage === 1} onClick={() => setCurrentPage((prev) => prev - 1)}>
               Prev
