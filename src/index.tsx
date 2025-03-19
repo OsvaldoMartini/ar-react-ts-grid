@@ -21,7 +21,7 @@ const App: React.FC = () => {
   const [socketPort, setSocketPort] = useState<number>(8181);
   const [botJobId, setBotJobId] = useState<number>(0);
   const [botJobName, setBotJobName] = useState<string>("");
-  const [homeBanking, setHomeBanking] = useState<number>(0);
+  const [homeBanking, setHomeBanking] = useState<number>(0); // VPBank 3
   const [sessionId, setSessionId] = useState<string>(""); // (SENDER: scannerTool) -> scannerGrid-1  -> componentTasks-1 
   const [errorFlag, setErrorFlag] = useState<boolean>(false)  //(SENDER: insertTool) -> botJobTasks-1  
   const [alertImage, setAlertImage] = useState(constructionImage);
