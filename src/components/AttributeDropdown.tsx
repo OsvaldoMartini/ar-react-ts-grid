@@ -52,7 +52,7 @@ const AttributeDropdown: React.FC<{ elementDTO: ElementDTO; onChange?: (value: s
             <option value="-1">no attributes</option>
           ) : (
             elementDTO.attributeData.map((attr, idx) => (
-              <option key={idx} value={attr.value}>
+              <option key={idx} value={attr.value} title={attr.value}>
                 {attr.name}
               </option>
             ))
