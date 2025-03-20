@@ -279,6 +279,10 @@
       attributeData: identity.attributeData ?? "",
       customXPath: identity.customXPath ?? "",
       iFrameXPath: identity.iFrameXPath ?? "",
+      shadowHost: identity.shadowHost ?? "",
+      shadowRoot: identity.shadowRoot ?? "",
+      nestedShadow: identity.nestedShadow ?? "",
+      cssSelector: identity.cssSelector ?? "",
       attributeValue: identity.attributeValue ?? "",
       attributeType: identity.attributeType ?? "",
       searchAttributeValue: identity.searchAttributeValue ?? "",
@@ -522,7 +526,7 @@
 
         // If clickable elements are found, perform your action (e.g., highlight them)
         clickableElements.forEach((element) => {
-          pushElement(element);
+          pushElement(element, shadowHost, shadowRoot);
         });
       } else {
         // Commom Elementes
@@ -540,8 +544,57 @@
     }, 1000);
   }
 
-  function pushElement(element) {
-    const elementIdentity = getElementIdentity(element);
+  function pushElement(element, shadowHost, shadowRoot) {
+    const elementIdentityTemp = getElementIdentity(element);
+
+    let shadowHostSelector = "";
+    let elementCssSelector = "";
+    let shadowPath = [];
+
+    function buildCssSelector(el) {
+      if (!el) return "";
+      let selector = el.tagName.toLowerCase();
+      if (el.id) selector += `#${el.id}`;
+      if (el.className) selector += `.${el.className.replace(/\s+/g, ".")}`;
+      return selector;
+    }
+
+    // Traverse shadow hosts if nested shadow DOM exists
+    let currentHost = shadowHost;
+    while (currentHost) {
+      shadowPath.unshift(buildCssSelector(currentHost));
+      currentHost =
+        currentHost.parentNode instanceof ShadowRoot
+          ? currentHost.parentNode.host
+          : null;
+    }
+
+    if (shadowHost) {
+      shadowHostSelector = buildCssSelector(shadowHost);
+    }
+
+    if (element) {
+      elementCssSelector = buildCssSelector(element);
+    }
+
+    // Construct the natural CSS selector for nested Shadow DOM
+    let cssSelector = elementCssSelector;
+
+    // Build nested CSS selector, if shadowPath is not empty.
+    if (shadowPath.length > 0) {
+      cssSelector = shadowPath.reduceRight((acc, hostSelector) => {
+        return `${hostSelector} ${acc}`;
+      }, elementCssSelector);
+    }
+
+    const elementIdentity = {
+      ...elementIdentityTemp,
+      shadowHost: shadowHostSelector,
+      shadowRoot: shadowRoot ? true : false,
+      nestedShadow: shadowPath.length > 1, // Detects if multiple shadow roots are involved
+      cssSelector: cssSelector, // Correct CSS selector for nested shadow elements
+    };
+
     // Store tagName and other details in the Map
     if (elementIdentity) {
       if (!originalStyles.has(element)) {
@@ -622,4 +675,4 @@
   arguments[4],
   arguments[5]
 );
-// })("http://localhost:3000/", "http://localhost:3000/", ["*"], false, 8181, 1);
+// })("https://www.vpbank.com/", "https://www.vpbank.com/", ["*"], false, 8181, 3);

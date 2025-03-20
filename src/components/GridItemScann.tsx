@@ -168,7 +168,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
     const message = {
       type: action,
       homeBankingId: homeBankingId,
-      sessionId: "componentTasks",
+      sessionId: "scannerReceiver",
       details: [elementDTO],
     };
 
