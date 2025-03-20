@@ -1,20 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { ComplexMessage, ElementDTO } from './instructionsMockData';
-import './griditem.scss';
-
 import crossImage from '../assets/cross.png';
 import saveImage from "../assets/save.png";
 import constructionImage from '../assets/construction.png';
-
 import clickImage from "../assets/click.png";
 import linkImage from "../assets/links-icon.png";
 import inputImage from "../assets/input_field.png";
 import outPutImage from "../assets/output1.png";
-
-
 import AlertModal from './AlertModal';
 import { useWebSocket } from './useWebSocket';
 import AttributeDropdown from './AttributeDropdown';
+import './griditem.scss';
 
 interface GridItemScannProps {
   homeBankingId: number;

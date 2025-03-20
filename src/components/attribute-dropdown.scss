@@ -1,0 +1,112 @@
+.attributes-dropdown-wrapper {
+  display: inline-block;
+  margin: 8px 0; /* Add margin for spacing around the dropdown */
+  font-size: smaller;
+}
+
+
+.attributes-dropdown {
+  font-weight: bold; /* Make the text bold */
+  margin-right: 3px; /* Add a 3px gap after the span */
+  display: inline-block; /* Ensure the span behaves as a block but allows space for the next element */
+  padding: 6px 12px; /* Add padding inside the dropdown for better readability */
+  border-radius: 4px; /* Round the corners of the dropdown */
+  border: 1px solid #ccc; /* Subtle border */
+  background-color: #f9f9f9; /* Light background */
+  font-size: 12px; /* Adjust font size */
+  transition: all 0.3s ease; /* Smooth transition for interactions */
+}
+
+.attributes-dropdown:hover {
+  border-color: #888; /* Slightly change border color on hover */
+  background-color: #f0f0f0; /* Lighter background on hover */
+}
+
+.attributes-dropdown option {
+  padding: 8px 12px; /* Add padding inside options for better clickability */
+  background-color: #fff; /* White background for options */
+}
+
+.attributes-dropdown option:hover {
+  background-color: #e0e0e0; /* Add hover effect to options */
+}
+
+
+.attributes-button {
+  background-color: #c3d3d9 !important;
+  color: #0b5394;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.attributes-button:hover {
+  background-color: #a9bec7 !important;
+  transform: scale(1.05);
+}
+
+.attributes-dropdown-flex-container {
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.attributes-dropdown-label {
+  color: #0b5394;
+  margin-right: 5px;
+}
+
+.attribute-display-container {
+  display: flex;  /* Keep items in a single line */
+  align-items: center;
+  margin-left: 10px;
+  max-width: 250px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+  min-height: 40px;
+}
+
+.attribute-label {
+  font-weight: bold;
+  margin-right: 5px; /* Space between label and value */
+}
+
+
+.attribute-display-value {
+  max-width: none; 
+  color: #0b5394;
+  background-color: #c3d3d9;
+  padding: 05px 5px 5px;
+  border-radius: 5px;
+  display: inline-block; /* Ensures proper alignment */
+  overflow: hidden;
+  // text-overflow: ellipsis; /* Shows "..." when text overflows */
+    text-overflow: clip; /* Prevents '...' */
+  white-space: nowrap;
+}
+
+// .attribute-display-value {
+//   color: #0b5394;
+//   background-color: #c3d3d9;
+//   padding: 05px 5px 5px;
+//   border-radius: 5px;
+//   display: inline-block; /* Ensures proper alignment */
+//   max-width: 100%; /* Prevents exceeding the parent */
+//   white-space: nowrap; /* Keeps text in a single line */
+//   overflow-x: auto; /* Enables horizontal scrolling */
+//   text-overflow: clip; /* Prevents '...' */
+// }
+
+
+
+.attribute-display-value.overflow-active {
+  overflow-x: auto; /* Enables horizontal scrolling when needed */
+  display: block; /* Ensures it takes the correct space */
+  max-width: 100%; /* Prevents it from stretching beyond its container */
+  min-height: 30px;
+}

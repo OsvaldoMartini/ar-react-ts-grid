@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ElementDTO } from "./instructionsMockData"; // Adjust the import path
+import './attribute-dropdown.scss';
 
 const AttributeDropdown: React.FC<{ elementDTO: ElementDTO; onChange?: (value: string) => void }> = ({
   elementDTO,
