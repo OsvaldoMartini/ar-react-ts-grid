@@ -31,24 +31,6 @@
   background-color: #e0e0e0; /* Add hover effect to options */
 }
 
-
-.attributes-button {
-  background-color: #c3d3d9 !important;
-  color: #0b5394;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: background-color 0.3s ease, transform 0.2s ease;
-  font-size: 12px;
-  font-weight: bold;
-}
-
-.attributes-button:hover {
-  background-color: #a9bec7 !important;
-  transform: scale(1.05);
-}
-
 .attributes-dropdown-flex-container {
   display: flex;
   align-items: center;

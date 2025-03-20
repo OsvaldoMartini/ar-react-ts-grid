@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ComplexMessage, ElementDTO } from './instructionsMockData';
 import crossImage from '../assets/cross.png';
 import saveImage from "../assets/save.png";
@@ -41,7 +41,8 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
   const [rowsPerPage, setRowsPerPage] = useState<number>(10);
   const [currentPage, setCurrentPage] = useState<number>(1);
 
-
+  const clickTimer = useRef<NodeJS.Timeout | null>(null);
+  const isDoubleClick = useRef<boolean>(false);
 
   const [errorFlag, setErrorFlag] = useState<boolean>(false)
   const [alertImage, setAlertImage] = useState(constructionImage);
@@ -98,41 +99,74 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
   const totalPages = Math.ceil(Object.keys(elementGrouped).length / rowsPerPage);
   const paginatedData = Object.entries(elementGrouped).slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
 
-  const handlesInsertAllClick = (element: ElementDTO) => {
-    console.log("handleCreateElementDTO:", elementDTO);
+  const handlesSendAllClick = () => {
+    console.log("handleSendAllClick: Sending all ElementDTOs");
 
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
       console.warn("🚨 WebSocket is not connected. Cannot send message.");
       return;
     }
 
+    // Flatten the elementGrouped object to get all ElementDTOs
+    const allElements = Object.values(elementGrouped).flatMap(group => group.elements);
+
     const message = {
-      type: "NEW_ELEMENT_DTO",
+      type: "SEND_ALL_ELEMENTS_DTO",
       homeBankingId: homeBankingId,
       sessionId: "componentTasks",
-      details: elementDTO,
+      details: allElements, // Send all elements
     };
 
     try {
       webSocket.send(JSON.stringify(message));
-      console.log('📤 Sent CREATE element DTO:', message);
+      console.log('📤 Sent CREATE all ElementDTOs:', message);
     } catch (error) {
       console.error('❌ Error sending WebSocket message:', error);
     }
-
   };
 
-  const handleRowDoubleClick = (event: React.MouseEvent<HTMLDivElement, MouseEvent>, elementDTO: ElementDTO) => {
-    event.stopPropagation(); // Prevent event bubbling
-    console.log("Double-clicked row:", elementDTO);
+  const handleRowSelectedClick = (
+    event: React.MouseEvent<HTMLDivElement, MouseEvent>,
+    elementDTO: ElementDTO,
+    action: string
+  ) => {
+    event.stopPropagation();
 
+    if (action === "DETAILS_ELEMENT_DTO") {
+      // Single click logic
+      if (isDoubleClick.current) {
+        // Prevent single click logic if it's a double click
+        return;
+      }
+
+      clickTimer.current = setTimeout(() => {
+        if (!isDoubleClick.current) {
+          console.log("Single-clicked row:", elementDTO);
+          sendWebSocketMessage(elementDTO, action);
+        }
+        clickTimer.current = null;
+      }, 300); // Adjust delay as needed
+    } else {
+      // Double click or save button logic
+      if (clickTimer.current) {
+        clearTimeout(clickTimer.current);
+        clickTimer.current = null;
+      }
+      isDoubleClick.current = true;
+      console.log("Double-clicked or save button:", elementDTO);
+      sendWebSocketMessage(elementDTO, action);
+      isDoubleClick.current = false;
+    }
+  };
+
+  const sendWebSocketMessage = (elementDTO: ElementDTO, action: string) => {
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
       console.warn("🚨 WebSocket is not connected. Cannot send message.");
       return;
     }
 
     const message = {
-      type: "NEW_ELEMENT_DTO",
+      type: action,
       homeBankingId: homeBankingId,
       sessionId: "componentTasks",
       details: [elementDTO],
@@ -140,59 +174,37 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
 
     try {
       webSocket.send(JSON.stringify(message));
-      console.log('📤 Sent CREATE element DTO:', message);
+      console.log("📤 Sent element DTO:", message);
     } catch (error) {
-      console.error('❌ Error sending WebSocket message:', error);
+      console.error("❌ Error sending WebSocket message:", error);
     }
-
   };
 
+  const handleRemoveElementDTO = (elementToRemove: ElementDTO) => {
+    console.log("Removing elementDTO:", elementToRemove);
 
-  const handleCreateElementDTO = (elementDTO: ElementDTO) => {
-    console.log("handleCreateElementDTO:", elementDTO);
+    // Update elementDTO state
+    setElementDTO((prevElements) =>
+      prevElements.filter((element) => element !== elementToRemove)
+    );
 
-    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
-      console.warn("🚨 WebSocket is not connected. Cannot send message.");
-      return;
-    }
+    // Update elementGrouped state
+    setElementGrouped((prevGrouped) => {
+      const updatedGrouped = { ...prevGrouped };
 
-    const message = {
-      type: "NEW_ELEMENT_DTO",
-      homeBankingId: homeBankingId,
-      sessionId: "componentTasks",
-      details: [elementDTO],
-    };
+      for (const tagName in updatedGrouped) {
+        updatedGrouped[tagName].elements = updatedGrouped[tagName].elements.filter(
+          (element) => element !== elementToRemove
+        );
 
-    try {
-      webSocket.send(JSON.stringify(message));
-      console.log('📤 Sent CREATE element DTO:', message);
-    } catch (error) {
-      console.error('❌ Error sending WebSocket message:', error);
-    }
+        // If the group is empty after removal, you might want to remove the group
+        if (updatedGrouped[tagName].elements.length === 0) {
+          delete updatedGrouped[tagName];
+        }
+      }
 
-  };
-
-  const handleRemoveElementDTO = (elementDTO: ElementDTO) => {
-    console.log("handleCreateElementDTO:", elementDTO);
-
-    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
-      console.warn("🚨 WebSocket is not connected. Cannot send message.");
-      return;
-    }
-
-    const message = {
-      type: "DEL_ELEMENT_DTO",
-      homeBankingId: homeBankingId,
-      sessionId: "componentTasks",
-      details: [elementDTO],
-    };
-
-    try {
-      webSocket.send(JSON.stringify(message));
-      console.log('📤 Sent DELETE element DTO:', message);
-    } catch (error) {
-      console.error('❌ Error sending WebSocket message:', error);
-    }
+      return updatedGrouped;
+    });
   };
 
   const getElementBlockText = (typeElement: string): string => {
@@ -347,6 +359,9 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
         <>
           {/* Toggle Button and Pagination Controls on the same row */}
           <div className="controls-row">
+            <button className="send-all-button" onClick={handlesSendAllClick}>
+              {'Insert All Elements'}
+            </button>
             <button className="attributes-button" onClick={() => setShowAttributes(!showAttributes)}>
               {showAttributes ? 'Hide Attributes' : 'Show Attributes'}
             </button>
@@ -378,8 +393,8 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
                 {elementData.elements.map((elementDTO, i) => (
                   <div key={i}
                     className="instruction-item"
-                    onDoubleClick={(event) => handleRowDoubleClick(event, elementDTO)} // Pass event
-
+                    onDoubleClick={(event) => handleRowSelectedClick(event, elementDTO, "NEW_ELEMENT_DTO")}
+                    onClick={(event) => handleRowSelectedClick(event, elementDTO, "DETAILS_ELEMENT_DTO")}
                   >
                     <span className="instruction-line">{getInstructionElement(elementDTO)}</span>
                     {showAttributes ? (
@@ -390,7 +405,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
                       <span>{"\u00A0".repeat(20)}</span> // 100 non-breaking spaces
                     )}
                     <div className="options-column">
-                      <img src={saveImage} alt="save" className="save-button" onClick={() => handleCreateElementDTO(elementDTO)} />
+                      <img src={saveImage} alt="save" className="save-button" onClick={(event) => handleRowSelectedClick(event, elementDTO, "NEW_ELEMENT_DTO")} />
                       <img src={crossImage} alt="" className="cross-button" onClick={() => handleRemoveElementDTO(elementDTO)} />
                     </div>
                   </div>

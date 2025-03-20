@@ -293,6 +293,42 @@
   display: inline-block; /* Ensure the span behaves as a block but allows space for the next element */
 }
 
+.attributes-button {
+  background-color: #c3d3d9 !important;
+  color: #0b5394;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.attributes-button:hover {
+  background-color: #a9bec7 !important;
+  transform: scale(1.05);
+}
+
+.send-all-button {
+  background-color: #c3d3d9 !important;
+  color: #0b5394;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.send-all-button:hover {
+  background-color: #a9bec7 !important;
+  transform: scale(1.05);
+}
+
+
+
 .selected-attribute {
   margin-top: 10px;
   font-weight: bold;
