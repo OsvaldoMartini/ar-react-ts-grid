@@ -98,6 +98,56 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
   const totalPages = Math.ceil(Object.keys(elementGrouped).length / rowsPerPage);
   const paginatedData = Object.entries(elementGrouped).slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
 
+  const handlesInsertAllClick = (element: ElementDTO) => {
+    console.log("handleCreateElementDTO:", elementDTO);
+
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
+      console.warn("🚨 WebSocket is not connected. Cannot send message.");
+      return;
+    }
+
+    const message = {
+      type: "NEW_ELEMENT_DTO",
+      homeBankingId: homeBankingId,
+      sessionId: "componentTasks",
+      details: elementDTO,
+    };
+
+    try {
+      webSocket.send(JSON.stringify(message));
+      console.log('📤 Sent CREATE element DTO:', message);
+    } catch (error) {
+      console.error('❌ Error sending WebSocket message:', error);
+    }
+
+  };
+
+  const handleRowDoubleClick = (event: React.MouseEvent<HTMLDivElement, MouseEvent>, elementDTO: ElementDTO) => {
+    event.stopPropagation(); // Prevent event bubbling
+    console.log("Double-clicked row:", elementDTO);
+
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
+      console.warn("🚨 WebSocket is not connected. Cannot send message.");
+      return;
+    }
+
+    const message = {
+      type: "NEW_ELEMENT_DTO",
+      homeBankingId: homeBankingId,
+      sessionId: "componentTasks",
+      details: [elementDTO],
+    };
+
+    try {
+      webSocket.send(JSON.stringify(message));
+      console.log('📤 Sent CREATE element DTO:', message);
+    } catch (error) {
+      console.error('❌ Error sending WebSocket message:', error);
+    }
+
+  };
+
+
   const handleCreateElementDTO = (elementDTO: ElementDTO) => {
     console.log("handleCreateElementDTO:", elementDTO);
 
@@ -326,7 +376,11 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
               </div>
               <div className="instructions-list">
                 {elementData.elements.map((elementDTO, i) => (
-                  <div key={i} className="instruction-item">
+                  <div key={i}
+                    className="instruction-item"
+                    onDoubleClick={(event) => handleRowDoubleClick(event, elementDTO)} // Pass event
+
+                  >
                     <span className="instruction-line">{getInstructionElement(elementDTO)}</span>
                     {showAttributes ? (
                       <div>
