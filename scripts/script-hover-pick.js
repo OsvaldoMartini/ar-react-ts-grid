@@ -592,7 +592,7 @@
       shadowHost: shadowHostSelector,
       shadowRoot: shadowRoot ? true : false,
       nestedShadow: shadowPath.length > 1, // Detects if multiple shadow roots are involved
-      cssSelector: cssSelector, // Correct CSS selector for nested shadow elements
+      cssSelector: elementCssSelector, // cssSelector shadowRoot
     };
 
     // Store tagName and other details in the Map
