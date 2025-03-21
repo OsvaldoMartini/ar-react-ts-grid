@@ -53,6 +53,38 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
   const [alertDismissed, setAlertDismissed] = useState(false);
   const [showAttributes, setShowAttributes] = useState(false);
 
+  const totalPages = Math.max(1, Math.ceil(Object.entries(elementGrouped).length / rowsPerPage));
+  const paginatedData = Object.entries(elementGrouped).slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
+  const [blockPages, setBlockPages] = useState<Record<string, number>>({});
+  const [blockCurrentPages, setBlockCurrentPages] = useState<Record<string, number>>({});
+  const [blockRowsPerPage, setBlockRowsPerPage] = useState<number>(5);
+
+  const handleNextBlockPage = (typeElement: string) => {
+    setBlockCurrentPages((prev) => ({
+      ...prev,
+      [typeElement]: Math.min((prev[typeElement] || 1) + 1, blockPages[typeElement] || 1),
+    }));
+  };
+
+  const handlePrevBlockPage = (typeElement: string) => {
+    setBlockCurrentPages((prev) => ({
+      ...prev,
+      [typeElement]: Math.max((prev[typeElement] || 1) - 1, 1),
+    }));
+  };
+
+  useEffect(() => {
+    const newBlockPages: Record<string, number> = {};
+    Object.entries(elementGrouped).forEach(([typeElement, elementData]) => {
+      newBlockPages[typeElement] = Math.max(1, Math.ceil(elementData.elements.length / blockRowsPerPage));
+    });
+    setBlockPages(newBlockPages);
+    setBlockCurrentPages(Object.keys(elementGrouped).reduce((acc, key) => ({ ...acc, [key]: 1 }), {}));
+  }, [elementGrouped, blockRowsPerPage]);
+
+  useEffect(() => {
+    console.log("Updated elementGrouped:", elementGrouped);
+  }, [elementGrouped]);
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -103,9 +135,6 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
     setAlertMessageHeader('');
     setAlertMessageBody('');
   };
-
-  const totalPages = Math.ceil(Object.keys(elementGrouped).length / rowsPerPage);
-  const paginatedData = Object.entries(elementGrouped).slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
 
   const handlesSendAllClick = () => {
     console.log("handleSendAllClick: Sending all ElementDTOs");
@@ -376,10 +405,9 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
             <div className="pagination-controls">
               <label>Rows per page: </label>
               <select
-                value={rowsPerPage}
+                value={blockRowsPerPage}
                 onChange={(e) => {
-                  setRowsPerPage(Number(e.target.value));
-                  setCurrentPage(1);
+                  setBlockRowsPerPage(Number(e.target.value));
                 }}
               >
                 <option value={5}>5</option>
@@ -390,47 +418,59 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
             </div>
           </div>
 
-          {paginatedData.map(([typeElement, elementData], index) => (
-            <div key={typeElement} className="block">
-              <div className="block-header color-component1">
-                <span className="block-order-number">#{index + 1}</span>
-                <span className="block-name">{getInstructionTypeElement(typeElement)}</span>
-                <span className="block-count">({elementData.elements.length})</span>
-              </div>
-              <div className="instructions-list">
-                {elementData.elements.map((elementDTO, i) => (
-                  <div key={i}
-                    className="instruction-item"
-                    onDoubleClick={(event) => handleRowSelectedClick(event, elementDTO, "NEW_ELEMENT_DTO")}
-                    onClick={(event) => handleRowSelectedClick(event, elementDTO, "DETAILS_ELEMENT_DTO")}
-                  >
-                    <span className="instruction-line">{getInstructionElement(elementDTO)}</span>
-                    {showAttributes ? (
-                      <div>
-                        <AttributeDropdown elementDTO={elementDTO} onChange={handleAttributeChange} />
-                      </div>
-                    ) : (
-                      <span>{"\u00A0".repeat(20)}</span> // 100 non-breaking spaces
-                    )}
-                    <div className="options-column">
-                      <img src={saveImage} alt="save" className="save-button" onClick={(event) => handleRowSelectedClick(event, elementDTO, "NEW_ELEMENT_DTO")} />
-                      <img src={crossImage} alt="" className="cross-button" onClick={() => handleRemoveElementDTO(elementDTO)} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
+          {Object.entries(elementGrouped).map(([typeElement, elementData], index) => {
+            const currentPage = blockCurrentPages[typeElement] || 1;
+            const totalPages = blockPages[typeElement] || 1;
+            const paginatedElements = elementData.elements.slice(
+              (currentPage - 1) * blockRowsPerPage,
+              currentPage * blockRowsPerPage
+            );
 
-          <div className="bottom-pagination-controls"> {/* Changed class name here */}
-            <button disabled={currentPage === 1} onClick={() => setCurrentPage((prev) => prev - 1)}>
-              Prev
-            </button>
-            <span> Page {currentPage} of {totalPages} </span>
-            <button disabled={currentPage === totalPages} onClick={() => setCurrentPage((prev) => prev + 1)}>
-              Next
-            </button>
-          </div>
+            return (
+              <div key={typeElement} className="block">
+                <div className="block-header color-component1">
+                  <span className="block-order-number">#{index + 1}</span>
+                  <span className="block-name">{getInstructionTypeElement(typeElement)}</span>
+                  <span className="block-count">({elementData.elements.length})</span>
+                  {elementData.elements.length > blockRowsPerPage && (
+                    <div className="bottom-pagination-controls">
+                      <button disabled={currentPage === 1} onClick={() => handlePrevBlockPage(typeElement)}>
+                        Prev
+                      </button>
+                      <span>
+                        Page {currentPage} of {totalPages}
+                      </span>
+                      <button disabled={currentPage === totalPages} onClick={() => handleNextBlockPage(typeElement)}>
+                        Next
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className="instructions-list">
+                  {paginatedElements.map((elementDTO, i) => (
+                    <div key={i}
+                      className="instruction-item"
+                      onDoubleClick={(event) => handleRowSelectedClick(event, elementDTO, "NEW_ELEMENT_DTO")}
+                      onClick={(event) => handleRowSelectedClick(event, elementDTO, "DETAILS_ELEMENT_DTO")}
+                    >
+                      <span className="instruction-line">{getInstructionElement(elementDTO)}</span>
+                      {showAttributes ? (
+                        <div>
+                          <AttributeDropdown elementDTO={elementDTO} onChange={handleAttributeChange} />
+                        </div>
+                      ) : (
+                        <span>{"\u00A0".repeat(20)}</span>
+                      )}
+                      <div className="options-column">
+                        <img src={saveImage} alt="save" className="save-button" onClick={(event) => handleRowSelectedClick(event, elementDTO, "NEW_ELEMENT_DTO")} />
+                        <img src={crossImage} alt="" className="cross-button" onClick={() => handleRemoveElementDTO(elementDTO)} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </>
       )}
     </div>
