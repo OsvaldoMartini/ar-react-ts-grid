@@ -5,7 +5,8 @@
   socketPort,
   sessionId,
   destination,
-  operationId
+  operationId,
+  homeBankingId
 ) {
   let attempts = 0;
   let maxAttempts = 100;
@@ -18,6 +19,7 @@
   window.sessionId = sessionId;
   window.destination = destination;
   window.operationId = operationId;
+  window.homeBankingId = homeBankingId;
   // var elementInfoSubmit = new Map();
 
   function connectWebSocket() {
@@ -493,6 +495,7 @@
         type: "SEARCH_TOOL",
         sessionId: window.destination,
         operationId: window.operationId,
+        homeBankingId: window.homeBankingId,
         details: window.allElementInfo, // Send allElementInfo
       };
       wSocket.send(JSON.stringify(message));
@@ -849,10 +852,11 @@
   arguments[2],
   arguments[3],
   arguments[4],
-  arguments[5]
+  arguments[5],
+  arguments[6]
 );
-// })([], false, 8181, "scannerTool", "scannerGrid", "searchTerms");
-// })(["with name"], false, 8181, "scannerTool", "scannerGrid", "searchTerms");
-// })(["input", "button", "a"], false, 8181, "scannerTool", "scannerGrid", "searchTerms");
-// })(["*"], false, 8181, "scannerTool", "scannerGrid", "searchTerms");
-// })(["button"], false, 8181, "scannerTool", "scannerGrid", "searchTerms");
+// })([], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
+// })(["with name"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
+// })(["input", "button", "a"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
+// })(["*"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
+// })(["button"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
