@@ -525,7 +525,7 @@
     }));
     const attribId = element.id || "";
     const attribName = element.name || "";
-    const coords = `${element.getBoundingClientRect().left.toFixed(2)},${element
+    const coordinates = `${element.getBoundingClientRect().left.toFixed(2)},${element
       .getBoundingClientRect()
       .top.toFixed(2)}`;
     const someText = getSomeText(tagName, attributeData, element);
@@ -537,7 +537,7 @@
       customXPath: "",
       attribId,
       attribName,
-      coords,
+      coordinates,
       someText,
     };
   };
@@ -570,8 +570,8 @@
   const elementInfoString = function elementInfoString(element, identity) {
     return `${element.tagName.toLowerCase()};xpath:${identity.xpath};text:${
       identity.someText
-    };attribId:${identity.attribId};attribName:${identity.attribName};coords:${
-      identity.coords
+    };attribId:${identity.attribId};attribName:${identity.attribName};coordinates:${
+      identity.coordinates
     };attributeData:${identity.attributeData};customXPath:${
       identity.customXPath
     };`;
@@ -585,7 +585,7 @@
       someText: identity.someText ?? "",
       attribId: identity.attribId ?? "",
       attribName: identity.attribName ?? "",
-      coords: identity.coords ?? "",
+      coordinates: identity.coordinates ?? "",
       attributeData: identity.attributeData ?? "",
       customXPath: identity.customXPath ?? "",
       iFrameXPath: identity.iFrameXPath ?? "",

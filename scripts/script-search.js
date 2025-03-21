@@ -60,13 +60,13 @@
             customXPath,
             attribId,
             attribName,
-            coords,
+            coordinates,
             someText,
           } = elementIdentity;
 
           if (someText && someText.length > 0) {
             // Construct the element info string
-            var elementInfoString = `${node.tagName.toLowerCase()};xpath:${xpath};text:${someText};attribId:${attribId};attribName:${attribName};coords:${coords};allAttributes:${allAttributes};customXPath:${customXPath};`;
+            var elementInfoString = `${node.tagName.toLowerCase()};xpath:${xpath};text:${someText};attribId:${attribId};attribName:${attribName};coordinates:${coordinates};allAttributes:${allAttributes};customXPath:${customXPath};`;
 
             // highlightElementsSequentially(elementsToProcess);
             // Store the element information in the Map with XPath as the key
@@ -133,12 +133,12 @@
             customXPath,
             attribId,
             attribName,
-            coords,
+            coordinates,
             someText,
           } = elementIdentity;
 
           // Construct the element info string
-          var elementInfoString = `${node.tagName.toLowerCase()};xpath:${xpath};text:${someText};attribId:${attribId};attribName:${attribName};coords:${coords};allAttributes:${allAttributes};customXPath:${customXPath};`;
+          var elementInfoString = `${node.tagName.toLowerCase()};xpath:${xpath};text:${someText};attribId:${attribId};attribName:${attribName};coordinates:${coordinates};allAttributes:${allAttributes};customXPath:${customXPath};`;
 
           // highlightElementsSequentially(elementsToProcess);
           // Store the element information in the Map with XPath as the key
@@ -190,12 +190,12 @@
             customXPath,
             attribId,
             attribName,
-            coords,
+            coordinates,
             someText,
           } = elementIdentity;
 
           // Construct the element info string
-          var elementInfoString = `${node.tagName.toLowerCase()};xpath:${xpath};text:${someText};attribId:${attribId};attribName:${attribName};coords:${coords};allAttributes:${allAttributes};customXPath:${customXPath};`;
+          var elementInfoString = `${node.tagName.toLowerCase()};xpath:${xpath};text:${someText};attribId:${attribId};attribName:${attribName};coordinates:${coordinates};allAttributes:${allAttributes};customXPath:${customXPath};`;
 
           // highlightElementsSequentially(elementsToProcess);
           // Store the element information in the Map with XPath as the key
@@ -248,11 +248,11 @@
           customXPath,
           attribId,
           attribName,
-          coords,
+          coordinates,
           someText,
         } = elementIdentity;
 
-        let elementInfoString = `found:${element.tagName.toLowerCase()};xpath:${xpath};text:${someText};attribId:${attribId};attribName:${attribName};coords:${coords};allAttributes:${allAttributes};customXPath:${customXPath};`;
+        let elementInfoString = `found:${element.tagName.toLowerCase()};xpath:${xpath};text:${someText};attribId:${attribId};attribName:${attribName};coordinates:${coordinates};allAttributes:${allAttributes};customXPath:${customXPath};`;
 
         if (!elementInfoMap.has(xpath)) {
           elementInfoMap.set(xpath, elementInfoString);
@@ -454,8 +454,8 @@
 
     var attribId = element.id || "";
     var attribName = element.name || "";
-    var coords = element.getBoundingClientRect();
-    coords = `${coords.left},${coords.top}`;
+    var coordinates = element.getBoundingClientRect();
+    coordinates = `${coordinates.left},${coordinates.top}`;
 
     var someText = element.textContent.trim() || "";
     if (
@@ -474,7 +474,7 @@
     //   (element.tagName.toLowerCase() === "button" &&
     //     (element.type === "submit" || !element.type)) // Default button type is "submit" if not set
     // ) {
-    //   var elementInfoString = `${element.tagName.toLowerCase()};xpath:${xpath};text:${someText};attribId:${attribId};attribName:${attribName};coords:${coords};allAttributes:${allAttributes};customXPath:${customXPath};`;
+    //   var elementInfoString = `${element.tagName.toLowerCase()};xpath:${xpath};text:${someText};attribId:${attribId};attribName:${attribName};coordinates:${coordinates};allAttributes:${allAttributes};customXPath:${customXPath};`;
 
     //   // Add to global Map without repetition
     //   if (!elementInfoSubmit.has(xpath)) {
@@ -488,7 +488,7 @@
       customXPath,
       attribId,
       attribName,
-      coords,
+      coordinates,
       someText,
     };
   }

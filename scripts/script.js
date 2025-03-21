@@ -108,10 +108,10 @@
       event.clientY
     );
     window.tagNameTemp = elementBelowTooltip.tagName.toLowerCase();
-    window.coordsTemp = elementBelowTooltip.getBoundingClientRect();
-    window.coordsTemp = window.coordsTemp.left + "," + window.coordsTemp.top;
+    window.coordinatesTemp = elementBelowTooltip.getBoundingClientRect();
+    window.coordinatesTemp = window.coordinatesTemp.left + "," + window.coordinatesTemp.top;
     tooltip.textContent =
-      window.tagNameTemp + "-Coordinates:(" + window.coordsTemp + ")";
+      window.tagNameTemp + "-Coordinates:(" + window.coordinatesTemp + ")";
     var tooltipWidth = tooltip.offsetWidth;
     var tooltipHeight = tooltip.offsetHeight;
     var left = event.pageX - tooltipWidth / 2;
@@ -159,7 +159,7 @@
 
         // Get the coordinates of the element inside the iframe
         var elementCoordinates = elementInsideIframe.getBoundingClientRect();
-        var elementCoords = {
+        var elementcoordinates = {
           left: elementCoordinates.left,
           top: elementCoordinates.top,
           right: elementCoordinates.right,
@@ -183,7 +183,7 @@
         var elementInfo = {
           tagName: elementInsideIframe.tagName.toLowerCase(),
           xpath: iframeElementXPath,
-          coordinates: elementCoords,
+          coordinates: elementcoordinates,
           text: someText,
         };
 
@@ -201,8 +201,8 @@
       window.attribId = elementBelowTooltip.id || "";
       window.attribName = elementBelowTooltip.name || "";
       window.tagName = elementBelowTooltip.tagName.toLowerCase();
-      window.coords = elementBelowTooltip.getBoundingClientRect();
-      window.coords = window.coords.left + "," + window.coords.top;
+      window.coordinates = elementBelowTooltip.getBoundingClientRect();
+      window.coordinates = window.coordinates.left + "," + window.coordinates.top;
 
       // Extract text content (or input value if applicable)
       if (
@@ -239,9 +239,9 @@
     window.attribId = "";
     window.attribName = "";
     window.tagName = "";
-    window.coords = "";
+    window.coordinates = "";
     window.tagNameTemp = "";
-    window.coordsTemp = "";
+    window.coordinatesTemp = "";
     window.text = "";
   }
 

@@ -7,6 +7,7 @@ import clickImage from "../assets/click.png";
 import linkImage from "../assets/links-icon.png";
 import inputImage from "../assets/input_field.png";
 import outPutImage from "../assets/output1.png";
+import testImage from "../assets/test.png";
 import AlertModal from './AlertModal';
 import { useWebSocket } from './useWebSocket';
 import AttributeDropdown from './AttributeDropdown';
@@ -37,12 +38,6 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
   const [elementDTO, setElementDTO] = useState<ElementDTO[]>(dataDTO);
   const [elementGrouped, setElementGrouped] = useState<Record<string, { tagName: string; elements: ElementDTO[] }>>({});
   const [isElementGrouped, setIsElementGrouped] = useState<boolean>(false);
-
-  const [rowsPerPage, setRowsPerPage] = useState<number>(10);
-  const [currentPage, setCurrentPage] = useState<number>(1);
-
-  const clickTimer = useRef<NodeJS.Timeout | null>(null);
-  const isDoubleClick = useRef<boolean>(false);
 
   const [errorFlag, setErrorFlag] = useState<boolean>(false)
   const [alertImage, setAlertImage] = useState(constructionImage);
@@ -176,7 +171,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
     const message = {
       type: "SEND_ALL_ELEMENTS_DTO",
       homeBankingId: homeBankingId,
-      sessionId: "componentTasks",
+      sessionId: `scannerReceiver-${homeBankingId}`,
       details: allElements, // Send all elements
     };
 
@@ -195,31 +190,8 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
   ) => {
     event.stopPropagation();
 
-    if (action === "DETAILS_ELEMENT_DTO") {
-      // Single click logic
-      if (isDoubleClick.current) {
-        // Prevent single click logic if it's a double click
-        return;
-      }
+    sendWebSocketMessage(elementDTO, action);
 
-      clickTimer.current = setTimeout(() => {
-        if (!isDoubleClick.current) {
-          console.log("Single-clicked row:", elementDTO);
-          sendWebSocketMessage(elementDTO, action);
-        }
-        clickTimer.current = null;
-      }, 300); // Adjust delay as needed
-    } else {
-      // Double click or save button logic
-      if (clickTimer.current) {
-        clearTimeout(clickTimer.current);
-        clickTimer.current = null;
-      }
-      isDoubleClick.current = true;
-      console.log("Double-clicked or save button:", elementDTO);
-      sendWebSocketMessage(elementDTO, action);
-      isDoubleClick.current = false;
-    }
   };
 
   const sendWebSocketMessage = (elementDTO: ElementDTO, action: string) => {
@@ -491,6 +463,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
                       )}
                       <div className="options-column">
                         <img src={saveImage} alt="save" className="save-button" onClick={(event) => handleRowSelectedClick(event, elementDTO, "NEW_ELEMENT_DTO")} />
+                        <img src={testImage} alt="test" className="test-button" onClick={(event) => handleRowSelectedClick(event, elementDTO, "TEST_ELEMENT_DTO")} />
                         <img src={crossImage} alt="" className="cross-button" onClick={() => handleRemoveElementDTO(elementDTO)} />
                       </div>
                     </div>

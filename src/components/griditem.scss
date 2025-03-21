@@ -91,6 +91,7 @@
 .excel-button,
 .cross-button,
 .save-button,
+.test-button,
 .active-button,
 .inactive-button,
 .arrow-left-button,
@@ -138,8 +139,7 @@
 }
 
 .edit-button,
-.excel-button,
-.cross-button {
+.excel-button {
   margin-left: 2px; /* Reduced margins */
 }
 
@@ -153,8 +153,17 @@
   padding: 0 6px 0 0;
 }
 
+.save-button {
+  padding: 0 2px 0 6px;
+}
+
+
+.test-button {
+  padding: 0 2px 0 6px;
+}
+
 .cross-button {
-  padding: 0 0 0 6px;
+  padding: 0 2px 0 6px;
 }
 
 /* Operations Button */

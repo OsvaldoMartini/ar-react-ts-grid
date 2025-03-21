@@ -166,9 +166,9 @@ const sendDataToIframe = function sendDataToIframe(
 
     // Create serializable data (exclude DOM elements)
     const serializableData = collectionFound.map((node) => {
-      const { xpath, attribId, attribName, coords, someText, allAttributes } =
+      const { xpath, attribId, attribName, coordinates, someText, allAttributes } =
         getElementIdentity(node) || {}; // Fallback to empty object
-      return { xpath, attribId, attribName, coords, someText, allAttributes };
+      return { xpath, attribId, attribName, coordinates, someText, allAttributes };
     });
 
     const messageType = isIframeChild ? "iFrame-Child" : "iFrame-Found";
@@ -202,7 +202,7 @@ const getElementIdentity = function getElementIdentity(element) {
     .join(";");
   const attribId = element.id || "";
   const attribName = element.name || "";
-  const coords = `${element.getBoundingClientRect().left},${
+  const coordinates = `${element.getBoundingClientRect().left},${
     element.getBoundingClientRect().top
   }`;
   const someText =
@@ -215,7 +215,7 @@ const getElementIdentity = function getElementIdentity(element) {
     customXPath: "",
     attribId,
     attribName,
-    coords,
+    coordinates,
     someText,
   };
 };
@@ -248,8 +248,8 @@ const getMartiniXPath = function getMartiniXPath(element) {
 const elementInfoString = function elementInfoString(element, identity) {
   return `${element.tagName.toLowerCase()};xpath:${identity.xpath};text:${
     identity.someText
-  };attribId:${identity.attribId};attribName:${identity.attribName};coords:${
-    identity.coords
+  };attribId:${identity.attribId};attribName:${identity.attribName};coordinates:${
+    identity.coordinates
   };allAttributes:${identity.allAttributes};customXPath:${
     identity.customXPath
   };`;
