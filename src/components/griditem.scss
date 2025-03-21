@@ -29,6 +29,7 @@
   margin: 0;
   box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.4); /* Slightly smaller shadow */
   height: 20px; /* Set a fixed height */
+  justify-content: space-between;
 
   &.color-component1 {
     background-color: #c3d3d9   !important;
@@ -42,6 +43,11 @@
   
 }
 
+.block-header-left {
+  display: flex;
+  align-items: center;
+  gap: 5px; /* Adjust gap as needed */
+}
 
 
 /* Block Name Span */
@@ -53,18 +59,17 @@
   text-overflow: ellipsis; /* Add ellipsis if text is too long */
 }
 
-.block-order-number{
-  font-size: 14px; // Decrease font size
-  // width: 200px; /* Set width of block name to 100px */
+/* Block Name Span */
+.block-header .block-count {
+  width: 50px; /* Set width of block name to 100px */
   white-space: nowrap; /* Prevent text wrapping */
   overflow: hidden; /* Hide overflow */
   text-overflow: ellipsis; /* Add ellipsis if text is too long */
 }
 
-
-/* Block Name Span */
-.block-header .block-count {
-  width: 50px; /* Set width of block name to 100px */
+.block-order-number{
+  font-size: 14px; // Decrease font size
+  // width: 200px; /* Set width of block name to 100px */
   white-space: nowrap; /* Prevent text wrapping */
   overflow: hidden; /* Hide overflow */
   text-overflow: ellipsis; /* Add ellipsis if text is too long */
@@ -303,6 +308,7 @@
   transition: background-color 0.3s ease, transform 0.2s ease;
   font-size: 12px;
   font-weight: bold;
+  white-space: nowrap;
 }
 
 .attributes-button:hover {
@@ -320,6 +326,7 @@
   transition: background-color 0.3s ease, transform 0.2s ease;
   font-size: 12px;
   font-weight: bold;
+  white-space: nowrap;
 }
 
 .send-all-button:hover {
@@ -434,6 +441,8 @@
   align-items: center;
   gap: 15px;
   font-size: 12px;
+  width: 100px;
+  white-space: nowrap;
 }
 
 .pagination-controls label {
@@ -449,6 +458,7 @@
   background-color: white;
   cursor: pointer;
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  width: 80px;
 }
 
 .pagination-controls select:hover {
@@ -489,13 +499,15 @@
   color: #555;
 }
 
-.bottom-pagination-controls { /* New CSS rule */
+.bottom-pagination-controls {
   display: flex;
   align-items: center;
-  justify-content: center; /* Center the bottom pagination */
   gap: 15px;
-  margin-top: 20px;
   font-size: 12px;
+}
+
+.bottom-pagination-controls span {
+  white-space: nowrap; /* Prevent line breaks */
 }
 
 .no-data-message {

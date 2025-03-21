@@ -53,8 +53,8 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
   const [alertDismissed, setAlertDismissed] = useState(false);
   const [showAttributes, setShowAttributes] = useState(false);
 
-  const totalPages = Math.max(1, Math.ceil(Object.entries(elementGrouped).length / rowsPerPage));
-  const paginatedData = Object.entries(elementGrouped).slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
+  // const totalPages = Math.max(1, Math.ceil(Object.entries(elementGrouped).length / rowsPerPage));
+  // const paginatedData = Object.entries(elementGrouped).slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
   const [blockPages, setBlockPages] = useState<Record<string, number>>({});
   const [blockCurrentPages, setBlockCurrentPages] = useState<Record<string, number>>({});
   const [blockRowsPerPage, setBlockRowsPerPage] = useState<number>(5);
@@ -205,7 +205,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
     const message = {
       type: action,
       homeBankingId: homeBankingId,
-      sessionId: "scannerReceiver",
+      sessionId: `scannerReceiver-${homeBankingId}`,
       details: [elementDTO],
     };
 
@@ -383,7 +383,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
         />
       )}
 
-      {paginatedData.length === 0 ? (
+      {elementDTO.length === 0 ? (
         // No data message (as before)
         <div className="block">
           <div className="block-header color-component2">Scanned Web Elements</div>
@@ -429,9 +429,11 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
             return (
               <div key={typeElement} className="block">
                 <div className="block-header color-component1">
-                  <span className="block-order-number">#{index + 1}</span>
-                  <span className="block-name">{getInstructionTypeElement(typeElement)}</span>
-                  <span className="block-count">({elementData.elements.length})</span>
+                  <div className="block-header-left">
+                    <span className="block-order-number">#{index + 1}</span>
+                    <span className="block-name">{getInstructionTypeElement(typeElement)}</span>
+                    <span className="block-count">({elementData.elements.length})</span>
+                  </div>
                   {elementData.elements.length > blockRowsPerPage && (
                     <div className="bottom-pagination-controls">
                       <button disabled={currentPage === 1} onClick={() => handlePrevBlockPage(typeElement)}>
@@ -450,7 +452,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
                   {paginatedElements.map((elementDTO, i) => (
                     <div key={i}
                       className="instruction-item"
-                      onDoubleClick={(event) => handleRowSelectedClick(event, elementDTO, "NEW_ELEMENT_DTO")}
+                      // onDoubleClick={(event) => handleRowSelectedClick(event, elementDTO, "NEW_ELEMENT_DTO")}
                       onClick={(event) => handleRowSelectedClick(event, elementDTO, "DETAILS_ELEMENT_DTO")}
                     >
                       <span className="instruction-line">{getInstructionElement(elementDTO)}</span>
