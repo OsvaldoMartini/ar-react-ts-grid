@@ -69,8 +69,16 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
           // Ensure detailsData is always an array if possible
           const detailsData = Array.isArray(bodyData.details) ? bodyData.details : [];
 
-          // Update elementDTO first
-          setElementDTO(detailsData);
+          // Check if detailsData is empty
+          if (detailsData.length === 0) {
+            // If empty, set elementDTO to an empty array
+            setElementDTO([]);
+            setElementGrouped({}); // Or set to your initial empty state
+            setIsElementGrouped(true); // Or false, depending on your logic
+          } else {
+            // Otherwise, set elementDTO to detailsData
+            setElementDTO(detailsData);
+          }
           // Then, set isElementGrouped to false, triggering the useEffect
           setIsElementGrouped(false);
         }

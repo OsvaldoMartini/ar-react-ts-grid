@@ -201,7 +201,7 @@
       searchTerms.length === 0 ||
       (!searchTerms.includes("with id") &&
         !searchTerms.includes("with name") &&
-        !searchTerms.includes("allWithText"))
+        !searchTerms.includes("with text"))
     ) {
       // If no search terms, directly add the element
       window.elementInfoMap.set(
@@ -225,7 +225,7 @@
       ) {
         matches = true;
       } else if (
-        term.includes("allWithText") &&
+        term.includes("with text") &&
         elementIdentity.someText.length > 0
       ) {
         matches = true;
@@ -855,6 +855,7 @@
   arguments[5],
   arguments[6]
 );
+
 // })([], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
 // })(["with name"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
 // })(["input", "button", "a"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
