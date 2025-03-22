@@ -185,7 +185,7 @@
     let textResult = "";
 
     if (element) {
-      // Check computed styles to filter out hidden elements
+      // Function to check if an element is hidden (using computed styles and attributes)
       const isHidden = (el) => {
         const style = window.getComputedStyle(el);
         return (
@@ -208,13 +208,38 @@
       }
     }
 
-    // Extract attribute-based text (only meaningful ones)
+    // List of meaningful attributes to extract
+    const meaningfulAttributes = [
+      "placeholder",
+      "label",
+      "name",
+      "title",
+      "id",
+      "alt",
+      "for",
+      "aria-label",
+      "aria-labelledby",
+      "aria-describedby",
+      "data-label",
+      "data-name",
+      "data-title",
+    ];
+
+    // Extract text from attributes
     attributeData.forEach(({ name, value }) => {
       const trimmedValue = value.trim();
       if (!trimmedValue) return;
 
-      if (["placeholder", "label", "name", "title", "id"].includes(name)) {
+      if (meaningfulAttributes.includes(name) || name.startsWith("data-")) {
         textSet.add(trimmedValue);
+      }
+
+      // Handle `aria-labelledby` and `aria-describedby`
+      if (name === "aria-labelledby" || name === "aria-describedby") {
+        const referencedElement = document.getElementById(value);
+        if (referencedElement && !isHidden(referencedElement)) {
+          textSet.add(referencedElement.textContent.trim());
+        }
       }
 
       // Extract text from `srcdoc` if available
@@ -233,14 +258,13 @@
       }
     });
 
-    // Add extracted visible text to the set (removing duplicates)
+    // Combine extracted visible text
     textResult
       .split(";")
       .map((text) => text.trim())
       .filter(Boolean)
       .forEach((text) => textSet.add(text));
 
-    // Return unique, clean, and visible text
     return Array.from(textSet).join("; ");
   }
 
@@ -667,12 +691,12 @@
   });
 
   // window.cloneTerms = null; // Invalidating the function
-})(
-  arguments[0],
-  arguments[1],
-  arguments[2],
-  arguments[3],
-  arguments[4],
-  arguments[5]
-);
-// })("https://www.vpbank.com/", "https://www.vpbank.com/", ["*"], false, 8181, 3);
+  // })(
+  //   arguments[0],
+  //   arguments[1],
+  //   arguments[2],
+  //   arguments[3],
+  //   arguments[4],
+  //   arguments[5]
+  // );
+})("https://www.vpbank.com/", "https://www.vpbank.com/", ["*"], false, 8181, 3);
