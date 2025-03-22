@@ -180,8 +180,8 @@
       someText,
     };
   };
+
   function getVisibleText(tagName, attributeData, element) {
-    let textSet = new Set();
     let textResult = "";
 
     if (element) {
@@ -208,116 +208,55 @@
       }
     }
 
-    // List of meaningful attributes to extract
-    const meaningfulAttributes = [
+    // Define priority order for attributes
+    const attributePriority = [
+      "aria-label",
+      "aria-labelledby",
+      "aria-describedby",
       "placeholder",
       "label",
       "name",
       "title",
-      "id",
       "alt",
       "for",
-      "aria-label",
-      "aria-labelledby",
-      "aria-describedby",
       "data-label",
       "data-name",
       "data-title",
+      "id",
+      "data-testid",
     ];
 
-    // Extract text from attributes
-    attributeData.forEach(({ name, value }) => {
-      const trimmedValue = value.trim();
-      if (!trimmedValue) return;
+    let firstMeaningfulText = "";
 
-      if (meaningfulAttributes.includes(name) || name.startsWith("data-")) {
-        textSet.add(trimmedValue);
-      }
-
-      // Handle `aria-labelledby` and `aria-describedby`
+    // Function to get attribute text with priority
+    const getAttributeText = (name, value) => {
       if (name === "aria-labelledby" || name === "aria-describedby") {
         const referencedElement = document.getElementById(value);
         if (referencedElement && !isHidden(referencedElement)) {
-          textSet.add(referencedElement.textContent.trim());
+          return referencedElement.textContent.trim();
         }
       }
+      return value.trim();
+    };
 
-      // Extract text from `srcdoc` if available
-      if (name === "srcdoc") {
-        try {
-          const doc = new DOMParser().parseFromString(value, "text/html");
-          const extractedText = extractVisibleTextFromHTML(doc.body);
-          [
-            ...extractedText.titles,
-            ...extractedText.text,
-            ...extractedText.labels,
-          ].forEach((text) => textSet.add(text.trim()));
-        } catch (e) {
-          console.warn("Error parsing srcdoc:", e);
-        }
-      }
-    });
-
-    // Combine extracted visible text
-    textResult
-      .split(";")
-      .map((text) => text.trim())
-      .filter(Boolean)
-      .forEach((text) => textSet.add(text));
-
-    return Array.from(textSet).join("; ");
-  }
-
-  const getMartiniXPath = function getMartiniXPath(element) {
-    if (element === document.body) return "/html/body";
-    let ix = 0;
-    const siblings = element.parentNode ? element.parentNode.childNodes : [];
-    for (let i = 0; i < siblings.length; i++) {
-      let sibling = siblings[i];
-      if (sibling.nodeType === 1 && sibling.tagName === element.tagName) {
-        if (sibling === element) {
-          return (
-            getMartiniXPath(element.parentNode) +
-            "/" +
-            element.tagName.toLowerCase() +
-            "[" +
-            (ix + 1) +
-            "]"
+    // Check element's text first
+    if (textResult) {
+      firstMeaningfulText = textResult;
+    } else {
+      // Check attributes based on priority
+      for (const attr of attributePriority) {
+        const foundAttr = attributeData.find(({ name }) => name === attr);
+        if (foundAttr) {
+          firstMeaningfulText = getAttributeText(
+            foundAttr.name,
+            foundAttr.value
           );
+          if (firstMeaningfulText) break; // Stop at first meaningful attribute
         }
-        ix++;
       }
     }
-    return "";
-  };
 
-  const elementDTO = function elementDTO(typeElement, identity) {
-    return {
-      typeElement: typeElement,
-      tagName: identity.tagName ?? "No Tag Name Detected",
-      xPath: identity.xPath ?? "",
-      someText: identity.someText ?? "",
-      attribId: identity.attribId ?? "",
-      attribName: identity.attribName ?? "",
-      coordinates: identity.coordinates ?? "",
-      attributeData: identity.attributeData ?? "",
-      customXPath: identity.customXPath ?? "",
-      iFrameXPath: identity.iFrameXPath ?? "",
-      shadowHost: identity.shadowHost ?? "",
-      shadowRoot: identity.shadowRoot ?? "",
-      nestedShadow: identity.nestedShadow ?? "",
-      cssSelector: identity.cssSelector ?? "",
-      attributeValue: identity.attributeValue ?? "",
-      attributeType: identity.attributeType ?? "",
-      searchAttributeValue: identity.searchAttributeValue ?? "",
-    };
-  };
-
-  function limitMapCharacters(elementInfoMap) {
-    elementInfoMap.forEach((value, key) => {
-      let modifiedValue = value;
-      window.allElementInfo.push(modifiedValue);
-    });
+    return firstMeaningfulText; // Return the most meaningful text
   }
 
   function extractVisibleTextFromHTML(element) {
@@ -426,6 +365,58 @@
       labels: Array.from(result.labels),
       titles: Array.from(result.titles),
     };
+  }
+
+  const getMartiniXPath = function getMartiniXPath(element) {
+    if (element === document.body) return "/html/body";
+    let ix = 0;
+    const siblings = element.parentNode ? element.parentNode.childNodes : [];
+    for (let i = 0; i < siblings.length; i++) {
+      let sibling = siblings[i];
+      if (sibling.nodeType === 1 && sibling.tagName === element.tagName) {
+        if (sibling === element) {
+          return (
+            getMartiniXPath(element.parentNode) +
+            "/" +
+            element.tagName.toLowerCase() +
+            "[" +
+            (ix + 1) +
+            "]"
+          );
+        }
+        ix++;
+      }
+    }
+    return "";
+  };
+
+  const elementDTO = function elementDTO(typeElement, identity) {
+    return {
+      typeElement: typeElement,
+      tagName: identity.tagName ?? "No Tag Name Detected",
+      xPath: identity.xPath ?? "",
+      someText: identity.someText ?? "",
+      attribId: identity.attribId ?? "",
+      attribName: identity.attribName ?? "",
+      coordinates: identity.coordinates ?? "",
+      attributeData: identity.attributeData ?? "",
+      customXPath: identity.customXPath ?? "",
+      iFrameXPath: identity.iFrameXPath ?? "",
+      shadowHost: identity.shadowHost ?? "",
+      shadowRoot: identity.shadowRoot ?? "",
+      nestedShadow: identity.nestedShadow ?? "",
+      cssSelector: identity.cssSelector ?? "",
+      attributeValue: identity.attributeValue ?? "",
+      attributeType: identity.attributeType ?? "",
+      searchAttributeValue: identity.searchAttributeValue ?? "",
+    };
+  };
+
+  function limitMapCharacters(elementInfoMap) {
+    elementInfoMap.forEach((value, key) => {
+      let modifiedValue = value;
+      window.allElementInfo.push(modifiedValue);
+    });
   }
 
   // Add event listener for mouse movement to update coordinates
