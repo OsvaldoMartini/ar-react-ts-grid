@@ -650,18 +650,25 @@
     };
 
     // Check element's text first
-    if (textResult) {
+    if (textResult && !/^\..*\{.*\}$/.test(textResult)) {
       firstMeaningfulText = textResult;
     } else {
-      // Check attributes based on priority
-      for (const attr of attributePriority) {
-        const foundAttr = attributeData.find(({ name }) => name === attr);
-        if (foundAttr) {
-          firstMeaningfulText = getAttributeText(
-            foundAttr.name,
-            foundAttr.value
-          );
-          if (firstMeaningfulText) break; // Stop at first meaningful attribute
+      // Directly prioritize title before checking others
+      const titleAttr = attributeData.find(({ name }) => name === "title");
+      if (titleAttr) {
+        firstMeaningfulText = getAttributeText(titleAttr.name, titleAttr.value);
+      }
+
+      if (!firstMeaningfulText) {
+        for (const attr of attributePriority) {
+          const foundAttr = attributeData.find(({ name }) => name === attr);
+          if (foundAttr) {
+            firstMeaningfulText = getAttributeText(
+              foundAttr.name,
+              foundAttr.value
+            );
+            if (firstMeaningfulText) break; // Stop at first meaningful attribute
+          }
         }
       }
     }
@@ -692,7 +699,10 @@
 
     // Extract visible text content from an element
     if (element.textContent?.trim() && isVisible(element)) {
-      result.text.add(element.textContent.trim());
+      // Ignore text content that looks like CSS rules
+      if (!/^\..*\{.*\}$/.test(element.textContent.trim())) {
+        result.text.add(element.textContent.trim());
+      }
     }
 
     // Extract text from labels (including associated input fields)
@@ -823,26 +833,18 @@
   // startCollectingElements(window.searchTerms);
   // init("Initiate");
   // window.initSearchTerms = null; // Invalidating the function
-  // })(
-  //   arguments[0],
-  //   arguments[1],
-  //   arguments[2],
-  //   arguments[3],
-  //   arguments[4],
-  //   arguments[5],
-  //   arguments[6]
-  // );
-
-  // })([], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
-  // })(["with name"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
 })(
-  ["input", "button", "a", "select"],
-  false,
-  8181,
-  "scannerTool",
-  "scannerGrid-2",
-  "searchTerms",
-  2
+  arguments[0],
+  arguments[1],
+  arguments[2],
+  arguments[3],
+  arguments[4],
+  arguments[5],
+  arguments[6]
 );
+
+// })([], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
+// })(["with name"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
+// })(["input", "button", "a", "select"], false, 8181, "scannerTool", "scannerGrid-2", "searchTerms", 2);
 // })(["*"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
 // })(["button"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
