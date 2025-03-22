@@ -1,3 +1,4 @@
+// HOVER PICK IN USE (SENDER: scannerTool) -> scannerGrid
 (function (
   targetOriginURL,
   trustedOriginURL,
@@ -157,7 +158,13 @@
       }
     }
     const xPath = getMartiniXPath(element);
-    const tagName = element.tagName.toLowerCase();
+
+    let tagName = element.tagName.toLowerCase();
+    const tagNameTemp = identifyElementTypeFromXPath(tagName, xPath);
+    if (tagNameTemp !== tagName) {
+      tagName = tagNameTemp;
+    }
+
     const attributeData = Array.from(element.attributes).map((attr) => ({
       name: attr.name,
       value: attr.value,
@@ -285,11 +292,20 @@
       );
     };
 
+    // Function to filter out technical patterns
+    const isTechnicalPattern = (word) => {
+      return word.includes("_") || word.includes("--") || word.includes("-");
+    };
+
     // Extract visible text content from an element
     if (element.textContent?.trim() && isVisible(element)) {
-      // Ignore text content that looks like CSS rules
-      if (!/^\..*\{.*\}$/.test(element.textContent.trim())) {
-        result.text.add(element.textContent.trim());
+      // Ignore text content that looks like CSS rules and words with technical patterns
+      const textContent = element.textContent.trim();
+      const words = textContent.split(/\s+/);
+      const filteredWords = words.filter((word) => !isTechnicalPattern(word));
+      const filteredText = filteredWords.join(" ").trim();
+      if (filteredText) {
+        result.text.add(filteredText);
       }
     }
 
@@ -306,8 +322,21 @@
         if (inputElement && isVisible(inputElement)) {
           const value = inputElement.value?.trim();
           const placeholder = inputElement.placeholder?.trim();
-          if (value) result.text.add(value);
-          else if (placeholder) result.text.add(placeholder);
+          if (value) {
+            const words = value.split(/\s+/);
+            const filteredWords = words.filter(
+              (word) => !isTechnicalPattern(word)
+            );
+            const filteredText = filteredWords.join(" ").trim();
+            if (filteredText) result.text.add(filteredText);
+          } else if (placeholder) {
+            const words = placeholder.split(/\s+/);
+            const filteredWords = words.filter(
+              (word) => !isTechnicalPattern(word)
+            );
+            const filteredText = filteredWords.join(" ").trim();
+            if (filteredText) result.text.add(filteredText);
+          }
         }
       }
     });
@@ -333,7 +362,15 @@
     visibleTextElements.forEach((tag) => {
       element.querySelectorAll(tag).forEach((child) => {
         if (isVisible(child) && child.textContent?.trim()) {
-          result.text.add(child.textContent.trim());
+          const textContent = child.textContent.trim();
+          const words = textContent.split(/\s+/);
+          const filteredWords = words.filter(
+            (word) => !isTechnicalPattern(word)
+          );
+          const filteredText = filteredWords.join(" ").trim();
+          if (filteredText) {
+            result.text.add(filteredText);
+          }
         }
       });
     });
@@ -341,7 +378,13 @@
     // Extract visible link text
     element.querySelectorAll("a").forEach((link) => {
       if (isVisible(link) && link.textContent?.trim()) {
-        result.text.add(link.textContent.trim());
+        const textContent = link.textContent.trim();
+        const words = textContent.split(/\s+/);
+        const filteredWords = words.filter((word) => !isTechnicalPattern(word));
+        const filteredText = filteredWords.join(" ").trim();
+        if (filteredText) {
+          result.text.add(filteredText);
+        }
       }
     });
 
@@ -374,7 +417,6 @@
       titles: Array.from(result.titles),
     };
   }
-
   const getMartiniXPath = function getMartiniXPath(element) {
     if (element === document.body) return "/html/body";
     let ix = 0;
@@ -397,6 +439,52 @@
     }
     return "";
   };
+
+  function identifyElementTypeFromXPath(tagName, xpath) {
+    if (typeof xpath !== "string" || xpath.trim() === "") {
+      return "unknown";
+    }
+
+    const parts = xpath.split("/").filter((part) => part.trim() !== "");
+
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const part = parts[i];
+
+      const tagMatch = part.match(/^([a-zA-Z-]+)(?:\[\d+\])?/);
+      if (!tagMatch) continue;
+
+      const tag = tagMatch[1].toLowerCase();
+
+      if (tag === "a") {
+        return "a"; // Link
+      }
+
+      if (tag === "input") {
+        const typeMatch = part.match(/@type=["']?([^"'\]]+)["']?/);
+        const type = typeMatch ? typeMatch[1].toLowerCase() : "";
+
+        if (["button", "submit", "reset"].includes(type)) {
+          return "button";
+        }
+        return "input";
+      }
+
+      if (tag === "button") {
+        return "button";
+      }
+
+      // Detect if it's an Angular Material expansion panel (likely a button)
+      if (
+        tag.includes("expansion-panel-header") ||
+        tag.includes("sidenav") ||
+        tag.includes("nav")
+      ) {
+        return "button";
+      }
+    }
+
+    return tagName; // Default to the given tagName if no match
+  }
 
   const elementDTO = function elementDTO(typeElement, identity) {
     return {
@@ -691,12 +779,12 @@
   });
 
   // window.cloneTerms = null; // Invalidating the function
-  // })(
-  //   arguments[0],
-  //   arguments[1],
-  //   arguments[2],
-  //   arguments[3],
-  //   arguments[4],
-  //   arguments[5]
-  // );
-})("https://www.vpbank.com/", "https://www.vpbank.com/", ["*"], false, 8181, 3);
+})(
+  arguments[0],
+  arguments[1],
+  arguments[2],
+  arguments[3],
+  arguments[4],
+  arguments[5]
+);
+// })("https://www.vpbank.com/", "https://www.vpbank.com/", ["*"], false, 8181, 3);

@@ -1,4 +1,4 @@
-// (SENDER: scannerTool) -> scannerGrid
+// SEARCH IN USE (SENDER: scannerTool) -> scannerGrid
 (function (
   searchTerms,
   hiddenFields,
@@ -11,6 +11,7 @@
   let attempts = 0;
   let maxAttempts = 100;
   let wSocket = null;
+  const originalStyles = new Map();
   let pageFullyLoaded = false;
   window.elementInfoMap = new Map();
   // window.searchTerms = ["button", "input", "a", "select"];
@@ -182,6 +183,7 @@
       const elementIdentity = getElementIdentity(element);
       if (elementIdentity) {
         filterSearchTerms(
+          element,
           "tagName-Found",
           elementIdentity.xPath,
           elementIdentity,
@@ -192,6 +194,7 @@
   };
 
   function filterSearchTerms(
+    element,
     typeDTO,
     referXPath,
     elementIdentity,
@@ -203,11 +206,40 @@
         !searchTerms.includes("with name") &&
         !searchTerms.includes("with text"))
     ) {
-      // If no search terms, directly add the element
-      window.elementInfoMap.set(
-        referXPath,
-        elementDTO(typeDTO, elementIdentity)
-      );
+      // Check if the clicked element has a shadow root
+      let shadowHost = element;
+
+      // Locate the shadow host element if it has a shadow root
+      while (shadowHost && !shadowHost.shadowRoot) {
+        shadowHost = shadowHost.parentElement; // Traverse upwards in the DOM
+      }
+
+      if (shadowHost && shadowHost.shadowRoot) {
+        // Access the Shadow DOM
+        const shadowRoot = shadowHost.shadowRoot;
+
+        // Find all clickable elements inside the Shadow DOM
+        let clickableElements = findClickableElements(shadowRoot);
+
+        // If clickable elements are found, perform your action (e.g., highlight them)
+        clickableElements.forEach((element) => {
+          pushElement(
+            element,
+            elementIdentity,
+            referXPath,
+            typeDTO,
+            shadowHost,
+            shadowRoot
+          );
+        });
+      } else {
+        // If no search terms, directly add the element
+        pushElement(element, elementIdentity, referXPath, typeDTO, null, null);
+      }
+      // window.elementInfoMap.set(
+      //   referXPath,
+      //   elementDTO(typeDTO, elementIdentity)
+      // );
       return;
     }
     // Iterate through search terms and apply corresponding checks
@@ -233,10 +265,47 @@
 
       // If a match is found, set the element in the map
       if (matches) {
-        window.elementInfoMap.set(
-          referXPath,
-          elementDTO(typeDTO, elementIdentity)
-        );
+        // Check if the clicked element has a shadow root
+        let shadowHost = element;
+
+        // Locate the shadow host element if it has a shadow root
+        while (shadowHost && !shadowHost.shadowRoot) {
+          shadowHost = shadowHost.parentElement; // Traverse upwards in the DOM
+        }
+
+        if (shadowHost && shadowHost.shadowRoot) {
+          // Access the Shadow DOM
+          const shadowRoot = shadowHost.shadowRoot;
+
+          // Find all clickable elements inside the Shadow DOM
+          let clickableElements = findClickableElements(shadowRoot);
+
+          // If clickable elements are found, perform your action (e.g., highlight them)
+          clickableElements.forEach((element) => {
+            pushElement(
+              element,
+              elementIdentity,
+              referXPath,
+              typeDTO,
+              shadowHost,
+              shadowRoot
+            );
+          });
+        } else {
+          // If no search terms, directly add the element
+          pushElement(
+            element,
+            elementIdentity,
+            referXPath,
+            typeDTO,
+            null,
+            null
+          );
+        }
+        // window.elementInfoMap.set(
+        //   referXPath,
+        //   elementDTO(typeDTO, elementIdentity)
+        // );
       }
     });
   }
@@ -332,6 +401,7 @@
           const elementIdentity = getElementIdentity(iframe);
           if (elementIdentity) {
             filterSearchTerms(
+              iframe,
               "iFrame-Found",
               elementIdentity.xPath,
               elementIdentity,
@@ -364,6 +434,7 @@
                 if (elementIdentity) {
                   elementIdentity.iFrameXPath = xPathIFrame;
                   filterSearchTerms(
+                    element,
                     "iFrame-Child",
                     `${xPathIFrame}${elementIdentity?.xPath}`,
                     elementIdentity,
@@ -399,6 +470,7 @@
               if (elementIdentity) {
                 elementIdentity.iFrameXPath = xPathIFrame;
                 filterSearchTerms(
+                  elementInsideIframe,
                   "iFrame-Child",
                   `${xPathIFrame}${elementIdentity?.xPath}`,
                   elementIdentity,
@@ -417,6 +489,7 @@
             if (elementIdentity) {
               elementIdentity.iFrameXPath = xPathIFrame;
               filterSearchTerms(
+                element,
                 "iFrame-Child",
                 `${xPathIFrame}${elementIdentity?.xPath}`,
                 elementIdentity,
@@ -458,6 +531,7 @@
         if (elementIdentity) {
           elementIdentity.iFrameXPath = xPathIFrame;
           filterSearchTerms(
+            elementInsideIframe,
             "iFrame-Child",
             `${xPathIFrame}${elementIdentity?.xPath}`,
             elementIdentity,
@@ -503,6 +577,77 @@
     }
   };
 
+  function pushElement(
+    element,
+    elementIdentityTemp,
+    referXPath,
+    typeDTO,
+    shadowHost,
+    shadowRoot
+  ) {
+    let shadowHostSelector = "";
+    let elementCssSelector = "";
+    let shadowPath = [];
+
+    function buildCssSelector(el) {
+      if (!el) return "";
+      let selector = el.tagName.toLowerCase();
+      if (el.id) selector += `#${el.id}`;
+      if (el.className) selector += `.${el.className.replace(/\s+/g, ".")}`;
+      return selector;
+    }
+
+    // Traverse shadow hosts if nested shadow DOM exists
+    let currentHost = shadowHost;
+    while (currentHost) {
+      shadowPath.unshift(buildCssSelector(currentHost));
+      currentHost =
+        currentHost.parentNode instanceof ShadowRoot
+          ? currentHost.parentNode.host
+          : null;
+    }
+
+    if (shadowHost) {
+      shadowHostSelector = buildCssSelector(shadowHost);
+    }
+
+    if (element) {
+      elementCssSelector = buildCssSelector(element);
+    }
+
+    // Construct the natural CSS selector for nested Shadow DOM
+    let cssSelector = elementCssSelector;
+
+    // Build nested CSS selector, if shadowPath is not empty.
+    if (shadowPath.length > 0) {
+      cssSelector = shadowPath.reduceRight((acc, hostSelector) => {
+        return `${hostSelector} ${acc}`;
+      }, elementCssSelector);
+    }
+
+    const elementIdentity = {
+      ...elementIdentityTemp,
+      shadowHost: shadowHostSelector,
+      shadowRoot: shadowRoot ? true : false,
+      nestedShadow: shadowPath.length > 1, // Detects if multiple shadow roots are involved
+      cssSelector: elementCssSelector, // cssSelector shadowRoot
+    };
+
+    // Store tagName and other details in the Map
+    if (elementIdentity) {
+      if (!originalStyles.has(element)) {
+        // Store the original outline before changing it
+        originalStyles.set(element, element.style.outline);
+      }
+      element.style.outline = "3px solid red";
+
+      window.elementInfoMap.set(
+        referXPath, // Keep Distinction iFrameXPath / child / etc...
+        elementDTO(typeDTO, elementIdentity)
+      );
+    }
+  }
+
   const getElementIdentity = function getElementIdentity(element) {
     if (!hiddenFields) {
       if (
@@ -518,7 +663,13 @@
       }
     }
     const xPath = getMartiniXPath(element);
-    const tagName = element.tagName.toLowerCase();
+
+    let tagName = element.tagName.toLowerCase();
+    const tagNameTemp = identifyElementTypeFromXPath(tagName, xPath);
+    if (tagNameTemp !== tagName) {
+      tagName = tagNameTemp;
+    }
+
     const attributeData = Array.from(element.attributes).map((attr) => ({
       name: attr.name,
       value: attr.value,
@@ -541,55 +692,6 @@
       someText,
     };
   };
-
-  // Helper function to generate a unique XPath for an element
-  const getMartiniXPath = function getMartiniXPath(element) {
-    if (element === document.body) return "/html/body";
-    let ix = 0;
-    const siblings = element.parentNode ? element.parentNode.childNodes : [];
-    for (let i = 0; i < siblings.length; i++) {
-      let sibling = siblings[i];
-      if (sibling.nodeType === 1 && sibling.tagName === element.tagName) {
-        if (sibling === element) {
-          return (
-            getMartiniXPath(element.parentNode) +
-            "/" +
-            element.tagName.toLowerCase() +
-            "[" +
-            (ix + 1) +
-            "]"
-          );
-        }
-        ix++;
-      }
-    }
-    return "";
-  };
-
-  const elementDTO = function elementDTO(typeElement, identity) {
-    return {
-      typeElement: typeElement,
-      tagName: identity.tagName ?? "No Tag Name Detected",
-      xPath: identity.xPath ?? "",
-      someText: identity.someText ?? "",
-      attribId: identity.attribId ?? "",
-      attribName: identity.attribName ?? "",
-      coordinates: identity.coordinates ?? "",
-      attributeData: identity.attributeData ?? "",
-      customXPath: identity.customXPath ?? "",
-      iFrameXPath: identity.iFrameXPath ?? "",
-      attributeValue: identity.attributeValue ?? "",
-      attributeType: identity.attributeType ?? "",
-      searchAttributeValue: identity.searchAttributeValue ?? "",
-    };
-  };
-
-  function limitMapCharacters(elementInfoMap) {
-    elementInfoMap.forEach((value, key) => {
-      let modifiedValue = value;
-      window.allElementInfo.push(modifiedValue);
-    });
-  }
 
   // Function to check if an element is hidden (using computed styles and attributes)
   const isHidden = (el) => {
@@ -673,6 +775,7 @@
 
     return firstMeaningfulText; // Return the most meaningful text
   }
+
   function extractVisibleTextFromHTML(element) {
     if (!element) {
       return { text: [], labels: [], titles: [] };
@@ -819,6 +922,105 @@
       titles: Array.from(result.titles),
     };
   }
+  // Helper function to generate a unique XPath for an element
+  const getMartiniXPath = function getMartiniXPath(element) {
+    if (element === document.body) return "/html/body";
+    let ix = 0;
+    const siblings = element.parentNode ? element.parentNode.childNodes : [];
+    for (let i = 0; i < siblings.length; i++) {
+      let sibling = siblings[i];
+      if (sibling.nodeType === 1 && sibling.tagName === element.tagName) {
+        if (sibling === element) {
+          return (
+            getMartiniXPath(element.parentNode) +
+            "/" +
+            element.tagName.toLowerCase() +
+            "[" +
+            (ix + 1) +
+            "]"
+          );
+        }
+        ix++;
+      }
+    }
+    return "";
+  };
+
+  function identifyElementTypeFromXPath(tagName, xpath) {
+    if (typeof xpath !== "string" || xpath.trim() === "") {
+      return "unknown";
+    }
+
+    const parts = xpath.split("/").filter((part) => part.trim() !== "");
+
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const part = parts[i];
+
+      const tagMatch = part.match(/^([a-zA-Z-]+)(?:\[\d+\])?/);
+      if (!tagMatch) continue;
+
+      const tag = tagMatch[1].toLowerCase();
+
+      if (tag === "a") {
+        return "a"; // Link
+      }
+
+      if (tag === "input") {
+        const typeMatch = part.match(/@type=["']?([^"'\]]+)["']?/);
+        const type = typeMatch ? typeMatch[1].toLowerCase() : "";
+
+        if (["button", "submit", "reset"].includes(type)) {
+          return "button";
+        }
+        return "input";
+      }
+
+      if (tag === "button") {
+        return "button";
+      }
+
+      // Detect if it's an Angular Material expansion panel (likely a button)
+      if (
+        tag.includes("expansion-panel-header") ||
+        tag.includes("sidenav") ||
+        tag.includes("nav")
+      ) {
+        return "button";
+      }
+    }
+
+    return tagName; // Default to the given tagName if no match
+  }
+
+  const elementDTO = function elementDTO(typeElement, identity) {
+    return {
+      typeElement: typeElement,
+      tagName: identity.tagName ?? "No Tag Name Detected",
+      xPath: identity.xPath ?? "",
+      someText: identity.someText ?? "",
+      attribId: identity.attribId ?? "",
+      attribName: identity.attribName ?? "",
+      coordinates: identity.coordinates ?? "",
+      attributeData: identity.attributeData ?? "",
+      customXPath: identity.customXPath ?? "",
+      iFrameXPath: identity.iFrameXPath ?? "",
+      shadowHost: identity.shadowHost ?? "",
+      shadowRoot: identity.shadowRoot ?? "",
+      nestedShadow: identity.nestedShadow ?? "",
+      cssSelector: identity.cssSelector ?? "",
+      attributeValue: identity.attributeValue ?? "",
+      attributeType: identity.attributeType ?? "",
+      searchAttributeValue: identity.searchAttributeValue ?? "",
+    };
+  };
+
+  function limitMapCharacters(elementInfoMap) {
+    elementInfoMap.forEach((value, key) => {
+      let modifiedValue = value;
+      window.allElementInfo.push(modifiedValue);
+    });
+  }
+
   // Event listener to handle incoming messages from iframes
   window.addEventListener("message", function (event) {
     if (event.origin !== window.trustedOriginURL) {
@@ -862,29 +1064,46 @@
   }
 
   connectWebSocket();
+
+  window.revertSearchInjections = function () {
+    // Remove the tooltip from the page and delete the reference after 5 seconds
+    setTimeout(() => {
+      restoreOriginalStyles();
+      window.allElementInfo = [];
+    }, 1000);
+  };
+
+  // Function to restore the original outline
+  function restoreOriginalStyles() {
+    originalStyles.forEach((originalStyle, element) => {
+      element.style.outline = originalStyle; // Restore original outline
+    });
+    originalStyles.clear(); // Clear the stored styles
+  }
+
   // startCollectingElements(window.searchTerms);
   // init("Initiate");
   // window.initSearchTerms = null; // Invalidating the function
-  // })(
-  //   arguments[0],
-  //   arguments[1],
-  //   arguments[2],
-  //   arguments[3],
-  //   arguments[4],
-  //   arguments[5],
-  //   arguments[6]
-  // );
-
-  // })([], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
-  // })(["with name"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
 })(
-  ["input", "button", "a", "select"],
-  false,
-  8181,
-  "scannerTool",
-  "scannerGrid-3",
-  "searchTerms",
-  3
+  arguments[0],
+  arguments[1],
+  arguments[2],
+  arguments[3],
+  arguments[4],
+  arguments[5],
+  arguments[6]
 );
+
+// })([], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
+// })(["with name"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
+// })(
+//   ["input", "button", "a", "select"],
+//   false,
+//   8181,
+//   "scannerTool",
+//   "scannerGrid-3",
+//   "searchTerms",
+//   3
+// );
 // })(["*"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
 // })(["button"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
