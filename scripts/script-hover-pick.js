@@ -181,31 +181,29 @@
     };
   };
 
+  // Function to check if an element is hidden (using computed styles and attributes)
+  const isHidden = (el) => {
+    const style = window.getComputedStyle(el);
+    return (
+      style.display === "none" ||
+      style.visibility === "hidden" ||
+      el.hasAttribute("aria-hidden")
+    );
+  };
+
   function getVisibleText(tagName, attributeData, element) {
     let textResult = "";
 
-    if (element) {
-      // Function to check if an element is hidden (using computed styles and attributes)
-      const isHidden = (el) => {
-        const style = window.getComputedStyle(el);
-        return (
-          style.display === "none" ||
-          style.visibility === "hidden" ||
-          el.hasAttribute("aria-hidden")
-        );
-      };
-
-      if (!isHidden(element)) {
-        const extractedText = extractVisibleTextFromHTML(element);
-        textResult = [
-          ...extractedText.titles,
-          ...extractedText.text,
-          ...extractedText.labels,
-        ]
-          .map((text) => text.trim())
-          .filter(Boolean)
-          .join("; ");
-      }
+    if (element && !isHidden(element)) {
+      const extractedText = extractVisibleTextFromHTML(element);
+      textResult = [
+        ...extractedText.titles,
+        ...extractedText.text,
+        ...extractedText.labels,
+      ]
+        .map((text) => text.trim())
+        .filter(Boolean)
+        .join("; ");
     }
 
     // Define priority order for attributes
@@ -555,6 +553,7 @@
         });
       } else {
         // Commom Elementes
+        pushElement(clickedElement, null, null);
       }
     }
 
@@ -692,12 +691,12 @@
   });
 
   // window.cloneTerms = null; // Invalidating the function
-})(
-  arguments[0],
-  arguments[1],
-  arguments[2],
-  arguments[3],
-  arguments[4],
-  arguments[5]
-);
-// })("https://www.vpbank.com/", "https://www.vpbank.com/", ["*"], false, 8181, 3);
+  // })(
+  //   arguments[0],
+  //   arguments[1],
+  //   arguments[2],
+  //   arguments[3],
+  //   arguments[4],
+  //   arguments[5]
+  // );
+})("https://www.vpbank.com/", "https://www.vpbank.com/", ["*"], false, 8181, 3);

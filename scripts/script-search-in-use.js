@@ -591,31 +591,29 @@
     });
   }
 
+  // Function to check if an element is hidden (using computed styles and attributes)
+  const isHidden = (el) => {
+    const style = window.getComputedStyle(el);
+    return (
+      style.display === "none" ||
+      style.visibility === "hidden" ||
+      el.hasAttribute("aria-hidden")
+    );
+  };
+
   function getVisibleText(tagName, attributeData, element) {
     let textResult = "";
 
-    if (element) {
-      // Function to check if an element is hidden (using computed styles and attributes)
-      const isHidden = (el) => {
-        const style = window.getComputedStyle(el);
-        return (
-          style.display === "none" ||
-          style.visibility === "hidden" ||
-          el.hasAttribute("aria-hidden")
-        );
-      };
-
-      if (!isHidden(element)) {
-        const extractedText = extractVisibleTextFromHTML(element);
-        textResult = [
-          ...extractedText.titles,
-          ...extractedText.text,
-          ...extractedText.labels,
-        ]
-          .map((text) => text.trim())
-          .filter(Boolean)
-          .join("; ");
-      }
+    if (element && !isHidden(element)) {
+      const extractedText = extractVisibleTextFromHTML(element);
+      textResult = [
+        ...extractedText.titles,
+        ...extractedText.text,
+        ...extractedText.labels,
+      ]
+        .map((text) => text.trim())
+        .filter(Boolean)
+        .join("; ");
     }
 
     // Define priority order for attributes
@@ -675,7 +673,6 @@
 
     return firstMeaningfulText; // Return the most meaningful text
   }
-
   function extractVisibleTextFromHTML(element) {
     if (!element) {
       return { text: [], labels: [], titles: [] };
@@ -833,18 +830,26 @@
   // startCollectingElements(window.searchTerms);
   // init("Initiate");
   // window.initSearchTerms = null; // Invalidating the function
-})(
-  arguments[0],
-  arguments[1],
-  arguments[2],
-  arguments[3],
-  arguments[4],
-  arguments[5],
-  arguments[6]
-);
+  // })(
+  //   arguments[0],
+  //   arguments[1],
+  //   arguments[2],
+  //   arguments[3],
+  //   arguments[4],
+  //   arguments[5],
+  //   arguments[6]
+  // );
 
-// })([], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
-// })(["with name"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
-// })(["input", "button", "a", "select"], false, 8181, "scannerTool", "scannerGrid-2", "searchTerms", 2);
+  // })([], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
+  // })(["with name"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
+})(
+  ["input", "button", "a", "select"],
+  false,
+  8181,
+  "scannerTool",
+  "scannerGrid-2",
+  "searchTerms",
+  2
+);
 // })(["*"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
 // })(["button"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
