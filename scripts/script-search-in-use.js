@@ -525,10 +525,10 @@
     }));
     const attribId = element.id || "";
     const attribName = element.name || "";
-    const coordinates = `${element.getBoundingClientRect().left.toFixed(2)},${element
+    const coordinates = `${element
       .getBoundingClientRect()
-      .top.toFixed(2)}`;
-    const someText = getSomeText(tagName, attributeData, element);
+      .left.toFixed(2)},${element.getBoundingClientRect().top.toFixed(2)}`;
+    const someText = getVisibleText(tagName, attributeData, element);
 
     return {
       xPath,
@@ -566,17 +566,6 @@
     return "";
   };
 
-  // Helper function to generate element information string
-  const elementInfoString = function elementInfoString(element, identity) {
-    return `${element.tagName.toLowerCase()};xpath:${identity.xpath};text:${
-      identity.someText
-    };attribId:${identity.attribId};attribName:${identity.attribName};coordinates:${
-      identity.coordinates
-    };attributeData:${identity.attributeData};customXPath:${
-      identity.customXPath
-    };`;
-  };
-
   const elementDTO = function elementDTO(typeElement, identity) {
     return {
       typeElement: typeElement,
@@ -602,136 +591,131 @@
     });
   }
 
-  function getSomeText(tagName, attributeData, element) {
-    let textSet = new Set();
+  function getVisibleText(tagName, attributeData, element) {
     let textResult = "";
 
-    if (["input", "textarea", "select", "button"].includes(tagName)) {
-      const extractedText = extractTextFromHTML(element || "");
-      textResult = [
-        ...extractedText.titles,
-        ...extractedText.text,
-        ...extractedText.labels,
-      ]
-        .join("; ")
-        .trim();
-    } else if (["option", "label", "a"].includes(tagName)) {
-      const extractedText = extractTextFromHTML(element || "");
-      textResult = [
-        ...extractedText.titles,
-        ...extractedText.text,
-        ...extractedText.labels,
-      ]
-        .join("; ")
-        .trim();
-    } else if (!["html", "body", "script"].includes(tagName)) {
-      const extractedText = extractTextFromHTML(element || "");
-      textResult = [
-        ...extractedText.titles,
-        ...extractedText.text,
-        ...extractedText.labels,
-      ]
-        .join("; ")
-        .trim();
-    }
-
-    // Now, extract text from attributes AFTER processing the element
-    attributeData.forEach((attr) => {
-      const trimmedValue = attr.value.trim();
-
-      if (trimmedValue) {
-        // Process only if value is not empty
-        if (
-          attr.name === "placeholder" ||
-          attr.name === "label" ||
-          attr.name === "name" ||
-          attr.name === "title" ||
-          attr.name === "id"
-        ) {
-          textSet.add(trimmedValue);
-        }
-      }
-    });
-
-    // Continue processing srcdoc separately
-    attributeData.forEach((attr) => {
-      if (attr.name === "srcdoc") {
-        try {
-          const doc = new DOMParser().parseFromString(attr.value, "text/html");
-          const extractedText = extractTextFromHTML(doc.body);
-          [
-            ...extractedText.titles,
-            ...extractedText.text,
-            ...extractedText.labels,
-          ].forEach((text) => textSet.add(text.trim()));
-        } catch (e) {
-          console.warn("Error parsing srcdoc:", e);
-        }
-      }
-    });
-
-    // Add the extracted text from the element to the set to avoid duplicates
-    textResult
-      .split(";")
-      .map((text) => text.trim())
-      .filter(Boolean)
-      .forEach((text) => textSet.add(text));
-
-    // Return a clean, unique, and deduplicated string
-    return Array.from(textSet).join("; ");
-  }
-
-  function extractTextFromHTML(element) {
-    // If element is invalid or empty, return an empty result
-    if (!element || element === " ") {
-      return {
-        text: [],
-        labels: [],
-        titles: [],
+    if (element) {
+      // Function to check if an element is hidden (using computed styles and attributes)
+      const isHidden = (el) => {
+        const style = window.getComputedStyle(el);
+        return (
+          style.display === "none" ||
+          style.visibility === "hidden" ||
+          el.hasAttribute("aria-hidden")
+        );
       };
+
+      if (!isHidden(element)) {
+        const extractedText = extractVisibleTextFromHTML(element);
+        textResult = [
+          ...extractedText.titles,
+          ...extractedText.text,
+          ...extractedText.labels,
+        ]
+          .map((text) => text.trim())
+          .filter(Boolean)
+          .join("; ");
+      }
     }
-    const result = {
-      text: new Set(), // Using Set to avoid duplicate text
-      labels: new Set(), // Using Set to avoid duplicate labels
-      titles: new Set(), // Using Set to avoid duplicate titles
+
+    // Define priority order for attributes
+    const attributePriority = [
+      "aria-label",
+      "aria-labelledby",
+      "aria-describedby",
+      "placeholder",
+      "label",
+      "name",
+      "title",
+      "alt",
+      "for",
+      "data-label",
+      "data-name",
+      "data-title",
+      "id",
+      "data-testid",
+    ];
+
+    let firstMeaningfulText = "";
+
+    // Function to get attribute text with priority
+    const getAttributeText = (name, value) => {
+      if (name === "aria-labelledby" || name === "aria-describedby") {
+        const referencedElement = document.getElementById(value);
+        if (referencedElement && !isHidden(referencedElement)) {
+          return referencedElement.textContent.trim();
+        }
+      }
+      return value.trim();
     };
 
-    // Extract text content directly from the element (in case it has no children)
-    if (element.textContent) {
-      let elementText = element.textContent.trim();
-      if (elementText) {
-        result.text.add(elementText); // Using .add() instead of .push() for Set
+    // Check element's text first
+    if (textResult) {
+      firstMeaningfulText = textResult;
+    } else {
+      // Check attributes based on priority
+      for (const attr of attributePriority) {
+        const foundAttr = attributeData.find(({ name }) => name === attr);
+        if (foundAttr) {
+          firstMeaningfulText = getAttributeText(
+            foundAttr.name,
+            foundAttr.value
+          );
+          if (firstMeaningfulText) break; // Stop at first meaningful attribute
+        }
       }
     }
 
-    // Extract label text from input placeholders and other form-related data
+    return firstMeaningfulText; // Return the most meaningful text
+  }
+
+  function extractVisibleTextFromHTML(element) {
+    if (!element) {
+      return { text: [], labels: [], titles: [] };
+    }
+
+    const result = {
+      text: new Set(),
+      labels: new Set(),
+      titles: new Set(),
+    };
+
+    // Utility function to check if an element is visible
+    const isVisible = (el) => {
+      const style = window.getComputedStyle(el);
+      return !(
+        style.display === "none" ||
+        style.visibility === "hidden" ||
+        el.hasAttribute("aria-hidden")
+      );
+    };
+
+    // Extract visible text content from an element
+    if (element.textContent?.trim() && isVisible(element)) {
+      result.text.add(element.textContent.trim());
+    }
+
+    // Extract text from labels (including associated input fields)
     element.querySelectorAll("label").forEach((label) => {
-      if (label.textContent) {
-        let labelText = label.textContent.trim();
-        if (labelText) {
-          result.labels.add(labelText); // Using .add() for Set to ensure uniqueness
-        }
+      if (isVisible(label) && label.textContent?.trim()) {
+        result.labels.add(label.textContent.trim());
       }
 
-      // Handle associated input fields (if the label has a 'for' attribute)
-      let forAttribute = label.getAttribute("for");
-      if (forAttribute) {
-        let associatedInput = element.querySelector(`#${forAttribute}`);
-        if (associatedInput) {
-          // Check if it's an input field or textarea and extract value or placeholder
-          let inputValue = associatedInput.value?.trim();
-          let inputPlaceholder = associatedInput.placeholder?.trim();
-          if (inputValue) {
-            result.text.add(inputValue); // Using .add() for Set to ensure uniqueness
-          } else if (inputPlaceholder) {
-            result.text.add(inputPlaceholder); // Fallback to placeholder
-          }
+      // Handle labels associated with form elements
+      const forAttr = label.getAttribute("for");
+      if (forAttr) {
+        const inputElement = document.getElementById(forAttr);
+        if (inputElement && isVisible(inputElement)) {
+          const value = inputElement.value?.trim();
+          const placeholder = inputElement.placeholder?.trim();
+          if (value) result.text.add(value);
+          else if (placeholder) result.text.add(placeholder);
         }
       }
     });
 
-    // Extract text from common block and inline elements
-    const textExtractors = [
+    // Extract text from common inline and block elements
+    const visibleTextElements = [
       "p",
       "h1",
       "h2",
@@ -748,51 +732,44 @@
       "i",
       "blockquote",
     ];
-
-    textExtractors.forEach((tagName) => {
-      element.querySelectorAll(tagName).forEach((childElement) => {
-        if (childElement.textContent) {
-          let elemText = childElement.textContent.trim();
-          if (elemText) {
-            result.text.add(elemText); // Using .add() for Set to ensure uniqueness
-          }
+    visibleTextElements.forEach((tag) => {
+      element.querySelectorAll(tag).forEach((child) => {
+        if (isVisible(child) && child.textContent?.trim()) {
+          result.text.add(child.textContent.trim());
         }
       });
     });
 
-    // Extract text from <a> tags (links)
+    // Extract visible link text
     element.querySelectorAll("a").forEach((link) => {
-      if (link.textContent) {
-        let linkText = link.textContent.trim();
-        if (linkText) {
-          result.text.add(linkText); // Using .add() for Set to ensure uniqueness
-        }
+      if (isVisible(link) && link.textContent?.trim()) {
+        result.text.add(link.textContent.trim());
       }
     });
 
-    // Extract iframe titles and nested content
+    // Extract titles from iframes if accessible
     element.querySelectorAll("iframe").forEach((iframe) => {
-      if (iframe.getAttribute("title")) {
-        let title = iframe.getAttribute("title")?.trim();
-        if (title) {
-          result.titles.add(title); // Using .add() for Set to ensure uniqueness
-        }
+      if (iframe.hasAttribute("title")) {
+        const title = iframe.getAttribute("title")?.trim();
+        if (title) result.titles.add(title);
       }
 
       try {
-        let iframeDoc =
+        const iframeDoc =
           iframe.contentDocument ||
           new DOMParser().parseFromString(iframe.srcdoc || "", "text/html");
-        let iframeContent = extractTextFromHTML(iframeDoc); // Here we assume iframeDoc is an element.
-        iframeContent.titles.forEach((title) => result.titles.add(title));
-        iframeContent.text.forEach((text) => result.text.add(text));
-        iframeContent.labels.forEach((label) => result.labels.add(label));
+        if (iframeDoc.body) {
+          const extractedText = extractVisibleTextFromHTML(iframeDoc.body);
+          extractedText.titles.forEach((title) => result.titles.add(title));
+          extractedText.text.forEach((text) => result.text.add(text));
+          extractedText.labels.forEach((label) => result.labels.add(label));
+        }
       } catch (e) {
         console.warn("Could not access iframe content", e);
       }
     });
 
-    // Convert Sets to arrays before returning to maintain previous structure
+    // Return arrays instead of Sets
     return {
       text: Array.from(result.text),
       labels: Array.from(result.labels),
@@ -846,18 +823,26 @@
   // startCollectingElements(window.searchTerms);
   // init("Initiate");
   // window.initSearchTerms = null; // Invalidating the function
-})(
-  arguments[0],
-  arguments[1],
-  arguments[2],
-  arguments[3],
-  arguments[4],
-  arguments[5],
-  arguments[6]
-);
+  // })(
+  //   arguments[0],
+  //   arguments[1],
+  //   arguments[2],
+  //   arguments[3],
+  //   arguments[4],
+  //   arguments[5],
+  //   arguments[6]
+  // );
 
-// })([], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
-// })(["with name"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
-// })(["input", "button", "a"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
+  // })([], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
+  // })(["with name"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
+})(
+  ["input", "button", "a", "select"],
+  false,
+  8181,
+  "scannerTool",
+  "scannerGrid-2",
+  "searchTerms",
+  2
+);
 // })(["*"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
 // })(["button"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
