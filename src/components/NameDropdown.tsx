@@ -1,17 +1,17 @@
 import React, { useState, useEffect, useRef } from "react";
 import './attribute-dropdown.scss';
 
-interface Attribute {
+interface Names {
   name: string;
   value: string;
 }
 
-interface AttributeDropdownProps {
-  dataArray: Attribute[];
+interface NameDropdownProps {
+  dataArray: Names[];
   onChange?: (value: string) => void;
 }
 
-const AttributeDropdown: React.FC<AttributeDropdownProps> = ({ dataArray, onChange }) => {
+const AttributeDropdown: React.FC<NameDropdownProps> = ({ dataArray, onChange }) => {
   const findBestAttribute = () => {
     if (!dataArray?.length) return null;
 
@@ -45,7 +45,6 @@ const AttributeDropdown: React.FC<AttributeDropdownProps> = ({ dataArray, onChan
   return (
     <div className="attributes-dropdown-wrapper">
       <div className="attributes-dropdown-flex-container">
-        <span className="attributes-dropdown-label"># Attributes:</span>
         <select
           className="attributes-dropdown"
           value={selectedAttribute || ""}
@@ -56,7 +55,7 @@ const AttributeDropdown: React.FC<AttributeDropdownProps> = ({ dataArray, onChan
           }}
         >
           {dataArray.length === 0 ? (
-            <option value="-1">no attributes</option>
+            <option value="-1">no names</option>
           ) : (
             dataArray.map((attr, idx) => (
               <option key={idx} value={attr.value} title={attr.value}>
@@ -65,17 +64,6 @@ const AttributeDropdown: React.FC<AttributeDropdownProps> = ({ dataArray, onChan
             ))
           )}
         </select>
-        {selectedAttribute && (
-          <div className="attribute-display-container">
-            <span className="attribute-label">Value:</span>
-            <span
-              ref={valueRef}
-              className={`attribute-display-value ${overflowActive ? "overflow-active" : ""}`}
-            >
-              {selectedAttribute}
-            </span>
-          </div>
-        )}
       </div>
     </div>
   );

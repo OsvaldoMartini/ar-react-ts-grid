@@ -12,6 +12,7 @@ import AlertModal from './AlertModal';
 import { useWebSocket } from './useWebSocket';
 import AttributeDropdown from './AttributeDropdown';
 import './griditem.scss';
+import NameDropdown from './NameDropdown';
 
 interface GridItemScannProps {
   homeBankingId: number;
@@ -276,6 +277,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
   };
 
 
+
   const getInstructionElement = (instruction: ElementDTO): JSX.Element | string | null => {
     let imageSrc: string | null = null;
     let text: string | null = null;
@@ -299,19 +301,32 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
     // Set the text based on the instruction properties
     text = instruction.someText?.trim() ? instruction.someText : instruction.tagName;
 
-    // Return a combined image and text element if imageSrc exists, otherwise return just the text
+    // If someText exists and contains commas or semicolons, split it into an array and format it correctly
+    const dataNames = instruction.someText
+      ?.split(/[;,]/) // Split by both "," and ";"
+      .map(item => item.trim()) // Trim whitespace
+      .filter(Boolean) // Remove empty values
+      .map(item => ({ name: item, value: item })); // Convert to { name, value }
+
+    // If the array has only one element, display the text directly
+    const displayText = dataNames.length === 1 ? dataNames[0].name : text;
+
     return (
       <div className="instruction-type">
-        {imageSrc && (
-          <>
-            <img src={imageSrc} alt="" className={imageClass} />
-            <span>{text}</span>
-          </>
+        {imageSrc && <img src={imageSrc} alt="" className={imageClass} />}
+
+        {dataNames.length > 1 ? (
+          <div className="attribute-name">
+            <NameDropdown dataArray={dataNames} onChange={handleNameChange} />
+          </div>
+        ) : (
+          <span>{displayText}</span>
         )}
-        {!imageSrc && <span>{text}</span>}
       </div>
     );
   };
+
+
 
   const getInstructionTypeElement = (typeElement: string): JSX.Element | string | null => {
     let imageSrc: string | null = null;
@@ -375,10 +390,13 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
 
   };
 
+  const handleNameChange = (value: string) => {
+    console.log('Selected name:', value);
+  };
+
   const handleAttributeChange = (value: string) => {
     console.log('Selected attribute:', value);
   };
-
 
 
   return (
@@ -478,7 +496,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
                       <span className="instruction-line">{getInstructionElement(elementDTO)}</span>
                       {showAttributes ? (
                         <div>
-                          <AttributeDropdown elementDTO={elementDTO} onChange={handleAttributeChange} />
+                          <AttributeDropdown dataArray={elementDTO.attributeData} onChange={handleAttributeChange} />
                         </div>
                       ) : (
                         <span>{"\u00A0".repeat(20)}</span>

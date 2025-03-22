@@ -694,11 +694,20 @@
       );
     };
 
+    // Function to filter out technical patterns
+    const isTechnicalPattern = (word) => {
+      return word.includes("_") || word.includes("--") || word.includes("-");
+    };
+
     // Extract visible text content from an element
     if (element.textContent?.trim() && isVisible(element)) {
-      // Ignore text content that looks like CSS rules
-      if (!/^\..*\{.*\}$/.test(element.textContent.trim())) {
-        result.text.add(element.textContent.trim());
+      // Ignore text content that looks like CSS rules and words with technical patterns
+      const textContent = element.textContent.trim();
+      const words = textContent.split(/\s+/);
+      const filteredWords = words.filter((word) => !isTechnicalPattern(word));
+      const filteredText = filteredWords.join(" ").trim();
+      if (filteredText) {
+        result.text.add(filteredText);
       }
     }
 
@@ -715,8 +724,21 @@
         if (inputElement && isVisible(inputElement)) {
           const value = inputElement.value?.trim();
           const placeholder = inputElement.placeholder?.trim();
-          if (value) result.text.add(value);
-          else if (placeholder) result.text.add(placeholder);
+          if (value) {
+            const words = value.split(/\s+/);
+            const filteredWords = words.filter(
+              (word) => !isTechnicalPattern(word)
+            );
+            const filteredText = filteredWords.join(" ").trim();
+            if (filteredText) result.text.add(filteredText);
+          } else if (placeholder) {
+            const words = placeholder.split(/\s+/);
+            const filteredWords = words.filter(
+              (word) => !isTechnicalPattern(word)
+            );
+            const filteredText = filteredWords.join(" ").trim();
+            if (filteredText) result.text.add(filteredText);
+          }
         }
       }
     });
@@ -742,7 +764,15 @@
     visibleTextElements.forEach((tag) => {
       element.querySelectorAll(tag).forEach((child) => {
         if (isVisible(child) && child.textContent?.trim()) {
-          result.text.add(child.textContent.trim());
+          const textContent = child.textContent.trim();
+          const words = textContent.split(/\s+/);
+          const filteredWords = words.filter(
+            (word) => !isTechnicalPattern(word)
+          );
+          const filteredText = filteredWords.join(" ").trim();
+          if (filteredText) {
+            result.text.add(filteredText);
+          }
         }
       });
     });
@@ -750,7 +780,13 @@
     // Extract visible link text
     element.querySelectorAll("a").forEach((link) => {
       if (isVisible(link) && link.textContent?.trim()) {
-        result.text.add(link.textContent.trim());
+        const textContent = link.textContent.trim();
+        const words = textContent.split(/\s+/);
+        const filteredWords = words.filter((word) => !isTechnicalPattern(word));
+        const filteredText = filteredWords.join(" ").trim();
+        if (filteredText) {
+          result.text.add(filteredText);
+        }
       }
     });
 
@@ -783,7 +819,6 @@
       titles: Array.from(result.titles),
     };
   }
-
   // Event listener to handle incoming messages from iframes
   window.addEventListener("message", function (event) {
     if (event.origin !== window.trustedOriginURL) {
@@ -847,9 +882,9 @@
   false,
   8181,
   "scannerTool",
-  "scannerGrid-2",
+  "scannerGrid-3",
   "searchTerms",
-  2
+  3
 );
 // })(["*"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
 // })(["button"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
