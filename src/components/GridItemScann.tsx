@@ -242,6 +242,21 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
     });
   };
 
+
+  const handleRemoveRowsBlock = (blockTagName: string) => {
+    console.log("Removing block:", blockTagName);
+
+    setElementDTO((prevElements) =>
+      prevElements.filter((element) => element.tagName !== blockTagName)
+    );
+
+    setElementGrouped((prevGrouped) => {
+      const updatedGrouped = { ...prevGrouped };
+      delete updatedGrouped[blockTagName]; // Remove the entire group
+      return updatedGrouped;
+    });
+  };
+
   const getElementBlockText = (typeElement: string): string => {
     const lowerTag = typeElement.toLowerCase();
 
@@ -275,7 +290,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
       imageClass = "click-image";
     } else if (instruction.tagName === "a") {
       imageSrc = linkImage;
-      imageClass = "click-image";
+      imageClass = "link-image";
     } else {
       imageSrc = outPutImage;
       imageClass = "output-image";
@@ -445,6 +460,13 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
                       </button>
                     </div>
                   )}
+                  <img
+                    src={crossImage}
+                    alt="Remove Block"
+                    className="cross-button"
+                    onClick={() => handleRemoveRowsBlock(typeElement)}
+                  />
+
                 </div>
                 <div className="instructions-list">
                   {paginatedElements.map((elementDTO, i) => (

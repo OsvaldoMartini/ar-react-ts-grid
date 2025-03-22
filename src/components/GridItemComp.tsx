@@ -26,6 +26,7 @@ import pauseImage from "../assets/pause4.png";
 import refreshOnlyImage from "../assets/refresh-only.png";
 import refreshLoopImage from "../assets/refresh-loop.png";
 import clickImage from "../assets/click.png";
+import linkImage from "../assets/links-icon.png";
 import inputImage from "../assets/input_field.png";
 import outPutImage from "../assets/output1.png";
 import constructionImage from '../assets/construction.png';
@@ -579,10 +580,18 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, dataComp, so
           // Ensure detailsData is always an array if possible
           const detailsData = Array.isArray(bodyData) ? bodyData : [];
 
-          setComponentsData(detailsData);
-          setIsDataReordered(false); // To trigger reordering logic if needed
+          // Check if detailsData is empty
+          if (detailsData.length === 0) {
+            // If empty, set elementDTO to an empty array
+            setComponentsData([]);
+            setGroupedData({}); // Or set to your initial empty state
+            setIsDataReordered(true); // Or false, depending on your logic
+          } else {
+            // Otherwise, set elementDTO to detailsData
+            setComponentsData(detailsData);
+            setIsDataReordered(false); // To trigger reordering logic if needed
 
-
+          }
         }
 
       } catch (error) {
@@ -2281,6 +2290,10 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, dataComp, so
       if (actionParts.length === 3 && actionParts[2] === "hidden") {
         hiddenField = true;
       }
+    } else if (instruction.tagName == "a") {
+      imageSrc = linkImage;
+      text = `(${instruction.id})${instruction.name}`;
+      imageClass = "link-image";
     } else if (instruction.actions.startsWith("O:")) {
       imageSrc = outPutImage;
       text = `(${instruction.id})${instruction.name}`;

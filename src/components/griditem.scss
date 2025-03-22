@@ -198,6 +198,11 @@
   height: 20px; /* Override height */
 }
 
+.link-image{
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
+
 .ifelse-image {
   @extend .operations; /* Inherit styles from .operations */
   height: 20px; /* Override height */

@@ -26,6 +26,7 @@ import pauseImage from "../assets/pause4.png";
 import refreshOnlyImage from "../assets/refresh-only.png";
 import refreshLoopImage from "../assets/refresh-loop.png";
 import clickImage from "../assets/click.png";
+import linkImage from "../assets/links-icon.png";
 import inputImage from "../assets/input_field.png";
 import outPutImage from "../assets/output1.png";
 import constructionImage from '../assets/construction.png';
@@ -581,10 +582,18 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingId, data, socketPort, se
           // Ensure detailsData is always an array if possible
           const detailsData = Array.isArray(bodyData) ? bodyData : [];
 
-          setInstructionsData(detailsData);
-          setIsDataReordered(false); // To trigger reordering logic if needed
+          // Check if detailsData is empty
+          if (detailsData.length === 0) {
+            // If empty, set elementDTO to an empty array
+            setInstructionsData([]);
+            setGroupedData({}); // Or set to your initial empty state
+            setIsDataReordered(true); // Or false, depending on your logic
+          } else {
+            // Otherwise, set elementDTO to detailsData
+            setInstructionsData(detailsData);
+            setIsDataReordered(false); // To trigger reordering logic if needed
 
-
+          }
         }
 
       } catch (error) {
@@ -2289,6 +2298,10 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingId, data, socketPort, se
       if (actionParts.length === 3 && actionParts[2] === "hidden") {
         hiddenField = true;
       }
+    } else if (instruction.tagName == "a") {
+      imageSrc = linkImage;
+      text = `(${instruction.id})${instruction.name}`;
+      imageClass = "link-image";
     } else if (instruction.actions.startsWith("O:")) {
       imageSrc = outPutImage;
       text = `(${instruction.id})${instruction.name}`;
@@ -2879,14 +2892,14 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingId, data, socketPort, se
                         className="save-button"
                         onClick={() => handleCreateComponent(Number(blockData.instructions[0].blockId))}
                       />
-                      {index !== 0 && (
-                        <img
-                          src={crossImage}
-                          alt=""
-                          className="cross-button"
-                          onClick={() => handleRemoveBlock(Number(blockData.instructions[0].blockId))}
-                        />
-                      )}
+                      {/* {index !== 0 && ( */}
+                      <img
+                        src={crossImage}
+                        alt=""
+                        className="cross-button"
+                        onClick={() => handleRemoveBlock(Number(blockData.instructions[0].blockId))}
+                      />
+                      {/* )} */}
 
                     </div>
                   </div>

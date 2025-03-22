@@ -1,6 +1,7 @@
 // Sample data (mocketData)
 export interface BlockLoopInstructionLoadDTO {
   homeBankingId: number;
+  tagName: string;
   botJobId: number;
   botJobName: string;
   id: number;
@@ -25,6 +26,7 @@ export interface BlockLoopInstructionLoadDTO {
 
 export interface ComponentsInstructionsDTO {
   homeBankingId: number;
+  tagName: string;
   botJobId: number;
   botJobName: string;
   id: number;
