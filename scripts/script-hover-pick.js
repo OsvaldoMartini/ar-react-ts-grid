@@ -481,10 +481,15 @@
       ) {
         return "button";
       }
+
+      if (tag === "mat-expansion-panel-header") {
+        return "button"; // Corrected to directly check for the full tag
+      }
     }
 
     return tagName; // Default to the given tagName if no match
   }
+
   function isInteractiveElement(element) {
     if (!element || element.nodeType !== Node.ELEMENT_NODE) {
       return false; // Not a valid element
@@ -574,6 +579,7 @@
       element.classList.contains("el-select-dropdown__item")
     );
   }
+
   const elementDTO = function elementDTO(typeElement, identity) {
     return {
       typeElement: typeElement,
@@ -597,6 +603,7 @@
   };
 
   function limitMapCharacters(elementInfoMap) {
+    console.log("limitMapCharacters");
     elementInfoMap.forEach((value, key) => {
       let modifiedValue = value;
       window.allElementInfo.push(modifiedValue);
@@ -741,9 +748,9 @@
         });
       } else {
         // Commom Elementes
-        const elementIdentityTemp = getElementIdentity(element);
+        const elementIdentityTemp = getElementIdentity(clickedElement);
         pushElement(
-          element,
+          clickedElement,
           elementIdentityTemp,
           elementIdentityTemp.xPath,
           "clicked",
@@ -828,12 +835,15 @@
       }
       element.style.outline = "3px solid red";
 
-      if (isInteractiveElement(element)) {
-        window.elementInfoMap.set(
-          referXPath, // Keep Distinction iFrameXPath / child / etc...
-          elementDTO(typeDTO, elementIdentity)
-        );
+      if (["html", "body", "main"].includes(element.tagName.toLowerCase())) {
+        return; // Don't proceed if it's one of these elements
       }
+      // if (isInteractiveElement(element)) {
+      window.elementInfoMap.set(
+        referXPath, // Keep Distinction iFrameXPath / child / etc...
+        elementDTO(typeDTO, elementIdentity)
+      );
+      // }
     }
   }
 
