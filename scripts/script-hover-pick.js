@@ -130,7 +130,7 @@
         const message = {
           type: "SEARCH_TOOL",
           sessionId: `scannerGrid-${homeBankingId}`,
-          operationId: "searchTerms",
+          operationId: "addPickOne",
           homeBankingId: homeBankingId,
           details: window.allElementInfo, // Send allElementInfo
         };
@@ -481,103 +481,9 @@
       ) {
         return "button";
       }
-
-      if (tag === "mat-expansion-panel-header") {
-        return "button"; // Corrected to directly check for the full tag
-      }
     }
 
     return tagName; // Default to the given tagName if no match
-  }
-
-  function isInteractiveElement(element) {
-    if (!element || element.nodeType !== Node.ELEMENT_NODE) {
-      return false; // Not a valid element
-    }
-
-    const tagName = element.tagName.toLowerCase();
-    const type = element.getAttribute("type")?.toLowerCase();
-
-    // Check for standard interactive elements
-    if (
-      tagName === "button" ||
-      tagName === "a" ||
-      tagName === "select" ||
-      tagName === "option"
-    ) {
-      return true;
-    }
-
-    // Check for input elements
-    if (tagName === "input" || tagName === "textarea") {
-      if (
-        !type ||
-        [
-          "text",
-          "password",
-          "email",
-          "number",
-          "search",
-          "tel",
-          "url",
-        ].includes(type)
-      ) {
-        return true;
-      }
-    }
-
-    // Framework-specific checks
-    if (
-      isAngularMaterialElement(element) ||
-      isReactElement(element) ||
-      isGenericMaterialElement(element) ||
-      isElementUIElement(element)
-    ) {
-      return true;
-    }
-
-    return false;
-  }
-
-  function isAngularMaterialElement(element) {
-    return (
-      element.hasAttribute("mat-button") ||
-      element.hasAttribute("mat-raised-button") ||
-      element.hasAttribute("mat-icon-button") ||
-      element.hasAttribute("mat-menu-item") ||
-      element.hasAttribute("mat-select") ||
-      element.hasAttribute("mat-option") ||
-      element.hasAttribute("matInput")
-    );
-  }
-
-  function isReactElement(element) {
-    // Check for React's data-testid, aria-label, and role attributes, or classnames
-    return (
-      element.hasAttribute("data-testid") ||
-      element.hasAttribute("aria-label") ||
-      element.getAttribute("role") === "button" ||
-      element.getAttribute("role") === "textbox" ||
-      element.classList.contains("react-button") ||
-      element.classList.contains("react-link") ||
-      element.classList.contains("react-input")
-    );
-  }
-
-  function isGenericMaterialElement(element) {
-    return (
-      element.classList.contains("mdc-button") ||
-      element.classList.contains("mdc-text-field") ||
-      element.classList.contains("mdc-list-item")
-    );
-  }
-
-  function isElementUIElement(element) {
-    return (
-      element.classList.contains("el-button") ||
-      element.classList.contains("el-input__inner") ||
-      element.classList.contains("el-select-dropdown__item")
-    );
   }
 
   const elementDTO = function elementDTO(typeElement, identity) {
@@ -603,7 +509,6 @@
   };
 
   function limitMapCharacters(elementInfoMap) {
-    console.log("limitMapCharacters");
     elementInfoMap.forEach((value, key) => {
       let modifiedValue = value;
       window.allElementInfo.push(modifiedValue);
@@ -681,13 +586,9 @@
         xPathIFrame = elementIdentity.xPath;
 
         if (elementIdentity) {
-          pushElement(
-            clickedElement,
-            elementIdentity,
+          window.elementInfoMap.set(
             elementIdentity.xPath,
-            "clicked-iFrame",
-            null,
-            null
+            elementDTO("clicked-iFrame", elementIdentity)
           );
         }
 
@@ -701,19 +602,19 @@
           // );
           if (elementIdentity) {
             elementIdentity.iFrameXPath = xPathIFrame;
-            pushElement(
-              elementInsideIframe,
-              elementIdentity,
-              `${xPathIFrame}${elementIdentity?.xPath}`,
-              "iFrame-Child",
-              null,
-              null
+            window.elementInfoMap.set(
+              elementIdentity.xPath,
+              elementDTO("iFrame-Child", elementIdentity)
             );
           }
         });
       }
     } else {
       var tagName = clickedElement.tagName.toLowerCase();
+
+      if (["html", "body", "main"].includes(tagName)) {
+        return; // Don't proceed if it's one of these elements
+      }
 
       window.elementInfoMap.clear();
 
@@ -736,27 +637,11 @@
 
         // If clickable elements are found, perform your action (e.g., highlight them)
         clickableElements.forEach((element) => {
-          const elementIdentityTemp = getElementIdentity(element);
-          pushElement(
-            element,
-            elementIdentityTemp,
-            elementIdentityTemp.xPath,
-            "clicked",
-            shadowHost,
-            shadowRoot
-          );
+          pushElement(element, shadowHost, shadowRoot);
         });
       } else {
         // Commom Elementes
-        const elementIdentityTemp = getElementIdentity(clickedElement);
-        pushElement(
-          clickedElement,
-          elementIdentityTemp,
-          elementIdentityTemp.xPath,
-          "clicked",
-          null,
-          null
-        );
+        pushElement(clickedElement, null, null);
       }
     }
 
@@ -771,14 +656,9 @@
     }, 1000);
   }
 
-  function pushElement(
-    element,
-    elementIdentityTemp,
-    referXPath,
-    typeDTO,
-    shadowHost,
-    shadowRoot
-  ) {
+  function pushElement(element, shadowHost, shadowRoot) {
+    const elementIdentityTemp = getElementIdentity(element);
+
     let shadowHostSelector = "";
     let elementCssSelector = "";
     let shadowPath = [];
@@ -835,15 +715,10 @@
       }
       element.style.outline = "3px solid red";
 
-      if (["html", "body", "main"].includes(element.tagName.toLowerCase())) {
-        return; // Don't proceed if it's one of these elements
-      }
-      // if (isInteractiveElement(element)) {
       window.elementInfoMap.set(
-        referXPath, // Keep Distinction iFrameXPath / child / etc...
-        elementDTO(typeDTO, elementIdentity)
+        elementIdentity.xPath,
+        elementDTO("clicked", elementIdentity)
       );
-      // }
     }
   }
 
@@ -904,12 +779,12 @@
   });
 
   // window.cloneTerms = null; // Invalidating the function
-  // })(
-  //   arguments[0],
-  //   arguments[1],
-  //   arguments[2],
-  //   arguments[3],
-  //   arguments[4],
-  //   arguments[5]
-  // );
-})("https://www.vpbank.com/", "https://www.vpbank.com/", ["*"], false, 8181, 3);
+})(
+  arguments[0],
+  arguments[1],
+  arguments[2],
+  arguments[3],
+  arguments[4],
+  arguments[5]
+);
+// })("https://www.vpbank.com/", "https://www.vpbank.com/", ["*"], false, 8181, 4);

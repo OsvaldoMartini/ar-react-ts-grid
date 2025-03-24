@@ -617,9 +617,9 @@
     }));
     const attribId = element.id || "";
     const attribName = element.name || "";
-    const coordinates = `${element
+    const coordinates = `${element.getBoundingClientRect().left.toFixed(2)},${element
       .getBoundingClientRect()
-      .left.toFixed(2)},${element.getBoundingClientRect().top.toFixed(2)}`;
+      .top.toFixed(2)}`;
     const someText = getVisibleText(tagName, attributeData, element);
 
     return {
@@ -1249,4 +1249,4 @@
 
   // window.pickTerms = null; // Invalidating the function
   // })(arguments[0], arguments[1], arguments[2], arguments[3], arguments[4], arguments[5]);
-})("https://www.inlinea.ch/", "https://www.inlinea.ch/", ["*"], false, 8181, 1);
+})("http://localhost:3000/", "http://localhost:3000/", ["*"], false, 8181, 1);

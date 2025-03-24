@@ -82,51 +82,61 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
     console.log("Updated elementGrouped:", elementGrouped);
   }, [elementGrouped]);
 
+
   useEffect(() => {
     if (messages.length > 0) {
       const lastMessage = messages[messages.length - 1];
-      console.log('RECEIVED -> Last WebSocket message ', lastMessage);
+      console.log("RECEIVED -> Last WebSocket message ", lastMessage);
       try {
         const parsedMessage = JSON.parse(lastMessage);
 
-        const bodyData = typeof parsedMessage.body === "string"
-          ? JSON.parse(parsedMessage.body)
-          : parsedMessage.body;
+        const bodyData =
+          typeof parsedMessage.body === "string"
+            ? JSON.parse(parsedMessage.body)
+            : parsedMessage.body;
 
         if (sessionId === bodyData.sessionId) {
           if (bodyData.operationId === "searchTerms") {
-            // Ensure detailsData is always an array if possible
             const detailsData = Array.isArray(bodyData.details) ? bodyData.details : [];
 
-            // Check if detailsData is empty
             if (detailsData.length === 0) {
-              // If empty, set elementDTO to an empty array
               setElementDTO([]);
-              setElementGrouped({}); // Or set to your initial empty state
-              setIsElementGrouped(true); // Or false, depending on your logic
+              setElementGrouped({});
+              setIsElementGrouped(true);
             } else {
-              // Otherwise, set elementDTO to detailsData
               setElementDTO(detailsData);
             }
-            // Then, set isElementGrouped to false, triggering the useEffect
             setIsElementGrouped(false);
-          } else if (bodyData.operationId === "clonedElement") {
-            // Handle clonedElement operation
-            const clonedElement = bodyData.details;
+          } else if (bodyData.operationId === "clonedElement" || bodyData.operationId === "addPickOne") {
+            // Handle clonedElement and addPickOne operations
+            const newElements = bodyData.details;
 
-            if (clonedElement && Array.isArray(clonedElement) && clonedElement.length > 0) {
-              const newElement = clonedElement[0]; // Assuming details array always have one element.
+            if (newElements && Array.isArray(newElements) && newElements.length > 0) {
+              const newElement = newElements[0]; // Assuming a single element in details
 
-              setElementDTO((prevElements) => [...prevElements, newElement]);
+              setElementDTO((prevElements) => {
+                // Check for duplicates based on xPath
+                if (prevElements.some((el) => el.xPath === newElement.xPath)) {
+                  return prevElements; // Ignore if xPath already exists
+                }
+                return [newElement, ...prevElements]; // Insert at the top
+              });
 
               setElementGrouped((prevGrouped) => {
                 const newGrouped = { ...prevGrouped };
-                const { tagName } = newElement;
+                const { tagName, xPath } = newElement;
+
+                if (
+                  newGrouped[tagName] &&
+                  newGrouped[tagName].elements.some((el) => el.xPath === xPath)
+                ) {
+                  return prevGrouped; // Prevent duplication within groups
+                }
 
                 if (!newGrouped[tagName]) {
                   newGrouped[tagName] = { tagName, elements: [newElement] };
                 } else {
-                  newGrouped[tagName].elements.push(newElement);
+                  newGrouped[tagName].elements.unshift(newElement);
                 }
 
                 return newGrouped;
@@ -136,12 +146,13 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
             }
           }
         }
-
       } catch (error) {
         console.error("Error parsing WebSocket message:", error);
       }
     }
-  }, [messages]);
+  }, [messages, sessionId]);
+
+
 
   useEffect(() => {
     if (!isElementGrouped && elementDTO && elementDTO.length > 0) {
@@ -306,16 +317,20 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
       ?.split(/[;,]/) // Split by both "," and ";"
       .map(item => item.trim()) // Trim whitespace
       .filter(Boolean) // Remove empty values
-      .map(item => ({ name: item, value: item })); // Convert to { name, value }
+      .map(item => {
+        // Ensure the name is no longer than 150 characters
+        const name = item.length > 150 ? item.substring(0, 150) : item;
+        return { name, value: name };
+      }); // Convert to { name, value }
 
     // If the array has only one element, display the text directly
-    const displayText = dataNames.length === 1 ? dataNames[0].name : text;
+    const displayText = dataNames?.length === 1 ? dataNames[0].name : text;
 
     return (
       <div className="instruction-type">
         {imageSrc && <img src={imageSrc} alt="" className={imageClass} />}
 
-        {dataNames.length > 1 ? (
+        {dataNames?.length > 1 ? (
           <div className="attribute-name">
             <NameDropdown dataArray={dataNames} onChange={handleNameChange} />
           </div>
@@ -325,6 +340,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
       </div>
     );
   };
+
 
 
 
