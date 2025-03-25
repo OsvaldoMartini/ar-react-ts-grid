@@ -18,7 +18,7 @@ const App: React.FC = () => {
   const [componentsData, setComponentsData] = useState<ComponentsInstructionsDTO[]>([]);
   const [elementDTO, setElementDTO] = useState<ElementDTO[]>(elementsDTOMockData);
   const [botJobData, setBotJobData] = useState<BotJobData>(botJobMockData);
-  const [socketPort, setSocketPort] = useState<number>(8181);
+  const [socketPort, setSocketPort] = useState<number>(8282);
   const [botJobId, setBotJobId] = useState<number>(0);
   const [botJobName, setBotJobName] = useState<string>("");
   const [homeBanking, setHomeBanking] = useState<number>(0); // VPBank 3
