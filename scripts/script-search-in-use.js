@@ -1160,13 +1160,13 @@
     const coordinatesMap = new Map();
 
     elementsList.forEach((element) => {
-      // if (
-      //   element.tagName !== "SPAN" &&
-      //   element.tagName !== "DIV" &&
-      //   element.tagName !== "button"
-      // ) {
-      //   return; // Ignore elements that are not <span>, <div>, or button
-      // }
+      if (
+        element.tagName !== "SPAN" &&
+        element.tagName !== "DIV" &&
+        element.tagName !== "button"
+      ) {
+        return; // Ignore elements that are not <span>, <div>, or button
+      }
 
       const someText = element.someText?.trim();
       if (someText) {
@@ -1272,6 +1272,17 @@
         }
       } else {
         filteredResult.push(el);
+      }
+    });
+
+    // Add the elements that did not match the initial filter
+    elementsList.forEach((element) => {
+      if (
+        element.tagName !== "SPAN" &&
+        element.tagName !== "DIV" &&
+        element.tagName !== "button"
+      ) {
+        filteredResult.push(element);
       }
     });
 
