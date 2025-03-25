@@ -575,7 +575,30 @@
     collectElements(document, searchTerms, collectionFound, elementInfoMap);
 
     window.allElementInfo = [];
-    limitMapCharacters(window.elementInfoMap);
+
+    collectionFound = getResultMap(window.elementInfoMap);
+    console.log("All Collection Found :", collectionFound);
+
+    // Define the order
+    const order = ["input", "button", "a", "select", "label", "span", "div"];
+
+    // Create the final list based on the specified order
+    const sortedList = order.reduce((acc, type) => {
+      const filteredElements = collectionFound.filter((item) => {
+        // For "label", "span", and "div", check if someText is not empty
+        if (["label", "span", "div"].includes(type)) {
+          return item.tagName === type && item.someText?.trim() !== "";
+        }
+        // For other types, no need to check someText
+        return item.tagName === type;
+      });
+
+      return [...acc, ...filteredElements];
+    }, []);
+
+    console.log("sortedList", sortedList);
+
+    limitMapSize(sortedList);
     console.log("All element info stored in Map:", window.allElementInfo);
     window.elementInfoMap.clear();
 
@@ -1108,12 +1131,24 @@
     };
   };
 
-  // function limitMapCharacters(elementInfoMap) {
-  //   elementInfoMap.forEach((value, key) => {
-  //     let modifiedValue = value;
-  //     window.allElementInfo.push(modifiedValue);
-  //   });
-  // }
+  function getResultMap(elementInfoMap) {
+    let collectionMap = [];
+    elementInfoMap.forEach((value, key) => {
+      let modifiedValue = value;
+      collectionMap.push(modifiedValue);
+    });
+    return collectionMap;
+  }
+
+  function limitMapSize(sortedList) {
+    // Check the length of allElementInfo before adding new elements
+    console.log("limitMapSize");
+    sortedList.forEach((item) => {
+      if (window.allElementInfo.length < 30) {
+        window.allElementInfo.push(item);
+      }
+    });
+  }
 
   function limitMapCharacters(elementInfoMap) {
     // Check the length of allElementInfo before adding new elements
