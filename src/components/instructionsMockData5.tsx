@@ -29,7 +29,7 @@ export interface ElementDTO {
   someText: string;
   attribId: string;
   attribName: string;
-  coords: string;
+  coordinates: string;
   attributeData: AttributeData[];
   customXPath: string;
   iFrameXPath: string;
@@ -87,7 +87,7 @@ export const elementsDTOMockData: ElementDTO[] = [
     "someText": "Submit",
     "attribId": "submit",
     "attribName": "submitBtn",
-    "coords": "100,200",
+    "coordinates": "100,200",
     "attributeData": [
       { "name": "id", "value": "submit" },
       { "name": "title", "value": "Click to submit the form" },
@@ -106,7 +106,7 @@ export const elementsDTOMockData: ElementDTO[] = [
     "someText": "",
     "attribId": "userInput",
     "attribName": "username",
-    "coords": "150,250",
+    "coordinates": "150,250",
     "attributeData": [
       { "name": "id", "value": "username" },
       { "name": "placeholder", "value": "Enter username" },
@@ -125,7 +125,7 @@ export const elementsDTOMockData: ElementDTO[] = [
     "someText": "",
     "attribId": "password",
     "attribName": "passwordInput",
-    "coords": "150,280",
+    "coordinates": "150,280",
     "attributeData": [
       { "name": "id", "value": "password" },
       { "name": "placeholder", "value": "Enter password" },
@@ -144,7 +144,7 @@ export const elementsDTOMockData: ElementDTO[] = [
     "someText": "Error: Invalid login",
     "attribId": "",
     "attribName": "errorDiv",
-    "coords": "160,300",
+    "coordinates": "160,300",
     "attributeData": [
       { "name": "class", "value": "alert alert-danger" },
       { "name": "role", "value": "alert" },
@@ -163,7 +163,7 @@ export const elementsDTOMockData: ElementDTO[] = [
     "someText": "Forgot Password?",
     "attribId": "",
     "attribName": "forgotPwd",
-    "coords": "170,320",
+    "coordinates": "170,320",
     "attributeData": [
       { "name": "href", "value": "/forgot-password" },
       { "name": "title", "value": "Go to forgot password page" }
@@ -181,7 +181,7 @@ export const elementsDTOMockData: ElementDTO[] = [
     "someText": "Username:",
     "attribId": "",
     "attribName": "usernameLabel",
-    "coords": "100,200",
+    "coordinates": "100,200",
     "attributeData": [
       { "name": "for", "value": "username" },
       { "name": "class", "value": "form-label" }
@@ -199,7 +199,7 @@ export const elementsDTOMockData: ElementDTO[] = [
     "someText": "",
     "attribId": "countrySelect",
     "attribName": "country",
-    "coords": "200,350",
+    "coordinates": "200,350",
     "attributeData": [
       { "name": "id", "value": "country" },
       { "name": "name", "value": "country" },
@@ -218,7 +218,7 @@ export const elementsDTOMockData: ElementDTO[] = [
     "someText": "United States",
     "attribId": "",
     "attribName": "usOption",
-    "coords": "210,360",
+    "coordinates": "210,360",
     "attributeData": [
       { "name": "value", "value": "US" },
       { "name": "selected", "value": "true" }
@@ -236,7 +236,7 @@ export const elementsDTOMockData: ElementDTO[] = [
     "someText": "",
     "attribId": "agree",
     "attribName": "agreeCheck",
-    "coords": "220,370",
+    "coordinates": "220,370",
     "attributeData": [
       { "name": "id", "value": "agree" },
       { "name": "name", "value": "agree" },
@@ -255,7 +255,7 @@ export const elementsDTOMockData: ElementDTO[] = [
     "someText": "",
     "attribId": "male",
     "attribName": "genderRadio",
-    "coords": "230,380",
+    "coordinates": "230,380",
     "attributeData": [
       { "name": "value", "value": "male" },
       { "name": "checked", "value": "true" }
@@ -273,7 +273,7 @@ export const elementsDTOMockData: ElementDTO[] = [
     "someText": "",
     "attribId": "comments",
     "attribName": "commentsTextArea",
-    "coords": "240,390",
+    "coordinates": "240,390",
     "attributeData": [
       { "name": "id", "value": "comments" },
       { "name": "placeholder", "value": "Enter your comments" },
@@ -293,7 +293,7 @@ export const elementsDTOMockData: ElementDTO[] = [
     "someText": "Help text",
     "attribId": "",
     "attribName": "helpTooltip",
-    "coords": "250,400",
+    "coordinates": "250,400",
     "attributeData": [
       { "name": "class", "value": "tooltip-text" },
       { "name": "aria-describedby", "value": "help" }
@@ -311,7 +311,7 @@ export const elementsDTOMockData: ElementDTO[] = [
     "someText": "",
     "attribId": "dataTable",
     "attribName": "dataTable",
-    "coords": "260,410",
+    "coordinates": "260,410",
     "attributeData": [
       { "name": "id", "value": "dataTable" },
       { "name": "class", "value": "table-striped" }
@@ -329,7 +329,7 @@ export const elementsDTOMockData: ElementDTO[] = [
     "someText": "",
     "attribId": "",
     "attribName": "tableRow",
-    "coords": "270,420",
+    "coordinates": "270,420",
     "attributeData": [
       { "name": "class", "value": "row1" }
     ],
@@ -346,7 +346,7 @@ export const elementsDTOMockData: ElementDTO[] = [
     "someText": "Cell Data",
     "attribId": "",
     "attribName": "tableCell",
-    "coords": "280,430",
+    "coordinates": "280,430",
     "attributeData": [
       { "name": "class", "value": "column1" }
     ],

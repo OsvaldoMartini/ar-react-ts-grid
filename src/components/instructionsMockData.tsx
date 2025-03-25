@@ -55,7 +55,7 @@ export interface ElementDTO {
   someText: string;
   attribId: string;
   attribName: string;
-  coords: string;
+  coordinates: string;
   attributeData: AttributeData[];
   customXPath: string;
   iFrameXPath: string;
