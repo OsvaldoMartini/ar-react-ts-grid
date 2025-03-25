@@ -144,202 +144,62 @@
     pageFullyLoaded = true;
   }
 
-  const findUniqueAndOneRepeated = (sortedList) => {
-    const wordFrequency = new Map();
-    const wordToItems = new Map();
-
-    sortedList.forEach((item) => {
-      const someText = item.elementIdentity.someText;
-      if (someText) {
-        someText.split(/[\s,;]+/).forEach((word) => {
-          const trimmedWord = word.trim();
-          wordFrequency.set(
-            trimmedWord,
-            (wordFrequency.get(trimmedWord) || 0) + 1
-          );
-          if (!wordToItems.has(trimmedWord)) {
-            wordToItems.set(trimmedWord, new Set());
-          }
-          wordToItems.get(trimmedWord).add(item);
-        });
-      }
-    });
-
-    const repeatedWords = Array.from(wordFrequency.entries())
-      .filter(([_, count]) => count > 1)
-      .map(([word]) => word);
-
-    const result = [];
-    const addedItems = new Set(); // Track items already added
-
-    // Add one of each repeated item
-    repeatedWords.forEach((word) => {
-      if (wordToItems.has(word)) {
-        const items = Array.from(wordToItems.get(word));
-        if (items.length > 0) {
-          // Add only if not already added
-          if (!addedItems.has(items[0])) {
-            result.push(items[0]);
-            addedItems.add(items[0]);
-          }
-        }
-      }
-    });
-
-    // Add non-repeated items
-    sortedList.forEach((item) => {
-      const someText = item.elementIdentity.someText;
-      if (someText) {
-        const words = someText.split(/[\s,;]+/).map((word) => word.trim());
-        const isRepeated = words.some((word) => repeatedWords.includes(word));
-        if (!isRepeated && !addedItems.has(item)) {
-          result.push(item);
-          addedItems.add(item);
-        }
-      } else if (!addedItems.has(item)) {
-        result.push(item);
-        addedItems.add(item);
-      }
-    });
-
-    return result;
-  };
-
   // Function to collect general elements based on search terms
   const collectElements = function collectElements(
     doc,
     searchTerms,
     collectionFound
   ) {
-    const foundElements = new Map(); // Store elements with their metadata
-
-    // Collect all elements from the page
-    doc.querySelectorAll("*").forEach((el) => {
-      if (el.tagName.toLowerCase() !== "iframe") {
-        const elementIdentity = getElementIdentity(el);
-        if (elementIdentity) {
-          const tagName = el.tagName.toLowerCase();
-          const xpath = elementIdentity.xPath;
-          const elementType = identifyElementTypeFromXPath(tagName, xpath);
-
-          // Store in a Map to avoid duplicates, using element as key
-          foundElements.set(el, {
-            tagName,
-            xpath,
-            elementType,
-            elementIdentity,
-          });
-        }
-      }
-    });
-
-    // If search terms exist, refine the selection
+    // Collect elements from the current document using the provided search terms
     if (searchTerms.length > 0) {
       searchTerms.forEach((selector) => {
+        // If search term includes "with id", filter only elements that have an "id" attribute
         if (selector.includes("with id")) {
-          doc.querySelectorAll("[id]").forEach((el) => addToFoundElements(el));
-        } else if (selector.includes("with name")) {
-          doc
-            .querySelectorAll("[name]")
-            .forEach((el) => addToFoundElements(el));
-        } else if (selector.includes("with role")) {
-          doc
-            .querySelectorAll("[role]")
-            .forEach((el) => addToFoundElements(el));
+          collectionFound.push(...Array.from(doc.querySelectorAll("[id]")));
+        }
+        // If search term includes "with name", filter only elements that have a "name" attribute
+        else if (selector.includes("with name")) {
+          collectionFound.push(...Array.from(doc.querySelectorAll("[name]")));
+        }
+        // If search term includes "with test-id", filter only elements that have a "test-id" attribute
+        else if (selector.includes("with test-id")) {
+          collectionFound.push(
+            ...Array.from(doc.querySelectorAll("[test-id]"))
+          );
         } else {
-          doc
-            .querySelectorAll(selector)
-            .forEach((el) => addToFoundElements(el));
+          collectionFound.push(...Array.from(doc.querySelectorAll(selector)));
         }
       });
+    } else {
+      // Collect all elements except iframes
+      collectionFound.push(
+        ...Array.from(doc.querySelectorAll("*")).filter(
+          (el) => el.tagName.toLowerCase() !== "iframe"
+        )
+      );
     }
 
-    // Convert Map to an array and push to collectionFound
-    foundElements.forEach((metadata, element) => {
-      collectionFound.push({ element, ...metadata });
-    });
-
-    console.log("sortedList", collectionFound);
-    // Define the order
-    const order = ["input", "button", "a", "select", "label", "span", "div"];
-
-    // Create the final list based on the specified order
-    const sortedList = order.reduce((acc, type) => {
-      const filteredElements = collectionFound.filter((item) => {
-        // For "label", "span", and "div", check if someText is not empty
-        if (["label", "span", "div"].includes(type)) {
-          return (
-            item.elementType === type &&
-            item.elementIdentity.someText?.trim() !== ""
-          );
-        }
-        // For other types, no need to check someText
-        return item.elementType === type;
-      });
-
-      return [...acc, ...filteredElements];
-    }, []);
-
-    const noRepeatedItems = findUniqueAndOneRepeated(sortedList);
-    console.log("noRepeatedItems", noRepeatedItems); // Output the items with repetitions
-
-    // Create the final list based on the specified order
-    const sortedFinal = order.reduce((acc, type) => {
-      const filteredElements = noRepeatedItems.filter((item) => {
-        // For "label", "span", and "div", check if someText is not empty
-        if (["label", "span", "div"].includes(type)) {
-          return (
-            item.elementType === type &&
-            item.elementIdentity.someText?.trim() !== ""
-          );
-        }
-        // For other types, no need to check someText
-        return item.elementType === type;
-      });
-
-      return [...acc, ...filteredElements];
-    }, []);
-
-    // Process each collected element
-    console.log("sortedList", sortedFinal);
-    sortedFinal.forEach(({ element, tagName, xpath, elementIdentity }) => {
+    // After collecting, process element identities for the parent document
+    collectionFound.forEach((element) => {
       if (
         ["html", "body", "main", "script", "meta", "head", "style"].includes(
-          tagName
+          element.tagName.toLowerCase()
         )
       ) {
         return;
       }
 
-      // console.log("tagName-Found:", tagName);
-      filterSearchTerms(
-        element,
-        "tagName-Found", // typeDTO
-        xpath, // referXPath
-        elementIdentity, // Now passing the correct structure
-        searchTerms
-      );
-    });
-
-    /**
-     * Helper function to add elements to foundElements
-     */
-    function addToFoundElements(el) {
-      if (!foundElements.has(el)) {
-        const elementIdentity = getElementIdentity(el);
-        if (elementIdentity) {
-          const tagName = el.tagName.toLowerCase();
-          const xpath = elementIdentity.xPath;
-          const elementType = identifyElementTypeFromXPath(tagName, xpath);
-          foundElements.set(el, {
-            tagName,
-            xpath,
-            elementType,
-            elementIdentity,
-          });
-        }
+      const elementIdentity = getElementIdentity(element);
+      if (elementIdentity) {
+        filterSearchTerms(
+          element,
+          "tagName-Found",
+          elementIdentity.xPath,
+          elementIdentity,
+          searchTerms
+        );
       }
-    }
+    });
   };
 
   function filterSearchTerms(
@@ -714,59 +574,30 @@
     // Then, collect general elements based on search terms
     collectElements(document, searchTerms, collectionFound, elementInfoMap);
 
-    // window.allElementInfo = [];
-    // limitMapCharacters(window.elementInfoMap);
-    // console.log("All element info stored in Map:", window.allElementInfo);
-    // window.elementInfoMap.clear();
-
-    if (wSocket && wSocket.readyState) {
-      console.log("WebSocket readyState:", wSocket.readyState);
-    }
-
-    console.log("sendingData");
-    sendingData();
-
-    // if (wSocket && wSocket.readyState === WebSocket.OPEN) {
-    //   const message = {
-    //     type: "SEARCH_TOOL",
-    //     sessionId: window.destination,
-    //     operationId: window.operationId,
-    //     homeBankingId: window.homeBankingId,
-    //     details: window.allElementInfo, // Send allElementInfo
-    //   };
-    //   wSocket.send(JSON.stringify(message));
-    //   console.log("Sent SEARCH_TOOL:", message);
-    // }
-  };
-
-  function sendingData() {
     window.allElementInfo = [];
     limitMapCharacters(window.elementInfoMap);
     console.log("All element info stored in Map:", window.allElementInfo);
+    window.elementInfoMap.clear();
 
     if (wSocket && wSocket.readyState) {
       console.log("WebSocket readyState:", wSocket.readyState);
     }
 
     if (wSocket && wSocket.readyState === WebSocket.OPEN) {
-      if (window.allElementInfo.length > 0) {
-        const message = {
-          type: "SEARCH_TOOL",
-          sessionId: `scannerGrid-${homeBankingId}`,
-          operationId: "searchTerms",
-          homeBankingId: homeBankingId,
-          details: window.allElementInfo, // Send allElementInfo
-        };
-        wSocket.send(JSON.stringify(message));
-        console.log("Sent SEARCH_TOOL:", message);
-        alreadySent = true;
-        window.allElementInfo = [];
-        window.elementInfoMap.clear();
-      }
-    } else {
-      console.warn("WebSocket is not open. Cannot send message.");
+      const message = {
+        type: "SEARCH_TOOL",
+        sessionId: window.destination,
+        operationId: window.operationId,
+        homeBankingId: window.homeBankingId,
+        details: window.allElementInfo, // Send allElementInfo
+      };
+      wSocket.send(JSON.stringify(message));
+      console.log("Sent SEARCH_TOOL:", message);
+      alreadySent = true;
+      window.allElementInfo = [];
+      window.elementInfoMap.clear();
     }
-  }
+  };
 
   function pushElement(
     element,
@@ -839,29 +670,11 @@
       }
       element.style.outline = "3px solid red";
 
-      // if (isInteractiveElement(element)) {
-      // if (isInteractiveElement(element)) {
-      if (["html", "body", "main"].includes(element.tagName.toLowerCase())) {
-        return; // Don't proceed if it's one of these elements
-      }
       window.elementInfoMap.set(
         referXPath, // Keep Distinction iFrameXPath / child / etc...
         elementDTO(typeDTO, elementIdentity)
       );
-      // }
     }
-  }
-
-  function filterElementByType(collectionFound) {
-    // Define the types of elements we are interested in
-    const validElementTypes = ["button", "a", "input"];
-
-    // Filter the collection based on elementType and return only the elementIdentity
-    const filteredElements = collectionFound
-      .filter((item) => validElementTypes.includes(item.elementType)) // Filter by element type
-      .map((item) => item.elementIdentity); // Map to return only the elementIdentity
-
-    return filteredElements;
   }
 
   const getElementIdentity = function getElementIdentity(element) {
@@ -1273,96 +1086,6 @@
     return tagName; // Default to the given tagName if no match
   }
 
-  function isInteractiveElement(element) {
-    if (!element || element.nodeType !== Node.ELEMENT_NODE) {
-      return false; // Not a valid element
-    }
-
-    const tagName = element.tagName.toLowerCase();
-    const type = element.getAttribute("type")?.toLowerCase();
-
-    // Check for standard interactive elements
-    if (
-      tagName === "button" ||
-      tagName === "a" ||
-      tagName === "select" ||
-      tagName === "option"
-    ) {
-      return true;
-    }
-
-    // Check for input elements
-    if (tagName === "input" || tagName === "textarea") {
-      if (
-        !type ||
-        [
-          "text",
-          "password",
-          "email",
-          "number",
-          "search",
-          "tel",
-          "url",
-        ].includes(type)
-      ) {
-        return true;
-      }
-    }
-
-    // Framework-specific checks
-    if (
-      isAngularMaterialElement(element) ||
-      isReactElement(element) ||
-      isGenericMaterialElement(element) ||
-      isElementUIElement(element)
-    ) {
-      return true;
-    }
-
-    return false;
-  }
-
-  function isAngularMaterialElement(element) {
-    return (
-      element.hasAttribute("mat-button") ||
-      element.hasAttribute("mat-raised-button") ||
-      element.hasAttribute("mat-icon-button") ||
-      element.hasAttribute("mat-menu-item") ||
-      element.hasAttribute("mat-select") ||
-      element.hasAttribute("mat-option") ||
-      element.hasAttribute("matInput")
-    );
-  }
-
-  function isReactElement(element) {
-    // Check for React's data-testid, aria-label, and role attributes, or classnames
-    return (
-      element.hasAttribute("data-testid") ||
-      element.hasAttribute("aria-label") ||
-      element.getAttribute("role") === "button" ||
-      element.getAttribute("role") === "textbox" ||
-      element.classList.contains("react-button") ||
-      element.classList.contains("react-link") ||
-      element.classList.contains("react-input")
-    );
-  }
-
-  function isGenericMaterialElement(element) {
-    return (
-      element.classList.contains("mdc-button") ||
-      element.classList.contains("mdc-text-field") ||
-      element.classList.contains("mdc-list-item")
-    );
-  }
-
-  function isElementUIElement(element) {
-    return (
-      element.classList.contains("el-button") ||
-      element.classList.contains("el-input__inner") ||
-      element.classList.contains("el-select-dropdown__item")
-    );
-  }
-
   const elementDTO = function elementDTO(typeElement, identity) {
     return {
       typeElement: typeElement,
@@ -1385,6 +1108,13 @@
     };
   };
 
+  // function limitMapCharacters(elementInfoMap) {
+  //   elementInfoMap.forEach((value, key) => {
+  //     let modifiedValue = value;
+  //     window.allElementInfo.push(modifiedValue);
+  //   });
+  // }
+
   function limitMapCharacters(elementInfoMap) {
     // Check the length of allElementInfo before adding new elements
     console.log("limitMapCharacters");
@@ -1396,6 +1126,7 @@
       }
     });
   }
+
   // Event listener to handle incoming messages from iframes
   window.addEventListener("message", function (event) {
     if (event.origin !== window.trustedOriginURL) {
@@ -1459,26 +1190,35 @@
   // startCollectingElements(window.searchTerms);
   // init("Initiate");
   // window.initSearchTerms = null; // Invalidating the function
-})(
-  arguments[0],
-  arguments[1],
-  arguments[2],
-  arguments[3],
-  arguments[4],
-  arguments[5],
-  arguments[6]
-);
+  // })(
+  //   arguments[0],
+  //   arguments[1],
+  //   arguments[2],
+  //   arguments[3],
+  //   arguments[4],
+  //   arguments[5],
+  //   arguments[6]
+  // );
+})(["*"], false, 8282, "scannerTool", "scannerGrid-2", "searchTerms", 2);
 
-// })([], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
 // })(["with name"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
+// })(
+//   ["with test-id"],
+//   false,
+//   8282,
+//   "scannerTool",
+//   "scannerGrid-2",
+//   "searchTerms",
+//   2
+// );
 // })(
 //   ["input", "button", "a", "select"],
 //   false,
-//   8181,
+//   8282,
 //   "scannerTool",
-//   "scannerGrid-4",
+//   "scannerGrid-2",
 //   "searchTerms",
-//   4
+//   2
 // );
 // })(["*"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
 // })(["button"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
