@@ -579,8 +579,6 @@
 
     collectionFound = getResultMap(window.elementInfoMap);
     console.log("All Collection Found :", collectionFound);
-    const noRepeatedItems = findUniqueAndOneRepeated(collectionFound);
-    console.log("noRepeatedItems", noRepeatedItems); // Output the items with repetitions
 
     // Define the order
     const order = ["input", "button", "a", "select", "label", "span", "div"];
@@ -1152,50 +1150,6 @@
       }
     });
   }
-
-  const findUniqueAndOneRepeated = (collectionRep) => {
-    const wordFrequency = new Map();
-    const wordToBestItem = new Map();
-
-    collectionRep.forEach((item) => {
-      const someText = item.someText?.trim() || "";
-
-      if (someText) {
-        someText.split(/[\s,;]+/).forEach((word) => {
-          const trimmedWord = word.trim();
-
-          // Track frequency
-          wordFrequency.set(
-            trimmedWord,
-            (wordFrequency.get(trimmedWord) || 0) + 1
-          );
-
-          // Store the best item (the first one with `someText`)
-          if (
-            !wordToBestItem.has(trimmedWord) ||
-            !wordToBestItem.get(trimmedWord).someText
-          ) {
-            wordToBestItem.set(trimmedWord, item);
-          }
-        });
-      }
-    });
-
-    // Collect unique items
-    const result = new Set();
-
-    // Add prioritized unique items
-    wordToBestItem.forEach((item) => result.add(item));
-
-    // Add items that have no `someText` but are not duplicates
-    collectionRep.forEach((item) => {
-      if (!item.someText?.trim() && !result.has(item)) {
-        result.add(item);
-      }
-    });
-
-    return Array.from(result);
-  };
 
   function limitMapCharacters(elementInfoMap) {
     // Check the length of allElementInfo before adding new elements
