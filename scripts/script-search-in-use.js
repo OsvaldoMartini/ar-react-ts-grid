@@ -1161,9 +1161,10 @@
 
     elementsList.forEach((element) => {
       if (
-        element.tagName !== "SPAN" &&
-        element.tagName !== "DIV" &&
-        element.tagName !== "button"
+        element.tagName.toLowerCase() !== "a" &&
+        element.tagName.toLowerCase() !== "span" &&
+        element.tagName.toLowerCase() !== "div" &&
+        element.tagName.toLowerCase() !== "button"
       ) {
         return; // Ignore elements that are not <span>, <div>, or button
       }
@@ -1292,9 +1293,10 @@
     // Add the elements that did not match the initial filter
     elementsList.forEach((element) => {
       if (
-        element.tagName !== "SPAN" &&
-        element.tagName !== "DIV" &&
-        element.tagName !== "button"
+        // element.tagName.toLowerCase() !== "a" &&
+        element.tagName.toLowerCase() !== "span" &&
+        element.tagName.toLowerCase() !== "div" &&
+        element.tagName.toLowerCase() !== "button"
       ) {
         filteredResult.push(element);
       }
