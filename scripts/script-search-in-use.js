@@ -580,6 +580,9 @@
     collectionFound = getResultMap(window.elementInfoMap);
     console.log("All Collection Found :", collectionFound);
 
+    const noRepeatedItems = findUniqueAndOneRepeated(collectionFound);
+    console.log("noRepeatedItems", noRepeatedItems); // Output the items with repetitions
+
     // Define the order
     const order = ["input", "button", "a", "select", "label", "span", "div"];
 
@@ -615,8 +618,18 @@
         homeBankingId: window.homeBankingId,
         details: window.allElementInfo, // Send allElementInfo
       };
-      wSocket.send(JSON.stringify(message));
+
+      // Convert the JSON message to a buffer
+      const base64Message = btoa(
+        unescape(encodeURIComponent(JSON.stringify(message)))
+      );
+      // Convert the buffer to a Base64 string
+      wSocket.send(base64Message);
+      // wSocket.send(JSON.stringify(message));
       console.log("Sent SEARCH_TOOL:", message);
+      console.log("Sent ENCODED Length:", base64Message.length);
+      console.log("Sent ENCODED:", base64Message);
+
       alreadySent = true;
       window.allElementInfo = [];
       window.elementInfoMap.clear();
@@ -1141,11 +1154,135 @@
     return collectionMap;
   }
 
+  const findUniqueAndOneRepeated = (elementsList) => {
+    const wordFrequency = new Map();
+    const wordToItems = new Map();
+    const coordinatesMap = new Map();
+
+    elementsList.forEach((element) => {
+      // if (
+      //   element.tagName !== "SPAN" &&
+      //   element.tagName !== "DIV" &&
+      //   element.tagName !== "button"
+      // ) {
+      //   return; // Ignore elements that are not <span>, <div>, or button
+      // }
+
+      const someText = element.someText?.trim();
+      if (someText) {
+        someText.split(/[\s,;]+/).forEach((word) => {
+          const trimmedWord = word.trim();
+          if (trimmedWord) {
+            wordFrequency.set(
+              trimmedWord,
+              (wordFrequency.get(trimmedWord) || 0) + 1
+            );
+
+            if (!wordToItems.has(trimmedWord)) {
+              wordToItems.set(trimmedWord, new Set());
+            }
+            wordToItems.get(trimmedWord).add(element);
+          }
+        });
+      }
+
+      // Store elements by their coordinates
+      if (element.coordinates) {
+        if (!coordinatesMap.has(element.coordinates)) {
+          coordinatesMap.set(element.coordinates, []);
+        }
+        coordinatesMap.get(element.coordinates).push(element);
+      }
+    });
+
+    // Resolve elements with same coordinates, prioritizing "aria-label"
+    coordinatesMap.forEach((elements) => {
+      let priorityElement = elements.find((el) =>
+        el.attributeData?.some((attr) => attr.name === "aria-label")
+      );
+      if (priorityElement) {
+        const ariaLabelAttr = priorityElement.attributeData.find(
+          (attr) => attr.name === "aria-label"
+        );
+        if (ariaLabelAttr) {
+          elements.forEach((el) => {
+            if (el.someText !== ariaLabelAttr.value) {
+              el.someText = ariaLabelAttr.value; // Override someText with aria-label
+            }
+          });
+        }
+      }
+    });
+
+    const repeatedWords = Array.from(wordFrequency.entries())
+      .filter(([_, count]) => count > 1)
+      .map(([word]) => word);
+
+    const result = [];
+    const addedElements = new Set();
+
+    // Helper function to check if an element has a specific attribute
+    const hasAttribute = (element, attributeName) => {
+      return element.attributeData?.some((attr) => attr.name === attributeName);
+    };
+
+    // Add one occurrence of each repeated word's element, prioritizing "aria-label" over "test-id"
+    repeatedWords.forEach((word) => {
+      if (wordToItems.has(word)) {
+        let items = Array.from(wordToItems.get(word));
+
+        // Prioritize elements: first by "aria-label", then by "test-id"
+        items.sort(
+          (a, b) =>
+            hasAttribute(b, "aria-label") - hasAttribute(a, "aria-label") ||
+            hasAttribute(b, "test-id") - hasAttribute(a, "test-id")
+        );
+
+        if (!addedElements.has(items[0])) {
+          result.push(items[0]);
+          addedElements.add(items[0]);
+        }
+      }
+    });
+
+    // Add elements with unique words
+    elementsList.forEach((element) => {
+      if (!addedElements.has(element)) {
+        const someText = element.someText?.trim();
+        if (someText) {
+          const words = someText.split(/[\s,;]+/).map((word) => word.trim());
+          const isRepeated = words.some((word) => repeatedWords.includes(word));
+          if (!isRepeated) {
+            result.push(element);
+            addedElements.add(element);
+          }
+        }
+      }
+    });
+
+    // filter coordinate duplicates, keeping the first with aria-label.
+    const uniqueCoords = new Map();
+    const filteredResult = [];
+
+    result.forEach((el) => {
+      if (el.coordinates) {
+        if (!uniqueCoords.has(el.coordinates)) {
+          uniqueCoords.set(el.coordinates, true);
+          filteredResult.push(el);
+        }
+      } else {
+        filteredResult.push(el);
+      }
+    });
+
+    return filteredResult;
+  };
+
   function limitMapSize(sortedList) {
     // Check the length of allElementInfo before adding new elements
     console.log("limitMapSize");
     sortedList.forEach((item) => {
-      if (window.allElementInfo.length < 30) {
+      if (window.allElementInfo.length < 35) {
         window.allElementInfo.push(item);
       }
     });
