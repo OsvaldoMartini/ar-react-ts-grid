@@ -378,17 +378,17 @@
         "No description"
       }; ${iframeDetails}`
     );
-    // // Store the iframe details in the elementInfoMap
-    // elementInfoMap.set(
-    //   xPathIFrame,
-    //   `xpath:${xPathIFrame};text:${
-    //     iframe.src ||
-    //     iframe.title ||
-    //     iframe.id ||
-    //     iframe.name ||
-    //     "No description"
-    //   };${iframeDetails}`
-    // );
+    // Store the iframe details in the elementInfoMap
+    elementInfoMap.set(
+      xPathIFrame,
+      `xpath:${xPathIFrame};text:${
+        iframe.src ||
+        iframe.title ||
+        iframe.id ||
+        iframe.name ||
+        "No description"
+      };${iframeDetails}`
+    );
   };
 
   // Function to collect iframe elements recursively
@@ -580,7 +580,10 @@
     collectionFound = getResultMap(window.elementInfoMap);
     console.log("All Collection Found :", collectionFound);
 
-    const noRepeatedItems = findUniqueAndOneRepeated(collectionFound);
+    const sameXPathFound = processElementsWithXPath(collectionFound);
+    console.log("processElementsWithXPath", sameXPathFound);
+
+    const noRepeatedItems = findUniqueAndOneRepeated(sameXPathFound);
     console.log("noRepeatedItems", noRepeatedItems); // Output the items with repetitions
 
     // Define the order
@@ -1154,6 +1157,107 @@
     return collectionMap;
   }
 
+  const processElementsWithXPath = (elementsList) => {
+    const groupedElements = new Map();
+
+    // Helper function to parse XPath into an array of tags and indices
+    const parseXPath = (xPath) => {
+      return xPath
+        .split("/")
+        .filter((part) => part)
+        .map((part) => {
+          const match = part.match(/([a-zA-Z]+)(?:\[(\d+)\])?/);
+          if (match) {
+            return {
+              tagName: match[1],
+              index: match[2] ? parseInt(match[2]) : null,
+            };
+          }
+          return null;
+        })
+        .filter((item) => item !== null);
+    };
+
+    // Helper function to determine if two XPaths belong to the same component
+    const areSameComponent = (xpath1, xpath2) => {
+      const path1 = parseXPath(xpath1);
+      const path2 = parseXPath(xpath2);
+
+      if (path1.length === 0 || path2.length === 0) {
+        return false;
+      }
+
+      // Check if the paths have the same base part (up to the "a" tag)
+      let commonLength = 0;
+      for (let i = 0; i < Math.min(path1.length, path2.length); i++) {
+        if (
+          path1[i].tagName === path2[i].tagName &&
+          path1[i].index === path2[i].index
+        ) {
+          if (path1[i].tagName === "a") {
+            commonLength = i + 1;
+            break;
+          }
+        } else {
+          break;
+        }
+      }
+
+      if (commonLength === 0) {
+        return false;
+      }
+
+      return path1.slice(0, commonLength).every((item, index) => {
+        return (
+          item.tagName === path2[index].tagName &&
+          item.index === path2[index].index
+        );
+      });
+    };
+
+    elementsList.forEach((element) => {
+      if (element.xPath && element.coordinates) {
+        let foundGroup = false;
+        for (const [key, group] of groupedElements) {
+          if (
+            areSameComponent(element.xPath, key) &&
+            element.coordinates === group[0].coordinates
+          ) {
+            group.push(element);
+            foundGroup = true;
+            break;
+          }
+        }
+        if (!foundGroup) {
+          groupedElements.set(element.xPath, [element]);
+        }
+      }
+    });
+
+    const filteredResult = [];
+
+    groupedElements.forEach((group) => {
+      if (group.length > 1) {
+        // Find the element with the "highest" coordinates (assuming higher means further down/right)
+        let highestCoordinateElement = group[0];
+        group.forEach((element) => {
+          const [x, y] = element.coordinates.split(",").map(parseFloat);
+          const [highestX, highestY] = highestCoordinateElement.coordinates
+            .split(",")
+            .map(parseFloat);
+          if (y > highestY || (y === highestY && x > highestX)) {
+            highestCoordinateElement = element;
+          }
+        });
+        filteredResult.push(highestCoordinateElement);
+      } else {
+        filteredResult.push(group[0]);
+      }
+    });
+
+    return filteredResult;
+  };
+
   const findUniqueAndOneRepeated = (elementsList) => {
     const wordFrequency = new Map();
     const wordToItems = new Map();
@@ -1161,7 +1265,6 @@
 
     elementsList.forEach((element) => {
       if (
-        element.tagName.toLowerCase() !== "a" &&
         element.tagName.toLowerCase() !== "span" &&
         element.tagName.toLowerCase() !== "div" &&
         element.tagName.toLowerCase() !== "button"
@@ -1293,7 +1396,6 @@
     // Add the elements that did not match the initial filter
     elementsList.forEach((element) => {
       if (
-        // element.tagName.toLowerCase() !== "a" &&
         element.tagName.toLowerCase() !== "span" &&
         element.tagName.toLowerCase() !== "div" &&
         element.tagName.toLowerCase() !== "button"
