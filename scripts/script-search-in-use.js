@@ -1260,15 +1260,29 @@
       }
     });
 
-    // filter coordinate duplicates, keeping the first with aria-label.
+    // filter coordinate duplicates, keeping the first with aria-label or greatest attributeData size
     const uniqueCoords = new Map();
     const filteredResult = [];
 
     result.forEach((el) => {
       if (el.coordinates) {
         if (!uniqueCoords.has(el.coordinates)) {
-          uniqueCoords.set(el.coordinates, true);
+          uniqueCoords.set(el.coordinates, el);
           filteredResult.push(el);
+        } else {
+          const existingEl = uniqueCoords.get(el.coordinates);
+          if (
+            !hasAttribute(existingEl, "aria-label") &&
+            hasAttribute(el, "aria-label")
+          ) {
+            uniqueCoords.set(el.coordinates, el);
+            filteredResult[filteredResult.indexOf(existingEl)] = el;
+          } else if (el.attributeData && existingEl.attributeData) {
+            if (el.attributeData.length > existingEl.attributeData.length) {
+              uniqueCoords.set(el.coordinates, el);
+              filteredResult[filteredResult.indexOf(existingEl)] = el;
+            }
+          }
         }
       } else {
         filteredResult.push(el);
