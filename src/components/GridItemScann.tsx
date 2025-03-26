@@ -112,32 +112,57 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
             const newElements = bodyData.details;
 
             if (newElements && Array.isArray(newElements) && newElements.length > 0) {
-              const newElement = newElements[0]; // Assuming a single element in details
-
               setElementDTO((prevElements) => {
-                // Check for duplicates based on xPath
-                if (prevElements.some((el) => el.xPath === newElement.xPath)) {
-                  return prevElements; // Ignore if xPath already exists
-                }
-                return [newElement, ...prevElements]; // Insert at the top
+                let updatedElements = [...prevElements]; // Create a copy
+
+                newElements.forEach((newElement) => {
+                  // Check for duplicates based on xPath
+                  if (!updatedElements.some((el) => el.xPath === newElement.xPath)) {
+                    // Find if there is an existing element and insert after
+                    let insertIndex = -1;
+                    if (prevElements.length > 0) {
+                      insertIndex = prevElements.findIndex(el => el.xPath === bodyData?.afterXPath);
+                    }
+
+                    if (insertIndex !== -1) {
+                      updatedElements.splice(insertIndex + 1, 0, newElement); // Insert after found index
+                    } else {
+                      updatedElements.push(newElement); // Append at the end if not found
+                    }
+                  }
+                });
+                return updatedElements;
               });
 
               setElementGrouped((prevGrouped) => {
-                const newGrouped = { ...prevGrouped };
-                const { tagName, xPath } = newElement;
+                let newGrouped = { ...prevGrouped };
 
-                if (
-                  newGrouped[tagName] &&
-                  newGrouped[tagName].elements.some((el) => el.xPath === xPath)
-                ) {
-                  return prevGrouped; // Prevent duplication within groups
-                }
+                newElements.forEach((newElement) => {
+                  const { tagName, xPath } = newElement;
 
-                if (!newGrouped[tagName]) {
-                  newGrouped[tagName] = { tagName, elements: [newElement] };
-                } else {
-                  newGrouped[tagName].elements.unshift(newElement);
-                }
+                  if (
+                    newGrouped[tagName] &&
+                    newGrouped[tagName].elements.some((el) => el.xPath === xPath)
+                  ) {
+                    return; // Prevent duplication within groups
+                  }
+
+                  if (!newGrouped[tagName]) {
+                    newGrouped[tagName] = { tagName, elements: [newElement] };
+                  } else {
+                    // find if we need to insert after existing item.
+                    let insertIndex = -1;
+                    if (newGrouped[tagName].elements.length > 0) {
+                      insertIndex = newGrouped[tagName].elements.findIndex(el => el.xPath === bodyData?.afterXPath);
+                    }
+
+                    if (insertIndex !== -1) {
+                      newGrouped[tagName].elements.splice(insertIndex + 1, 0, newElement);
+                    } else {
+                      newGrouped[tagName].elements.push(newElement);
+                    }
+                  }
+                });
 
                 return newGrouped;
               });

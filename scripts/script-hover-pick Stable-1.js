@@ -45,14 +45,7 @@
             type: "echo",
             body: "subscribe",
           };
-
-          // Convert the JSON message to a buffer
-          const base64Message = btoa(
-            unescape(encodeURIComponent(JSON.stringify(subscriptionMessage)))
-          );
-          // Convert the buffer to a Base64 string
-          wSocket.send(base64Message);
-          // wSocket.send(JSON.stringify(message));
+          wSocket.send(JSON.stringify(subscriptionMessage));
         } catch (sendError) {
           console.error("Failed to send subscription message:", sendError);
         }
@@ -137,21 +130,12 @@
         const message = {
           type: "SEARCH_TOOL",
           sessionId: `scannerGrid-${homeBankingId}`,
-          operationId: "addPickOne",
+          operationId: "searchTerms",
           homeBankingId: homeBankingId,
           details: window.allElementInfo, // Send allElementInfo
         };
-
-        // Convert the JSON message to a buffer
-        const base64Message = btoa(
-          unescape(encodeURIComponent(JSON.stringify(message)))
-        );
-        // Convert the buffer to a Base64 string
-        wSocket.send(base64Message);
-        // wSocket.send(JSON.stringify(message));
+        wSocket.send(JSON.stringify(message));
         console.log("Sent SEARCH_TOOL:", message);
-        console.log("Sent ENCODED Length:", base64Message.length);
-        console.log("Sent ENCODED:", base64Message);
         window.elementInfoMap.clear();
       }
     } else {
@@ -803,11 +787,4 @@
   arguments[4],
   arguments[5]
 );
-// })(
-//   "https://www.vpbank.com/",
-//   "https://www.vpbank.com/",
-//   ["*"],
-//   false,
-//   63760,
-//   1
-// );
+// })("https://www.vpbank.com/", "https://www.vpbank.com/", ["*"], false, 8181, 3);

@@ -11,7 +11,6 @@
   let attempts = 0;
   let maxAttempts = 100;
   let wSocket = null;
-  let alreadySent = false;
   const originalStyles = new Map();
   let pageFullyLoaded = false;
   window.elementInfoMap = new Map();
@@ -47,16 +46,7 @@
             operationId: "test echo",
             body: "subscribe",
           };
-          // Convert the JSON message to a buffer
-          const base64Message = btoa(
-            unescape(encodeURIComponent(JSON.stringify(subscriptionMessage)))
-          );
-          // Convert the buffer to a Base64 string
-          wSocket.send(base64Message);
-          // wSocket.send(JSON.stringify(message));
-          console.log("Sent SEARCH_TOOL:", message);
-          console.log("Sent ENCODED Length:", base64Message.length);
-          console.log("Sent ENCODED:", base64Message);
+          wSocket.send(JSON.stringify(subscriptionMessage));
         } catch (sendError) {
           console.error("Failed to send subscription message:", sendError);
         }
@@ -106,9 +96,7 @@
         if (attempts < maxAttempts) {
           attempts++;
           console.log(`Reconnecting attempt ${attempts}...`);
-          if (!alreadySent) {
-            connectWebSocket(); // Retry connection
-          }
+          connectWebSocket(); // Retry connection
         } else {
           console.log(
             `${maxAttempts} Attempts to Reconnect with the WebSocket.`
@@ -165,16 +153,10 @@
         // If search term includes "with id", filter only elements that have an "id" attribute
         if (selector.includes("with id")) {
           collectionFound.push(...Array.from(doc.querySelectorAll("[id]")));
-        }
-        // If search term includes "with name", filter only elements that have a "name" attribute
+        } // If search term includes "with id", filter only elements that have an "id" attribute
         else if (selector.includes("with name")) {
+          foundElements = Array.from(doc.querySelectorAll("[name]"));
           collectionFound.push(...Array.from(doc.querySelectorAll("[name]")));
-        }
-        // If search term includes "with test-id", filter only elements that have a "test-id" attribute
-        else if (selector.includes("with test-id")) {
-          collectionFound.push(
-            ...Array.from(doc.querySelectorAll("[test-id]"))
-          );
         } else {
           collectionFound.push(...Array.from(doc.querySelectorAll(selector)));
         }
@@ -222,8 +204,7 @@
       searchTerms.length === 0 ||
       (!searchTerms.includes("with id") &&
         !searchTerms.includes("with name") &&
-        !searchTerms.includes("with text") &&
-        !searchTerms.includes("with test-id"))
+        !searchTerms.includes("with text"))
     ) {
       // Check if the clicked element has a shadow root
       let shadowHost = element;
@@ -329,16 +310,6 @@
     });
   }
 
-  // Function to find clickable elements (buttons, links, etc.)
-  function findClickableElements(root) {
-    const clickableSelectors = ["button", "a"]; // Add other clickable elements if needed
-    const clickableElements = [];
-    clickableSelectors.forEach((selector) => {
-      clickableElements.push(...root.querySelectorAll(selector));
-    });
-    return clickableElements;
-  }
-
   function fetchAndParseIframeContent(iframe) {
     if (!iframe.src) return null;
 
@@ -387,17 +358,17 @@
         "No description"
       }; ${iframeDetails}`
     );
-    // Store the iframe details in the elementInfoMap
-    elementInfoMap.set(
-      xPathIFrame,
-      `xpath:${xPathIFrame};text:${
-        iframe.src ||
-        iframe.title ||
-        iframe.id ||
-        iframe.name ||
-        "No description"
-      };${iframeDetails}`
-    );
+    // // Store the iframe details in the elementInfoMap
+    // elementInfoMap.set(
+    //   xPathIFrame,
+    //   `xpath:${xPathIFrame};text:${
+    //     iframe.src ||
+    //     iframe.title ||
+    //     iframe.id ||
+    //     iframe.name ||
+    //     "No description"
+    //   };${iframeDetails}`
+    // );
   };
 
   // Function to collect iframe elements recursively
@@ -585,36 +556,7 @@
     collectElements(document, searchTerms, collectionFound, elementInfoMap);
 
     window.allElementInfo = [];
-
-    collectionFound = getResultMap(window.elementInfoMap);
-    console.log("All Collection Found :", collectionFound);
-
-    const sameXPathFound = processElementsWithXPath(collectionFound);
-    console.log("processElementsWithXPath", sameXPathFound);
-
-    const noRepeatedItems = findUniqueAndOneRepeated(sameXPathFound);
-    console.log("noRepeatedItems", noRepeatedItems); // Output the items with repetitions
-
-    // Define the order
-    const order = ["input", "button", "a", "select", "label", "span", "div"];
-
-    // Create the final list based on the specified order
-    const sortedList = order.reduce((acc, type) => {
-      const filteredElements = collectionFound.filter((item) => {
-        // For "label", "span", and "div", check if someText is not empty
-        if (["label", "span", "div"].includes(type)) {
-          return item.tagName === type && item.someText?.trim() !== "";
-        }
-        // For other types, no need to check someText
-        return item.tagName === type;
-      });
-
-      return [...acc, ...filteredElements];
-    }, []);
-
-    console.log("sortedList", sortedList);
-
-    limitMapSize(sortedList);
+    limitMapCharacters(window.elementInfoMap);
     console.log("All element info stored in Map:", window.allElementInfo);
     window.elementInfoMap.clear();
 
@@ -630,21 +572,8 @@
         homeBankingId: window.homeBankingId,
         details: window.allElementInfo, // Send allElementInfo
       };
-
-      // Convert the JSON message to a buffer
-      const base64Message = btoa(
-        unescape(encodeURIComponent(JSON.stringify(message)))
-      );
-      // Convert the buffer to a Base64 string
-      wSocket.send(base64Message);
-      // wSocket.send(JSON.stringify(message));
+      wSocket.send(JSON.stringify(message));
       console.log("Sent SEARCH_TOOL:", message);
-      console.log("Sent ENCODED Length:", base64Message.length);
-      console.log("Sent ENCODED:", base64Message);
-
-      alreadySent = true;
-      window.allElementInfo = [];
-      window.elementInfoMap.clear();
     }
   };
 
@@ -662,16 +591,9 @@
 
     function buildCssSelector(el) {
       if (!el) return "";
-
       let selector = el.tagName.toLowerCase();
-
       if (el.id) selector += `#${el.id}`;
-
-      // Ensure className is treated as a string
-      if (el.className && typeof el.className === "string") {
-        selector += `.${el.className.replace(/\s+/g, ".")}`;
-      }
-
+      if (el.className) selector += `.${el.className.replace(/\s+/g, ".")}`;
       return selector;
     }
 
@@ -1065,71 +987,6 @@
       ) {
         return "button";
       }
-
-      if (tag === "select" || tag === "option") {
-        return "select"; // or option
-      }
-
-      if (tag === "textarea") {
-        return "textarea";
-      }
-
-      // Framework specific detection from isInteractiveElement function.
-      if (
-        tag.includes("mat-button") ||
-        tag.includes("mat-raised-button") ||
-        tag.includes("mat-icon-button") ||
-        tag.includes("mat-menu-item") ||
-        tag.includes("mat-select") ||
-        tag.includes("mat-option") ||
-        tag.includes("matinput")
-      ) {
-        return "button"; // or select, input, option.
-      }
-
-      if (
-        tag.includes("data-testid") ||
-        tag.includes("aria-label") ||
-        part.includes("@role='button'") ||
-        part.includes("@role='textbox'") ||
-        part.includes("react-button") ||
-        part.includes("react-link") ||
-        part.includes("react-input")
-      ) {
-        if (part.includes("react-input")) {
-          return "input";
-        } else if (part.includes("react-link")) {
-          return "a";
-        } else {
-          return "button";
-        }
-      }
-
-      if (
-        part.includes("mdc-button") ||
-        part.includes("mdc-text-field") ||
-        part.includes("mdc-list-item")
-      ) {
-        if (part.includes("mdc-text-field")) {
-          return "input";
-        } else {
-          return "button";
-        }
-      }
-
-      if (
-        part.includes("el-button") ||
-        part.includes("el-input__inner") ||
-        part.includes("el-select-dropdown__item")
-      ) {
-        if (part.includes("el-input__inner")) {
-          return "input";
-        } else if (part.includes("el-select-dropdown__item")) {
-          return "select";
-        } else {
-          return "button";
-        }
-      }
     }
 
     return tagName; // Default to the given tagName if no match
@@ -1157,284 +1014,10 @@
     };
   };
 
-  function getResultMap(elementInfoMap) {
-    let collectionMap = [];
+  function limitMapCharacters(elementInfoMap) {
     elementInfoMap.forEach((value, key) => {
       let modifiedValue = value;
-      collectionMap.push(modifiedValue);
-    });
-    return collectionMap;
-  }
-
-  const processElementsWithXPath = (elementsList) => {
-    const groupedElements = new Map();
-
-    // Helper function to parse XPath into an array of tags and indices
-    const parseXPath = (xPath) => {
-      return xPath
-        .split("/")
-        .filter((part) => part)
-        .map((part) => {
-          const match = part.match(/([a-zA-Z]+)(?:\[(\d+)\])?/);
-          if (match) {
-            return {
-              tagName: match[1],
-              index: match[2] ? parseInt(match[2]) : null,
-            };
-          }
-          return null;
-        })
-        .filter((item) => item !== null);
-    };
-
-    // Helper function to determine if two XPaths belong to the same component
-    const areSameComponent = (xpath1, xpath2) => {
-      const path1 = parseXPath(xpath1);
-      const path2 = parseXPath(xpath2);
-
-      if (path1.length === 0 || path2.length === 0) {
-        return false;
-      }
-
-      // Check if the paths have the same base part (up to the "a" tag)
-      let commonLength = 0;
-      for (let i = 0; i < Math.min(path1.length, path2.length); i++) {
-        if (
-          path1[i].tagName === path2[i].tagName &&
-          path1[i].index === path2[i].index
-        ) {
-          if (path1[i].tagName === "a") {
-            commonLength = i + 1;
-            break;
-          }
-        } else {
-          break;
-        }
-      }
-
-      if (commonLength === 0) {
-        return false;
-      }
-
-      return path1.slice(0, commonLength).every((item, index) => {
-        return (
-          item.tagName === path2[index].tagName &&
-          item.index === path2[index].index
-        );
-      });
-    };
-
-    elementsList.forEach((element) => {
-      if (element.xPath && element.coordinates) {
-        let foundGroup = false;
-        for (const [key, group] of groupedElements) {
-          if (
-            areSameComponent(element.xPath, key) &&
-            element.coordinates === group[0].coordinates
-          ) {
-            group.push(element);
-            foundGroup = true;
-            break;
-          }
-        }
-        if (!foundGroup) {
-          groupedElements.set(element.xPath, [element]);
-        }
-      }
-    });
-
-    const filteredResult = [];
-
-    groupedElements.forEach((group) => {
-      if (group.length > 1) {
-        // Find the element with the "highest" coordinates (assuming higher means further down/right)
-        let highestCoordinateElement = group[0];
-        group.forEach((element) => {
-          const [x, y] = element.coordinates.split(",").map(parseFloat);
-          const [highestX, highestY] = highestCoordinateElement.coordinates
-            .split(",")
-            .map(parseFloat);
-          if (y > highestY || (y === highestY && x > highestX)) {
-            highestCoordinateElement = element;
-          }
-        });
-        filteredResult.push(highestCoordinateElement);
-      } else {
-        filteredResult.push(group[0]);
-      }
-    });
-
-    return filteredResult;
-  };
-
-  const findUniqueAndOneRepeated = (elementsList) => {
-    const wordFrequency = new Map();
-    const wordToItems = new Map();
-    const coordinatesMap = new Map();
-
-    elementsList.forEach((element) => {
-      if (
-        element.tagName.toLowerCase() !== "span" &&
-        element.tagName.toLowerCase() !== "div" &&
-        element.tagName.toLowerCase() !== "button"
-      ) {
-        return; // Ignore elements that are not <span>, <div>, or button
-      }
-
-      const someText = element.someText?.trim();
-      if (someText) {
-        someText.split(/[\s,;]+/).forEach((word) => {
-          const trimmedWord = word.trim();
-          if (trimmedWord) {
-            wordFrequency.set(
-              trimmedWord,
-              (wordFrequency.get(trimmedWord) || 0) + 1
-            );
-
-            if (!wordToItems.has(trimmedWord)) {
-              wordToItems.set(trimmedWord, new Set());
-            }
-            wordToItems.get(trimmedWord).add(element);
-          }
-        });
-      }
-
-      // Store elements by their coordinates
-      if (element.coordinates) {
-        if (!coordinatesMap.has(element.coordinates)) {
-          coordinatesMap.set(element.coordinates, []);
-        }
-        coordinatesMap.get(element.coordinates).push(element);
-      }
-    });
-
-    // Resolve elements with same coordinates, prioritizing "aria-label"
-    coordinatesMap.forEach((elements) => {
-      let priorityElement = elements.find((el) =>
-        el.attributeData?.some((attr) => attr.name === "aria-label")
-      );
-      if (priorityElement) {
-        const ariaLabelAttr = priorityElement.attributeData.find(
-          (attr) => attr.name === "aria-label"
-        );
-        if (ariaLabelAttr) {
-          elements.forEach((el) => {
-            if (el.someText !== ariaLabelAttr.value) {
-              el.someText = ariaLabelAttr.value; // Override someText with aria-label
-            }
-          });
-        }
-      }
-    });
-
-    const repeatedWords = Array.from(wordFrequency.entries())
-      .filter(([_, count]) => count > 1)
-      .map(([word]) => word);
-
-    const result = [];
-    const addedElements = new Set();
-
-    // Helper function to check if an element has a specific attribute
-    const hasAttribute = (element, attributeName) => {
-      return element.attributeData?.some((attr) => attr.name === attributeName);
-    };
-
-    // Add one occurrence of each repeated word's element, prioritizing "aria-label" over "test-id"
-    repeatedWords.forEach((word) => {
-      if (wordToItems.has(word)) {
-        let items = Array.from(wordToItems.get(word));
-
-        // Prioritize elements: first by "aria-label", then by "test-id"
-        items.sort(
-          (a, b) =>
-            hasAttribute(b, "aria-label") - hasAttribute(a, "aria-label") ||
-            hasAttribute(b, "test-id") - hasAttribute(a, "test-id")
-        );
-
-        if (!addedElements.has(items[0])) {
-          result.push(items[0]);
-          addedElements.add(items[0]);
-        }
-      }
-    });
-
-    // Add elements with unique words
-    elementsList.forEach((element) => {
-      if (!addedElements.has(element)) {
-        const someText = element.someText?.trim();
-        if (someText) {
-          const words = someText.split(/[\s,;]+/).map((word) => word.trim());
-          const isRepeated = words.some((word) => repeatedWords.includes(word));
-          if (!isRepeated) {
-            result.push(element);
-            addedElements.add(element);
-          }
-        }
-      }
-    });
-
-    // filter coordinate duplicates, keeping the first with aria-label or greatest attributeData size
-    const uniqueCoords = new Map();
-    const filteredResult = [];
-
-    result.forEach((el) => {
-      if (el.coordinates) {
-        if (!uniqueCoords.has(el.coordinates)) {
-          uniqueCoords.set(el.coordinates, el);
-          filteredResult.push(el);
-        } else {
-          const existingEl = uniqueCoords.get(el.coordinates);
-          if (
-            !hasAttribute(existingEl, "aria-label") &&
-            hasAttribute(el, "aria-label")
-          ) {
-            uniqueCoords.set(el.coordinates, el);
-            filteredResult[filteredResult.indexOf(existingEl)] = el;
-          } else if (el.attributeData && existingEl.attributeData) {
-            if (el.attributeData.length > existingEl.attributeData.length) {
-              uniqueCoords.set(el.coordinates, el);
-              filteredResult[filteredResult.indexOf(existingEl)] = el;
-            }
-          }
-        }
-      } else {
-        filteredResult.push(el);
-      }
-    });
-
-    // Add the elements that did not match the initial filter
-    elementsList.forEach((element) => {
-      if (
-        element.tagName.toLowerCase() !== "span" &&
-        element.tagName.toLowerCase() !== "div" &&
-        element.tagName.toLowerCase() !== "button"
-      ) {
-        filteredResult.push(element);
-      }
-    });
-
-    return filteredResult;
-  };
-
-  function limitMapSize(sortedList) {
-    // Check the length of allElementInfo before adding new elements
-    console.log("limitMapSize");
-    sortedList.forEach((item) => {
-      if (window.allElementInfo.length < 35) {
-        window.allElementInfo.push(item);
-      }
-    });
-  }
-
-  function limitMapCharacters(elementInfoMap) {
-    // Check the length of allElementInfo before adding new elements
-    console.log("limitMapCharacters");
-    elementInfoMap.forEach((value, key) => {
-      // Only add elements if there are fewer than 20 elements in the array
-      if (window.allElementInfo.length < 30) {
-        let modifiedValue = value;
-        window.allElementInfo.push(modifiedValue);
-      }
+      window.allElementInfo.push(modifiedValue);
     });
   }
 
@@ -1501,35 +1084,26 @@
   // startCollectingElements(window.searchTerms);
   // init("Initiate");
   // window.initSearchTerms = null; // Invalidating the function
-})(
-  arguments[0],
-  arguments[1],
-  arguments[2],
-  arguments[3],
-  arguments[4],
-  arguments[5],
-  arguments[6]
-);
-// })(["*"], false, 8282, "scannerTool", "scannerGrid-2", "searchTerms", 2);
+  // })(
+  //   arguments[0],
+  //   arguments[1],
+  //   arguments[2],
+  //   arguments[3],
+  //   arguments[4],
+  //   arguments[5],
+  //   arguments[6]
+  // );
 
-// })(["with name"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
-// })(
-//   ["with test-id"],
-//   false,
-//   8282,
-//   "scannerTool",
-//   "scannerGrid-2",
-//   "searchTerms",
-//   2
-// );
-// })(
-//   ["input", "button", "a", "select"],
-//   false,
-//   8282,
-//   "scannerTool",
-//   "scannerGrid-2",
-//   "searchTerms",
-//   2
-// );
+  // })([], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
+  // })(["with name"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
+})(
+  ["input", "button", "a", "select"],
+  false,
+  8282,
+  "scannerTool",
+  "scannerGrid-2",
+  "searchTerms",
+  2
+);
 // })(["*"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
 // })(["button"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
