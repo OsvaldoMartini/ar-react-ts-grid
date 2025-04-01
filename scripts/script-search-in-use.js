@@ -1402,6 +1402,17 @@
       }
     });
 
+    // Use a Set to keep track of unique XPath values
+    const uniqueXPaths = new Set();
+    const finalResult = [];
+
+    filteredResult.forEach((el) => {
+      if (el.xPath && !uniqueXPaths.has(el.xPath)) {
+        uniqueXPaths.add(el.xPath);
+        finalResult.push(el);
+      }
+    });
+
     // Add the elements that did not match the initial filter
     elementsList.forEach((element) => {
       if (
@@ -1409,7 +1420,9 @@
         element.tagName.toLowerCase() !== "div" &&
         element.tagName.toLowerCase() !== "button"
       ) {
-        filteredResult.push(element);
+        if (element.xPath && !uniqueXPaths.has(element.xPath)) {
+          finalResult.push(element);
+        }
       }
     });
 
@@ -1525,7 +1538,7 @@
 // })(
 //   ["input", "button", "a", "select", "label"],
 //   false,
-//   58919,
+//   62134,
 //   "scannerTool",
 //   "scannerGrid-2",
 //   "searchTerms",

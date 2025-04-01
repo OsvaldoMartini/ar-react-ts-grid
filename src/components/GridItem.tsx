@@ -2578,7 +2578,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingId, data, socketPort, se
     if (instruction.actions === "CK" && instruction.operation) {
       const [left, middle, right] = instruction.operation.split(":").map((part) => part.trim());
 
-      if (middle === "=" || middle === ">" || middle === "!=") {
+      if (middle === "=" || middle === ">" || middle === "<" || middle === "!=") {
         return (
           <span className="instruction-details">
             <span style={{ color: "#0b5394" }}>({instruction.parentId}){left}</span>
