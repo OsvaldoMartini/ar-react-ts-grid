@@ -21,6 +21,7 @@ export interface BlockLoopInstructionLoadDTO {
   exportFile?: string;
   refreshLoop?: boolean;
   loopOnly?: boolean;
+  variableId?: number;
 }
 
 

@@ -1207,7 +1207,8 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingId, data, socketPort, se
         instructionName: instruction.name,
         operation: instruction.operation,
         actions: instruction.actions,
-        parentId: instruction.parentId
+        parentId: instruction.parentId,
+        variableId: instruction.variableId
       };
 
       // WebSocket message for "INSERT_BEFORE" with the selected instruction's details
@@ -1227,7 +1228,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingId, data, socketPort, se
 
           webSocket.send(JSON.stringify(message));
 
-          console.log('Sent insert after message:', message);
+          console.log('Edit Operation message:', message);
         } catch (error) {
           console.log('Error sending WebSocket message:', error);
         }
