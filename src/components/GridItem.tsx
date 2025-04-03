@@ -2573,7 +2573,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingId, data, socketPort, se
     instruction: BlockLoopInstructionLoadDTO,
     allInstructions: BlockLoopInstructionLoadDTO[]
   ) => {
-    const validActions = ["SET", "GET", "CK", "E", "GOTO", , "LOOP", "REFRESH_LOOP"];
+    const validActions = ["SET", "GET"];
 
     // Handle the "CK" action with special formatting for operation
     if (instruction.actions === "CK" && instruction.operation) {
@@ -2678,13 +2678,22 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingId, data, socketPort, se
     }
 
     // Handle operation for other actions (SET, GET, E)
-    if (instruction.operation && validActions.includes(instruction.actions)) {
+    if (validActions.includes(instruction.actions) && instruction.operation) {
       const [left, right] = instruction.operation.split(":");
 
       return (
         <span className="instruction-details">
           <span style={{ color: "#0b5394" }}>({instruction.parentId}){left}</span>:
           <span style={{ color: "#FFA500" }}>{right}</span>
+        </span>
+      );
+    }
+
+    // Handle operation for other actions (SET, GET, E)
+    if (instruction.actions === "E" && instruction.operation) {
+      return (
+        <span className="instruction-details">
+          <span style={{ color: "#FFA500" }}>({instruction.variableId}){instruction.operation}</span>
         </span>
       );
     }
