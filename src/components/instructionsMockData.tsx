@@ -50,6 +50,7 @@ export interface ComponentsInstructionsDTO {
 }
 
 export interface ElementDTO {
+  id: number;
   typeElement: string;
   tagName: string;
   xPath: string;

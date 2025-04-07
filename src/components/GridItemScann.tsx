@@ -58,6 +58,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
   const [blockRowsPerPage, setBlockRowsPerPage] = useState<number>(5);
   const elementDTORef = useRef<HTMLInputElement>(null);
   const [editingElementId, setEditingElementId] = useState<string | null>(null);
+  const [editingElementTagName, setEditingElementTagName] = useState<string | null>(null);
   const [elementName, setElementName] = useState<string>('');
 
   const handleNextBlockPage = (typeElement: string) => {
@@ -120,19 +121,29 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
               setElementDTO((prevElements) => {
                 let updatedElements = [...prevElements]; // Create a copy
 
+                // Find the maximum existing ID
+                const maxId = prevElements.reduce((max, el) => Math.max(max, el.id || 0), 0);
+                let nextId = maxId + 1;
+
                 newElements.forEach((newElement) => {
-                  // Check for duplicates based on xPath
-                  if (!updatedElements.some((el) => el.xPath === newElement.xPath)) {
-                    // Find if there is an existing element and insert after
+                  // Check for duplicates based on both xPath AND tagName
+                  if (!updatedElements.some(
+                    (el) => el.xPath === newElement.xPath && el.tagName === newElement.tagName
+                  )) {
+                    // Assign the next sequential ID to the new element
+                    const elementToAdd = { ...newElement, id: nextId++ };
+
                     let insertIndex = -1;
-                    if (prevElements.length > 0) {
-                      insertIndex = prevElements.findIndex(el => el.xPath === bodyData?.afterXPath);
+                    if (prevElements.length > 0 && bodyData?.afterXPath) {
+                      insertIndex = prevElements.findIndex(
+                        (el) => el.xPath === bodyData.afterXPath
+                      );
                     }
 
                     if (insertIndex !== -1) {
-                      updatedElements.splice(insertIndex + 1, 0, newElement); // Insert after found index
+                      updatedElements.splice(insertIndex + 1, 0, elementToAdd); // Insert after found index
                     } else {
-                      updatedElements.push(newElement); // Append at the end if not found
+                      updatedElements.push(elementToAdd); // Append at the end if not found
                     }
                   }
                 });
@@ -430,11 +441,13 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
 
   const handleEditInstruction = (elementEdit: ElementDTO) => {
     setEditingElementId(elementEdit.xPath);
+    setEditingElementTagName(elementEdit.tagName);
     setElementName(elementEdit.someText);
   };
-  const handleSaveInstruction = (selectedElement: ElementDTO) => {
+  const handleSaveInstruction = (selectedElement: ElementDTO, index: number) => {
     // Find the instruction to get blockId and botJobId
-    const elementToUpdate = elementDTO.find(element => selectedElement.xPath === element.xPath);
+    console.log("handleSaveInstruction", selectedElement + " - " + index);
+    const elementToUpdate = elementDTO.find(element => selectedElement.id === element.id);
 
     if (!elementToUpdate) {
       setAlertImage(warningRedImage);
@@ -447,12 +460,12 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
       return;
     }
 
-    const { xPath } = selectedElement;
+    const { id } = selectedElement;
     const updatedName = elementName; // The new value for someText
 
     // Update the instruction's someText
     const updatedElements = elementDTO.map((element) => {
-      if (element.xPath === xPath) {
+      if (element.id === id) {
         return { ...element, someText: updatedName }; // Update the someText property
       }
       return element; // Return the original element if it's not the one to update
@@ -461,6 +474,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
     setElementDTO(updatedElements);
     setIsElementGrouped(false); // Trigger re-grouping
     setEditingElementId(null); // Exit edit mode
+    setEditingElementTagName(null); // Exit edit mode
   };
 
 
@@ -570,14 +584,14 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
                       // onDoubleClick={(event) => handleRowSelectedClick(event, elementDTO, "NEW_ELEMENT_DTO")}
                       onClick={(event) => handleRowSelectedClick(event, elementDTO, "DETAILS_ELEMENT_DTO")}
                     >
-                      {editingElementId === elementDTO.xPath ? (
+                      {editingElementId === elementDTO.xPath && editingElementTagName === elementDTO.tagName ? (
                         <div className="edit-container">
                           <input
                             type="text"
                             value={elementName}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
-                                handleSaveInstruction(elementDTO); // Trigger save when "Enter" is pressed
+                                handleSaveInstruction(elementDTO, i); // Trigger save when "Enter" is pressed
                               }
                             }}
                             onChange={(e) => {
@@ -592,7 +606,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
                             alt="save"
                             className="save-button"
                             onClick={() =>
-                              handleSaveInstruction(elementDTO)
+                              handleSaveInstruction(elementDTO, i)
                             } // Save instruction logic
                           />
                         </div>
