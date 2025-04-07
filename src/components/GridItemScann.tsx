@@ -2,12 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ComplexMessage, ElementDTO } from './instructionsMockData';
 import crossImage from '../assets/cross.png';
 import saveImage from "../assets/save.png";
+import editImage from '../assets/edit.png';
 import constructionImage from '../assets/construction.png';
 import clickImage from "../assets/click.png";
 import linkImage from "../assets/links-icon.png";
 import inputImage from "../assets/input_field.png";
 import outPutImage from "../assets/output1.png";
 import testImage from "../assets/test.png";
+import warningRedImage from '../assets/warning_red.png';
 import AlertModal from './AlertModal';
 import { useWebSocket } from './useWebSocket';
 import AttributeDropdown from './AttributeDropdown';
@@ -54,6 +56,9 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
   const [blockPages, setBlockPages] = useState<Record<string, number>>({});
   const [blockCurrentPages, setBlockCurrentPages] = useState<Record<string, number>>({});
   const [blockRowsPerPage, setBlockRowsPerPage] = useState<number>(5);
+  const elementDTORef = useRef<HTMLInputElement>(null);
+  const [editingElementId, setEditingElementId] = useState<string | null>(null);
+  const [elementName, setElementName] = useState<string>('');
 
   const handleNextBlockPage = (typeElement: string) => {
     setBlockCurrentPages((prev) => ({
@@ -177,7 +182,12 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
     }
   }, [messages, sessionId]);
 
-
+  useEffect(() => {
+    //console.log("UseEffect -> editingInstructionId");
+    if (editingElementId && elementDTORef.current) {
+      elementDTORef.current.focus();
+    }
+  }, [editingElementId]);
 
   useEffect(() => {
     if (!isElementGrouped && elementDTO && elementDTO.length > 0) {
@@ -407,29 +417,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
   };
 
 
-  const handleSendDetailsDTO = (elementDTO: ElementDTO) => {
-    console.log("handleSendDetailsDTO:", elementDTO);
 
-    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
-      console.warn("🚨 WebSocket is not connected. Cannot send message.");
-      return;
-    }
-
-    const message = {
-      type: "DETAILS_ELEMENT_DTO",
-      homeBankingId: homeBankingId,
-      sessionId: "unknow",
-      details: [elementDTO],
-    };
-
-    try {
-      webSocket.send(JSON.stringify(message));
-      console.log('📤 Sent DETAILS element DTO:', message);
-    } catch (error) {
-      console.error('❌ Error sending WebSocket message:', error);
-    }
-
-  };
 
   const handleNameChange = (value: string) => {
     console.log('Selected name:', value);
@@ -437,6 +425,54 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
 
   const handleAttributeChange = (value: string) => {
     console.log('Selected attribute:', value);
+  };
+
+
+  const handleEditInstruction = (elementEdit: ElementDTO) => {
+    setEditingElementId(elementEdit.xPath);
+    setElementName(elementEdit.someText);
+  };
+  const handleSaveInstruction = (selectedElement: ElementDTO) => {
+    // Find the instruction to get blockId and botJobId
+    const elementToUpdate = elementDTO.find(element => selectedElement.xPath === element.xPath);
+
+    if (!elementToUpdate) {
+      setAlertImage(warningRedImage);
+      setAlertClass('construction-image');
+      setAlertMessageHeader(
+        `Error Element not found`
+      );
+      setErrorFlag(true);
+      setAlertMessageBody(`Element with TagName ${selectedElement.tagName} not found`);
+      return;
+    }
+
+    const { xPath } = selectedElement;
+    const updatedName = elementName; // The new value for someText
+
+    // Update the instruction's someText
+    const updatedElements = elementDTO.map((element) => {
+      if (element.xPath === xPath) {
+        return { ...element, someText: updatedName }; // Update the someText property
+      }
+      return element; // Return the original element if it's not the one to update
+    });
+
+    setElementDTO(updatedElements);
+    setIsElementGrouped(false); // Trigger re-grouping
+    setEditingElementId(null); // Exit edit mode
+  };
+
+
+  const renderEditButton = (elementDTO: ElementDTO, editImage: string,) => {
+    return (
+      <img
+        src={editImage}
+        alt="edit"
+        className="edit-button"
+        onClick={() => handleEditInstruction(elementDTO)}  // Trigger edit mode
+      />
+    );
   };
 
 
@@ -534,7 +570,34 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
                       // onDoubleClick={(event) => handleRowSelectedClick(event, elementDTO, "NEW_ELEMENT_DTO")}
                       onClick={(event) => handleRowSelectedClick(event, elementDTO, "DETAILS_ELEMENT_DTO")}
                     >
-                      <span className="instruction-line">{getInstructionElement(elementDTO)}</span>
+                      {editingElementId === elementDTO.xPath ? (
+                        <div className="edit-container">
+                          <input
+                            type="text"
+                            value={elementName}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                handleSaveInstruction(elementDTO); // Trigger save when "Enter" is pressed
+                              }
+                            }}
+                            onChange={(e) => {
+                              console.log(e.target.value);
+                              setElementName(e.target.value);
+                            }}
+                            ref={elementDTORef} // Associate the ref with the input element
+                            className="edit-textbox"
+                          />
+                          <img
+                            src={saveImage}
+                            alt="save"
+                            className="save-button"
+                            onClick={() =>
+                              handleSaveInstruction(elementDTO)
+                            } // Save instruction logic
+                          />
+                        </div>
+                      ) : (
+                        <span className="instruction-line">{getInstructionElement(elementDTO)}</span>)}
                       {showAttributes ? (
                         <div>
                           <AttributeDropdown dataArray={elementDTO.attributeData} onChange={handleAttributeChange} />
@@ -543,6 +606,10 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
                         <span>{"\u00A0".repeat(20)}</span>
                       )}
                       <div className="options-column">
+                        {renderEditButton(
+                          elementDTO,
+                          editImage
+                        )}
                         <img src={saveImage} alt="save" className="save-button" onClick={(event) => handleRowSelectedClick(event, elementDTO, "NEW_ELEMENT_DTO")} />
                         <img src={testImage} alt="test" className="test-button" onClick={(event) => handleRowSelectedClick(event, elementDTO, "TEST_ELEMENT_DTO")} />
                         <img src={crossImage} alt="" className="cross-button" onClick={() => handleRemoveElementDTO(elementDTO)} />
