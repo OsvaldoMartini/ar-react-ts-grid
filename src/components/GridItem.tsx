@@ -396,7 +396,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingId, data, socketPort, se
             `Moving "${instructionToMove.name}" is not allowed!"`
           );
           setAlertMessageFooter(
-            `It cannot be placed after "${forbiddenInstruction?.name}"`
+            `It cannot be placed before "${forbiddenInstruction?.name}"`
           );
 
           return { isMoveForbidden, forbiddenInstruction }; // Return both values if needed
