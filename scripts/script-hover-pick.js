@@ -130,6 +130,8 @@
 
     findMatLabel(window.allElementInfo);
 
+    changeDivToLabelWithSomeText(window.allElementInfo);
+
     console.log("All element info stored in Map:", window.allElementInfo);
 
     if (wSocket && wSocket.readyState) {
@@ -463,7 +465,7 @@
     return "";
   };
 
-  function identifyElementTypeFromXPath(tagName, xpath, someText) {
+  function identifyElementTypeFromXPath(tagName, xpath) {
     if (typeof xpath !== "string" || xpath.trim() === "") {
       return "unknown";
     }
@@ -478,8 +480,8 @@
 
       const tag = tagMatch[1].toLowerCase();
 
-      if (tag === "a" || tag === "label") {
-        return "label"; // Link
+      if (tag === "a") {
+        return "a"; // Link
       }
 
       if (tag === "input") {
@@ -504,10 +506,71 @@
       ) {
         return "button";
       }
-    }
 
-    if (someText.trim().length > 0) {
-      return "label";
+      if (tag === "select" || tag === "option") {
+        return "select"; // or option
+      }
+
+      if (tag === "textarea") {
+        return "input";
+      }
+
+      // Framework specific detection from isInteractiveElement function.
+      if (
+        tag.includes("mat-button") ||
+        tag.includes("mat-raised-button") ||
+        tag.includes("mat-icon-button") ||
+        tag.includes("mat-menu-item") ||
+        tag.includes("mat-select") ||
+        tag.includes("mat-option") ||
+        tag.includes("matinput")
+      ) {
+        return "button"; // or select, input, option.
+      }
+
+      if (
+        tag.includes("data-testid") ||
+        tag.includes("aria-label") ||
+        part.includes("@role='button'") ||
+        part.includes("@role='textbox'") ||
+        part.includes("react-button") ||
+        part.includes("react-link") ||
+        part.includes("react-input")
+      ) {
+        if (part.includes("react-input")) {
+          return "input";
+        } else if (part.includes("react-link")) {
+          return "a";
+        } else {
+          return "button";
+        }
+      }
+
+      if (
+        part.includes("mdc-button") ||
+        part.includes("mdc-text-field") ||
+        part.includes("mdc-list-item")
+      ) {
+        if (part.includes("mdc-text-field")) {
+          return "input";
+        } else {
+          return "button";
+        }
+      }
+
+      if (
+        part.includes("el-button") ||
+        part.includes("el-input__inner") ||
+        part.includes("el-select-dropdown__item")
+      ) {
+        if (part.includes("el-input__inner")) {
+          return "input";
+        } else if (part.includes("el-select-dropdown__item")) {
+          return "select";
+        } else {
+          return "button";
+        }
+      }
     }
 
     return tagName; // Default to the given tagName if no match
@@ -805,6 +868,14 @@
     });
   }
 
+  function changeDivToLabelWithSomeText(sortedList) {
+    sortedList.forEach((item) => {
+      if (item.someText && item.tagName === "div") {
+        item.tagName = "label";
+      }
+    });
+  }
+
   // Function to find clickable elements (buttons, links, etc.)
   function findClickableElements(root) {
     const clickableSelectors = ["button", "a"]; // Add other clickable elements if needed
@@ -862,19 +933,19 @@
   });
 
   // window.cloneTerms = null; // Invalidating the function
-  // })(
-  //   arguments[0],
-  //   arguments[1],
-  //   arguments[2],
-  //   arguments[3],
-  //   arguments[4],
-  //   arguments[5]
-  // );
 })(
-  "https://www.inlinea.ch/",
-  "https://www.inlinea.ch/",
-  ["*"],
-  false,
-  60332,
-  1
+  arguments[0],
+  arguments[1],
+  arguments[2],
+  arguments[3],
+  arguments[4],
+  arguments[5]
 );
+// })(
+//   "https://www.inlinea.ch/",
+//   "https://www.inlinea.ch/",
+//   ["*"],
+//   false,
+//   55330,
+//   1
+// );

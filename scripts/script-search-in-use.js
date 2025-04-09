@@ -625,6 +625,8 @@
 
     findMatLabel(sortedList);
 
+    changeDivToLabelWithSomeText(sortedList);
+
     limitMapSize(sortedList);
     console.log("All element info stored in Map:", window.allElementInfo);
     window.elementInfoMap.clear();
@@ -1509,6 +1511,14 @@
     });
   }
 
+  function changeDivToLabelWithSomeText(sortedList) {
+    sortedList.forEach((item) => {
+      if (item.someText && item.tagName === "div") {
+        item.tagName = "label";
+      }
+    });
+  }
+
   function limitMapCharacters(elementInfoMap) {
     // Check the length of allElementInfo before adding new elements
     console.log("limitMapCharacters");
@@ -1605,14 +1615,6 @@
 //   "searchTerms",
 //   2
 // );
-// })(
-//   ["textarea", "input"],
-//   false,
-//   52861,
-//   "scannerTool",
-//   "scannerGrid-1",
-//   "searchTerms",
-//   1
-// );
+// })(["div"], false, 55330, "scannerTool", "scannerGrid-1", "searchTerms", 1);
 // })(["*"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
 // })(["button"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
