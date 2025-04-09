@@ -740,13 +740,6 @@
         return null; // Ignore all hidden elements except <input type="hidden">
       }
     }
-    const xPath = getMartiniXPath(element);
-
-    let tagName = element.tagName.toLowerCase();
-    const tagNameTemp = identifyElementTypeFromXPath(tagName, xPath);
-    if (tagNameTemp !== tagName) {
-      tagName = tagNameTemp;
-    }
 
     const attributeData = Array.from(element.attributes).map((attr) => ({
       name: attr.name,
@@ -757,7 +750,17 @@
     const coordinates = `${element
       .getBoundingClientRect()
       .left.toFixed(2)},${element.getBoundingClientRect().top.toFixed(2)}`;
+
+    let tagName = element.tagName.toLowerCase();
+
     const someText = getVisibleText(tagName, attributeData, element);
+
+    const xPath = getMartiniXPath(element);
+
+    const tagNameTemp = identifyElementTypeFromXPath(tagName, xPath, someText);
+    if (tagNameTemp !== tagName) {
+      tagName = tagNameTemp;
+    }
 
     return {
       xPath,
@@ -1432,9 +1435,10 @@
   function limitMapSize(sortedList) {
     // Check the length of allElementInfo before adding new elements
     console.log("limitMapSize");
+    let currentId = 1;
     sortedList.forEach((item) => {
       if (window.allElementInfo.length < 35) {
-        window.allElementInfo.push(item);
+        window.allElementInfo.push({ ...item, id: currentId++ });
       }
     });
   }

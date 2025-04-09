@@ -8,7 +8,8 @@ import clickImage from "../assets/click.png";
 import linkImage from "../assets/links-icon.png";
 import inputImage from "../assets/input_field.png";
 import outPutImage from "../assets/output1.png";
-import testImage from "../assets/test.png";
+import testInputImage from "../assets/testInput.png";
+import clickTestImage from "../assets/clickTest2.png";
 import warningRedImage from '../assets/warning_red.png';
 import AlertModal from './AlertModal';
 import { useWebSocket } from './useWebSocket';
@@ -444,9 +445,9 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
     setEditingElementTagName(elementEdit.tagName);
     setElementName(elementEdit.someText);
   };
-  const handleSaveInstruction = (selectedElement: ElementDTO, index: number) => {
+  const handleSaveInstruction = (selectedElement: ElementDTO) => {
     // Find the instruction to get blockId and botJobId
-    console.log("handleSaveInstruction", selectedElement + " - " + index);
+    console.log("handleSaveInstruction", selectedElement);
     const elementToUpdate = elementDTO.find(element => selectedElement.id === element.id);
 
     if (!elementToUpdate) {
@@ -591,7 +592,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
                             value={elementName}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
-                                handleSaveInstruction(elementDTO, i); // Trigger save when "Enter" is pressed
+                                handleSaveInstruction(elementDTO); // Trigger save when "Enter" is pressed
                               }
                             }}
                             onChange={(e) => {
@@ -606,7 +607,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
                             alt="save"
                             className="save-button"
                             onClick={() =>
-                              handleSaveInstruction(elementDTO, i)
+                              handleSaveInstruction(elementDTO)
                             } // Save instruction logic
                           />
                         </div>
@@ -625,7 +626,8 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
                           editImage
                         )}
                         <img src={saveImage} alt="save" className="save-button" onClick={(event) => handleRowSelectedClick(event, elementDTO, "NEW_ELEMENT_DTO")} />
-                        <img src={testImage} alt="test" className="test-button" onClick={(event) => handleRowSelectedClick(event, elementDTO, "TEST_ELEMENT_DTO")} />
+                        <img src={testInputImage} alt="test" className="test-button" onClick={(event) => handleRowSelectedClick(event, elementDTO, "TEST_INPUT_DTO")} />
+                        <img src={clickTestImage} alt="test" className="test-button" onClick={(event) => handleRowSelectedClick(event, elementDTO, "TEST_CLICK_DTO")} />
                         <img src={crossImage} alt="" className="cross-button" onClick={() => handleRemoveElementDTO(elementDTO)} />
                       </div>
                     </div>
