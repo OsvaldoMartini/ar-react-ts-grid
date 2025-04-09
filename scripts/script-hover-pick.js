@@ -125,7 +125,11 @@
 
   function sendingData() {
     window.allElementInfo = [];
+
     limitMapCharacters(window.elementInfoMap);
+
+    findMatLabel(window.allElementInfo);
+
     console.log("All element info stored in Map:", window.allElementInfo);
 
     if (wSocket && wSocket.readyState) {
@@ -749,6 +753,58 @@
     }
   }
 
+  function findMatLabel(sortedList) {
+    sortedList.forEach((item) => {
+      if (item.attribId || item.attribName) {
+        let searchText = item.someText;
+        let searchId = item.attribId;
+        let searchName = item.attribName;
+        let foundLabelText = null;
+
+        const selectors = [];
+        if (searchId) {
+          selectors.push(`label[for="${searchId}"] mat-label`);
+          selectors.push(`mat-label[for="${searchId}"]`);
+          selectors.push(`mat-checkbox[test-id="${searchName}"] .mdc-label`); // Keep this in case 'test-id' is relevant
+          selectors.push(`label[for="${searchId}"]`); // Direct label using 'for' attribute
+        }
+        if (searchName) {
+          selectors.push(`label[for="${searchName}"] mat-label`);
+          selectors.push(`mat-label[for="${searchName}"]`);
+          selectors.push(`mat-checkbox[test-id="${searchName}"] .mdc-label`); // Keep this in case 'test-id' is relevant
+          selectors.push(`label[for="${searchId}"]`); // Direct label using 'for' attribute
+        }
+
+        selectors.forEach((selector) => {
+          const labelElement = document.querySelector(selector);
+          if (labelElement && foundLabelText === null) {
+            foundLabelText = labelElement.textContent.trim();
+            console.log(
+              `Found mat-label text for input with id/name '${
+                searchId || searchName
+              }':`,
+              foundLabelText
+            );
+
+            // Add "someText" to attributeData
+            item.attributeData.push({ name: "someText", value: searchText });
+
+            // Replace the value of someText with the found label text
+            item.someText = foundLabelText;
+          }
+        });
+
+        if (foundLabelText === null) {
+          console.log(
+            `No mat-label found for input with id/name '${
+              searchId || searchName
+            }'.`
+          );
+        }
+      }
+    });
+  }
+
   // Function to find clickable elements (buttons, links, etc.)
   function findClickableElements(root) {
     const clickableSelectors = ["button", "a"]; // Add other clickable elements if needed
@@ -806,19 +862,19 @@
   });
 
   // window.cloneTerms = null; // Invalidating the function
+  // })(
+  //   arguments[0],
+  //   arguments[1],
+  //   arguments[2],
+  //   arguments[3],
+  //   arguments[4],
+  //   arguments[5]
+  // );
 })(
-  arguments[0],
-  arguments[1],
-  arguments[2],
-  arguments[3],
-  arguments[4],
-  arguments[5]
+  "https://www.inlinea.ch/",
+  "https://www.inlinea.ch/",
+  ["*"],
+  false,
+  60332,
+  1
 );
-// })(
-//   "https://www.inlinea.ch/",
-//   "https://www.inlinea.ch/",
-//   ["*"],
-//   false,
-//   60332,
-//   1
-// );

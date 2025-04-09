@@ -1469,10 +1469,14 @@
         if (searchId) {
           selectors.push(`label[for="${searchId}"] mat-label`);
           selectors.push(`mat-label[for="${searchId}"]`);
+          selectors.push(`mat-checkbox[test-id="${searchName}"] .mdc-label`); // Keep this in case 'test-id' is relevant
+          selectors.push(`label[for="${searchId}"]`); // Direct label using 'for' attribute
         }
         if (searchName) {
           selectors.push(`label[for="${searchName}"] mat-label`);
           selectors.push(`mat-label[for="${searchName}"]`);
+          selectors.push(`mat-checkbox[test-id="${searchName}"] .mdc-label`); // Keep this in case 'test-id' is relevant
+          selectors.push(`label[for="${searchId}"]`); // Direct label using 'for' attribute
         }
 
         selectors.forEach((selector) => {
@@ -1602,9 +1606,9 @@
 //   2
 // );
 // })(
-//   ["textarea"],
+//   ["textarea", "input"],
 //   false,
-//   64680,
+//   52861,
 //   "scannerTool",
 //   "scannerGrid-1",
 //   "searchTerms",
