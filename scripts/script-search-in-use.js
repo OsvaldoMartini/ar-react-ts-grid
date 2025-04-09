@@ -596,7 +596,16 @@
     console.log("noRepeatedItems", noRepeatedItems); // Output the items with repetitions
 
     // Define the order
-    const order = ["input", "button", "a", "select", "label", "span", "div"];
+    const order = [
+      "input",
+      "textarea",
+      "button",
+      "a",
+      "select",
+      "label",
+      "span",
+      "div",
+    ];
 
     // Create the final list based on the specified order
     const sortedList = order.reduce((acc, type) => {
@@ -613,6 +622,8 @@
     }, []);
 
     console.log("sortedList", sortedList);
+
+    findMatLabel(sortedList);
 
     limitMapSize(sortedList);
     console.log("All element info stored in Map:", window.allElementInfo);
@@ -804,6 +815,9 @@
       "aria-label",
       "aria-labelledby",
       "aria-describedby",
+      "textarea",
+      "input",
+      "select",
       "placeholder",
       "label",
       "name",
@@ -1074,7 +1088,7 @@
       }
 
       if (tag === "textarea") {
-        return "textarea";
+        return "input";
       }
 
       // Framework specific detection from isInteractiveElement function.
@@ -1443,6 +1457,54 @@
     });
   }
 
+  function findMatLabel(sortedList) {
+    sortedList.forEach((item) => {
+      if (item.attribId || item.attribName) {
+        let searchText = item.someText;
+        let searchId = item.attribId;
+        let searchName = item.attribName;
+        let foundLabelText = null;
+
+        const selectors = [];
+        if (searchId) {
+          selectors.push(`label[for="${searchId}"] mat-label`);
+          selectors.push(`mat-label[for="${searchId}"]`);
+        }
+        if (searchName) {
+          selectors.push(`label[for="${searchName}"] mat-label`);
+          selectors.push(`mat-label[for="${searchName}"]`);
+        }
+
+        selectors.forEach((selector) => {
+          const labelElement = document.querySelector(selector);
+          if (labelElement && foundLabelText === null) {
+            foundLabelText = labelElement.textContent.trim();
+            console.log(
+              `Found mat-label text for input with id/name '${
+                searchId || searchName
+              }':`,
+              foundLabelText
+            );
+
+            // Add "someText" to attributeData
+            item.attributeData.push({ name: "someText", value: searchText });
+
+            // Replace the value of someText with the found label text
+            item.someText = foundLabelText;
+          }
+        });
+
+        if (foundLabelText === null) {
+          console.log(
+            `No mat-label found for input with id/name '${
+              searchId || searchName
+            }'.`
+          );
+        }
+      }
+    });
+  }
+
   function limitMapCharacters(elementInfoMap) {
     // Check the length of allElementInfo before adding new elements
     console.log("limitMapCharacters");
@@ -1540,13 +1602,13 @@
 //   2
 // );
 // })(
-//   ["input", "button", "a", "select", "label"],
+//   ["textarea"],
 //   false,
-//   62134,
+//   64680,
 //   "scannerTool",
-//   "scannerGrid-2",
+//   "scannerGrid-1",
 //   "searchTerms",
-//   2
+//   1
 // );
 // })(["*"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
 // })(["button"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
