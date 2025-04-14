@@ -62,6 +62,10 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
   const [editingElementTagName, setEditingElementTagName] = useState<string | null>(null);
   const [elementName, setElementName] = useState<string>('');
 
+  // Inside your component:
+  const [hoveredRow, setHoveredRow] = useState<ElementDTO | null>(null);
+  const [hoveredRowsList, setHoveredRowsList] = useState<ElementDTO[]>([]);
+
   const handleNextBlockPage = (typeElement: string) => {
     setBlockCurrentPages((prev) => ({
       ...prev,
@@ -258,11 +262,14 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
       console.warn("🚨 WebSocket is not connected. Cannot send message.");
       return;
     }
+    const sessionDestine = action === "HOVERED_ROW"
+      ? `scannerTool-${homeBankingId}`
+      : `scannerReceiver-${homeBankingId}`;
 
     const message = {
       type: action,
       homeBankingId: homeBankingId,
-      sessionId: `scannerReceiver-${homeBankingId}`,
+      sessionId: sessionDestine,
       details: [elementDTO],
     };
 
@@ -491,6 +498,27 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
   };
 
 
+  const handleRowHover = (elementDTO: ElementDTO) => {
+    console.clear(); // Clear previous logs to only show the current hovered row
+    console.log('Hovered Row:', elementDTO);
+
+    setHoveredRow(elementDTO);
+
+    sendWebSocketMessage(elementDTO, "HOVERED_ROW");
+
+    setHoveredRowsList((prevList) => {
+      if (!prevList.find((el) => el.id === elementDTO.id)) {
+        return [...prevList, elementDTO];
+      }
+      return prevList;
+    });
+  };
+
+  const handleRowLeave = () => {
+    setHoveredRow(null);
+  };
+
+
   return (
     <div className="grid-container">
       {/* Alert Modal (as before) */}
@@ -582,6 +610,8 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
                   {paginatedElements.map((elementDTO, i) => (
                     <div key={i}
                       className="instruction-item"
+                      onMouseEnter={() => handleRowHover(elementDTO)}
+                      onMouseLeave={handleRowLeave}
                       // onDoubleClick={(event) => handleRowSelectedClick(event, elementDTO, "NEW_ELEMENT_DTO")}
                       onClick={(event) => handleRowSelectedClick(event, elementDTO, "DETAILS_ELEMENT_DTO")}
                     >

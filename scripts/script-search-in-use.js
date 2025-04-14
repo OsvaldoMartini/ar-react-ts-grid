@@ -8,20 +8,22 @@
   operationId,
   homeBankingId
 ) {
+  let pingIntervalId = null;
   let attempts = 0;
   let maxAttempts = 100;
   let wSocket = null;
   let alreadySent = false;
   const originalStyles = new Map();
+  let previousHighlightedElement = null;
   let pageFullyLoaded = false;
   window.elementInfoMap = new Map();
   // window.searchTerms = ["button", "input", "a", "select"];
   window.searchTerms = searchTerms;
   window.allElementInfo = [];
-  window.sessionId = sessionId;
   window.destination = destination;
   window.operationId = operationId;
   window.homeBankingId = homeBankingId;
+  window.sessionId = `${sessionId}-${homeBankingId}`;
   // var elementInfoSubmit = new Map();
 
   function connectWebSocket() {
@@ -74,20 +76,68 @@
 
         if (receivedMessage) {
           try {
-            const parsedObject = JSON.parse(receivedMessage);
-            console.log("WebSocket message received:", parsedObject);
+            const parsedMessage = JSON.parse(receivedMessage);
+            console.log("WebSocket message received:", parsedMessage);
 
-            // Process parsedObject.body and parsedObject.footer here
-            if (parsedObject.body.includes("data_updated")) {
-              //Handle data update
-            }
+            const bodyData =
+              typeof parsedMessage.body === "string"
+                ? JSON.parse(parsedMessage.body)
+                : parsedMessage.body;
 
-            if (
-              parsedObject.body.includes("cannot be processed") ||
-              (parsedObject.footer &&
-                parsedObject.footer.includes("cannot be processed"))
-            ) {
-              //Handle cannot be processed
+            if (window.sessionId === bodyData.sessionId) {
+              if (bodyData.operationId === "highlight") {
+                const detailsData = Array.isArray(bodyData.details)
+                  ? bodyData.details
+                  : [];
+
+                console.log("detailsData", detailsData[0]);
+
+                var hoveredElement = getElementByCoordinates(
+                  detailsData[0].coordinates
+                );
+
+                if (hoveredElement) {
+                  const xPath = detailsData[0].xPath;
+
+                  // Restore style of previous element (if XPath is different)
+                  if (
+                    previousHighlightedElement &&
+                    previousHighlightedElement !== hoveredElement
+                  ) {
+                    const prevXPath = previousXPath;
+                    const originalOutline = originalStyles.get(prevXPath);
+                    previousHighlightedElement.style.outline =
+                      originalOutline || "";
+                  }
+
+                  // Save original style using XPath as key
+                  if (!originalStyles.has(xPath)) {
+                    originalStyles.set(xPath, hoveredElement.style.outline);
+                  }
+
+                  const originalOutline = originalStyles.get(xPath) || "";
+
+                  // Check if original style already had red
+                  if (originalOutline.includes("#2323FF")) {
+                    hoveredElement.style.outline = "3px solid #FF3131";
+                  } else if (originalOutline.includes("#FF3131")) {
+                    hoveredElement.style.outline = "3px solid #2323FF";
+                  } else {
+                    hoveredElement.style.outline = "3px solid #FF3131";
+                  }
+
+                  previousHighlightedElement = hoveredElement;
+                  previousXPath = xPath;
+                }
+              }
+
+              if (
+                parsedMessage.body.includes("cannot be processed") ||
+                (parsedMessage.footer &&
+                  parsedMessage.footer.includes("cannot be processed"))
+              ) {
+                //Handle cannot be processed
+              }
             }
           } catch (parseError) {
             console.warn("Non-JSON message received:", receivedMessage);
@@ -1575,6 +1625,46 @@
 
   connectWebSocket();
 
+  function startPing() {
+    // Send a ping every 30 seconds (adjust if needed)
+    pingIntervalId = setInterval(() => {
+      if (wSocket && wSocket.readyState === WebSocket.OPEN) {
+        const pingMessage = {
+          type: "ping-hover",
+          sessionId: window.sessionId,
+          timestamp: new Date().toISOString(),
+        };
+
+        try {
+          const encodedPing = btoa(
+            unescape(encodeURIComponent(JSON.stringify(pingMessage)))
+          );
+          wSocket.send(encodedPing);
+          console.log("Ping sent:", pingMessage);
+        } catch (pingError) {
+          console.error("Ping error:", pingError);
+        }
+      }
+    }, 30000); // 30 seconds
+  }
+
+  startPing();
+
+  function getElementByCoordinates(coordString) {
+    const [xStr, yStr] = coordString.split(",");
+    const x = parseFloat(xStr.trim());
+    const y = parseFloat(yStr.trim());
+
+    if (isNaN(x) || isNaN(y)) {
+      console.error("Invalid coordinates:", coordString);
+      return null;
+    }
+
+    const element = document.elementFromPoint(x, y);
+    console.log("Element found at", x, y, "=>", element);
+    return element;
+  }
+
   window.revertSearchInjections = function () {
     // Remove the tooltip from the page and delete the reference after 5 seconds
     setTimeout(() => {
@@ -1607,9 +1697,9 @@
 
 // })(["with name"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
 // })(
-//   ["with test-id"],
+//   ["button", "input", "label", "a", "select"],
 //   false,
-//   8282,
+//   51443,
 //   "scannerTool",
 //   "scannerGrid-2",
 //   "searchTerms",
