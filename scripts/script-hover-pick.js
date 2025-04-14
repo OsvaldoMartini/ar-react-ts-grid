@@ -174,9 +174,7 @@
             connectWebSocket(); // Retry connection
           }
         } else {
-          //console.log(
-            `${maxAttempts} Attempts to Reconnect with the WebSocket.`
-          );
+          //console.log(`${maxAttempts} Attempts to Reconnect with the WebSocket.`);
         }
       };
     } catch (initError) {
