@@ -133,6 +133,9 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingId, data, socketPort, se
   const [alertMessageFooter, setAlertMessageFooter] = useState<string | null>(null);
   const [alertDismissed, setAlertDismissed] = useState(false);
 
+  const [executionId, setExecutionId] = useState<number>(0);
+  const [executionState, setExecutionState] = useState<string>();
+
   // Drag-and-drop event handler
   const onDragEnd = (result: any) => {
     const { destination, source } = result;
@@ -572,7 +575,9 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingId, data, socketPort, se
       try {
         const parsedMessage = JSON.parse(lastMessage);
 
-        if (homeBankingId === parsedMessage.homeBankingId && sessionId === parsedMessage.sessionId && parsedMessage.operationId === "updateInstructions") {
+        if (homeBankingId === parsedMessage.homeBankingId
+          && sessionId === parsedMessage.sessionId
+          && parsedMessage.operationId === "updateInstructions") {
 
           const bodyData = typeof parsedMessage.body === "string"
             ? JSON.parse(parsedMessage.body)
@@ -594,6 +599,25 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingId, data, socketPort, se
             setIsDataReordered(false); // To trigger reordering logic if needed
 
           }
+        } else if (homeBankingId === parsedMessage.homeBankingId
+          && sessionId === parsedMessage.sessionId
+          && parsedMessage.operationId === "rowStatus") {
+
+
+
+          const bodyData = typeof parsedMessage.body === "string"
+            ? JSON.parse(parsedMessage.body)
+            : parsedMessage.body;
+
+          setExecutionId(bodyData.instructionId);
+          setExecutionState(bodyData.color);
+          // #fcba03  deep carmine yellow 
+          // #56dfc1 deep carmine green
+          // #1d9c06 Neon green
+          // #ba0f34 red
+          // #FF3131 Neon Red
+          // #a52a2a red
+
         }
 
       } catch (error) {
@@ -2943,6 +2967,16 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingId, data, socketPort, se
                                       ? 'light-yellow-background'
                                       : ''
                                     }`}
+                                  style={
+                                    instruction.id === executionId
+                                      ? {
+                                        backgroundColor: executionState,
+                                        animation: 'pulseBg 2s infinite',
+                                        boxShadow: `0 0 10px ${executionState}`,
+                                      }
+                                      : undefined
+                                  }
+
                                 >
                                   {editingInstructionId === instruction.id ? (
                                     <div className="edit-container">

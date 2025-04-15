@@ -260,7 +260,7 @@
   // padding: 8px; /* Decreased padding */
   background-color: #e0f7fa;
   box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1); /* Reduced shadow size */
-  border-radius: 8px; /* Smaller border-radius */
+  border-radius: 6px; /* Smaller border-radius */
   border: 1px solid #ddd;
   align-items: center; /* Center content vertically */
   
@@ -541,4 +541,33 @@
   border: 1px solid #ccc;
   border-radius: 3px;
 }
+
+@keyframes pulseBg {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+
+@keyframes pulseRed {
+  0% {
+    opacity: 1;
+    background-color: #ba0f34;
+  }
+  50% {
+    opacity: 0.6;
+    background-color: #FF3131;
+  }
+  100% {
+    opacity: 1;
+    background-color: #ba0f34;
+  }
+}
+
 
