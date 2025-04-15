@@ -9,12 +9,15 @@
   targetOriginURL,
   trustedOriginURL
 ) {
+  let pingIntervalId = null;
   let attempts = 0;
   let maxAttempts = 100;
   var wSocket = null;
   let alreadySent = false;
+  let previousXPath = null;
   // Temporary storage for original styles
   const originalStyles = new Map();
+  const hoveredXPathMap = new Set(); // Changed from Map to Set
   let previousHighlightedElement = null;
   var coordinatesElement = document.createElement("div");
   coordinatesElement.id = "coordinates";
@@ -80,6 +83,7 @@
 
         // Call startCollectingElements AFTER WebSocket is open
         sendingData();
+        startPing();
       };
 
       wSocket.onmessage = (event) => {
@@ -107,30 +111,43 @@
 
                 //console.log("detailsData", detailsData[0]);
 
-                var hoveredElement = getElementByCoordinates(
-                  detailsData[0].coordinates
-                );
+                var hoveredElement = findElementByXPath(detailsData[0].xPath);
+
+                if (!hoveredElement) {
+                  hoveredElement = document.querySelector(
+                    detailsData[0].cssSelector
+                  );
+                }
+
+                if (!hoveredElement) {
+                  var hoveredElement = getElementByCoordinates(
+                    detailsData[0].coordinates
+                  );
+                }
 
                 if (hoveredElement) {
-                  const xPath = detailsData[0].xPath;
+                  // console.log("hoveredElement", hoveredElement);
+
+                  const currentXPath = detailsData[0].xPath;
 
                   // Restore style of previous element (if XPath is different)
-                  if (
-                    previousHighlightedElement &&
-                    previousHighlightedElement !== hoveredElement
-                  ) {
-                    const prevXPath = previousXPath;
-                    const originalOutline = originalStyles.get(prevXPath);
+                  if (previousXPath && previousXPath !== currentXPath) {
+                    const originalOutline = originalStyles.get(previousXPath);
                     previousHighlightedElement.style.outline =
                       originalOutline || "";
                   }
 
                   // Save original style using XPath as key
-                  if (!originalStyles.has(xPath)) {
-                    originalStyles.set(xPath, hoveredElement.style.outline);
+                  if (!originalStyles.has(currentXPath)) {
+                    originalStyles.set(
+                      currentXPath,
+                      hoveredElement.style.outline
+                    );
+                    hoveredXPathMap.add(currentXPath);
                   }
 
-                  const originalOutline = originalStyles.get(xPath) || "";
+                  const originalOutline =
+                    originalStyles.get(currentXPath) || "";
 
                   // Check if original style already had red
                   if (originalOutline.includes("#2323FF")) {
@@ -142,7 +159,9 @@
                   }
 
                   previousHighlightedElement = hoveredElement;
-                  previousXPath = xPath;
+                  previousXPath = currentXPath;
+                } else {
+                  restoreOriginalStyles();
                 }
               }
 
@@ -155,7 +174,7 @@
               }
             }
           } catch (parseError) {
-            console.warn("Non-JSON message received:", receivedMessage);
+            console.log("Non-JSON message received:", receivedMessage);
           }
         }
       };
@@ -188,6 +207,10 @@
       //console.log("Cleaning up WebSocket...");
       if (wSocket && wSocket.readyState === WebSocket.OPEN) {
         wSocket.close();
+      }
+      if (pingIntervalId) {
+        clearInterval(pingIntervalId);
+        pingIntervalId = null;
       }
     } catch (cleanupError) {
       //console.error("Error during WebSocket cleanup:", cleanupError);
@@ -232,7 +255,7 @@
         window.elementInfoMap.clear();
       }
     } else {
-      console.warn("WebSocket is not open. Cannot send message.");
+      console.log("WebSocket is not open. Cannot send message.");
     }
   }
 
@@ -256,10 +279,24 @@
           //console.error("Ping error:", pingError);
         }
       }
-    }, 30000); // 30 seconds
+    }, 15000); // 15 seconds
   }
 
-  startPing();
+  function findElementByXPath(xpath) {
+    try {
+      const result = document.evaluate(
+        xpath,
+        document,
+        null,
+        XPathResult.FIRST_ORDERED_NODE_TYPE,
+        null
+      );
+      return result.singleNodeValue;
+    } catch (error) {
+      console.error("Error finding element by XPath:", error);
+      return null; // Return null in case of error
+    }
+  }
 
   function getElementByCoordinates(coordString) {
     const [xStr, yStr] = coordString.split(",");
@@ -267,7 +304,7 @@
     const y = parseFloat(yStr.trim());
 
     if (isNaN(x) || isNaN(y)) {
-      console.error("Invalid coordinates:", coordString);
+      //console.error("Invalid coordinates:", coordString);
       return null;
     }
 
@@ -542,7 +579,7 @@
           extractedText.labels.forEach((label) => result.labels.add(label));
         }
       } catch (e) {
-        console.warn("Could not access iframe content", e);
+        console.log("Could not access iframe content", e);
       }
     });
 
@@ -969,11 +1006,7 @@
         });
 
         if (foundLabelText === null) {
-          console.log(
-            `No mat-label found for input with id/name '${
-              searchId || searchName
-            }'.`
-          );
+          // console.log(`No mat-label found for input with id/name '${searchId || searchName}'.`);
         }
       }
     });
@@ -1014,14 +1047,32 @@
 
   // Function to restore the original outline
   function restoreOriginalStyles() {
-    originalStyles.forEach((originalStyle, element) => {
-      element.style.outline = originalStyle; // Restore original outline
-    });
-    originalStyles.clear(); // Clear the stored styles
+    // console.log("restoreOriginalStyles", originalStyles);
+    if (originalStyles && originalStyles.size > 0) {
+      originalStyles.forEach((originalStyle, element) => {
+        if (element && element.style) {
+          element.style.outline = originalStyle; // Restore original outline
+        }
+      });
+
+      // Paranoic
+      if (hoveredXPathMap && hoveredXPathMap.size > 0) {
+        console.log("hoveredXPathMap");
+        hoveredXPathMap.forEach((xPath) => {
+          const originalOutline = originalStyles.get(xPath);
+          var element = findElementByXPath(xPath);
+          if (element && element.style) {
+            element.style.outline = originalOutline; // Restore original outline
+          }
+        });
+      }
+
+      // originalStyles.clear(); // Clear the stored styles
+    }
   }
 
-  // Set up the interval to call the function every 15 seconds (15000 milliseconds)
-  setInterval(restoreOriginalStyles, 15000);
+  // Set up the interval to call the function every 5 seconds (5000 milliseconds)
+  setInterval(restoreOriginalStyles, 3000);
 
   function removeElements() {
     // Remove highlight from the previous element if any
@@ -1059,7 +1110,7 @@
 );
 // })(
 //   false,
-//   50597,
+//   60594,
 //   "scannerTool",
 //   "scannerGrid-2",
 //   "addPickOne",

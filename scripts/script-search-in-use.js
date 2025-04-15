@@ -13,7 +13,10 @@
   let maxAttempts = 100;
   let wSocket = null;
   let alreadySent = false;
+  let previousXPath = null;
+  // Temporary storage for original styles
   const originalStyles = new Map();
+  const hoveredXPathMap = new Set(); // Changed from Map to Set
   let previousHighlightedElement = null;
   let pageFullyLoaded = false;
   window.elementInfoMap = new Map();
@@ -65,6 +68,7 @@
 
         // Call startCollectingElements AFTER WebSocket is open
         startCollectingElements(window.searchTerms);
+        startPing();
       };
 
       wSocket.onmessage = (event) => {
@@ -77,7 +81,7 @@
         if (receivedMessage) {
           try {
             const parsedMessage = JSON.parse(receivedMessage);
-            //console.log("WebSocket message received:", parsedMessage);
+            // console.log("WebSocket message received:", parsedMessage);
 
             const bodyData =
               typeof parsedMessage.body === "string"
@@ -92,30 +96,43 @@
 
                 //console.log("detailsData", detailsData[0]);
 
-                var hoveredElement = getElementByCoordinates(
-                  detailsData[0].coordinates
-                );
+                var hoveredElement = findElementByXPath(detailsData[0].xPath);
+
+                if (!hoveredElement) {
+                  hoveredElement = document.querySelector(
+                    detailsData[0].cssSelector
+                  );
+                }
+
+                if (!hoveredElement) {
+                  var hoveredElement = getElementByCoordinates(
+                    detailsData[0].coordinates
+                  );
+                }
 
                 if (hoveredElement) {
-                  const xPath = detailsData[0].xPath;
+                  // console.log("hoveredElement", hoveredElement);
+
+                  const currentXPath = detailsData[0].xPath;
 
                   // Restore style of previous element (if XPath is different)
-                  if (
-                    previousHighlightedElement &&
-                    previousHighlightedElement !== hoveredElement
-                  ) {
-                    const prevXPath = previousXPath;
-                    const originalOutline = originalStyles.get(prevXPath);
+                  if (previousXPath && previousXPath !== currentXPath) {
+                    const originalOutline = originalStyles.get(previousXPath);
                     previousHighlightedElement.style.outline =
                       originalOutline || "";
                   }
 
                   // Save original style using XPath as key
-                  if (!originalStyles.has(xPath)) {
-                    originalStyles.set(xPath, hoveredElement.style.outline);
+                  if (!originalStyles.has(currentXPath)) {
+                    originalStyles.set(
+                      currentXPath,
+                      hoveredElement.style.outline
+                    );
+                    hoveredXPathMap.add(currentXPath);
                   }
 
-                  const originalOutline = originalStyles.get(xPath) || "";
+                  const originalOutline =
+                    originalStyles.get(currentXPath) || "";
 
                   // Check if original style already had red
                   if (originalOutline.includes("#2323FF")) {
@@ -127,7 +144,9 @@
                   }
 
                   previousHighlightedElement = hoveredElement;
-                  previousXPath = xPath;
+                  previousXPath = currentXPath;
+                } else {
+                  restoreOriginalStyles();
                 }
               }
 
@@ -140,7 +159,7 @@
               }
             }
           } catch (parseError) {
-            console.warn("Non-JSON message received:", receivedMessage);
+            // console.log("Non-JSON message received:", receivedMessage);
           }
         }
       };
@@ -174,6 +193,10 @@
       //console.log("Cleaning up WebSocket...");
       if (wSocket && wSocket.readyState === WebSocket.OPEN) {
         wSocket.close();
+      }
+      if (pingIntervalId) {
+        clearInterval(pingIntervalId);
+        pingIntervalId = null;
       }
     } catch (cleanupError) {
       //console.error("Error during WebSocket cleanup:", cleanupError);
@@ -463,7 +486,7 @@
           //console.log("Iframe origin:",new URL(iframe.src, window.location.origin).origin);
           //console.log("Parent origin:", window.location.origin);
         } catch (e) {
-          //console.warn("Cross-origin access denied for iframe:", iframe.src);
+          //console.log("Cross-origin access denied for iframe:", iframe.src);
         }
 
         if (iframe) {
@@ -580,7 +603,7 @@
           // If the iframe contains nested iframes, recursively collect them
           collectIframeElements(iframeDocument, collectionFound, true);
         } else {
-          console.warn(`Skipping cross-origin iframe: ${iframe.src}`);
+          // console.log(`Skipping cross-origin iframe: ${iframe.src}`);
         }
       } catch (e) {
         // console.error(`Error accessing iframe: ${iframe.src || "Unknown iframe"}`, e);
@@ -700,6 +723,7 @@
       alreadySent = true;
       window.allElementInfo = [];
       window.elementInfoMap.clear();
+      window.revertSearchInjections();
     }
   };
 
@@ -1050,7 +1074,7 @@
           extractedText.labels.forEach((label) => result.labels.add(label));
         }
       } catch (e) {
-        console.warn("Could not access iframe content", e);
+        console.log("Could not access iframe content", e);
       }
     });
 
@@ -1527,12 +1551,7 @@
           const labelElement = document.querySelector(selector);
           if (labelElement && foundLabelText === null) {
             foundLabelText = labelElement.textContent.trim();
-            console.log(
-              `Found mat-label text for input with id/name '${
-                searchId || searchName
-              }':`,
-              foundLabelText
-            );
+            // console.log(`Found mat-label text for input with id/name '${searchId || searchName}':`,foundLabelText);
 
             // Add "someText" to attributeData
             item.attributeData.push({ name: "someText", value: searchText });
@@ -1543,11 +1562,7 @@
         });
 
         if (foundLabelText === null) {
-          console.log(
-            `No mat-label found for input with id/name '${
-              searchId || searchName
-            }'.`
-          );
+          // console.log(`No mat-label found for input with id/name '${searchId || searchName}'.`);
         }
       }
     });
@@ -1635,10 +1650,24 @@
           //console.error("Ping error:", pingError);
         }
       }
-    }, 30000); // 30 seconds
+    }, 15000); // 15 seconds
   }
 
-  startPing();
+  function findElementByXPath(xpath) {
+    try {
+      const result = document.evaluate(
+        xpath,
+        document,
+        null,
+        XPathResult.FIRST_ORDERED_NODE_TYPE,
+        null
+      );
+      return result.singleNodeValue;
+    } catch (error) {
+      console.error("Error finding element by XPath:", error);
+      return null; // Return null in case of error
+    }
+  }
 
   function getElementByCoordinates(coordString) {
     const [xStr, yStr] = coordString.split(",");
@@ -1660,16 +1689,37 @@
     setTimeout(() => {
       restoreOriginalStyles();
       window.allElementInfo = [];
-    }, 1000);
+    }, 3000);
   };
 
   // Function to restore the original outline
   function restoreOriginalStyles() {
-    originalStyles.forEach((originalStyle, element) => {
-      element.style.outline = originalStyle; // Restore original outline
-    });
-    originalStyles.clear(); // Clear the stored styles
+    // console.log("restoreOriginalStyles", originalStyles);
+    if (originalStyles && originalStyles.size > 0) {
+      originalStyles.forEach((originalStyle, element) => {
+        if (element && element.style) {
+          element.style.outline = originalStyle; // Restore original outline
+        }
+      });
+
+      // Paranoic
+      if (hoveredXPathMap && hoveredXPathMap.size > 0) {
+        console.log("hoveredXPathMap");
+        hoveredXPathMap.forEach((xPath) => {
+          const originalOutline = originalStyles.get(xPath);
+          var element = findElementByXPath(xPath);
+          if (element && element.style) {
+            element.style.outline = originalOutline; // Restore original outline
+          }
+        });
+      }
+
+      // originalStyles.clear(); // Clear the stored styles
+    }
   }
+
+  // Set up the interval to call the function every 5 seconds (5000 milliseconds)
+  setInterval(restoreOriginalStyles, 3000);
 
   // startCollectingElements(window.searchTerms);
   // init("Initiate");
@@ -1683,18 +1733,12 @@
   arguments[5],
   arguments[6]
 );
-// })(["*"], false, 8282, "scannerTool", "scannerGrid-2", "searchTerms", 2);
-
-// })(["with name"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
 // })(
 //   ["button", "input", "label", "a", "select"],
 //   false,
-//   51443,
+//   60594,
 //   "scannerTool",
 //   "scannerGrid-2",
 //   "searchTerms",
 //   2
 // );
-// })(["div"], false, 55330, "scannerTool", "scannerGrid-1", "searchTerms", 1);
-// })(["*"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
-// })(["button"], false, 8181, "scannerTool", "scannerGrid", "searchTerms", 3);
