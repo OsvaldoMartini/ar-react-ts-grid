@@ -2673,6 +2673,9 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingId, data, socketPort, se
 
     // Handle "LOOP" operation with simplified details
     if (instruction.actions === "LOOP" && instruction.operation) {
+      const parts = instruction.operation.split(":").map((part) => part.trim());
+      const [refreshValue, loopValue] = parts;
+
       // Retrieve parentValue from allInstructions
       const parentInstruction = allInstructions.find((item) => item.id === instruction.parentId);
 
@@ -2693,8 +2696,10 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingId, data, socketPort, se
 
       return (
         <span className="instruction-details">
+          <span style={{ color: "#0b5394" }}>Time</span>{" "}
+          <span style={{ color: "#FFA500" }}>{refreshValue}s</span> :{" "}
           <span style={{ color: "#0b5394" }}>Loop</span>{" "}
-          <span style={{ color: "#FFA500" }}>{instruction.operation} times</span> :{" "}
+          <span style={{ color: "#FFA500" }}>{loopValue} times</span> :{" "}
           <span style={{ color: "#0b5394" }}>Jump To Parent</span>{" "}
           <span style={{ color: "#FFA500" }}>({instruction.parentId}){parentValue}</span>
         </span>
@@ -2967,16 +2972,8 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingId, data, socketPort, se
                                       ? 'light-yellow-background'
                                       : ''
                                     }`}
-                                  style={
-                                    instruction.id === executionId
-                                      ? {
-                                        backgroundColor: executionState,
-                                        animation: 'pulseBg 2s infinite',
-                                        boxShadow: `0 0 10px ${executionState}`,
-                                      }
-                                      : undefined
-                                  }
-
+                                  data-executing={instruction.id === executionId}
+                                  style={instruction.id === executionId ? { '--execution-state-color': executionState } as React.CSSProperties : undefined}
                                 >
                                   {editingInstructionId === instruction.id ? (
                                     <div className="edit-container">

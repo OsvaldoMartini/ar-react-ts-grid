@@ -555,19 +555,13 @@
 }
 
 
-@keyframes pulseRed {
-  0% {
-    opacity: 1;
-    background-color: #ba0f34;
-  }
-  50% {
-    opacity: 0.6;
-    background-color: #FF3131;
-  }
-  100% {
-    opacity: 1;
-    background-color: #ba0f34;
-  }
+.instruction-item[data-executing='true'] {
+  background-color: var(--execution-state-color); // optional if using a CSS var
+  // animation: pulseBg 2s infinite;
+  box-shadow: 0 0 10px var(--execution-state-color);
+  z-index: 0; // or -1 if needed
+  position: relative; // required for z-index to work
 }
+
 
 
