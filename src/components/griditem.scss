@@ -264,16 +264,51 @@
   border: 1px solid #ddd;
   align-items: center; /* Center content vertically */
   
+  position: relative; // Required for background positioning
+  z-index: 1;
+
   &:hover {
     background-color: #b2ebf2; /* Slightly darker for hover effect */
     box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2); /* Stronger shadow on hover */
   }
+
+  .execution-background {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    border-radius: 6px;
+    pointer-events: none;
+    animation: pulseBg 2s infinite;
+  }
+
+  // Color variants
+  .execution-background.green {
+    background-color: #4caf50;
+    box-shadow: 0 0 10px #4caf50;
+  }
+
+  .execution-background.red {
+    background-color: #f44336;
+    box-shadow: 0 0 10px #f44336;
+  }
+
+  .execution-background.yellow {
+    background-color: #ffeb3b;
+    box-shadow: 0 0 10px #ffeb3b;
+  }
+    // Everything else above background
+    > *:not(.execution-background) {
+      position: relative;
+      z-index: 100;
+    }
 
 }
 
 /* Change background to white when dropdown is open */
 .instruction-item.dropdown-open {
   background-color: #9ee6ef; /* Change background to white */
+  position: relative;
+  z-index: 999;
 }
 
 /* Margin for the first span element with instruction type */
@@ -384,6 +419,7 @@
 /* Dropdown menu styling */
 .dropdown-menu {
   position: absolute;
+  z-index: 999;
   top: 25px; /* Default: Adjust based on layout */
   right: 0;
   background-color: #e0f7fa;
@@ -392,7 +428,7 @@
   box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
   padding: 4px 0;
   font-size: 0.85em;
-  z-index: 100;
+ 
   width: 150px;
 }
 
@@ -555,13 +591,13 @@
 }
 
 
-.instruction-item[data-executing='true'] {
-  background-color: var(--execution-state-color); // optional if using a CSS var
-  // animation: pulseBg 2s infinite;
-  box-shadow: 0 0 10px var(--execution-state-color);
-  z-index: 0; // or -1 if needed
-  position: relative; // required for z-index to work
-}
+// .instruction-item[data-executing='true'] {
+//   background-color: var(--execution-state-color); // optional if using a CSS var
+//   // animation: pulseBg 2s infinite;
+//   box-shadow: 0 0 10px var(--execution-state-color);
+//   z-index: 0; // or -1 if needed
+//   position: relative; // required for z-index to work
+// }
 
 
 

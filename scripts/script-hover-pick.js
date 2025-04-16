@@ -1072,7 +1072,7 @@
   }
 
   // Set up the interval to call the function every 5 seconds (5000 milliseconds)
-  setInterval(restoreOriginalStyles, 3000);
+  setInterval(restoreOriginalStyles, 5000);
 
   function removeElements() {
     // Remove highlight from the previous element if any

@@ -2972,9 +2972,11 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingId, data, socketPort, se
                                       ? 'light-yellow-background'
                                       : ''
                                     }`}
-                                  data-executing={instruction.id === executionId}
-                                  style={instruction.id === executionId ? { '--execution-state-color': executionState } as React.CSSProperties : undefined}
+                                // data-executing={instruction.id === executionId}
                                 >
+                                  {instruction.id === executionId && (
+                                    <div className={`execution-background ${executionState?.toLowerCase()}`} />
+                                  )}
                                   {editingInstructionId === instruction.id ? (
                                     <div className="edit-container">
                                       <input
