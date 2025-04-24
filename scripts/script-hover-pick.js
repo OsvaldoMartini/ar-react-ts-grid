@@ -1057,7 +1057,7 @@
 
       // Paranoic
       if (hoveredXPathMap && hoveredXPathMap.size > 0) {
-        console.log("hoveredXPathMap");
+        // console.log("hoveredXPathMap");
         hoveredXPathMap.forEach((xPath) => {
           const originalOutline = originalStyles.get(xPath);
           var element = findElementByXPath(xPath);
