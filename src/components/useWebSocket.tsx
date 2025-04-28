@@ -7,6 +7,7 @@ export const useWebSocket = (socketPort: number, sessionId: string) => {
   const [messages, setMessages] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const reconnectTimeout = useRef<NodeJS.Timeout | null>(null);
+  const pingInterval = useRef<NodeJS.Timeout | null>(null); // Ref for the ping interval
 
   const connectWebSocket = () => {
     if (webSocket) return; // Prevent multiple instances
@@ -18,6 +19,8 @@ export const useWebSocket = (socketPort: number, sessionId: string) => {
       setConnected(true);
       setReconnectAttempts(0);
       setWebSocket(ws);
+      // Start sending ping messages
+      startPing(ws);
     };
 
     ws.onmessage = (event) => {
@@ -33,6 +36,7 @@ export const useWebSocket = (socketPort: number, sessionId: string) => {
       console.warn('⚠️ WebSocket closed');
       setConnected(false);
       setWebSocket(null);
+      stopPing(); // Clear the ping interval
 
       if (reconnectAttempts < 5) {
         const delay = Math.min(2000 * reconnectAttempts, 10000); // Exponential backoff
@@ -48,6 +52,30 @@ export const useWebSocket = (socketPort: number, sessionId: string) => {
     };
   };
 
+  const startPing = (ws: WebSocket) => {
+    pingInterval.current = setInterval(() => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        try {
+          ws.send('ping-' + sessionId); // Or a more structured ping message, e.g., { type: 'ping' }
+          console.log('ping sent');
+        } catch (error) {
+          console.error('Failed to send ping:', error);
+          //  Handle error, e.g., consider closing and reconnecting.
+        }
+      } else {
+        //  Consider clearing the interval if the socket is not open
+        stopPing();
+      }
+    }, 15000); // Send ping every 15 seconds (15000 milliseconds)
+  };
+
+  const stopPing = () => {
+    if (pingInterval.current) {
+      clearInterval(pingInterval.current);
+      pingInterval.current = null;
+    }
+  };
+
   useEffect(() => {
     connectWebSocket(); // Establish the initial connection
 
@@ -58,6 +86,7 @@ export const useWebSocket = (socketPort: number, sessionId: string) => {
       if (reconnectTimeout.current) {
         clearTimeout(reconnectTimeout.current);
       }
+      stopPing(); // Clear the ping interval when the component unmounts
     };
   }, [socketPort, sessionId]); // Re-run effect if port or sessionId changes
 
