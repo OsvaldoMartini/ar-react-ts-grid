@@ -12,7 +12,7 @@ export const useWebSocket = (socketPort: number, sessionId: string) => {
   const connectWebSocket = () => {
     if (webSocket) return; // Prevent multiple instances
 
-    const ws = new WebSocket(`ws://localhost:${socketPort}/websocket?sessionId=${sessionId}`);
+    const ws = new WebSocket(`wss://localhost:${socketPort}/websocket?sessionId=${sessionId}`);
 
     ws.onopen = () => {
       console.log(`✅ WebSocket connected for session: ${sessionId}`);

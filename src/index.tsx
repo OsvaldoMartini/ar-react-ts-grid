@@ -50,8 +50,11 @@ const App: React.FC = () => {
         setSocketPort(socketPort);
         setSessionId(sessionIdFromJava);
         setHomeBanking(homeBanking);
-        setBotJobId(botJobId)
-        setBotJobName(botJobName)
+        setBotJobId(botJobId);
+        setBotJobName(botJobName);
+        setInstructionsData([] as BlockLoopInstructionLoadDTO[]);
+        setComponentsData([] as BlockLoopInstructionLoadDTO[]);
+        setElementDTO([] as ElementDTO[]);
 
         // Check if it's BlockLoopInstructionLoadDTO
         if (Array.isArray(dataLoad) && dataLoad.length > 0 && sessionIdFromJava.includes("botJobTasks")) {

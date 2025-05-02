@@ -53,7 +53,7 @@
     try {
       //console.log(`Attempt ${attempts + 1} to connect to WebSocket...`);
       wSocket = new WebSocket(
-        `ws://localhost:${socketPort}/websocket?sessionId=${window.sessionId}`
+        `wss://localhost:${socketPort}/websocket?sessionId=${window.sessionId}`
       );
 
       wSocket.onopen = () => {

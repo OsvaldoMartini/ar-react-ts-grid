@@ -1,19 +1,65 @@
-// CLOSE BROWSER IN USE (SENDER: scannerTool) -> scannerGrid
-(function (socketPort, sessionId, destination, operationId, homeBankingId) {
+// CLOSE BROWSER IN USE CSP (SENDER: scannerTool) -> scannerGrid
+(function (
+  socketPort,
+  sessionId,
+  destination,
+  operationId,
+  homeBankingId,
+  targetOriginURL,
+  trustedOriginURL
+) {
   let pingIntervalId = null;
   let attempts = 0;
   let maxAttempts = 100;
   var wSocket = null;
   let alreadySent = false;
-  let previousHighlightedElement = null;
-  let previousXPath = "";
-  const originalStyles = new Map();
-  const hoveredXPathMap = new Set();
 
   window.destination = destination;
   window.operationId = operationId;
   window.homeBankingId = homeBankingId;
   window.sessionId = `${sessionId}-${homeBankingId}`;
+
+  function logCSPDirectives() {
+    const csp = document.querySelector(
+      "meta[http-equiv='Content-Security-Policy']"
+    );
+    if (csp) {
+      console.log("Content Security Policy:", csp.content);
+      const directives = csp.content.split(";").map((d) => d.trim());
+      const connectSrcDirective = directives.find((d) =>
+        d.startsWith("connect-src")
+      );
+      if (connectSrcDirective) {
+        console.log("connect-src:", connectSrcDirective);
+      } else {
+        // Check if default-src might apply to connections
+        const defaultSrcDirective = directives.find((d) =>
+          d.startsWith("default-src")
+        );
+        if (defaultSrcDirective) {
+          console.log(
+            "connect-src not explicitly set. Falling back to default-src:",
+            defaultSrcDirective
+          );
+        } else {
+          console.log(
+            "connect-src not explicitly set, and no default-src found."
+          );
+        }
+      }
+    } else {
+      // Check for CSP in HTTP headers (this is more complex and often requires a server request)
+      // For a client-side script, you might not have direct access to these headers easily.
+      // One potential (but less clean) way could involve a dummy fetch request and inspecting the headers.
+      // However, this can be complex and might trigger CORS issues.
+      console.log(
+        "Content Security Policy meta tag not found. CSP might be set via HTTP headers."
+      );
+    }
+  }
+
+  // Call this function early in your script's execution
+  logCSPDirectives();
 
   function connectWebSocket() {
     if (attempts >= maxAttempts) {
@@ -64,23 +110,8 @@
 
         if (receivedMessage) {
           try {
-            const decodedJson = decodeURIComponent(
-              escape(atob(encodedMessage))
-            );
-            receivedMessage = JSON.parse(decodedJson);
-            console.log("Decoded message:", message);
-          } catch (error) {
-            // console.error("Not a message to be decoded:", error);
-          }
-
-          try {
             const parsedMessage = JSON.parse(receivedMessage);
             //console.log("WebSocket message received:", parsedMessage);
-
-            if (parsedMessage.body && parsedMessage.body.includes("echo")) {
-              console.log("ECHO received:", receivedMessage);
-              return;
-            }
 
             const bodyData =
               typeof parsedMessage.body === "string"
@@ -164,7 +195,7 @@
       };
 
       wSocket.onerror = (error) => {
-        //console.error("WebSocket error:", error);
+        console.error("WebSocket error:", error);
       };
 
       wSocket.onclose = () => {
@@ -181,7 +212,7 @@
         }
       };
     } catch (initError) {
-      //console.error("Failed to initialize WebSocket:", initError);
+      console.error("Failed to initialize WebSocket:", initError);
     }
   }
 
@@ -206,7 +237,7 @@
     pingIntervalId = setInterval(() => {
       if (wSocket && wSocket.readyState === WebSocket.OPEN) {
         const pingMessage = {
-          type: "ping-close-browser",
+          type: "ping-close-browser-csp",
           sessionId: window.sessionId,
           timestamp: new Date().toISOString(),
         };
@@ -221,10 +252,8 @@
           //console.error("Ping error:", pingError);
         }
       }
-    }, 10000); // 15 seconds
+    }, 15000); // 15 seconds
   }
-
-  connectWebSocket();
 
   window.addEventListener("beforeunload", function (event) {
     // event.preventDefault();
@@ -245,13 +274,42 @@
         unescape(encodeURIComponent(JSON.stringify(message)))
       );
       // Convert the buffer to a Base64 string
-      wSocket.send(JSON.stringify(base64Message));
+      wSocket.send(base64Message);
 
       alreadySent = true;
       window.allElementInfo = [];
+      window.elementInfoMap.clear();
+      window.revertSearchInjections();
     }
   });
 
+  window.postMessage({ type: "myMessage", data: "some data" }, targetOriginURL);
+
+  window.addEventListener("message", function (event) {
+    if (event.origin !== trustedOriginURL) return; // check the origin
+    //console.log(event.data);
+  });
+
+  connectWebSocket();
+
   // window.cloneTerms = null; // Invalidating the function
-  //})(arguments[0], arguments[1], arguments[2], arguments[3], arguments[4]);
-})(61757, "closeBrowser", "scannerReceiver-2", "closeBrowser", 2);
+})(
+  arguments[0],
+  arguments[1],
+  arguments[2],
+  arguments[3],
+  arguments[4],
+  arguments[5],
+  arguments[6]
+);
+// })(
+//   61757,
+//   "closeBrowser",
+//   "scannerReceiver-2",
+//   "closeBrowser",
+//   2,
+//   "https://www.tradingview.com/",
+//   "https://www.tradingview.com/"
+//   // "https://www.bloomberg.com/",
+//   // "https://www.bloomberg.com/"
+// );
