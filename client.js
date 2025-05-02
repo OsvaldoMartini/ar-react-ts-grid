@@ -2,9 +2,9 @@ const Stomp = require("stompjs");
 const SockJS = require("sockjs-client");
 
 const host = "localhost";
-const port = 15674; // Adjust if using a different port
+const port = 61757; // Adjust if using a different port
 
-const sockJS = new SockJS(`http://${host}:${port}/ws`);
+const sockJS = new SockJS(`http://${host}:${port}/wss`);
 const client = Stomp.over(sockJS);
 
 client.connect("", "", () => {

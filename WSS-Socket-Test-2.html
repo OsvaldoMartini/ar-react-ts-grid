@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Client</title>
+</head>
+<body>
+    <h1>WebSocket Connection</h1>
+    <div id="output"></div>
+    <script>
+        const output = document.getElementById('output');
+        let websocket;
+
+        function connectWebSocket() {
+            const sessionId = "your-session-id"; // Replace with your actual session ID
+            const wsUrl = `wss://localhost:61757/websocket?sessionId=${sessionId}`;
+
+            websocket = new WebSocket(wsUrl);
+
+            websocket.onopen = () => {
+                output.innerHTML += "<p>✅ Connection opened</p>";
+                websocket.send("Hello Server!");
+            };
+
+            websocket.onmessage = (event) => {
+                const receivedMessage = event.data;
+                output.innerHTML += `<p>⬅️ Received: ${receivedMessage}</p>`;
+
+                try {
+                    const parsedMessage = JSON.parse(receivedMessage);
+                    // console.log("WebSocket message received:", parsedMessage);
+
+                    if (parsedMessage.body && parsedMessage.body.includes("echo")) {
+                        console.log("ECHO received:", receivedMessage);
+                        return;
+                    }
+                } catch (error) {
+                    console.error("Error parsing message:", error);
+                    // Handle non-JSON messages or invalid JSON
+                    // For example:
+                    output.innerHTML += `<p>⚠️ Received non-JSON message: ${receivedMessage}</p>`;
+                }
+            };
+
+            websocket.onerror = (error) => {
+                output.innerHTML += `<p>❌ Error: ${error.message}</p>`;
+            };
+
+            websocket.onclose = () => {
+                output.innerHTML += "<p>⚠️ Connection closed</p>";
+            };
+        }
+
+        connectWebSocket(); // Start the connection
+
+        // Function to send a message (for demonstration purposes)
+        function sendMessage(message) {
+            if (websocket && websocket.readyState === WebSocket.OPEN) {
+                websocket.send(message);
+                output.innerHTML += `<p>➡️ Sent: ${message}</p>`;
+            } else {
+                output.innerHTML += "<p>❌ Connection is not open. Cannot send message.</p>";
+            }
+        }
+
+        // Example of sending a message after a delay
+        setTimeout(() => {
+            sendMessage(JSON.stringify({ type: "test", body: "This is a test message from the client!" }));
+        }, 2000);
+    </script>
+</body>
+</html>

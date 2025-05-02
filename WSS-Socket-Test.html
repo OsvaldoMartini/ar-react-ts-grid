@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>WebSocket Client</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+
+        #output {
+            border: 1px solid #ccc;
+            padding: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 20px;
+            font-size: 14px;
+            background-color: #f9f9f9;
+        }
+
+        #controls {
+            margin-top: 20px;
+        }
+
+        input[type="text"] {
+            width: 300px;
+            padding: 5px;
+        }
+
+        button {
+            padding: 6px 10px;
+            margin-left: 5px;
+        }
+
+        .status {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>WebSocket Client</h1>
+
+    <div class="status" id="status">🔌 Connecting...</div>
+
+    <div id="output"></div>
+
+    <div id="controls">
+        <input type="text" id="messageInput" placeholder="Enter message..." />
+        <button onclick="sendMessage()">Send Message</button>
+        <button onclick="connectWebSocket()">Reconnect WebSocket</button>
+    </div>
+    <script>
+        // CLOSE BROWSER IN USE (SENDER: scannerTool) -> scannerGrid
+        (function (socketPort, sessionId, destination, operationId, homeBankingId) {
+            let pingIntervalId = null;
+            let attempts = 0;
+            let maxAttempts = 100;
+            var wSocket = null;
+            let alreadySent = false;
+
+            window.destination = destination;
+            window.operationId = operationId;
+            window.homeBankingId = homeBankingId;
+            window.sessionId = `${sessionId}-${homeBankingId}`;
+
+            const statusElement = document.getElementById('status');
+            const outputElement = document.getElementById('output');
+            const messageInputElement = document.getElementById('messageInput');
+
+
+            function connectWebSocket() {
+                if (attempts >= maxAttempts) {
+                    console.error("Reached maximum reconnection attempts. Stopping.");
+                    statusElement.textContent = "❌ Max attempts reached";
+                    return;
+                }
+                statusElement.textContent = "🔌 Connecting...";
+                try {
+                    console.log(`Attempt ${attempts + 1} to connect to WebSocket...`);
+                    wSocket = new WebSocket(
+                        `wss://localhost:${socketPort}/websocket?sessionId=${window.sessionId}`
+                    );
+
+                    wSocket.onopen = () => {
+                        console.log(`WebSocket connected for session: ${window.sessionId}`);
+                        statusElement.textContent = "✅ Connected";
+                        attempts = 0; // Reset attempts on successful connection
+                        outputElement.innerHTML += "<p>✅ Connection opened</p>";
+                        try {
+                            const subscriptionMessage = {
+                                type: "echo",
+                                sessionId: window.sessionId,
+                                operationId: "test echo",
+                                body: "subscribe",
+                            };
+                            // Convert the JSON message to a Base64 string
+                            const base64Message = btoa(
+                                unescape(encodeURIComponent(JSON.stringify(subscriptionMessage)))
+                            );
+                            wSocket.send(base64Message);
+                            console.log("Sent SEARCH_TOOL:", subscriptionMessage);
+                            console.log("Sent ENCODED Length:", base64Message.length);
+                        } catch (sendError) {
+                            console.error("Failed to send subscription message:", sendError);
+                            outputElement.innerHTML += `<p>❌ Error sending subscription message: ${sendError.message}</p>`;
+                        }
+
+                        startPing();
+                    };
+
+                    wSocket.onmessage = (event) => {
+                        let receivedMessage = event.data;
+
+                        if (receivedMessage.endsWith("\u0000")) {
+                            receivedMessage = receivedMessage.slice(0, -1);
+                        }
+
+                        if (receivedMessage) {
+                            try {
+                                const decodedJson = decodeURIComponent(
+                                    escape(atob(receivedMessage)) // changed from encodedMessage to receivedMessage
+                                );
+                                receivedMessage = JSON.parse(decodedJson);
+                                console.log("Decoded message:", receivedMessage);
+                                outputElement.innerHTML += `<p>⬅️ Received: ${decodedJson}</p>`; //Show the decoded message
+                            } catch (error) {
+                                console.error("Not a message to be decoded:", error);
+                                outputElement.innerHTML += `<p>⚠️ Non-decodable message: ${receivedMessage}</p>`;
+                            }
+
+                            try {
+                                const parsedMessage = JSON.parse(receivedMessage);
+                                console.log("WebSocket message received:", parsedMessage);
+
+                                if (parsedMessage.body && parsedMessage.body.includes("echo")) {
+                                    console.log("ECHO received:", receivedMessage);
+                                    outputElement.innerHTML += `<p>⬅️ ECHO: ${receivedMessage}</p>`;
+                                    return;
+                                }
+
+                                const bodyData =
+                                    typeof parsedMessage.body === "string"
+                                        ? JSON.parse(parsedMessage.body)
+                                        : parsedMessage.body;
+
+                                if (window.sessionId === bodyData.sessionId) {
+                                    if (bodyData.operationId === "highlight") {
+                                        const detailsData = Array.isArray(bodyData.details)
+                                            ? bodyData.details
+                                            : [];
+
+                                        console.log("detailsData", detailsData[0]);
+
+                                        var hoveredElement = findElementByXPath(detailsData[0].xPath);
+
+                                        if (!hoveredElement) {
+                                            hoveredElement = document.querySelector(
+                                                detailsData[0].cssSelector
+                                            );
+                                        }
+
+                                        if (!hoveredElement) {
+                                            hoveredElement = getElementByCoordinates(
+                                                detailsData[0].coordinates
+                                            );
+                                        }
+
+                                        if (hoveredElement) {
+                                            console.log("hoveredElement", hoveredElement);
+
+                                            const currentXPath = detailsData[0].xPath;
+
+                                            // Restore style of previous element (if XPath is different)
+                                            if (previousXPath && previousXPath !== currentXPath) {
+                                                const originalOutline = originalStyles.get(previousXPath);
+                                                previousHighlightedElement.style.outline =
+                                                    originalOutline || "";
+                                            }
+
+                                            // Save original style using XPath as key
+                                            if (!originalStyles.has(currentXPath)) {
+                                                originalStyles.set(
+                                                    currentXPath,
+                                                    hoveredElement.style.outline
+                                                );
+                                                hoveredXPathMap.add(currentXPath);
+                                            }
+
+                                            const originalOutline =
+                                                originalStyles.get(currentXPath) || "";
+
+                                            // Check if original style already had red
+                                            if (originalOutline.includes("#2323FF")) {
+                                                hoveredElement.style.outline = "3px solid #FF3131";
+                                            } else if (originalOutline.includes("#FF3131")) {
+                                                hoveredElement.style.outline = "3px solid #2323FF";
+                                            } else {
+                                                hoveredElement.style.outline = "3px solid #FF3131";
+                                            }
+
+                                            previousHighlightedElement = hoveredElement;
+                                            previousXPath = currentXPath;
+                                        } else {
+                                            restoreOriginalStyles();
+                                        }
+                                    }
+
+                                    if (
+                                        parsedMessage.body.includes("cannot be processed") ||
+                                        (parsedMessage.footer &&
+                                            parsedMessage.footer.includes("cannot be processed"))
+                                    ) {
+                                        //Handle cannot be processed
+                                        outputElement.innerHTML += `<p>❌ Server Error: Cannot process message</p>`;
+                                    }
+                                }
+                            } catch (parseError) {
+                                console.error("Non-JSON message received:", receivedMessage);
+                                outputElement.innerHTML += `<p>⚠️ Non-JSON message: ${receivedMessage}</p>`;
+                            }
+                        }
+                    };
+
+                    wSocket.onerror = (error) => {
+                        console.error("WebSocket error:", error);
+                        statusElement.textContent = "❌ Error";
+                        outputElement.innerHTML += `<p>❌ Error: ${error.message}</p>`;
+                    };
+
+                    wSocket.onclose = () => {
+                        console.log("WebSocket connection closed");
+                        statusElement.textContent = "⚠️ Disconnected";
+                        outputElement.innerHTML += "<p>⚠️ Connection closed</p>";
+
+                        if (attempts < maxAttempts) {
+                            attempts++;
+                            console.log(`Reconnecting attempt ${attempts}...`);
+                            if (!alreadySent) {
+                                connectWebSocket(); // Retry connection
+                            }
+                        } else {
+                            console.log(`${maxAttempts} Attempts to Reconnect with the WebSocket.`);
+                            statusElement.textContent = "❌ Max attempts reached";
+                            outputElement.innerHTML += `<p>❌ ${maxAttempts} Reconnection Attempts Failed</p>`;
+                        }
+                    };
+                } catch (initError) {
+                    console.error("Failed to initialize WebSocket:", initError);
+                    statusElement.textContent = "❌ Error";
+                    outputElement.innerHTML += `<p>❌ Error initializing WebSocket: ${initError.message}</p>`;
+                }
+            }
+
+            // Optionally, expose a cleanup function
+            window.cleanupWebSocket = () => {
+                try {
+                    console.log("Cleaning up WebSocket...");
+                    if (wSocket && wSocket.readyState === WebSocket.OPEN) {
+                        wSocket.close();
+                    }
+                    if (pingIntervalId) {
+                        clearInterval(pingIntervalId);
+                        pingIntervalId = null;
+                    }
+                } catch (cleanupError) {
+                    console.error("Error during WebSocket cleanup:", cleanupError);
+                    outputElement.innerHTML += `<p>❌ Error cleaning up WebSocket: ${cleanupError.message}</p>`;
+                }
+            };
+
+            function startPing() {
+                // Send a ping every 10 seconds
+                pingIntervalId = setInterval(() => {
+                    if (wSocket && wSocket.readyState === WebSocket.OPEN) {
+                        const pingMessage = {
+                            type: "ping-close-browser",
+                            sessionId: window.sessionId,
+                            timestamp: new Date().toISOString(),
+                        };
+
+                        try {
+                            const encodedPing = btoa(
+                                unescape(encodeURIComponent(JSON.stringify(pingMessage)))
+                            );
+                            wSocket.send(encodedPing);
+                            console.log("Ping sent:", pingMessage);
+                        } catch (pingError) {
+                            console.error("Ping error:", pingError);
+                            outputElement.innerHTML += `<p>❌ Ping error: ${pingError.message}</p>`;
+                        }
+                    }
+                }, 10000);
+            }
+
+            connectWebSocket();
+
+            window.addEventListener("beforeunload", function (event) {
+                // event.preventDefault();
+                // event.returnValue =
+                //   "⚠️ Warning: Closing this tab will terminate an active WebDriver session!";
+
+                if (wSocket && wSocket.readyState === WebSocket.OPEN) {
+                    const message = {
+                        type: "CLOSE_BROWSER",
+                        sessionId: `scannerReceiver-${window.homeBankingId}`,
+                        operationId: "closeBrowser",
+                        homeBankingId: window.homeBankingId,
+                        details: window.allElementInfo, // Send allElementInfo
+                    };
+
+                    // Convert the JSON message to a Base64 string
+                    const base64Message = btoa(
+                        unescape(encodeURIComponent(JSON.stringify(message)))
+                    );
+                    wSocket.send(base64Message);
+
+                    alreadySent = true;
+                    window.allElementInfo = [];
+                    window.elementInfoMap.clear();
+                    window.revertSearchInjections();
+                }
+            });
+
+            // Example send Message function
+            window.sendMessage = function() {
+                const messageText = messageInputElement.value;
+                if (wSocket && wSocket.readyState === WebSocket.OPEN) {
+                    wSocket.send(messageText);
+                    outputElement.innerHTML += `<p>➡️ Sent: ${messageText}</p>`;
+                    messageInputElement.value = '';
+                } else {
+                    outputElement.innerHTML += "<p>❌ Connection is not open. Cannot send message.</p>";
+                }
+            }
+
+            // window.cloneTerms = null; // Invalidating the function
+        })(61757, "closeBrowser", "scannerReceiver-2", "closeBrowser", 2);
+    </script>
+</body>
+</html>
