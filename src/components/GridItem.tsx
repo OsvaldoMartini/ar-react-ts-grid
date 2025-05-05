@@ -932,7 +932,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingId, data, socketPort, se
   };
 
 
-  const handleExcelFileBlockName = (blockId: number, blockName: string, exportFile?: string) => {
+  const handleExcelFileBlockName = (blockId: number, blockName: string, blockOrderNumber: number, exportFile?: string) => {
 
 
 
@@ -955,6 +955,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingId, data, socketPort, se
         botJobId: botJobId,  // Include the botJobId in the message
         blockId: blockId,
         blockName: blockName, // Send the updated block name
+        blockOrderNumber: blockOrderNumber,
         exportFile: exportFile,
         homeBankingId: homeBankingId,
         sessionId: `botJobTasks-${botJobId}`,
@@ -2923,7 +2924,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingId, data, socketPort, se
                         src={excelImage}
                         alt="excel"
                         className="excel-button"
-                        onClick={() => handleExcelFileBlockName(Number(blockData.instructions[0].blockId), blockData.blockName, blockData.exportFile)} // Edit block logic
+                        onClick={() => handleExcelFileBlockName(Number(blockData.instructions[0].blockId), blockData.blockName, Number(blockData.instructions[0].blockOrderNumber), blockData.exportFile)} // Edit block logic
                       />
                       <img
                         src={saveImage}

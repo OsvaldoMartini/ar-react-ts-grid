@@ -965,7 +965,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, dataComp, so
   };
 
 
-  const handleExcelFileBlockName = (blockId: number, blockName: string, exportFile?: string) => {
+  const handleExcelFileBlockName = (blockId: number, blockName: string, blockOrderNumber: number, exportFile?: string) => {
 
 
 
@@ -988,6 +988,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, dataComp, so
         botJobId: botJobId,  // Include the botJobId in the message
         blockId: blockId,
         blockName: blockName, // Send the updated block name
+        blockOrderNumber: blockOrderNumber,
         exportFile: exportFile,
         homeBankingId: homeBankingId,
         sessionId: `componentTasks-${botJobId}`
@@ -2836,7 +2837,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, dataComp, so
                         src={excelImage}
                         alt="excel"
                         className="excel-button"
-                        onClick={() => handleExcelFileBlockName(Number(blockData.instructions[0].blockId), blockData.blockName, blockData.exportFile)} // Edit block logic
+                        onClick={() => handleExcelFileBlockName(Number(blockData.instructions[0].blockId), blockData.blockName, Number(blockData.instructions[0].blockOrderNumber), blockData.exportFile)} // Edit block logic
                       />
                       <img
                         src={crossImage}
