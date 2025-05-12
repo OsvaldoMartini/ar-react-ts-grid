@@ -1,46 +1,111 @@
-# Getting Started with Create React App
+# React App with Webpack + Terser + JavaScript Obfuscator
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+This project is configured to build and protect your JavaScript code using:
 
-## Available Scripts
+- [Webpack](https://webpack.js.org/)
+- [Terser](https://github.com/terser/terser) for minification
+- [JavaScript Obfuscator](https://github.com/javascript-obfuscator/javascript-obfuscator) for code protection
+- [SCSS](https://sass-lang.com/) for styling
+---
 
-In the project directory, you can run:
+## 📦 Installation
 
-### `npm start`
+Install the required dev dependencies:
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+```bash
+npm install --save-dev webpack webpack-cli webpack-dev-server babel-loader @babel/core @babel/preset-env @babel/preset-react @babel/preset-typescript typescript sass sass-loader css-loader style-loader html-webpack-plugin terser-webpack-plugin webpack-obfuscator
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+```
 
-### `npm test`
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
 
-### `npm run build`
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+📁 Project Structure
+```lua
+my-project/
+│
+├── src/
+│   ├── index.tsx
+│   ├── components/
+│   │   └── griditem.scss
+│   └── App.tsx
+├── public/
+│   └── index.html
+├── dist/                  # Regular Webpack build output
+├── dist-obfuscated/       # Obfuscated JavaScript output
+├── webpack.config.js
+├── obfuscator-config.json
+└── package.json
+```
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
 
-### `npm run eject`
+🧠 Execution Flow
+The recommended flow is:
+```bash
+# Step 1: Build your app (minified with Terser)
+npm run build
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+# Step 2: Obfuscate the JS output
+npm run obfuscate
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+# Step 3: Deploy the obfuscated version
+# → Use the contents of dist-obfuscated/ as your production build
+```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
 
-## Learn More
+🔐 obfuscator-config.json Guide
+This file contains all configuration settings used by the JavaScript Obfuscator CLI.
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+➤ Sample **obfuscator-config.json**
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+```json
+{
+  "compact": true,
+  "controlFlowFlattening": true,
+  "deadCodeInjection": true,
+  "debugProtection": true,
+  "disableConsoleOutput": true,
+  "stringArray": true,
+  "rotateStringArray": true,
+  "stringArrayEncoding": ["base64"],
+  "stringArrayThreshold": 0.75
+}
+```
+
+
+➤ Key Settings Explained
+
+| Option                  | Description                                                                          |
+| ----------------------- | ------------------------------------------------------------------------------------ |
+| `compact`               | Minifies code as much as possible                                                    |
+| `controlFlowFlattening` | Converts control structures into a single block with switches — harder to understand |
+| `deadCodeInjection`     | Inserts fake code to confuse decompilers                                             |
+| `debugProtection`       | Prevents opening dev tools (disables console/debugging)                              |
+| `disableConsoleOutput`  | Removes all `console.*` output                                                       |
+| `stringArray`           | Converts all strings into array form                                                 |
+| `rotateStringArray`     | Shuffles the order of strings in the array                                           |
+| `stringArrayEncoding`   | Encodes strings using `base64` or RC4                                                |
+| `stringArrayThreshold`  | Percentage of strings to convert (0–1.0)                                             |
+
+
+
+🔧 Webpack Configuration
+
+The webpack.config.js file is set up to:
+- Use TerserPlugin to minify and remove comments/console
+- Use webpack-obfuscator to obfuscate during build (optional)
+- Support React/JSX/JS out of the box
+
+>If you prefer CLI-based obfuscation instead of the plugin, skip the Webpack plugin and use npx javascript-obfuscator directly after the build.
+
+
+✅ Summary
+
+| Task               | Command             |
+| ------------------ | ------------------- |
+| Run dev server     | `npm start`         |
+| Build optimized JS | `npm run build`     |
+| Obfuscate JS       | `npm run obfuscate` |
+| Deploy this folder | `dist-obfuscated/`  |
