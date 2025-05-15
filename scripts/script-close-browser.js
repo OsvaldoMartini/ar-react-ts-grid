@@ -13,7 +13,7 @@
   window.destination = destination;
   window.operationId = operationId;
   window.homeBankingId = homeBankingId;
-  window.sessionId = `${sessionId}-${homeBankingId}`;
+  // window.sessionId = `${sessionId}-${homeBankingId}`;
 
   function connectWebSocket() {
     if (attempts >= maxAttempts) {
@@ -234,7 +234,7 @@
     if (wSocket && wSocket.readyState === WebSocket.OPEN) {
       const message = {
         type: "CLOSE_BROWSER",
-        sessionId: `scannerReceiver-${window.homeBankingId}`,
+        sessionId: `scannerReceiver`, //-${window.homeBankingId}`,
         operationId: "closeBrowser",
         homeBankingId: window.homeBankingId,
         details: window.allElementInfo, // Send allElementInfo

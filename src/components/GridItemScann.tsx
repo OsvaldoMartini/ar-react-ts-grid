@@ -18,11 +18,13 @@ import './griditem.scss';
 import NameDropdown from './NameDropdown';
 
 interface GridItemScannProps {
-  homeBankingId: number;
+  homeBankingIdInitial: number;
   dataDTO: ElementDTO[];
   socketPort: number;
   sessionId: string;
 }
+
+const OPENAI_KEY = process.env.REACT_APP_OPENAI_API_KEY || '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';
 
 const groupByTagName = (data: ElementDTO[]) => {
   return data.reduce((result, item) => {
@@ -35,9 +37,11 @@ const groupByTagName = (data: ElementDTO[]) => {
   }, {} as Record<string, { tagName: string; elements: ElementDTO[] }>);
 };
 
-const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, socketPort, sessionId }) => {
+const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, dataDTO, socketPort, sessionId }) => {
   // Using the custom WebSocket hook
   const { webSocket, connected, reconnectAttempts, messages, error } = useWebSocket(socketPort, sessionId);
+
+  const [homeBankingId, setHomeBankingId] = useState<number>(homeBankingIdInitial);
 
   const [elementDTO, setElementDTO] = useState<ElementDTO[]>(dataDTO);
   const [elementGrouped, setElementGrouped] = useState<Record<string, { tagName: string; elements: ElementDTO[] }>>({});
@@ -101,12 +105,18 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
       try {
         const parsedMessage = JSON.parse(lastMessage);
 
-        const bodyData =
-          typeof parsedMessage.body === "string"
-            ? JSON.parse(parsedMessage.body)
-            : parsedMessage.body;
+        if (typeof parsedMessage.homeBankingId === "number") {
+          setHomeBankingId(parsedMessage.homeBankingId);
+        }
 
-        if (sessionId === bodyData.sessionId) {
+        if (sessionId === parsedMessage.sessionId) {
+
+          const bodyData =
+            typeof parsedMessage.body === "string"
+              ? JSON.parse(parsedMessage.body)
+              : parsedMessage.body;
+
+
           if (bodyData.operationId === "searchTerms") {
             const detailsData = Array.isArray(bodyData.details) ? bodyData.details : [];
 
@@ -234,7 +244,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
     const message = {
       type: "SEND_ALL_ELEMENTS_DTO",
       homeBankingId: homeBankingId,
-      sessionId: `scannerReceiver-${homeBankingId}`,
+      sessionId: `scannerReceiver`, //-${homeBankingId}`,
       details: allElements, // Send all elements
     };
 
@@ -262,9 +272,13 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingId, dataDTO, s
       console.warn("🚨 WebSocket is not connected. Cannot send message.");
       return;
     }
+    // const sessionDestine = action === "HOVERED_ROW"
+    //   ? `scannerTool-${homeBankingId}`
+    //   : `scannerReceiver-${homeBankingId}`;
+
     const sessionDestine = action === "HOVERED_ROW"
-      ? `scannerTool-${homeBankingId}`
-      : `scannerReceiver-${homeBankingId}`;
+      ? `scannerTool`
+      : `scannerReceiver`;
 
     const message = {
       type: action,

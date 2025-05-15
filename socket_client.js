@@ -35,7 +35,7 @@ function startPing(ws) {
   function ping() {
     if (ws.readyState === WebSocket.OPEN) {
       console.log("Sending ping...");
-      ws.send("ping--socket-javascript"); // Send a ping message (customize this message as needed)
+      ws.send("ping-socket-javascript"); // Send a ping message (customize this message as needed)
     } else {
       console.log("WebSocket is not connected, skipping ping.");
     }
@@ -51,7 +51,7 @@ function startPing(ws) {
 // Main function to establish WebSocket connection
 function main() {
   const brokerUrl =
-    "wss://localhost:61757/websocket?sessionId=javascript-session"; // WebSocket URL
+    "wss://localhost:56567/websocket?sessionId=javascript-session"; // WebSocket URL
   console.log(`Connecting to WebSocket at ${brokerUrl}...`);
 
   // SSL certificate path

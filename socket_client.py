@@ -32,7 +32,7 @@ def start_ping(ws):
         if ws and ws.sock and ws.sock.connected:
             try:
                 print("Sending ping...")
-                ws.send('ping-python')  # Send a ping message (customize this message as needed)
+                ws.send('ping-socket-python')  # Send a ping message (customize this message as needed)
             except Exception as e:
                 print(f"Error sending ping: {e}")
         else:
@@ -45,7 +45,7 @@ def start_ping(ws):
     ping()
 
 def main():
-    broker_url = 'wss://localhost:61757/websocket?sessionId=python-session'  # WebSocket URL
+    broker_url = 'wss://localhost:56567/websocket?sessionId=python-session'  # WebSocket URL
     print(f"Connecting to WebSocket at {broker_url}...")
     
     # Define the path to your .pem CA certificate

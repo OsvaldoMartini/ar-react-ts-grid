@@ -9,11 +9,14 @@ module.exports = {
     filename: "bundle.js",
     path: path.resolve(__dirname, "dist"),
     clean: true,
-    charset: "utf-8", // Enforce UTF-8 encoding in output
   },
   mode: "production",
   module: {
     rules: [
+      {
+        test: /\.(png|jpe?g|gif|svg)$/i,
+        type: "asset/resource", // Automatically handles small vs large files
+      },
       {
         test: /\.(ts|tsx)$/,
         exclude: /node_modules/,

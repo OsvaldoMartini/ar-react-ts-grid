@@ -43,12 +43,12 @@ import AlertModal from './AlertModal';
 import { useWebSocket } from './useWebSocket';
 
 interface GridItemCompProps {
-  homeBankingId: number;
+  homeBankingIdInitial: number;
   dataComp: ComponentsInstructionsDTO[];
   socketPort: number;
   sessionId: string;
-  botJobId: number;
-  botJobName: string;
+  botJobIdInitial: number;
+  botJobNameInitial: string;
 }
 
 // Helper function to reorder items in an array based on drag-and-drop actions
@@ -98,11 +98,16 @@ const reassignInstructionOrderNumbersByBlock = (instructions: ComponentsInstruct
   return updatedInstructions;
 };
 
-const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, dataComp, socketPort, sessionId, botJobId, botJobName }) => {
+const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataComp, socketPort, sessionId, botJobIdInitial, botJobNameInitial }) => {
   // Using the custom WebSocket hook
   const { webSocket, connected, reconnectAttempts, messages, error } = useWebSocket(socketPort, sessionId);
 
   const [componentsData, setComponentsData] = useState<ComponentsInstructionsDTO[]>(dataComp);
+
+  // Use state to manage the instructions data
+  const [homeBankingId, setHomeBankingId] = useState<number>(homeBankingIdInitial);
+  const [botJobId, setBotJobId] = useState<number | null>(botJobIdInitial);
+  const [botJobName, setBotJobName] = useState<string | null>(botJobNameInitial);
 
   // Use state to manage the instructions data
   const instructionRef = useRef<HTMLInputElement>(null);
@@ -540,7 +545,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, dataComp, so
         botJobId,
         deleteBlockId,
         homeBankingId: homeBankingId,
-        sessionId: `componentTasks-${botJobId}`,
+        sessionId: `componentTasks`, //-${botJobId}`,
         updatedRows,
       };
 
@@ -570,11 +575,17 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, dataComp, so
       try {
         const parsedMessage = JSON.parse(lastMessage);
 
-        if (homeBankingId === parsedMessage.homeBankingId && sessionId === parsedMessage.sessionId && parsedMessage.operationId === "componentsUpdate") {
+        if (typeof parsedMessage.homeBankingId === "number") {
+          setHomeBankingId(parsedMessage.homeBankingId);
+        }
+
+
+        if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "componentsUpdate") {
 
           const bodyData = typeof parsedMessage.body === "string"
             ? JSON.parse(parsedMessage.body)
             : parsedMessage.body;
+
 
           // ... handle updateInstructions ...
           // Ensure detailsData is always an array if possible
@@ -586,8 +597,18 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, dataComp, so
             setComponentsData([]);
             setGroupedData({}); // Or set to your initial empty state
             setIsDataReordered(true); // Or false, depending on your logic
+            setBotJobId(null);
+            setBotJobName(null);
           } else {
             // Otherwise, set elementDTO to detailsData
+            if (typeof detailsData[0].botJobId === "number") {
+              setBotJobId(detailsData[0].botJobId);
+            }
+
+            if (typeof detailsData[0].botJobName === "string") {
+              setBotJobName(detailsData[0].botJobName);
+            }
+
             setComponentsData(detailsData);
             setIsDataReordered(false); // To trigger reordering logic if needed
 
@@ -621,7 +642,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, dataComp, so
         type: 'BLOCK_ORDER',
         botJobId: botJobId,
         homeBankingId: homeBankingId,
-        sessionId: `componentTasks-${botJobId}`,
+        sessionId: `componentTasks`, //-${botJobId}`,
         updatedBlocks: updatedBlocks,
       };
 
@@ -748,7 +769,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, dataComp, so
         blockId: blockId,
         blockName: blockName, // Send the updated block name
         homeBankingId: homeBankingId,
-        sessionId: `componentTasks-${botJobId}`
+        sessionId: `componentTasks`, //-${botJobId}`
       };
 
       try {
@@ -817,7 +838,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, dataComp, so
         botJobId: botJobId, // Include the botJobId in the message
         blockId: blockId,
         homeBankingId: homeBankingId,
-        sessionId: `componentTasks-${botJobId}`,
+        sessionId: `componentTasks`, //-${botJobId}`,
         blockActive: newBlockActive, // Send the toggled blockActive value
       };
 
@@ -893,7 +914,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, dataComp, so
         parentId: parentId,
         actions: actions,
         homeBankingId: homeBankingId,
-        sessionId: `componentTasks-${botJobId}`
+        sessionId: `componentTasks`, //-${botJobId}`
       };
 
       try {
@@ -950,7 +971,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, dataComp, so
         type: "COMPONENT_INJECT",
         botJobId: botJobId,
         homeBankingId: homeBankingId,
-        sessionId: `botJobTasks-${botJobId}`,
+        sessionId: `botJobTasks`,  //-${botJobId}`,
         details: blockComnponent,
       };
 
@@ -991,7 +1012,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, dataComp, so
         blockOrderNumber: blockOrderNumber,
         exportFile: exportFile,
         homeBankingId: homeBankingId,
-        sessionId: `componentTasks-${botJobId}`
+        sessionId: `componentTasks`, //-${botJobId}`
       };
 
       try {
@@ -1103,7 +1124,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, dataComp, so
         type: 'BLOCK_MOVE',
         botJobId: botJobId,
         homeBankingId: homeBankingId,
-        sessionId: `componentTasks-${botJobId}`,
+        sessionId: `componentTasks`, //-${botJobId}`,
         updatedBlocks: updatedBlocks,
       };
 
@@ -1180,7 +1201,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, dataComp, so
         blockName: instruction.blockName,
         isBetween: isBetween,
         homeBankingId: homeBankingId,
-        sessionId: `componentTasks-${botJobId}`,
+        sessionId: `componentTasks`, //-${botJobId}`,
         updatedRows: [instructionDTO], // Wrap the instructionDTO in an array
       };
 
@@ -1223,7 +1244,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, dataComp, so
       blockId: -1,
       blockName: "Default Block",
       homeBankingId: homeBankingId,
-      sessionId: `componentTasks-${botJobId}`,
+      sessionId: `componentTasks`, //-${botJobId}`,
       updatedRows: [instructionDTO], // Wrap the instructionDTO in an array
     };
 
@@ -1275,7 +1296,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, dataComp, so
         blockId: instruction.blockId,
         blockName: instruction.blockName,
         homeBankingId: homeBankingId,
-        sessionId: `componentTasks-${botJobId}`,
+        sessionId: `componentTasks`, //-${botJobId}`,
         updatedRows: [instructionDTO], // Wrap the instructionDTO in an array
       };
 
@@ -1341,7 +1362,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, dataComp, so
         blockName: instruction.blockName,
         isBetween: isBetween,
         homeBankingId: homeBankingId,
-        sessionId: `componentTasks-${botJobId}`,
+        sessionId: `componentTasks`, //-${botJobId}`,
         updatedRows: [instructionDTO], // Wrap the instructionDTO in an array
       };
 
@@ -1404,7 +1425,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, dataComp, so
         blockName: instruction.blockName,
         isBetween: isBetween,
         homeBankingId: homeBankingId,
-        sessionId: `componentTasks-${botJobId}`,
+        sessionId: `componentTasks`, //-${botJobId}`,
         updatedRows: [instructionDTO], // Wrap the instructionDTO in an array
       };
 
@@ -1856,7 +1877,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, dataComp, so
         type: 'BLOCKS_SPLITTER',
         botJobId: botJobId,
         homeBankingId: homeBankingId,
-        sessionId: `componentTasks-${botJobId}`,
+        sessionId: `componentTasks`, //-${botJobId}`,
         details: blockSplitDetails,
       };
 
@@ -1928,7 +1949,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, dataComp, so
         type: 'BLOCK_MOVE',
         botJobId: botJobId,
         homeBankingId: homeBankingId,
-        sessionId: `componentTasks-${botJobId}`,
+        sessionId: `componentTasks`, //-${botJobId}`,
         updatedBlocks: updatedBlocks,
       };
 
@@ -1996,7 +2017,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, dataComp, so
             type: 'ROW_MOVE',
             botJobId: currentInstruction.botJobId,
             homeBankingId: homeBankingId,
-            sessionId: `componentTasks-${botJobId}`,
+            sessionId: `componentTasks`, //-${botJobId}`,
             updatedRows: updatedRows,
           };
 
@@ -2064,7 +2085,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, dataComp, so
             type: 'ROW_MOVE',
             botJobId: currentInstruction.botJobId,
             homeBankingId: homeBankingId,
-            sessionId: `componentTasks-${botJobId}`,
+            sessionId: `componentTasks`, //-${botJobId}`,
             updatedRows: updatedRows,
           };
 
@@ -2128,7 +2149,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, dataComp, so
         botJobId,
         blockId,
         homeBankingId: homeBankingId,
-        sessionId: `componentTasks-${botJobId}`
+        sessionId: `componentTasks`, //-${botJobId}`
       };
 
       webSocket.send(
@@ -2201,7 +2222,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, dataComp, so
         botJobId: botJobId,
         updatedBlocks: blocksToUpdate, // Include the list of updated blocks
         homeBankingId: homeBankingId,
-        sessionId: `componentTasks-${botJobId}`
+        sessionId: `componentTasks`, //-${botJobId}`
       };
 
       webSocket.send(
@@ -2254,7 +2275,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, dataComp, so
         blockId: blockId,
         blockName: firstBlockName, // Pass the block name here
         homeBankingId: homeBankingId,
-        sessionId: `componentTasks-${botJobId}`,
+        sessionId: `componentTasks`, //-${botJobId}`,
         instructions: reassignedData.map(instr => ({
           instructionId: instr.id,
           blockId: instr.blockId,
@@ -2529,7 +2550,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingId, dataComp, so
         blockId: blockId,
         blockName: blockName,
         homeBankingId: homeBankingId,
-        sessionId: `componentTasks-${botJobId}`,
+        sessionId: `componentTasks`, //-${botJobId}`,
         updatedRows: [{
           instructionId: instructionId,
           instructionOrderNumber: instructionOrderNumber,
