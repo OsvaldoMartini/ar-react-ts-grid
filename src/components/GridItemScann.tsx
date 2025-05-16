@@ -117,7 +117,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, dat
               : parsedMessage.body;
 
 
-          if (bodyData.operationId === "searchTerms") {
+          if (parsedMessage.operationId === "searchTerms") {
             const detailsData = Array.isArray(bodyData.details) ? bodyData.details : [];
 
             if (detailsData.length === 0) {
@@ -128,7 +128,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, dat
               setElementDTO(detailsData);
             }
             setIsElementGrouped(false);
-          } else if (bodyData.operationId === "clonedElement" || bodyData.operationId === "addPickOne") {
+          } else if (parsedMessage.operationId === "clonedElement" || parsedMessage.operationId === "addPickOne") {
             // Handle clonedElement and addPickOne operations
             const newElements = bodyData.details;
 

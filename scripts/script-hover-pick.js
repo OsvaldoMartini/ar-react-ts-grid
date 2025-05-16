@@ -39,7 +39,7 @@
   window.destination = destination;
   window.operationId = operationId;
   window.homeBankingId = homeBankingId;
-  // window.sessionId = `${sessionId}-${homeBankingId}`;
+  window.sessionId = `${sessionId}`; //-${homeBankingId}`;
 
   // Track the last hovered element to remove the border from it
   let lastHoveredElement = null;

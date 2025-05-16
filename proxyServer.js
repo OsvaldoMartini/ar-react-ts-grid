@@ -4,7 +4,7 @@ const fs = require("fs");
 
 // Configuration
 const FRONTEND_PORT = 8080; // Port for your browser to connect to (ws://localhost:8080)
-const BACKEND_URL = "wss://localhost:58779/websocket?sessionId=scannerGrid";
+const BACKEND_URL = "wss://localhost:51877/websocket?sessionId=scannerGrid";
 
 // Create a WebSocket server to accept frontend connections
 const wss = new WebSocket.Server({ port: FRONTEND_PORT }, () => {
