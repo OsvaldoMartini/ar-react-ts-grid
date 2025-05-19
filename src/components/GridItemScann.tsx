@@ -123,11 +123,11 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, dat
             if (detailsData.length === 0) {
               setElementDTO([]);
               setElementGrouped({});
-              setIsElementGrouped(true);
+              // setIsElementGrouped(true);
             } else {
               setElementDTO(detailsData);
             }
-            setIsElementGrouped(false);
+            // setIsElementGrouped(false);
           } else if (parsedMessage.operationId === "clonedElement" || parsedMessage.operationId === "addPickOne") {
             // Handle clonedElement and addPickOne operations
             const newElements = bodyData.details;
@@ -165,41 +165,41 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, dat
                 return updatedElements;
               });
 
-              setElementGrouped((prevGrouped) => {
-                let newGrouped = { ...prevGrouped };
+              // setElementGrouped((prevGrouped) => {
+              //   let newGrouped = { ...prevGrouped };
 
-                newElements.forEach((newElement) => {
-                  const { tagName, xPath } = newElement;
+              //   newElements.forEach((newElement) => {
+              //     const { tagName, xPath } = newElement;
 
-                  if (
-                    newGrouped[tagName] &&
-                    newGrouped[tagName].elements.some((el) => el.xPath === xPath)
-                  ) {
-                    return; // Prevent duplication within groups
-                  }
+              //     if (
+              //       newGrouped[tagName] &&
+              //       newGrouped[tagName].elements.some((el) => el.xPath === xPath)
+              //     ) {
+              //       return; // Prevent duplication within groups
+              //     }
 
-                  if (!newGrouped[tagName]) {
-                    newGrouped[tagName] = { tagName, elements: [newElement] };
-                  } else {
-                    // find if we need to insert after existing item.
-                    let insertIndex = -1;
-                    if (newGrouped[tagName].elements.length > 0) {
-                      insertIndex = newGrouped[tagName].elements.findIndex(el => el.xPath === bodyData?.afterXPath);
-                    }
+              //     if (!newGrouped[tagName]) {
+              //       newGrouped[tagName] = { tagName, elements: [newElement] };
+              //     } else {
+              //       // find if we need to insert after existing item.
+              //       let insertIndex = -1;
+              //       if (newGrouped[tagName].elements.length > 0) {
+              //         insertIndex = newGrouped[tagName].elements.findIndex(el => el.xPath === bodyData?.afterXPath);
+              //       }
 
-                    if (insertIndex !== -1) {
-                      newGrouped[tagName].elements.splice(insertIndex + 1, 0, newElement);
-                    } else {
-                      newGrouped[tagName].elements.push(newElement);
-                    }
-                  }
-                });
+              //       if (insertIndex !== -1) {
+              //         newGrouped[tagName].elements.splice(insertIndex + 1, 0, newElement);
+              //       } else {
+              //         newGrouped[tagName].elements.push(newElement);
+              //       }
+              //     }
+              //   });
 
-                return newGrouped;
-              });
+              //   return newGrouped;
+              // });
 
-              setIsElementGrouped(true);
             }
+            setIsElementGrouped(false);
           }
         }
       } catch (error) {
