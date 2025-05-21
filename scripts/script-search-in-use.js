@@ -38,7 +38,7 @@
     try {
       //console.log(`Attempt ${attempts + 1} to connect to WebSocket...`);
       wSocket = new WebSocket(
-        `wss://localhost:${socketPort}/websocket?sessionId=${window.sessionId}`
+        `ws://localhost:${socketPort}/websocket?sessionId=${window.sessionId}`
       );
 
       wSocket.onopen = () => {
@@ -1764,7 +1764,7 @@
 // })(
 //   ["button", "input", "label", "a", "select"],
 //   false,
-//   56727,
+//   51069,
 //   "scannerTool",
 //   "scannerGrid",
 //   "searchTerms",
