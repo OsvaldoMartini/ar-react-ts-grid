@@ -47,6 +47,7 @@ export interface ComponentsInstructionsDTO {
   exportFile?: string;
   refreshLoop?: boolean;
   loopOnly?: boolean;
+  variableId?: number;
 }
 
 export interface ElementDTO {
