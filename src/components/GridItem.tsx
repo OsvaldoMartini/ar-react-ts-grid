@@ -547,6 +547,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
       const message = {
         type: 'ROW_MOVE',
         botJobId,
+        botJobName,
         deleteBlockId,
         homeBankingId: homeBankingId,
         sessionId: `botJobTasks`, //-${botJobId}`,
@@ -659,6 +660,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
       const message = {
         type: 'BLOCK_ORDER',
         botJobId: botJobId,
+        botJobName: botJobName,
         homeBankingId: homeBankingId,
         sessionId: `botJobTasks`, //-${botJobId}`,
         updatedBlocks: updatedBlocks,
@@ -783,7 +785,8 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     if (webSocket && connected) {
       const message = {
         type: 'BLOCK_UPDATE',
-        botJobId: botJobId,  // Include the botJobId in the message
+        botJobId: botJobId,
+        botJobName: botJobName,
         blockId: blockId,
         blockName: blockName, // Send the updated block name
         homeBankingId: homeBankingId,
@@ -853,7 +856,8 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     if (webSocket && connected) {
       const message = {
         type: 'BLOCK_STATUS',
-        botJobId: botJobId, // Include the botJobId in the message
+        botJobId: botJobId,
+        botJobName: botJobName,
         blockId: blockId,
         homeBankingId: homeBankingId,
         sessionId: `botJobTasks`, //-${botJobId}`,
@@ -925,8 +929,9 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     if (webSocket && connected) {
       const message = {
         type: 'INSTRUCTION_STATUS',
-        botJobId: botJobId, // Include the botJobId in the message
+        botJobId: botJobId,
         blockId: instruction.blockId,
+        botJobName: botJobName,
         instructionId: instructionId,
         instructionActive: newInstructionActive, // Send the toggled instructionActive value
         parentId: parentId,
@@ -965,7 +970,8 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     if (webSocket && connected) {
       const message = {
         type: 'BLOCK_EXCEL_FILE',
-        botJobId: botJobId,  // Include the botJobId in the message
+        botJobId: botJobId,
+        botJobName: botJobName,
         blockId: blockId,
         blockName: blockName, // Send the updated block name
         blockOrderNumber: blockOrderNumber,
@@ -1082,6 +1088,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
       const message = {
         type: 'BLOCK_MOVE',
         botJobId: botJobId,
+        botJobName: botJobName,
         homeBankingId: homeBankingId,
         sessionId: `botJobTasks`, //-${botJobId}`,
         updatedBlocks: updatedBlocks,
@@ -1156,6 +1163,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
       const message = {
         type: 'INSERT_BEFORE',
         botJobId: botJobId,
+        botJobName: botJobName,
         blockId: instruction.blockId,
         blockName: instruction.blockName,
         isBetween: isBetween,
@@ -1253,6 +1261,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
       const message = {
         type: "EDIT_OPERATION",
         botJobId: botJobId,
+        botJobName: botJobName,
         blockId: instruction.blockId,
         blockName: instruction.blockName,
         homeBankingId: homeBankingId,
@@ -1318,6 +1327,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
       const message = {
         type: typeInsert,
         botJobId: botJobId,
+        botJobName: botJobName,
         blockId: instruction.blockId,
         blockName: instruction.blockName,
         isBetween: isBetween,
@@ -1381,6 +1391,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
       const message = {
         type: 'INSERT_AFTER',
         botJobId: botJobId,
+        botJobName: botJobName,
         blockId: instruction.blockId,
         blockName: instruction.blockName,
         isBetween: isBetween,
@@ -1465,6 +1476,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
       const message = {
         type: "BLOCKS_COMPONENT",
         botJobId: botJobId,
+        botJobName: botJobName,
         homeBankingId: homeBankingId,
         sessionId: `componentTasks`, //-${botJobId}`,
         details: blockComnponent,
@@ -1901,6 +1913,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
       const message = {
         type: 'BLOCKS_SPLITTER',
         botJobId: botJobId,
+        botJobName: botJobName,
         homeBankingId: homeBankingId,
         sessionId: `botJobTasks`, //-${botJobId}`,
         details: blockSplitDetails,
@@ -1973,6 +1986,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
       const message = {
         type: 'BLOCK_MOVE',
         botJobId: botJobId,
+        botJobName: botJobName,
         homeBankingId: homeBankingId,
         sessionId: `botJobTasks`, //-${botJobId}`,
         updatedBlocks: updatedBlocks,
@@ -2041,6 +2055,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
           const message = {
             type: 'ROW_MOVE',
             botJobId: currentInstruction.botJobId,
+            botJobName: botJobName,
             homeBankingId: homeBankingId,
             sessionId: `botJobTasks`, //-${botJobId}`,
             updatedRows: updatedRows,
@@ -2109,6 +2124,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
           const message = {
             type: 'ROW_MOVE',
             botJobId: currentInstruction.botJobId,
+            botJobName: botJobName,
             homeBankingId: homeBankingId,
             sessionId: `botJobTasks`, //-${botJobId}`,
             updatedRows: updatedRows,
@@ -2172,6 +2188,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
         actions,
         parentId,
         botJobId,
+        botJobName,
         blockId,
         homeBankingId: homeBankingId,
         sessionId: `botJobTasks`, //-${botJobId}`,
@@ -2245,6 +2262,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
         type: 'DELETE_BLOCK',
         blockId: blockId,
         botJobId: botJobId,
+        botJobName: botJobName,
         updatedBlocks: blocksToUpdate, // Include the list of updated blocks
         homeBankingId: homeBankingId,
         sessionId: `botJobTasks`, //-${botJobId}`,
@@ -2298,6 +2316,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
         type: 'BLOCK_ROLLBACK',
         botJobId: botJobId,
         blockId: blockId,
+        botJobName: botJobName,
         blockName: firstBlockName, // Pass the block name here
         homeBankingId: homeBankingId,
         sessionId: `botJobTasks`, //-${botJobId}`,

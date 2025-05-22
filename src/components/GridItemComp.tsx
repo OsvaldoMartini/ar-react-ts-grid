@@ -543,8 +543,9 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       const message = {
         type: 'ROW_MOVE',
         botJobId,
+        botJobName,
         deleteBlockId,
-        homeBankingId: homeBankingId,
+        homeBankingId,
         sessionId: `componentTasks`, //-${botJobId}`,
         updatedRows,
       };
@@ -641,6 +642,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       const message = {
         type: 'BLOCK_ORDER',
         botJobId: botJobId,
+        botJobName: botJobName,
         homeBankingId: homeBankingId,
         sessionId: `componentTasks`, //-${botJobId}`,
         updatedBlocks: updatedBlocks,
@@ -766,6 +768,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       const message = {
         type: 'BLOCK_UPDATE',
         botJobId: botJobId,  // Include the botJobId in the message
+        botJobName: botJobName,
         blockId: blockId,
         blockName: blockName, // Send the updated block name
         homeBankingId: homeBankingId,
@@ -836,6 +839,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       const message = {
         type: 'BLOCK_STATUS',
         botJobId: botJobId, // Include the botJobId in the message
+        botJobName: botJobName,
         blockId: blockId,
         homeBankingId: homeBankingId,
         sessionId: `componentTasks`, //-${botJobId}`,
@@ -908,6 +912,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       const message = {
         type: 'INSTRUCTION_STATUS',
         botJobId: botJobId, // Include the botJobId in the message
+        botJobName: botJobName,
         blockId: instruction.blockId,
         instructionId: instructionId,
         instructionActive: newInstructionActive, // Send the toggled instructionActive value
@@ -970,6 +975,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       const message = {
         type: "COMPONENT_INJECT",
         botJobId: botJobId,
+        botJobName: botJobName,
         homeBankingId: homeBankingId,
         sessionId: `botJobTasks`,  //-${botJobId}`,
         details: blockComnponent,
@@ -1007,6 +1013,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       const message = {
         type: 'BLOCK_EXCEL_FILE',
         botJobId: botJobId,  // Include the botJobId in the message
+        botJobName: botJobName,  // Include the botJobId in the message
         blockId: blockId,
         blockName: blockName, // Send the updated block name
         blockOrderNumber: blockOrderNumber,
@@ -1123,6 +1130,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       const message = {
         type: 'BLOCK_MOVE',
         botJobId: botJobId,
+        botJobName: botJobName,
         homeBankingId: homeBankingId,
         sessionId: `componentTasks`, //-${botJobId}`,
         updatedBlocks: updatedBlocks,
@@ -1197,6 +1205,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       const message = {
         type: 'INSERT_BEFORE',
         botJobId: botJobId,
+        botJobName: botJobName,
         blockId: instruction.blockId,
         blockName: instruction.blockName,
         isBetween: isBetween,
@@ -1293,6 +1302,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       const message = {
         type: "EDIT_OPERATION",
         botJobId: botJobId,
+        botJobName: botJobName,
         blockId: instruction.blockId,
         blockName: instruction.blockName,
         homeBankingId: homeBankingId,
@@ -1358,6 +1368,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       const message = {
         type: typeInsert,
         botJobId: botJobId,
+        botJobName: botJobName,
         blockId: instruction.blockId,
         blockName: instruction.blockName,
         isBetween: isBetween,
@@ -1421,6 +1432,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       const message = {
         type: 'INSERT_AFTER',
         botJobId: botJobId,
+        botJobName: botJobName,
         blockId: instruction.blockId,
         blockName: instruction.blockName,
         isBetween: isBetween,
@@ -1876,6 +1888,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       const message = {
         type: 'BLOCKS_SPLITTER',
         botJobId: botJobId,
+        botJobName: botJobName,
         homeBankingId: homeBankingId,
         sessionId: `componentTasks`, //-${botJobId}`,
         details: blockSplitDetails,
@@ -1948,6 +1961,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       const message = {
         type: 'BLOCK_MOVE',
         botJobId: botJobId,
+        botJobName: botJobName,
         homeBankingId: homeBankingId,
         sessionId: `componentTasks`, //-${botJobId}`,
         updatedBlocks: updatedBlocks,
@@ -2016,6 +2030,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
           const message = {
             type: 'ROW_MOVE',
             botJobId: currentInstruction.botJobId,
+            botJobName: botJobName,
             homeBankingId: homeBankingId,
             sessionId: `componentTasks`, //-${botJobId}`,
             updatedRows: updatedRows,
@@ -2084,6 +2099,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
           const message = {
             type: 'ROW_MOVE',
             botJobId: currentInstruction.botJobId,
+            botJobName: botJobName,
             homeBankingId: homeBankingId,
             sessionId: `componentTasks`, //-${botJobId}`,
             updatedRows: updatedRows,
@@ -2147,6 +2163,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
         actions,
         parentId,
         botJobId,
+        botJobName,
         blockId,
         homeBankingId: homeBankingId,
         sessionId: `componentTasks`, //-${botJobId}`
@@ -2220,6 +2237,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
         type: 'DELETE_BLOCK',
         blockId: blockId,
         botJobId: botJobId,
+        botJobName: botJobName,
         updatedBlocks: blocksToUpdate, // Include the list of updated blocks
         homeBankingId: homeBankingId,
         sessionId: `componentTasks`, //-${botJobId}`
@@ -2273,6 +2291,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
         type: 'BLOCK_ROLLBACK',
         botJobId: botJobId,
         blockId: blockId,
+        botJobName: botJobName,
         blockName: firstBlockName, // Pass the block name here
         homeBankingId: homeBankingId,
         sessionId: `componentTasks`, //-${botJobId}`,
@@ -3019,28 +3038,6 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                                         >
                                           Insert Step After
                                         </div>
-
-
-                                        {!isJustOne &&
-                                          ((!["IF", "ELSEIF", "ELSE", "ENDIF"].includes(instruction.actions) &&
-                                            !isBetweenIfAndEndIf(instruction.instructionOrderNumber, blockData.instructions))) && (
-                                            <>
-                                              <div
-                                                onClick={() =>
-                                                  handleSplitComponent(
-                                                    instruction.id,
-                                                    groupedData,
-                                                    setGroupedData,
-                                                    componentsData,
-                                                    isLastInstruction
-                                                  )
-                                                }
-                                              >
-                                                Split Component
-                                              </div>
-                                            </>
-                                          )
-                                        }
 
 
                                         {
