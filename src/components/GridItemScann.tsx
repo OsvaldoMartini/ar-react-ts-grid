@@ -24,8 +24,6 @@ interface GridItemScannProps {
   sessionId: string;
 }
 
-const OPENAI_KEY = process.env.REACT_APP_OPENAI_API_KEY || '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';
-
 const groupByTagName = (data: ElementDTO[]) => {
   return data.reduce((result, item) => {
     const { tagName } = item;
