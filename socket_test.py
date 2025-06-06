@@ -12,7 +12,7 @@ class MyListener(stomp.ConnectionListener):
         print(f"Received message: {frame.body}")
 
 def main():
-    broker_url = 'wss://localhost:61757/websocket'  # WebSocket URL (ensure this is correct)
+    broker_url = 'wss://localhost:64479/websocket'  # WebSocket URL (ensure this is correct)
     destination = '/topic/messages'
 
     try:
