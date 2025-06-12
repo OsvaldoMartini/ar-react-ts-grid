@@ -18,11 +18,11 @@ const App: React.FC = () => {
   const [componentsData, setComponentsData] = useState<ComponentsInstructionsDTO[]>([]);
   const [elementDTO, setElementDTO] = useState<ElementDTO[]>(elementsDTOMockData);
   const [botJobData, setBotJobData] = useState<BotJobData>(botJobMockData);
-  const [socketPort, setSocketPort] = useState<number>(0);
-  const [botJobId, setBotJobId] = useState<number>(0);
+  const [socketPort, setSocketPort] = useState<number>(53937);
+  const [botJobId, setBotJobId] = useState<number>(1);
   const [botJobName, setBotJobName] = useState<string>("");
-  const [homeBanking, setHomeBanking] = useState<number>(0); // VPBank 3
-  const [sessionId, setSessionId] = useState<string>(""); // (SENDER: scannerTool) -> scannerGrid-1  -> componentTasks-1 
+  const [homeBanking, setHomeBanking] = useState<number>(2);
+  const [sessionId, setSessionId] = useState<string>("botJobTasks"); // (SENDER: scannerTool) -> scannerGrid-1  -> componentTasks-1 
   const [errorFlag, setErrorFlag] = useState<boolean>(false)  //(SENDER: insertTool) -> botJobTasks-1 -> componentTasks  
   const [alertImage, setAlertImage] = useState(constructionImage);
   const [alertClass, setAlertClass] = useState('construction-image')

@@ -244,6 +244,50 @@
   height: 20px; /* Override height */
 }
 
+// .excelgoto-image {
+//   @extend .operations; /* Inherit styles from .operations */
+//   height: 20px; /* Override height */
+//   width: 30px; /* Override height */
+// }
+
+.excel-goto-container {
+  @extend .move-buttons; /* Inherit styles from .move-buttons */
+  background-color: transparent; /* Transparent background */
+  background-color: #c3d3d9; /* Light gray background */
+  // padding: 10px;
+  border-radius: 5px;
+  display: flex; /* Use flexbox for layout */
+  align-items: center; /* Vertically center items */
+  // margin-bottom: 10px; /* Add some space below the container */
+
+
+  /* Add transition for smooth effect */
+  transition: background-color 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+  cursor: pointer; /* Indicates it's interactive */
+}
+
+.excel-goto-container:hover {
+  background-color: #a7bed3; /* Slightly darker shade on hover */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Subtle shadow on hover */
+}
+
+.excelgoto-image {
+  height: 16px;
+  width: 16px;
+  margin-right: 5px; /* Space between image and text */
+}
+
+.excelgoto-text {
+  font-size: 0.8em; /* Makes the font size 80% of its parent's font size */
+  margin-right: 5px; /* Space between text and cross image */
+}
+
+.cross-image {
+  height: 16px;
+  width: 16px;
+}
+
+
 /* Instructions List */
 .instructions-list {
   display: flex;

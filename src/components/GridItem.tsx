@@ -19,6 +19,7 @@ import excelImage from "../assets/excel.png";
 import screenImage from "../assets/screen.png";
 import waitImage from "../assets/wait.png";
 import gotoImage from "../assets/goto8.png";
+import excelGotoImage from "../assets/excel_goto2.png";
 import ifElseImage from "../assets/ifElse.png";
 import elseImage from "../assets/else6.png";
 import endIfImage from "../assets/endIf4.png";
@@ -102,6 +103,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
   const { webSocket, connected, reconnectAttempts, messages, error } = useWebSocket(socketPort, sessionId);
 
   const [instructionsData, setInstructionsData] = useState<BlockLoopInstructionLoadDTO[]>(data);
+  const [excelGotoInstruction, setExcelGotoInstruction] = useState<BlockLoopInstructionLoadDTO | null>(null);
   // const [homeBanking, setHomeBanking] = useState<number>(homeBankingId);
   // const [botJobId, setBotJobId] = useState<number>(botJobId);
   // const [botJobName, setBotJobName] = useState<string>(botJobName);
@@ -573,6 +575,8 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
 
   useEffect(() => {
+    console.log("WebSocket Messages");
+
     if (messages.length > 0) {
       const lastMessage = messages[messages.length - 1];
       console.log('RECEIVED -> Last WebSocket message ', lastMessage);
@@ -642,20 +646,22 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
 
   useEffect(() => {
-    //console.log("UseEffect -> editingInstructionId");
+    console.log("UseEffect -> editingInstructionId");
     if (editingInstructionId && instructionRef.current) {
       instructionRef.current.focus();
     }
   }, [editingInstructionId]);
 
   useEffect(() => {
-    //console.log("UseEffect -> editingBlockId");
+    console.log("UseEffect -> editingBlockId");
     if (editingBlockId && blockRef.current) {
       blockRef.current.focus();
     }
   }, [editingBlockId]);
 
   useEffect(() => {
+    console.log("Update Blocks");
+
     if (updatedBlocks.length > 0 && webSocket && connected) {
       const message = {
         type: 'BLOCK_ORDER',
@@ -678,13 +684,19 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
   }, [updatedBlocks]); // Remove unnecessary dependencies
 
   useEffect(() => {
+    console.log("Reassigning instruction order numbers");
     if (!isDataReordered && instructionsData.length > 0) {
-      console.log("Reassigning instruction order numbers");
+
 
       const reassignedData = reassignInstructionOrderNumbersByBlock([...instructionsData]);
       const { updatedData, updatedBlocks } = correctBlockOrderNumbers(reassignedData);
 
+      const gotoInstructionAfterReorder = reassignedData.find(
+        (instruction) => instruction.actions === 'EXCEL GOTO'
+      );
+
       setInstructionsData(updatedData);
+      setExcelGotoInstruction(gotoInstructionAfterReorder || null);
       setGroupedData(groupByBlock(reassignedData));
 
       if (JSON.stringify(updatedBlocks) !== JSON.stringify(updatedBlocks)) {
@@ -698,7 +710,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
   // Add the event listener to detect clicks outside the dropdown
   useEffect(() => {
-    //console.log("UseEffect -> handleClickOutside");
+    console.log("UseEffect -> handleClickOutside");
     document.addEventListener('mousedown', handleClickOutside);
 
     // Cleanup the event listener on component unmount
@@ -709,7 +721,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
   // Close the dropdown when clicking outside
   useEffect(() => {
-    //console.log("UseEffect -> openDropdown");
+    console.log("UseEffect -> openDropdown");
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setOpenDropdown(null); // Close the dropdown if clicked outside
@@ -2421,6 +2433,11 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
           text = instruction.name;
           imageClass = "goto-image";
           break;
+        case "EXCEL GOTO":
+          imageSrc = excelGotoImage;
+          text = instruction.name;
+          imageClass = "excelgoto-image";
+          break;
         case "ELSEIF":
           imageSrc = ifElseImage;
           text = instruction.name;
@@ -2474,7 +2491,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
 
   const editableSpecialOperations = (actionType: string) => {
-    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "PAUSE", "REFRESH", "LOOP", "REFRESH_LOOP"].includes(actionType)) {
+    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "PAUSE", "REFRESH", "LOOP", "REFRESH_LOOP", "EXCEL GOTO"].includes(actionType)) {
       return true;
     } else {
       return false;
@@ -2483,7 +2500,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
 
   const allSpecialOperations = (actionType: string) => {
-    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "IF", "ELSEIF", "ELSE", "ENDIF", "PAUSE", "REFRESH", "LOOP", "REFRESH_LOOP"].includes(actionType)) {
+    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "IF", "ELSEIF", "ELSE", "ENDIF", "PAUSE", "REFRESH", "LOOP", "REFRESH_LOOP", "EXCEL GOTO"].includes(actionType)) {
       return true;
     } else {
       return false;
@@ -2932,6 +2949,24 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                           onClick={() => handleRollbackBlock(Number(blockData.instructions[0].blockId))}
                         />
                       )}
+                      {excelGotoInstruction &&
+                        blockData.instructions[0].blockOrderNumber === excelGotoInstruction.blockOrderNumber && (
+                          <div className="excel-goto-container">
+                            <img
+                              src={excelGotoImage}
+                              alt=""
+                              className="excelgoto-image"
+                              title="This block contains the Excel GOTO instruction"
+                            />
+                            <span className="excelgoto-text">Excel Next Row</span>
+                            <img
+                              src={crossImage}
+                              alt=""
+                              className="cross-button"
+                              onClick={() => handleRemoveInstruction(Number(excelGotoInstruction.id))}
+                            />
+                          </div>
+                        )}
                       <img
                         src={upImage}
                         alt=""
