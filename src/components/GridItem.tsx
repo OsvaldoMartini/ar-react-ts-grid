@@ -21,6 +21,7 @@ import screenImage from "../assets/screen.png";
 import waitImage from "../assets/wait.png";
 import gotoImage from "../assets/goto8.png";
 import excelGotoImage from "../assets/excel_goto2.png";
+import nextRowImage from "../assets/excel.png";
 import ifElseImage from "../assets/ifElse.png";
 import elseImage from "../assets/else6.png";
 import endIfImage from "../assets/endIf4.png";
@@ -2437,7 +2438,12 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
         case "EXCEL GOTO":
           imageSrc = excelGotoImage;
           text = instruction.name;
-          imageClass = "excelgoto-image";
+          // imageClass = "excelgoto-image";
+          break;
+        case "NEXT ROW":
+          imageSrc = nextRowImage;
+          text = "Excel Data Next Row"; //instruction.name;
+          // imageClass = "excelgoto-image";
           break;
         case "ELSEIF":
           imageSrc = ifElseImage;
@@ -2492,7 +2498,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
 
   const editableSpecialOperations = (actionType: string) => {
-    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "PAUSE", "REFRESH", "LOOP", "REFRESH_LOOP", "EXCEL GOTO"].includes(actionType)) {
+    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "PAUSE", "REFRESH", "LOOP", "REFRESH_LOOP", "EXCEL GOTO", "NEXT ROW"].includes(actionType)) {
       return true;
     } else {
       return false;
@@ -2501,7 +2507,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
 
   const allSpecialOperations = (actionType: string) => {
-    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "IF", "ELSEIF", "ELSE", "ENDIF", "PAUSE", "REFRESH", "LOOP", "REFRESH_LOOP", "EXCEL GOTO"].includes(actionType)) {
+    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "IF", "ELSEIF", "ELSE", "ENDIF", "PAUSE", "REFRESH", "LOOP", "REFRESH_LOOP", "EXCEL GOTO", "NEXT ROW"].includes(actionType)) {
       return true;
     } else {
       return false;
