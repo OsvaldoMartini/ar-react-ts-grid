@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ComplexMessage, ElementDTO } from './instructionsMockData';
 import crossImage from '../assets/cross.png';
+import pickItemImage from '../assets/pick-item5.png';
 import saveImage from "../assets/save.png";
 import editImage from '../assets/edit.png';
 import constructionImage from '../assets/construction.png';
@@ -624,8 +625,8 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, dat
                       className="instruction-item"
                       onMouseEnter={() => handleRowHover(elementDTO)}
                       onMouseLeave={handleRowLeave}
-                      // onDoubleClick={(event) => handleRowSelectedClick(event, elementDTO, "NEW_ELEMENT_DTO")}
-                      onClick={(event) => handleRowSelectedClick(event, elementDTO, "DETAILS_ELEMENT_DTO")}
+                    // onDoubleClick={(event) => handleRowSelectedClick(event, elementDTO, "NEW_ELEMENT_DTO")}
+                    // onClick={(event) => handleRowSelectedClick(event, elementDTO, "DETAILS_ELEMENT_DTO")}
                     >
                       {editingElementId === elementDTO.xPath && editingElementTagName === elementDTO.tagName ? (
                         <div className="edit-container">
@@ -663,13 +664,14 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, dat
                         <span>{"\u00A0".repeat(20)}</span>
                       )}
                       <div className="options-column">
+                        <img src={pickItemImage} alt="" className="pick-button" onClick={(event) => handleRowSelectedClick(event, elementDTO, "DETAILS_ELEMENT_DTO")} />
                         {renderEditButton(
                           elementDTO,
                           editImage
                         )}
-                        <img src={saveImage} alt="save" className="save-button" onClick={(event) => handleRowSelectedClick(event, elementDTO, "NEW_ELEMENT_DTO")} />
-                        <img src={testInputImage} alt="test" className="test-button" onClick={(event) => handleRowSelectedClick(event, elementDTO, "TEST_INPUT_DTO")} />
-                        <img src={clickTestImage} alt="test" className="test-button" onClick={(event) => handleRowSelectedClick(event, elementDTO, "TEST_CLICK_DTO")} />
+                        <img src={saveImage} alt="" className="save-button" onClick={(event) => handleRowSelectedClick(event, elementDTO, "NEW_ELEMENT_DTO")} />
+                        <img src={testInputImage} alt="" className="test-button" onClick={(event) => handleRowSelectedClick(event, elementDTO, "TEST_INPUT_DTO")} />
+                        <img src={clickTestImage} alt="" className="test-button" onClick={(event) => handleRowSelectedClick(event, elementDTO, "TEST_CLICK_DTO")} />
                         <img src={crossImage} alt="" className="cross-button" onClick={() => handleRemoveElementDTO(elementDTO)} />
                       </div>
                     </div>

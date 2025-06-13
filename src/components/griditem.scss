@@ -91,6 +91,7 @@
 .excel-button,
 .cross-button,
 .save-button,
+.pick-button,
 .test-button,
 .active-button,
 .inactive-button,
@@ -157,6 +158,9 @@
   padding: 0 2px 0 6px;
 }
 
+.pick-button{
+  padding: 0 2px 0 6px;
+}
 
 .test-button {
   padding: 0 2px 0 6px;
@@ -280,6 +284,7 @@
 .excelgoto-text {
   font-size: 0.8em; /* Makes the font size 80% of its parent's font size */
   margin-right: 5px; /* Space between text and cross image */
+  color: #b163ff;
 }
 
 .cross-image {

@@ -9,6 +9,7 @@ import checkImage from '../assets/check4.png';
 
 import crossImage from '../assets/cross.png';
 import editImage from '../assets/edit.png';
+import edit2Image from '../assets/edit2.png';
 import upImage from '../assets/up.png';
 import downImage from '../assets/down.png';
 import rollBackImage from '../assets/rollback4.png';
@@ -2960,6 +2961,12 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                             />
                             <span className="excelgoto-text">Excel Next Row</span>
                             <img
+                              src={edit2Image}
+                              alt=""
+                              className="edit-button"
+                              onClick={() => handleEditSpecialOper(Number(excelGotoInstruction.id), instructionsData)}
+                            />
+                            <img
                               src={crossImage}
                               alt=""
                               className="cross-button"
@@ -3018,6 +3025,8 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                         {...provided.droppableProps}
                       >
                         {blockData.instructions.map((instruction, index) => {
+                          if (instruction.actions === "EXCEL GOTO") return null;
+
                           const isLastInstruction =
                             index === blockData.instructions.length - 1;
                           const isJustOne = blockData.instructions.length === 1;
