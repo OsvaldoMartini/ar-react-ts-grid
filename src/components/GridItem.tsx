@@ -2793,7 +2793,38 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     return <span className="instruction-details">&nbsp;</span>;
   };
 
+  const renderExportFile = (input: string) => {
+    const lastChar = input.slice(-1);
+    const path = input.slice(0, -2); // remove ":," or ":|" from the end
 
+    // If path is "No Excel Export File", render only the path
+    if (path.includes("No Excel Export")) {
+      return (
+        <span className="instruction-details">
+          <span style={{ color: "#FFA500" }}>No Excel Export File</span>
+        </span>
+      );
+    }
+
+    let delimiterName = '';
+    switch (lastChar) {
+      case ',':
+        delimiterName = 'Comma';
+        break;
+      case '|':
+        delimiterName = 'Pipe';
+        break;
+      default:
+        delimiterName = 'Comma';
+    }
+
+    return (
+      <span className="instruction-details">
+        <span style={{ color: "#FFA500" }}>{path}</span>{'  '}
+        <span style={{ color: "#FFA500" }}>({delimiterName})</span>
+      </span>
+    );
+  };
 
   return (
     <div className="grid-container">
@@ -2945,7 +2976,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                     </span>
                     {/* Show the export file or "No Export File" */}
                     <span className="block-export-file">
-                      {blockData.exportFile}
+                      {renderExportFile(String(blockData.exportFile))}
                     </span>
                     <div className="move-buttons">
                       {index === 0 && (
