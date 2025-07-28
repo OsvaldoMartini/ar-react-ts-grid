@@ -29,6 +29,7 @@ import pauseImage from "../assets/pause4.png";
 import refreshOnlyImage from "../assets/refresh-only.png";
 import refreshLoopImage from "../assets/refresh-loop.png";
 import clickImage from "../assets/click.png";
+import clickTestImage from "../assets/clickTest2.png";
 import linkImage from "../assets/links-icon.png";
 import inputImage from "../assets/input_field.png";
 import outPutImage from "../assets/output1.png";
@@ -2157,6 +2158,65 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     }
   };
 
+  const handleRowSelectedClick = (
+    event: React.MouseEvent<HTMLDivElement, MouseEvent>,
+    instruction: BlockLoopInstructionLoadDTO,
+    action: string
+  ) => {
+    event.stopPropagation();
+
+    // Example filled object
+    const clickElement: ElementDTO = {
+      id: instruction.id,
+      typeElement: instruction.tagName,
+      tagName: instruction.tagName,
+      xPath: "",
+      someText: "",
+      attribId: "",
+      attribName: "",
+      coordinates: "",
+      attributeData: [],
+      customXPath: "",
+      iFrameXPath: "",
+      attributeValue: "",
+      attributeType: "",
+      searchAttributeValue: ""
+    };
+
+    sendWebSocketMessage(clickElement, action);
+
+  };
+
+  const sendWebSocketMessage = (elementDTO: ElementDTO, action: string) => {
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
+      console.warn("🚨 WebSocket is not connected. Cannot send message.");
+      return;
+    }
+    // const sessionDestine = action === "HOVERED_ROW"
+    //   ? `scannerTool-${homeBankingId}`
+    //   : `scannerReceiver-${homeBankingId}`;
+
+    const sessionDestine = action === "HOVERED_ROW"
+      ? `scannerTool`
+      : `scannerReceiver`;
+
+    const message = {
+      type: action,
+      homeBankingId: homeBankingId,
+      botJobId: botJobId,
+      sessionId: sessionDestine,
+      operationId: "TEST_STEP",
+      details: [elementDTO],
+    };
+
+    try {
+      webSocket.send(JSON.stringify(message));
+      console.log("📤 Sent element DTO:", message);
+    } catch (error) {
+      console.error("❌ Error sending WebSocket message:", error);
+    }
+  };
+
 
   const handleRemoveInstruction = (instructionId: number) => {
     // Find the instruction to remove
@@ -2550,6 +2610,22 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
           className="move-button"
           onClick={() => handleMoveRowDown(instructionId)}
         />
+      </>
+    );
+  };
+
+  // Function to render the move buttons based on the action type
+  const renderTestClick = (actionType: string, instruction: BlockLoopInstructionLoadDTO) => {
+    if (allSpecialOperations(actionType)) {
+      return null; // Don't render buttons for these action types
+    }
+
+    return (
+      <>
+        <img src={clickTestImage}
+          alt=""
+          className="test-button"
+          onClick={(event) => handleRowSelectedClick(event, instruction, "TEST_CLICK_DTO")} />
       </>
     );
   };
@@ -3164,6 +3240,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                                         instruction
                                       )}
                                       {renderMoveButtons(instruction.actions, instruction.id)}
+                                      {renderTestClick(instruction.actions, instruction)}
                                       <img
                                         src={crossImage}
                                         alt=""
@@ -3174,7 +3251,6 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                                       />
                                     </div>
                                   </div>
-
                                   {/* New column for dropdown menu */}
                                   <div className="dropdown-column">
                                     <img
