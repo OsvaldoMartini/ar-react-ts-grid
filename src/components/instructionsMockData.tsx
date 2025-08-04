@@ -22,6 +22,7 @@ export interface BlockLoopInstructionLoadDTO {
   refreshLoop?: boolean;
   loopOnly?: boolean;
   variableId?: number;
+  parentBlockId?: number;
 }
 
 
@@ -48,6 +49,7 @@ export interface ComponentsInstructionsDTO {
   refreshLoop?: boolean;
   loopOnly?: boolean;
   variableId?: number;
+  parentBlockId?: number;
 }
 
 export interface ElementDTO {

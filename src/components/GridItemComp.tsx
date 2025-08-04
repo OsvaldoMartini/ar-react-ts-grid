@@ -1296,7 +1296,8 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
         operation: instruction.operation,
         actions: instruction.actions,
         parentId: instruction.parentId,
-        variableId: instruction.variableId
+        variableId: instruction.variableId,
+        parentBlockId: instruction.parentBlockId
       };
 
       // WebSocket message for "INSERT_BEFORE" with the selected instruction's details
