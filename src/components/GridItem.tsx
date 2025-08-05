@@ -607,8 +607,8 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
             setInstructionsData([]);
             setGroupedData({}); // Or set to your initial empty state
             setIsDataReordered(true); // Or false, depending on your logic
-            setBotJobId(null);
-            setBotJobName(null);
+            setBotJobId(bodyData.id);
+            setBotJobName(bodyData.name);
           } else {
             // Otherwise, set elementDTO to detailsData
 
