@@ -202,6 +202,16 @@
   height: 20px; /* Override height */
 }
 
+.close-image {
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
+
+.screen-image {
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
+
 .link-image{
   @extend .operations; /* Inherit styles from .operations */
   height: 20px; /* Override height */

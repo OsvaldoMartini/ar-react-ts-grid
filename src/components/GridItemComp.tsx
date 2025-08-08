@@ -13,6 +13,7 @@ import upImage from '../assets/up.png';
 import downImage from '../assets/down.png';
 import rollBackImage from '../assets/rollback4.png';
 import binImage from '../assets/bin.png';
+import closeBrowserImage from '../assets/close-browser.png'
 import menuDownImage from '../assets/menu-down.png';
 import saveImage from "../assets/save.png";
 import excelImage from "../assets/excel.png";
@@ -2362,6 +2363,12 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
         case "P":
           imageSrc = screenImage;
           text = instruction.name;
+          imageClass = "screen-image";
+          break;
+        case "Q":
+          imageSrc = closeBrowserImage;
+          text = instruction.name;
+          imageClass = "close-browser-image";
           break;
         case "C":
           imageSrc = clickImage;
