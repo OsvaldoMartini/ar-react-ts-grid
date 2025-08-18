@@ -9,6 +9,7 @@ import checkImage from '../assets/check4.png';
 
 import crossImage from '../assets/cross.png';
 import editImage from '../assets/edit.png';
+import edit2Image from '../assets/edit2.png';
 import upImage from '../assets/up.png';
 import downImage from '../assets/down.png';
 import rollBackImage from '../assets/rollback4.png';
@@ -20,6 +21,8 @@ import excelImage from "../assets/excel.png";
 import screenImage from "../assets/screen.png";
 import waitImage from "../assets/wait.png";
 import gotoImage from "../assets/goto8.png";
+import excelGotoImage from "../assets/excel_goto2.png";
+import nextRowImage from "../assets/excel.png";
 import ifElseImage from "../assets/ifElse.png";
 import elseImage from "../assets/else6.png";
 import endIfImage from "../assets/endIf4.png";
@@ -104,6 +107,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
   const { webSocket, connected, reconnectAttempts, messages, error } = useWebSocket(socketPort, sessionId);
 
   const [componentsData, setComponentsData] = useState<ComponentsInstructionsDTO[]>(dataComp);
+  const [excelGotoInstruction, setExcelGotoInstruction] = useState<ComponentsInstructionsDTO | null>(null);
 
   // Use state to manage the instructions data
   const [homeBankingId, setHomeBankingId] = useState<number>(homeBankingIdInitial);
@@ -667,7 +671,13 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       const reassignedData = reassignInstructionOrderNumbersByBlock([...componentsData]);
       const { updatedData, updatedBlocks } = correctBlockOrderNumbers(reassignedData);
 
+
+      const gotoInstructionAfterReorder = reassignedData.find(
+        (instruction) => instruction.actions === 'EXCEL GOTO'
+      );
+
       setComponentsData(updatedData);
+      setExcelGotoInstruction(gotoInstructionAfterReorder || null);
       setGroupedData(groupByBlock(reassignedData));
 
       if (JSON.stringify(updatedBlocks) !== JSON.stringify(updatedBlocks)) {
@@ -2368,7 +2378,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
         case "Q":
           imageSrc = closeBrowserImage;
           text = instruction.name;
-          imageClass = "close-browser-image";
+          imageClass = "close-image";
           break;
         case "C":
           imageSrc = clickImage;
@@ -2404,6 +2414,16 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
           imageSrc = gotoImage;
           text = instruction.name;
           imageClass = "goto-image";
+          break;
+        case "EXCEL GOTO":
+          imageSrc = excelGotoImage;
+          text = instruction.name;
+          // imageClass = "excelgoto-image";
+          break;
+        case "NEXT ROW":
+          imageSrc = nextRowImage;
+          text = "Excel Data Next Row"; //instruction.name;
+          // imageClass = "excelgoto-image";
           break;
         case "ELSEIF":
           imageSrc = ifElseImage;
@@ -2458,7 +2478,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
 
 
   const editableSpecialOperations = (actionType: string) => {
-    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "PAUSE", "REFRESH", "LOOP", "REFRESH_LOOP"].includes(actionType)) {
+    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "PAUSE", "REFRESH", "LOOP", "REFRESH_LOOP", "EXCEL GOTO", "NEXT ROW"].includes(actionType)) {
       return true;
     } else {
       return false;
@@ -2467,7 +2487,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
 
 
   const allSpecialOperations = (actionType: string) => {
-    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "IF", "ELSEIF", "ELSE", "ENDIF", "PAUSE", "REFRESH", "LOOP", "REFRESH_LOOP"].includes(actionType)) {
+    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "IF", "ELSEIF", "ELSE", "ENDIF", "PAUSE", "REFRESH", "LOOP", "REFRESH_LOOP", "EXCEL GOTO", "NEXT ROW"].includes(actionType)) {
       return true;
     } else {
       return false;
@@ -2636,9 +2656,9 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     if (instruction.actions === "GOTO" && instruction.operation) {
 
       // Guard against null parentId
-      const parentId = instruction.parentId;
-      const [blockOrderNumber, blockName] = parentId
-        ? getBlockDetails(parentId)
+      const parentBlockId = instruction.parentBlockId;
+      const [blockOrderNumber, blockName] = parentBlockId
+        ? getBlockDetails(parentBlockId)
         : ["N/A", "Unknown"]; // Fallback values if parentId is null
 
       return (
@@ -2877,6 +2897,30 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                           onClick={() => handleRollbackBlock(Number(blockData.instructions[0].blockId))}
                         />
                       )}
+                      {excelGotoInstruction &&
+                        blockData.instructions[0].blockOrderNumber === excelGotoInstruction.blockOrderNumber && (
+                          <div className="excel-goto-container">
+                            <img
+                              src={excelGotoImage}
+                              alt=""
+                              className="excelgoto-image"
+                              title="This block contains the Excel GOTO instruction"
+                            />
+                            <span className="excelgoto-text">Excel Next Row</span>
+                            <img
+                              src={edit2Image}
+                              alt=""
+                              className="edit-button"
+                              onClick={() => handleEditSpecialOper(Number(excelGotoInstruction.id), componentsData)}
+                            />
+                            <img
+                              src={crossImage}
+                              alt=""
+                              className="cross-button"
+                              onClick={() => handleRemoveInstruction(Number(excelGotoInstruction.id))}
+                            />
+                          </div>
+                        )}
                       <img
                         src={upImage}
                         alt=""
@@ -2921,6 +2965,8 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                         {...provided.droppableProps}
                       >
                         {blockData.instructions.map((instruction, index) => {
+                          if (instruction.actions === "EXCEL GOTO") return null;
+
                           const isLastInstruction =
                             index === blockData.instructions.length - 1;
                           const isJustOne = blockData.instructions.length === 1;

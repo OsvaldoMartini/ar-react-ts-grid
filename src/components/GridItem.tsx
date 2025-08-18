@@ -2760,9 +2760,9 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     if (instruction.actions === "GOTO" && instruction.operation) {
 
       // Guard against null parentId
-      const parentId = instruction.parentId;
-      const [blockOrderNumber, blockName] = parentId
-        ? getBlockDetails(parentId)
+      const parentBlockId = instruction.parentBlockId;
+      const [blockOrderNumber, blockName] = parentBlockId
+        ? getBlockDetails(parentBlockId)
         : ["N/A", "Unknown"]; // Fallback values if parentId is null
 
       return (
