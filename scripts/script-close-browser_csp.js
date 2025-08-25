@@ -263,7 +263,7 @@
     if (wSocket && wSocket.readyState === WebSocket.OPEN) {
       const message = {
         type: "CLOSE_BROWSER",
-        sessionId: `scannerReceiver`, //-${window.homeBankingId}`,
+        sessionId: `scanner-element-pane`, //-${window.homeBankingId}`,
         operationId: "closeBrowser",
         homeBankingId: window.homeBankingId,
         details: window.allElementInfo, // Send allElementInfo
@@ -305,7 +305,7 @@
 // })(
 //   61757,
 //   "closeBrowser",
-//   "scannerReceiver-2",
+//   "scanner-element-pane-2",
 //   "closeBrowser",
 //   2,
 //   "https://www.tradingview.com/",

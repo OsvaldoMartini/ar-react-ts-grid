@@ -243,7 +243,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, dat
     const message = {
       type: "SEND_ALL_ELEMENTS_DTO",
       homeBankingId: homeBankingId,
-      sessionId: `scannerReceiver`, //-${homeBankingId}`,
+      sessionId: `scanner-element-pane`, //-${homeBankingId}`,
       details: allElements, // Send all elements
     };
 
@@ -273,11 +273,11 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, dat
     }
     // const sessionDestine = action === "HOVERED_ROW"
     //   ? `scannerTool-${homeBankingId}`
-    //   : `scannerReceiver-${homeBankingId}`;
+    //   : `scanner-element-pane-${homeBankingId}`;
 
     const sessionDestine = action === "HOVERED_ROW"
       ? `scannerTool`
-      : `scannerReceiver`;
+      : `scanner-element-pane`;
 
     const message = {
       type: action,

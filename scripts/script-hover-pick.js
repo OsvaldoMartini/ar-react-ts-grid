@@ -1105,7 +1105,7 @@
   //   if (wSocket && wSocket.readyState === WebSocket.OPEN) {
   //     const message = {
   //       type: "CLOSE_BROWSER",
-  //       sessionId: `scannerReceiver`, //-${window.homeBankingId}`,
+  //       sessionId: `scanner-element-pane`, //-${window.homeBankingId}`,
   //       operationId: "closeBrowser",
   //       homeBankingId: window.homeBankingId,
   //       details: window.allElementInfo, // Send allElementInfo
@@ -1140,7 +1140,7 @@
 //   false,
 //   57197,
 //   "scannerTool",
-//   "scannerReceiver-2",
+//   "scanner-element-pane-2",
 //   "addPickOne",
 //   2,
 //   "https://www.inlinea.ch/",

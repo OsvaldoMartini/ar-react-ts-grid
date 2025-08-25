@@ -115,6 +115,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
   // Use state to manage the instructions data
   const [homeBankingId, setHomeBankingId] = useState<number>(homeBankingIdInitial);
   const [botJobId, setBotJobId] = useState<number | null>(botJobIdInitial);
+  const [blockId, setBockId] = useState<number | null>(-1);
   const [botJobName, setBotJobName] = useState<string | null>(botJobNameInitial);
 
   const instructionRef = useRef<HTMLInputElement>(null);
@@ -610,6 +611,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
             setIsDataReordered(true); // Or false, depending on your logic
             setBotJobId(bodyData.id);
             setBotJobName(bodyData.name);
+            setBockId(bodyData.blockId);
           } else {
             // Otherwise, set elementDTO to detailsData
 
@@ -1216,6 +1218,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     // Create the InstructionDTO object with necessary details
     const instructionDTO = {
       botJobId: botJobId,
+      blockId: blockId,
       instructionOrderNumber: 1,
     };
 
@@ -1224,7 +1227,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
       botJobId: botJobId,
       botJobName: botJobName,
       blockOrderNumber: 1,
-      blockId: -1,
+      blockId: blockId,
       blockName: "Default Block",
       homeBankingId: homeBankingId,
       sessionId: `botJobTasks`, //-${botJobId}`,
@@ -2196,11 +2199,11 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     }
     // const sessionDestine = action === "HOVERED_ROW"
     //   ? `scannerTool-${homeBankingId}`
-    //   : `scannerReceiver-${homeBankingId}`;
+    //   : `scanner-element-pane-${homeBankingId}`;
 
     const sessionDestine = action === "HOVERED_ROW"
       ? `scannerTool`
-      : `scannerReceiver`;
+      : `scanner-element-pane`;
 
     const message = {
       type: action,
@@ -2960,7 +2963,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
             // Render default block if groupedData is empty
             <div className="block">
               <div className={`block-header`}>
-                <span className="block-name">BotJob: {botJobName}</span>
+                <span className="block-name">{botJobName}</span>
                 <span className="block-order-number">(AR Web) No Blocks were created yet</span>
               </div>
               <div className="instructions-list">

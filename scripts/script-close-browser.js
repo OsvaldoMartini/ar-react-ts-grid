@@ -234,7 +234,7 @@
     if (wSocket && wSocket.readyState === WebSocket.OPEN) {
       const message = {
         type: "CLOSE_BROWSER",
-        sessionId: `scannerReceiver`, //-${window.homeBankingId}`,
+        sessionId: `scanner-element-pane`, //-${window.homeBankingId}`,
         operationId: "closeBrowser",
         homeBankingId: window.homeBankingId,
         details: window.allElementInfo, // Send allElementInfo
@@ -254,4 +254,4 @@
 
   // window.cloneTerms = null; // Invalidating the function
   //})(arguments[0], arguments[1], arguments[2], arguments[3], arguments[4]);
-})(61757, "closeBrowser", "scannerReceiver-2", "closeBrowser", 2);
+})(61757, "closeBrowser", "scanner-element-pane-2", "closeBrowser", 2);

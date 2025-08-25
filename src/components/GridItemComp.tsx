@@ -113,6 +113,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
   const [homeBankingId, setHomeBankingId] = useState<number>(homeBankingIdInitial);
   const [botJobId, setBotJobId] = useState<number | null>(botJobIdInitial);
   const [botJobName, setBotJobName] = useState<string | null>(botJobNameInitial);
+  const [blockId, setBlockId] = useState<number | null>(-1);
 
   // Use state to manage the instructions data
   const instructionRef = useRef<HTMLInputElement>(null);
@@ -605,6 +606,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
             setIsDataReordered(true); // Or false, depending on your logic
             setBotJobId(bodyData.id);
             setBotJobName(bodyData.name);
+            setBlockId(bodyData.blockId);
           } else {
             // Otherwise, set elementDTO to detailsData
             if (typeof detailsData[0].botJobId === "number") {
@@ -1253,6 +1255,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     // Create the InstructionDTO object with necessary details
     const instructionDTO = {
       botJobId: botJobId,
+      blockId: blockId,
       instructionOrderNumber: 1,
     };
 
@@ -1261,7 +1264,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       botJobId: botJobId,
       botJobName: botJobName,
       blockOrderNumber: 1,
-      blockId: -1,
+      blockId: blockId,
       blockName: "Default Block",
       homeBankingId: homeBankingId,
       sessionId: `componentTasks`, //-${botJobId}`,
@@ -2795,7 +2798,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
             // Render default block if groupedData is empty
             <div className="block">
               <div className={`block-header color-component2`}>
-                <span className="block-name">BotJob: {botJobName}</span>
+                <span className="block-name">{botJobName}</span>
                 <span className="block-order-number">(AR Web) No components were created yet</span>
               </div>
               <div className="instructions-list">
