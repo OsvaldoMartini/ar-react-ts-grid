@@ -424,9 +424,10 @@
   transform: scale(1.05);
 }
 
+
 .send-all-button {
   background-color: #c3d3d9 !important;
-  color: #0b5394;
+  color: #0b5394; /* dark blue text */
   border: none;
   padding: 8px 16px;
   border-radius: 5px;
@@ -442,7 +443,13 @@
   transform: scale(1.05);
 }
 
-
+/* When isSending = true */
+.send-all-button.sending {
+  background-color: #4caf50 !important; /* yellow */
+  color: #0b5394 !important; /* dark blue text */
+  animation: pulseBg 2s infinite;
+  box-shadow: 0 0 10px #4caf50;
+}
 
 .selected-attribute {
   margin-top: 10px;
@@ -648,7 +655,6 @@
     opacity: 1;
   }
 }
-
 
 // .instruction-item[data-executing='true'] {
 //   background-color: var(--execution-state-color); // optional if using a CSS var

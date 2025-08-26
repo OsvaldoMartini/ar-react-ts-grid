@@ -64,6 +64,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, dat
   const [editingElementId, setEditingElementId] = useState<string | null>(null);
   const [editingElementTagName, setEditingElementTagName] = useState<string | null>(null);
   const [elementName, setElementName] = useState<string>('');
+  const [isSending, setIsSending] = useState(false);
 
   // Inside your component:
   const [hoveredRow, setHoveredRow] = useState<ElementDTO | null>(null);
@@ -132,6 +133,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, dat
             const newElements = bodyData.details;
 
             if (newElements && Array.isArray(newElements) && newElements.length > 0) {
+              setIsSending(false);
               setElementDTO((prevElements) => {
                 let updatedElements = [...prevElements]; // Create a copy
 
@@ -163,42 +165,10 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, dat
                 });
                 return updatedElements;
               });
-
-              // setElementGrouped((prevGrouped) => {
-              //   let newGrouped = { ...prevGrouped };
-
-              //   newElements.forEach((newElement) => {
-              //     const { tagName, xPath } = newElement;
-
-              //     if (
-              //       newGrouped[tagName] &&
-              //       newGrouped[tagName].elements.some((el) => el.xPath === xPath)
-              //     ) {
-              //       return; // Prevent duplication within groups
-              //     }
-
-              //     if (!newGrouped[tagName]) {
-              //       newGrouped[tagName] = { tagName, elements: [newElement] };
-              //     } else {
-              //       // find if we need to insert after existing item.
-              //       let insertIndex = -1;
-              //       if (newGrouped[tagName].elements.length > 0) {
-              //         insertIndex = newGrouped[tagName].elements.findIndex(el => el.xPath === bodyData?.afterXPath);
-              //       }
-
-              //       if (insertIndex !== -1) {
-              //         newGrouped[tagName].elements.splice(insertIndex + 1, 0, newElement);
-              //       } else {
-              //         newGrouped[tagName].elements.push(newElement);
-              //       }
-              //     }
-              //   });
-
-              //   return newGrouped;
-              // });
-
             }
             setIsElementGrouped(false);
+          } else if (parsedMessage.operationId === "activate-insert-all") {
+            setIsSending(true);
           }
         }
       } catch (error) {
@@ -237,21 +207,24 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, dat
       return;
     }
 
+    setIsSending(true); // 🔒 Disable the button after first click
+
     // Flatten the elementGrouped object to get all ElementDTOs
     const allElements = Object.values(elementGrouped).flatMap(group => group.elements);
 
     const message = {
       type: "SEND_ALL_ELEMENTS_DTO",
       homeBankingId: homeBankingId,
-      sessionId: `scanner-element-pane`, //-${homeBankingId}`,
-      details: allElements, // Send all elements
+      sessionId: `scanner-element-pane`,
+      details: allElements,
     };
 
     try {
       webSocket.send(JSON.stringify(message));
-      console.log('📤 Sent CREATE all ElementDTOs:', message);
+      console.log("📤 Sent CREATE all ElementDTOs:", message);
     } catch (error) {
-      console.error('❌ Error sending WebSocket message:', error);
+      console.error("❌ Error sending WebSocket message:", error);
+      setIsSending(false); // re-enable if send fails
     }
   };
 
@@ -560,8 +533,12 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, dat
         <>
           {/* Toggle Button and Pagination Controls on the same row */}
           <div className="controls-row">
-            <button className="send-all-button" onClick={handlesSendAllClick}>
-              {'Insert All Elements'}
+            <button
+              className={`send-all-button ${isSending ? 'sending' : ''}`}
+              onClick={handlesSendAllClick}
+              disabled={isSending}
+            >
+              {isSending ? 'Sending...' : 'Insert All Elements'}
             </button>
             <button className="attributes-button" onClick={() => setShowAttributes(!showAttributes)}>
               {showAttributes ? 'Hide Attributes' : 'Show Attributes'}
