@@ -118,6 +118,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, dat
 
 
           if (parsedMessage.operationId === "searchTerms") {
+            setIsSending(false);
             const detailsData = Array.isArray(bodyData.details) ? bodyData.details : [];
 
             if (detailsData.length === 0) {
@@ -168,7 +169,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, dat
             }
             setIsElementGrouped(false);
           } else if (parsedMessage.operationId === "activate-insert-all") {
-            setIsSending(true);
+            setIsSending(false);
           }
         }
       } catch (error) {
