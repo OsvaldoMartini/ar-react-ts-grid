@@ -542,7 +542,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     if (webSocket && connected) {
       const updatedRows = updatedInstructionsData.map(instruction => ({
         blockId: instruction.blockId,
-        instructionId: instruction.id,
+        id: instruction.id,
         instructionOrderNumber: instruction.instructionOrderNumber,
       }));
 
@@ -927,7 +927,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
         botJobId: botJobId, // Include the botJobId in the message
         botJobName: botJobName,
         blockId: instruction.blockId,
-        instructionId: instructionId,
+        id: instructionId,
         instructionActive: newInstructionActive, // Send the toggled instructionActive value
         parentId: parentId,
         actions: actions,
@@ -977,7 +977,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
           blockName: newBlock.blockName,
           blockOrderNumber: newBlock.blockOrderNumber,
           instructions: newBlock.instructions.map(instruction => ({
-            instructionId: instruction.id,
+            id: instruction.id,
             blockId: newBlock.id,
             blockOrderNumber: newBlock.blockOrderNumber,
             instructionOrderNumber: instruction.instructionOrderNumber,
@@ -1204,7 +1204,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       // Create the InstructionDTO object with necessary details
       const instructionDTO = {
         botJobId: botJobId,
-        instructionId: instruction.id,
+        id: instruction.id,
         blockId: instruction.blockId,
         blockOrderNumber: instruction.blockOrderNumber,
         instructionOrderNumber: instruction.instructionOrderNumber,
@@ -1302,7 +1302,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       // Create the InstructionDTO object with necessary details
       const instructionDTO = {
         botJobId: botJobId,
-        instructionId: instruction.id,
+        id: instruction.id,
         blockId: instruction.blockId,
         blockOrderNumber: instruction.blockOrderNumber,
         instructionOrderNumber: instruction.instructionOrderNumber,
@@ -1370,7 +1370,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       // Create the InstructionDTO object with necessary details
       const instructionDTO = {
         botJobId: botJobId,
-        instructionId: instruction.id,
+        id: instruction.id,
         blockId: instruction.blockId,
         blockOrderNumber: instruction.blockOrderNumber,
         instructionOrderNumber: instruction.instructionOrderNumber,
@@ -1434,7 +1434,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       // Create the InstructionDTO object with necessary details
       const instructionDTO = {
         botJobId: botJobId,
-        instructionId: instruction.id,
+        id: instruction.id,
         blockId: instruction.blockId,
         blockOrderNumber: instruction.blockOrderNumber,
         instructionOrderNumber: instruction.instructionOrderNumber,
@@ -1869,7 +1869,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
           botJobId: botJobId,
           blockOrderNumber: blockOrderNumber,
           updatedInstructions: updatedBlock.instructions.map(instruction => ({
-            instructionId: instruction.id,
+            id: instruction.id,
             blockId: instruction.blockId,
             blockOrderNumber: blockOrderNumber,
             instructionOrderNumber: instruction.instructionOrderNumber
@@ -1882,7 +1882,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
           blockOrderNumber: newBlock.blockOrderNumber,
           active: true,
           instructions: newBlock.instructions.map(instruction => ({
-            instructionId: instruction.id,
+            id: instruction.id,
             blockId: instruction.blockId,
             blockOrderNumber: newBlock.blockOrderNumber,
             instructionOrderNumber: instruction.instructionOrderNumber
@@ -2022,12 +2022,12 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
         const updatedRows = [
           {
             blockId: currentInstruction.blockId, // Add the blockId of the instruction
-            instructionId: currentInstruction.id,
+            id: currentInstruction.id,
             instructionOrderNumber: nextInstruction.instructionOrderNumber,
           },
           {
             blockId: currentInstruction.blockId, // Add the blockId of the instruction
-            instructionId: nextInstruction.id,
+            id: nextInstruction.id,
             instructionOrderNumber: currentInstruction.instructionOrderNumber,
           },
         ];
@@ -2091,12 +2091,12 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
         const updatedRows = [
           {
             blockId: currentInstruction.blockId, // Add the blockId of the instruction
-            instructionId: currentInstruction.id,
+            id: currentInstruction.id,
             instructionOrderNumber: previousInstruction.instructionOrderNumber,
           },
           {
             blockId: currentInstruction.blockId, // Add the blockId of the instruction
-            instructionId: previousInstruction.id,
+            id: previousInstruction.id,
             instructionOrderNumber: currentInstruction.instructionOrderNumber,
           },
         ];
@@ -2175,7 +2175,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     if (webSocket && connected) {
       const message = {
         type: "DELETE_INSTRUCTION",
-        instructionId,
+        id: instructionId,
         actions,
         parentId,
         botJobId,
@@ -2312,7 +2312,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
         homeBankingId: homeBankingId,
         sessionId: `componentTasks`, //-${botJobId}`,
         instructions: reassignedData.map(instr => ({
-          instructionId: instr.id,
+          id: instr.id,
           blockId: instr.blockId,
           blockOrderNumber: instr.blockOrderNumber,
           instructionOrderNumber: instr.instructionOrderNumber,
@@ -2603,7 +2603,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
         homeBankingId: homeBankingId,
         sessionId: `componentTasks`, //-${botJobId}`,
         updatedRows: [{
-          instructionId: instructionId,
+          id: instructionId,
           instructionOrderNumber: instructionOrderNumber,
           blockId: blockId,
           blockOrderNumber: blockOrderNumber,
