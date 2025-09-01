@@ -2316,6 +2316,8 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
           blockId: instr.blockId,
           blockOrderNumber: instr.blockOrderNumber,
           instructionOrderNumber: instr.instructionOrderNumber,
+          parentId: instr.parentId,
+          parentBlockId: instr.parentBlockId
         })),
       };
 
@@ -2646,7 +2648,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       if (middle === "=" || middle === ">" || middle === "<" || middle === "!=") {
         return (
           <span className="instruction-details">
-            <span style={{ color: "#0b5394" }}>({instruction.parentId}){left}</span>
+            <span style={{ color: "#FFA500" }}>({instruction.variableId}){left}</span>
             <span style={{ color: "#0b5394" }}>{middle}</span>
             <span style={{ color: "#FFA500" }}>{right}</span>
           </span>
@@ -2666,6 +2668,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
 
       return (
         <span className="instruction-details">
+          <span style={{ color: "#0b5394" }}>Block:</span>{" "}
           <span style={{ color: "#b163ff" }}>#{blockOrderNumber} {blockName}</span>{" "}
           <span style={{ color: "blue" }}>Limit:</span>{" "}
           <span style={{ color: "#b163ff" }}>{instruction.operation}</span>
@@ -2702,11 +2705,11 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       return (
         <span className="instruction-details">
           <span style={{ color: "#0b5394" }}>Refresh</span>{" "}
-          <span style={{ color: "#FFA500" }}>{refreshValue}s</span> :{" "}
+          <span style={{ color: "#FFA500" }}>{refreshValue}s</span> {" "}
           <span style={{ color: "#0b5394" }}>Loop</span>{" "}
-          <span style={{ color: "#FFA500" }}>{loopValue} times</span> :{" "}
+          <span style={{ color: "#FFA500" }}>{loopValue} times</span> {" "}
           <span style={{ color: "#0b5394" }}>Jump To Parent</span>{" "}
-          <span style={{ color: "#FFA500" }}>({instruction.parentId}){parentValue}</span>
+          <span style={{ color: "#b163ff" }}>({instruction.parentId}){parentValue}</span>
         </span>
       );
     }
@@ -2737,16 +2740,16 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       return (
         <span className="instruction-details">
           <span style={{ color: "#0b5394" }}>Time</span>{" "}
-          <span style={{ color: "#FFA500" }}>{refreshValue}s</span> :{" "}
+          <span style={{ color: "#FFA500" }}>{refreshValue}s</span> {" "}
           <span style={{ color: "#0b5394" }}>Loop</span>{" "}
-          <span style={{ color: "#FFA500" }}>{loopValue} times</span> :{" "}
+          <span style={{ color: "#FFA500" }}>{loopValue} times</span> {" "}
           <span style={{ color: "#0b5394" }}>Jump To Parent</span>{" "}
-          <span style={{ color: "#FFA500" }}>({instruction.parentId}){parentValue}</span>
+          <span style={{ color: "#b163ff" }}>({instruction.parentId}){parentValue}</span>
         </span>
       );
     }
 
-    // Handle operation for other actions (SET, GET, E)
+    // Handle operation for other actions (SET, GET)
     if (validActions.includes(instruction.actions) && instruction.operation) {
       const [left, right] = instruction.operation.split(":");
 
@@ -2758,7 +2761,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       );
     }
 
-    // Handle operation for other actions (SET, GET, E)
+    // Handle operation for other actions (E - Excel Write)
     if (instruction.actions === "E" && instruction.operation) {
       return (
         <span className="instruction-details">

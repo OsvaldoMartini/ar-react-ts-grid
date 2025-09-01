@@ -1682,6 +1682,8 @@ const GridDrag: React.FC<GridItemProps> = ({ data, botJobData }) => {
           blockId: instr.blockId,
           blockOrderNumber: instr.blockOrderNumber,
           instructionOrderNumber: instr.instructionOrderNumber,
+          parentId: instr.parentId,
+          parentBlockId: instr.parentBlockId
         })),
       };
 
