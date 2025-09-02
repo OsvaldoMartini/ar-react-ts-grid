@@ -2857,9 +2857,27 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     if (validActions.includes(instruction.actions) && instruction.operation) {
       const [left, right] = instruction.operation.split(":");
 
+      // Retrieve parentValue from allInstructions
+      const parentInstruction = allInstructions.find((item) => item.id === instruction.parentId);
+
+      // Validate parentInstruction
+      if (
+        parentInstruction &&
+        (parentInstruction.blockId !== instruction.blockId ||
+          parentInstruction.instructionOrderNumber >= instruction.instructionOrderNumber)
+      ) {
+        console.log(
+          `Invalid parent instruction for LOOP. Parent ID: ${instruction.parentId}, ` +
+          `Block ID: ${parentInstruction?.blockId}, Instruction Order Number: ${parentInstruction?.instructionOrderNumber}`
+        );
+        return null;
+      }
+
+      const parentValue = parentInstruction?.name || "Unknown";
+
       return (
         <span className="instruction-details">
-          <span style={{ color: "#0b5394" }}>({instruction.parentId}){left}</span>:
+          <span style={{ color: "#0b5394" }}>({instruction.parentId}){parentValue}</span>:
           <span style={{ color: "#FFA500" }}>{right}</span>
         </span>
       );
