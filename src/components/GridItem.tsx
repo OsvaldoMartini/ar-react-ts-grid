@@ -547,7 +547,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     if (webSocket && connected) {
       const updatedRows = updatedInstructionsData.map(instruction => ({
         blockId: instruction.blockId,
-        id: instruction.id,
+        instructionId: instruction.id,
         instructionOrderNumber: instruction.instructionOrderNumber,
       }));
 
@@ -950,7 +950,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
         botJobId: botJobId,
         blockId: instruction.blockId,
         botJobName: botJobName,
-        id: instructionId,
+        instructionId,
         instructionActive: newInstructionActive, // Send the toggled instructionActive value
         parentId: parentId,
         actions: actions,
@@ -1034,7 +1034,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
       blockMap.get(blockId)?.forEach(instruction => {
         if (instruction.blockOrderNumber !== newOrderNumber) {
           updatedBlocks.push({
-            botJobId: instruction.botJobId || null,
+            botJobId: instruction.botJobId || -1,
             blockId: instruction.blockId,
             blockName: instruction.blockName,
             blockOrderNumber: newOrderNumber,
@@ -1150,7 +1150,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
   };
 
 
-  const handleInsertStepBefore = (instructionId: number, instructions: BlockLoopInstructionLoadDTO[]) => {
+  const handleInsertStepBefore = (type: string, destination: string, instructionId: number, instructions: BlockLoopInstructionLoadDTO[]) => {
     // Find the instruction based on the instructionId
     const instruction = instructions.find(instruction => instruction.id === instructionId);
 
@@ -1158,17 +1158,20 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
       const isBetween = isBetweenIfAndEndIf(instruction.instructionOrderNumber, instructions);
 
-      const botJobId = instruction.botJobId || null;
+      const botJobId = instruction.botJobId || -1;
 
-      // If the instruction is found, use its name for the alert message
-      // setErrorFlag(true);
-      // setAlertMessageBody(`Inserting step before instruction: ${instruction.name}`);
-
-      // Create the InstructionDTO object with necessary details
-      const instructionDTO = {
+      const message = {
+        type: type,
         botJobId: botJobId,
-        id: instruction.id,
+        botJobName: botJobName,
         blockId: instruction.blockId,
+        blockName: instruction.blockName,
+        isBetween: isBetween,
+        homeBankingId: homeBankingId,
+        sessionId: destination, // or `botJobTasks-${botJobId}`
+
+        // InstructionDTO fields (flattened)
+        instructionId: instruction.id,
         blockOrderNumber: instruction.blockOrderNumber,
         instructionOrderNumber: instruction.instructionOrderNumber,
         instructionName: instruction.name,
@@ -1177,18 +1180,6 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
         parentId: instruction.parentId
       };
 
-      // WebSocket message for "INSERT_BEFORE" with the selected instruction's details
-      const message = {
-        type: 'INSERT_BEFORE',
-        botJobId: botJobId,
-        botJobName: botJobName,
-        blockId: instruction.blockId,
-        blockName: instruction.blockName,
-        isBetween: isBetween,
-        homeBankingId: homeBankingId,
-        sessionId: `botJobTasks`, //-${botJobId}`,
-        updatedRows: [instructionDTO], // Wrap the instructionDTO in an array
-      };
 
       // Send WebSocket message
       if (webSocket && connected) {
@@ -1213,26 +1204,30 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
   };
 
   const handleNewStepAfter = (instructionId: number) => {
-    // WebSocket message for "INSERT_AFTER" with the selected instruction's details
-
-    // Create the InstructionDTO object with necessary details
-    const instructionDTO = {
-      botJobId: botJobId,
-      blockId: blockId,
-      instructionOrderNumber: 1,
-    };
-
     const message = {
       type: 'INSERT_NEW',
+      homeBankingId: homeBankingId,
+      sessionId: `botJobTasks`, // or `botJobTasks-${botJobId}`
       botJobId: botJobId,
       botJobName: botJobName,
-      blockOrderNumber: 1,
       blockId: blockId,
       blockName: "Default Block",
-      homeBankingId: homeBankingId,
-      sessionId: `botJobTasks`, //-${botJobId}`,
-      updatedRows: [instructionDTO], // Wrap the instructionDTO in an array
+      blockOrderNumber: 1,
+
+      // InstructionDTO fields (flattened)
+      instructionId: instructionId,
+      instructionName: "New Instruction",
+      instructionOrderNumber: 1,
+
+      isBetween: null,
+
+      operation: null,
+      actions: null,
+      variableId: null,
+      parentId: null,
+      parentBlockId: null
     };
+
 
     // Send WebSocket message
     if (webSocket && connected) {
@@ -1255,39 +1250,34 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
     if (instruction) {
 
-      const botJobId = instruction.botJobId || null;
+      const isBetween = isBetweenIfAndEndIf(instruction.instructionOrderNumber, instructions);
 
-      // If the instruction is found, use its name for the alert message
-      // setErrorFlag(true);
-      // setAlertMessageBody(`Inserting step before instruction: ${instruction.name}`);
+      const botJobId = instruction.botJobId || -1;
 
-
-      // Create the InstructionDTO object with necessary details
-      const instructionDTO = {
-        botJobId: botJobId,
-        id: instruction.id,
-        blockId: instruction.blockId,
-        blockOrderNumber: instruction.blockOrderNumber,
-        instructionOrderNumber: instruction.instructionOrderNumber,
-        instructionName: instruction.name,
-        operation: instruction.operation,
-        actions: instruction.actions,
-        parentId: instruction.parentId,
-        variableId: instruction.variableId,
-        parentBlockId: instruction.parentBlockId
-      };
-
-      // WebSocket message for "INSERT_BEFORE" with the selected instruction's details
       const message = {
-        type: "EDIT_OPERATION",
+        type: 'EDIT_OPERATION',
+        homeBankingId: homeBankingId,
+        sessionId: `botJobTasks`, // or `botJobTasks-${botJobId}`
         botJobId: botJobId,
         botJobName: botJobName,
         blockId: instruction.blockId,
-        blockName: instruction.blockName,
-        homeBankingId: homeBankingId,
-        sessionId: `botJobTasks`, //-${botJobId}`,
-        updatedRows: [instructionDTO], // Wrap the instructionDTO in an array
+        blockName: "Default Block",
+        blockOrderNumber: 1,
+
+        // InstructionDTO fields (flattened)
+        instructionId: instruction.id,
+        instructionName: instruction.name,
+        instructionOrderNumber: instruction.instructionOrderNumber,
+
+        isBetween: isBetween,
+
+        operation: instruction.operation,
+        actions: instruction.actions,
+        variableId: instruction.variableId,
+        parentId: instruction.parentId,
+        parentBlockId: instruction.parentBlockId
       };
+
 
       // Send WebSocket message
       if (webSocket && connected) {
@@ -1322,7 +1312,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
       const { isBetween, parentId } = isBetweenCondition(instruction.instructionOrderNumber, instructions);
 
-      const botJobId = instruction.botJobId || null;
+      const botJobId = instruction.botJobId || -1;
 
       // If the instruction is found, use its name for the alert message
       // setErrorFlag(true);
@@ -1330,20 +1320,6 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
       const typeInsert = instruction.actions === "ELSE" ? "INSERT_BEFORE_ELSEIF" : "INSERT_AFTER_ELSEIF";
 
-      // Create the InstructionDTO object with necessary details
-      const instructionDTO = {
-        botJobId: botJobId,
-        id: instruction.id,
-        blockId: instruction.blockId,
-        blockOrderNumber: instruction.blockOrderNumber,
-        instructionOrderNumber: instruction.instructionOrderNumber,
-        instructionName: "ELSEIF",
-        operation: "ELSEIF",
-        actions: "ELSEIF",
-        parentId: parentId
-      };
-
-      // WebSocket message for "INSERT_BEFORE" with the selected instruction's details
       const message = {
         type: typeInsert,
         botJobId: botJobId,
@@ -1352,8 +1328,16 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
         blockName: instruction.blockName,
         isBetween: isBetween,
         homeBankingId: homeBankingId,
-        sessionId: `botJobTasks`, //-${botJobId}`,
-        updatedRows: [instructionDTO], // Wrap the instructionDTO in an array
+        sessionId: `botJobTasks`, // or `botJobTasks-${botJobId}`
+
+        // InstructionDTO fields (flattened)
+        instructionId: instruction.id,
+        blockOrderNumber: instruction.blockOrderNumber,
+        instructionOrderNumber: instruction.instructionOrderNumber,
+        instructionName: "ELSEIF",
+        operation: "ELSEIF",
+        actions: "ELSEIF",
+        parentId: instruction.parentId
       };
 
       // Send WebSocket message
@@ -1388,36 +1372,26 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
       const isBetween = isBetweenIfAndEndIf(instruction.instructionOrderNumber, instructions);
 
-      const botJobId = instruction.botJobId || null;
+      const botJobId = instruction.botJobId || -1;
 
-      // If the instruction is found, use its name for the alert message
-      // setErrorFlag(true);
-      // setAlertMessageBody(`Inserting step after instruction: ${instruction.name}`);
-
-      // Create the InstructionDTO object with necessary details
-      const instructionDTO = {
+      const message = {
+        type: 'INSERT_AFTER',
+        sessionId: `botJobTasks`, // or `botJobTasks-${botJobId}`
+        homeBankingId: homeBankingId,
         botJobId: botJobId,
-        id: instruction.id,
+        botJobName: botJobName,
         blockId: instruction.blockId,
+        blockName: instruction.blockName,
+        isBetween: isBetween,
+
+        // InstructionDTO fields (flattened)
+        instructionId: instruction.id,
         blockOrderNumber: instruction.blockOrderNumber,
         instructionOrderNumber: instruction.instructionOrderNumber,
         instructionName: instruction.name,
         operation: instruction.operation,
         actions: instruction.actions,
         parentId: instruction.parentId
-      };
-
-      // WebSocket message for "INSERT_AFTER" with the selected instruction's details
-      const message = {
-        type: 'INSERT_AFTER',
-        botJobId: botJobId,
-        botJobName: botJobName,
-        blockId: instruction.blockId,
-        blockName: instruction.blockName,
-        isBetween: isBetween,
-        homeBankingId: homeBankingId,
-        sessionId: `botJobTasks`, //-${botJobId}`,
-        updatedRows: [instructionDTO], // Wrap the instructionDTO in an array
       };
 
       // Send WebSocket message
@@ -1459,7 +1433,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     // Get the block order
     const blockOrderNumber = blockCompent.instructions[0].blockOrderNumber;
 
-    const botJobId = blockCompent.instructions[0]?.botJobId || null; // Retrieve botJobId from the first instruction
+    const botJobId = blockCompent.instructions[0]?.botJobId || -1; // Retrieve botJobId from the first instruction
 
     const newBlock = {
       homeBankingId: homeBankingId,
@@ -1485,7 +1459,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
           blockName: newBlock.blockName,
           blockOrderNumber: newBlock.blockOrderNumber,
           instructions: newBlock.instructions.map(instruction => ({
-            id: instruction.id,
+            instructionId: instruction.id,
             blockId: newBlock.id,
             blockOrderNumber: newBlock.blockOrderNumber,
             instructionOrderNumber: instruction.instructionOrderNumber,
@@ -1898,7 +1872,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
           botJobId: botJobId,
           blockOrderNumber: blockOrderNumber,
           updatedInstructions: updatedBlock.instructions.map(instruction => ({
-            id: instruction.id,
+            instructionId: instruction.id,
             blockId: instruction.blockId,
             blockOrderNumber: blockOrderNumber,
             instructionOrderNumber: instruction.instructionOrderNumber
@@ -1911,7 +1885,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
           blockOrderNumber: newBlock.blockOrderNumber,
           active: true,
           instructions: newBlock.instructions.map(instruction => ({
-            id: instruction.id,
+            instructionId: instruction.id,
             blockId: instruction.blockId,
             blockOrderNumber: newBlock.blockOrderNumber,
             instructionOrderNumber: instruction.instructionOrderNumber
@@ -2263,7 +2237,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     if (webSocket && connected) {
       const message = {
         type: "DELETE_INSTRUCTION",
-        id: instructionId,
+        instructionId,
         actions,
         parentId,
         botJobId,
@@ -2703,20 +2677,16 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     if (webSocket && connected && updatedInstruction) {
       const message = {
         type: 'ROW_UPDATE',
-        botJobId: botJobId,
-        blockId: blockId,
-        blockName: blockName,
-        homeBankingId: homeBankingId,
+        botJobId,
+        blockId,
+        blockName,
+        homeBankingId,
         sessionId: `botJobTasks`, //-${botJobId}`,
-        updatedRows: [{
-          id: instructionId,
-          instructionOrderNumber: instructionOrderNumber,
-          blockId: blockId,
-          blockOrderNumber: blockOrderNumber,
-          botJobId: botJobId,
-          instructionName: instructionName, // The updated name
-          actions: updatedInstruction.actions, // Include the updated actions
-        }]
+        instructionId,
+        instructionOrderNumber,
+        blockOrderNumber,
+        instructionName, // The updated name
+        actions: updatedInstruction.actions, // Include the updated actions
       };
 
       try {
@@ -3305,7 +3275,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                                       >
                                         <div
                                           onClick={() =>
-                                            handleInsertStepBefore(instruction.id, blockData.instructions)
+                                            handleInsertStepBefore("INSERT_BEFORE", "botJobTasks", instruction.id, blockData.instructions)
                                           }
                                         >
                                           Insert Step Before

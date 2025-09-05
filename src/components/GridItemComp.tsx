@@ -927,7 +927,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
         botJobId: botJobId, // Include the botJobId in the message
         botJobName: botJobName,
         blockId: instruction.blockId,
-        id: instructionId,
+        instructionId,
         instructionActive: newInstructionActive, // Send the toggled instructionActive value
         parentId: parentId,
         actions: actions,
@@ -2175,7 +2175,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     if (webSocket && connected) {
       const message = {
         type: "DELETE_INSTRUCTION",
-        id: instructionId,
+        instructionId,
         actions,
         parentId,
         botJobId,
@@ -2599,20 +2599,16 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     if (webSocket && connected && updatedInstruction) {
       const message = {
         type: 'ROW_UPDATE',
-        botJobId: botJobId,
-        blockId: blockId,
-        blockName: blockName,
-        homeBankingId: homeBankingId,
+        botJobId,
+        blockId,
+        blockName,
+        homeBankingId,
         sessionId: `componentTasks`, //-${botJobId}`,
-        updatedRows: [{
-          id: instructionId,
-          instructionOrderNumber: instructionOrderNumber,
-          blockId: blockId,
-          blockOrderNumber: blockOrderNumber,
-          botJobId: botJobId,
-          instructionName: instructionName, // The updated name
-          actions: updatedInstruction.actions, // Include the updated actions
-        }]
+        instructionId,
+        instructionOrderNumber,
+        blockOrderNumber,
+        instructionName, // The updated name
+        actions: updatedInstruction.actions, // Include the updated actions
       };
 
       try {
