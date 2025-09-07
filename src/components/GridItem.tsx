@@ -41,6 +41,7 @@ import brickImage from '../assets/brick.png';
 import hiddenImage from '../assets/hidden-black.png';
 import activeImage from '../assets/active3.png';
 import inactiveImage from '../assets/inactive2.png';
+import ArrowLeft from '../assets/ArrowLeft.png';
 
 
 import AlertModal from './AlertModal';
@@ -115,7 +116,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
   // Use state to manage the instructions data
   const [homeBankingId, setHomeBankingId] = useState<number>(homeBankingIdInitial);
   const [botJobId, setBotJobId] = useState<number | null>(botJobIdInitial);
-  const [blockId, setBockId] = useState<number | null>(-1);
+  const [blockId, setBlockId] = useState<number | null>(-1);
   const [botJobName, setBotJobName] = useState<string | null>(botJobNameInitial);
 
   const instructionRef = useRef<HTMLInputElement>(null);
@@ -611,7 +612,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
             setIsDataReordered(true); // Or false, depending on your logic
             setBotJobId(bodyData.id);
             setBotJobName(bodyData.name);
-            setBockId(bodyData.blockId);
+            setBlockId(bodyData.blockId);
           } else {
             // Otherwise, set elementDTO to detailsData
 
@@ -652,14 +653,14 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
 
   useEffect(() => {
-    console.log("UseEffect -> editingInstructionId");
+    //console.log("UseEffect -> editingInstructionId");
     if (editingInstructionId && instructionRef.current) {
       instructionRef.current.focus();
     }
   }, [editingInstructionId]);
 
   useEffect(() => {
-    console.log("UseEffect -> editingBlockId");
+    //console.log("UseEffect -> editingBlockId");
     if (editingBlockId && blockRef.current) {
       blockRef.current.focus();
     }
@@ -716,7 +717,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
   // Add the event listener to detect clicks outside the dropdown
   useEffect(() => {
-    console.log("UseEffect -> handleClickOutside");
+    //console.log("UseEffect -> handleClickOutside");
     document.addEventListener('mousedown', handleClickOutside);
 
     // Cleanup the event listener on component unmount
@@ -727,7 +728,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
   // Close the dropdown when clicking outside
   useEffect(() => {
-    console.log("UseEffect -> openDropdown");
+    //console.log("UseEffect -> openDropdown");
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setOpenDropdown(null); // Close the dropdown if clicked outside

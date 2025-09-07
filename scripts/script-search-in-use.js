@@ -1519,7 +1519,7 @@
     //console.log("limitMapSize");
     let currentId = 1;
     sortedList.forEach((item) => {
-      if (window.allElementInfo.length < 35) {
+      if (window.allElementInfo.length < 150) {
         window.allElementInfo.push({ ...item, id: currentId++ });
       }
     });
@@ -1752,21 +1752,21 @@
   // startCollectingElements(window.searchTerms);
   // init("Initiate");
   // window.initSearchTerms = null; // Invalidating the function
+  // })(
+  //   arguments[0],
+  //   arguments[1],
+  //   arguments[2],
+  //   arguments[3],
+  //   arguments[4],
+  //   arguments[5],
+  //   arguments[6]
+  // );
 })(
-  arguments[0],
-  arguments[1],
-  arguments[2],
-  arguments[3],
-  arguments[4],
-  arguments[5],
-  arguments[6]
+  ["button", "input", "label", "a", "select"],
+  false,
+  53701,
+  "scannerTool",
+  "scannerGrid",
+  "searchTerms",
+  2
 );
-// })(
-//   ["button", "input", "label", "a", "select"],
-//   false,
-//   51069,
-//   "scannerTool",
-//   "scannerGrid",
-//   "searchTerms",
-//   2
-// );
