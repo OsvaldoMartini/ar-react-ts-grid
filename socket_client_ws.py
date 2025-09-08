@@ -34,7 +34,8 @@ def start_ping(ws):
     ping()
 
 def main():
-    broker_url = 'ws://192.168.1.130:60192/websocket?sessionId=python-session'  # Changed to ws://
+    # broker_url = 'ws://192.168.1.130:60192/websocket?sessionId=python-session'  # Changed to ws://
+    broker_url = 'ws://localhost:60288/websocket?sessionId=python-session'  # Changed to ws://
     print(f"Connecting to WebSocket at {broker_url}...")
 
     ws = websocket.WebSocketApp(

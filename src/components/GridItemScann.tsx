@@ -20,6 +20,8 @@ import NameDropdown from './NameDropdown';
 
 interface GridItemScannProps {
   homeBankingIdInitial: number;
+  botJobIdInitial: number;
+  botJobNameInitial: string;
   dataDTO: ElementDTO[];
   socketPort: number;
   sessionId: string;
@@ -36,11 +38,13 @@ const groupByTagName = (data: ElementDTO[]) => {
   }, {} as Record<string, { tagName: string; elements: ElementDTO[] }>);
 };
 
-const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, dataDTO, socketPort, sessionId }) => {
+const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, botJobIdInitial, botJobNameInitial, dataDTO, socketPort, sessionId }) => {
   // Using the custom WebSocket hook
   const { webSocket, connected, reconnectAttempts, messages, error } = useWebSocket(socketPort, sessionId);
 
   const [homeBankingId, setHomeBankingId] = useState<number>(homeBankingIdInitial);
+  const [botJobId, setBotJobId] = useState<number | null>(botJobIdInitial);
+  const [botJobName, setBotJobName] = useState<string | null>(botJobNameInitial);
 
   const [elementDTO, setElementDTO] = useState<ElementDTO[]>(dataDTO);
   const [elementGrouped, setElementGrouped] = useState<Record<string, { tagName: string; elements: ElementDTO[] }>>({});
@@ -125,13 +129,18 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, dat
               setElementDTO([]);
               setElementGrouped({});
               // setIsElementGrouped(true);
+              setBotJobId(bodyData.botJobId);
+              setBotJobName(bodyData.botJobName);
             } else {
               setElementDTO(detailsData);
             }
             // setIsElementGrouped(false);
           } else if (parsedMessage.operationId === "clonedElement" || parsedMessage.operationId === "addPickOne") {
             // Handle clonedElement and addPickOne operations
-            const newElements = bodyData.details;
+            const newElements = bodyData.elementDetails;
+
+            setBotJobId(bodyData.botJobId);
+            setBotJobName(bodyData.botJobName);
 
             if (newElements && Array.isArray(newElements) && newElements.length > 0) {
               setIsSending(false);
@@ -216,8 +225,10 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, dat
     const message = {
       type: "SEND_ALL_ELEMENTS_DTO",
       homeBankingId: homeBankingId,
+      botJobId: botJobId,
+      botJobName: botJobName,
       sessionId: `scanner-element-pane`,
-      details: allElements,
+      elementDetails: allElements,
     };
 
     try {
@@ -256,8 +267,10 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, dat
     const message = {
       type: action,
       homeBankingId: homeBankingId,
+      botJobId: botJobId,
+      botJobName: botJobName,
       sessionId: sessionDestine,
-      details: [elementDTO],
+      elementDetails: [elementDTO],
     };
 
     try {
@@ -491,7 +504,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, dat
 
     setHoveredRow(elementDTO);
 
-    sendWebSocketMessage(elementDTO, "HOVERED_ROW");
+    // sendWebSocketMessage(elementDTO, "HOVERED_ROW");
 
     setHoveredRowsList((prevList) => {
       if (!prevList.find((el) => el.id === elementDTO.id)) {

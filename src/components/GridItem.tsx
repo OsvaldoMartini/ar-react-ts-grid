@@ -610,8 +610,8 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
             setInstructionsData([]);
             setGroupedData({}); // Or set to your initial empty state
             setIsDataReordered(true); // Or false, depending on your logic
-            setBotJobId(bodyData.id);
-            setBotJobName(bodyData.name);
+            setBotJobId(bodyData.botJobId);
+            setBotJobName(bodyData.botJobName);
             setBlockId(bodyData.blockId);
           } else {
             // Otherwise, set elementDTO to detailsData
@@ -1452,7 +1452,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
     // Send WebSocket message with block split details
     if (webSocket && connected) {
-      const blockComnponent = {
+      const blockComponent = {
         newBlock: {
           homeBankingId: homeBankingId,
           botJobId: botJobId,
@@ -1474,7 +1474,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
         botJobName: botJobName,
         homeBankingId: homeBankingId,
         sessionId: `componentTasks`, //-${botJobId}`,
-        details: blockComnponent,
+        details: blockComponent,
       };
 
       try {
@@ -2026,12 +2026,12 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
         const updatedRows = [
           {
             blockId: currentInstruction.blockId, // Add the blockId of the instruction
-            id: currentInstruction.id,
+            instructionId: currentInstruction.id,
             instructionOrderNumber: nextInstruction.instructionOrderNumber,
           },
           {
             blockId: currentInstruction.blockId, // Add the blockId of the instruction
-            id: nextInstruction.id,
+            instructionId: nextInstruction.id,
             instructionOrderNumber: currentInstruction.instructionOrderNumber,
           },
         ];
@@ -2095,12 +2095,12 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
         const updatedRows = [
           {
             blockId: currentInstruction.blockId, // Add the blockId of the instruction
-            id: currentInstruction.id,
+            instructionId: currentInstruction.id,
             instructionOrderNumber: previousInstruction.instructionOrderNumber,
           },
           {
             blockId: currentInstruction.blockId, // Add the blockId of the instruction
-            id: previousInstruction.id,
+            instructionId: previousInstruction.id,
             instructionOrderNumber: currentInstruction.instructionOrderNumber,
           },
         ];
@@ -2374,8 +2374,8 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
         blockName: firstBlockName, // Pass the block name here
         homeBankingId: homeBankingId,
         sessionId: `botJobTasks`, //-${botJobId}`,
-        instructions: reassignedData.map(instr => ({
-          id: instr.id,
+        updateRows: reassignedData.map(instr => ({
+          instructionId: instr.id,
           blockId: instr.blockId,
           blockOrderNumber: instr.blockOrderNumber,
           instructionOrderNumber: instr.instructionOrderNumber,

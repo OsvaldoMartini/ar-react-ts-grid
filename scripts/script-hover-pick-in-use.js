@@ -6,6 +6,7 @@
   destination,
   operationId,
   homeBankingId,
+  botJobId,
   targetOriginURL,
   trustedOriginURL
 ) {
@@ -39,6 +40,7 @@
   window.destination = destination;
   window.operationId = operationId;
   window.homeBankingId = homeBankingId;
+  window.botJobId = botJobId;
   window.sessionId = `${sessionId}`; //-${homeBankingId}`;
 
   // Track the last hovered element to remove the border from it
@@ -239,6 +241,7 @@
           sessionId: window.destination,
           operationId: window.operationId,
           homeBankingId: window.homeBankingId,
+          botJobId: window.botJobId,
           details: window.allElementInfo, // Send allElementInfo
         };
 
@@ -1108,6 +1111,7 @@
   //       sessionId: `scanner-element-pane`, //-${window.homeBankingId}`,
   //       operationId: "closeBrowser",
   //       homeBankingId: window.homeBankingId,
+  //       botJobId: window.botJobId,
   //       details: window.allElementInfo, // Send allElementInfo
   //     };
 
@@ -1134,7 +1138,8 @@
   arguments[4],
   arguments[5],
   arguments[6],
-  arguments[7]
+  arguments[7],
+  arguments[8]
 );
 // })(
 //   false,
@@ -1143,6 +1148,7 @@
 //   "scanner-element-pane-2",
 //   "addPickOne",
 //   2,
+//   66,
 //   "https://www.inlinea.ch/",
 //   "https://www.inlinea.ch/"
 // );

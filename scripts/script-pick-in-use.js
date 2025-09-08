@@ -122,7 +122,7 @@
       if (window.allElementInfo.length > 0) {
         const message = {
           type: "SEARCH_TOOL",
-          details: window.allElementInfo, // Send allElementInfo
+          elementDetails: window.allElementInfo, // Send allElementInfo
         };
         wSocket.send(JSON.stringify(message));
         console.log("Sent SEARCH_TOOL:", message);
@@ -613,9 +613,9 @@
     }));
     const attribId = element.id || "";
     const attribName = element.name || "";
-    const coordinates = `${element.getBoundingClientRect().left.toFixed(2)},${element
+    const coordinates = `${element
       .getBoundingClientRect()
-      .top.toFixed(2)}`;
+      .left.toFixed(2)},${element.getBoundingClientRect().top.toFixed(2)}`;
     const someText = getSomeText(tagName, attributeData, element);
 
     return {
@@ -1071,5 +1071,5 @@
   });
 
   // window.pickTerms = null; // Invalidating the function
-})(arguments[0], arguments[1], arguments[2], arguments[3], arguments[4]);
-// })("http://localhost:3000/", "http://localhost:3000/", ["*"], false, 8181);
+  // })(arguments[0], arguments[1], arguments[2], arguments[3], arguments[4]);
+})("http://localhost:3000/", "http://localhost:3000/", ["*"], false, 8181);

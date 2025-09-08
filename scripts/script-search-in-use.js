@@ -6,7 +6,8 @@
   sessionId,
   destination,
   operationId,
-  homeBankingId
+  homeBankingId,
+  botJobId
 ) {
   let pingIntervalId = null;
   let attempts = 0;
@@ -26,6 +27,7 @@
   window.destination = destination;
   window.operationId = operationId;
   window.homeBankingId = homeBankingId;
+  window.botJobId = botJobId;
   window.sessionId = `${sessionId}`; // -${homeBankingId}`;
   // var elementInfoSubmit = new Map();
 
@@ -90,8 +92,8 @@
 
             if (window.sessionId === bodyData.sessionId) {
               if (bodyData.operationId === "highlight") {
-                const detailsData = Array.isArray(bodyData.details)
-                  ? bodyData.details
+                const detailsData = Array.isArray(bodyData.elementDetails)
+                  ? bodyData.elementDetails
                   : [];
 
                 //console.log("detailsData", detailsData[0]);
@@ -706,7 +708,8 @@
         sessionId: window.destination,
         operationId: window.operationId,
         homeBankingId: window.homeBankingId,
-        details: window.allElementInfo, // Send allElementInfo
+        botJobId: window.botJobId,
+        elementDetails: window.allElementInfo, // Send allElementInfo
       };
 
       // Convert the JSON message to a buffer
@@ -1732,7 +1735,8 @@
   //       sessionId: `scanner-element-pane`, //-${window.homeBankingId}`,
   //       operationId: "closeBrowser",
   //       homeBankingId: window.homeBankingId,
-  //       details: window.allElementInfo, // Send allElementInfo
+  //       botJobId: window.botJobId,
+  //       elementDetails: window.allElementInfo, // Send allElementInfo
   //     };
 
   //     // Convert the JSON message to a buffer
@@ -1759,14 +1763,16 @@
   //   arguments[3],
   //   arguments[4],
   //   arguments[5],
-  //   arguments[6]
+  //   arguments[6],
+  //   arguments[7]
   // );
 })(
   ["button", "input", "label", "a", "select"],
   false,
-  53701,
+  62601,
   "scannerTool",
   "scannerGrid",
   "searchTerms",
-  2
+  2,
+  66
 );
