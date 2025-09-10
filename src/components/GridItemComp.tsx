@@ -2159,7 +2159,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       botJobId: botJobId,
       sessionId: sessionDestine,
       operationId: "TEST_STEP",
-      details: [elementDTO],
+      elementDetails: [elementDTO],
     };
 
     try {
