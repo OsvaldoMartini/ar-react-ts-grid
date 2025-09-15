@@ -100,12 +100,38 @@ const reassignInstructionOrderNumbersByBlock = (instructions: BlockLoopInstructi
   return updatedInstructions;
 };
 
+// Add this line to check WebAssembly availability
+console.log("Type of WebAssembly:", typeof WebAssembly);
+
+let wasmMemory = new WebAssembly.Memory({ initial: 256, maximum: 256 });
+
+let wasmTable = new WebAssembly.Table({
+  initial: 0, // or 1 if needed immediately
+  maximum: 100, // optional
+  element: "anyfunc", // required type
+});
+
+const wasmImports = {
+  env: {
+    memory: wasmMemory,
+    table: wasmTable,
+    // Add any other required imports like console logging, malloc, etc.
+    // Example stub:
+    abort: () => console.error("WASM abort called"),
+    // ... other necessary functions for your C code
+  },
+  // Optional: include wasi if used in your C code
+  wasi_snapshot_preview1: {},
+};
+
 const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketPort, sessionId, botJobIdInitial, botJobNameInitial }) => {
   // Using the custom WebSocket hook
   const { webSocket, connected, reconnectAttempts, messages, error } = useWebSocket(socketPort, sessionId);
 
   const [instructionsData, setInstructionsData] = useState<BlockLoopInstructionLoadDTO[]>(data);
   const [excelGotoInstruction, setExcelGotoInstruction] = useState<BlockLoopInstructionLoadDTO | null>(null);
+  const [resultWasm, setResultWasm] = useState<number | null>(null);
+  const addWasmRef = useRef<((a: number, b: number) => number) | null>(null);
   // const [homeBanking, setHomeBanking] = useState<number>(homeBankingId);
   // const [botJobId, setBotJobId] = useState<number>(botJobId);
   // const [botJobName, setBotJobName] = useState<string>(botJobName);
@@ -574,6 +600,62 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
       setOpenDropdown(null); // Close the dropdown if clicked outside
     }
   }, [dropdownRef]);
+
+  useEffect(() => {
+    const loadWasm = async () => {
+      // Add more console logs here for deeper debugging
+      console.log('Attempting to load WASM...');
+      console.log('Is WebAssembly defined?', typeof WebAssembly !== 'undefined');
+
+      if (typeof WebAssembly === 'undefined') {
+        console.error('WebAssembly is not defined in this environment.');
+        setAlertClass('error-icon');
+        setAlertMessageHeader('Browser Compatibility Error');
+        setAlertMessageBody('Your browser environment does not support WebAssembly.');
+        setAlertMessageFooter('Please update your JavaFX/JRE or use a compatible browser.');
+        setErrorFlag(true);
+        return; // Exit if WebAssembly isn't available
+      }
+
+      try {
+        const response = await fetch('./functions.wasm');
+        if (!response.ok) {
+          console.error('Failed to load wasm file:', response.statusText);
+          setAlertClass('error-icon'); // Assuming these are state setters for your alert UI
+          setAlertMessageHeader('WASM Load Error');
+          setAlertMessageBody('Failed to load wasm file: ' + response.statusText);
+          setAlertMessageFooter('Please check the file path and server configuration.');
+          setErrorFlag(true);
+          return;
+        }
+        const buffer = await response.arrayBuffer();
+        const wasmModule = await WebAssembly.instantiate(buffer);
+
+        // Ensure that the 'add' function exists in the exports
+        const { add } = wasmModule.instance.exports as any;
+        if (typeof add === 'function') {
+          addWasmRef.current = add;
+          console.log('WASM functions loaded successfully.');
+        } else {
+          console.error('WASM "add" function not found in exports.');
+          setAlertClass('error-icon');
+          setAlertMessageHeader('WASM Export Error');
+          setAlertMessageBody('WASM module loaded, but "add" function not found.');
+          setAlertMessageFooter('Please check your WASM module exports.');
+          setErrorFlag(true);
+        }
+      } catch (error: any) {
+        console.error('WASM instantiation failed:', error);
+        setAlertClass('error-icon');
+        setAlertMessageHeader('WASM Instantiation Error');
+        setAlertMessageBody(`WASM instantiation failed. Reason: ${error.message || error}`);
+        setAlertMessageFooter('Please contact support or try reloading the page.');
+        setErrorFlag(true);
+      }
+    };
+
+    loadWasm();
+  }, []);
 
 
   useEffect(() => {
@@ -2793,6 +2875,52 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     return <span className="instruction-details">&nbsp;</span>;
   };
 
+  const renderExportFile = (input: string) => {
+    const lastChar = input.slice(-1);
+    const path = input.slice(0, -2); // remove ":," or ":|" from the end
+
+    // If path is "No Excel Export File", render only the path
+    if (path.includes("No Excel Export")) {
+      return (
+        <span className="instruction-details">
+          <span style={{ color: "#FFA500" }}>No Excel Export File</span>
+        </span>
+      );
+    }
+
+    let delimiterName = '';
+    switch (lastChar) {
+      case ',':
+        delimiterName = 'Comma';
+        break;
+      case '|':
+        delimiterName = 'Pipe';
+        break;
+      default:
+        delimiterName = 'Comma';
+    }
+
+    return (
+      <span className="instruction-details">
+        <span style={{ color: "#FFA500" }}>{path}</span> -
+        <span style={{ color: "#FFA500" }}>({delimiterName})</span>
+      </span>
+    );
+  };
+
+
+  const handleClickWasm = () => {
+    if (addWasmRef.current) {
+      const sum = addWasmRef.current(7, 3);
+      setResultWasm(sum);
+      setAlertMessageBody('Result ' + sum);
+    } else {
+      console.warn('WASM function not loaded yet.');
+      setAlertMessageBody('WASM function not loaded yet.')
+    }
+  };
+
+
 
 
   return (
@@ -2808,6 +2936,12 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
           error={errorFlag}
         />
       )}
+      {/* <div>
+        <button onClick={handleClickWasm} style={{ padding: '6px 12px', fontSize: '14px' }}>
+          Add 7 + 3
+        </button>
+        {resultWasm !== null && <div>Result: {resultWasm}</div>}
+      </div> */}
       <DragDropContext onDragEnd={onDragEnd} // Define the onDragEnd handler to update the state when the dragging stops
       >
         {
@@ -2945,7 +3079,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                     </span>
                     {/* Show the export file or "No Export File" */}
                     <span className="block-export-file">
-                      {blockData.exportFile}
+                      {renderExportFile(String(blockData.exportFile))}
                     </span>
                     <div className="move-buttons">
                       {index === 0 && (
