@@ -2374,7 +2374,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
         blockName: firstBlockName, // Pass the block name here
         homeBankingId: homeBankingId,
         sessionId: `botJobTasks`, //-${botJobId}`,
-        updateRows: reassignedData.map(instr => ({
+        updatedRows: reassignedData.map(instr => ({
           instructionId: instr.id,
           blockId: instr.blockId,
           blockOrderNumber: instr.blockOrderNumber,
