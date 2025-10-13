@@ -456,19 +456,19 @@
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 8px; /* closer spacing than .controls-row */
+  gap: 8px;
   margin-top: 10px;
-  margin-bottom: 10px;
+  margin-bottom: 5px;      /* ↓ reduced from 10px */
   font-size: 12px;
-  border-bottom: 1px solid #c0c0c0; /* subtle full-width line below buttons */
-  padding-bottom: 8px;
+  border-bottom: 1px solid #c0c0c0;
+  padding-bottom: 8px;     /* ↓ reduced from 8px */
   width: 100%;
 }
 
 /* === Buttons inside top toolbar === */
 .buttons-toolbar {
   background-color: #c3d3d9 !important;
-  color: #0b5394; /* dark blue text */
+  color: #0b5394;
   border: none;
   padding: 7px 14px;
   border-radius: 5px;
@@ -486,12 +486,12 @@
 
 /* Insert All Elements row directly after toolbar */
 .controls-toolbar + .controls-row {
-  margin-top: 0px;   /* tighter */
+  margin-top: -2px;   /* slightly overlaps line for tighter look */
 }
 
 /* No-data header block directly after toolbar */
 .controls-toolbar + .block {
-  margin-top: 0px;   /* tighter */
+  margin-top: -2px;
 }
 
 .selected-attribute {
