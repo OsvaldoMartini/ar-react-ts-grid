@@ -252,6 +252,26 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     }
   };
 
+  const handleScannAppClick = () => {
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
+      console.warn("🚨 WebSocket is not connected. Cannot send message.");
+      return;
+    }
+    const message = {
+      type: "SCANNER_APP",
+      homeBankingId,
+      botJobId,
+      botJobName,
+      sessionId: "scannerTool",
+    };
+    try {
+      webSocket.send(JSON.stringify(message));
+      console.log("📤 Sent SCANNER_APP:", message);
+    } catch (err) {
+      console.error("❌ Error sending SCANNER_APP:", err);
+    }
+  };
+
   const handlesSendAllClick = () => {
     console.log("handleSendAllClick: Sending all ElementDTOs");
 
@@ -585,13 +605,37 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
         >
           Connect Device
         </button>
+
+        {/* New text fields */}
+        <input
+          type="text"
+          className="toolbar-input"
+          placeholder="InLinea"
+          defaultValue="InLinea"
+        />
+        <input
+          type="text"
+          className="toolbar-input"
+          placeholder="ch.bsct.ebanking.mobile"
+          defaultValue="ch.bsct.ebanking.mobile"
+        />
+
+
         <button
           className="buttons-toolbar"
           onClick={handleDiscoveryAppClick}
         >
           Discovery App
         </button>
+
+        <button
+          className="buttons-toolbar"
+          onClick={handleScannAppClick}
+        >
+          Scanner App
+        </button>
       </div>
+
 
       {elementDTO.length === 0 ? (
         // No data message (as before)
