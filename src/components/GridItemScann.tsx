@@ -209,6 +209,49 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     setAlertMessageBody('');
   };
 
+
+
+
+  const handleConnectDeviceClick = () => {
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
+      console.warn("🚨 WebSocket is not connected. Cannot send message.");
+      return;
+    }
+    const message = {
+      type: "CONNECT_DEVICE",
+      homeBankingId,
+      botJobId,
+      botJobName,
+      sessionId: "scannerTool",
+    };
+    try {
+      webSocket.send(JSON.stringify(message));
+      console.log("📤 Sent CONNECT_DEVICE:", message);
+    } catch (err) {
+      console.error("❌ Error sending CONNECT_DEVICE:", err);
+    }
+  };
+
+  const handleDiscoveryAppClick = () => {
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
+      console.warn("🚨 WebSocket is not connected. Cannot send message.");
+      return;
+    }
+    const message = {
+      type: "DISCOVERY_APP",
+      homeBankingId,
+      botJobId,
+      botJobName,
+      sessionId: "scannerTool",
+    };
+    try {
+      webSocket.send(JSON.stringify(message));
+      console.log("📤 Sent DISCOVERY_APP:", message);
+    } catch (err) {
+      console.error("❌ Error sending DISCOVERY_APP:", err);
+    }
+  };
+
   const handlesSendAllClick = () => {
     console.log("handleSendAllClick: Sending all ElementDTOs");
 
@@ -533,6 +576,22 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
           error={errorFlag}
         />
       )}
+
+      {/* Top toolbar — always visible */}
+      <div className="controls-toolbar">
+        <button
+          className="buttons-toolbar"
+          onClick={handleConnectDeviceClick}
+        >
+          Connect Device
+        </button>
+        <button
+          className="buttons-toolbar"
+          onClick={handleDiscoveryAppClick}
+        >
+          Discovery App
+        </button>
+      </div>
 
       {elementDTO.length === 0 ? (
         // No data message (as before)

@@ -451,6 +451,49 @@
   box-shadow: 0 0 10px #4caf50;
 }
 
+/* === Toolbar above all sections === */
+.controls-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px; /* closer spacing than .controls-row */
+  margin-top: 10px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  border-bottom: 1px solid #c0c0c0; /* subtle full-width line below buttons */
+  padding-bottom: 8px;
+  width: 100%;
+}
+
+/* === Buttons inside top toolbar === */
+.buttons-toolbar {
+  background-color: #c3d3d9 !important;
+  color: #0b5394; /* dark blue text */
+  border: none;
+  padding: 7px 14px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+  font-size: 12px;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.buttons-toolbar:hover {
+  background-color: #a9bec7 !important;
+  transform: scale(1.05);
+}
+
+/* Insert All Elements row directly after toolbar */
+.controls-toolbar + .controls-row {
+  margin-top: 0px;   /* tighter */
+}
+
+/* No-data header block directly after toolbar */
+.controls-toolbar + .block {
+  margin-top: 0px;   /* tighter */
+}
+
 .selected-attribute {
   margin-top: 10px;
   font-weight: bold;
