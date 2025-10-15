@@ -456,12 +456,12 @@
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 8px;
+  gap: 14px; /* ↑ increased spacing between buttons & inputs */
   margin-top: 10px;
-  margin-bottom: 5px;      /* ↓ reduced from 10px */
+  margin-bottom: 5px;
   font-size: 12px;
   border-bottom: 1px solid #c0c0c0;
-  padding-bottom: 8px;     /* ↓ reduced from 8px */
+  padding-bottom: 8px;
   width: 100%;
 }
 
@@ -470,7 +470,7 @@
   background-color: #c3d3d9 !important;
   color: #0b5394;
   border: none;
-  padding: 7px 14px;
+  padding: 7px 18px; /* slightly wider button */
   border-radius: 5px;
   cursor: pointer;
   transition: background-color 0.3s ease, transform 0.2s ease;
@@ -484,9 +484,17 @@
   transform: scale(1.05);
 }
 
+/* When isSending = true */
+.buttons-toolbar.sending {
+  background-color: #4caf50 !important; /* yellow */
+  color: #0b5394 !important; /* dark blue text */
+  animation: pulseBg 2s infinite;
+  box-shadow: 0 0 10px #4caf50;
+}
+
 /* Insert All Elements row directly after toolbar */
 .controls-toolbar + .controls-row {
-  margin-top: -2px;   /* slightly overlaps line for tighter look */
+  margin-top: -2px;
 }
 
 /* No-data header block directly after toolbar */
@@ -507,10 +515,49 @@
   transition: border-color 0.2s ease;
 }
 
+/* Add subtle extra space after input fields */
+.toolbar-input + .buttons-toolbar {
+  margin-left: 4px;
+}
+
 .toolbar-input:focus {
   border-color: #0b5394;
 }
 
+/* vertical separator in the toolbar */
+.toolbar-separator {
+  width: 1px;
+  height: 24px;              /* matches your 12px font & button height nicely */
+  background-color: #c0c0c0; /* same tone as your border */
+  display: inline-block;
+  margin: 0 6px;
+}
+
+/* combobox styling in the toolbar */
+.toolbar-select {
+  padding: 6px 10px;
+  border: 1px solid #c0c0c0;
+  border-radius: 5px;
+  font-size: 12px;
+  color: #0b5394;
+  background-color: #f5f8fa;
+  outline: none;
+  transition: border-color 0.2s ease;
+  cursor: pointer;
+  white-space: nowrap;
+
+  &:focus {
+    border-color: #0b5394;
+  }
+}
+
+/* disabled look for the newBotJobName input when preset is not "Create New Bot jOb" */
+.toolbar-input:disabled {
+  background-color: #eeeeee;
+  color: #7a7a7a;
+  cursor: not-allowed;
+  opacity: 0.8;
+}
 
 .selected-attribute {
   margin-top: 10px;

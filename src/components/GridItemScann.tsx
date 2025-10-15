@@ -68,11 +68,20 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   const [editingElementId, setEditingElementId] = useState<string | null>(null);
   const [editingElementTagName, setEditingElementTagName] = useState<string | null>(null);
   const [elementName, setElementName] = useState<string>('');
-  const [isSending, setIsSending] = useState(false);
+  const [isSendingAll, setIsSendingAll] = useState(false);
+  // below existing useState hooks
+  const [isSendingDevice, setIsSendingDevice] = useState(false);
+  const [isSendingDiscovery, setIsSendingDiscovery] = useState(false);
+  const [isSendingScanner, setIsSendingScanner] = useState(false);
+
 
   // Inside your component:
   const [hoveredRow, setHoveredRow] = useState<ElementDTO | null>(null);
   const [hoveredRowsList, setHoveredRowsList] = useState<ElementDTO[]>([]);
+
+  const [selectedJobOption, setSelectedJobOption] = useState<string>("Create New Bot Job");
+  const [newBotJobName, setNewBotJobName] = useState<string>("");
+  const isCreatingNew = selectedJobOption === "Create New Bot Job";
 
   const handleNextBlockPage = (typeElement: string) => {
     setBlockCurrentPages((prev) => ({
@@ -89,6 +98,17 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   };
 
   useEffect(() => {
+    if (!isSendingAll && !isSendingDevice && !isSendingDiscovery && !isSendingScanner) return;
+    const t = setTimeout(() => {
+      setIsSendingAll(false);
+      setIsSendingDevice(false);
+      setIsSendingDiscovery(false);
+      setIsSendingScanner(false);
+    }, 15000); // 15s fallback
+    return () => clearTimeout(t);
+  }, [isSendingAll, isSendingDevice, isSendingDiscovery, isSendingScanner]);
+
+  useEffect(() => {
     const newBlockPages: Record<string, number> = {};
     Object.entries(elementGrouped).forEach(([typeElement, elementData]) => {
       newBlockPages[typeElement] = Math.max(1, Math.ceil(elementData.elements.length / blockRowsPerPage));
@@ -103,87 +123,127 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
 
 
   useEffect(() => {
-    if (messages.length > 0) {
-      const lastMessage = messages[messages.length - 1];
-      console.log("RECEIVED -> Last WebSocket message ", lastMessage);
+    if (messages.length === 0) return;
+
+    const lastMessage = messages[messages.length - 1];
+    console.log("RECEIVED -> Last WebSocket message ", lastMessage);
+
+    const tryParse = (val: any) => {
+      if (typeof val !== "string") return val;
       try {
-        const parsedMessage = JSON.parse(lastMessage);
-
-        if (typeof parsedMessage.homeBankingId === "number") {
-          setHomeBankingId(parsedMessage.homeBankingId);
-        }
-
-        if (sessionId === parsedMessage.sessionId) {
-
-          const bodyData =
-            typeof parsedMessage.body === "string"
-              ? JSON.parse(parsedMessage.body)
-              : parsedMessage.body;
-
-
-          if (parsedMessage.operationId === "searchTerms") {
-            setIsSending(false);
-            const detailsData = Array.isArray(bodyData.details) ? bodyData.details : [];
-
-            if (detailsData.length === 0) {
-              setElementDTO([]);
-              setElementGrouped({});
-              // setIsElementGrouped(true);
-              setBotJobId(bodyData.botJobId);
-              setBotJobName(bodyData.botJobName);
-            } else {
-              setElementDTO(detailsData);
-            }
-            // setIsElementGrouped(false);
-          } else if (parsedMessage.operationId === "clonedElement" || parsedMessage.operationId === "addPickOne") {
-            // Handle clonedElement and addPickOne operations
-            const newElements = bodyData.elementDetails;
-
-            setBotJobId(bodyData.botJobId);
-            setBotJobName(bodyData.botJobName);
-
-            if (newElements && Array.isArray(newElements) && newElements.length > 0) {
-              setIsSending(false);
-              setElementDTO((prevElements) => {
-                let updatedElements = [...prevElements]; // Create a copy
-
-                // Find the maximum existing ID
-                const maxId = prevElements.reduce((max, el) => Math.max(max, el.id || 0), 0);
-                let nextId = maxId + 1;
-
-                newElements.forEach((newElement) => {
-                  // Check for duplicates based on both xPath AND tagName
-                  if (!updatedElements.some(
-                    (el) => el.xPath === newElement.xPath && el.tagName === newElement.tagName
-                  )) {
-                    // Assign the next sequential ID to the new element
-                    const elementToAdd = { ...newElement, id: nextId++ };
-
-                    let insertIndex = -1;
-                    if (prevElements.length > 0 && bodyData?.afterXPath) {
-                      insertIndex = prevElements.findIndex(
-                        (el) => el.xPath === bodyData.afterXPath
-                      );
-                    }
-
-                    if (insertIndex !== -1) {
-                      updatedElements.splice(insertIndex + 1, 0, elementToAdd); // Insert after found index
-                    } else {
-                      updatedElements.push(elementToAdd); // Append at the end if not found
-                    }
-                  }
-                });
-                return updatedElements;
-              });
-            }
-            setIsElementGrouped(false);
-          } else if (parsedMessage.operationId === "activate-insert-all") {
-            setIsSending(false);
-          }
-        }
-      } catch (error) {
-        console.error("Error parsing WebSocket message:", error);
+        return JSON.parse(val);
+      } catch {
+        return val;
       }
+    };
+
+    try {
+      const parsedMessage = JSON.parse(lastMessage);
+
+      if (typeof parsedMessage.homeBankingId === "number") {
+        setHomeBankingId(parsedMessage.homeBankingId);
+      }
+
+      // Accept messages for this component from multiple sessions your backend may use.
+      const acceptedSessions = new Set([
+        sessionId,                 // the one passed as prop
+        "scannerGrid",             // your backend sender
+        "scannerTool",
+        "scanner-element-pane",
+      ]);
+
+      if (!acceptedSessions.has(parsedMessage.sessionId)) return;
+
+      const bodyData = tryParse(parsedMessage.body);
+
+      switch (parsedMessage.operationId) {
+        // ---------- EXISTING FLOWS ----------
+        case "searchTerms": {
+          setIsSendingAll(false);
+
+          const detailsData = Array.isArray(bodyData?.details) ? bodyData.details : [];
+          if (detailsData.length === 0) {
+            setElementDTO([]);
+            setElementGrouped({});
+            setBotJobId(bodyData?.botJobId);
+            setBotJobName(bodyData?.botJobName);
+          } else {
+            setElementDTO(detailsData);
+          }
+          break;
+        }
+
+        case "clonedElement":
+        case "addPickOne": {
+          setIsSendingAll(false);
+
+          const newElements = bodyData?.elementDetails;
+          setBotJobId(bodyData?.botJobId);
+          setBotJobName(bodyData?.botJobName);
+
+          if (newElements && Array.isArray(newElements) && newElements.length > 0) {
+            setElementDTO((prevElements) => {
+              let updatedElements = [...prevElements];
+
+              const maxId = prevElements.reduce((max, el) => Math.max(max, el.id || 0), 0);
+              let nextId = maxId + 1;
+
+              newElements.forEach((newElement: any) => {
+                const isDup = updatedElements.some(
+                  (el) => el.xPath === newElement.xPath && el.tagName === newElement.tagName
+                );
+                if (!isDup) {
+                  const elementToAdd = { ...newElement, id: nextId++ };
+
+                  let insertIndex = -1;
+                  if (prevElements.length > 0 && bodyData?.afterXPath) {
+                    insertIndex = prevElements.findIndex(
+                      (el) => el.xPath === bodyData.afterXPath
+                    );
+                  }
+
+                  if (insertIndex !== -1) {
+                    updatedElements.splice(insertIndex + 1, 0, elementToAdd);
+                  } else {
+                    updatedElements.push(elementToAdd);
+                  }
+                }
+              });
+
+              return updatedElements;
+            });
+          }
+
+          setIsElementGrouped(false);
+          break;
+        }
+
+        // ---------- EXISTING BUTTON-ACTIVATE ----------
+        case "activate-insert-all": {
+          setIsSendingAll(false);
+          break;
+        }
+
+        // ---------- NEW: PER-BUTTON UNLOCK ----------
+        case "activate-connect-device": {
+          setIsSendingDevice(false);
+          break;
+        }
+        case "activate-discovery-app": {
+          setIsSendingDiscovery(false);
+          break;
+        }
+        case "activate-scanner-app": {
+          setIsSendingScanner(false);
+          break;
+        }
+
+        default:
+          // no-op
+          break;
+      }
+    } catch (error) {
+      console.error("Error parsing WebSocket message:", error);
     }
   }, [messages, sessionId]);
 
@@ -209,26 +269,28 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     setAlertMessageBody('');
   };
 
-
-
-
   const handleConnectDeviceClick = () => {
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
       console.warn("🚨 WebSocket is not connected. Cannot send message.");
       return;
     }
+
+    setIsSendingDevice(true); // 🔒 lock the button
+
     const message = {
-      type: "CONNECT_DEVICE",
+      type: "ATTACH_DEVICE",
       homeBankingId,
       botJobId,
       botJobName,
       sessionId: "scannerTool",
     };
+
     try {
       webSocket.send(JSON.stringify(message));
       console.log("📤 Sent CONNECT_DEVICE:", message);
     } catch (err) {
       console.error("❌ Error sending CONNECT_DEVICE:", err);
+      setIsSendingDevice(false); // 🔓 unlock on failure
     }
   };
 
@@ -237,6 +299,9 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
       console.warn("🚨 WebSocket is not connected. Cannot send message.");
       return;
     }
+
+    setIsSendingDiscovery(true);
+
     const message = {
       type: "DISCOVERY_APP",
       homeBankingId,
@@ -244,11 +309,13 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
       botJobName,
       sessionId: "scannerTool",
     };
+
     try {
       webSocket.send(JSON.stringify(message));
       console.log("📤 Sent DISCOVERY_APP:", message);
     } catch (err) {
       console.error("❌ Error sending DISCOVERY_APP:", err);
+      setIsSendingDiscovery(false);
     }
   };
 
@@ -257,6 +324,9 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
       console.warn("🚨 WebSocket is not connected. Cannot send message.");
       return;
     }
+
+    setIsSendingScanner(true);
+
     const message = {
       type: "SCANNER_APP",
       homeBankingId,
@@ -264,11 +334,13 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
       botJobName,
       sessionId: "scannerTool",
     };
+
     try {
       webSocket.send(JSON.stringify(message));
       console.log("📤 Sent SCANNER_APP:", message);
     } catch (err) {
       console.error("❌ Error sending SCANNER_APP:", err);
+      setIsSendingScanner(false);
     }
   };
 
@@ -280,7 +352,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
       return;
     }
 
-    setIsSending(true); // 🔒 Disable the button after first click
+    setIsSendingAll(true); // 🔒 Disable the button after first click
 
     // Flatten the elementGrouped object to get all ElementDTOs
     const allElements = Object.values(elementGrouped).flatMap(group => group.elements);
@@ -299,7 +371,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
       console.log("📤 Sent CREATE all ElementDTOs:", message);
     } catch (error) {
       console.error("❌ Error sending WebSocket message:", error);
-      setIsSending(false); // re-enable if send fails
+      setIsSendingAll(false); // re-enable if send fails
     }
   };
 
@@ -600,10 +672,11 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
       {/* Top toolbar — always visible */}
       <div className="controls-toolbar">
         <button
-          className="buttons-toolbar"
+          className={`buttons-toolbar ${isSendingDevice ? 'sending' : ''}`}
           onClick={handleConnectDeviceClick}
+          disabled={isSendingDevice}
         >
-          Connect Device
+          {isSendingDevice ? 'Sending…' : 'Connect Device'}
         </button>
 
         {/* New text fields */}
@@ -620,22 +693,46 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
           defaultValue="ch.bsct.ebanking.mobile"
         />
 
-
         <button
-          className="buttons-toolbar"
+          className={`buttons-toolbar ${isSendingDiscovery ? 'sending' : ''}`}
           onClick={handleDiscoveryAppClick}
+          disabled={isSendingDiscovery}
         >
-          Discovery App
+          {isSendingDiscovery ? 'Sending…' : 'Discovery App'}
         </button>
 
         <button
-          className="buttons-toolbar"
+          className={`buttons-toolbar ${isSendingScanner ? 'sending' : ''}`}
           onClick={handleScannAppClick}
+          disabled={isSendingScanner}
         >
-          Scanner App
+          {isSendingScanner ? 'Sending…' : 'Scanner App'}
         </button>
-      </div>
 
+        {/* ---- vertical separator ---- */}
+        <span className="toolbar-separator" aria-hidden="true" />
+
+        {/* ---- combo box + conditional input ---- */}
+        <select
+          className="toolbar-select"
+          value={selectedJobOption}
+          onChange={(e) => setSelectedJobOption(e.target.value)}
+          aria-label="Bot Job Presets"
+        >
+          <option value="Create New Bot Job">Create New Bot Job</option>
+          <option value="Mega Job">Mega Job</option>
+          <option value="Pagamento Banca Stato">Pagamento Banca Stato</option>
+        </select>
+
+        <input
+          type="text"
+          className="toolbar-input"
+          placeholder="new Bot Job Name"
+          value={newBotJobName}
+          onChange={(e) => setNewBotJobName(e.target.value)}
+          disabled={!isCreatingNew}
+        />
+      </div>
 
       {elementDTO.length === 0 ? (
         // No data message (as before)
@@ -651,11 +748,11 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
           {/* Toggle Button and Pagination Controls on the same row */}
           <div className="controls-row">
             <button
-              className={`send-all-button ${isSending ? 'sending' : ''}`}
+              className={`send-all-button ${isSendingAll ? 'sending' : ''}`}
               onClick={handlesSendAllClick}
-              disabled={isSending}
+              disabled={isSendingAll}
             >
-              {isSending ? 'Sending...' : 'Insert All Elements'}
+              {isSendingAll ? 'Sending...' : 'Insert All Elements'}
             </button>
             <button className="attributes-button" onClick={() => setShowAttributes(!showAttributes)}>
               {showAttributes ? 'Hide Attributes' : 'Show Attributes'}
