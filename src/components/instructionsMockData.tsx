@@ -110,6 +110,119 @@ export interface BotJobData {
   instructionId: number;
 }
 
+export interface ReferenceLoadDTO {
+  id: number | null;
+  homeBankingId: number | null;
+  botJobId: number | null;
+  referenceType: string;
+  value: string;
+  instructionId: number | null;
+}
+
+export interface InstructionLoad {
+  homeBankingId: number | null;
+  id: number;
+  botJobId: number | null;
+  botJobName: string;
+  instructionOrderNumber: number | null;
+  actions: string;
+  name: string;
+  xpath: string;
+  coordinates: string;
+  forceCoordinates: boolean | null;
+  iFrameXPath: string;
+  tagName: string;
+  shadowHost: string;
+  shadowRoot: string;
+  cssSelector: string;
+  description: string;
+  optional: boolean | null;
+  blockMarked: boolean | null;
+  defaultValue: string;
+  actionCustomMaxWaitSec: number | null;
+  onHoldSeconds: number | null;
+  codified: boolean | null;
+  exportToABR: boolean | null;
+  executed: boolean | null;
+  priority: string;
+  operation: string;
+  exportFile: string;
+  parentId: number | null;
+  blockId: number | null;
+  blockOrderNumber: number | null;
+  blockName: string;
+  blockActive: boolean | null;
+  instructionActive: boolean | null;
+  blockWait: number | null;
+  editMode: boolean;
+  refreshLoop: boolean | null;
+  loopOnly: boolean | null;
+  variableId: number | null;
+  type: string;
+  sessionId: string;
+  parentBlockId: number | null;
+  referenceLoadDTOList?: ReferenceLoadDTO[];
+}
+
+export interface HomeUrlDTO {
+  id: number | null;
+  url: string;
+  homeBankingId: number | null;
+  orgName: string;
+}
+
+export interface BlockLoadDTO {
+  homeBankingName?: string;
+  homeBankingId?: number;
+  id: number;
+  blockOrderNumber?: number;
+  name: string;
+  description?: string;
+  typeId?: number;
+  botJobId?: number;
+  botJobName?: string;
+  exportFile?: string;
+  active?: boolean | null;
+  wait?: number | null;
+  hasAnyInput?: boolean;
+  instructionLoad?: InstructionLoad[];
+}
+
+export interface HomeBankingLoadDTO {
+  id: number;
+  url: string;
+  name: string;
+  priority?: string;
+  searchConfig?: string;
+  optionsConfig?: string;
+  cookies?: string;
+  driverSession?: string;
+  username?: string;
+  password?: string;
+  jobs?: number;
+  homeUrlDTOs?: HomeUrlDTO[];
+}
+
+export interface BotJobLoadDTO {
+  id?: number;
+  name: string;
+  botJobId?: number;
+  description?: string;
+  priority?: string;
+  blockOrderNumber?: number;
+  blockName?: string;
+  blockId?: number;
+  blockDescription?: string;
+  homeBankingId?: number;
+  homeUrlId?: number;
+  typeId?: number;
+  active?: boolean;
+  blockLoadDTOList?: BlockLoadDTO[];
+  homeBankingLoadDTO?: HomeBankingLoadDTO;
+}
+
+
+
 export const elementsDTOMockData: ElementDTO[] = [
   // {
   //   "typeElement": "button",
