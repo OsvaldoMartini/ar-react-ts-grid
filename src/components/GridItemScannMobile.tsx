@@ -71,8 +71,12 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
   const [isSendingAll, setIsSendingAll] = useState(false);
   // below existing useState hooks
   const [isSendingDevice, setIsSendingDevice] = useState(false);
+  const [isButtonDisabled, setIsButtonDisabled] = useState(true); // disabled by default
   const [isSendingDiscovery, setIsSendingDiscovery] = useState(false);
   const [isSendingScanner, setIsSendingScanner] = useState(false);
+
+  const [appQueryApp, setappQueryApp] = useState<string>("InLinea");
+  const [appQueryPackage, setappQueryPackage] = useState<string>("ch.bsct.ebanking.mobile");
 
 
   // Inside your component:
@@ -313,6 +317,8 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       botJobId,
       botJobName,
       sessionId: "mobileScannerGrid",
+      appQueryApp,
+      appQueryPackage,
     };
 
     try {
@@ -689,19 +695,21 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
           type="text"
           className="toolbar-input"
           placeholder="InLinea"
-          defaultValue="InLinea"
+          value={appQueryApp}
+          onChange={(e) => setappQueryApp(e.target.value)}
         />
         <input
           type="text"
           className="toolbar-input"
           placeholder="ch.bsct.ebanking.mobile"
-          defaultValue="ch.bsct.ebanking.mobile"
+          value={appQueryPackage}
+          onChange={(e) => setappQueryPackage(e.target.value)}
         />
 
         <button
           className={`buttons-toolbar ${isSendingDiscovery ? 'sending' : ''}`}
           onClick={handleDiscoveryAppClick}
-          disabled={isSendingDiscovery}
+          disabled={isButtonDisabled || isSendingDiscovery} // disabled by default
         >
           {isSendingDiscovery ? 'Sending…' : 'Discovery App'}
         </button>

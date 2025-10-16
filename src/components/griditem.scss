@@ -492,6 +492,17 @@
   box-shadow: 0 0 10px #4caf50;
 }
 
+/* Disabled state for toolbar buttons */
+.buttons-toolbar:disabled {
+  background-color: #cccccc !important;
+  color: #7a7a7a !important;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+  opacity: 0.7;
+}
+
+
 /* Insert All Elements row directly after toolbar */
 .controls-toolbar + .controls-row {
   margin-top: -2px;
