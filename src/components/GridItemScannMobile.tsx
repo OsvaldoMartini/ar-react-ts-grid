@@ -78,7 +78,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
   const [appQueryPackage, setappQueryPackage] = useState<string>("ch.bsct.ebanking.mobile");
   // GridItemScannMobile.tsx
   const elementDTORef = useRef<HTMLInputElement>(null);
-  // const hasShownInitialAlert = useRef(false);
+  const hasShownInitialAlert = useRef(false);
 
 
 
@@ -105,39 +105,39 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
     }));
   };
 
-  // useEffect(() => {
-  //   // Only show the initial alert once, and only if we actually have data
-  //   if (hasShownInitialAlert.current) return;
-  //   if (!elementDTO || elementDTO.length === 0) return;
+  useEffect(() => {
+    // Only show the initial alert once, and only if we actually have data
+    if (hasShownInitialAlert.current) return;
+    if (!elementDTO || elementDTO.length === 0) return;
 
-  //   // Build a quick summary by tag
-  //   const grouped = groupByTagName(elementDTO);
-  //   const byTagSummary = Object.entries(grouped)
-  //     .map(([tag, g]) => `${tag}: ${g.elements.length}`)
-  //     .join(" • ");
+    // Build a quick summary by tag
+    const grouped = groupByTagName(elementDTO);
+    const byTagSummary = Object.entries(grouped)
+      .map(([tag, g]) => `${tag}: ${g.elements.length}`)
+      .join(" • ");
 
-  //   // Header: totals
-  //   setAlertMessageHeader(
-  //     `Loaded ${elementDTO.length} element(s) in ${Object.keys(grouped).length} block(s)`
-  //   );
+    // Header: totals
+    setAlertMessageHeader(
+      `Loaded ${elementDTO.length} element(s) in ${Object.keys(grouped).length} block(s)`
+    );
 
-  //   // Body: per-tag breakdown
-  //   setAlertMessageBody(
-  //     `By type → ${byTagSummary}`
-  //   );
+    // Body: per-tag breakdown
+    setAlertMessageBody(
+      `By type → ${byTagSummary}`
+    );
 
-  //   // Optional: footer context
-  //   setAlertMessageFooter(
-  //     `HomeBanking ${homeBankingId} • BotJob ${botJobName ?? "-"}${botJobId ? ` (#${botJobId})` : ""}`
-  //   );
+    // Optional: footer context
+    setAlertMessageFooter(
+      `HomeBanking ${homeBankingId} • BotJob ${botJobName ?? "-"}${botJobId ? ` (#${botJobId})` : ""}`
+    );
 
-  //   // Choose the icon/style you prefer
-  //   setAlertImage(constructionImage);
-  //   setAlertClass('construction-image');
-  //   setErrorFlag(false);
+    // Choose the icon/style you prefer
+    setAlertImage(constructionImage);
+    setAlertClass('construction-image');
+    setErrorFlag(false);
 
-  //   hasShownInitialAlert.current = true;
-  // }, [elementDTO, homeBankingId, botJobId, botJobName]);
+    hasShownInitialAlert.current = true;
+  }, [elementDTO, homeBankingId, botJobId, botJobName]);
 
 
   useEffect(() => {
