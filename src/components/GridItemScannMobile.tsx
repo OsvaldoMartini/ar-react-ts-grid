@@ -78,9 +78,6 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
   const [appQueryPackage, setappQueryPackage] = useState<string>("ch.bsct.ebanking.mobile");
   // GridItemScannMobile.tsx
   const elementDTORef = useRef<HTMLInputElement>(null);
-  const hasShownInitialAlert = useRef(false);
-
-
 
   // Inside your component:
   const [hoveredRow, setHoveredRow] = useState<ElementDTO | null>(null);
@@ -104,22 +101,6 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       [typeElement]: Math.max((prev[typeElement] || 1) - 1, 1),
     }));
   };
-
-  //SMALL DATA ALERT
-  useEffect(() => {
-    if (hasShownInitialAlert.current) return;
-
-    if (Array.isArray(elementDTO) && elementDTO.length === 0) {
-      setAlertMessageHeader("No elements found");
-      setAlertMessageBody("Use Discovery/Scanner to populate elements.");
-      // setAlertMessageFooter(`HomeBanking ${homeBankingId} • BotJob ${botJobName ?? "-"}`);
-      setAlertImage(constructionImage);
-      setAlertClass("construction-image");
-      setErrorFlag(false);
-      hasShownInitialAlert.current = true;
-    }
-  }, [elementDTO, homeBankingId, botJobName]);
-
 
   useEffect(() => {
     if (!isSendingAll && !isSendingDevice && !isSendingDiscovery && !isSendingScanner) return;
