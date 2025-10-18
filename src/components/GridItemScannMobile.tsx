@@ -64,7 +64,6 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
   const [blockPages, setBlockPages] = useState<Record<string, number>>({});
   const [blockCurrentPages, setBlockCurrentPages] = useState<Record<string, number>>({});
   const [blockRowsPerPage, setBlockRowsPerPage] = useState<number>(10);
-  const elementDTORef = useRef<HTMLInputElement>(null);
   const [editingElementId, setEditingElementId] = useState<string | null>(null);
   const [editingElementTagName, setEditingElementTagName] = useState<string | null>(null);
   const [elementName, setElementName] = useState<string>('');
@@ -77,6 +76,10 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
 
   const [appQueryApp, setappQueryApp] = useState<string>("InLinea");
   const [appQueryPackage, setappQueryPackage] = useState<string>("ch.bsct.ebanking.mobile");
+  // GridItemScannMobile.tsx
+  const elementDTORef = useRef<HTMLInputElement>(null);
+  // const hasShownInitialAlert = useRef(false);
+
 
 
   // Inside your component:
@@ -101,6 +104,41 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       [typeElement]: Math.max((prev[typeElement] || 1) - 1, 1),
     }));
   };
+
+  // useEffect(() => {
+  //   // Only show the initial alert once, and only if we actually have data
+  //   if (hasShownInitialAlert.current) return;
+  //   if (!elementDTO || elementDTO.length === 0) return;
+
+  //   // Build a quick summary by tag
+  //   const grouped = groupByTagName(elementDTO);
+  //   const byTagSummary = Object.entries(grouped)
+  //     .map(([tag, g]) => `${tag}: ${g.elements.length}`)
+  //     .join(" • ");
+
+  //   // Header: totals
+  //   setAlertMessageHeader(
+  //     `Loaded ${elementDTO.length} element(s) in ${Object.keys(grouped).length} block(s)`
+  //   );
+
+  //   // Body: per-tag breakdown
+  //   setAlertMessageBody(
+  //     `By type → ${byTagSummary}`
+  //   );
+
+  //   // Optional: footer context
+  //   setAlertMessageFooter(
+  //     `HomeBanking ${homeBankingId} • BotJob ${botJobName ?? "-"}${botJobId ? ` (#${botJobId})` : ""}`
+  //   );
+
+  //   // Choose the icon/style you prefer
+  //   setAlertImage(constructionImage);
+  //   setAlertClass('construction-image');
+  //   setErrorFlag(false);
+
+  //   hasShownInitialAlert.current = true;
+  // }, [elementDTO, homeBankingId, botJobId, botJobName]);
+
 
   useEffect(() => {
     if (!isSendingAll && !isSendingDevice && !isSendingDiscovery && !isSendingScanner) return;
