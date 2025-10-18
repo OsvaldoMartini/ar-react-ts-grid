@@ -9,6 +9,7 @@ import { BlockLoopInstructionLoadDTO, BotJobData, ComplexMessage, ElementDTO } f
 import AlertModal from './components/AlertModal';
 import constructionImage from './assets/construction.png';
 import GridItemComp from './components/GridItemComp';
+import GridItemScannMobile from './components/GridItemScannMobile';
 
 // Initialize the root
 const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
@@ -22,7 +23,7 @@ const App: React.FC = () => {
   const [botJobId, setBotJobId] = useState<number>(0);
   const [botJobName, setBotJobName] = useState<string>("");
   const [homeBanking, setHomeBanking] = useState<number>(0);
-  const [sessionId, setSessionId] = useState<string>(""); // (SENDER: scannerTool) -> scannerGrid-1  -> componentTasks-1 
+  const [sessionId, setSessionId] = useState<string>(""); // (SENDER: scannerTool) -> scannerGrid-1  -> componentTasks-1 -> mobileScannerGrid 
   const [errorFlag, setErrorFlag] = useState<boolean>(false)  //(SENDER: insertTool) -> botJobTasks-1 -> componentTasks  
   const [alertImage, setAlertImage] = useState(constructionImage);
   const [alertClass, setAlertClass] = useState('construction-image')
@@ -40,8 +41,14 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    // Define the function for receiving JavaFX data
-    (window as any).receiveDataFromJava = (jsonData: string, socketPort: number, sessionIdFromJava: string, homeBanking: number, botJobId: number, botJobName: string) => {
+    (window as any).receiveDataFromJava = (
+      jsonData: string,
+      socketPort: number,
+      sessionIdFromJava: string,
+      homeBanking: number,
+      botJobId: number,
+      botJobName: string
+    ) => {
       try {
         console.log("sessionIdFromJava", sessionIdFromJava);
 
@@ -52,32 +59,31 @@ const App: React.FC = () => {
         setHomeBanking(homeBanking);
         setBotJobId(botJobId);
         setBotJobName(botJobName);
+
+        // keep your resets
         setInstructionsData([] as BlockLoopInstructionLoadDTO[]);
         setComponentsData([] as BlockLoopInstructionLoadDTO[]);
         setElementDTO([] as ElementDTO[]);
 
-        // Check if it's BlockLoopInstructionLoadDTO
         if (Array.isArray(dataLoad) && dataLoad.length > 0 && sessionIdFromJava.includes("botJobTasks")) {
           setInstructionsData(dataLoad as BlockLoopInstructionLoadDTO[]);
-          // setAlertMessageHeader("DATA  BlockLoopInstructionLoadDTO " + dataLoad.length);
-          // setAlertMessageBody("ReceiveDataFromJava Socket " + socketPort + " - " + sessionIdFromJava);
         } else if (Array.isArray(dataLoad) && dataLoad.length > 0 && sessionIdFromJava.includes("componentTasks")) {
           setComponentsData(dataLoad as BlockLoopInstructionLoadDTO[]);
-        }
-        // Check if it's ElementDTO
-        else if (Array.isArray(dataLoad) && dataLoad.length > 0 && sessionIdFromJava.includes("scannerGrid")) {
+        } else if (Array.isArray(dataLoad) && dataLoad.length > 0 && sessionIdFromJava.includes("scannerGrid")) {
+          // existing desktop scanner
           setElementDTO(dataLoad as ElementDTO[]);
-          // setAlertMessageHeader("DATA  ElementDTO " + dataLoad.length);
-          // setAlertMessageBody("ReceiveDataFromJava Socket " + socketPort + " - " + sessionIdFromJava);
+        } else if (Array.isArray(dataLoad) && dataLoad.length > 0 && sessionIdFromJava.includes("mobileScannerGrid")) {
+          // NEW: mobile scanner
+          setElementDTO(dataLoad as ElementDTO[]);
         } else {
           console.error('Unknown data format');
         }
-
       } catch (error) {
         console.error('Error parsing jsonData:', error);
       }
     };
   }, []);
+
 
 
   // useEffect(() => {
@@ -112,6 +118,11 @@ const App: React.FC = () => {
       {sessionId && (sessionId.includes("scannerGrid")) && (
         <GridItemScann homeBankingIdInitial={homeBanking} dataDTO={elementDTO} socketPort={socketPort} sessionId={sessionId} botJobIdInitial={botJobId} botJobNameInitial={botJobName} />
       )}
+      {sessionId && (sessionId.includes("mobileScannerGrid")) && (
+        <GridItemScannMobile homeBankingIdInitial={homeBanking} dataDTO={elementDTO} socketPort={socketPort} sessionId={sessionId} botJobIdInitial={botJobId} botJobNameInitial={botJobName} />
+      )}
+
+
     </React.StrictMode>
   );
 };
