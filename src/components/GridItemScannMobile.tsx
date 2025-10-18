@@ -105,39 +105,20 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
     }));
   };
 
+  //SMALL DATA ALERT
   useEffect(() => {
-    // Only show the initial alert once, and only if we actually have data
     if (hasShownInitialAlert.current) return;
-    if (!elementDTO || elementDTO.length === 0) return;
 
-    // Build a quick summary by tag
-    const grouped = groupByTagName(elementDTO);
-    const byTagSummary = Object.entries(grouped)
-      .map(([tag, g]) => `${tag}: ${g.elements.length}`)
-      .join(" • ");
-
-    // Header: totals
-    setAlertMessageHeader(
-      `Loaded ${elementDTO.length} element(s) in ${Object.keys(grouped).length} block(s)`
-    );
-
-    // Body: per-tag breakdown
-    setAlertMessageBody(
-      `By type → ${byTagSummary}`
-    );
-
-    // Optional: footer context
-    setAlertMessageFooter(
-      `HomeBanking ${homeBankingId} • BotJob ${botJobName ?? "-"}${botJobId ? ` (#${botJobId})` : ""}`
-    );
-
-    // Choose the icon/style you prefer
-    setAlertImage(constructionImage);
-    setAlertClass('construction-image');
-    setErrorFlag(false);
-
-    hasShownInitialAlert.current = true;
-  }, [elementDTO, homeBankingId, botJobId, botJobName]);
+    if (Array.isArray(elementDTO) && elementDTO.length === 0) {
+      setAlertMessageHeader("No elements found");
+      setAlertMessageBody("Use Discovery/Scanner to populate elements.");
+      // setAlertMessageFooter(`HomeBanking ${homeBankingId} • BotJob ${botJobName ?? "-"}`);
+      setAlertImage(constructionImage);
+      setAlertClass("construction-image");
+      setErrorFlag(false);
+      hasShownInitialAlert.current = true;
+    }
+  }, [elementDTO, homeBankingId, botJobName]);
 
 
   useEffect(() => {
