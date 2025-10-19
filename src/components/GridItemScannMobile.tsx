@@ -84,9 +84,9 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
   const [hoveredRowsList, setHoveredRowsList] = useState<ElementDTO[]>([]);
 
   const [botJobs, setBotJobs] = useState<BotJobLoadDTO[]>([]);
-  const [selectedJobOption, setSelectedJobOption] = useState<string>("Create New Bot Job");
-  const [newBotJobName, setNewBotJobName] = useState<string>("");
-  const isCreatingNew = selectedJobOption === "Create New Bot Job";
+  const [selectedJobOption, setSelectedJobOption] = useState<string>("Select a Bot Job");
+  const [isBotJobRunning, setIsBotJobRunning] = useState(false);
+
 
   const handleNextBlockPage = (typeElement: string) => {
     setBlockCurrentPages((prev) => ({
@@ -109,6 +109,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       setIsSendingDevice(false);
       setIsSendingDiscovery(false);
       setIsSendingScanner(false);
+      setIsBotJobRunning(false); // added
     }, 15000); // 15s fallback
     return () => clearTimeout(t);
   }, [isSendingAll, isSendingDevice, isSendingDiscovery, isSendingScanner]);
@@ -167,10 +168,11 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
           setBotJobs(list as BotJobLoadDTO[]);
 
           // OPTIONAL: auto-select the first job by name if you want
-          if ((list as BotJobLoadDTO[]).length > 0) {
-            const firstName = (list as BotJobLoadDTO[])[0].name ?? "Create New Bot Job";
-            setSelectedJobOption(firstName);
-          }
+          // if ((list as BotJobLoadDTO[]).length > 0) {
+          //   const firstName = (list as BotJobLoadDTO[])[0].name ?? "Create New Bot Job";
+          //   setSelectedJobOption(firstName);
+          // }
+          setSelectedJobOption("Select a Bot Job");
           break;
         }
 
@@ -354,6 +356,34 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       setIsSendingScanner(false);
     }
   };
+
+
+  const handleLaunchBotJobClick = () => {
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
+      console.warn("🚨 WebSocket is not connected. Cannot send message.");
+      return;
+    }
+
+    setIsBotJobRunning(true);
+
+    const message = {
+      type: "LAUNCH_BOT_JOB_TEST", // adjust to your backend contract if needed
+      homeBankingId,
+      botJobId,
+      botJobName,
+      sessionId: "mobileScannerGrid",
+      selectedJobName: selectedJobOption,
+    };
+
+    try {
+      webSocket.send(JSON.stringify(message));
+      console.log("📤 Sent LAUNCH_BOT_JOB_TEST:", message);
+    } catch (err) {
+      console.error("❌ Error sending LAUNCH_BOT_JOB_TEST:", err);
+      setIsBotJobRunning(false);
+    }
+  };
+
 
   const handlesSendAllClick = () => {
     console.log("handleSendAllClick: Sending all ElementDTOs");
@@ -732,7 +762,8 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
           onChange={(e) => setSelectedJobOption(e.target.value)}
           aria-label="Bot Job Presets"
         >
-          <option value="Create New Bot Job">Create New Bot Job</option>
+          {/* NEW first option text */}
+          <option value="Select a Bot Job">Select a Bot Job</option>
           {botJobs.map(j => (
             <option key={(j.botJobId ?? j.id ?? j.name) as React.Key} value={j.name}>
               {j.name}
@@ -740,15 +771,14 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
           ))}
         </select>
 
+        <button
+          className={`buttons-toolbar ${isBotJobRunning ? 'Rrunning' : ''}`}
+          onClick={handleLaunchBotJobClick}
+          disabled={isBotJobRunning || selectedJobOption === "Select a Bot Job"}  // prevent launch without a selection
+        >
+          {isBotJobRunning ? 'Sending…' : 'Launch Test'}
+        </button>
 
-        <input
-          type="text"
-          className="toolbar-input"
-          placeholder="new Bot Job Name"
-          value={newBotJobName}
-          onChange={(e) => setNewBotJobName(e.target.value)}
-          disabled={!isCreatingNew}
-        />
       </div>
 
       {elementDTO.length === 0 ? (
