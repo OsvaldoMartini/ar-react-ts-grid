@@ -459,7 +459,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   };
 
   const getElementBlockText = (typeElement: string): string => {
-    const lowerTag = typeElement.toLowerCase();
+    const lowerTag = typeElement ? typeElement.toLowerCase() : "";
 
     if (["input", "textarea"].includes(lowerTag)) {
       return "Input Text";
@@ -470,10 +470,14 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     if (lowerTag === "button") {
       return "Button";
     }
-    if (lowerTag === "a") {
+    if (lowerTag === "a" || lowerTag === "link") {
       return "Link";
     }
-    return typeElement; // Default to returning the tag name
+    if (lowerTag === "label") {
+      return "Output";
+    }
+
+    return typeElement; //"Output Text"; // optional fallback
   };
 
 
@@ -483,14 +487,16 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     let text: string | null = null;
     let imageClass = "operations"; // Default class for images
 
-    // Set the image source based on the tag name
-    if (instruction.tagName === "input") {
+    // Normalize to lowercase once
+    const tag = instruction.tagName?.toLowerCase() || "";
+
+    if (tag === "input") {
       imageSrc = inputImage;
       imageClass = "input-image";
-    } else if (instruction.tagName === "button") {
+    } else if (tag === "button") {
       imageSrc = clickImage;
       imageClass = "click-image";
-    } else if (instruction.tagName === "a") {
+    } else if (tag === "a" || tag === "link") {
       imageSrc = linkImage;
       imageClass = "link-image";
     } else {
@@ -545,7 +551,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     } else if (typeElement === "button") {
       imageSrc = clickImage;
       imageClass = "click-image";
-    } else if (typeElement === "a") {
+    } else if (typeElement === "a" || typeElement === "link") {
       imageSrc = linkImage;
       imageClass = "click-image";
     } else {
