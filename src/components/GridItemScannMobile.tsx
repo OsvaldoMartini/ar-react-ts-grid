@@ -84,9 +84,8 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
   const [hoveredRowsList, setHoveredRowsList] = useState<ElementDTO[]>([]);
 
   const [botJobs, setBotJobs] = useState<BotJobLoadDTO[]>([]);
-  const [selectedJobOption, setSelectedJobOption] = useState<string>("Select a Bot Job");
+  const [selectedJob, setSelectedJob] = useState<BotJobLoadDTO | null>(null);
   const [isBotJobRunning, setIsBotJobRunning] = useState(false);
-
 
   const handleNextBlockPage = (typeElement: string) => {
     setBlockCurrentPages((prev) => ({
@@ -172,7 +171,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
           //   const firstName = (list as BotJobLoadDTO[])[0].name ?? "Create New Bot Job";
           //   setSelectedJobOption(firstName);
           // }
-          setSelectedJobOption("Select a Bot Job");
+          setSelectedJob(null);
           break;
         }
 
@@ -247,6 +246,17 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
         }
         case "activate-scanner-app": {
           setIsSendingScanner(false);
+          break;
+        }
+
+        case "activate-running-bot-job": {
+          // Optional: if backend returns ids/names, sync them
+          if (typeof bodyData?.botJobId === "number") setBotJobId(bodyData.botJobId);
+          if (typeof bodyData?.homeBankingId === "number") setHomeBankingId(bodyData.homeBankingId);
+          if (typeof bodyData?.botJobName === "string") setBotJobName(bodyData.botJobName);
+
+          // Stop the spinner / unlock the button
+          setIsBotJobRunning(false);
           break;
         }
 
@@ -359,27 +369,25 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
 
 
   const handleLaunchBotJobClick = () => {
-    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
-      console.warn("🚨 WebSocket is not connected. Cannot send message.");
-      return;
-    }
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) return;
+    if (!selectedJob) return;
 
     setIsBotJobRunning(true);
 
     const message = {
-      type: "LAUNCH_BOT_JOB_TEST", // adjust to your backend contract if needed
-      homeBankingId,
-      botJobId,
-      botJobName,
+      type: "LAUNCH_BOT_JOB_TEST",       // or your actual type
+      homeBankingId,                     // updated from selected job
+      botJobId,                          // updated from selected job
+      botJobName,                        // updated from selected job
       sessionId: "mobileScannerGrid",
-      selectedJobName: selectedJobOption,
+      selectedJobName: selectedJob.name, // optional
     };
 
     try {
       webSocket.send(JSON.stringify(message));
       console.log("📤 Sent LAUNCH_BOT_JOB_TEST:", message);
     } catch (err) {
-      console.error("❌ Error sending LAUNCH_BOT_JOB_TEST:", err);
+      console.error("❌ Error:", err);
       setIsBotJobRunning(false);
     }
   };
@@ -717,7 +725,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
           onClick={handleConnectDeviceClick}
           disabled={isSendingDevice}
         >
-          {isSendingDevice ? 'Sending…' : 'Connect Device'}
+          {isSendingDevice ? 'Connecting…' : 'Connect Device'}
         </button>
 
         {/* New text fields */}
@@ -741,7 +749,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
           onClick={handleDiscoveryAppClick}
           disabled={isButtonDisabled || isSendingDiscovery} // disabled by default
         >
-          {isSendingDiscovery ? 'Sending…' : 'Discovery App'}
+          {isSendingDiscovery ? 'Discovering…' : 'Discovery App'}
         </button>
 
         <button
@@ -749,7 +757,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
           onClick={handleScannAppClick}
           disabled={isSendingScanner}
         >
-          {isSendingScanner ? 'Sending…' : 'Scanner App'}
+          {isSendingScanner ? 'Scanning…' : 'Scanner App'}
         </button>
 
         {/* ---- vertical separator ---- */}
@@ -758,26 +766,42 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
         {/* ---- combo box + conditional input ---- */}
         <select
           className="toolbar-select"
-          value={selectedJobOption}
-          onChange={(e) => setSelectedJobOption(e.target.value)}
+          value={selectedJob ? String(selectedJob.botJobId ?? selectedJob.id ?? selectedJob.name) : ""}
+          onChange={(e) => {
+            const key = e.target.value;
+            const job = botJobs.find(j => String(j.botJobId ?? j.id ?? j.name) === key) ?? null;
+            setSelectedJob(job);
+
+            // Keep these in sync so all your senders use the selected job automatically
+            setBotJobId(job?.botJobId ?? job?.id ?? null);
+            setBotJobName(job?.name ?? null);
+            if (job?.homeBankingId != null) setHomeBankingId(job.homeBankingId);
+          }}
           aria-label="Bot Job Presets"
         >
-          {/* NEW first option text */}
-          <option value="Select a Bot Job">Select a Bot Job</option>
+          {/* Placeholder */}
+          <option value="">Select a Bot Job</option>
+
+          {/* Real options */}
           {botJobs.map(j => (
-            <option key={(j.botJobId ?? j.id ?? j.name) as React.Key} value={j.name}>
+            <option
+              key={(j.botJobId ?? j.id ?? j.name) as React.Key}
+              value={String(j.botJobId ?? j.id ?? j.name)}
+            >
               {j.name}
             </option>
           ))}
         </select>
 
+
         <button
-          className={`buttons-toolbar ${isBotJobRunning ? 'Rrunning' : ''}`}
+          className={`buttons-toolbar ${isBotJobRunning ? 'Running' : ''}`}
           onClick={handleLaunchBotJobClick}
-          disabled={isBotJobRunning || selectedJobOption === "Select a Bot Job"}  // prevent launch without a selection
+          disabled={isBotJobRunning || !selectedJob}  // prevent launch without a selection
         >
-          {isBotJobRunning ? 'Sending…' : 'Launch Test'}
+          {isBotJobRunning ? 'Running…' : 'Launch Test'}
         </button>
+
 
       </div>
 
