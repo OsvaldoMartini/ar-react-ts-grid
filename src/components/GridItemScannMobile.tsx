@@ -381,6 +381,17 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
     setHoveredRowsList([]);
   };
 
+  // 1) Add this small helper anywhere inside the component (top-level, before returns)
+  const showSelectJobAlert = () => {
+    setAlertImage(warningRedImage);
+    setAlertClass('construction-image');
+    setAlertMessageHeader('No Bot Job selected');
+    setAlertMessageBody(
+      'Please select or create a Bot Job using AR Web Server / Scanner, then try again.'
+    );
+    setAlertMessageFooter(null);
+    setErrorFlag(true);
+  };
 
   const handleLaunchBotJobClick = () => {
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN) return;
@@ -409,6 +420,12 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
 
   const handlesSendAllClick = () => {
     console.log("handleSendAllClick: Sending all ElementDTOs");
+
+    // ❗ Block if no Bot Job is selected
+    if (!selectedJob || !botJobId || !botJobName) {
+      showSelectJobAlert();
+      return;
+    }
 
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
       console.warn("🚨 WebSocket is not connected. Cannot send message.");
@@ -444,6 +461,12 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
     action: string
   ) => {
     event.stopPropagation();
+
+    // ❗ Block if no Bot Job is selected
+    if (!selectedJob || !botJobId || !botJobName) {
+      showSelectJobAlert();
+      return;
+    }
 
     sendWebSocketMessage(elementDTO, action);
 
@@ -851,10 +874,11 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
             <button
               className={`send-all-button ${isSendingAll ? 'sending' : ''}`}
               onClick={handlesSendAllClick}
-              disabled={isSendingAll}
+              disabled={isSendingAll || !selectedJob}
             >
               {isSendingAll ? 'Sending...' : 'Insert All Elements'}
             </button>
+
             <button className="attributes-button" onClick={() => setShowAttributes(!showAttributes)}>
               {showAttributes ? 'Hide Attributes' : 'Show Attributes'}
             </button>
