@@ -2,7 +2,7 @@ const WebSocket = require("ws");
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0"; // ignore self-signed cert
 
-const ws = new WebSocket("wss://localhost:61757");
+const ws = new WebSocket("wss://localhost:50070");
 
 ws.on("open", () => {
   console.log("Connected to server");

@@ -42,7 +42,7 @@ function startPing(ws) {
 // Main function to establish WebSocket connection
 function main() {
   const brokerUrl =
-    "ws://localhost:56567/websocket?sessionId=javascript-session"; // Notice: ws:// instead of wss://
+    "ws://localhost:50070/websocket?sessionId=javascript-session"; // Notice: ws:// instead of wss://
   console.log(`Connecting to WebSocket at ${brokerUrl}...`);
 
   // Create the WebSocket client without HTTPS agent
