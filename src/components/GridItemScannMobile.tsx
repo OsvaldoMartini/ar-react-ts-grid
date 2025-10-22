@@ -368,6 +368,20 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
   };
 
 
+  const handleClearDataClick = () => {
+    // Clear data + dependent state
+    setElementDTO([]);
+    setElementGrouped({});
+    setIsElementGrouped(false);
+
+    // Optional quality-of-life resets
+    setBlockPages({});
+    setBlockCurrentPages({});
+    setHoveredRow(null);
+    setHoveredRowsList([]);
+  };
+
+
   const handleLaunchBotJobClick = () => {
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN) return;
     if (!selectedJob) return;
@@ -767,6 +781,15 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
           {isSendingScanner ? 'Scanning…' : 'Scanner App'}
         </button>
 
+        <button
+          className="buttons-toolbar danger"
+          onClick={handleClearDataClick}
+          disabled={elementDTO.length === 0}
+          title={elementDTO.length === 0 ? "No data to clear" : "Clear all scanned elements"}
+        >
+          Clear Data
+        </button>
+
         {/* ---- vertical separator ---- */}
         <span className="toolbar-separator" aria-hidden="true" />
 
@@ -802,7 +825,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
 
 
         <button
-          className={`buttons-toolbar ${isBotJobRunning ? 'Running' : ''}`}
+          className={`buttons-toolbar ${isBotJobRunning ? 'sending' : ''}`}
           onClick={handleLaunchBotJobClick}
           disabled={isBotJobRunning || !selectedJob}  // prevent launch without a selection
         >
