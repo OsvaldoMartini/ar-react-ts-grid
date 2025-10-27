@@ -56,8 +56,12 @@ const App: React.FC = () => {
 
         setSocketPort(socketPort);
         setSessionId(sessionIdFromJava);
-        setHomeBanking(homeBanking);
-        setBotJobId(botJobId);
+        if (homeBanking !== -9999) {
+          setHomeBanking(homeBanking);
+        }
+        if (botJobId !== -9999) {
+          setBotJobId(botJobId);
+        }
         setBotJobName(botJobName);
 
         // keep your resets
