@@ -185,8 +185,10 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
           if (detailsData.length === 0) {
             setElementDTO([]);
             setElementGrouped({});
-            setBotJobId(bodyData?.botJobId);
-            setBotJobName(bodyData?.botJobName);
+            if (bodyData?.botJobId !== -9999) {
+              setBotJobId(bodyData?.botJobId);
+              setBotJobName(bodyData?.botJobName);
+            }
           } else {
             setElementDTO(detailsData);
           }
@@ -197,8 +199,10 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
         case "addPickOne": {
           setIsSendingAll(false);
           const newElements = bodyData?.elementDetails;
-          setBotJobId(bodyData?.botJobId);
-          setBotJobName(bodyData?.botJobName);
+          if (bodyData?.botJobId !== -9999) {
+            setBotJobId(bodyData?.botJobId);
+            setBotJobName(bodyData?.botJobName);
+          }
 
           if (newElements && Array.isArray(newElements) && newElements.length > 0) {
             setElementDTO((prevElements) => {
@@ -254,9 +258,16 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
 
         case "activate-running-bot-job": {
           // Optional: if backend returns ids/names, sync them
-          if (typeof bodyData?.botJobId === "number") setBotJobId(bodyData.botJobId);
-          if (typeof bodyData?.homeBankingId === "number") setHomeBankingId(bodyData.homeBankingId);
-          if (typeof bodyData?.botJobName === "string") setBotJobName(bodyData.botJobName);
+          if (typeof bodyData?.botJobId === "number" && bodyData.botJobId !== -9999) {
+            setBotJobId(bodyData.botJobId);
+            if (typeof bodyData?.botJobName === "string") {
+              setBotJobName(bodyData.botJobName);
+            }
+          }
+
+          if (typeof bodyData?.homeBankingId === "number" && bodyData.homeBankingId !== -9999) {
+            setHomeBankingId(bodyData.homeBankingId);
+          }
 
           // Stop the spinner / unlock the button
           setIsBotJobRunning(false);
@@ -512,8 +523,8 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
     const message = {
       type: action,
       homeBankingId: homeBankingId,
-      botJobId: botJobId,
-      botJobName: botJobName,
+      botJobId: selectedJob!.botJobId || botJobId,
+      botJobName: selectedJob!.name || botJobName,
       sessionId: sessionDestine,
       elementDetails: [elementDTO],
     };
