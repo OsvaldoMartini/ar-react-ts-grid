@@ -486,7 +486,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
   ) => {
     event.stopPropagation();
     // ❗ Block if no Bot Job is selected
-    if (action === "NEW_ELEMENT_DTO" && (!selectedJob)) {
+    if (!selectedJob) {
       showSelectJobAlert();
       return;
     }
