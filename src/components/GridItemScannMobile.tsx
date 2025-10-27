@@ -86,6 +86,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
   const [botJobs, setBotJobs] = useState<BotJobLoadDTO[]>([]);
   const [selectedJob, setSelectedJob] = useState<BotJobLoadDTO | null>(null);
   const [isBotJobRunning, setIsBotJobRunning] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleNextBlockPage = (typeElement: string) => {
     setBlockCurrentPages((prev) => ({
@@ -108,7 +109,8 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       setIsSendingDevice(false);
       setIsSendingDiscovery(false);
       setIsSendingScanner(false);
-      setIsBotJobRunning(false); // added
+      setIsBotJobRunning(false);
+      setIsRefreshing(false);
     }, 15000); // 15s fallback
     return () => clearTimeout(t);
   }, [isSendingAll, isSendingDevice, isSendingDiscovery, isSendingScanner]);
@@ -172,6 +174,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
           //   setSelectedJobOption(firstName);
           // }
           setSelectedJob(null);
+          setIsRefreshing(false);
           break;
         }
 
@@ -393,6 +396,27 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
     setErrorFlag(true);
   };
 
+  const refreshBotJobs = () => {
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) return;
+
+    const message = {
+      type: "MOBILE_LOAD_JOBS",
+      homeBankingId: -9999,
+      botJobId: -9999,
+      sessionId: "mobile-perform-list",
+    };
+
+    try {
+      setIsRefreshing(true);
+      webSocket.send(JSON.stringify(message));
+      console.log("📤 Sent refreshBotJobs:", message);
+      setTimeout(() => setIsRefreshing(false), 2000); // brief pulse animation
+    } catch (err) {
+      console.error("❌ Error sending refreshBotJobs:", err);
+      setIsRefreshing(false);
+    }
+  };
+
   const handleLaunchBotJobClick = () => {
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN) return;
     if (!selectedJob) return;
@@ -422,7 +446,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
     console.log("handleSendAllClick: Sending all ElementDTOs");
 
     // ❗ Block if no Bot Job is selected
-    if (!selectedJob || !botJobId || !botJobName) {
+    if (!selectedJob) {
       showSelectJobAlert();
       return;
     }
@@ -461,9 +485,8 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
     action: string
   ) => {
     event.stopPropagation();
-
     // ❗ Block if no Bot Job is selected
-    if (!selectedJob || !botJobId || !botJobName) {
+    if (action === "NEW_ELEMENT_DTO" && (!selectedJob)) {
       showSelectJobAlert();
       return;
     }
@@ -817,34 +840,42 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
         <span className="toolbar-separator" aria-hidden="true" />
 
         {/* ---- combo box + conditional input ---- */}
-        <select
-          className="toolbar-select"
-          value={selectedJob ? String(selectedJob.botJobId ?? selectedJob.id ?? selectedJob.name) : ""}
-          onChange={(e) => {
-            const key = e.target.value;
-            const job = botJobs.find(j => String(j.botJobId ?? j.id ?? j.name) === key) ?? null;
-            setSelectedJob(job);
+        <div className="toolbar-inline">
+          <select
+            className="toolbar-select"
+            value={selectedJob ? String(selectedJob.botJobId ?? selectedJob.id ?? selectedJob.name) : ""}
+            onChange={(e) => {
+              const key = e.target.value;
+              const job = botJobs.find(j => String(j.botJobId ?? j.id ?? j.name) === key) ?? null;
+              setSelectedJob(job);
 
-            // Keep these in sync so all your senders use the selected job automatically
-            setBotJobId(job?.botJobId ?? job?.id ?? null);
-            setBotJobName(job?.name ?? null);
-            if (job?.homeBankingId != null) setHomeBankingId(job.homeBankingId);
-          }}
-          aria-label="Bot Job Presets"
-        >
-          {/* Placeholder */}
-          <option value="">Select a Bot Job</option>
+              setBotJobId(job?.botJobId ?? job?.id ?? null);
+              setBotJobName(job?.name ?? null);
+              if (job?.homeBankingId != null) setHomeBankingId(job.homeBankingId);
+            }}
+            aria-label="Bot Job Presets"
+          >
+            <option value="">Select a Bot Job</option>
+            {botJobs.map(j => (
+              <option
+                key={(j.botJobId ?? j.id ?? j.name) as React.Key}
+                value={String(j.botJobId ?? j.id ?? j.name)}
+              >
+                {j.name}
+              </option>
+            ))}
+          </select>
 
-          {/* Real options */}
-          {botJobs.map(j => (
-            <option
-              key={(j.botJobId ?? j.id ?? j.name) as React.Key}
-              value={String(j.botJobId ?? j.id ?? j.name)}
-            >
-              {j.name}
-            </option>
-          ))}
-        </select>
+          <button
+            type="button"
+            className={`buttons-toolbar ${isRefreshing ? "sending" : ""}`}
+            onClick={refreshBotJobs}
+            title="Refresh bot jobs"
+          >
+            ↻
+          </button>
+        </div>
+
 
 
         <button

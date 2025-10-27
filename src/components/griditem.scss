@@ -580,6 +580,25 @@
   opacity: 0.8;
 }
 
+.toolbar-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.toolbar-refresh-btn {
+  padding: 4px 7px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: #f9f9f9;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.toolbar-refresh-btn:hover {
+  background: #eef;
+}
+
 .selected-attribute {
   margin-top: 10px;
   font-weight: bold;
