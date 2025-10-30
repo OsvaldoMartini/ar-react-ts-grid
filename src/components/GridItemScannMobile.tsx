@@ -143,7 +143,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
     try {
       const parsedMessage = JSON.parse(lastMessage);
 
-      if (typeof parsedMessage.homeBankingId === "number") {
+      if (typeof parsedMessage?.homeBankingId === "number" && parsedMessage.homeBankingId !== -9999) {
         setHomeBankingId(parsedMessage.homeBankingId);
       }
 
@@ -185,6 +185,9 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
           if (detailsData.length === 0) {
             setElementDTO([]);
             setElementGrouped({});
+            if (bodyData?.homeBankingId !== -9999) {
+              setHomeBankingId(bodyData?.homeBankingId);
+            }
             if (bodyData?.botJobId !== -9999) {
               setBotJobId(bodyData?.botJobId);
               setBotJobName(bodyData?.botJobName);
@@ -199,6 +202,9 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
         case "addPickOne": {
           setIsSendingAll(false);
           const newElements = bodyData?.elementDetails;
+          if (bodyData?.homeBankingId !== -9999) {
+            setHomeBankingId(bodyData?.homeBankingId);
+          }
           if (bodyData?.botJobId !== -9999) {
             setBotJobId(bodyData?.botJobId);
             setBotJobName(bodyData?.botJobName);
@@ -258,15 +264,15 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
 
         case "activate-running-bot-job": {
           // Optional: if backend returns ids/names, sync them
+          if (typeof bodyData?.homeBankingId === "number" && bodyData.homeBankingId !== -9999) {
+            setHomeBankingId(bodyData.homeBankingId);
+          }
+
           if (typeof bodyData?.botJobId === "number" && bodyData.botJobId !== -9999) {
             setBotJobId(bodyData.botJobId);
             if (typeof bodyData?.botJobName === "string") {
               setBotJobName(bodyData.botJobName);
             }
-          }
-
-          if (typeof bodyData?.homeBankingId === "number" && bodyData.homeBankingId !== -9999) {
-            setHomeBankingId(bodyData.homeBankingId);
           }
 
           // Stop the spinner / unlock the button
@@ -863,7 +869,9 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
 
               setBotJobId(job?.botJobId ?? job?.id ?? null);
               setBotJobName(job?.name ?? null);
-              if (job?.homeBankingId != null) setHomeBankingId(job.homeBankingId);
+              if (job?.homeBankingId != null && job?.homeBankingId !== -9999) {
+                setHomeBankingId(job.homeBankingId);
+              }
             }}
             aria-label="Bot Job Presets"
           >
