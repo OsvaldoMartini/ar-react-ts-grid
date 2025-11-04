@@ -420,7 +420,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       type: "MOBILE_LOAD_JOBS",
       homeBankingId: -9999,
       botJobId: -9999,
-      sessionId: "mobile-perform-list",
+      sessionId: "mobileScannerGrid",
     };
 
     try {
