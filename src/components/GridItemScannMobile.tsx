@@ -149,7 +149,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
 
       const acceptedSessions = new Set([
         sessionId,
-        "mobileScannerGrid",
+        "mobile-return-server",
       ]);
       if (!acceptedSessions.has(parsedMessage.sessionId)) return;
 
@@ -323,7 +323,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       homeBankingId,
       botJobId,
       botJobName,
-      sessionId: "mobileScannerGrid",
+      sessionId: "mobile-return-server",
     };
 
     try {
@@ -348,7 +348,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       homeBankingId,
       botJobId,
       botJobName,
-      sessionId: "mobileScannerGrid",
+      sessionId: "mobile-return-server",
       appQueryApp,
       appQueryPackage,
     };
@@ -375,7 +375,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       homeBankingId,
       botJobId,
       botJobName,
-      sessionId: "mobileScannerGrid",
+      sessionId: "mobile-return-server",
     };
 
     try {
@@ -420,7 +420,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       type: "MOBILE_LOAD_JOBS",
       homeBankingId: -9999,
       botJobId: -9999,
-      sessionId: "mobileScannerGrid",
+      sessionId: "mobile-return-server",
     };
 
     try {
@@ -445,7 +445,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       homeBankingId,                     // updated from selected job
       botJobId,                          // updated from selected job
       botJobName,                        // updated from selected job
-      sessionId: "mobileScannerGrid",
+      sessionId: "mobile-return-server",
       selectedJobName: selectedJob.name, // optional
     };
 
@@ -483,7 +483,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       homeBankingId: homeBankingId,
       botJobId: botJobId,
       botJobName: botJobName,
-      sessionId: `mobileScannerGrid`,
+      sessionId: `mobile-return-server`,
       elementDetails: allElements,
     };
 
@@ -520,11 +520,11 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
     }
     // const sessionDestine = action === "HOVERED_ROW"
     //   ? `scannerTool-${homeBankingId}`
-    //   : `mobileScannerGrid-${homeBankingId}`;
+    //   : `mobile-return-server-${homeBankingId}`;
 
     const sessionDestine = action === "HOVERED_ROW"
-      ? `mobileScannerGrid`
-      : `mobileScannerGrid`;
+      ? `mobile-return-server`
+      : `mobile-return-server`;
 
     const message = {
       type: action,
