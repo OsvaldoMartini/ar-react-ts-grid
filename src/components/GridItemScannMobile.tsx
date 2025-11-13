@@ -74,7 +74,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
   const [isSendingDiscovery, setIsSendingDiscovery] = useState(false);
   const [isSendingScanner, setIsSendingScanner] = useState(false);
 
-  const [appQueryApp, setappQueryApp] = useState<string>("InLinea");
+  const [appQueryApp, setappQueryApp] = useState<string>("ebanking");
   const [appQueryPackage, setappQueryPackage] = useState<string>("ch.bsct.ebanking.mobile");
   const [appMainActivity, setAppMainActivity] = useState<string>("");
   const [packagesFound, setPackagesFound] = useState<string[]>([]);
