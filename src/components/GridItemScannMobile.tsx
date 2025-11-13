@@ -845,14 +845,14 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
         {/* New text fields */}
         <input
           type="text"
-          className="toolbar-input"
+          className="toolbar-input input-app-name"
           placeholder="eBanking"
           value={appQueryApp}
           onChange={(e) => setappQueryApp(e.target.value)}
         />
         {packagesFound.length > 0 ? (
           <select
-            className="toolbar-input"
+            className="toolbar-input select-package-name"
             value={appQueryPackage}
             onChange={(e) => setappQueryPackage(e.target.value)}
           >
@@ -866,7 +866,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
         ) : (
           <input
             type="text"
-            className="toolbar-input"
+            className="toolbar-input input-package-name"
             placeholder="ch.bsct.ebanking.mobile"
             value={appQueryPackage}
             onChange={(e) => setappQueryPackage(e.target.value)}

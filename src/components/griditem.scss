@@ -556,6 +556,7 @@
 
 /* combobox styling in the toolbar */
 .toolbar-select {
+  width: 180px;
   padding: 6px 10px;
   border: 1px solid #c0c0c0;
   border-radius: 5px;
@@ -597,6 +598,19 @@
 
 .toolbar-refresh-btn:hover {
   background: #eef;
+}
+
+/* Custom widths for new input fields */
+.input-app-name {
+  width: 180px !important;
+}
+
+.select-package-name {
+  width: 180px !important;
+}
+
+.input-package-name {
+  width: 180px !important;
 }
 
 .selected-attribute {
