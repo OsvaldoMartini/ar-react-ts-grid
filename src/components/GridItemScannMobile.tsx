@@ -79,6 +79,11 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
   const [appMainActivity, setAppMainActivity] = useState<string>("");
   const [packagesFound, setPackagesFound] = useState<string[]>([]);
 
+  // --- ⬇⬇ PLACE IT HERE ⬇⬇ ---
+  const isPackageSelectionRequired =
+    packagesFound.length > 0 &&
+    (!appQueryPackage || appQueryPackage.trim() === "");
+
   // GridItemScannMobile.tsx
   const elementDTORef = useRef<HTMLInputElement>(null);
 
@@ -832,7 +837,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
         <button
           className={`buttons-toolbar ${isSendingDevice ? 'sending' : ''}`}
           onClick={handleConnectDeviceClick}
-          disabled={isSendingDevice}
+          disabled={isSendingDevice || isPackageSelectionRequired}
         >
           {isSendingDevice ? 'Connecting…' : 'Connect Device'}
         </button>
@@ -841,18 +846,17 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
         <input
           type="text"
           className="toolbar-input"
-          placeholder="InLinea"
+          placeholder="eBanking"
           value={appQueryApp}
           onChange={(e) => setappQueryApp(e.target.value)}
         />
         {packagesFound.length > 0 ? (
-          // 🔽 SHOW DROPDOWN WHEN PACKAGES FOUND
           <select
             className="toolbar-input"
             value={appQueryPackage}
             onChange={(e) => setappQueryPackage(e.target.value)}
           >
-            <option value="">Select package</option>
+            <option value="">Select package...</option>
             {packagesFound.map((pkg) => (
               <option key={pkg} value={pkg}>
                 {pkg}
@@ -860,7 +864,6 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
             ))}
           </select>
         ) : (
-          // 🔤 DEFAULT TEXT INPUT
           <input
             type="text"
             className="toolbar-input"
@@ -881,7 +884,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
         <button
           className={`buttons-toolbar ${isSendingScanner ? 'sending' : ''}`}
           onClick={handleScannAppClick}
-          disabled={isSendingScanner}
+          disabled={isSendingScanner || isPackageSelectionRequired}
         >
           {isSendingScanner ? 'Scanning…' : 'Scanner App'}
         </button>
