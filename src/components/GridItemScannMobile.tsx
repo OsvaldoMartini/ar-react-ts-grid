@@ -76,6 +76,9 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
 
   const [appQueryApp, setappQueryApp] = useState<string>("InLinea");
   const [appQueryPackage, setappQueryPackage] = useState<string>("ch.bsct.ebanking.mobile");
+  const [appMainActivity, setAppMainActivity] = useState<string>("");
+  const [packagesFound, setPackagesFound] = useState<string[]>([]);
+
   // GridItemScannMobile.tsx
   const elementDTORef = useRef<HTMLInputElement>(null);
 
@@ -255,6 +258,24 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
         }
         case "activate-discovery-app": {
           setIsSendingDiscovery(false);
+          const splitDTO = bodyData.splitDTO;
+          if (!splitDTO) return;
+
+          // --- SET MAIN ACTIVITY (if backend sent it) ---
+          if (splitDTO.appMainActivity) {
+            setAppMainActivity(splitDTO.appMainActivity);
+          }
+
+          // --- SET MAIN PACKAGE ---
+          if (splitDTO.appQueryPackage) {
+            setappQueryPackage(splitDTO.appQueryPackage);
+          }
+
+          // --- SET DROPDOWN LIST ---
+          if (Array.isArray(splitDTO.packagesFound)) {
+            setPackagesFound(splitDTO.packagesFound);
+          }
+
           break;
         }
         case "activate-scanner-app": {
@@ -324,6 +345,9 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       botJobId,
       botJobName,
       sessionId: "mobile-return-server",
+      appQueryApp,        // e.g. "InLinea"
+      appQueryPackage,    // e.g. "ch.bsct.ebanking.mobile" or dropdown selection
+      appMainActivity
     };
 
     try {
@@ -821,18 +845,35 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
           value={appQueryApp}
           onChange={(e) => setappQueryApp(e.target.value)}
         />
-        <input
-          type="text"
-          className="toolbar-input"
-          placeholder="ch.bsct.ebanking.mobile"
-          value={appQueryPackage}
-          onChange={(e) => setappQueryPackage(e.target.value)}
-        />
+        {packagesFound.length > 0 ? (
+          // 🔽 SHOW DROPDOWN WHEN PACKAGES FOUND
+          <select
+            className="toolbar-input"
+            value={appQueryPackage}
+            onChange={(e) => setappQueryPackage(e.target.value)}
+          >
+            <option value="">Select package</option>
+            {packagesFound.map((pkg) => (
+              <option key={pkg} value={pkg}>
+                {pkg}
+              </option>
+            ))}
+          </select>
+        ) : (
+          // 🔤 DEFAULT TEXT INPUT
+          <input
+            type="text"
+            className="toolbar-input"
+            placeholder="ch.bsct.ebanking.mobile"
+            value={appQueryPackage}
+            onChange={(e) => setappQueryPackage(e.target.value)}
+          />
+        )}
 
         <button
           className={`buttons-toolbar ${isSendingDiscovery ? 'sending' : ''}`}
           onClick={handleDiscoveryAppClick}
-          disabled={isButtonDisabled || isSendingDiscovery} // disabled by default
+          disabled={isSendingDiscovery} // disabled by default
         >
           {isSendingDiscovery ? 'Discovering…' : 'Discovery App'}
         </button>
