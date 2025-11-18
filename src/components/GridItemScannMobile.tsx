@@ -112,7 +112,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
   };
 
   useEffect(() => {
-    if (!isSendingAll && !isSendingDevice && !isSendingDiscovery && !isSendingScanner) return;
+    if (!isSendingAll && !isSendingDevice && !isSendingDiscovery && !isSendingScanner && !isSendingScannerAI && !isBotJobRunning) return;
     const t = setTimeout(() => {
       setIsSendingAll(false);
       setIsSendingDevice(false);
@@ -123,7 +123,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       setIsRefreshing(false);
     }, 15000); // 15s fallback
     return () => clearTimeout(t);
-  }, [isSendingAll, isSendingDevice, isSendingDiscovery, isSendingScanner]);
+  }, [isSendingAll, isSendingDevice, isSendingDiscovery, isSendingScanner, isSendingScannerAI, isBotJobRunning]);
 
   useEffect(() => {
     const newBlockPages: Record<string, number> = {};
@@ -926,7 +926,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
           onClick={handleScannAIAppClick}
           disabled={isSendingScannerAI || isPackageSelectionRequired}
         >
-          {isSendingScanner ? 'Scanning…' : 'Scanner AI'}
+          {isSendingScannerAI ? 'Scanning…' : 'Scanner AI'}
         </button>
 
         <button
