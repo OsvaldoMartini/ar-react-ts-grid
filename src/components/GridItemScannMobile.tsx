@@ -73,6 +73,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
   const [isButtonDisabled, setIsButtonDisabled] = useState(true); // disabled by default
   const [isSendingDiscovery, setIsSendingDiscovery] = useState(false);
   const [isSendingScanner, setIsSendingScanner] = useState(false);
+  const [isSendingScannerAI, setIsSendingScannerAI] = useState(false);
 
   const [appQueryApp, setappQueryApp] = useState<string>("ebanking");
   const [appQueryPackage, setappQueryPackage] = useState<string>("ch.bsct.ebanking.mobile");
@@ -117,6 +118,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       setIsSendingDevice(false);
       setIsSendingDiscovery(false);
       setIsSendingScanner(false);
+      setIsSendingScannerAI(false);
       setIsBotJobRunning(false);
       setIsRefreshing(false);
     }, 15000); // 15s fallback
@@ -288,6 +290,11 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
           break;
         }
 
+        case "activate-vision-scanner": {
+          setIsSendingScannerAI(false);
+          break;
+        }
+
         case "activate-running-bot-job": {
           // Optional: if backend returns ids/names, sync them
           if (typeof bodyData?.homeBankingId === "number" && bodyData.homeBankingId !== -9999) {
@@ -413,6 +420,31 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
     } catch (err) {
       console.error("❌ Error sending SCANNER_APP:", err);
       setIsSendingScanner(false);
+    }
+  };
+
+  const handleScannAIAppClick = () => {
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
+      console.warn("🚨 WebSocket is not connected. Cannot send message.");
+      return;
+    }
+
+    setIsSendingScannerAI(true);
+
+    const message = {
+      type: "SCANNER_APP_VISION",
+      homeBankingId,
+      botJobId,
+      botJobName,
+      sessionId: "mobile-return-server",
+    };
+
+    try {
+      webSocket.send(JSON.stringify(message));
+      console.log("📤 Sent SCANNER_APP_VISION:", message);
+    } catch (err) {
+      console.error("❌ Error sending SCANNER_APP_VISION:", err);
+      setIsSendingScannerAI(false);
     }
   };
 
@@ -886,7 +918,15 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
           onClick={handleScannAppClick}
           disabled={isSendingScanner || isPackageSelectionRequired}
         >
-          {isSendingScanner ? 'Scanning…' : 'Scanner App'}
+          {isSendingScanner ? 'Scanning…' : 'Scanner'}
+        </button>
+
+        <button
+          className={`buttons-toolbar ${isSendingScanner ? 'sending' : ''}`}
+          onClick={handleScannAIAppClick}
+          disabled={isSendingScannerAI || isPackageSelectionRequired}
+        >
+          {isSendingScanner ? 'Scanning…' : 'Scanner AI'}
         </button>
 
         <button
