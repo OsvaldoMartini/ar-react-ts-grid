@@ -110,6 +110,33 @@
   
 }
 
+.scroll-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;                /* Space between label & icon */
+  cursor: pointer;
+  margin-bottom: 4px;
+}
+
+.scroll-toggle-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.scroll-toggle-label {
+  font-size: 10px;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.scroll-toggle-label-active {
+  color: #0f9d58; /* green */
+}
+
+.scroll-toggle-label-inactive {
+  color: #d93025; /* red */
+}
+
 // .active-button{
 //   width: 20px;
 //   height: 20px;
@@ -406,58 +433,46 @@
   display: inline-block; /* Ensure the span behaves as a block but allows space for the next element */
 }
 
-.attributes-button {
+.toolbar-main-button {
   background-color: #c3d3d9 !important;
   color: #0b5394;
   border: none;
-  padding: 8px 16px;
+  padding: 5px 13px;
   border-radius: 5px;
   cursor: pointer;
   transition: background-color 0.3s ease, transform 0.2s ease;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: bold;
   white-space: nowrap;
 }
 
-.attributes-button:hover {
-  background-color: #a9bec7 !important;
-  transform: scale(1.05);
+.attributes-button {
+  @extend .toolbar-main-button;
 }
-
 
 .send-all-button {
-  background-color: #c3d3d9 !important;
-  color: #0b5394; /* dark blue text */
-  border: none;
-  padding: 8px 16px;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: background-color 0.3s ease, transform 0.2s ease;
-  font-size: 12px;
-  font-weight: bold;
-  white-space: nowrap;
+  @extend .toolbar-main-button;
 }
 
+.attributes-button:hover,
 .send-all-button:hover {
   background-color: #a9bec7 !important;
   transform: scale(1.05);
 }
 
-/* When isSending = true */
-.send-all-button.sending {
-  background-color: #4caf50 !important; /* yellow */
-  color: #0b5394 !important; /* dark blue text */
+.send-all-button.sending,
+.attributes-button.sending {
+  background-color: #4caf50 !important;
+  color: #0b5394 !important;
   animation: pulseBg 2s infinite;
   box-shadow: 0 0 10px #4caf50;
 }
 
-/* Disabled state for toolbar buttons */
-.send-all-button:disabled {
+.send-all-button:disabled,
+.attributes-button:disabled {
   background-color: #cccccc;
   color: #7a7a7a;
   cursor: not-allowed;
-  box-shadow: none;
-  transform: none;
   opacity: 0.7;
 }
 
@@ -466,12 +481,12 @@
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 14px; /* ↑ increased spacing between buttons & inputs */
-  margin-top: 10px;
-  margin-bottom: 5px;
+  gap: 6px; /* ↑ increased spacing between buttons & inputs */
+  margin-top: 4px;
+  margin-bottom: 2px;
   font-size: 12px;
   border-bottom: 1px solid #c0c0c0;
-  padding-bottom: 8px;
+  padding-bottom: 4px;
   width: 100%;
 }
 
@@ -481,11 +496,11 @@
   background-color: #c3d3d9 !important;
   color: #0b5394;
   border: none;
-  padding: 7px 18px; /* slightly wider button */
+  padding: 5px 12px; /* slightly wider button */
   border-radius: 5px;
   cursor: pointer;
   transition: background-color 0.3s ease, transform 0.2s ease;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: bold;
   white-space: nowrap;
 }
@@ -539,7 +554,7 @@
 
 /* Add subtle extra space after input fields */
 .toolbar-input + .buttons-toolbar {
-  margin-left: 4px;
+  margin-left: 1px;
 }
 
 .toolbar-input:focus {
@@ -552,7 +567,7 @@
   height: 24px;              /* matches your 12px font & button height nicely */
   background-color: #c0c0c0; /* same tone as your border */
   display: inline-block;
-  margin: 0 6px;
+  margin: 0 3px;
 }
 
 /* combobox styling in the toolbar */
@@ -585,7 +600,7 @@
 .toolbar-inline {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .toolbar-refresh-btn {

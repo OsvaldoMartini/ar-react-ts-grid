@@ -12,6 +12,9 @@ import outPutImage from "../assets/output1.png";
 import testInputImage from "../assets/testInput.png";
 import clickTestImage from "../assets/clickTest2.png";
 import warningRedImage from '../assets/warning_red.png';
+import activeImage from '../assets/active3.png';
+import inactiveImage from '../assets/inactive2.png';
+
 import AlertModal from './AlertModal';
 import { useWebSocket } from './useWebSocket';
 import AttributeDropdown from './AttributeDropdown';
@@ -557,6 +560,36 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
     }
   };
 
+  const handleActiveDeviceScroll = (
+    event: React.MouseEvent<HTMLDivElement, MouseEvent>,
+    targetElement: ElementDTO
+  ) => {
+    event.stopPropagation();
+
+    // ❗ Block if no Bot Job is selected
+    // if (!selectedJob) {
+    //   showSelectJobAlert();
+    //   return;
+    // }
+
+    // Toggle logic: if already "scroll-active", clear it, otherwise set it
+    setElementDTO((prevElements) =>
+      prevElements.map((el) =>
+        el.id === targetElement.id
+          ? {
+            ...el,
+            searchAttributeValue:
+              el.searchAttributeValue === 'scroll-active' ? '' : 'scroll-active',
+          }
+          : el
+      )
+    );
+
+    // force regroup if you rely on searchAttributeValue for grouping later
+    setIsElementGrouped(false);
+  };
+
+
   const handleRowSelectedClick = (
     event: React.MouseEvent<HTMLDivElement, MouseEvent>,
     elementDTO: ElementDTO,
@@ -922,7 +955,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
         </button>
 
         <button
-          className={`buttons-toolbar ${isSendingScanner ? 'sending' : ''}`}
+          className={`buttons-toolbar ${isSendingScannerAI ? 'sending' : ''}`}
           onClick={handleScannAIAppClick}
           disabled={isSendingScannerAI || isPackageSelectionRequired}
         >
@@ -1115,7 +1148,32 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
                         <span>{"\u00A0".repeat(20)}</span>
                       )}
                       <div className="options-column">
-                        <img src={pickItemImage} alt="" className="pick-button" onClick={(event) => handleRowSelectedClick(event, elementDTO, "DETAILS_ELEMENT_DTO")} />
+                        {/* Scrollable toggle (above) */}
+                        <div
+                          className="scroll-toggle"
+                          onClick={(event) => handleActiveDeviceScroll(event, elementDTO)}
+                        >
+                          <span
+                            className={
+                              elementDTO.searchAttributeValue === 'scroll-active'
+                                ? 'scroll-toggle-label scroll-toggle-label-active'
+                                : 'scroll-toggle-label scroll-toggle-label-inactive'
+                            }
+                          >
+                            Scrollable
+                          </span>
+
+                          <img
+                            src={
+                              elementDTO.searchAttributeValue === 'scroll-active'
+                                ? activeImage
+                                : inactiveImage
+                            }
+                            alt="scrollable toggle"
+                            className="scroll-toggle-icon"
+                          />
+                        </div>
+                        {/* <img src={pickItemImage} alt="" className="pick-button" onClick={(event) => handleRowSelectedClick(event, elementDTO, "DETAILS_ELEMENT_DTO")} /> */}
                         {renderEditButton(
                           elementDTO,
                           editImage
