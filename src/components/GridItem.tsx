@@ -3236,6 +3236,30 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                                   )}
                                   {renderOperations(instruction, instructionsData)}
                                   <div className="options-column">
+                                    {instruction.defaultValue === 'scroll-active' && (
+                                      <div className="scroll-toggle">
+                                        <span
+                                          className={
+                                            instruction.defaultValue === 'scroll-active'
+                                              ? 'scroll-toggle-label scroll-toggle-label-active'
+                                              : 'scroll-toggle-label scroll-toggle-label-inactive'
+                                          }
+                                        >
+                                          auto scroll
+                                        </span>
+
+                                        <img
+                                          src={
+                                            instruction.defaultValue === 'scroll-active'
+                                              ? activeImage
+                                              : inactiveImage
+                                          }
+                                          alt="scrollable toggle"
+                                          className="scroll-toggle-icon"
+                                        />
+                                      </div>
+                                    )}
+
                                     <div className="move-buttons">
                                       {renderEditButton(
                                         instruction.actions,

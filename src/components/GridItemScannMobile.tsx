@@ -1149,7 +1149,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
                       )}
                       <div className="options-column">
                         {/* Scrollable toggle (above) */}
-                        <div
+                        {elementDTO.searchAttributeValue === 'scroll-active' && (<div
                           className="scroll-toggle"
                           onClick={(event) => handleActiveDeviceScroll(event, elementDTO)}
                         >
@@ -1160,7 +1160,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
                                 : 'scroll-toggle-label scroll-toggle-label-inactive'
                             }
                           >
-                            Scrollable
+                            auto scroll
                           </span>
 
                           <img
@@ -1173,6 +1173,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
                             className="scroll-toggle-icon"
                           />
                         </div>
+                        )}
                         {/* <img src={pickItemImage} alt="" className="pick-button" onClick={(event) => handleRowSelectedClick(event, elementDTO, "DETAILS_ELEMENT_DTO")} /> */}
                         {renderEditButton(
                           elementDTO,

@@ -23,6 +23,7 @@ export interface BlockLoopInstructionLoadDTO {
   loopOnly?: boolean;
   variableId?: number;
   parentBlockId?: number;
+  defaultValue?: string
 }
 
 
