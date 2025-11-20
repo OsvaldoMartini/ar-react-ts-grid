@@ -82,6 +82,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
   const [appQueryPackage, setappQueryPackage] = useState<string>("ch.bsct.ebanking.mobile");
   const [appMainActivity, setAppMainActivity] = useState<string>("");
   const [packagesFound, setPackagesFound] = useState<string[]>([]);
+  const [scrollStep, setScrollStep] = useState<number>(0);
 
   // --- ⬇⬇ PLACE IT HERE ⬇⬇ ---
   const isPackageSelectionRequired =
@@ -440,6 +441,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       botJobId,
       botJobName,
       sessionId: "mobile-return-server",
+      scrollTimes: scrollStep
     };
 
     try {
@@ -945,7 +947,6 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
         >
           {isSendingDiscovery ? 'Discovering…' : 'Discovery App'}
         </button>
-
         <button
           className={`buttons-toolbar ${isSendingScanner ? 'sending' : ''}`}
           onClick={handleScannAppClick}
@@ -953,15 +954,34 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
         >
           {isSendingScanner ? 'Scanning…' : 'Scanner'}
         </button>
+        <div className="scanner-group">
 
-        <button
-          className={`buttons-toolbar ${isSendingScannerAI ? 'sending' : ''}`}
-          onClick={handleScannAIAppClick}
-          disabled={isSendingScannerAI || isPackageSelectionRequired}
-        >
-          {isSendingScannerAI ? 'Scanning…' : 'Scanner AI'}
-        </button>
+          <button
+            className={`buttons-toolbar ${isSendingScannerAI ? 'sending' : ''}`}
+            onClick={handleScannAIAppClick}
+            disabled={isSendingScannerAI || isPackageSelectionRequired}
+          >
+            {isSendingScannerAI ? 'Scanning…' : 'Scanner AI'}
+          </button>
+          <div className="scroll-select-group">
+            <span className="scroll-label">Scrolling</span>
 
+            <select
+              className="scroll-select"
+              value={scrollStep}
+              onChange={(e) => setScrollStep(Number(e.target.value))}
+              title="Scroll step for auto-scroll"
+            >
+              <option value={0}>no scroll</option>
+              <option value={1}>scroll 01</option>
+              <option value={5}>scroll 05</option>
+              <option value={10}>scroll 10</option>
+              <option value={20}>scroll 20</option>
+              <option value={30}>scroll 30</option>
+              <option value={50}>scroll 50</option>
+            </select>
+          </div>
+        </div>
         <button
           className="buttons-toolbar danger"
           onClick={handleClearDataClick}
@@ -1149,7 +1169,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
                       )}
                       <div className="options-column">
                         {/* Scrollable toggle (above) */}
-                        {elementDTO.searchAttributeValue === 'scroll-active' && (<div
+                        <div
                           className="scroll-toggle"
                           onClick={(event) => handleActiveDeviceScroll(event, elementDTO)}
                         >
@@ -1173,7 +1193,6 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
                             className="scroll-toggle-icon"
                           />
                         </div>
-                        )}
                         {/* <img src={pickItemImage} alt="" className="pick-button" onClick={(event) => handleRowSelectedClick(event, elementDTO, "DETAILS_ELEMENT_DTO")} /> */}
                         {renderEditButton(
                           elementDTO,
