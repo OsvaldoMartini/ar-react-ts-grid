@@ -570,17 +570,14 @@
   margin: 0 3px;
 }
 
-/* combobox styling in the toolbar */
 .toolbar-select {
-  width: 180px;
-  padding: 6px 10px;
+  width: 130px;          /* narrower */
+  padding: 3px 6px;      /* minimal height */
   border: 1px solid #c0c0c0;
-  border-radius: 5px;
-  font-size: 12px;
+  border-radius: 4px;
+  font-size: 11px;       /* slightly smaller font */
   color: #0b5394;
   background-color: #f5f8fa;
-  outline: none;
-  transition: border-color 0.2s ease;
   cursor: pointer;
   white-space: nowrap;
 
@@ -588,6 +585,7 @@
     border-color: #0b5394;
   }
 }
+
 
 /* disabled look for the newBotJobName input when preset is not "Create New Bot jOb" */
 .toolbar-input:disabled {
@@ -618,7 +616,7 @@
 
 /* Custom widths for new input fields */
 .input-app-name {
-  width: 180px !important;
+  width: 130px !important;
 }
 
 .select-package-name {
