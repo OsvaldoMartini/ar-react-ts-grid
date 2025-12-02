@@ -943,7 +943,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
         <button
           className={`buttons-toolbar ${isSendingDiscovery ? 'sending' : ''}`}
           onClick={handleDiscoveryAppClick}
-          disabled={isSendingDiscovery} // disabled by default
+          disabled={isSendingDiscovery}
         >
           {isSendingDiscovery ? 'Discovering…' : 'Discovery App'}
         </button>
@@ -954,8 +954,8 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
         >
           {isSendingScanner ? 'Scanning…' : 'Scanner'}
         </button>
-        <div className="scanner-group">
 
+        <div className="scanner-group">
           <button
             className={`buttons-toolbar ${isSendingScannerAI ? 'sending' : ''}`}
             onClick={handleScannAIAppClick}
@@ -982,6 +982,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
             </select>
           </div>
         </div>
+
         <button
           className="buttons-toolbar danger"
           onClick={handleClearDataClick}
@@ -994,7 +995,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
         {/* ---- vertical separator ---- */}
         <span className="toolbar-separator" aria-hidden="true" />
 
-        {/* ---- combo box + conditional input ---- */}
+        {/* ---- combo box + refresh ---- */}
         <div className="toolbar-inline">
           <select
             className="toolbar-select"
@@ -1033,23 +1034,19 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
           </button>
         </div>
 
-
-
         <button
           className={`buttons-toolbar ${isBotJobRunning ? 'sending' : ''}`}
           onClick={handleLaunchBotJobClick}
-          disabled={isBotJobRunning || !selectedJob}  // prevent launch without a selection
+          disabled={isBotJobRunning || !selectedJob}
         >
           {isBotJobRunning ? 'Running…' : 'Launch Test'}
         </button>
-
-
       </div>
 
-      {/* NEW: scrollable area for the grid */}
-      <div className="grid-content">
-        {elementDTO.length === 0 ? (
-          // No data message (as before)
+      {/* === BELOW TOOLBAR === */}
+      {elementDTO.length === 0 ? (
+        // Empty state uses the scrollable area too
+        <div className="grid-content">
           <div className="block">
             <div className="block-header color-component2">Scanned Web Elements</div>
             <div className="instruction-item"> </div>
@@ -1057,37 +1054,42 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
               <div className="no-data-message">No data found</div>
             </div>
           </div>
-        ) : (
-          <>
-            {/* Toggle Button and Pagination Controls on the same row */}
-            <div className="controls-row">
-              <button
-                className={`send-all-button ${isSendingAll ? 'sending' : ''}`}
-                onClick={handlesSendAllClick}
-                disabled={isSendingAll || !selectedJob}
+        </div>
+      ) : (
+        <>
+          {/* SECOND FIXED ROW: Insert All / Attributes / Pagination */}
+          <div className="controls-row fixed-controls-row">
+            <button
+              className={`send-all-button ${isSendingAll ? 'sending' : ''}`}
+              onClick={handlesSendAllClick}
+              disabled={isSendingAll || !selectedJob}
+            >
+              {isSendingAll ? 'Sending...' : 'Insert All Elements'}
+            </button>
+
+            <button
+              className="attributes-button"
+              onClick={() => setShowAttributes(!showAttributes)}
+            >
+              {showAttributes ? 'Hide Attributes' : 'Show Attributes'}
+            </button>
+
+            <div className="pagination-controls">
+              <label>Rows per page: </label>
+              <select
+                value={blockRowsPerPage}
+                onChange={(e) => setBlockRowsPerPage(Number(e.target.value))}
               >
-                {isSendingAll ? 'Sending...' : 'Insert All Elements'}
-              </button>
-
-              <button className="attributes-button" onClick={() => setShowAttributes(!showAttributes)}>
-                {showAttributes ? 'Hide Attributes' : 'Show Attributes'}
-              </button>
-              <div className="pagination-controls">
-                <label>Rows per page: </label>
-                <select
-                  value={blockRowsPerPage}
-                  onChange={(e) => {
-                    setBlockRowsPerPage(Number(e.target.value));
-                  }}
-                >
-                  <option value={5}>5</option>
-                  <option value={10}>10</option>
-                  <option value={20}>20</option>
-                  <option value={50}>50</option>
-                </select>
-              </div>
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+              </select>
             </div>
+          </div>
 
+          {/* SCROLLABLE GRID ONLY */}
+          <div className="grid-content">
             {Object.entries(elementGrouped).map(([typeElement, elementData], index) => {
               const currentPage = blockCurrentPages[typeElement] || 1;
               const totalPages = blockPages[typeElement] || 1;
@@ -1104,73 +1106,83 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
                       <span className="block-name">{getInstructionTypeElement(typeElement)}</span>
                       <span className="block-count">({elementData.elements.length})</span>
                     </div>
+
                     {elementData.elements.length > blockRowsPerPage && (
                       <div className="bottom-pagination-controls">
-                        <button disabled={currentPage === 1} onClick={() => handlePrevBlockPage(typeElement)}>
+                        <button
+                          disabled={currentPage === 1}
+                          onClick={() => handlePrevBlockPage(typeElement)}
+                        >
                           Prev
                         </button>
                         <span>
                           Page {currentPage} of {totalPages}
                         </span>
-                        <button disabled={currentPage === totalPages} onClick={() => handleNextBlockPage(typeElement)}>
+                        <button
+                          disabled={currentPage === totalPages}
+                          onClick={() => handleNextBlockPage(typeElement)}
+                        >
                           Next
                         </button>
                       </div>
                     )}
+
                     <img
                       src={crossImage}
                       alt="Remove Block"
                       className="cross-button"
                       onClick={() => handleRemoveRowsBlock(typeElement)}
                     />
-
                   </div>
+
                   <div className="instructions-list">
                     {paginatedElements.map((elementDTO, i) => (
-                      <div key={i}
+                      <div
+                        key={i}
                         className="instruction-item"
                         onMouseEnter={() => handleRowHover(elementDTO)}
                         onMouseLeave={handleRowLeave}
-                      // onDoubleClick={(event) => handleRowSelectedClick(event, elementDTO, "NEW_ELEMENT_DTO")}
-                      // onClick={(event) => handleRowSelectedClick(event, elementDTO, "DETAILS_ELEMENT_DTO")}
                       >
-                        {editingElementId === elementDTO.xPath && editingElementTagName === elementDTO.tagName ? (
+                        {editingElementId === elementDTO.xPath &&
+                          editingElementTagName === elementDTO.tagName ? (
                           <div className="edit-container">
                             <input
                               type="text"
                               value={elementName}
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter') {
-                                  handleSaveInstruction(elementDTO); // Trigger save when "Enter" is pressed
+                                  handleSaveInstruction(elementDTO);
                                 }
                               }}
-                              onChange={(e) => {
-                                console.log(e.target.value);
-                                setElementName(e.target.value);
-                              }}
-                              ref={elementDTORef} // Associate the ref with the input element
+                              onChange={(e) => setElementName(e.target.value)}
+                              ref={elementDTORef}
                               className="edit-textbox"
                             />
                             <img
                               src={saveImage}
                               alt="save"
                               className="save-button"
-                              onClick={() =>
-                                handleSaveInstruction(elementDTO)
-                              } // Save instruction logic
+                              onClick={() => handleSaveInstruction(elementDTO)}
                             />
                           </div>
                         ) : (
-                          <span className="instruction-line">{getInstructionElement(elementDTO)}</span>)}
+                          <span className="instruction-line">
+                            {getInstructionElement(elementDTO)}
+                          </span>
+                        )}
+
                         {showAttributes ? (
                           <div>
-                            <AttributeDropdown dataArray={elementDTO.attributeData} onChange={handleAttributeChange} />
+                            <AttributeDropdown
+                              dataArray={elementDTO.attributeData}
+                              onChange={handleAttributeChange}
+                            />
                           </div>
                         ) : (
                           <span>{"\u00A0".repeat(20)}</span>
                         )}
+
                         <div className="options-column">
-                          {/* Scrollable toggle (above) */}
                           <div
                             className="scroll-toggle"
                             onClick={(event) => handleActiveDeviceScroll(event, elementDTO)}
@@ -1195,15 +1207,38 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
                               className="scroll-toggle-icon"
                             />
                           </div>
-                          {/* <img src={pickItemImage} alt="" className="pick-button" onClick={(event) => handleRowSelectedClick(event, elementDTO, "DETAILS_ELEMENT_DTO")} /> */}
-                          {renderEditButton(
-                            elementDTO,
-                            editImage
-                          )}
-                          <img src={saveImage} alt="" className="save-button" onClick={(event) => handleRowSelectedClick(event, elementDTO, "NEW_ELEMENT_DTO")} />
-                          <img src={testInputImage} alt="" className="test-button" onClick={(event) => handleRowSelectedClick(event, elementDTO, "TEST_INPUT_DTO")} />
-                          <img src={clickTestImage} alt="" className="test-button" onClick={(event) => handleRowSelectedClick(event, elementDTO, "TEST_CLICK_DTO")} />
-                          <img src={crossImage} alt="" className="cross-button" onClick={() => handleRemoveElementDTO(elementDTO)} />
+
+                          {renderEditButton(elementDTO, editImage)}
+                          <img
+                            src={saveImage}
+                            alt=""
+                            className="save-button"
+                            onClick={(event) =>
+                              handleRowSelectedClick(event, elementDTO, "NEW_ELEMENT_DTO")
+                            }
+                          />
+                          <img
+                            src={testInputImage}
+                            alt=""
+                            className="test-button"
+                            onClick={(event) =>
+                              handleRowSelectedClick(event, elementDTO, "TEST_INPUT_DTO")
+                            }
+                          />
+                          <img
+                            src={clickTestImage}
+                            alt=""
+                            className="test-button"
+                            onClick={(event) =>
+                              handleRowSelectedClick(event, elementDTO, "TEST_CLICK_DTO")
+                            }
+                          />
+                          <img
+                            src={crossImage}
+                            alt=""
+                            className="cross-button"
+                            onClick={() => handleRemoveElementDTO(elementDTO)}
+                          />
                         </div>
                       </div>
                     ))}
@@ -1211,9 +1246,9 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
                 </div>
               );
             })}
-          </>
-        )}
-      </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };
