@@ -416,6 +416,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       botJobId,
       botJobName,
       sessionId: "mobile-return-server",
+      scrollTimes: scrollStep
     };
 
     try {
