@@ -259,6 +259,15 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
           break;
         }
 
+        case "activate-all-buttons": {
+          setIsSendingAll(false);
+          setIsSendingDevice(false);
+          setIsSendingDiscovery(false);
+          setIsSendingScanner(false);
+          setIsSendingScannerAI(false);
+          setIsBotJobRunning(false);
+          break;
+        }
         case "activate-insert-all": {
           setIsSendingAll(false);
           break;
