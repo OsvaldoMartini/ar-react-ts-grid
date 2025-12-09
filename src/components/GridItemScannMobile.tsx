@@ -76,13 +76,13 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
   const [isButtonDisabled, setIsButtonDisabled] = useState(true); // disabled by default
   const [isSendingDiscovery, setIsSendingDiscovery] = useState(false);
   const [isSendingScanner, setIsSendingScanner] = useState(false);
-  const [isSendingScannerAI, setIsSendingScannerAI] = useState(false);
 
   const [appQueryApp, setappQueryApp] = useState<string>("ebanking");
   const [appQueryPackage, setappQueryPackage] = useState<string>("ch.bsct.ebanking.mobile");
   const [appMainActivity, setAppMainActivity] = useState<string>("");
   const [packagesFound, setPackagesFound] = useState<string[]>([]);
   const [scrollStep, setScrollStep] = useState<number>(0);
+  const [scannerType, setScannerType] = useState<string>("UiAutomator2");
 
   // --- ⬇⬇ PLACE IT HERE ⬇⬇ ---
   const isPackageSelectionRequired =
@@ -116,18 +116,17 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
   };
 
   useEffect(() => {
-    if (!isSendingAll && !isSendingDevice && !isSendingDiscovery && !isSendingScanner && !isSendingScannerAI && !isBotJobRunning) return;
+    if (!isSendingAll && !isSendingDevice && !isSendingDiscovery && !isSendingScanner && !isSendingScanner && !isBotJobRunning) return;
     const t = setTimeout(() => {
       setIsSendingAll(false);
       setIsSendingDevice(false);
       setIsSendingDiscovery(false);
       setIsSendingScanner(false);
-      setIsSendingScannerAI(false);
       setIsBotJobRunning(false);
       setIsRefreshing(false);
     }, 15000); // 15s fallback
     return () => clearTimeout(t);
-  }, [isSendingAll, isSendingDevice, isSendingDiscovery, isSendingScanner, isSendingScannerAI, isBotJobRunning]);
+  }, [isSendingAll, isSendingDevice, isSendingDiscovery, isSendingScanner, isSendingScanner, isBotJobRunning]);
 
   useEffect(() => {
     const newBlockPages: Record<string, number> = {};
@@ -264,7 +263,6 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
           setIsSendingDevice(false);
           setIsSendingDiscovery(false);
           setIsSendingScanner(false);
-          setIsSendingScannerAI(false);
           setIsBotJobRunning(false);
           break;
         }
@@ -300,11 +298,6 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
         }
         case "activate-scanner-app": {
           setIsSendingScanner(false);
-          break;
-        }
-
-        case "activate-vision-scanner": {
-          setIsSendingScannerAI(false);
           break;
         }
 
@@ -425,7 +418,8 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       botJobId,
       botJobName,
       sessionId: "mobile-return-server",
-      scrollTimes: scrollStep
+      scrollTimes: scrollStep,
+      scannerType,
     };
 
     try {
@@ -436,33 +430,6 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       setIsSendingScanner(false);
     }
   };
-
-  const handleScannAIAppClick = () => {
-    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
-      console.warn("🚨 WebSocket is not connected. Cannot send message.");
-      return;
-    }
-
-    setIsSendingScannerAI(true);
-
-    const message = {
-      type: "SCANNER_APP_VISION",
-      homeBankingId,
-      botJobId,
-      botJobName,
-      sessionId: "mobile-return-server",
-      scrollTimes: scrollStep
-    };
-
-    try {
-      webSocket.send(JSON.stringify(message));
-      console.log("📤 Sent SCANNER_APP_VISION:", message);
-    } catch (err) {
-      console.error("❌ Error sending SCANNER_APP_VISION:", err);
-      setIsSendingScannerAI(false);
-    }
-  };
-
 
   const handleClearDataClick = () => {
     // Clear data + dependent state
@@ -966,13 +933,19 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
         </button>
 
         <div className="scanner-group">
-          <button
-            className={`buttons-toolbar ${isSendingScannerAI ? 'sending' : ''}`}
-            onClick={handleScannAIAppClick}
-            disabled={isSendingScannerAI || isPackageSelectionRequired}
+          <select
+            className="scroll-select"
+            value={scannerType}
+            onChange={(e) => setScannerType(e.target.value)}
+            disabled={isSendingScanner || isPackageSelectionRequired}
+            title="Select scanner engine"
           >
-            {isSendingScannerAI ? 'Scanning…' : 'Scanner AI'}
-          </button>
+            <option value="UiAutomator2">UiAutomator2</option>
+            <option value="Espresso">Espresso</option>
+            <option value="Gecko">Gekco</option>
+            <option value="Chromium">Chromium</option>
+            <option value="AssistedAI">Assited AI</option>
+          </select>
           <div className="scroll-select-group">
             <span className="scroll-label">Scrolling</span>
 
