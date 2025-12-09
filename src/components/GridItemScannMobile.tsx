@@ -365,7 +365,8 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       sessionId: "mobile-return-server",
       appQueryApp,        // e.g. "InLinea"
       appQueryPackage,    // e.g. "ch.bsct.ebanking.mobile" or dropdown selection
-      appMainActivity
+      appMainActivity,
+      scannerType
     };
 
     try {
@@ -393,6 +394,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       sessionId: "mobile-return-server",
       appQueryApp,
       appQueryPackage,
+      scannerType
     };
 
     try {
