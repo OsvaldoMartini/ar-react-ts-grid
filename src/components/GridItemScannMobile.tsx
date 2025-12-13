@@ -145,7 +145,8 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
   useEffect(() => {
     if (messages.length === 0) return;
 
-    const lastMessage = messages[messages.length - 1];
+    const last10 = messages.slice(-10);
+    const lastMessage = last10[last10.length - 1];
     console.log("RECEIVED -> Last WebSocket message ", lastMessage);
 
     const tryParse = (val: any) => {
