@@ -944,10 +944,11 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
             title="Select scanner engine"
           >
             <option value="UiAutomator2">UiAutomator2</option>
+            <option value="CpVisionDevice">CpVision Device</option>
+            <option value="CpVisionFiles">CpVision Files</option>
             <option value="Espresso">Espresso</option>
             <option value="Gecko">Gekco</option>
             <option value="Chromium">Chromium</option>
-            <option value="AssistedAI">Assited AI</option>
           </select>
           <div className="scroll-select-group">
             <span className="scroll-label">Scrolling</span>
