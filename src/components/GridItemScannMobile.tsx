@@ -82,7 +82,12 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
   const [appMainActivity, setAppMainActivity] = useState<string>("");
   const [packagesFound, setPackagesFound] = useState<string[]>([]);
   const [scrollStep, setScrollStep] = useState<number>(0);
+
   const [scannerType, setScannerType] = useState<string>("UiAutomator2");
+
+  const KEEP_ALIVE_VALUE = "KeepAlive";
+  const keepAliveEnabled = scannerType === KEEP_ALIVE_VALUE;
+  const FOUR_MINUTES_MS = 4 * 60 * 1000; // 240000 ms
 
   // --- ⬇⬇ PLACE IT HERE ⬇⬇ ---
   const isPackageSelectionRequired =
@@ -114,6 +119,33 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       [typeElement]: Math.max((prev[typeElement] || 1) - 1, 1),
     }));
   };
+
+  useEffect(() => {
+    if (!keepAliveEnabled) {
+      console.log("[KeepAlive] ⛔ disabled");
+      return;
+    }
+
+    console.log("[KeepAlive] ✅ enabled – will send ATTACHED_DEVICE every 4 minutes");
+
+    const intervalMs = 4 * 60 * 1000; // 240000 ms
+
+    const id = window.setInterval(() => {
+      if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
+        console.warn("[KeepAlive] websocket not open – skip tick");
+        return;
+      }
+
+      console.log("[KeepAlive] 🔄 tick – sending Connect Device (ATTACHED_DEVICE)");
+      sendConnectDevice(false); // silent call
+    }, intervalMs);
+
+    return () => {
+      console.log("[KeepAlive] 🧹 interval cleared");
+      window.clearInterval(id);
+    };
+  }, [keepAliveEnabled, webSocket, scannerType]);
+
 
   useEffect(() => {
     if (!isSendingAll && !isSendingDevice && !isSendingDiscovery && !isSendingScanner && !isSendingScanner && !isBotJobRunning) return;
@@ -350,13 +382,22 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
     setAlertMessageBody('');
   };
 
-  const handleConnectDeviceClick = () => {
+
+
+  // --- add/keep near your other helpers ---
+  const sendConnectDevice = (lockUi: boolean) => {
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
-      console.warn("🚨 WebSocket is not connected. Cannot send message.");
+      console.error("WebSocket is not connected");
       return;
     }
 
-    setIsSendingDevice(true); // 🔒 lock the button
+    if (!botJobId) {
+      console.error("botJobId is missing");
+      return;
+    }
+
+    // only lock UI if this was triggered by user
+    if (lockUi) setIsSendingDevice(true);
 
     const message = {
       type: "ATTACHED_DEVICE",
@@ -364,19 +405,26 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       botJobId,
       botJobName,
       sessionId: "mobile-return-server",
-      appQueryApp,        // e.g. "InLinea"
-      appQueryPackage,    // e.g. "ch.bsct.ebanking.mobile" or dropdown selection
+      appQueryApp,
+      appQueryPackage,
       appMainActivity,
-      scannerType
+      scannerType: scannerType,
     };
 
-    try {
-      webSocket.send(JSON.stringify(message));
-      console.log("📤 Sent ATTACHED_DEVICE:", message);
-    } catch (err) {
-      console.error("❌ Error sending ATTACHED_DEVICE:", err);
-      setIsSendingDevice(false); // 🔓 unlock on failure
+    webSocket.send(JSON.stringify(message));
+
+    // only apply the "safety unlock" timeout for UI-locked calls
+    if (lockUi) {
+      setTimeout(() => {
+        setIsSendingDevice(false);
+        console.log("Reset isSendingDevice after timeout");
+      }, 15000);
     }
+  };
+
+  // --- normal button click calls lockUi=true ---
+  const handleConnectDeviceClick = () => {
+    sendConnectDevice(true);
   };
 
   const handleDiscoveryAppClick = () => {
@@ -395,7 +443,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       sessionId: "mobile-return-server",
       appQueryApp,
       appQueryPackage,
-      scannerType
+      scannerType: scannerType,
     };
 
     try {
@@ -408,6 +456,11 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
   };
 
   const handleScannAppClick = () => {
+    if (keepAliveEnabled) {
+      console.log("[Scanner] blocked because KeepAlive is selected");
+      return;
+    }
+
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
       console.warn("🚨 WebSocket is not connected. Cannot send message.");
       return;
@@ -422,7 +475,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       botJobName,
       sessionId: "mobile-return-server",
       scrollTimes: scrollStep,
-      scannerType,
+      scannerType: scannerType,
     };
 
     try {
@@ -930,45 +983,27 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
         <button
           className={`buttons-toolbar ${isSendingScanner ? 'sending' : ''}`}
           onClick={handleScannAppClick}
-          disabled={isSendingScanner || isPackageSelectionRequired}
+          disabled={keepAliveEnabled || isSendingScanner || isPackageSelectionRequired}
         >
           {isSendingScanner ? 'Scanning…' : 'Scanner'}
         </button>
 
-        <div className="scanner-group">
-          <select
-            className="scroll-select"
-            value={scannerType}
-            onChange={(e) => setScannerType(e.target.value)}
-            disabled={isSendingScanner || isPackageSelectionRequired}
-            title="Select scanner engine"
-          >
-            <option value="UiAutomator2">UiAutomator2</option>
-            <option value="CpVisionDevice">CpVision Device</option>
-            <option value="CpVisionFiles">CpVision Files</option>
-            <option value="Espresso">Espresso</option>
-            <option value="Gecko">Gekco</option>
-            <option value="Chromium">Chromium</option>
-          </select>
-          <div className="scroll-select-group">
-            <span className="scroll-label">Scrolling</span>
+        <select
+          className="scroll-select"
+          value={scannerType}
+          onChange={(e) => setScannerType(e.target.value)}
+          disabled={isSendingScanner || isPackageSelectionRequired}
+        >
+          <option value="UiAutomator2">UiAutomator2</option>
+          <option value="CpVisionDevice">CpVision Device</option>
+          <option value="CpVisionFiles">CpVision Files</option>
+          <option value="Espresso">Espresso</option>
+          <option value="Gecko">Gekco</option>
+          <option value="Chromium">Chromium</option>
 
-            <select
-              className="scroll-select"
-              value={scrollStep}
-              onChange={(e) => setScrollStep(Number(e.target.value))}
-              title="Scroll step for auto-scroll"
-            >
-              <option value={0}>no scroll</option>
-              <option value={1}>scroll 01</option>
-              <option value={5}>scroll 05</option>
-              <option value={10}>scroll 10</option>
-              <option value={20}>scroll 20</option>
-              <option value={30}>scroll 30</option>
-              <option value={50}>scroll 50</option>
-            </select>
-          </div>
-        </div>
+          {/* NEW */}
+          <option value={KEEP_ALIVE_VALUE}>Keep Alive</option>
+        </select>
 
         <button
           className="buttons-toolbar danger"
