@@ -456,11 +456,6 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
   };
 
   const handleScannAppClick = () => {
-    if (keepAliveEnabled) {
-      console.log("[Scanner] blocked because KeepAlive is selected");
-      return;
-    }
-
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
       console.warn("🚨 WebSocket is not connected. Cannot send message.");
       return;
@@ -983,7 +978,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
         <button
           className={`buttons-toolbar ${isSendingScanner ? 'sending' : ''}`}
           onClick={handleScannAppClick}
-          disabled={keepAliveEnabled || isSendingScanner || isPackageSelectionRequired}
+          disabled={isSendingScanner || isPackageSelectionRequired}
         >
           {isSendingScanner ? 'Scanning…' : 'Scanner'}
         </button>
