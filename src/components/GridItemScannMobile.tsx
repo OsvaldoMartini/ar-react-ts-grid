@@ -504,6 +504,42 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
     }
   };
 
+  const scrollDeviceUp = () => {
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) return;
+
+    const message = {
+      type: "MOBILE_SROLL_UP",
+      homeBankingId: -9999,
+      botJobId: -9999,
+      sessionId: "mobile-return-server",
+    };
+
+    try {
+      webSocket.send(JSON.stringify(message));
+      console.log("📤 Sent scroll up:", message);
+    } catch (err) {
+      console.error("❌ Error sending scroll up:", err);
+    }
+  };
+
+  const scrollDeviceDown = () => {
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) return;
+
+    const message = {
+      type: "MOBILE_SROLL_DOWN",
+      homeBankingId: -9999,
+      botJobId: -9999,
+      sessionId: "mobile-return-server",
+    };
+
+    try {
+      webSocket.send(JSON.stringify(message));
+      console.log("📤 Sent scroll down:", message);
+    } catch (err) {
+      console.error("❌ Error sending scroll down:", err);
+    }
+  };
+
   const handleLaunchBotJobClick = () => {
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN) return;
     if (!selectedJob) return;
@@ -967,18 +1003,13 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
             disabled={isSendingScanner || isPackageSelectionRequired}
             title="Select scanner engine"
           >
-            <option value="UiAutomator2">UiAutomator2</option>
-            <option value="CpVisionDevice">CpVision Device</option>
-            <option value="CpVisionFiles">CpVision Files</option>
-            <option value="Espresso">Espresso</option>
-            <option value="Gecko">Gekco</option>
-            <option value="Chromium">Chromium</option>
+            <option value="UiAutomator2">Android</option>
             <option value="KeepAlive">Keep Alive</option>
           </select>
           <div className="scroll-select-group">
             <span className="scroll-label">Scrolling</span>
 
-            <select
+            {/* <select
               className="scroll-select"
               value={scrollStep}
               onChange={(e) => setScrollStep(Number(e.target.value))}
@@ -991,7 +1022,26 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
               <option value={20}>scroll 20</option>
               <option value={30}>scroll 30</option>
               <option value={50}>scroll 50</option>
-            </select>
+            </select> */}
+            <div className="scroll-buttons inline">
+              <button
+                type="button"
+                className="buttons-toolbar scroll-btn scroll-up"
+                title="Scroll device up"
+                onClick={scrollDeviceUp}
+              >
+                ▲
+              </button>
+
+              <button
+                type="button"
+                className="buttons-toolbar scroll-btn scroll-down"
+                title="Scroll device down"
+                onClick={scrollDeviceDown}
+              >
+                ▼
+              </button>
+            </div>
           </div>
         </div>
 

@@ -724,6 +724,64 @@
   color: #0b5394;
 }
 
+/* ===== Scroll buttons (toolbar) ===== */
+
+.scroll-buttons-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.scroll-buttons {
+  display: flex;
+  flex-direction: center;
+  gap: 2px;
+}
+
+.scroll-buttons.inline {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.scroll-btn {
+ width: 26px;          /* same visual footprint as ↻ */
+  height: 22px;
+  padding: 0;
+  font-size: 11px;
+  // font-weight: bold;
+   font-weight: 700;
+  line-height: 1;
+  border-radius: 4px;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+/* UP */
+.scroll-btn.scroll-up {
+  background: linear-gradient(180deg, #4caf50, #2e7d32);
+  color: #ffffff;
+}
+
+/* DOWN */
+.scroll-btn.scroll-down {
+  background: linear-gradient(180deg, #ff9800, #ef6c00);
+  color: #ffffff;
+}
+
+/* Hover / Active */
+.scroll-btn:hover {
+  filter: brightness(1.15);
+}
+
+.scroll-btn:active {
+  transform: translateY(1px);
+}
+
+/* Disabled state (inherits toolbar behavior) */
+.scroll-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 
 /* Dropdown arrow styling */
 .dropdown-column {
