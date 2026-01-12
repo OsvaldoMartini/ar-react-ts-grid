@@ -508,7 +508,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN) return;
 
     const message = {
-      type: "MOBILE_SROLL_UP",
+      type: "MOBILE_SCROLL_UP",
       homeBankingId: -9999,
       botJobId: -9999,
       sessionId: "mobile-return-server",
@@ -526,7 +526,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN) return;
 
     const message = {
-      type: "MOBILE_SROLL_DOWN",
+      type: "MOBILE_SCROLL_DOWN",
       homeBankingId: -9999,
       botJobId: -9999,
       sessionId: "mobile-return-server",
