@@ -974,6 +974,106 @@
   }
 }
 
+/* ===== Validate selector (toolbar-aligned) ===== */
+
+.validate-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Label: "Validate:" */
+.validate-inline .toolbar-label {
+  font-size: 11px;
+  font-weight: bold;
+  color: #0b5394;
+  white-space: nowrap;
+  margin-right: 2px; /* very tight */
+}
+
+/* Dropdown wrapper */
+.validate-dropdown {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Trigger button (same footprint as toolbar buttons) */
+.validate-trigger {
+  width: auto;
+  min-width: 70px;
+  height: 22px;
+  padding: 3px 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #0b5394;
+  line-height: 1;
+  border-radius: 4px;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+/* Disabled state */
+.validate-trigger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Dropdown panel */
+.validate-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 60;
+
+  min-width: 300px;
+  padding: 6px;
+
+  background: #ffffff;
+  border: 1px solid rgba(11, 83, 148, 0.25);
+  border-radius: 6px;
+
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+}
+
+/* Single checkbox row */
+.validate-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+
+  padding: 4px 4px;
+  cursor: pointer;
+
+  font-size: 11px;
+  font-weight: 700;
+  color: #0b5394;
+}
+
+/* Checkbox alignment */
+.validate-item input[type="checkbox"] {
+  margin-top: 2px;
+}
+
+/* Text container */
+.validate-item-text {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* Field value */
+.validate-item-value {
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+/* Confidence */
+.validate-item-conf {
+  font-weight: 700;
+  opacity: 0.65;
+}
+
+
 // .instruction-item[data-executing='true'] {
 //   background-color: var(--execution-state-color); // optional if using a CSS var
 //   // animation: pulseBg 2s infinite;

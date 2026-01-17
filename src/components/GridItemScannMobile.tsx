@@ -84,6 +84,68 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
   const [scrollStep, setScrollStep] = useState<number>(0);
   const [scannerType, setScannerType] = useState<string>("UiAutomator2");
 
+
+  type ValidateFieldKey = "iban" | "saldo" | "conto" | "nuovo_saldo";
+
+  type ValidatePayload = {
+    sourceImage?: string;
+    fields?: Record<string, { value?: string; confidence?: number }>;
+  };
+
+  // holds the latest json received (your sample)
+  const [validatePayload, setValidatePayload] = useState<ValidatePayload | null>(null);
+
+  // what’s checked in the UI
+  const [validateChecked, setValidateChecked] = useState<Record<ValidateFieldKey, boolean>>({
+    iban: false,
+    saldo: false,
+    conto: false,
+    nuovo_saldo: false,
+  });
+
+  // dropdown open/close
+  const [validateOpen, setValidateOpen] = useState(false);
+
+  const validateOrder: ValidateFieldKey[] = ["iban", "saldo", "conto", "nuovo_saldo"];
+
+  const validateLabel: Record<ValidateFieldKey, string> = {
+    iban: "iban",
+    saldo: "saldo",
+    conto: "conto",
+    nuovo_saldo: "Nuovo_saldo",
+  };
+
+  const toggleValidate = (k: ValidateFieldKey) => {
+    setValidateChecked((prev) => ({ ...prev, [k]: !prev[k] }));
+  };
+
+  const checkedCount = validateOrder.reduce((acc, k) => acc + (validateChecked[k] ? 1 : 0), 0);
+
+  type FieldsToValidateDTO = {
+    value: string;
+    confidence?: number;
+  };
+
+  const buildFieldsToValidate = (): Record<string, FieldsToValidateDTO> => {
+    const fields = validatePayload?.fields ?? {};
+    const out: Record<string, FieldsToValidateDTO> = {};
+
+    validateOrder.forEach((k) => {
+      if (!validateChecked[k]) return;
+
+      const f = fields[k];
+      if (!f?.value || f.value.trim() === "") return;
+
+      out[k] = {
+        value: f.value,
+        confidence: f.confidence,
+      };
+    });
+
+    return out;
+  };
+
+
   // --- ⬇⬇ PLACE IT HERE ⬇⬇ ---
   const isPackageSelectionRequired =
     packagesFound.length > 0 &&
@@ -194,6 +256,24 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       const bodyData = tryParse(parsedMessage.body);
 
       switch (parsedMessage.operationId) {
+        case "validateFields": {
+          const fieldsObj =
+            typeof bodyData === "string" ? JSON.parse(bodyData) : bodyData;
+
+          setValidatePayload({ fields: fieldsObj });
+
+          // ✅ AUTO-CHECK fields that exist
+          setValidateChecked({
+            iban: !!fieldsObj?.iban?.value,
+            saldo: !!fieldsObj?.saldo?.value,
+            conto: !!fieldsObj?.conto?.value,
+            nuovo_saldo: !!fieldsObj?.nuovo_saldo?.value,
+          });
+
+          break;
+        }
+
+
         // ---------- NEW: receive BotJobs list ----------
         case "botJobList": {
           // Body may be either an array or an object like { list: [...]} or { botJobs: [...] }
@@ -553,6 +633,8 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       botJobName,                        // updated from selected job
       sessionId: "mobile-return-server",
       selectedJobName: selectedJob.name, // optional
+      // ✅ array of VALUES that are checked
+      fieldsToValidate: buildFieldsToValidate(),
     };
 
     try {
@@ -1056,6 +1138,49 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
 
         {/* ---- vertical separator ---- */}
         <span className="toolbar-separator" aria-hidden="true" />
+
+        {/* ---- Validate: multi-select ---- */}
+        <div className="toolbar-inline validate-inline">
+          <span className="toolbar-label">Validate:</span>
+
+          <div className="validate-dropdown">
+            <button
+              type="button"
+              className="buttons-toolbar validate-trigger"
+              onClick={() => setValidateOpen((v) => !v)}
+              disabled={!validatePayload?.fields}
+              title={!validatePayload?.fields ? "No validation fields received yet" : "Select fields to validate"}
+            >
+              {validatePayload?.fields ? `Select (${checkedCount})` : "No data"}
+            </button>
+
+            {validateOpen && (
+              <div className="validate-menu" role="menu">
+                {validateOrder.map((k) => {
+                  const v = validatePayload?.fields?.[k]?.value ?? "";
+                  const conf = validatePayload?.fields?.[k]?.confidence;
+
+                  return (
+                    <label key={k} className="validate-item">
+                      <input
+                        type="checkbox"
+                        checked={validateChecked[k]}
+                        onChange={() => toggleValidate(k)}
+                      />
+                      <span className="validate-item-text">
+                        <strong>{validateLabel[k]}</strong>
+                        {v ? <span className="validate-item-value"> — {v}</span> : null}
+                        {typeof conf === "number" ? (
+                          <span className="validate-item-conf"> ({Math.round(conf * 100)}%)</span>
+                        ) : null}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* ---- combo box + refresh ---- */}
         <div className="toolbar-inline">
