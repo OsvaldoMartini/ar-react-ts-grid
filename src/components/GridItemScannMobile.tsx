@@ -85,8 +85,6 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
   const [scannerType, setScannerType] = useState<string>("UiAutomator2");
 
 
-  type ValidateFieldKey = "iban" | "saldo" | "conto" | "nuovo_saldo";
-
   type ValidatePayload = {
     sourceImage?: string;
     fields?: Record<string, { value?: string; confidence?: number }>;
@@ -96,30 +94,29 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
   const [validatePayload, setValidatePayload] = useState<ValidatePayload | null>(null);
 
   // what’s checked in the UI
-  const [validateChecked, setValidateChecked] = useState<Record<ValidateFieldKey, boolean>>({
-    iban: false,
-    saldo: false,
-    conto: false,
-    nuovo_saldo: false,
-  });
+  const [validateChecked, setValidateChecked] = useState<Record<string, boolean>>({});
+
 
   // dropdown open/close
   const [validateOpen, setValidateOpen] = useState(false);
 
-  const validateOrder: ValidateFieldKey[] = ["iban", "saldo", "conto", "nuovo_saldo"];
+  const validateKeys = React.useMemo(
+    () => Object.keys(validatePayload?.fields ?? {}).sort((a, b) => a.localeCompare(b)),
+    [validatePayload?.fields]
+  );
 
-  const validateLabel: Record<ValidateFieldKey, string> = {
-    iban: "iban",
-    saldo: "saldo",
-    conto: "conto",
-    nuovo_saldo: "Nuovo_saldo",
+  const toggleValidate = (key: string) => {
+    setValidateChecked((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const toggleValidate = (k: ValidateFieldKey) => {
-    setValidateChecked((prev) => ({ ...prev, [k]: !prev[k] }));
-  };
 
-  const checkedCount = validateOrder.reduce((acc, k) => acc + (validateChecked[k] ? 1 : 0), 0);
+  const checkedCount = validateKeys.reduce(
+    (acc, key) => acc + (validateChecked[key] ? 1 : 0),
+    0
+  );
+
+  // const checkedCount = Object.values(validateChecked).filter(Boolean).length;
+  // const checkedCount = Object.values(validateChecked).filter(Boolean).length;
 
   type FieldsToValidateDTO = {
     value: string;
@@ -130,20 +127,19 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
     const fields = validatePayload?.fields ?? {};
     const out: Record<string, FieldsToValidateDTO> = {};
 
-    validateOrder.forEach((k) => {
-      if (!validateChecked[k]) return;
+    Object.entries(fields).forEach(([key, field]) => {
+      if (!validateChecked[key]) return;
+      if (!field?.value?.trim()) return;
 
-      const f = fields[k];
-      if (!f?.value || f.value.trim() === "") return;
-
-      out[k] = {
-        value: f.value,
-        confidence: f.confidence,
+      out[key] = {
+        value: field.value,
+        confidence: field.confidence,
       };
     });
 
     return out;
   };
+
 
 
   // --- ⬇⬇ PLACE IT HERE ⬇⬇ ---
@@ -263,12 +259,14 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
           setValidatePayload({ fields: fieldsObj });
 
           // ✅ AUTO-CHECK fields that exist
-          setValidateChecked({
-            iban: !!fieldsObj?.iban?.value,
-            saldo: !!fieldsObj?.saldo?.value,
-            conto: !!fieldsObj?.conto?.value,
-            nuovo_saldo: !!fieldsObj?.nuovo_saldo?.value,
+          const initialChecked: Record<string, boolean> = {};
+
+          Object.keys(fieldsObj ?? {}).forEach((key) => {
+            initialChecked[key] = !!fieldsObj[key]?.value;
           });
+
+          setValidateChecked(initialChecked);
+
 
           break;
         }
@@ -1156,19 +1154,19 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
 
             {validateOpen && (
               <div className="validate-menu" role="menu">
-                {validateOrder.map((k) => {
-                  const v = validatePayload?.fields?.[k]?.value ?? "";
-                  const conf = validatePayload?.fields?.[k]?.confidence;
+                {Object.entries(validatePayload?.fields ?? {}).map(([key, field]) => {
+                  const v = field?.value ?? "";
+                  const conf = field?.confidence;
 
                   return (
-                    <label key={k} className="validate-item">
+                    <label key={key} className="validate-item">
                       <input
                         type="checkbox"
-                        checked={validateChecked[k]}
-                        onChange={() => toggleValidate(k)}
+                        checked={!!validateChecked[key]}
+                        onChange={() => toggleValidate(key)}
                       />
                       <span className="validate-item-text">
-                        <strong>{validateLabel[k]}</strong>
+                        <strong>{key}</strong>
                         {v ? <span className="validate-item-value"> — {v}</span> : null}
                         {typeof conf === "number" ? (
                           <span className="validate-item-conf"> ({Math.round(conf * 100)}%)</span>
