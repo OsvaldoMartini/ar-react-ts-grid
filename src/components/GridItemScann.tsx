@@ -69,19 +69,10 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   const [editingElementTagName, setEditingElementTagName] = useState<string | null>(null);
   const [elementName, setElementName] = useState<string>('');
   const [isSendingAll, setIsSendingAll] = useState(false);
-  // below existing useState hooks
-  const [isSendingDevice, setIsSendingDevice] = useState(false);
-  const [isSendingDiscovery, setIsSendingDiscovery] = useState(false);
-  const [isSendingScanner, setIsSendingScanner] = useState(false);
-
 
   // Inside your component:
   const [hoveredRow, setHoveredRow] = useState<ElementDTO | null>(null);
   const [hoveredRowsList, setHoveredRowsList] = useState<ElementDTO[]>([]);
-
-  const [selectedJobOption, setSelectedJobOption] = useState<string>("Create New Bot Job");
-  const [newBotJobName, setNewBotJobName] = useState<string>("");
-  const isCreatingNew = selectedJobOption === "Create New Bot Job";
 
   const handleNextBlockPage = (typeElement: string) => {
     setBlockCurrentPages((prev) => ({
@@ -98,15 +89,12 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   };
 
   useEffect(() => {
-    if (!isSendingAll && !isSendingDevice && !isSendingDiscovery && !isSendingScanner) return;
+    if (!isSendingAll) return;
     const t = setTimeout(() => {
       setIsSendingAll(false);
-      setIsSendingDevice(false);
-      setIsSendingDiscovery(false);
-      setIsSendingScanner(false);
     }, 15000); // 15s fallback
     return () => clearTimeout(t);
-  }, [isSendingAll, isSendingDevice, isSendingDiscovery, isSendingScanner]);
+  }, [isSendingAll]);
 
   useEffect(() => {
     const newBlockPages: Record<string, number> = {};
@@ -224,20 +212,6 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
           break;
         }
 
-        // ---------- NEW: PER-BUTTON UNLOCK ----------
-        case "activate-connect-device": {
-          setIsSendingDevice(false);
-          break;
-        }
-        case "activate-discovery-app": {
-          setIsSendingDiscovery(false);
-          break;
-        }
-        case "activate-scanner-app": {
-          setIsSendingScanner(false);
-          break;
-        }
-
         default:
           // no-op
           break;
@@ -267,81 +241,6 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     setErrorFlag(false); // Reset error flag
     setAlertMessageHeader('');
     setAlertMessageBody('');
-  };
-
-  const handleConnectDeviceClick = () => {
-    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
-      console.warn("🚨 WebSocket is not connected. Cannot send message.");
-      return;
-    }
-
-    setIsSendingDevice(true); // 🔒 lock the button
-
-    const message = {
-      type: "ATTACH_DEVICE",
-      homeBankingId,
-      botJobId,
-      botJobName,
-      sessionId: "scannerTool",
-    };
-
-    try {
-      webSocket.send(JSON.stringify(message));
-      console.log("📤 Sent CONNECT_DEVICE:", message);
-    } catch (err) {
-      console.error("❌ Error sending CONNECT_DEVICE:", err);
-      setIsSendingDevice(false); // 🔓 unlock on failure
-    }
-  };
-
-  const handleDiscoveryAppClick = () => {
-    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
-      console.warn("🚨 WebSocket is not connected. Cannot send message.");
-      return;
-    }
-
-    setIsSendingDiscovery(true);
-
-    const message = {
-      type: "DISCOVERY_APP",
-      homeBankingId,
-      botJobId,
-      botJobName,
-      sessionId: "scannerTool",
-    };
-
-    try {
-      webSocket.send(JSON.stringify(message));
-      console.log("📤 Sent DISCOVERY_APP:", message);
-    } catch (err) {
-      console.error("❌ Error sending DISCOVERY_APP:", err);
-      setIsSendingDiscovery(false);
-    }
-  };
-
-  const handleScannAppClick = () => {
-    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
-      console.warn("🚨 WebSocket is not connected. Cannot send message.");
-      return;
-    }
-
-    setIsSendingScanner(true);
-
-    const message = {
-      type: "SCANNER_APP",
-      homeBankingId,
-      botJobId,
-      botJobName,
-      sessionId: "scannerTool",
-    };
-
-    try {
-      webSocket.send(JSON.stringify(message));
-      console.log("📤 Sent SCANNER_APP:", message);
-    } catch (err) {
-      console.error("❌ Error sending SCANNER_APP:", err);
-      setIsSendingScanner(false);
-    }
   };
 
   const handlesSendAllClick = () => {
@@ -674,71 +573,6 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
           error={errorFlag}
         />
       )}
-
-      {/* Top toolbar — always visible */}
-      <div className="controls-toolbar">
-        <button
-          className={`buttons-toolbar ${isSendingDevice ? 'sending' : ''}`}
-          onClick={handleConnectDeviceClick}
-          disabled={isSendingDevice}
-        >
-          {isSendingDevice ? 'Sending…' : 'Connect Device'}
-        </button>
-
-        {/* New text fields */}
-        <input
-          type="text"
-          className="toolbar-input"
-          placeholder="InLinea"
-          defaultValue="InLinea"
-        />
-        <input
-          type="text"
-          className="toolbar-input"
-          placeholder="ch.bsct.ebanking.mobile"
-          defaultValue="ch.bsct.ebanking.mobile"
-        />
-
-        <button
-          className={`buttons-toolbar ${isSendingDiscovery ? 'sending' : ''}`}
-          onClick={handleDiscoveryAppClick}
-          disabled={isSendingDiscovery}
-        >
-          {isSendingDiscovery ? 'Sending…' : 'Discovery App'}
-        </button>
-
-        <button
-          className={`buttons-toolbar ${isSendingScanner ? 'sending' : ''}`}
-          onClick={handleScannAppClick}
-          disabled={isSendingScanner}
-        >
-          {isSendingScanner ? 'Sending…' : 'Scanner App'}
-        </button>
-
-        {/* ---- vertical separator ---- */}
-        <span className="toolbar-separator" aria-hidden="true" />
-
-        {/* ---- combo box + conditional input ---- */}
-        <select
-          className="toolbar-select"
-          value={selectedJobOption}
-          onChange={(e) => setSelectedJobOption(e.target.value)}
-          aria-label="Bot Job Presets"
-        >
-          <option value="Create New Bot Job">Create New Bot Job</option>
-          <option value="Mega Job">Mega Job</option>
-          <option value="Pagamento Banca Stato">Pagamento Banca Stato</option>
-        </select>
-
-        <input
-          type="text"
-          className="toolbar-input"
-          placeholder="new Bot Job Name"
-          value={newBotJobName}
-          onChange={(e) => setNewBotJobName(e.target.value)}
-          disabled={!isCreatingNew}
-        />
-      </div>
 
       {elementDTO.length === 0 ? (
         // No data message (as before)
