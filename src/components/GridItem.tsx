@@ -2726,26 +2726,37 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
   ) => {
     const validActions = ["SET", "GET"];
 
-    // Handle the "CK" action with special formatting for operation
+    // Handle CK / CSV CHECK / PDF CHECK actions with special formatting
     if (
       (instruction.actions === "CK" ||
         instruction.actions === "CSV CHECK" ||
         instruction.actions === "PDF CHECK") &&
       instruction.operation
     ) {
-      const [left, middle, right] = instruction.operation.split(":").map((part) => part.trim());
+      const [left, middle, right] = instruction.operation
+        .split(":")
+        .map((part) => part.trim());
 
       if (middle === "=" || middle === ">" || middle === "<" || middle === "!=") {
+
+        const rightLabel =
+          instruction.actions === "CSV CHECK"
+            ? "CSV VALUES"
+            : instruction.actions === "PDF CHECK"
+              ? "PDF VALUES"
+              : right;
+
         return (
           <span className="instruction-details">
-            <span style={{ color: "#FFA500" }}>({instruction.variableId}){left}</span>
+            <span style={{ color: "#FFA500" }}>
+              ({instruction.variableId}){left}
+            </span>
             <span style={{ color: "#0b5394" }}>{middle}</span>
-            <span style={{ color: "#FFA500" }}>{right}</span>
+            <span style={{ color: "#FFA500" }}>{rightLabel}</span>
           </span>
         );
       }
     }
-
 
     // Special case for "GOTO" action - render only the operation without parentId or colon
     if (instruction.actions === "GOTO" && instruction.operation) {
