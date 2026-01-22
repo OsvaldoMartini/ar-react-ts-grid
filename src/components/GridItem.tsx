@@ -2434,6 +2434,16 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
           imageSrc = checkImage;
           text = instruction.name;
           break;
+        case "CSV CHECK":
+          imageSrc = excelGotoImage;
+          text = instruction.name;
+          // imageClass = "excelgoto-image";
+          break;
+        case "PDF CHECK":
+          imageSrc = excelGotoImage;
+          text = instruction.name;
+          // imageClass = "excelgoto-image";
+          break;
         case "E":
           imageSrc = excelImage;
           text = instruction.name;
@@ -2546,7 +2556,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
 
   const editableSpecialOperations = (actionType: string) => {
-    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "PAUSE", "REFRESH", "LOOP", "REFRESH_LOOP", "EXCEL GOTO", "NEXT ROW"].includes(actionType)) {
+    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "PAUSE", "REFRESH", "LOOP", "REFRESH_LOOP", "EXCEL GOTO", "NEXT ROW", "CSV CHECK", "PDF CHECK"].includes(actionType)) {
       return true;
     } else {
       return false;
@@ -2555,7 +2565,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
 
   const allSpecialOperations = (actionType: string) => {
-    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "IF", "ELSEIF", "ELSE", "ENDIF", "PAUSE", "REFRESH", "LOOP", "REFRESH_LOOP", "EXCEL GOTO", "NEXT ROW"].includes(actionType)) {
+    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "IF", "ELSEIF", "ELSE", "ENDIF", "PAUSE", "REFRESH", "LOOP", "REFRESH_LOOP", "EXCEL GOTO", "NEXT ROW", "CSV CHECK", "PDF CHECK"].includes(actionType)) {
       return true;
     } else {
       return false;
@@ -2717,7 +2727,12 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     const validActions = ["SET", "GET"];
 
     // Handle the "CK" action with special formatting for operation
-    if (instruction.actions === "CK" && instruction.operation) {
+    if (
+      (instruction.actions === "CK" ||
+        instruction.actions === "CSV CHECK" ||
+        instruction.actions === "PDF CHECK") &&
+      instruction.operation
+    ) {
       const [left, middle, right] = instruction.operation.split(":").map((part) => part.trim());
 
       if (middle === "=" || middle === ">" || middle === "<" || middle === "!=") {
