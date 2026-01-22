@@ -783,6 +783,45 @@
   cursor: not-allowed;
 }
 
+.nav-buttons {
+  margin-bottom: 2px;
+}
+
+.nav-btn {
+  width: 28px;          // smaller hitbox
+  height: 24px;
+  padding: 0;
+  line-height: 1;
+  font-size: 13px;      // ↓ smaller font
+  font-weight: 800;     // ↑ bold
+  text-align: center;
+}
+
+.nav-btn.back {
+  font-size: 13px;
+  font-weight: 900;     // strongest for arrow
+}
+
+.nav-btn.home {
+  font-size: 14px;      // circle needs a touch more size
+  font-weight: 900;
+}
+
+.nav-btn.recents {
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: -1px; // tighter "≡"
+}
+
+.nav-btn.close-all {
+  color: #d32f2f;
+  font-weight: bold;
+
+  &:hover {
+    background-color: rgba(211, 47, 47, 0.15);
+  }
+}
+
 /* Dropdown arrow styling */
 .dropdown-column {
   position: relative;

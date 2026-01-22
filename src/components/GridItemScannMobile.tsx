@@ -618,6 +618,53 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
     }
   };
 
+  const sendMobileBack = () => {
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) return;
+
+    webSocket.send(JSON.stringify({
+      type: "MOBILE_BACK",
+      homeBankingId: -9999,
+      botJobId: -9999,
+      sessionId: "mobile-return-server",
+    }));
+  };
+
+
+  const sendMobileCloseAll = () => {
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) return;
+
+    webSocket.send(JSON.stringify({
+      type: "MOBILE_CLOSE_ALL",
+      homeBankingId: -9999,
+      botJobId: -9999,
+      sessionId: "mobile-return-server",
+      appQueryApp,
+      appQueryPackage,
+    }));
+  };
+
+  const sendMobileHome = () => {
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) return;
+
+    webSocket.send(JSON.stringify({
+      type: "MOBILE_HOME",
+      homeBankingId: -9999,
+      botJobId: -9999,
+      sessionId: "mobile-return-server",
+    }));
+  };
+
+  const sendMobileRecents = () => {
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) return;
+
+    webSocket.send(JSON.stringify({
+      type: "MOBILE_RECENTS",
+      homeBankingId: -9999,
+      botJobId: -9999,
+      sessionId: "mobile-return-server",
+    }));
+  };
+
   const handleLaunchBotJobClick = () => {
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN) return;
     if (!selectedJob) return;
@@ -1087,7 +1134,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
             <option value="KeepAlive">Keep Alive</option>
           </select>
           <div className="scroll-select-group">
-            <span className="scroll-label">Scrolling</span>
+            <span className="scroll-label">Navigation</span>
 
             {/* <select
               className="scroll-select"
@@ -1103,6 +1150,44 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
               <option value={30}>scroll 30</option>
               <option value={50}>scroll 50</option>
             </select> */}
+            <div className="scroll-buttons inline nav-buttons">
+              <button
+                type="button"
+                className="buttons-toolbar nav-btn recents"
+                title="Recents"
+                onClick={sendMobileRecents}
+              >
+                ≡
+              </button>
+              <button
+                type="button"
+                className="buttons-toolbar nav-btn home"
+                title="Home"
+                onClick={sendMobileHome}
+              >
+                ○
+              </button>
+              <button
+                type="button"
+                className="buttons-toolbar nav-btn back"
+                title="Back"
+                onClick={sendMobileBack}
+              >
+                ←
+              </button>
+              {/* 🔴 NEW: Close all apps */}
+              <button
+                type="button"
+                className="buttons-toolbar nav-btn close-all"
+                title="Close all apps"
+                onClick={sendMobileCloseAll}
+              >
+                ✕
+              </button>
+            </div>
+
+            <span className="scroll-label">Scrolling</span>
+
             <div className="scroll-buttons inline">
               <button
                 type="button"
