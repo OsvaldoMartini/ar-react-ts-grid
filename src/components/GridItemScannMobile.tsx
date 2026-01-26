@@ -1068,61 +1068,62 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
 
       {/* Top toolbar — always visible */}
       <div className="controls-toolbar">
-        <button
-          className={`buttons-toolbar ${isSendingDevice ? 'sending' : ''}`}
-          onClick={handleConnectDeviceClick}
-          disabled={isSendingDevice || isPackageSelectionRequired}
-        >
-          {isSendingDevice ? 'Connecting…' : 'Connect Device'}
-        </button>
 
-        {/* New text fields */}
-        <input
-          type="text"
-          className="toolbar-input input-app-name"
-          placeholder="eBanking"
-          value={appQueryApp}
-          onChange={(e) => setappQueryApp(e.target.value)}
-        />
-        {packagesFound.length > 0 ? (
-          <select
-            className="toolbar-input select-package-name"
-            value={appQueryPackage}
-            onChange={(e) => setappQueryPackage(e.target.value)}
+        {/* ================= ROW 1 ================= */}
+        <div className="toolbar-row toolbar-row-top">
+          <button
+            className={`buttons-toolbar ${isSendingDevice ? 'sending' : ''}`}
+            onClick={handleConnectDeviceClick}
+            disabled={isSendingDevice || isPackageSelectionRequired}
           >
-            <option value="">Select package...</option>
-            {packagesFound.map((pkg) => (
-              <option key={pkg} value={pkg}>
-                {pkg}
-              </option>
-            ))}
-          </select>
-        ) : (
+            {isSendingDevice ? 'Connecting…' : 'Connect Device'}
+          </button>
+
           <input
             type="text"
-            className="toolbar-input input-package-name"
-            placeholder="ch.bsct.ebanking.mobile"
-            value={appQueryPackage}
-            onChange={(e) => setappQueryPackage(e.target.value)}
+            className="toolbar-input input-app-name"
+            placeholder="eBanking"
+            value={appQueryApp}
+            onChange={(e) => setappQueryApp(e.target.value)}
           />
-        )}
 
-        <button
-          className={`buttons-toolbar ${isSendingDiscovery ? 'sending' : ''}`}
-          onClick={handleDiscoveryAppClick}
-          disabled={isSendingDiscovery}
-        >
-          {isSendingDiscovery ? 'Discovering…' : 'Discovery App'}
-        </button>
-        <button
-          className={`buttons-toolbar ${isSendingScanner ? 'sending' : ''}`}
-          onClick={handleScannAppClick}
-          disabled={isSendingScanner || isPackageSelectionRequired}
-        >
-          {isSendingScanner ? 'Scanning…' : 'Scanner'}
-        </button>
+          {packagesFound.length > 0 ? (
+            <select
+              className="toolbar-input select-package-name"
+              value={appQueryPackage}
+              onChange={(e) => setappQueryPackage(e.target.value)}
+            >
+              <option value="">Select package...</option>
+              {packagesFound.map((pkg) => (
+                <option key={pkg} value={pkg}>{pkg}</option>
+              ))}
+            </select>
+          ) : (
+            <input
+              type="text"
+              className="toolbar-input input-package-name"
+              placeholder="ch.bsct.ebanking.mobile"
+              value={appQueryPackage}
+              onChange={(e) => setappQueryPackage(e.target.value)}
+            />
+          )}
 
-        <div className="scanner-group">
+          <button
+            className={`buttons-toolbar ${isSendingDiscovery ? 'sending' : ''}`}
+            onClick={handleDiscoveryAppClick}
+            disabled={isSendingDiscovery}
+          >
+            {isSendingDiscovery ? 'Discovering…' : 'Discovery App'}
+          </button>
+
+          <button
+            className={`buttons-toolbar ${isSendingScanner ? 'sending' : ''}`}
+            onClick={handleScannAppClick}
+            disabled={isSendingScanner || isPackageSelectionRequired}
+          >
+            {isSendingScanner ? 'Scanning…' : 'Scanner'}
+          </button>
+
           <select
             className="scroll-select"
             value={scannerType}
@@ -1133,184 +1134,124 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
             <option value="UiAutomator2">Android</option>
             <option value="KeepAlive">Keep Alive</option>
           </select>
-          <div className="scroll-select-group">
-            <span className="scroll-label">Navigation</span>
-
-            {/* <select
-              className="scroll-select"
-              value={scrollStep}
-              onChange={(e) => setScrollStep(Number(e.target.value))}
-              title="Scroll step for auto-scroll"
-            >
-              <option value={0}>no scroll</option>
-              <option value={1}>scroll 01</option>
-              <option value={5}>scroll 05</option>
-              <option value={10}>scroll 10</option>
-              <option value={20}>scroll 20</option>
-              <option value={30}>scroll 30</option>
-              <option value={50}>scroll 50</option>
-            </select> */}
-            <div className="scroll-buttons inline nav-buttons">
-              <button
-                type="button"
-                className="buttons-toolbar nav-btn recents"
-                title="Recents"
-                onClick={sendMobileRecents}
-              >
-                ≡
-              </button>
-              <button
-                type="button"
-                className="buttons-toolbar nav-btn home"
-                title="Home"
-                onClick={sendMobileHome}
-              >
-                ○
-              </button>
-              <button
-                type="button"
-                className="buttons-toolbar nav-btn back"
-                title="Back"
-                onClick={sendMobileBack}
-              >
-                ←
-              </button>
-              {/* 🔴 NEW: Close all apps */}
-              <button
-                type="button"
-                className="buttons-toolbar nav-btn close-all"
-                title="Close all apps"
-                onClick={sendMobileCloseAll}
-              >
-                ✕
-              </button>
-            </div>
-
-            <span className="scroll-label">Scrolling</span>
-
-            <div className="scroll-buttons inline">
-              <button
-                type="button"
-                className="buttons-toolbar scroll-btn scroll-up"
-                title="Scroll device up"
-                onClick={scrollDeviceUp}
-              >
-                ▲
-              </button>
-
-              <button
-                type="button"
-                className="buttons-toolbar scroll-btn scroll-down"
-                title="Scroll device down"
-                onClick={scrollDeviceDown}
-              >
-                ▼
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <button
-          className="buttons-toolbar danger"
-          onClick={handleClearDataClick}
-          disabled={elementDTO.length === 0}
-          title={elementDTO.length === 0 ? "No data to clear" : "Clear all scanned elements"}
-        >
-          Clear Data
-        </button>
-
-        {/* ---- vertical separator ---- */}
-        <span className="toolbar-separator" aria-hidden="true" />
-
-        {/* ---- Validate: multi-select ---- */}
-        <div className="toolbar-inline validate-inline">
-          <span className="toolbar-label">Validate:</span>
-
-          <div className="validate-dropdown">
-            <button
-              type="button"
-              className="buttons-toolbar validate-trigger"
-              onClick={() => setValidateOpen((v) => !v)}
-              disabled={!validatePayload?.fields}
-              title={!validatePayload?.fields ? "No validation fields received yet" : "Select fields to validate"}
-            >
-              {validatePayload?.fields ? `Select (${checkedCount})` : "No data"}
-            </button>
-
-            {validateOpen && (
-              <div className="validate-menu" role="menu">
-                {Object.entries(validatePayload?.fields ?? {}).map(([key, field]) => {
-                  const v = field?.value ?? "";
-                  const conf = field?.confidence;
-
-                  return (
-                    <label key={key} className="validate-item">
-                      <input
-                        type="checkbox"
-                        checked={!!validateChecked[key]}
-                        onChange={() => toggleValidate(key)}
-                      />
-                      <span className="validate-item-text">
-                        <strong>{key}</strong>
-                        {v ? <span className="validate-item-value"> — {v}</span> : null}
-                        {typeof conf === "number" ? (
-                          <span className="validate-item-conf"> ({Math.round(conf * 100)}%)</span>
-                        ) : null}
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* ---- combo box + refresh ---- */}
-        <div className="toolbar-inline">
-          <select
-            className="toolbar-select"
-            value={selectedJob ? String(selectedJob.botJobId ?? selectedJob.id ?? selectedJob.name) : ""}
-            onChange={(e) => {
-              const key = e.target.value;
-              const job = botJobs.find(j => String(j.botJobId ?? j.id ?? j.name) === key) ?? null;
-              setSelectedJob(job);
-
-              setBotJobId(job?.botJobId ?? job?.id ?? null);
-              setBotJobName(job?.name ?? null);
-              if (job?.homeBankingId != null && job?.homeBankingId !== -9999) {
-                setHomeBankingId(job.homeBankingId);
-              }
-            }}
-            aria-label="Bot Job Presets"
-          >
-            <option value="">Select a Bot Job</option>
-            {botJobs.map(j => (
-              <option
-                key={(j.botJobId ?? j.id ?? j.name) as React.Key}
-                value={String(j.botJobId ?? j.id ?? j.name)}
-              >
-                {j.name}
-              </option>
-            ))}
-          </select>
 
           <button
-            type="button"
-            className={`buttons-toolbar ${isRefreshing ? "sending" : ""}`}
-            onClick={refreshBotJobs}
-            title="Refresh bot jobs"
+            className="buttons-toolbar danger"
+            onClick={handleClearDataClick}
+            disabled={elementDTO.length === 0}
+            title={elementDTO.length === 0 ? "No data to clear" : "Clear all scanned elements"}
           >
-            ↻
+            Clear Data
           </button>
         </div>
 
-        <button
-          className={`buttons-toolbar ${isBotJobRunning ? 'sending' : ''}`}
-          onClick={handleLaunchBotJobClick}
-          disabled={isBotJobRunning || !selectedJob}
-        >
-          {isBotJobRunning ? 'Running…' : 'Launch Test'}
-        </button>
+        {/* ================= ROW 2 ================= */}
+        <div className="toolbar-row toolbar-row-bottom">
+
+          {/* ---- LEFT: Navigation + Scrolling ---- */}
+          <div className="toolbar-left">
+            <div className="scroll-select-group">
+              <span className="scroll-label">Navigation</span>
+
+              <div className="scroll-buttons inline nav-buttons">
+                <button type="button" className="buttons-toolbar nav-btn recents" onClick={sendMobileRecents}>≡</button>
+                <button type="button" className="buttons-toolbar nav-btn home" onClick={sendMobileHome}>○</button>
+                <button type="button" className="buttons-toolbar nav-btn back" onClick={sendMobileBack}>←</button>
+                <button type="button" className="buttons-toolbar nav-btn close-all" onClick={sendMobileCloseAll}>✕</button>
+              </div>
+
+              <span className="scroll-label">Scrolling</span>
+
+              <div className="scroll-buttons inline">
+                <button type="button" className="buttons-toolbar scroll-btn scroll-up" onClick={scrollDeviceUp}>▲</button>
+                <button type="button" className="buttons-toolbar scroll-btn scroll-down" onClick={scrollDeviceDown}>▼</button>
+              </div>
+            </div>
+          </div>
+
+          {/* ---- RIGHT: Validate + Bot Job + Launch ---- */}
+          <div className="toolbar-right">
+            {/* <span className="toolbar-separator" aria-hidden="true" /> */}
+
+            <div className="toolbar-inline validate-inline">
+              <span className="toolbar-label">Validate:</span>
+
+              <div className="validate-dropdown">
+                <button
+                  type="button"
+                  className="buttons-toolbar validate-trigger"
+                  onClick={() => setValidateOpen((v) => !v)}
+                  disabled={!validatePayload?.fields}
+                >
+                  {validatePayload?.fields ? `Select (${checkedCount})` : "No data"}
+                </button>
+
+                {validateOpen && (
+                  <div className="validate-menu">
+                    {Object.entries(validatePayload?.fields ?? {}).map(([key, field]) => (
+                      <label key={key} className="validate-item">
+                        <input
+                          type="checkbox"
+                          checked={!!validateChecked[key]}
+                          onChange={() => toggleValidate(key)}
+                        />
+                        <span className="validate-item-text">
+                          <strong>{key}</strong>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="toolbar-inline">
+
+              <select
+                className="toolbar-select"
+                value={selectedJob ? String(selectedJob.botJobId ?? selectedJob.id ?? selectedJob.name) : ""}
+                onChange={(e) => {
+                  const key = e.target.value;
+                  const job = botJobs.find(j => String(j.botJobId ?? j.id ?? j.name) === key) ?? null;
+                  setSelectedJob(job);
+
+                  setBotJobId(job?.botJobId ?? job?.id ?? null);
+                  setBotJobName(job?.name ?? null);
+                  if (job?.homeBankingId != null && job?.homeBankingId !== -9999) {
+                    setHomeBankingId(job.homeBankingId);
+                  }
+                }}
+                aria-label="Bot Job Presets"
+              >
+                <option value="">Select a Bot Job</option>
+                {botJobs.map(j => (
+                  <option
+                    key={(j.botJobId ?? j.id ?? j.name) as React.Key}
+                    value={String(j.botJobId ?? j.id ?? j.name)}
+                  >
+                    {j.name}
+                  </option>
+                ))}
+              </select>
+
+              <button
+                type="button"
+                className={`buttons-toolbar ${isRefreshing ? "sending" : ""}`}
+                onClick={refreshBotJobs}
+              >
+                ↻
+              </button>
+            </div>
+
+            <button
+              className={`buttons-toolbar ${isBotJobRunning ? 'sending' : ''}`}
+              onClick={handleLaunchBotJobClick}
+              disabled={isBotJobRunning || !selectedJob}
+            >
+              {isBotJobRunning ? 'Running…' : 'Launch Test'}
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* === BELOW TOOLBAR === */}
