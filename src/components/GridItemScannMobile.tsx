@@ -1174,7 +1174,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
             {/* <span className="toolbar-separator" aria-hidden="true" /> */}
 
             <div className="toolbar-inline validate-inline">
-              <span className="toolbar-label">Validate:</span>
+              <span className="toolbar-label">Validate (CSV/PDF):</span>
 
               <div className="validate-dropdown">
                 <button

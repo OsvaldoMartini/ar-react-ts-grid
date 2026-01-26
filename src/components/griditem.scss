@@ -511,18 +511,12 @@
 
 .toolbar-row-top {
   justify-content: flex-start;
-    flex-wrap: wrap;
 }
 
-/* Row 2: allow wrapping but keep shared left alignment */
 .toolbar-row-bottom {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
+  justify-content: space-between; /* left group on left, right group on right */
 }
 
-/* Make left and right behave like inline groups */
 .toolbar-left,
 .toolbar-right {
   display: flex;
@@ -530,18 +524,8 @@
   gap: 6px;
 }
 
-/* 🔑 CRITICAL FIX */
 .toolbar-right {
-  margin-left: 0;          /* remove any push */
-  padding-left: 0;
-}
-
-/* 🔑 When wrapped, force same left start as Navigation */
-@media (max-width: 900px) {
-  .toolbar-right {
-    width: 100%;           /* take full row */
-    justify-content: flex-start;
-  }
+  margin-left: auto; /* keeps right cluster aligned right */
 }
 
 
