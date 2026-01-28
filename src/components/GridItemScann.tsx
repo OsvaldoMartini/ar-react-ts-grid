@@ -69,6 +69,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   const [editingElementTagName, setEditingElementTagName] = useState<string | null>(null);
   const [elementName, setElementName] = useState<string>('');
   const [isSendingAll, setIsSendingAll] = useState(false);
+  const lastProcessedIndexRef = useRef(0);
 
   // Inside your component:
   const [hoveredRow, setHoveredRow] = useState<ElementDTO | null>(null);
@@ -113,9 +114,6 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   useEffect(() => {
     if (messages.length === 0) return;
 
-    const lastMessage = messages[messages.length - 1];
-    console.log("RECEIVED -> Last WebSocket message ", lastMessage);
-
     const tryParse = (val: any) => {
       if (typeof val !== "string") return val;
       try {
@@ -125,100 +123,106 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
       }
     };
 
-    try {
-      const parsedMessage = JSON.parse(lastMessage);
+    // Accept messages for this component from multiple sessions your backend may use.
+    const acceptedSessions = new Set([
+      sessionId, // the one passed as prop
+      "scannerGrid",
+      "scannerTool",
+      "scanner-element-pane",
+    ]);
 
-      if (typeof parsedMessage.homeBankingId === "number") {
-        setHomeBankingId(parsedMessage.homeBankingId);
-      }
+    // ✅ process only NEW messages since last effect run
+    for (let i = lastProcessedIndexRef.current; i < messages.length; i++) {
+      const msg = messages[i];
+      console.log("RECEIVED -> WebSocket message", msg);
 
-      // Accept messages for this component from multiple sessions your backend may use.
-      const acceptedSessions = new Set([
-        sessionId,                 // the one passed as prop
-        "scannerGrid",             // your backend sender
-        "scannerTool",
-        "scanner-element-pane",
-      ]);
+      try {
+        const parsedMessage = JSON.parse(msg);
 
-      if (!acceptedSessions.has(parsedMessage.sessionId)) return;
+        if (typeof parsedMessage.homeBankingId === "number") {
+          setHomeBankingId(parsedMessage.homeBankingId);
+        }
 
-      const bodyData = tryParse(parsedMessage.body);
+        if (!acceptedSessions.has(parsedMessage.sessionId)) continue;
 
-      switch (parsedMessage.operationId) {
-        // ---------- EXISTING FLOWS ----------
-        case "searchTerms": {
-          setIsSendingAll(false);
+        const bodyData = tryParse(parsedMessage.body);
 
-          const detailsData = Array.isArray(bodyData?.details) ? bodyData.details : [];
-          if (detailsData.length === 0) {
-            setElementDTO([]);
-            setElementGrouped({});
+        switch (parsedMessage.operationId) {
+          case "searchTerms": {
+            setIsSendingAll(false);
+
+            const detailsData = Array.isArray(bodyData?.details) ? bodyData.details : [];
+            if (detailsData.length === 0) {
+              setElementDTO([]);
+              setElementGrouped({});
+              setBotJobId(bodyData?.botJobId);
+              setBotJobName(bodyData?.botJobName);
+            } else {
+              setElementDTO(detailsData);
+            }
+            break;
+          }
+
+          case "clonedElement":
+          case "addPickOne": {
+            setIsSendingAll(false);
+
+            const newElements = bodyData?.elementDetails;
             setBotJobId(bodyData?.botJobId);
             setBotJobName(bodyData?.botJobName);
-          } else {
-            setElementDTO(detailsData);
-          }
-          break;
-        }
 
-        case "clonedElement":
-        case "addPickOne": {
-          setIsSendingAll(false);
+            if (newElements && Array.isArray(newElements) && newElements.length > 0) {
+              setElementDTO((prevElements) => {
+                let updatedElements = [...prevElements];
 
-          const newElements = bodyData?.elementDetails;
-          setBotJobId(bodyData?.botJobId);
-          setBotJobName(bodyData?.botJobName);
+                const maxId = prevElements.reduce((max, el) => Math.max(max, el.id || 0), 0);
+                let nextId = maxId + 1;
 
-          if (newElements && Array.isArray(newElements) && newElements.length > 0) {
-            setElementDTO((prevElements) => {
-              let updatedElements = [...prevElements];
+                newElements.forEach((newElement: any) => {
+                  const isDup = updatedElements.some(
+                    (el) => el.xPath === newElement.xPath && el.tagName === newElement.tagName
+                  );
+                  if (!isDup) {
+                    const elementToAdd = { ...newElement, id: nextId++ };
 
-              const maxId = prevElements.reduce((max, el) => Math.max(max, el.id || 0), 0);
-              let nextId = maxId + 1;
+                    let insertIndex = -1;
+                    if (prevElements.length > 0 && bodyData?.afterXPath) {
+                      insertIndex = prevElements.findIndex(
+                        (el) => el.xPath === bodyData.afterXPath
+                      );
+                    }
 
-              newElements.forEach((newElement: any) => {
-                const isDup = updatedElements.some(
-                  (el) => el.xPath === newElement.xPath && el.tagName === newElement.tagName
-                );
-                if (!isDup) {
-                  const elementToAdd = { ...newElement, id: nextId++ };
-
-                  let insertIndex = -1;
-                  if (prevElements.length > 0 && bodyData?.afterXPath) {
-                    insertIndex = prevElements.findIndex(
-                      (el) => el.xPath === bodyData.afterXPath
-                    );
+                    if (insertIndex !== -1) {
+                      updatedElements.splice(insertIndex + 1, 0, elementToAdd);
+                    } else {
+                      updatedElements.push(elementToAdd);
+                    }
                   }
+                });
 
-                  if (insertIndex !== -1) {
-                    updatedElements.splice(insertIndex + 1, 0, elementToAdd);
-                  } else {
-                    updatedElements.push(elementToAdd);
-                  }
-                }
+                return updatedElements;
               });
+            }
 
-              return updatedElements;
-            });
+            setIsElementGrouped(false);
+            break;
           }
 
-          setIsElementGrouped(false);
-          break;
-        }
+          case "activate-insert-all": {
+            setIsSendingAll(false);
+            break;
+          }
 
-        // ---------- EXISTING BUTTON-ACTIVATE ----------
-        case "activate-insert-all": {
-          setIsSendingAll(false);
-          break;
+          default:
+            break;
         }
-
-        default:
-          // no-op
-          break;
+      } catch (error) {
+        console.error("Error parsing WebSocket message:", error);
       }
-    } catch (error) {
-      console.error("Error parsing WebSocket message:", error);
     }
+
+    // ✅ mark all messages as processed
+    lastProcessedIndexRef.current = messages.length;
   }, [messages, sessionId]);
 
   useEffect(() => {
