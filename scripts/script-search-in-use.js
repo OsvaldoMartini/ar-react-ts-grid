@@ -7,7 +7,7 @@
   destination,
   operationId,
   homeBankingId,
-  botJobId
+  botJobId,
 ) {
   let pingIntervalId = null;
   let attempts = 0;
@@ -40,7 +40,7 @@
     try {
       //console.log(`Attempt ${attempts + 1} to connect to WebSocket...`);
       wSocket = new WebSocket(
-        `ws://localhost:${socketPort}/websocket?sessionId=${window.sessionId}`
+        `ws://localhost:${socketPort}/websocket?sessionId=${window.sessionId}`,
       );
 
       wSocket.onopen = () => {
@@ -56,7 +56,7 @@
           };
           // Convert the JSON message to a buffer
           const base64Message = btoa(
-            unescape(encodeURIComponent(JSON.stringify(subscriptionMessage)))
+            unescape(encodeURIComponent(JSON.stringify(subscriptionMessage))),
           );
           // Convert the buffer to a Base64 string
           wSocket.send(base64Message);
@@ -102,13 +102,13 @@
 
                 if (!hoveredElement) {
                   hoveredElement = document.querySelector(
-                    detailsData[0].cssSelector
+                    detailsData[0].cssSelector,
                   );
                 }
 
                 if (!hoveredElement) {
                   var hoveredElement = getElementByCoordinates(
-                    detailsData[0].coordinates
+                    detailsData[0].coordinates,
                   );
                 }
 
@@ -128,7 +128,7 @@
                   if (!originalStyles.has(currentXPath)) {
                     originalStyles.set(
                       currentXPath,
-                      hoveredElement.style.outline
+                      hoveredElement.style.outline,
                     );
                     hoveredXPathMap.add(currentXPath);
                   }
@@ -230,7 +230,7 @@
   const collectElements = function collectElements(
     doc,
     searchTerms,
-    collectionFound
+    collectionFound,
   ) {
     // Collect elements from the current document using the provided search terms
     if (searchTerms.length > 0) {
@@ -246,7 +246,7 @@
         // If search term includes "with test-id", filter only elements that have a "test-id" attribute
         else if (selector.includes("with test-id")) {
           collectionFound.push(
-            ...Array.from(doc.querySelectorAll("[test-id]"))
+            ...Array.from(doc.querySelectorAll("[test-id]")),
           );
         } else {
           collectionFound.push(...Array.from(doc.querySelectorAll(selector)));
@@ -256,8 +256,8 @@
       // Collect all elements except iframes
       collectionFound.push(
         ...Array.from(doc.querySelectorAll("*")).filter(
-          (el) => el.tagName.toLowerCase() !== "iframe"
-        )
+          (el) => el.tagName.toLowerCase() !== "iframe",
+        ),
       );
     }
 
@@ -265,7 +265,7 @@
     collectionFound.forEach((element) => {
       if (
         ["html", "body", "main", "script", "meta", "head", "style"].includes(
-          element.tagName.toLowerCase()
+          element.tagName.toLowerCase(),
         )
       ) {
         return;
@@ -278,7 +278,7 @@
           "tagName-Found",
           elementIdentity.xPath,
           elementIdentity,
-          searchTerms
+          searchTerms,
         );
       }
     });
@@ -289,7 +289,7 @@
     typeDTO,
     referXPath,
     elementIdentity,
-    searchTerms
+    searchTerms,
   ) {
     if (
       searchTerms.length === 0 ||
@@ -321,7 +321,7 @@
             referXPath,
             typeDTO,
             shadowHost,
-            shadowRoot
+            shadowRoot,
           );
         });
       } else {
@@ -380,7 +380,7 @@
               referXPath,
               typeDTO,
               shadowHost,
-              shadowRoot
+              shadowRoot,
             );
           });
         } else {
@@ -391,7 +391,7 @@
             referXPath,
             typeDTO,
             null,
-            null
+            null,
           );
         }
         // window.elementInfoMap.set(
@@ -458,7 +458,7 @@
         iframe.id ||
         iframe.name ||
         "No description"
-      }; ${iframeDetails}`
+      }; ${iframeDetails}`,
     );
     // Store the iframe details in the elementInfoMap
     elementInfoMap.set(
@@ -469,7 +469,7 @@
         iframe.id ||
         iframe.name ||
         "No description"
-      };${iframeDetails}`
+      };${iframeDetails}`,
     );
   };
 
@@ -477,7 +477,7 @@
   const collectIframeElements = function collectIframeElements(
     doc,
     collectionFound,
-    isIframeChild = false
+    isIframeChild = false,
   ) {
     doc.querySelectorAll("iframe").forEach((iframe) => {
       try {
@@ -504,7 +504,7 @@
               "iFrame-Found",
               elementIdentity.xPath,
               elementIdentity,
-              searchTerms
+              searchTerms,
             );
           }
 
@@ -537,7 +537,7 @@
                     "iFrame-Child",
                     `${xPathIFrame}${elementIdentity?.xPath}`,
                     elementIdentity,
-                    searchTerms
+                    searchTerms,
                   );
                 }
               });
@@ -552,8 +552,8 @@
               srcDocElements
                 ? srcDocElements.length
                 : iframeDocument
-                ? iframeDocument.querySelectorAll("*").length
-                : 0
+                  ? iframeDocument.querySelectorAll("*").length
+                  : 0,
             );
           }
 
@@ -573,7 +573,7 @@
                   "iFrame-Child",
                   `${xPathIFrame}${elementIdentity?.xPath}`,
                   elementIdentity,
-                  searchTerms
+                  searchTerms,
                 );
               }
             });
@@ -592,7 +592,7 @@
                 "iFrame-Child",
                 `${xPathIFrame}${elementIdentity?.xPath}`,
                 elementIdentity,
-                searchTerms
+                searchTerms,
               );
             }
           });
@@ -631,7 +631,7 @@
             "iFrame-Child",
             `${xPathIFrame}${elementIdentity?.xPath}`,
             elementIdentity,
-            searchTerms
+            searchTerms,
           );
         }
       });
@@ -639,7 +639,7 @@
 
   // Function to initialize the collection process
   const startCollectingElements = function startCollectingElements(
-    searchTerms
+    searchTerms,
   ) {
     // const searchTerms = ["button", "input", "a", "div"]; // Define elements to search for
     window.elementInfoMap = new Map(); // Initialize the map to store element information
@@ -654,13 +654,13 @@
     window.allElementInfo = [];
 
     collectionFound = getResultMap(window.elementInfoMap);
-    console.log("All Collection Found :", collectionFound);
+    // console.log("All Collection Found :", collectionFound);
 
     const sameXPathFound = processElementsWithXPath(collectionFound);
     // console.log("processElementsWithXPath", sameXPathFound);
 
     const noRepeatedItems = findUniqueAndOneRepeated(sameXPathFound);
-    console.log("noRepeatedItems", noRepeatedItems); // Output the items with repetitions
+    // console.log("noRepeatedItems", noRepeatedItems); // Output the items with repetitions
 
     // Define the order
     const order = [
@@ -688,40 +688,56 @@
       return [...acc, ...filteredElements];
     }, []);
 
-    console.log("sortedList", sortedList);
+    // console.log("sortedList", sortedList);
 
     findMatLabel(sortedList);
 
     changeDivToLabelWithSomeText(sortedList);
 
     limitMapSize(sortedList);
-    console.log("All element info stored in Map:", window.allElementInfo);
+    // console.log("All element info stored in Map:", window.allElementInfo);
     window.elementInfoMap.clear();
 
     if (wSocket && wSocket.readyState) {
       //console.log("WebSocket readyState:", wSocket.readyState);
     }
 
+    // Send elementDetails in chunks of 25
     if (wSocket && wSocket.readyState === WebSocket.OPEN) {
-      const message = {
-        type: "SEARCH_TOOL",
-        sessionId: window.destination,
-        operationId: window.operationId,
-        homeBankingId: window.homeBankingId,
-        botJobId: window.botJobId,
-        elementDetails: window.allElementInfo, // Send allElementInfo
-      };
+      const CHUNK_SIZE = 25;
 
-      // Convert the JSON message to a buffer
-      const base64Message = btoa(
-        unescape(encodeURIComponent(JSON.stringify(message)))
-      );
-      // Convert the buffer to a Base64 string
-      wSocket.send(base64Message);
-      // wSocket.send(JSON.stringify(message));
-      //console.log("Sent SEARCH_TOOL:", message);
-      //console.log("Sent ENCODED Length:", base64Message.length);
-      //console.log("Sent ENCODED:", base64Message);
+      // snapshot so later clears don't affect what we send
+      const all = Array.isArray(window.allElementInfo)
+        ? window.allElementInfo
+        : [];
+
+      for (let i = 0; i < all.length; i += CHUNK_SIZE) {
+        const chunk = all.slice(i, i + CHUNK_SIZE);
+
+        const message = {
+          type: "SEARCH_TOOL",
+          sessionId: window.destination,
+          operationId: window.operationId,
+          homeBankingId: window.homeBankingId,
+          botJobId: window.botJobId,
+
+          // ✅ only 25 items each message
+          elementDetails: chunk,
+
+          // optional: helps backend reassemble in order
+          chunkIndex: Math.floor(i / CHUNK_SIZE),
+          totalChunks: Math.ceil(all.length / CHUNK_SIZE),
+          chunkSize: CHUNK_SIZE,
+          totalElements: all.length,
+        };
+
+        const base64Message = btoa(
+          unescape(encodeURIComponent(JSON.stringify(message))),
+        );
+
+        wSocket.send(base64Message);
+        console.log(`Sent chunk: # ${i}`, chunk);
+      }
 
       alreadySent = true;
       window.allElementInfo = [];
@@ -736,7 +752,7 @@
     referXPath,
     typeDTO,
     shadowHost,
-    shadowRoot
+    shadowRoot,
   ) {
     let shadowHostSelector = "";
     let elementCssSelector = "";
@@ -803,7 +819,7 @@
 
       window.elementInfoMap.set(
         referXPath, // Keep Distinction iFrameXPath / child / etc...
-        elementDTO(typeDTO, elementIdentity)
+        elementDTO(typeDTO, elementIdentity),
       );
     }
   }
@@ -931,7 +947,7 @@
           if (foundAttr) {
             firstMeaningfulText = getAttributeText(
               foundAttr.name,
-              foundAttr.value
+              foundAttr.value,
             );
             if (firstMeaningfulText) break; // Stop at first meaningful attribute
           }
@@ -996,14 +1012,14 @@
           if (value) {
             const words = value.split(/\s+/);
             const filteredWords = words.filter(
-              (word) => !isTechnicalPattern(word)
+              (word) => !isTechnicalPattern(word),
             );
             const filteredText = filteredWords.join(" ").trim();
             if (filteredText) result.text.add(filteredText);
           } else if (placeholder) {
             const words = placeholder.split(/\s+/);
             const filteredWords = words.filter(
-              (word) => !isTechnicalPattern(word)
+              (word) => !isTechnicalPattern(word),
             );
             const filteredText = filteredWords.join(" ").trim();
             if (filteredText) result.text.add(filteredText);
@@ -1036,7 +1052,7 @@
           const textContent = child.textContent.trim();
           const words = textContent.split(/\s+/);
           const filteredWords = words.filter(
-            (word) => !isTechnicalPattern(word)
+            (word) => !isTechnicalPattern(word),
           );
           const filteredText = filteredWords.join(" ").trim();
           if (filteredText) {
@@ -1376,7 +1392,7 @@
           if (trimmedWord) {
             wordFrequency.set(
               trimmedWord,
-              (wordFrequency.get(trimmedWord) || 0) + 1
+              (wordFrequency.get(trimmedWord) || 0) + 1,
             );
 
             if (!wordToItems.has(trimmedWord)) {
@@ -1399,11 +1415,11 @@
     // Resolve elements with same coordinates, prioritizing "aria-label"
     coordinatesMap.forEach((elements) => {
       let priorityElement = elements.find((el) =>
-        el.attributeData?.some((attr) => attr.name === "aria-label")
+        el.attributeData?.some((attr) => attr.name === "aria-label"),
       );
       if (priorityElement) {
         const ariaLabelAttr = priorityElement.attributeData.find(
-          (attr) => attr.name === "aria-label"
+          (attr) => attr.name === "aria-label",
         );
         if (ariaLabelAttr) {
           elements.forEach((el) => {
@@ -1436,7 +1452,7 @@
         items.sort(
           (a, b) =>
             hasAttribute(b, "aria-label") - hasAttribute(a, "aria-label") ||
-            hasAttribute(b, "test-id") - hasAttribute(a, "test-id")
+            hasAttribute(b, "test-id") - hasAttribute(a, "test-id"),
         );
 
         if (!addedElements.has(items[0])) {
@@ -1518,15 +1534,23 @@
   };
 
   function limitMapSize(sortedList) {
-    // Check the length of allElementInfo before adding new elements
-    //console.log("limitMapSize");
     let currentId = 1;
+
     sortedList.forEach((item) => {
-      if (window.allElementInfo.length < 150) {
-        window.allElementInfo.push({ ...item, id: currentId++ });
-      }
+      window.allElementInfo.push({ ...item, id: currentId++ });
     });
   }
+
+  // function limitMapSize(sortedList) {
+  //   // Check the length of allElementInfo before adding new elements
+  //   //console.log("limitMapSize");
+  //   let currentId = 1;
+  //   sortedList.forEach((item) => {
+  //     if (window.allElementInfo.length < 150) {
+  //       window.allElementInfo.push({ ...item, id: currentId++ });
+  //     }
+  //   });
+  // }
 
   function findMatLabel(sortedList) {
     sortedList.forEach((item) => {
@@ -1621,7 +1645,7 @@
     setTimeout(() => init("Direct Execution"), 0);
   } else {
     document.addEventListener("DOMContentLoaded", () =>
-      setTimeout(() => init("DOMContentLoaded"), 0)
+      setTimeout(() => init("DOMContentLoaded"), 0),
     );
     window.addEventListener("load", () => init("load"));
     document.attachEvent?.("onreadystatechange", function () {
@@ -1645,7 +1669,7 @@
 
         try {
           const encodedPing = btoa(
-            unescape(encodeURIComponent(JSON.stringify(pingMessage)))
+            unescape(encodeURIComponent(JSON.stringify(pingMessage))),
           );
           wSocket.send(encodedPing);
           //console.log("Ping sent:", pingMessage);
@@ -1663,7 +1687,7 @@
         document,
         null,
         XPathResult.FIRST_ORDERED_NODE_TYPE,
-        null
+        null,
       );
       return result.singleNodeValue;
     } catch (error) {
@@ -1756,23 +1780,23 @@
   // startCollectingElements(window.searchTerms);
   // init("Initiate");
   // window.initSearchTerms = null; // Invalidating the function
-  // })(
-  //   arguments[0],
-  //   arguments[1],
-  //   arguments[2],
-  //   arguments[3],
-  //   arguments[4],
-  //   arguments[5],
-  //   arguments[6],
-  //   arguments[7]
-  // );
 })(
-  ["button", "input", "label", "a", "select"],
-  false,
-  62601,
-  "scannerTool",
-  "scannerGrid",
-  "searchTerms",
-  2,
-  66
+  arguments[0],
+  arguments[1],
+  arguments[2],
+  arguments[3],
+  arguments[4],
+  arguments[5],
+  arguments[6],
+  arguments[7],
 );
+// })(
+//   ["button", "textarea", "input", "label", "a", "select"],
+//   false,
+//   59162,
+//   "scannerTool",
+//   "scannerGrid",
+//   "searchTerms",
+//   184,
+//   310,
+// );
