@@ -69,6 +69,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   const [editingElementTagName, setEditingElementTagName] = useState<string | null>(null);
   const [elementName, setElementName] = useState<string>('');
   const [isSendingAll, setIsSendingAll] = useState(false);
+  const [isUpdatingAll, setIsUpdatingAll] = useState(false);
   const lastProcessedIndexRef = useRef(0);
 
   // Inside your component:
@@ -96,6 +97,14 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     }, 15000); // 15s fallback
     return () => clearTimeout(t);
   }, [isSendingAll]);
+
+  useEffect(() => {
+    if (!isUpdatingAll) return;
+    const t = setTimeout(() => {
+      setIsUpdatingAll(false);
+    }, 15000); // 15s fallback
+    return () => clearTimeout(t);
+  }, [isUpdatingAll]);
 
   useEffect(() => {
     const newBlockPages: Record<string, number> = {};
@@ -150,6 +159,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
         switch (parsedMessage.operationId) {
           case "searchTerms": {
             setIsSendingAll(false);
+            setIsUpdatingAll(false);
 
             const detailsData = Array.isArray(bodyData?.details) ? bodyData.details : [];
             if (detailsData.length === 0) {
@@ -166,6 +176,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
           case "clonedElement":
           case "addPickOne": {
             setIsSendingAll(false);
+            setIsUpdatingAll(false);
 
             const newElements = bodyData?.elementDetails;
             setBotJobId(bodyData?.botJobId);
@@ -210,6 +221,11 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
 
           case "activate-insert-all": {
             setIsSendingAll(false);
+            break;
+          }
+
+          case "activate-update-all": {
+            setIsUpdatingAll(false);
             break;
           }
 
@@ -275,6 +291,37 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     } catch (error) {
       console.error("❌ Error sending WebSocket message:", error);
       setIsSendingAll(false); // re-enable if send fails
+    }
+  };
+
+  const handlesUpdateAllClick = () => {
+    console.log("handleSendAllClick: Sending all ElementDTOs");
+
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
+      console.warn("🚨 WebSocket is not connected. Cannot send message.");
+      return;
+    }
+
+    setIsUpdatingAll(true); // 🔒 Disable the button after first click
+
+    // Flatten the elementGrouped object to get all ElementDTOs
+    const allElements = Object.values(elementGrouped).flatMap(group => group.elements);
+
+    const message = {
+      type: "UPDATE_ALL_ELEMENTS_DTO",
+      homeBankingId: homeBankingId,
+      botJobId: botJobId,
+      botJobName: botJobName,
+      sessionId: `scanner-element-pane`,
+      elementDetails: allElements,
+    };
+
+    try {
+      webSocket.send(JSON.stringify(message));
+      console.log("📤 Sent UPDATE all ElementDTOs:", message);
+    } catch (error) {
+      console.error("❌ Error sending WebSocket message:", error);
+      setIsUpdatingAll(false); // re-enable if send fails
     }
   };
 
@@ -597,6 +644,13 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
               disabled={isSendingAll}
             >
               {isSendingAll ? 'Sending...' : 'Insert All Elements'}
+            </button>
+            <button
+              className={`send-all-button ${isSendingAll ? 'updating' : ''}`}
+              onClick={handlesUpdateAllClick}
+              disabled={isUpdatingAll}
+            >
+              {isUpdatingAll ? 'Updating...' : 'Update All Elements'}
             </button>
             <button className="attributes-button" onClick={() => setShowAttributes(!showAttributes)}>
               {showAttributes ? 'Hide Attributes' : 'Show Attributes'}
