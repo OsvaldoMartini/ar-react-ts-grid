@@ -1786,7 +1786,7 @@
 })(
   ["button", "textarea", "input", "label", "a", "select"],
   false,
-  55235,
+  57398,
   "scannerTool",
   "scannerGrid",
   "searchTerms",

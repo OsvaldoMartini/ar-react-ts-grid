@@ -463,13 +463,19 @@
   @extend .toolbar-main-button;
 }
 
+.update-all-button {
+  @extend .toolbar-main-button;
+}
+
 .attributes-button:hover,
-.send-all-button:hover {
+.send-all-button:hover,
+.update-all-button:hover {
   background-color: #a9bec7 !important;
   transform: scale(1.05);
 }
 
 .send-all-button.sending,
+.update-all-button.sending,
 .attributes-button.sending {
   background-color: #4caf50 !important;
   color: #0b5394 !important;
@@ -478,6 +484,7 @@
 }
 
 .send-all-button:disabled,
+.update-all-button:disabled,
 .attributes-button:disabled {
   background-color: #cccccc;
   color: #7a7a7a;

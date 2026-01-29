@@ -646,7 +646,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
               {isSendingAll ? 'Sending...' : 'Insert All Elements'}
             </button>
             <button
-              className={`send-all-button ${isUpdatingAll ? 'updating' : ''}`}
+              className={`update-all-button ${isUpdatingAll ? 'updating' : ''}`}
               onClick={handlesUpdateAllClick}
               disabled={isUpdatingAll}
             >
