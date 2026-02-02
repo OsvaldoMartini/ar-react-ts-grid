@@ -20,17 +20,6 @@
   const originalStyles = new Map();
   const hoveredXPathMap = new Set(); // Changed from Map to Set
   let previousHighlightedElement = null;
-
-  // --- NEW: stop any previous injected instance ---
-  try {
-    if (typeof window.__scannerToolCleanup === "function") {
-      window.__scannerToolCleanup(); // stop previous run
-    }
-  } catch (e) {}
-
-  // reset before registering this run
-  window.__scannerToolCleanup = null;
-
   var coordinatesElement = document.createElement("div");
   coordinatesElement.id = "coordinates";
   coordinatesElement.style.position = "fixed"; // Fixed so it stays above all elements
@@ -215,52 +204,20 @@
   }
 
   // Optionally, expose a cleanup function
-  // --- NEW: unified cleanup for reinjection/unload ---
-  const cleanup = () => {
+  window.cleanupWebSocket = () => {
     try {
-      alreadySent = true; // IMPORTANT: prevents reconnect loop in onclose
-
-      // remove listeners
-      document.removeEventListener("mousemove", showMartiniTooltip);
-      document.removeEventListener("click", handleMartiniClick);
-
-      // stop intervals
+      //console.log("Cleaning up WebSocket...");
+      if (wSocket && wSocket.readyState === WebSocket.OPEN) {
+        wSocket.close();
+      }
       if (pingIntervalId) {
         clearInterval(pingIntervalId);
         pingIntervalId = null;
       }
-      if (restoreIntervalId) {
-        clearInterval(restoreIntervalId);
-        restoreIntervalId = null;
-      }
-
-      // remove UI + restore styles
-      removeElements();
-      restoreOriginalStyles();
-
-      // close ws even if CONNECTING
-      if (
-        wSocket &&
-        (wSocket.readyState === WebSocket.OPEN ||
-          wSocket.readyState === WebSocket.CONNECTING)
-      ) {
-        try {
-          wSocket.onclose = null; // avoid triggering reconnect logic
-        } catch (e) {}
-        wSocket.close(1000, "cleanup");
-      }
-
-      // clear data
-      try {
-        window.elementInfoMap?.clear();
-      } catch (e) {}
-      window.allElementInfo = [];
-    } catch (e) {}
+    } catch (cleanupError) {
+      //console.error("Error during WebSocket cleanup:", cleanupError);
+    }
   };
-
-  window.cleanupWebSocket = cleanup;
-  window.__scannerToolCleanup = cleanup; // NEW: so next injection can stop this one
-  window.addEventListener("beforeunload", cleanup, { once: true });
 
   function sendingData() {
     window.allElementInfo = [];
@@ -1118,7 +1075,7 @@
   }
 
   // Set up the interval to call the function every 5 seconds (5000 milliseconds)
-  let restoreIntervalId = setInterval(restoreOriginalStyles, 5000);
+  setInterval(restoreOriginalStyles, 5000);
 
   function removeElements() {
     // Remove highlight from the previous element if any
@@ -1186,12 +1143,12 @@
 );
 // })(
 //   false,
-//   59433,
+//   57197,
 //   "scannerTool",
-//   "scannerGrid",
+//   "scanner-element-pane-2",
 //   "addPickOne",
 //   2,
 //   66,
 //   "https://www.inlinea.ch/",
-//   "https://www.inlinea.ch/",
+//   "https://www.inlinea.ch/"
 // );

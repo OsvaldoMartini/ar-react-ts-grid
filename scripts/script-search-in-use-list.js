@@ -1,4 +1,4 @@
-// SEARCH IN USE (SENDER: scannerTool) -> scannerGrid
+// SEARCH IN USE (SENDER: scannerTool) -> UPDATE_LIST_ELEMENTS
 (function (
   searchTerms,
   hiddenFields,
@@ -16,9 +16,6 @@
   let alreadySent = false;
   let previousXPath = null;
   // Temporary storage for original styles
-  const originalStyles = new Map();
-  const hoveredXPathMap = new Set(); // Changed from Map to Set
-  let previousHighlightedElement = null;
   let pageFullyLoaded = false;
 
   // --- NEW: stop any previous injected instance ---
@@ -28,7 +25,7 @@
     }
   } catch (e) {}
 
-  // reset before registering this run
+  // keep reference to *this* run cleanup (assigned later)
   window.__scannerToolCleanup = null;
 
   window.elementInfoMap = new Map();
@@ -72,7 +69,7 @@
           // Convert the buffer to a Base64 string
           wSocket.send(base64Message);
           // wSocket.send(JSON.stringify(message));
-          //console.log("Sent SEARCH_TOOL:", subscriptionMessage);
+          //console.log("Sent UPDATE_LIST_ELEMENTS:", subscriptionMessage);
           //console.log("Sent ENCODED Length:", base64Message.length);
           //console.log("Sent ENCODED:", base64Message);
         } catch (sendError) {
@@ -100,77 +97,6 @@
               typeof parsedMessage.body === "string"
                 ? JSON.parse(parsedMessage.body)
                 : parsedMessage.body;
-
-            if (window.sessionId === bodyData.sessionId) {
-              if (bodyData.operationId === "highlight") {
-                const detailsData = Array.isArray(bodyData.elementDetails)
-                  ? bodyData.elementDetails
-                  : [];
-
-                //console.log("detailsData", detailsData[0]);
-
-                var hoveredElement = findElementByXPath(detailsData[0].xPath);
-
-                if (!hoveredElement) {
-                  hoveredElement = document.querySelector(
-                    detailsData[0].cssSelector,
-                  );
-                }
-
-                if (!hoveredElement) {
-                  var hoveredElement = getElementByCoordinates(
-                    detailsData[0].coordinates,
-                  );
-                }
-
-                if (hoveredElement) {
-                  // console.log("hoveredElement", hoveredElement);
-
-                  const currentXPath = detailsData[0].xPath;
-
-                  // Restore style of previous element (if XPath is different)
-                  if (previousXPath && previousXPath !== currentXPath) {
-                    const originalOutline = originalStyles.get(previousXPath);
-                    previousHighlightedElement.style.outline =
-                      originalOutline || "";
-                  }
-
-                  // Save original style using XPath as key
-                  if (!originalStyles.has(currentXPath)) {
-                    originalStyles.set(
-                      currentXPath,
-                      hoveredElement.style.outline,
-                    );
-                    hoveredXPathMap.add(currentXPath);
-                  }
-
-                  const originalOutline =
-                    originalStyles.get(currentXPath) || "";
-
-                  // Check if original style already had red
-                  if (originalOutline.includes("#2323FF")) {
-                    hoveredElement.style.outline = "3px solid #FF3131";
-                  } else if (originalOutline.includes("#FF3131")) {
-                    hoveredElement.style.outline = "3px solid #2323FF";
-                  } else {
-                    hoveredElement.style.outline = "3px solid #FF3131";
-                  }
-
-                  previousHighlightedElement = hoveredElement;
-                  previousXPath = currentXPath;
-                } else {
-                  restoreOriginalStyles();
-                }
-              }
-
-              if (
-                parsedMessage.body.includes("cannot be processed") ||
-                (parsedMessage.footer &&
-                  parsedMessage.footer.includes("cannot be processed"))
-              ) {
-                //Handle cannot be processed
-              }
-            }
           } catch (parseError) {
             // console.log("Non-JSON message received:", receivedMessage);
           }
@@ -204,19 +130,7 @@
   const cleanup = () => {
     try {
       alreadySent = true; // IMPORTANT: prevents reconnect loop in onclose
-
-      // stop restore timer
-      if (typeof restoreIntervalId !== "undefined") {
-        clearInterval(restoreIntervalId);
-      }
-
-      // stop ping timer
-      if (pingIntervalId) {
-        clearInterval(pingIntervalId);
-        pingIntervalId = null;
-      }
-
-      // close ws even if CONNECTING
+      //console.log("Cleaning up WebSocket...");
       if (
         wSocket &&
         (wSocket.readyState === WebSocket.OPEN ||
@@ -227,7 +141,13 @@
         } catch (e) {}
         wSocket.close(1000, "cleanup");
       }
-    } catch (cleanupError) {}
+      if (pingIntervalId) {
+        clearInterval(pingIntervalId);
+        pingIntervalId = null;
+      }
+    } catch (cleanupError) {
+      //console.error("Error during WebSocket cleanup:", cleanupError);
+    }
   };
 
   window.cleanupWebSocket = cleanup;
@@ -749,7 +669,7 @@
           const chunk = all.slice(i, i + CHUNK_SIZE);
 
           const message = {
-            type: "SEARCH_TOOL",
+            type: "UPDATE_LIST_ELEMENTS",
             sessionId: window.destination,
             operationId: window.operationId,
             homeBankingId: window.homeBankingId,
@@ -845,12 +765,6 @@
 
     // Store tagName and other details in the Map
     if (elementIdentity) {
-      if (!originalStyles.has(element)) {
-        // Store the original outline before changing it
-        originalStyles.set(element, element.style.outline);
-      }
-      element.style.outline = "3px solid red";
-
       window.elementInfoMap.set(
         referXPath, // Keep Distinction iFrameXPath / child / etc...
         elementDTO(typeDTO, elementIdentity),
@@ -1702,103 +1616,6 @@
     }, 15000); // 15 seconds
   }
 
-  function findElementByXPath(xpath) {
-    try {
-      const result = document.evaluate(
-        xpath,
-        document,
-        null,
-        XPathResult.FIRST_ORDERED_NODE_TYPE,
-        null,
-      );
-      return result.singleNodeValue;
-    } catch (error) {
-      console.error("Error finding element by XPath:", error);
-      return null; // Return null in case of error
-    }
-  }
-
-  function getElementByCoordinates(coordString) {
-    const [xStr, yStr] = coordString.split(",");
-    const x = parseFloat(xStr.trim());
-    const y = parseFloat(yStr.trim());
-
-    if (isNaN(x) || isNaN(y)) {
-      //console.error("Invalid coordinates:", coordString);
-      return null;
-    }
-
-    const element = document.elementFromPoint(x, y);
-    //console.log("Element found at", x, y, "=>", element);
-    return element;
-  }
-
-  window.revertSearchInjections = function () {
-    // Remove the tooltip from the page and delete the reference after 5 seconds
-    setTimeout(() => {
-      restoreOriginalStyles();
-      window.allElementInfo = [];
-    }, 3000);
-  };
-
-  // Function to restore the original outline
-  function restoreOriginalStyles() {
-    // console.log("restoreOriginalStyles", originalStyles);
-    if (originalStyles && originalStyles.size > 0) {
-      originalStyles.forEach((originalStyle, element) => {
-        if (element && element.style) {
-          element.style.outline = originalStyle; // Restore original outline
-        }
-      });
-
-      // Paranoic
-      if (hoveredXPathMap && hoveredXPathMap.size > 0) {
-        // console.log("hoveredXPathMap");
-        hoveredXPathMap.forEach((xPath) => {
-          const originalOutline = originalStyles.get(xPath);
-          var element = findElementByXPath(xPath);
-          if (element && element.style) {
-            element.style.outline = originalOutline; // Restore original outline
-          }
-        });
-      }
-
-      // originalStyles.clear(); // Clear the stored styles
-    }
-  }
-
-  // Set up the interval to call the function every 5 seconds (5000 milliseconds)
-  const restoreIntervalId = setInterval(restoreOriginalStyles, 5000);
-
-  // window.addEventListener("beforeunload", function (event) {
-  //   // event.preventDefault();
-  //   // event.returnValue =
-  //   //   "⚠️ Warning: Closing this tab will terminate an active WebDriver session!";
-
-  //   if (wSocket && wSocket.readyState === WebSocket.OPEN) {
-  //     const message = {
-  //       type: "CLOSE_BROWSER",
-  //       sessionId: `scanner-element-pane`, //-${window.homeBankingId}`,
-  //       operationId: "closeBrowser",
-  //       homeBankingId: window.homeBankingId,
-  //       botJobId: window.botJobId,
-  //       elementDetails: window.allElementInfo, // Send allElementInfo
-  //     };
-
-  //     // Convert the JSON message to a buffer
-  //     const base64Message = btoa(
-  //       unescape(encodeURIComponent(JSON.stringify(message)))
-  //     );
-  //     // Convert the buffer to a Base64 string
-  //     wSocket.send(base64Message);
-
-  //     alreadySent = true;
-  //     window.allElementInfo = [];
-  //     window.elementInfoMap.clear();
-  //     window.revertSearchInjections();
-  //   }
-  // });
-
   // startCollectingElements(window.searchTerms);
   // init("Initiate");
   // window.initSearchTerms = null; // Invalidating the function
@@ -1815,9 +1632,9 @@
 // })(
 //   ["button", "textarea", "input", "label", "a", "select"],
 //   false,
-//   59057,
-//   "scannerTool",
-//   "scannerGrid",
+//   61369,
+//   "UPDATE_LIST_ELEMENTS",
+//   "perform-list-data",
 //   "searchTerms",
 //   184,
 //   310,
