@@ -155,11 +155,18 @@ const __done = arguments[arguments.length - 1];
         !searchTerms.includes("with test-id"))
     ) {
       // Check if the clicked element has a shadow root
-      let shadowHost = element;
+      let shadowHost = null;
 
-      // Locate the shadow host element if it has a shadow root
-      while (shadowHost && !shadowHost.shadowRoot) {
-        shadowHost = shadowHost.parentElement; // Traverse upwards in the DOM
+      // If element is inside an OPEN shadow root, jump directly to the host
+      const root = element.getRootNode && element.getRootNode();
+      if (root && root instanceof ShadowRoot) {
+        shadowHost = root.host;
+      } else {
+        // Fallback: walk up light DOM to find a host that owns a shadow root
+        shadowHost = element;
+        while (shadowHost && !shadowHost.shadowRoot) {
+          shadowHost = shadowHost.parentElement;
+        }
       }
 
       if (shadowHost && shadowHost.shadowRoot) {
@@ -170,11 +177,14 @@ const __done = arguments[arguments.length - 1];
         let clickableElements = findClickableElements(shadowRoot);
 
         // If clickable elements are found, perform your action (e.g., highlight them)
-        clickableElements.forEach((element) => {
+        clickableElements.forEach((shadowEl) => {
+          const shadowElIdentity = getElementIdentity(shadowEl);
+          if (!shadowElIdentity) return;
+
           pushElement(
-            element,
-            elementIdentity,
-            referXPath,
+            shadowEl,
+            shadowElIdentity,
+            shadowElIdentity.xPath,
             typeDTO,
             shadowHost,
             shadowRoot,
@@ -214,11 +224,18 @@ const __done = arguments[arguments.length - 1];
       // If a match is found, set the element in the map
       if (matches) {
         // Check if the clicked element has a shadow root
-        let shadowHost = element;
+        let shadowHost = null;
 
-        // Locate the shadow host element if it has a shadow root
-        while (shadowHost && !shadowHost.shadowRoot) {
-          shadowHost = shadowHost.parentElement; // Traverse upwards in the DOM
+        // If element is inside an OPEN shadow root, jump directly to the host
+        const root = element.getRootNode && element.getRootNode();
+        if (root && root instanceof ShadowRoot) {
+          shadowHost = root.host;
+        } else {
+          // Fallback: walk up light DOM to find a host that owns a shadow root
+          shadowHost = element;
+          while (shadowHost && !shadowHost.shadowRoot) {
+            shadowHost = shadowHost.parentElement;
+          }
         }
 
         if (shadowHost && shadowHost.shadowRoot) {
@@ -229,11 +246,14 @@ const __done = arguments[arguments.length - 1];
           let clickableElements = findClickableElements(shadowRoot);
 
           // If clickable elements are found, perform your action (e.g., highlight them)
-          clickableElements.forEach((element) => {
+          clickableElements.forEach((shadowEl) => {
+            const shadowElIdentity = getElementIdentity(shadowEl);
+            if (!shadowElIdentity) return;
+
             pushElement(
-              element,
-              elementIdentity,
-              referXPath,
+              shadowEl,
+              shadowElIdentity,
+              shadowElIdentity.xPath,
               typeDTO,
               shadowHost,
               shadowRoot,
@@ -316,6 +336,46 @@ const __done = arguments[arguments.length - 1];
     );
   };
 
+  // NEW: collect Shadow DOM elements recursively (open shadow roots only)
+  function collectShadowElements(rootNode, searchTerms) {
+    try {
+      // Find potential shadow hosts in the current light DOM tree
+      const hosts = rootNode.querySelectorAll("*");
+
+      hosts.forEach((host) => {
+        if (!host || !host.shadowRoot) return; // only OPEN shadow roots
+
+        const shadowRoot = host.shadowRoot;
+
+        // Reuse your existing clickable finder (or broaden if you want)
+        const clickable = findClickableElements(shadowRoot);
+
+        clickable.forEach((shadowEl) => {
+          const shadowElIdentity = getElementIdentity(shadowEl);
+          if (!shadowElIdentity) return;
+
+          filterSearchTerms(
+            shadowEl,
+            "Shadow-Child",
+            shadowElIdentity.xPath,
+            shadowElIdentity,
+            searchTerms,
+          );
+
+          // Ensure it gets shadowHost/shadowRoot fields like your previous code
+          // filterSearchTerms will call pushElement with shadowHost/shadowRoot
+          // because shadowEl is inside a shadow root
+        });
+
+        // IMPORTANT: nested shadow roots inside this shadowRoot
+        // We need to walk inside it to find more hosts.
+        collectShadowElements(shadowRoot, searchTerms);
+      });
+    } catch (e) {
+      // swallow to keep scanner robust
+    }
+  }
+
   // Function to collect iframe elements recursively
   const collectIframeElements = function collectIframeElements(
     doc,
@@ -326,6 +386,9 @@ const __done = arguments[arguments.length - 1];
       try {
         let iframeDocument =
           iframe.contentDocument || iframe.contentWindow.document;
+
+        // NEW: collect Shadow DOM elements inside iframe (same-origin only)
+        collectShadowElements(iframeDocument, searchTerms);
 
         try {
           //console.log("Iframe origin:",new URL(iframe.src, window.location.origin).origin);
@@ -490,6 +553,9 @@ const __done = arguments[arguments.length - 1];
 
     // First, collect iframe elements
     collectIframeElements(document, collectionFound, elementInfoMap);
+
+    // Then, collect shadow DOM elements in the top document
+    collectShadowElements(document, searchTerms);
 
     // Then, collect general elements based on search terms
     collectElements(document, searchTerms, collectionFound, elementInfoMap);
