@@ -607,8 +607,8 @@ const __done = arguments[arguments.length - 1];
     const elementIdentity = {
       ...elementIdentityTemp,
       shadowHost: shadowHostSelector,
-      shadowRoot: shadowRoot ? true : false,
-      nestedShadow: shadowPath.length > 1, // Detects if multiple shadow roots are involved
+      shadowRoot: String(!!shadowRoot), // "true" or "false"
+      nestedShadow: String(shadowPath.length > 1), // Detects if multiple shadow roots are involved
       cssSelector: elementCssSelector, // cssSelector shadowRoot
     };
 
