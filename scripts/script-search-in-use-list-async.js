@@ -670,20 +670,12 @@ const __done = arguments[arguments.length - 1];
       }, elementCssSelector);
     }
 
-    // Build a stable shadow-DOM path using ::shadow
-    // Example: host-a#id ::shadow host-b ::shadow button.primary
-    const shadowXPath =
-      shadowPath.length > 0
-        ? `${shadowPath.join(" ::shadow ")} ::shadow ${elementCssSelector}`
-        : "";
-
     const elementIdentity = {
       ...elementIdentityTemp,
       shadowHost: shadowHostSelector,
-      shadowRoot: String(!!shadowRoot),
-      nestedShadow: String(shadowPath.length > 1),
-      cssSelector: cssSelector, // full nested selector chain
-      customXPath: shadowXPath || elementIdentityTemp.customXPath || "",
+      shadowRoot: String(!!shadowRoot), // "true" or "false"
+      nestedShadow: String(shadowPath.length > 1), // Detects if multiple shadow roots are involved
+      cssSelector: elementCssSelector, // cssSelector shadowRoot
     };
 
     // ✅ compute names here
@@ -731,15 +723,6 @@ const __done = arguments[arguments.length - 1];
 
     const someText = getVisibleText(tagName, attributeData, element);
 
-    // Raw DOM values (important for anchors & shadow DOM)
-    const domTextContent = element
-      ? normalizeSpaces(element.textContent || "")
-      : "";
-    const domInnerText = element
-      ? normalizeSpaces(element.innerText || "")
-      : "";
-    const domInnerHTML = element ? String(element.innerHTML || "") : "";
-
     const xPath = getMartiniXPath(element);
 
     const tagNameTemp = identifyElementTypeFromXPath(tagName, xPath, someText);
@@ -756,9 +739,6 @@ const __done = arguments[arguments.length - 1];
       attribName,
       coordinates,
       someText,
-      domTextContent,
-      domInnerText,
-      domInnerHTML,
     };
   };
 
@@ -994,35 +974,17 @@ const __done = arguments[arguments.length - 1];
       titles: Array.from(result.titles),
     };
   }
-
   // Helper function to generate a unique XPath for an element
   const getMartiniXPath = function getMartiniXPath(element) {
-    if (!element) return "";
-
-    // If we’re inside Shadow DOM, stop generating light-DOM XPath here.
-    // You already have customXPath/cssSelector for these.
-    if (element instanceof ShadowRoot) return "";
-
-    // Some browsers: element.getRootNode() may be a ShadowRoot
-    const root = element.getRootNode && element.getRootNode();
-    if (root && root instanceof ShadowRoot) {
-      return ""; // rely on customXPath / cssSelector instead
-    }
-
     if (element === document.body) return "/html/body";
-
     let ix = 0;
-    const parent = element.parentNode;
-    if (!parent || parent instanceof ShadowRoot) return "";
-
-    const siblings = parent.childNodes || [];
+    const siblings = element.parentNode ? element.parentNode.childNodes : [];
     for (let i = 0; i < siblings.length; i++) {
-      const sibling = siblings[i];
+      let sibling = siblings[i];
       if (sibling.nodeType === 1 && sibling.tagName === element.tagName) {
         if (sibling === element) {
-          const parentPath = getMartiniXPath(parent);
           return (
-            parentPath +
+            getMartiniXPath(element.parentNode) +
             "/" +
             element.tagName.toLowerCase() +
             "[" +
@@ -1623,10 +1585,7 @@ const __done = arguments[arguments.length - 1];
     const dataTestId = getAttr(attrs, "data-test-id");
     const title = getAttr(attrs, "title");
     const valueAttr = getAttr(attrs, "value");
-    // Prefer real DOM properties captured in identity
-    const domTextContent = normalizeSpaces(identity.domTextContent);
-    const domInnerText = normalizeSpaces(identity.domInnerText);
-    const domInnerHTML = identity.domInnerHTML || "";
+    const innerHTML = getAttr(attrs, "innerhtml"); // likely not present; kept for parity
     const href = getAttr(attrs, "href");
 
     const textLabel = normalizeSpaces(identity.someText); // your JS already extracts "best" visible text
@@ -1661,19 +1620,9 @@ const __done = arguments[arguments.length - 1];
     } else if (hasText(ariaLabel)) {
       nameLabel = ariaLabel;
       nameField = ariaLabel;
-    } else if (isAnchor && hasText(domInnerText)) {
-      nameLabel = domInnerText;
-      nameField = domInnerText;
-    } else if (isAnchor && hasText(domTextContent)) {
-      nameLabel = domTextContent;
-      nameField = domTextContent;
-    } else if (
-      isAnchor &&
-      hasText(domInnerHTML) &&
-      !/[<>]/.test(domInnerHTML)
-    ) {
-      nameLabel = domInnerHTML;
-      nameField = domInnerHTML;
+    } else if (isAnchor && hasText(innerHTML) && !/[<>]/.test(innerHTML)) {
+      nameLabel = innerHTML;
+      nameField = innerHTML;
     } else if (hasText(idAttr)) {
       nameLabel = idAttr;
       nameField = idAttr;
