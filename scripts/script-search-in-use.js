@@ -328,11 +328,19 @@
         !searchTerms.includes("with test-id"))
     ) {
       // Check if the clicked element has a shadow root
-      let shadowHost = element;
+      // Check if the clicked element has a shadow root
+      let shadowHost = null;
 
-      // Locate the shadow host element if it has a shadow root
-      while (shadowHost && !shadowHost.shadowRoot) {
-        shadowHost = shadowHost.parentElement; // Traverse upwards in the DOM
+      // If element is inside an OPEN shadow root, jump directly to the host
+      const root = element.getRootNode && element.getRootNode();
+      if (root && root instanceof ShadowRoot) {
+        shadowHost = root.host;
+      } else {
+        // Fallback: walk up light DOM to find a host that owns a shadow root
+        shadowHost = element;
+        while (shadowHost && !shadowHost.shadowRoot) {
+          shadowHost = shadowHost.parentElement;
+        }
       }
 
       if (shadowHost && shadowHost.shadowRoot) {
@@ -343,11 +351,14 @@
         let clickableElements = findClickableElements(shadowRoot);
 
         // If clickable elements are found, perform your action (e.g., highlight them)
-        clickableElements.forEach((element) => {
+        clickableElements.forEach((shadowEl) => {
+          const shadowElIdentity = getElementIdentity(shadowEl);
+          if (!shadowElIdentity) return;
+
           pushElement(
-            element,
-            elementIdentity,
-            referXPath,
+            shadowEl,
+            shadowElIdentity,
+            shadowElIdentity.xPath,
             typeDTO,
             shadowHost,
             shadowRoot,
@@ -387,11 +398,18 @@
       // If a match is found, set the element in the map
       if (matches) {
         // Check if the clicked element has a shadow root
-        let shadowHost = element;
+        let shadowHost = null;
 
-        // Locate the shadow host element if it has a shadow root
-        while (shadowHost && !shadowHost.shadowRoot) {
-          shadowHost = shadowHost.parentElement; // Traverse upwards in the DOM
+        // If element is inside an OPEN shadow root, jump directly to the host
+        const root = element.getRootNode && element.getRootNode();
+        if (root && root instanceof ShadowRoot) {
+          shadowHost = root.host;
+        } else {
+          // Fallback: walk up light DOM to find a host that owns a shadow root
+          shadowHost = element;
+          while (shadowHost && !shadowHost.shadowRoot) {
+            shadowHost = shadowHost.parentElement;
+          }
         }
 
         if (shadowHost && shadowHost.shadowRoot) {
@@ -402,11 +420,14 @@
           let clickableElements = findClickableElements(shadowRoot);
 
           // If clickable elements are found, perform your action (e.g., highlight them)
-          clickableElements.forEach((element) => {
+          clickableElements.forEach((shadowEl) => {
+            const shadowElIdentity = getElementIdentity(shadowEl);
+            if (!shadowElIdentity) return;
+
             pushElement(
-              element,
-              elementIdentity,
-              referXPath,
+              shadowEl,
+              shadowElIdentity,
+              shadowElIdentity.xPath,
               typeDTO,
               shadowHost,
               shadowRoot,
@@ -501,6 +522,46 @@
       };${iframeDetails}`,
     );
   };
+
+  // NEW: collect Shadow DOM elements recursively (open shadow roots only)
+  function collectShadowElements(rootNode, searchTerms) {
+    try {
+      // Find potential shadow hosts in the current light DOM tree
+      const hosts = rootNode.querySelectorAll("*");
+
+      hosts.forEach((host) => {
+        if (!host || !host.shadowRoot) return; // only OPEN shadow roots
+
+        const shadowRoot = host.shadowRoot;
+
+        // Reuse your existing clickable finder (or broaden if you want)
+        const clickable = findClickableElements(shadowRoot);
+
+        clickable.forEach((shadowEl) => {
+          const shadowElIdentity = getElementIdentity(shadowEl);
+          if (!shadowElIdentity) return;
+
+          filterSearchTerms(
+            shadowEl,
+            "Shadow-Child",
+            shadowElIdentity.xPath,
+            shadowElIdentity,
+            searchTerms,
+          );
+
+          // Ensure it gets shadowHost/shadowRoot fields like your previous code
+          // filterSearchTerms will call pushElement with shadowHost/shadowRoot
+          // because shadowEl is inside a shadow root
+        });
+
+        // IMPORTANT: nested shadow roots inside this shadowRoot
+        // We need to walk inside it to find more hosts.
+        collectShadowElements(shadowRoot, searchTerms);
+      });
+    } catch (e) {
+      // swallow to keep scanner robust
+    }
+  }
 
   // Function to collect iframe elements recursively
   const collectIframeElements = function collectIframeElements(
@@ -677,6 +738,9 @@
     // First, collect iframe elements
     collectIframeElements(document, collectionFound, elementInfoMap);
 
+    // Then, collect shadow DOM elements in the top document
+    collectShadowElements(document, searchTerms);
+
     // Then, collect general elements based on search terms
     collectElements(document, searchTerms, collectionFound, elementInfoMap);
 
@@ -843,6 +907,13 @@
       cssSelector: elementCssSelector, // cssSelector shadowRoot
     };
 
+    // ✅ compute names here
+    const names = defineNameTitlesJs(elementIdentity) || {
+      nameLabel: "",
+      nameField: "",
+      definedName: "",
+    };
+
     // Store tagName and other details in the Map
     if (elementIdentity) {
       if (!originalStyles.has(element)) {
@@ -853,7 +924,7 @@
 
       window.elementInfoMap.set(
         referXPath, // Keep Distinction iFrameXPath / child / etc...
-        elementDTO(typeDTO, elementIdentity),
+        elementDTO(typeDTO, elementIdentity, names),
       );
     }
   }
@@ -1273,7 +1344,7 @@
     return tagName; // Default to the given tagName if no match
   }
 
-  const elementDTO = function elementDTO(typeElement, identity) {
+  const elementDTO = function elementDTO(typeElement, identity, names) {
     return {
       typeElement: typeElement,
       tagName: identity.tagName ?? "No Tag Name Detected",
@@ -1292,6 +1363,11 @@
       attributeValue: identity.attributeValue ?? "",
       attributeType: identity.attributeType ?? "",
       searchAttributeValue: identity.searchAttributeValue ?? "",
+      // NEW FIELDS (match your TargetElement fields)
+      // ✅ safe
+      nameLabel: names?.nameLabel ?? "",
+      nameField: names?.nameField ?? "",
+      definedName: names?.definedName ?? "",
     };
   };
 
@@ -1802,6 +1878,161 @@
   // startCollectingElements(window.searchTerms);
   // init("Initiate");
   // window.initSearchTerms = null; // Invalidating the function
+
+  function normalizeSpaces(s) {
+    return (s ?? "").toString().trim().replace(/\s+/g, " ");
+  }
+
+  function truncateAndNormalize(s, maxLen) {
+    const t = normalizeSpaces(s);
+    if (!t) return "";
+    return t.length > maxLen ? t.slice(0, maxLen) : t;
+  }
+
+  function getAttr(attributeData, name) {
+    if (!Array.isArray(attributeData)) return "";
+    const found = attributeData.find(
+      (a) =>
+        a &&
+        typeof a.name === "string" &&
+        a.name.toLowerCase() === name.toLowerCase(),
+    );
+    return found?.value ?? "";
+  }
+
+  // Similar intent as your Java "isValidString"
+  function hasText(s) {
+    return normalizeSpaces(s).length > 0;
+  }
+
+  function extractFileExtensionFromHref(href) {
+    const v = normalizeSpaces(href);
+    if (!v) return "";
+    // very small: take last path segment, then extension
+    try {
+      const u = new URL(v, window.location.href);
+      const path = u.pathname || "";
+      const last = path.split("/").pop() || "";
+      const m = last.match(/\.([a-z0-9]+)$/i);
+      return m ? m[1] : "";
+    } catch {
+      const m = v.match(/\.([a-z0-9]+)(?:[?#].*)?$/i);
+      return m ? m[1] : "";
+    }
+  }
+
+  /**
+   * Minimal port of your Java defineNameTitles + setElementText behavior.
+   * We DO NOT try to replicate clickability checks etc. (JS doesn't have WebElement.isEnabled reliably).
+   * Instead we follow your existing JS inputs: tagName + someText + attributes.
+   */
+  function defineNameTitlesJs(identity) {
+    // identity: { tagName, someText, attribId, attribName, attributeData }
+    const tag = (identity.tagName || "").toLowerCase();
+    const attrs = identity.attributeData || [];
+
+    // Java reads these attributes:
+    const labelAttr = getAttr(attrs, "label"); // rarely present on HTML, but keep it
+    const forLabelAttr = getAttr(attrs, "for");
+    const idAttr = getAttr(attrs, "id");
+    const nameAttr = getAttr(attrs, "name");
+    const ariaLabel = getAttr(attrs, "aria-label");
+    const formControlName = getAttr(attrs, "formcontrolname");
+    const testId = getAttr(attrs, "test-id");
+    const dataTestId = getAttr(attrs, "data-test-id");
+    const title = getAttr(attrs, "title");
+    const valueAttr = getAttr(attrs, "value");
+    const innerHTML = getAttr(attrs, "innerhtml"); // likely not present; kept for parity
+    const href = getAttr(attrs, "href");
+
+    const textLabel = normalizeSpaces(identity.someText); // your JS already extracts "best" visible text
+    const valueHrefFile = extractFileExtensionFromHref(href);
+
+    const isAnchor = tag === "a";
+    const isOption = tag === "option";
+
+    // ---- choose nameLabel + nameField (minimal mapping) ----
+    // We mirror your Java decision tree but using what JS already has.
+    let nameLabel = "";
+    let nameField = "";
+
+    if (hasText(labelAttr)) {
+      nameLabel = labelAttr;
+      nameField = labelAttr;
+    } else if (hasText(forLabelAttr)) {
+      nameLabel = forLabelAttr;
+      nameField = forLabelAttr;
+    } else if (isOption && hasText(valueAttr)) {
+      nameLabel = valueAttr;
+      nameField = valueAttr;
+    } else if (hasText(formControlName)) {
+      nameLabel = formControlName;
+      nameField = formControlName;
+    } else if (hasText(testId)) {
+      nameLabel = testId;
+      nameField = testId;
+    } else if (hasText(nameAttr)) {
+      nameLabel = nameAttr;
+      nameField = nameAttr;
+    } else if (hasText(ariaLabel)) {
+      nameLabel = ariaLabel;
+      nameField = ariaLabel;
+    } else if (isAnchor && hasText(innerHTML) && !/[<>]/.test(innerHTML)) {
+      nameLabel = innerHTML;
+      nameField = innerHTML;
+    } else if (hasText(idAttr)) {
+      nameLabel = idAttr;
+      nameField = idAttr;
+    } else if (hasText(valueHrefFile)) {
+      nameLabel = `${valueHrefFile} File`;
+      nameField = `${valueHrefFile} File`;
+    } else if (hasText(textLabel)) {
+      // for p/button/span/div in Java you set (textLabel, tagNameDefined)
+      // BUT then setElementText overrides definedName anyway.
+      nameLabel = textLabel;
+      nameField = tag; // closest equivalent to your Java for those cases
+    } else if (hasText(dataTestId)) {
+      nameLabel = dataTestId;
+      nameField = dataTestId;
+    } else if (hasText(title)) {
+      nameLabel = title;
+      nameField = title;
+    } else {
+      nameLabel = tag || "";
+      nameField = "NO IDENTIFICATION";
+    }
+
+    nameLabel = normalizeSpaces(nameLabel);
+    nameField = normalizeSpaces(nameField);
+
+    // ---- replicate Java setElementText() priority for definedName ----
+    let definedName = nameLabel;
+
+    // Your Java priority:
+    // if attribId/attribName/someText present:
+    //    definedName = someText (truncate 30)
+    //    else attribId else attribName else nameDefinedPriority
+    const hasAnyPriority =
+      hasText(identity.attribId) ||
+      hasText(identity.attribName) ||
+      hasText(identity.someText);
+
+    if (hasAnyPriority) {
+      if (hasText(identity.someText)) {
+        definedName = truncateAndNormalize(identity.someText, 30);
+      } else if (hasText(identity.attribId)) {
+        definedName = normalizeSpaces(identity.attribId);
+      } else if (hasText(identity.attribName)) {
+        definedName = normalizeSpaces(identity.attribName);
+      }
+    }
+
+    return {
+      nameLabel,
+      nameField,
+      definedName,
+    };
+  }
 })(
   arguments[0],
   arguments[1],
