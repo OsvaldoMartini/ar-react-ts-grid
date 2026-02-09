@@ -1640,7 +1640,7 @@
       }
     });
 
-    return filteredResult;
+    return finalResult;
   };
 
   function limitMapSize(sortedList) {
@@ -2046,7 +2046,7 @@
 // })(
 //   ["button", "textarea", "input", "label", "a", "select"],
 //   false,
-//   59057,
+//   55432,
 //   "scannerTool",
 //   "scannerGrid",
 //   "searchTerms",

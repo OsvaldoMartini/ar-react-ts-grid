@@ -1405,7 +1405,7 @@ const __done = arguments[arguments.length - 1];
       }
     });
 
-    return filteredResult;
+    return finalResult;
   };
 
   function limitMapSize(sortedList) {
