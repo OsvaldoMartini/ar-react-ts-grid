@@ -390,7 +390,7 @@
 
     const xPath = getMartiniXPath(element);
 
-    const tagNameTemp = identifyElementTypeFromXPath(tagName, xPath, someText);
+    const tagNameTemp = identifyElementTypeFromXPath(tagName, xPath, element);
     if (tagNameTemp !== tagName) {
       tagName = tagNameTemp;
     }
@@ -659,9 +659,9 @@
     return "";
   };
 
-  function identifyElementTypeFromXPath(tagName, xpath) {
+  function identifyElementTypeFromXPath(tagName, xpath, element) {
     if (typeof xpath !== "string" || xpath.trim() === "") {
-      return "unknown";
+      return "label"; // was "unknown"
     }
 
     const parts = xpath.split("/").filter((part) => part.trim() !== "");
@@ -674,8 +674,8 @@
 
       const tag = tagMatch[1].toLowerCase();
 
-      if (tag === "a") {
-        return "a"; // Link
+      if (tag === "a" && isActuallyClickable(element)) {
+        return "a";
       }
 
       if (tag === "input") {
@@ -692,82 +692,89 @@
         return "button";
       }
 
-      // Detect if it's an Angular Material expansion panel (likely a button)
+      // Angular Material heuristics → ONLY if really clickable
       if (
-        tag.includes("expansion-panel-header") ||
-        tag.includes("sidenav") ||
-        tag.includes("nav")
+        isActuallyClickable(element) &&
+        (tag.includes("expansion-panel-header") ||
+          tag.includes("sidenav") ||
+          tag.includes("nav"))
       ) {
         return "button";
       }
 
       if (tag === "select" || tag === "option") {
-        return "select"; // or option
+        return "select";
       }
 
       if (tag === "textarea") {
         return "input";
       }
 
-      // Framework specific detection from isInteractiveElement function.
+      // React / Angular / framework detection (UNCHANGED, just guarded)
       if (
-        tag.includes("mat-button") ||
-        tag.includes("mat-raised-button") ||
-        tag.includes("mat-icon-button") ||
-        tag.includes("mat-menu-item") ||
-        tag.includes("mat-select") ||
-        tag.includes("mat-option") ||
-        tag.includes("matinput")
+        isActuallyClickable(element) &&
+        (tag.includes("mat-button") ||
+          tag.includes("mat-raised-button") ||
+          tag.includes("mat-icon-button") ||
+          tag.includes("mat-menu-item") ||
+          tag.includes("mat-select") ||
+          tag.includes("mat-option") ||
+          tag.includes("matinput"))
       ) {
-        return "button"; // or select, input, option.
+        return "button";
       }
 
       if (
-        tag.includes("data-testid") ||
-        tag.includes("aria-label") ||
-        part.includes("@role='button'") ||
-        part.includes("@role='textbox'") ||
-        part.includes("react-button") ||
-        part.includes("react-link") ||
-        part.includes("react-input")
+        isActuallyClickable(element) &&
+        (tag.includes("data-testid") ||
+          tag.includes("aria-label") ||
+          part.includes("@role='button'") ||
+          part.includes("@role='textbox'") ||
+          part.includes("react-button") ||
+          part.includes("react-link") ||
+          part.includes("react-input"))
       ) {
-        if (part.includes("react-input")) {
-          return "input";
-        } else if (part.includes("react-link")) {
-          return "a";
-        } else {
-          return "button";
-        }
+        if (part.includes("react-input")) return "input";
+        if (part.includes("react-link")) return "a";
+        return "button";
       }
 
       if (
-        part.includes("mdc-button") ||
-        part.includes("mdc-text-field") ||
-        part.includes("mdc-list-item")
+        isActuallyClickable(element) &&
+        (part.includes("mdc-button") ||
+          part.includes("mdc-text-field") ||
+          part.includes("mdc-list-item"))
       ) {
-        if (part.includes("mdc-text-field")) {
-          return "input";
-        } else {
-          return "button";
-        }
+        if (part.includes("mdc-text-field")) return "input";
+        return "button";
       }
 
       if (
-        part.includes("el-button") ||
-        part.includes("el-input__inner") ||
-        part.includes("el-select-dropdown__item")
+        isActuallyClickable(element) &&
+        (part.includes("el-button") ||
+          part.includes("el-input__inner") ||
+          part.includes("el-select-dropdown__item"))
       ) {
-        if (part.includes("el-input__inner")) {
-          return "input";
-        } else if (part.includes("el-select-dropdown__item")) {
-          return "select";
-        } else {
-          return "button";
-        }
+        if (part.includes("el-input__inner")) return "input";
+        if (part.includes("el-select-dropdown__item")) return "select";
+        return "button";
       }
     }
 
-    return tagName; // Default to the given tagName if no match
+    // ✅ definitive fallback
+    return "label"; // was: return tagName
+  }
+
+  function isActuallyClickable(el) {
+    if (!el || typeof el.getAttribute !== "function") return false; // ✅ guard
+
+    return (
+      el instanceof HTMLButtonElement ||
+      el instanceof HTMLAnchorElement ||
+      el instanceof HTMLInputElement ||
+      el.onclick ||
+      el.getAttribute("role") === "button"
+    );
   }
 
   const elementDTO = function elementDTO(typeElement, identity) {
@@ -1197,25 +1204,25 @@
   // });
 
   // window.cloneTerms = null; // Invalidating the function
-  // })(
-  //   arguments[0],
-  //   arguments[1],
-  //   arguments[2],
-  //   arguments[3],
-  //   arguments[4],
-  //   arguments[5],
-  //   arguments[6],
-  //   arguments[7],
-  //   arguments[8],
-  // );
 })(
-  false,
-  49960,
-  "scannerTool",
-  "scannerGrid",
-  "addPickOne",
-  2,
-  66,
-  "https://www.inlinea.ch/",
-  "https://www.inlinea.ch/",
+  arguments[0],
+  arguments[1],
+  arguments[2],
+  arguments[3],
+  arguments[4],
+  arguments[5],
+  arguments[6],
+  arguments[7],
+  arguments[8],
 );
+// })(
+//   false,
+//   49960,
+//   "scannerTool",
+//   "scannerGrid",
+//   "addPickOne",
+//   2,
+//   66,
+//   "https://www.inlinea.ch/",
+//   "https://www.inlinea.ch/",
+// );
