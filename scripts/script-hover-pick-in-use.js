@@ -845,7 +845,8 @@
     const clickY = event.clientY;
 
     // Get the element at the clicked position
-    const clickedElement = document.elementFromPoint(clickX, clickY);
+    let clickedElement = document.elementFromPoint(clickX, clickY);
+    clickedElement = resolveControlFromClicked(clickedElement);
 
     coordinatesElement.style.display = "block";
 
@@ -942,6 +943,29 @@
       window.allElementInfo = [];
       window.elementInfoMap.clear();
     }, 1000);
+  }
+
+  function resolveControlFromClicked(el) {
+    if (!el) return el;
+
+    const tag = el.tagName?.toLowerCase();
+
+    // If user clicks mat-label or label, go to associated input/textarea
+    if (tag === "mat-label" || tag === "label") {
+      const label = tag === "label" ? el : el.closest("label");
+      const forId = label?.getAttribute("for");
+      if (forId) {
+        const control = document.getElementById(forId);
+        if (control) return control;
+      }
+
+      // Fallback: inside same mat-form-field, pick the real control
+      const mff = el.closest("mat-form-field");
+      const control = mff?.querySelector("textarea, input, select");
+      if (control) return control;
+    }
+
+    return el;
   }
 
   function pushElement(element, shadowHost, shadowRoot) {
@@ -1173,25 +1197,25 @@
   // });
 
   // window.cloneTerms = null; // Invalidating the function
+  // })(
+  //   arguments[0],
+  //   arguments[1],
+  //   arguments[2],
+  //   arguments[3],
+  //   arguments[4],
+  //   arguments[5],
+  //   arguments[6],
+  //   arguments[7],
+  //   arguments[8],
+  // );
 })(
-  arguments[0],
-  arguments[1],
-  arguments[2],
-  arguments[3],
-  arguments[4],
-  arguments[5],
-  arguments[6],
-  arguments[7],
-  arguments[8],
+  false,
+  49960,
+  "scannerTool",
+  "scannerGrid",
+  "addPickOne",
+  2,
+  66,
+  "https://www.inlinea.ch/",
+  "https://www.inlinea.ch/",
 );
-// })(
-//   false,
-//   59433,
-//   "scannerTool",
-//   "scannerGrid",
-//   "addPickOne",
-//   2,
-//   66,
-//   "https://www.inlinea.ch/",
-//   "https://www.inlinea.ch/",
-// );
