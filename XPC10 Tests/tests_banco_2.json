@@ -1,0 +1,447 @@
+{
+  "ok": true,
+  "elements": [
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "input",
+      "xPath": "/html/body/iam-loginapp[1]/div[2]/div[4]/div[2]/div[1]/div[1]/div[1]/div[1]/iam-auth-password[1]/iam-page[1]/iam-card[1]/div[1]/div[2]/div[2]/iam-form[1]/form[1]/iam-input-row[1]/iam-row-with-label[1]/div[1]/div[1]/input[1]",
+      "someText": "User number",
+      "attribId": "username",
+      "attribName": "username",
+      "coordinates": "684.50,514.00",
+      "attributeData": [
+        {
+          "name": "class",
+          "value": "iam-form-control ng-pristine ng-invalid ng-touched"
+        },
+        { "name": "name", "value": "username" },
+        { "name": "type", "value": "text" },
+        { "name": "id", "value": "username" },
+        { "name": "placeholder", "value": "" },
+        { "name": "autocapitalize", "value": "off" },
+        { "name": "spellcheck", "value": "false" },
+        { "name": "someText", "value": "username" }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "input#username.iam-form-control.ng-pristine.ng-invalid.ng-touched",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "username",
+      "nameField": "username",
+      "definedName": "username",
+      "id": 1
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "input",
+      "xPath": "/html/body/iam-loginapp[1]/div[2]/div[4]/div[2]/div[1]/div[1]/div[1]/div[1]/iam-auth-password[1]/iam-page[1]/iam-card[1]/div[1]/div[2]/div[2]/iam-form[1]/form[1]/iam-input-row[2]/iam-row-with-label[1]/div[1]/div[1]/input[1]",
+      "someText": "Password",
+      "attribId": "password",
+      "attribName": "password",
+      "coordinates": "684.50,614.00",
+      "attributeData": [
+        {
+          "name": "class",
+          "value": "iam-form-control ng-untouched ng-pristine ng-invalid"
+        },
+        { "name": "name", "value": "password" },
+        { "name": "type", "value": "password" },
+        { "name": "id", "value": "password" },
+        { "name": "placeholder", "value": "" },
+        { "name": "autocapitalize", "value": "off" },
+        { "name": "spellcheck", "value": "false" },
+        { "name": "someText", "value": "password" }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "input#password.iam-form-control.ng-untouched.ng-pristine.ng-invalid",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "password",
+      "nameField": "password",
+      "definedName": "password",
+      "id": 2
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "input",
+      "xPath": "/html/body/iam-loginapp[1]/div[2]/div[4]/div[2]/div[1]/div[1]/div[1]/div[1]/iam-auth-password[1]/iam-page[1]/iam-card[1]/div[1]/div[2]/div[2]/iam-form[1]/form[1]/input[1]",
+      "someText": "CSRFT759",
+      "attribId": "",
+      "attribName": "CSRFT759",
+      "coordinates": "0.00,0.00",
+      "attributeData": [
+        { "name": "type", "value": "hidden" },
+        { "name": "name", "value": "CSRFT759" },
+        { "name": "value", "value": "Wc10nEChROMRjrs5NQ1S_A" }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "input",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "CSRFT759",
+      "nameField": "CSRFT759",
+      "definedName": "CSRFT759",
+      "id": 3
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "button",
+      "xPath": "/html/body/iam-loginapp[1]/div[2]/div[4]/div[2]/div[1]/div[1]/div[1]/div[1]/iam-auth-password[1]/iam-page[1]/iam-card[1]/div[1]/div[2]/div[2]/iam-form[1]/form[1]/iam-button-row[1]/div[1]/iam-button[1]/button[1]",
+      "someText": "Send",
+      "attribId": "loginButton",
+      "attribName": "",
+      "coordinates": "684.50,718.00",
+      "attributeData": [
+        {
+          "name": "class",
+          "value": "iam-btn iam-btn-block-level-sm-down iam-float-right iam-btn-outline-primary"
+        },
+        { "name": "type", "value": "submit" },
+        { "name": "id", "value": "loginButton" },
+        { "name": "title", "value": "" },
+        { "name": "disabled", "value": "" }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "button#loginButton.iam-btn.iam-btn-block-level-sm-down.iam-float-right.iam-btn-outline-primary",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "loginButton",
+      "nameField": "loginButton",
+      "definedName": "Send",
+      "id": 4
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "a",
+      "xPath": "/html/body/iam-loginapp[1]/div[1]/div[1]/div[1]/div[2]/a[1]",
+      "someText": "Help",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "1836.92,-65.00",
+      "attributeData": [
+        { "name": "href", "value": "https://www.bancastato.ch/" }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "a",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "Help",
+      "nameField": "a",
+      "definedName": "Help",
+      "id": 5
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "a",
+      "xPath": "/html/body/iam-loginapp[1]/div[2]/div[4]/div[2]/div[1]/div[1]/div[1]/div[1]/iam-auth-password[1]/iam-page[1]/iam-card[1]/div[1]/div[2]/iam-maintenance-message[1]/div[1]/iam-text-message[1]/div[1]/p[1]/span[1]/span[1]/span[1]/a[1]",
+      "someText": "qui",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "1024.00,314.00",
+      "attributeData": [
+        {
+          "name": "href",
+          "value": "https://www.bancastato.ch/su-di-noi/media-novita/notizie/ultime-novita/Attenzione-alle-truffe-del--falso-funzionario-di-banca-.html"
+        },
+        { "name": "target", "value": "_blank" }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "a",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "html File",
+      "nameField": "html File",
+      "definedName": "qui",
+      "id": 6
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "a",
+      "xPath": "/html/body/iam-loginapp[1]/div[2]/div[4]/div[2]/div[1]/div[1]/div[1]/div[1]/iam-auth-password[1]/iam-page[1]/iam-card[1]/div[1]/div[2]/div[2]/iam-form[1]/form[1]/div[1]/a[1]",
+      "someText": "Forgotten password?",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "684.50,675.00",
+      "attributeData": [
+        { "name": "class", "value": "iam-general-link" },
+        {
+          "name": "href",
+          "value": "https://www.inlinea.ch/auth/ui/app/self-service/select/flow/password-reset-init"
+        }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "a.iam-general-link",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "Forgotten password?",
+      "nameField": "a",
+      "definedName": "Forgotten password?",
+      "id": 7
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "a",
+      "xPath": "/html/body/iam-loginapp[1]/div[2]/div[4]/div[2]/div[1]/div[1]/div[1]/div[1]/iam-auth-password[1]/iam-page[1]/iam-card[1]/div[1]/div[2]/div[2]/iam-form[1]/form[1]/a[1]",
+      "someText": "Access problems?",
+      "attribId": "access-problems",
+      "attribName": "",
+      "coordinates": "684.50,779.00",
+      "attributeData": [
+        { "name": "id", "value": "access-problems" },
+        { "name": "class", "value": "iam-general-link" }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "a#access-problems.iam-general-link",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "access-problems",
+      "nameField": "access-problems",
+      "definedName": "Access problems?",
+      "id": 8
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "a",
+      "xPath": "/html/body/iam-loginapp[1]/div[2]/div[4]/div[2]/div[1]/footer[1]/div[1]/a[1]",
+      "someText": "Contact",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "721.06,896.00",
+      "attributeData": [
+        {
+          "name": "href",
+          "value": "https://www.bancastato.ch/su-di-noi/chi-siamo/contatti/entrate-in-contatto-con-noi"
+        },
+        { "name": "target", "value": "_blank" }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "a",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "Contact",
+      "nameField": "a",
+      "definedName": "Contact",
+      "id": 9
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "a",
+      "xPath": "/html/body/iam-loginapp[1]/div[2]/div[4]/div[2]/div[1]/footer[1]/div[1]/a[2]",
+      "someText": "Processing Time",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "794.05,896.00",
+      "attributeData": [
+        {
+          "name": "href",
+          "value": "https://www.bancastato.ch/prodotti-e-prezzi/e-banking-inlinea/borse-e-orari-di-elaborazione"
+        },
+        { "name": "target", "value": "_blank" }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "a",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "Processing Time",
+      "nameField": "a",
+      "definedName": "Processing Time",
+      "id": 10
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "a",
+      "xPath": "/html/body/iam-loginapp[1]/div[2]/div[4]/div[2]/div[1]/footer[1]/div[1]/a[3]",
+      "someText": "Minimum Requisite",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "919.27,896.00",
+      "attributeData": [
+        {
+          "name": "href",
+          "value": "https://www.bancastato.ch/prodotti-e-prezzi/e-banking-inlinea/Requisiti-minimi-di-InLinea"
+        },
+        { "name": "target", "value": "_blank" }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "a",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "Minimum Requisite",
+      "nameField": "a",
+      "definedName": "Minimum Requisite",
+      "id": 11
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "a",
+      "xPath": "/html/body/iam-loginapp[1]/div[2]/div[4]/div[2]/div[1]/footer[1]/div[1]/a[4]",
+      "someText": "Security",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "1064.42,896.00",
+      "attributeData": [
+        {
+          "name": "href",
+          "value": "https://www.bancastato.ch/tools/Sicurezza.html"
+        },
+        { "name": "target", "value": "_blank" }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "a",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "html File",
+      "nameField": "html File",
+      "definedName": "Security",
+      "id": 12
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "a",
+      "xPath": "/html/body/iam-loginapp[1]/div[2]/div[4]/div[2]/div[1]/footer[1]/div[1]/a[5]",
+      "someText": "Legal Disclaimer",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "912.98,896.00",
+      "attributeData": [
+        {
+          "name": "href",
+          "value": "https://www.bancastato.ch/tools/Avvertenze-legali-InLinea.html"
+        },
+        { "name": "target", "value": "_blank" }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "a",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "html File",
+      "nameField": "html File",
+      "definedName": "Legal Disclaimer",
+      "id": 13
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "label",
+      "xPath": "/html/body/iam-loginapp[1]/div[2]/div[4]/div[2]/div[1]/div[1]/div[1]/div[1]/iam-auth-password[1]/iam-page[1]/iam-card[1]/div[1]/div[2]/div[2]/iam-form[1]/form[1]/iam-input-row[1]/iam-row-with-label[1]/div[1]/label[1]",
+      "someText": "User number",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "684.50,478.00",
+      "attributeData": [
+        {
+          "name": "class",
+          "value": "iam-col-12 iam-col-md-5 iam-col-form-label"
+        },
+        { "name": "for", "value": "username" }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "label.iam-col-12.iam-col-md-5.iam-col-form-label",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "username",
+      "nameField": "username",
+      "definedName": "User number",
+      "id": 14
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "label",
+      "xPath": "/html/body/iam-loginapp[1]/div[2]/div[4]/div[2]/div[1]/div[1]/div[1]/div[1]/iam-auth-password[1]/iam-page[1]/iam-card[1]/div[1]/div[2]/div[2]/iam-form[1]/form[1]/iam-input-row[2]/iam-row-with-label[1]/div[1]/label[1]",
+      "someText": "Password",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "684.50,578.00",
+      "attributeData": [
+        {
+          "name": "class",
+          "value": "iam-col-12 iam-col-md-5 iam-col-form-label"
+        },
+        { "name": "for", "value": "password" }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "label.iam-col-12.iam-col-md-5.iam-col-form-label",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "password",
+      "nameField": "password",
+      "definedName": "Password",
+      "id": 15
+    }
+  ],
+  "totalElements": 15
+}
