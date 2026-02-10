@@ -665,6 +665,24 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
     }));
   };
 
+  const sendDoneCmd = () => {
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) return;
+
+    const message = {
+      type: "MOBILE_NEXT_DONE",
+      homeBankingId: -9999,
+      botJobId: -9999,
+      sessionId: "mobile-return-server",
+    };
+
+    try {
+      webSocket.send(JSON.stringify(message));
+      console.log("📤 Sent next done:", message);
+    } catch (err) {
+      console.error("❌ Error sending next done:", err);
+    }
+  };
+
   const handleLaunchBotJobClick = () => {
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN) return;
     if (!selectedJob) return;
@@ -1154,10 +1172,10 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
               <span className="scroll-label">Navigation</span>
 
               <div className="scroll-buttons inline nav-buttons">
-                <button type="button" className="buttons-toolbar nav-btn recents" onClick={sendMobileRecents}>≡</button>
-                <button type="button" className="buttons-toolbar nav-btn home" onClick={sendMobileHome}>○</button>
-                <button type="button" className="buttons-toolbar nav-btn back" onClick={sendMobileBack}>←</button>
-                <button type="button" className="buttons-toolbar nav-btn close-all" onClick={sendMobileCloseAll}>✕</button>
+                <button type="button" className="buttons-toolbar nav-btn recents" onClick={sendMobileRecents}>(≡)</button>
+                <button type="button" className="buttons-toolbar nav-btn home" onClick={sendMobileHome}>(○)</button>
+                <button type="button" className="buttons-toolbar nav-btn back" onClick={sendMobileBack}>(←)</button>
+                <button type="button" className="buttons-toolbar nav-btn close-all" onClick={sendMobileCloseAll}>(✕)</button>
               </div>
 
               <span className="scroll-label">Scrolling</span>
@@ -1165,6 +1183,19 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
               <div className="scroll-buttons inline">
                 <button type="button" className="buttons-toolbar scroll-btn scroll-up" onClick={scrollDeviceUp}>▲</button>
                 <button type="button" className="buttons-toolbar scroll-btn scroll-down" onClick={scrollDeviceDown}>▼</button>
+              </div>
+
+              {/* NEXT / DONE button */}
+              <div className="scroll-buttons inline">
+                <span className="scroll-label">NEXT/DONE</span>
+
+                <button
+                  type="button"
+                  className="buttons-toolbar nav-btn next-done"
+                  onClick={sendDoneCmd}
+                >
+                  →|
+                </button>
               </div>
             </div>
           </div>

@@ -850,6 +850,11 @@
   letter-spacing: -1px; // tighter "≡"
 }
 
+ .nav-btn.next-done {
+    // minimal, optional overrides
+    font-weight: 600;
+  }
+
 .nav-btn.close-all {
   color: #d32f2f;
   font-weight: bold;
