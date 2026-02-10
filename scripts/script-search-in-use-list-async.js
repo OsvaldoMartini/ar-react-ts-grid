@@ -603,6 +603,8 @@ const __done = arguments[arguments.length - 1];
 
     changeDivToLabelWithSomeText(sortedList);
 
+    normalizeSomeTextForTables(sortedList);
+
     limitMapSize(sortedList);
     // console.log("All element info stored in Map:", window.allElementInfo);
     window.elementInfoMap.clear();
@@ -1478,6 +1480,65 @@ const __done = arguments[arguments.length - 1];
     });
   }
 
+  function getElementByXPath(xpath) {
+    try {
+      // your xPaths are like /html/body/.../div[1]
+      const result = document.evaluate(
+        xpath,
+        document,
+        null,
+        XPathResult.FIRST_ORDERED_NODE_TYPE,
+        null,
+      );
+      return result.singleNodeValue || null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function normalizeSomeTextForTables(sortedList) {
+    if (!Array.isArray(sortedList) || sortedList.length === 0) return;
+
+    // For list-scans (no click), normalize each entry based on its own DOM position
+    sortedList.forEach((item) => {
+      if (!item || !item.xPath) return;
+
+      const raw = getElementByXPath(item.xPath);
+      if (!raw) return;
+
+      const inInstrumentTable =
+        raw.closest?.("avq-instrument-table") ||
+        raw.closest?.("avq-trades-table") ||
+        raw.closest?.("table[mat-table]") ||
+        raw.closest?.("table.mat-mdc-table");
+
+      if (!inInstrumentTable) return;
+
+      // If it is inside a table, tagName must be "button"
+      item.tagName = "button";
+
+      const cell = raw.closest?.('td[role="gridcell"], td, th');
+      if (!cell) return;
+
+      const cellText = (cell.innerText || cell.textContent || "")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      if (!cellText) return;
+
+      // Override someText with cell text (this fixes ISIN cell/div cases)
+      item.someText = cellText;
+
+      // Keep attributeData.someText aligned
+      if (Array.isArray(item.attributeData)) {
+        const idx = item.attributeData.findIndex((a) => a.name === "someText");
+        if (idx >= 0) item.attributeData[idx].value = item.someText;
+        else
+          item.attributeData.push({ name: "someText", value: item.someText });
+      }
+    });
+  }
+
   // Event listener to handle incoming messages from iframes
   window.addEventListener("message", function (event) {
     if (event.origin !== window.trustedOriginURL) {
@@ -1689,7 +1750,7 @@ const __done = arguments[arguments.length - 1];
 // })(
 //   ["button", "textarea", "input", "label", "a", "select"],
 //   false,
-//   52645,
+//   50869,
 //   "UPDATE_LIST_ELEMENTS",
 //   "perform-list-data",
 //   "searchTerms",
