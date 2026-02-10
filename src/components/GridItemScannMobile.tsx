@@ -683,6 +683,24 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
     }
   };
 
+  const sendCloseKeyboardCmd = () => {
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) return;
+
+    const message = {
+      type: "MOBILE_CLOSE_KEYBOARD",
+      homeBankingId: -9999,
+      botJobId: -9999,
+      sessionId: "mobile-return-server",
+    };
+
+    try {
+      webSocket.send(JSON.stringify(message));
+      console.log("📤 Sent next done:", message);
+    } catch (err) {
+      console.error("❌ Error sending next done:", err);
+    }
+  };
+
   const handleLaunchBotJobClick = () => {
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN) return;
     if (!selectedJob) return;
@@ -1195,6 +1213,20 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
                   onClick={sendDoneCmd}
                 >
                   →|
+                </button>
+              </div>
+
+
+              {/* Close Keyboard button */}
+              <div className="scroll-buttons inline">
+                <span className="scroll-label">Close Keyboard</span>
+
+                <button
+                  type="button"
+                  className="buttons-toolbar nav-btn close-keyboard"
+                  onClick={sendCloseKeyboardCmd}
+                >
+                  X
                 </button>
               </div>
             </div>
