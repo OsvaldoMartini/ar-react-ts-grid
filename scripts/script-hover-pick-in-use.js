@@ -270,6 +270,7 @@
     findMatLabel(window.allElementInfo);
 
     changeDivToLabelWithSomeText(window.allElementInfo);
+    normalizeSomeTextForTables(window.allElementInfo);
 
     console.log("All element info stored in Map:", window.allElementInfo);
 
@@ -852,8 +853,10 @@
     const clickY = event.clientY;
 
     // Get the element at the clicked position
-    let clickedElement = document.elementFromPoint(clickX, clickY);
-    clickedElement = resolveControlFromClicked(clickedElement);
+    let rawClickedElement = document.elementFromPoint(clickX, clickY);
+    window.__scannerRawClickedElement = rawClickedElement; // NEW: keep the true target
+    let clickedElement = resolveControlFromClicked(rawClickedElement);
+    window.__scannerLastClickedElement = clickedElement; // optional, useful for debugging
 
     coordinatesElement.style.display = "block";
 
@@ -950,6 +953,66 @@
       window.allElementInfo = [];
       window.elementInfoMap.clear();
     }, 1000);
+  }
+
+  function normalizeSomeTextForTables(sortedList) {
+    const raw = window.__scannerRawClickedElement;
+    if (!raw || !Array.isArray(sortedList) || sortedList.length === 0) return;
+
+    // Only apply inside instrument tables (or any mat-table)
+    const inInstrumentTable =
+      raw.closest?.("avq-instrument-table") ||
+      raw.closest?.("avq-trades-table") ||
+      raw.closest?.("table[mat-table]") ||
+      raw.closest?.("table.mat-mdc-table");
+
+    if (!inInstrumentTable) return;
+
+    // Get the clicked cell's text (this is what you want as someText)
+    const cell = raw.closest?.('td[role="gridcell"], td, th');
+    if (!cell) return;
+
+    const cellText = (cell.innerText || cell.textContent || "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (!cellText) return;
+
+    sortedList.forEach((item) => {
+      if (!item) return;
+
+      // If item is the radio input, it often contains aria-label = row name.
+      // Override with clicked cell text unless input already has an explicit someText value different from aria-label.
+      if (item.tagName === "input") {
+        const ariaLabel =
+          item.attributeData
+            ?.find((a) => a.name === "aria-label")
+            ?.value?.trim() || "";
+
+        const existingSomeTextAttr =
+          item.attributeData
+            ?.find((a) => a.name === "someText")
+            ?.value?.trim() || "";
+
+        // Rule:
+        // - If the input has no someText yet, or it's effectively the aria-label, replace with cellText
+        // - If input already has a different someText, keep it
+        if (!existingSomeTextAttr || existingSomeTextAttr === ariaLabel) {
+          item.someText = cellText;
+        }
+      } else {
+        // For div/label captured in table cells, always prefer the clicked cell text
+        item.someText = cellText;
+      }
+
+      // Keep attributeData.someText aligned with item.someText
+      if (Array.isArray(item.attributeData)) {
+        const idx = item.attributeData.findIndex((a) => a.name === "someText");
+        if (idx >= 0) item.attributeData[idx].value = item.someText;
+        else
+          item.attributeData.push({ name: "someText", value: item.someText });
+      }
+    });
   }
 
   function resolveControlFromClicked(el) {
@@ -1204,25 +1267,25 @@
   // });
 
   // window.cloneTerms = null; // Invalidating the function
+  // })(
+  //   arguments[0],
+  //   arguments[1],
+  //   arguments[2],
+  //   arguments[3],
+  //   arguments[4],
+  //   arguments[5],
+  //   arguments[6],
+  //   arguments[7],
+  //   arguments[8],
+  // );
 })(
-  arguments[0],
-  arguments[1],
-  arguments[2],
-  arguments[3],
-  arguments[4],
-  arguments[5],
-  arguments[6],
-  arguments[7],
-  arguments[8],
+  false,
+  50869,
+  "scannerTool",
+  "scannerGrid",
+  "addPickOne",
+  2,
+  66,
+  "https://www.inlinea.ch/",
+  "https://www.inlinea.ch/",
 );
-// })(
-//   false,
-//   49960,
-//   "scannerTool",
-//   "scannerGrid",
-//   "addPickOne",
-//   2,
-//   66,
-//   "https://www.inlinea.ch/",
-//   "https://www.inlinea.ch/",
-// );
