@@ -968,6 +968,12 @@
 
     if (!inInstrumentTable) return;
 
+    // If it is inside a table, tagName must be "button"
+    sortedList.forEach((item) => {
+      if (!item) return;
+      item.tagName = "button";
+    });
+
     // Get the clicked cell's text (this is what you want as someText)
     const cell = raw.closest?.('td[role="gridcell"], td, th');
     if (!cell) return;
