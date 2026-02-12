@@ -86,14 +86,8 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
 
   const mapElementForSend = (el: ElementDTO): ElementDTO => el;
 
+  const isActive = (v?: string) => v === "active";
   const toggleFlag = (value?: string) => (value === "active" ? "" : "active");
-
-  const toggleLabelClass = (v?: string) =>
-    v === "active"
-      ? "options-toggle-label options-toggle-label-active"
-      : "options-toggle-label options-toggle-label-inactive";
-
-  const toggleIcon = (v?: string) => (v === "active" ? activeImage : inactiveImage);
 
   type ValidatePayload = {
     sourceImage?: string;
@@ -1437,99 +1431,120 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
                   </div>
 
                   <div className="instructions-list">
-                    {paginatedElements.map((elementDTO, i) => (
-                      <div
-                        key={i}
-                        className="instruction-item"
-                        onMouseEnter={() => handleRowHover(elementDTO)}
-                        onMouseLeave={handleRowLeave}
-                      >
-                        {editingElementId === elementDTO.xPath &&
-                          editingElementTagName === elementDTO.tagName ? (
-                          <div className="edit-container">
-                            <input
-                              type="text"
-                              value={elementName}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  handleSaveInstruction(elementDTO);
-                                }
-                              }}
-                              onChange={(e) => setElementName(e.target.value)}
-                              ref={elementDTORef}
-                              className="edit-textbox"
-                            />
+                    {paginatedElements.map((elementDTO, i) => {
+                      const scrollOn = elementDTO.autoScroll === "active";
+                      const enterOn = elementDTO.autoEnter === "active";
+                      return (
+                        <div
+                          key={i}
+                          className="instruction-item"
+                          onMouseEnter={() => handleRowHover(elementDTO)}
+                          onMouseLeave={handleRowLeave}
+                        >
+                          {editingElementId === elementDTO.xPath &&
+                            editingElementTagName === elementDTO.tagName ? (
+                            <div className="edit-container">
+                              <input
+                                type="text"
+                                value={elementName}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    handleSaveInstruction(elementDTO);
+                                  }
+                                }}
+                                onChange={(e) => setElementName(e.target.value)}
+                                ref={elementDTORef}
+                                className="edit-textbox"
+                              />
+                              <img
+                                src={saveImage}
+                                alt="save"
+                                className="save-button"
+                                onClick={() => handleSaveInstruction(elementDTO)}
+                              />
+                            </div>
+                          ) : (
+                            <span className="instruction-line">
+                              {getInstructionElement(elementDTO)}
+                            </span>
+                          )}
+
+                          {showAttributes ? (
+                            <div>
+                              <AttributeDropdown
+                                dataArray={elementDTO.attributeData}
+                                onChange={handleAttributeChange}
+                              />
+                            </div>
+                          ) : (
+                            <span>{"\u00A0".repeat(20)}</span>
+                          )}
+
+                          <div className="options-column">
+                            <div className="options-row">
+                              {/* AUTO SCROLL */}
+                              <div
+                                className={`options-toggle ${scrollOn ? "active" : "inactive"}`}
+                                onClick={(e) => handleActiveDeviceScroll(e, elementDTO)}
+                              >
+                                <span className="options-toggle-label">scroll</span>
+                                <img
+                                  src={scrollOn ? activeImage : inactiveImage}
+                                  alt="auto scroll toggle"
+                                  className="options-toggle-icon"
+                                />
+                              </div>
+
+                              {/* NEXT/ENTER */}
+                              <div
+                                className={`options-toggle ${enterOn ? "active" : "inactive"}`}
+                                onClick={(e) => handleActiveDeviceEnter(e, elementDTO)}
+                              >
+                                <span className="options-toggle-label">next/enter</span>
+                                <img
+                                  src={enterOn ? activeImage : inactiveImage}
+                                  alt="next/enter toggle"
+                                  className="options-toggle-icon"
+                                />
+                              </div>
+                            </div>
+
+                            {renderEditButton(elementDTO, editImage)}
                             <img
                               src={saveImage}
-                              alt="save"
+                              alt=""
                               className="save-button"
-                              onClick={() => handleSaveInstruction(elementDTO)}
+                              onClick={(event) =>
+                                handleRowSelectedClick(event, elementDTO, "NEW_ELEMENT_DTO")
+                              }
+                            />
+                            <img
+                              src={testInputImage}
+                              alt=""
+                              className="test-button"
+                              onClick={(event) =>
+                                handleRowSelectedClick(event, elementDTO, "TEST_INPUT_DTO")
+                              }
+                            />
+                            <img
+                              src={clickTestImage}
+                              alt=""
+                              className="test-button"
+                              onClick={(event) =>
+                                handleRowSelectedClick(event, elementDTO, "TEST_CLICK_DTO")
+                              }
+                            />
+                            <img
+                              src={crossImage}
+                              alt=""
+                              className="cross-button"
+                              onClick={() => handleRemoveElementDTO(elementDTO)}
                             />
                           </div>
-                        ) : (
-                          <span className="instruction-line">
-                            {getInstructionElement(elementDTO)}
-                          </span>
-                        )}
-
-                        {showAttributes ? (
-                          <div>
-                            <AttributeDropdown
-                              dataArray={elementDTO.attributeData}
-                              onChange={handleAttributeChange}
-                            />
-                          </div>
-                        ) : (
-                          <span>{"\u00A0".repeat(20)}</span>
-                        )}
-
-                        <div className="options-column">
-                          {/* AUTO SCROLL */}
-                          <div className="options-toggle" onClick={(e) => handleActiveDeviceScroll(e, elementDTO)}>
-                            <span className={toggleLabelClass(elementDTO.autoScroll)}>scroll</span>
-                            <img src={toggleIcon(elementDTO.autoScroll)} alt="auto scroll toggle" className="options-toggle-icon" />
-                          </div>
-
-                          {/* NEXT/ENTER */}
-                          <div className="options-toggle" onClick={(e) => handleActiveDeviceEnter(e, elementDTO)}>
-                            <span className={toggleLabelClass(elementDTO.autoEnter)}>next/enter</span>
-                            <img src={toggleIcon(elementDTO.autoEnter)} alt="next/enter toggle" className="options-toggle-icon" />
-                          </div>
-
-                          {renderEditButton(elementDTO, editImage)}
-                          <img
-                            src={saveImage}
-                            alt=""
-                            className="save-button"
-                            onClick={(event) =>
-                              handleRowSelectedClick(event, elementDTO, "NEW_ELEMENT_DTO")
-                            }
-                          />
-                          <img
-                            src={testInputImage}
-                            alt=""
-                            className="test-button"
-                            onClick={(event) =>
-                              handleRowSelectedClick(event, elementDTO, "TEST_INPUT_DTO")
-                            }
-                          />
-                          <img
-                            src={clickTestImage}
-                            alt=""
-                            className="test-button"
-                            onClick={(event) =>
-                              handleRowSelectedClick(event, elementDTO, "TEST_CLICK_DTO")
-                            }
-                          />
-                          <img
-                            src={crossImage}
-                            alt=""
-                            className="cross-button"
-                            onClick={() => handleRemoveElementDTO(elementDTO)}
-                          />
                         </div>
-                      </div>
-                    ))}
+                      );
+                    }
+                    )}
                   </div>
                 </div>
               );
