@@ -119,24 +119,41 @@
   
 }
 
+.options-row {
+  display: flex;
+  flex-direction: row;
+  gap: 12px; // ← horizontal spacing between toggles (adjust 8px / 12px / 16px)
+  align-items: center;
+}
+
 .options-toggle {
   display: flex;
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
   border-radius: 6px;
-  background: #f4f4f4;
   font-size: 12px;
   font-weight: 500;
   transition: all 0.2s ease;
 }
 
+/* ACTIVE */
 .options-toggle.active {
-  background: #e6f4ea; // light green
+  background: #e6f4ea;
 }
 
 .options-toggle.active .options-toggle-label {
-  color: #1a7f37; // green
+  color: #0f9d58;
+}
+
+/* INACTIVE */
+.options-toggle.inactive {
+    background: transparent;
+  border: 1px solid #e0e0e0;
+}
+
+.options-toggle.inactive .options-toggle-label {
+  color: #d93025;
 }
 
 .options-toggle-icon {
@@ -144,26 +161,7 @@
   height: 14px;
 }
 
-.options-toggle-label {
-  font-size: 10px;
-  font-weight: bold;
-  white-space: nowrap;
-}
 
-.options-toggle-label-active {
-  color: #0f9d58; /* green */
-}
-
-.options-toggle-label-inactive {
-  color: #d93025; /* red */
-}
-
-.options-row {
-  display: flex;
-  flex-direction: row;
-  gap: 12px; // ← horizontal spacing between toggles (adjust 8px / 12px / 16px)
-  align-items: center;
-}
 // .active-button{
 //   width: 20px;
 //   height: 20px;
