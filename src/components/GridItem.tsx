@@ -2707,31 +2707,31 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
 
   const updateInstructionActions = (instructionId: number, flag: ActionFlag) => {
-    setInstructionsData(prev => {
-      const instruction = prev.find(x => x.id === instructionId);
-      if (!instruction) return prev;
+    const instruction = instructionsData.find(x => x.id === instructionId);
+    if (!instruction) return;
 
-      const newActions = toggleActionFlag(instruction.actions, flag, instruction.name);
+    const newActions = toggleActionFlag(instruction.actions, flag, instruction.name);
 
-      // send ONLY this message
-      if (webSocket && connected) {
-        const message = {
-          type: "ACTIONS_UPDATE",
-          botJobId: instruction.botJobId,
-          blockId: instruction.blockId,
-          botJobName,
-          instructionId,
-          parentId: instruction.parentId,
-          actions: newActions,
-          homeBankingId,
-          sessionId: "botJobTasks",
-        };
-        webSocket.send(JSON.stringify(message));
-      }
+    // ✅ side-effect OUTSIDE setState
+    if (webSocket && connected) {
+      const message = {
+        type: "ACTIONS_UPDATE",
+        botJobId: instruction.botJobId,
+        blockId: instruction.blockId,
+        botJobName,
+        instructionId,
+        parentId: instruction.parentId,
+        actions: newActions,
+        homeBankingId,
+        sessionId: "botJobTasks",
+      };
+      webSocket.send(JSON.stringify(message));
+    }
 
-      // update local state
-      return prev.map(x => (x.id === instructionId ? { ...x, actions: newActions } : x));
-    });
+    // ✅ pure state update
+    setInstructionsData(prev =>
+      prev.map(x => (x.id === instructionId ? { ...x, actions: newActions } : x))
+    );
   };
 
 
