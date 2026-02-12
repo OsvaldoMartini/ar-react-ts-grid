@@ -147,11 +147,64 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
   const [executionId, setExecutionId] = useState<number>(0);
   const [executionState, setExecutionState] = useState<string>();
+  type ActionFlag = "E" | "S";
 
-  const hasActionFlag = (actions: string | null | undefined, flag: "E" | "S") => {
-    const tokens = actions
-      ? actions.split(":").map(t => t.trim().toUpperCase()).filter(Boolean)
-      : [];
+  const parseActions = (actions?: string | null) =>
+    (actions ?? "")
+      .split(":")
+      .map(t => t.trim())
+      .filter(Boolean);
+
+  const buildActions = (tokens: string[]) => tokens.join(":");
+
+  const isFlag = (t: string) => {
+    const u = t.toUpperCase();
+    return u === "E" || u === "S";
+  };
+
+  // choose a consistent flag order (CHANGE if you prefer S before E)
+  const FLAG_ORDER: ActionFlag[] = ["E", "S"];
+
+  const toggleActionFlag = (actions: string | null | undefined, flag: ActionFlag) => {
+    const tokens = parseActions(actions);
+    const upper = tokens.map(t => t.toUpperCase());
+
+    // Special case: I:... where last token is NAME
+    if (upper[0] === "I" && tokens.length >= 2) {
+      const name = tokens[tokens.length - 1]; // keep original casing
+      const head = tokens.slice(0, tokens.length - 1);
+      const headUpper = head.map(t => t.toUpperCase());
+
+      const base = head[0] ?? "I"; // usually "I"
+      const existingFlags = headUpper.filter(isFlag) as ActionFlag[];
+
+      const has = existingFlags.includes(flag);
+      const nextFlags = has
+        ? existingFlags.filter(f => f !== flag)
+        : [...existingFlags, flag];
+
+      // enforce consistent order for flags
+      const orderedFlags = FLAG_ORDER.filter(f => nextFlags.includes(f));
+
+      return buildActions([base, ...orderedFlags, name]);
+    }
+
+    // Default case (non-I): preserve token order, just toggle the flag in-place.
+    const flagUpper = flag.toUpperCase();
+    const idx = upper.indexOf(flagUpper);
+
+    if (idx >= 0) {
+      // remove the flag (keep order)
+      const out = tokens.slice(0, idx).concat(tokens.slice(idx + 1));
+      return buildActions(out);
+    }
+
+    // add flag at the end (or choose another insertion rule)
+    return buildActions([...tokens, flag]);
+  };
+
+  const hasActionFlag = (actions: string | null | undefined, flag: ActionFlag) => {
+    const tokens = parseActions(actions).map(t => t.toUpperCase());
     return tokens.includes(flag);
   };
 
@@ -2409,6 +2462,11 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     let hiddenField: boolean = false;
 
 
+    const actionsRaw = (instruction.actions ?? "").trim();
+    const tokens = actionsRaw.split(":").map(t => t.trim()).filter(Boolean);
+    const baseAction = (tokens[0] ?? "").toUpperCase(); // I / O / C / SET / IF ...
+    const hasHidden = tokens.some(t => t.toLowerCase() === "hidden");
+
     // Determine the image source and text based on instruction type
     if (instruction.actions.startsWith("I:")) {
       const actionParts: string[] = instruction.actions.split(":");
@@ -2420,14 +2478,23 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
       if (actionParts.length === 3 && actionParts[2] === "hidden") {
         hiddenField = true;
       }
-    } else if (instruction.tagName == "a") {
+    }// LINK (<a>, a, a:E, a:S, ...)
+    else if ((instruction.tagName ?? "").toLowerCase() === "a" || baseAction === "A") {
       imageSrc = linkImage;
       text = `(${instruction.id})${instruction.name}`;
       imageClass = "link-image";
-    } else if (instruction.actions.startsWith("O:")) {
+    }
+    // OUTPUT (O, O:E, O:S, ...)
+    else if (baseAction === "O") {
       imageSrc = outPutImage;
       text = `(${instruction.id})${instruction.name}`;
       imageClass = "output-image";
+    }
+    // CLICK (C, C:E, C:S, ...)
+    else if (baseAction === "C") {
+      imageSrc = clickImage;
+      text = `(${instruction.id})${instruction.name}`;
+      imageClass = "click-image";
     } else {
       switch (instruction.actions) {
         case "SET":
@@ -2597,13 +2664,38 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
   };
 
 
-  const renderDeviceOptionsRow = (
-    instruction: BlockLoopInstructionLoadDTO
+  const updateInstructionActions = (instructionId: number, flag: ActionFlag) => {
+    setInstructionsData(prev => {
+      const instruction = prev.find(x => x.id === instructionId);
+      if (!instruction) return prev;
 
-  ) => {
+      const newActions = toggleActionFlag(instruction.actions, flag);
 
+      // send ONLY this message
+      if (webSocket && connected) {
+        const message = {
+          type: "ACTIONS_UPDATE",
+          botJobId: instruction.botJobId,
+          blockId: instruction.blockId,
+          botJobName,
+          instructionId,
+          parentId: instruction.parentId,
+          actions: newActions,
+          homeBankingId,
+          sessionId: "botJobTasks",
+        };
+        webSocket.send(JSON.stringify(message));
+      }
+
+      // update local state
+      return prev.map(x => (x.id === instructionId ? { ...x, actions: newActions } : x));
+    });
+  };
+
+
+  const renderDeviceOptionsRow = (instruction: BlockLoopInstructionLoadDTO) => {
     if (allSpecialOperations(instruction.actions)) {
-      return <span className="edit-button-space">&nbsp;</span>; // Render a space or an empty element
+      return <span className="edit-button-space">&nbsp;</span>;
     }
 
     const isScroll = hasActionFlag(instruction.actions, "S");
@@ -2612,7 +2704,12 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     return (
       <div className="options-row">
         {/* SCROLL */}
-        <div className={`options-toggle ${isScroll ? "active" : "inactive"}`}>
+        <div
+          className={`options-toggle ${isScroll ? "active" : "inactive"}`}
+          onClick={() => updateInstructionActions(instruction.id, "S")}
+          role="button"
+          tabIndex={0}
+        >
           <span className="options-toggle-label">Scroll</span>
           <img
             src={isScroll ? activeImage : inactiveImage}
@@ -2622,7 +2719,12 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
         </div>
 
         {/* ENTER */}
-        <div className={`options-toggle ${isEnter ? "active" : "inactive"}`}>
+        <div
+          className={`options-toggle ${isEnter ? "active" : "inactive"}`}
+          onClick={() => updateInstructionActions(instruction.id, "E")}
+          role="button"
+          tabIndex={0}
+        >
           <span className="options-toggle-label">Next / Enter</span>
           <img
             src={isEnter ? activeImage : inactiveImage}
@@ -2633,7 +2735,6 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
       </div>
     );
   };
-
 
   // Function to render the move buttons based on the action type
   const renderMoveButtons = (actionType: string, instructionId: number) => {
