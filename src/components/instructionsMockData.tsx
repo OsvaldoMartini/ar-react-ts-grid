@@ -67,7 +67,8 @@ export interface ElementDTO {
   iFrameXPath: string;
   attributeValue: string;
   attributeType: string;
-  searchAttributeValue: string;
+  autoScroll: string;
+  autoEnter: string;
 }
 
 export interface AttributeData {

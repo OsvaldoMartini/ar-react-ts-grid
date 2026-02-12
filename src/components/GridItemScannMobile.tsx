@@ -84,6 +84,16 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
   const [scrollStep, setScrollStep] = useState<number>(0);
   const [scannerType, setScannerType] = useState<string>("UiAutomator2");
 
+  const mapElementForSend = (el: ElementDTO): ElementDTO => el;
+
+  const toggleFlag = (value?: string) => (value === "active" ? "" : "active");
+
+  const toggleLabelClass = (v?: string) =>
+    v === "active"
+      ? "options-toggle-label options-toggle-label-active"
+      : "options-toggle-label options-toggle-label-inactive";
+
+  const toggleIcon = (v?: string) => (v === "active" ? activeImage : inactiveImage);
 
   type ValidatePayload = {
     sourceImage?: string;
@@ -753,7 +763,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       botJobId: botJobId,
       botJobName: botJobName,
       sessionId: `mobile-return-server`,
-      elementDetails: allElements,
+      elementDetails: allElements.map(mapElementForSend),
     };
 
     try {
@@ -763,6 +773,23 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       console.error("❌ Error sending WebSocket message:", error);
       setIsSendingAll(false); // re-enable if send fails
     }
+  };
+
+  const handleActiveDeviceEnter = (
+    event: React.MouseEvent<HTMLDivElement, MouseEvent>,
+    targetElement: ElementDTO
+  ) => {
+    event.stopPropagation();
+
+    setElementDTO((prev) =>
+      prev.map((el) =>
+        el.id === targetElement.id
+          ? { ...el, autoEnter: toggleFlag(el.autoEnter) }
+          : el
+      )
+    );
+
+    setIsElementGrouped(false);
   };
 
   const handleActiveDeviceScroll = (
@@ -777,20 +804,16 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
     //   return;
     // }
 
-    // Toggle logic: if already "scroll-active", clear it, otherwise set it
-    setElementDTO((prevElements) =>
-      prevElements.map((el) =>
+    // Toggle logic: if already "active", clear it, otherwise set it
+    setElementDTO((prev) =>
+      prev.map((el) =>
         el.id === targetElement.id
-          ? {
-            ...el,
-            searchAttributeValue:
-              el.searchAttributeValue === 'scroll-active' ? '' : 'scroll-active',
-          }
+          ? { ...el, autoScroll: toggleFlag(el.autoScroll) }
           : el
       )
     );
 
-    // force regroup if you rely on searchAttributeValue for grouping later
+    // force regroup if you rely on autoScroll for grouping later
     setIsElementGrouped(false);
   };
 
@@ -809,8 +832,11 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
     }
 
     sendWebSocketMessage(elementDTO, action);
+    console.log("ENTER:", elementDTO.autoEnter);
+    console.log("SCROLL:", elementDTO.autoScroll);
 
   };
+
 
   const sendWebSocketMessage = (elementDTO: ElementDTO, action: string) => {
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
@@ -831,7 +857,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       botJobId: selectedJob!.botJobId || botJobId,
       botJobName: selectedJob!.name || botJobName,
       sessionId: sessionDestine,
-      elementDetails: [elementDTO],
+      elementDetails: [mapElementForSend(elementDTO)],
     };
 
     try {
@@ -1020,6 +1046,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
     setEditingElementTagName(elementEdit.tagName);
     setElementName(elementEdit.someText);
   };
+
   const handleSaveInstruction = (selectedElement: ElementDTO) => {
     // Find the instruction to get blockId and botJobId
     console.log("handleSaveInstruction", selectedElement);
@@ -1457,29 +1484,16 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
                         )}
 
                         <div className="options-column">
-                          <div
-                            className="scroll-toggle"
-                            onClick={(event) => handleActiveDeviceScroll(event, elementDTO)}
-                          >
-                            <span
-                              className={
-                                elementDTO.searchAttributeValue === 'scroll-active'
-                                  ? 'scroll-toggle-label scroll-toggle-label-active'
-                                  : 'scroll-toggle-label scroll-toggle-label-inactive'
-                              }
-                            >
-                              auto scroll
-                            </span>
+                          {/* AUTO SCROLL */}
+                          <div className="options-toggle" onClick={(e) => handleActiveDeviceScroll(e, elementDTO)}>
+                            <span className={toggleLabelClass(elementDTO.autoScroll)}>scroll</span>
+                            <img src={toggleIcon(elementDTO.autoScroll)} alt="auto scroll toggle" className="options-toggle-icon" />
+                          </div>
 
-                            <img
-                              src={
-                                elementDTO.searchAttributeValue === 'scroll-active'
-                                  ? activeImage
-                                  : inactiveImage
-                              }
-                              alt="scrollable toggle"
-                              className="scroll-toggle-icon"
-                            />
+                          {/* NEXT/ENTER */}
+                          <div className="options-toggle" onClick={(e) => handleActiveDeviceEnter(e, elementDTO)}>
+                            <span className={toggleLabelClass(elementDTO.autoEnter)}>next/enter</span>
+                            <img src={toggleIcon(elementDTO.autoEnter)} alt="next/enter toggle" className="options-toggle-icon" />
                           </div>
 
                           {renderEditButton(elementDTO, editImage)}

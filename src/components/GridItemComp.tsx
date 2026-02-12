@@ -2133,7 +2133,8 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       iFrameXPath: "",
       attributeValue: "",
       attributeType: "",
-      searchAttributeValue: ""
+      autoScroll: "",
+      autoEnter: ""
     };
 
     sendWebSocketMessage(clickElement, action);

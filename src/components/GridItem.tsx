@@ -148,6 +148,13 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
   const [executionId, setExecutionId] = useState<number>(0);
   const [executionState, setExecutionState] = useState<string>();
 
+  const hasActionFlag = (actions: string | null | undefined, flag: "E" | "S") => {
+    const tokens = actions
+      ? actions.split(":").map(t => t.trim().toUpperCase()).filter(Boolean)
+      : [];
+    return tokens.includes(flag);
+  };
+
   // Drag-and-drop event handler
   const onDragEnd = (result: any) => {
     const { destination, source } = result;
@@ -2160,7 +2167,8 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
       iFrameXPath: "",
       attributeValue: "",
       attributeType: "",
-      searchAttributeValue: ""
+      autoScroll: "",
+      autoEnter: ""
     };
 
     sendWebSocketMessage(clickElement, action);
@@ -3167,6 +3175,9 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                         {...provided.droppableProps}
                       >
                         {blockData.instructions.map((instruction, index) => {
+                          const isScroll = hasActionFlag(instruction.actions, "S");
+                          const isEnter = hasActionFlag(instruction.actions, "E");
+
                           if (instruction.actions === "EXCEL GOTO") return null;
 
                           const isLastInstruction =
@@ -3262,29 +3273,27 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                                   )}
                                   {renderOperations(instruction, instructionsData)}
                                   <div className="options-column">
-                                    {instruction.defaultValue === 'scroll-active' && (
-                                      <div className="scroll-toggle">
-                                        <span
-                                          className={
-                                            instruction.defaultValue === 'scroll-active'
-                                              ? 'scroll-toggle-label scroll-toggle-label-active'
-                                              : 'scroll-toggle-label scroll-toggle-label-inactive'
-                                          }
-                                        >
-                                          auto scroll
-                                        </span>
-
+                                    <div className="options-row">
+                                      {/* SCROLL */}
+                                      <div className={`options-toggle ${isScroll ? "active" : "inactive"}`}>
+                                        <span className="options-toggle-label">Scroll</span>
                                         <img
-                                          src={
-                                            instruction.defaultValue === 'scroll-active'
-                                              ? activeImage
-                                              : inactiveImage
-                                          }
-                                          alt="scrollable toggle"
-                                          className="scroll-toggle-icon"
+                                          src={isScroll ? activeImage : inactiveImage}
+                                          alt="scroll toggle"
+                                          className="options-toggle-icon"
                                         />
                                       </div>
-                                    )}
+
+                                      {/* ENTER */}
+                                      <div className={`options-toggle ${isEnter ? "active" : "inactive"}`}>
+                                        <span className="options-toggle-label">Next / Enter</span>
+                                        <img
+                                          src={isEnter ? activeImage : inactiveImage}
+                                          alt="enter toggle"
+                                          className="options-toggle-icon"
+                                        />
+                                      </div>
+                                    </div>
 
                                     <div className="move-buttons">
                                       {renderEditButton(
