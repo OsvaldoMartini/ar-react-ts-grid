@@ -134,12 +134,17 @@
   border-radius: 6px;
   font-size: 12px;
   font-weight: 500;
-  transition: all 0.2s ease;
+
+  box-sizing: border-box;
+  border: 1px solid transparent;   // <-- reserve space always
+
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
 
 /* ACTIVE */
 .options-toggle.active {
   background: #e6f4ea;
+  border-color: transparent;        // (optional, but explicit)
 }
 
 .options-toggle.active .options-toggle-label {
@@ -148,8 +153,8 @@
 
 /* INACTIVE */
 .options-toggle.inactive {
-    background: transparent;
-  border: 1px solid #e0e0e0;
+  background: transparent;
+  border-color: #e0e0e0;            // <-- instead of adding/removing border
 }
 
 .options-toggle.inactive .options-toggle-label {
@@ -159,6 +164,8 @@
 .options-toggle-icon {
   width: 14px;
   height: 14px;
+  display: block;
+  flex: 0 0 14px;
 }
 
 
