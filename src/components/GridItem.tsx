@@ -162,20 +162,65 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     return u === "E" || u === "S";
   };
 
+  function updateInputActionName(actions: string, newName: string) {
+    if (!actions || !actions.startsWith("I")) return actions;
+
+    // Only apply to inputs:
+    // "I" or "I:..." (covers "I:" too)
+    if (actions !== "I" && !actions.startsWith("I:")) return actions;
+
+    const parts = actions
+      .split(":")
+      .map(p => p.trim())
+      .filter(p => p.length > 0);
+
+    // Ensure base is exactly "I"
+    const base = "I";
+
+    // Collect flags from everything except base and the tail-name if present
+    // We treat any non-flag token after I as "name" candidate, but we ultimately set it to newName.
+    const middle = parts.slice(1);
+    const flags = middle.filter(isFlag);
+
+    // Stable order (S then E)
+    const normalizedFlags: string[] = [];
+    if (flags.includes("S")) normalizedFlags.push("S");
+    if (flags.includes("E")) normalizedFlags.push("E");
+
+    // Always: I[:S][:E]:newName  (so the LAST token is always the name)
+    return [base, ...normalizedFlags, newName].join(":");
+  }
+
   // choose a consistent flag order (CHANGE if you prefer S before E)
   const FLAG_ORDER: ActionFlag[] = ["E", "S"];
 
-  const toggleActionFlag = (actions: string | null | undefined, flag: ActionFlag) => {
+  const toggleActionFlag = (
+    actions: string | null | undefined,
+    flag: ActionFlag,
+    origName?: string
+  ) => {
     const tokens = parseActions(actions);
     const upper = tokens.map(t => t.toUpperCase());
 
-    // Special case: I:... where last token is NAME
-    if (upper[0] === "I" && tokens.length >= 2) {
-      const name = tokens[tokens.length - 1]; // keep original casing
+    // Special case: I:... (inputs)
+    if (upper[0] === "I") {
+      let name = tokens[tokens.length - 1] ?? "";
+
+      // If last token is a flag, then there is no name yet
+      if (isFlag(name.toUpperCase())) {
+        name = origName ?? "";
+      }
+
+      // If origName provided and different → enforce it
+      if (origName && name !== origName) {
+        name = origName;
+      }
+
+      // Extract base + flags (exclude last token)
       const head = tokens.slice(0, tokens.length - 1);
       const headUpper = head.map(t => t.toUpperCase());
 
-      const base = head[0] ?? "I"; // usually "I"
+      const base = "I";
       const existingFlags = headUpper.filter(isFlag) as ActionFlag[];
 
       const has = existingFlags.includes(flag);
@@ -183,26 +228,23 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
         ? existingFlags.filter(f => f !== flag)
         : [...existingFlags, flag];
 
-      // enforce consistent order for flags
+      // Stable order
       const orderedFlags = FLAG_ORDER.filter(f => nextFlags.includes(f));
 
       return buildActions([base, ...orderedFlags, name]);
     }
 
-    // Default case (non-I): preserve token order, just toggle the flag in-place.
+    // Default (non-I)
     const flagUpper = flag.toUpperCase();
     const idx = upper.indexOf(flagUpper);
 
     if (idx >= 0) {
-      // remove the flag (keep order)
       const out = tokens.slice(0, idx).concat(tokens.slice(idx + 1));
       return buildActions(out);
     }
 
-    // add flag at the end (or choose another insertion rule)
     return buildActions([...tokens, flag]);
   };
-
   const hasActionFlag = (actions: string | null | undefined, flag: ActionFlag) => {
     const tokens = parseActions(actions).map(t => t.toUpperCase());
     return tokens.includes(flag);
@@ -2669,7 +2711,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
       const instruction = prev.find(x => x.id === instructionId);
       if (!instruction) return prev;
 
-      const newActions = toggleActionFlag(instruction.actions, flag);
+      const newActions = toggleActionFlag(instruction.actions, flag, instruction.name);
 
       // send ONLY this message
       if (webSocket && connected) {
@@ -2801,29 +2843,13 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
     // Update the instruction's name and actions
     const updatedInstructions = instructionsData.map((instruction) => {
-      if (instruction.id === instructionId) {
-        // Update the name
-        const updatedName = instructionName;
+      if (instruction.id !== instructionId) return instruction;
 
-        // Update actions in the format "I:instructionName"
-        let updatedActions = instruction.actions;
+      const updatedName = instructionName;
 
-        if (instruction.actions.includes(":")) {
-          const actionParts = instruction.actions.split(":"); // Split into parts
-          if (actionParts.length > 2) {
-            actionParts[2] = updatedName; // Replace the name part
-            updatedActions = actionParts.join(":"); // Reassemble the updated actions
-          } else {
-            if (actionParts.length == 2) {
-              actionParts[1] = updatedName; // Replace the name part
-              updatedActions = actionParts.join(":"); // Reassemble the updated actions
-            }
-          }
-        }
+      const updatedActions = updateInputActionName(instruction.actions, updatedName);
 
-        return { ...instruction, name: updatedName, actions: updatedActions };
-      }
-      return instruction;
+      return { ...instruction, name: updatedName, actions: updatedActions };
     });
 
     setInstructionsData(updatedInstructions);
