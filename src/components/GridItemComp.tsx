@@ -142,6 +142,16 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
   const [alertMessageFooter, setAlertMessageFooter] = useState<string | null>(null);
   const [alertDismissed, setAlertDismissed] = useState(false);
 
+  //  const [executionId, setExecutionId] = useState<number>(0);
+  //  const [executionState, setExecutionState] = useState<string>();
+
+  const hasActionFlag = (actions: string | null | undefined, flag: "E" | "S") => {
+    const tokens = actions
+      ? actions.split(":").map(t => t.trim().toUpperCase()).filter(Boolean)
+      : [];
+    return tokens.includes(flag);
+  };
+
   // Drag-and-drop event handler
   const onDragEnd = (result: any) => {
     const { destination, source } = result;
@@ -2408,6 +2418,16 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
           imageSrc = checkImage;
           text = instruction.name;
           break;
+        case "CSV CHECK":
+          imageSrc = excelGotoImage;
+          text = instruction.name;
+          // imageClass = "excelgoto-image";
+          break;
+        case "PDF CHECK":
+          imageSrc = excelGotoImage;
+          text = instruction.name;
+          // imageClass = "excelgoto-image";
+          break;
         case "E":
           imageSrc = excelImage;
           text = instruction.name;
@@ -2520,7 +2540,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
 
 
   const editableSpecialOperations = (actionType: string) => {
-    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "PAUSE", "REFRESH", "LOOP", "REFRESH_LOOP", "EXCEL GOTO", "NEXT ROW"].includes(actionType)) {
+    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "PAUSE", "REFRESH", "LOOP", "REFRESH_LOOP", "EXCEL GOTO", "NEXT ROW", "CSV CHECK", "PDF CHECK"].includes(actionType)) {
       return true;
     } else {
       return false;
@@ -2529,7 +2549,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
 
 
   const allSpecialOperations = (actionType: string) => {
-    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "IF", "ELSEIF", "ELSE", "ENDIF", "PAUSE", "REFRESH", "LOOP", "REFRESH_LOOP", "EXCEL GOTO", "NEXT ROW"].includes(actionType)) {
+    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "IF", "ELSEIF", "ELSE", "ENDIF", "PAUSE", "REFRESH", "LOOP", "REFRESH_LOOP", "EXCEL GOTO", "NEXT ROW", "CSV CHECK", "PDF CHECK"].includes(actionType)) {
       return true;
     } else {
       return false;
@@ -2551,6 +2571,45 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       />
     );
   };
+
+
+  const renderDeviceOptionsRow = (
+    instruction: ComponentsInstructionsDTO
+
+  ) => {
+
+    if (allSpecialOperations(instruction.actions)) {
+      return <span className="edit-button-space">&nbsp;</span>; // Render a space or an empty element
+    }
+
+    const isScroll = hasActionFlag(instruction.actions, "S");
+    const isEnter = hasActionFlag(instruction.actions, "E");
+
+    return (
+      <div className="options-row">
+        {/* SCROLL */}
+        <div className={`options-toggle ${isScroll ? "active" : "inactive"}`}>
+          <span className="options-toggle-label">Scroll</span>
+          <img
+            src={isScroll ? activeImage : inactiveImage}
+            alt="scroll toggle"
+            className="options-toggle-icon"
+          />
+        </div>
+
+        {/* ENTER */}
+        <div className={`options-toggle ${isEnter ? "active" : "inactive"}`}>
+          <span className="options-toggle-label">Next / Enter</span>
+          <img
+            src={isEnter ? activeImage : inactiveImage}
+            alt="enter toggle"
+            className="options-toggle-icon"
+          />
+        </div>
+      </div>
+    );
+  };
+
 
   // Function to render the move buttons based on the action type
   const renderMoveButtons = (actionType: string, instructionId: number) => {
@@ -2690,21 +2749,37 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
   ) => {
     const validActions = ["SET", "GET"];
 
-    // Handle the "CK" action with special formatting for operation
-    if (instruction.actions === "CK" && instruction.operation) {
-      const [left, middle, right] = instruction.operation.split(":").map((part) => part.trim());
+    // Handle CK / CSV CHECK / PDF CHECK actions with special formatting
+    if (
+      (instruction.actions === "CK" ||
+        instruction.actions === "CSV CHECK" ||
+        instruction.actions === "PDF CHECK") &&
+      instruction.operation
+    ) {
+      const [left, middle, right] = instruction.operation
+        .split(":")
+        .map((part) => part.trim());
 
       if (middle === "=" || middle === ">" || middle === "<" || middle === "!=") {
+
+        const rightLabel =
+          instruction.actions === "CSV CHECK"
+            ? "CSV VALUES"
+            : instruction.actions === "PDF CHECK"
+              ? "PDF VALUES"
+              : right;
+
         return (
           <span className="instruction-details">
-            <span style={{ color: "#FFA500" }}>({instruction.variableId}){left}</span>
+            <span style={{ color: "#FFA500" }}>
+              ({instruction.variableId}){left}
+            </span>
             <span style={{ color: "#0b5394" }}>{middle}</span>
-            <span style={{ color: "#FFA500" }}>{right}</span>
+            <span style={{ color: "#FFA500" }}>{rightLabel}</span>
           </span>
         );
       }
     }
-
 
     // Special case for "GOTO" action - render only the operation without parentId or colon
     if (instruction.actions === "GOTO" && instruction.operation) {
@@ -2910,6 +2985,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                 </div>
               </div>
             </div>
+
           ) : (
             Object.entries(groupedData)
               .sort(
@@ -3161,6 +3237,9 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                                   )}
                                   {renderOperations(instruction, componentsData)}
                                   <div className="options-column">
+                                    {renderDeviceOptionsRow(
+                                      instruction
+                                    )}
                                     <div className="move-buttons">
                                       {renderEditButton(
                                         instruction.actions,
