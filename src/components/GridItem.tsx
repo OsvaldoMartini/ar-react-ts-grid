@@ -2596,6 +2596,45 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     );
   };
 
+
+  const renderDeviceOptionsRow = (
+    instruction: BlockLoopInstructionLoadDTO
+
+  ) => {
+
+    if (allSpecialOperations(instruction.actions)) {
+      return <span className="edit-button-space">&nbsp;</span>; // Render a space or an empty element
+    }
+
+    const isScroll = hasActionFlag(instruction.actions, "S");
+    const isEnter = hasActionFlag(instruction.actions, "E");
+
+    return (
+      <div className="options-row">
+        {/* SCROLL */}
+        <div className={`options-toggle ${isScroll ? "active" : "inactive"}`}>
+          <span className="options-toggle-label">Scroll</span>
+          <img
+            src={isScroll ? activeImage : inactiveImage}
+            alt="scroll toggle"
+            className="options-toggle-icon"
+          />
+        </div>
+
+        {/* ENTER */}
+        <div className={`options-toggle ${isEnter ? "active" : "inactive"}`}>
+          <span className="options-toggle-label">Next / Enter</span>
+          <img
+            src={isEnter ? activeImage : inactiveImage}
+            alt="enter toggle"
+            className="options-toggle-icon"
+          />
+        </div>
+      </div>
+    );
+  };
+
+
   // Function to render the move buttons based on the action type
   const renderMoveButtons = (actionType: string, instructionId: number) => {
     if (["IF", "ELSEIF", "ELSE", "ENDIF"].includes(actionType)) {
@@ -3175,9 +3214,6 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                         {...provided.droppableProps}
                       >
                         {blockData.instructions.map((instruction, index) => {
-                          const isScroll = hasActionFlag(instruction.actions, "S");
-                          const isEnter = hasActionFlag(instruction.actions, "E");
-
                           if (instruction.actions === "EXCEL GOTO") return null;
 
                           const isLastInstruction =
@@ -3273,28 +3309,9 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                                   )}
                                   {renderOperations(instruction, instructionsData)}
                                   <div className="options-column">
-                                    <div className="options-row">
-                                      {/* SCROLL */}
-                                      <div className={`options-toggle ${isScroll ? "active" : "inactive"}`}>
-                                        <span className="options-toggle-label">Scroll</span>
-                                        <img
-                                          src={isScroll ? activeImage : inactiveImage}
-                                          alt="scroll toggle"
-                                          className="options-toggle-icon"
-                                        />
-                                      </div>
-
-                                      {/* ENTER */}
-                                      <div className={`options-toggle ${isEnter ? "active" : "inactive"}`}>
-                                        <span className="options-toggle-label">Next / Enter</span>
-                                        <img
-                                          src={isEnter ? activeImage : inactiveImage}
-                                          alt="enter toggle"
-                                          className="options-toggle-icon"
-                                        />
-                                      </div>
-                                    </div>
-
+                                    {renderDeviceOptionsRow(
+                                      instruction
+                                    )}
                                     <div className="move-buttons">
                                       {renderEditButton(
                                         instruction.actions,
