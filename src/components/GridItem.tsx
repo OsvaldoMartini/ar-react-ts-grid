@@ -28,6 +28,9 @@ import elseImage from "../assets/else6.png";
 import endIfImage from "../assets/endIf4.png";
 import pauseImage from "../assets/pause4.png";
 import refreshOnlyImage from "../assets/refresh-only.png";
+import nextEnterImage from "../assets/next_enter.png";
+import swipeUpImage from "../assets/swipe_up.png";
+import swipeDownImage from "../assets/swipe_down.png";
 import refreshLoopImage from "../assets/refresh-loop.png";
 import clickImage from "../assets/click.png";
 import clickTestImage from "../assets/clickTest2.png";
@@ -2600,6 +2603,21 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
           text = instruction.name;
           imageClass = "refresh-image";
           break;
+        case "NEXT_ENTER":
+          imageSrc = nextEnterImage;
+          text = 'NEXT/ENTER';
+          imageClass = "refresh-image";
+          break;
+        case "SWIPE_UP":
+          imageSrc = swipeUpImage;
+          text = 'SWIPE UP';
+          imageClass = "refresh-image";
+          break;
+        case "SWIPE_DOWN":
+          imageSrc = swipeDownImage;
+          text = 'SWIPE DOWN';
+          imageClass = "refresh-image";
+          break;
         case "REFRESH_LOOP":
           imageSrc = refreshLoopImage;
           text = instruction.name;
@@ -2673,7 +2691,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
 
   const editableSpecialOperations = (actionType: string) => {
-    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "PAUSE", "REFRESH", "LOOP", "REFRESH_LOOP", "EXCEL GOTO", "NEXT ROW", "CSV CHECK", "PDF CHECK"].includes(actionType)) {
+    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "PAUSE", "REFRESH", "LOOP", "REFRESH_LOOP", "NEXT_ENTER", "SWIPE_UP", "SWIPE_DOWN", "EXCEL GOTO", "NEXT ROW", "CSV CHECK", "PDF CHECK"].includes(actionType)) {
       return true;
     } else {
       return false;
@@ -2682,7 +2700,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
 
   const allSpecialOperations = (actionType: string) => {
-    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "IF", "ELSEIF", "ELSE", "ENDIF", "PAUSE", "REFRESH", "LOOP", "REFRESH_LOOP", "EXCEL GOTO", "NEXT ROW", "CSV CHECK", "PDF CHECK"].includes(actionType)) {
+    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "IF", "ELSEIF", "ELSE", "ENDIF", "PAUSE", "REFRESH", "LOOP", "REFRESH_LOOP", "NEXT_ENTER", "SWIPE_UP", "SWIPE_DOWN", "EXCEL GOTO", "NEXT ROW", "CSV CHECK", "PDF CHECK"].includes(actionType)) {
       return true;
     } else {
       return false;
@@ -2985,6 +3003,17 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
           <span style={{ color: "#FFA500" }}>{loopValue} times</span> {" "}
           <span style={{ color: "#0b5394" }}>Jump To Parent</span>{" "}
           <span style={{ color: "#b163ff" }}>({instruction.parentId}){parentValue}</span>
+        </span>
+      );
+    }
+
+    // Handle "LOOP" operation with simplified details
+    if ((instruction.actions === "SWIPE_UP" || instruction.actions === "SWIPE_DOWN") && instruction.operation) {
+
+      return (
+        <span className="instruction-details">
+          <span style={{ color: "#0b5394" }}>Times</span>{" "}
+          <span style={{ color: "#FFA500" }}>{instruction.operation}x</span> {" "}
         </span>
       );
     }
