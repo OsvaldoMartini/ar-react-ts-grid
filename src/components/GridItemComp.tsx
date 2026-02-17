@@ -2525,12 +2525,12 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
             {hiddenField && (
               <img src={hiddenImage} alt="hidden" className="hidden-image" />
             )}
-            <span>{text}</span>
+            <span>{text ? renderHighlighted(text, findText) : null}</span>
           </>
         )}
         {!imageSrc && (
           <span style={{ fontWeight: isActionBold ? 'bold' : 'normal' }}>
-            {text}
+            {text ? renderHighlighted(text, findText) : null}
           </span>
         )}
       </div>
@@ -2922,6 +2922,29 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     return <span className="instruction-details">&nbsp;</span>;
   };
 
+  const renderHighlighted = (text: string, query: string) => {
+    const q = query.trim();
+    if (!q) return text;
+
+    const lowerText = text.toLowerCase();
+    const lowerQ = q.toLowerCase();
+    const idx = lowerText.indexOf(lowerQ);
+
+    if (idx === -1) return text;
+
+    const before = text.slice(0, idx);
+    const match = text.slice(idx, idx + q.length);
+    const after = text.slice(idx + q.length);
+
+    return (
+      <>
+        {before}
+        <mark className="find-highlight">{match}</mark>
+        {after}
+      </>
+    );
+  };
+
   const renderExportFile = (input: string) => {
     const lastChar = input.slice(-1);
     const path = input.slice(0, -2); // remove ":," or ":|" from the end
@@ -3002,11 +3025,16 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
             ) : (
               Object.entries(groupedData)
                 .filter(([, blockData]) => {
-                  if (!findText.trim()) return true;
+                  const q = findText.trim().toLowerCase();
+                  if (!q) return true;
 
-                  return blockData.blockName
-                    ?.toLowerCase()
-                    .includes(findText.toLowerCase());
+                  const blockMatch = (blockData.blockName ?? "").toLowerCase().includes(q);
+
+                  const instructionMatch = (blockData.instructions ?? []).some((ins) =>
+                    (ins.name ?? "").toLowerCase().includes(q)
+                  );
+
+                  return blockMatch || instructionMatch;
                 })
                 .sort(
                   ([, aBlockData], [, bBlockData]) =>
@@ -3076,7 +3104,9 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                           />
                         </div>
                       ) : (
-                        <span className="block-name">{blockData.blockName}</span>
+                        <span className="block-name">
+                          {renderHighlighted(blockData.blockName ?? "", findText)}
+                        </span>
                         //<span className="block-name">{blockData.blockName} (Id:   {blockData.instructions[0].blockId})</span>
                       )}
 
