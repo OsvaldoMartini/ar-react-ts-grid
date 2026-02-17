@@ -250,6 +250,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
     return buildActions([...tokens, flag]);
   };
+
   const hasActionFlag = (actions: string | null | undefined, flag: ActionFlag) => {
     const tokens = parseActions(actions).map(t => t.toUpperCase());
     return tokens.includes(flag);
