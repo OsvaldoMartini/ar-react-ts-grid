@@ -9,6 +9,34 @@
   box-sizing: border-box; /* make padding play nice with height */
 }
 
+/* Fixed Find row (matches existing toolbar/button design) */
+.grid-find-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  margin-top: 4px;
+  margin-bottom: 2px;
+  padding-bottom: 4px;
+
+  width: 100%;
+  border-bottom: 1px solid #c0c0c0;
+}
+
+.grid-find-label {
+  font-size: 12px;
+  font-weight: bold;
+  color: #0b5394;
+  white-space: nowrap;
+}
+
+.grid-find-input {
+  @extend .toolbar-input;
+  flex: 1;          // ✅ takes all remaining free space
+  min-width: 0;     // ✅ prevents flex overflow issues
+}
+
+
 /* NEW: scrollable area for the grid/list */
 .grid-content {
   flex: 1;
