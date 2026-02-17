@@ -384,20 +384,21 @@
 }
 
 .excel-goto-container:hover {
-  background-color: #a7bed3; /* Slightly darker shade on hover */
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Subtle shadow on hover */
+  background-color: #a7bed3;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); 
 }
 
 .excelgoto-image {
   height: 16px;
   width: 16px;
-  margin-right: 5px; /* Space between image and text */
+  margin-right: 5px; 
 }
 
 .excelgoto-text {
-  font-size: 0.8em; /* Makes the font size 80% of its parent's font size */
-  margin-right: 5px; /* Space between text and cross image */
+  font-size: 0.8em; 
+  margin-right: 5px;
   color: #b163ff;
+  white-space: nowrap; 
 }
 
 .cross-image {

@@ -3355,7 +3355,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                                 className="excelgoto-image"
                                 title="This block contains the Excel GOTO instruction"
                               />
-                              <span className="excelgoto-text">Excel Next Row</span>
+                              <span className="excelgoto-text">Row to Return</span>
                               <img
                                 src={edit2Image}
                                 alt=""

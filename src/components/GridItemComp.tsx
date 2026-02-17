@@ -3269,7 +3269,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                                 className="excelgoto-image"
                                 title="This block contains the Excel GOTO instruction"
                               />
-                              <span className="excelgoto-text">Excel Next Row</span>
+                              <span className="excelgoto-text">Row to Return</span>
                               <img
                                 src={edit2Image}
                                 alt=""
