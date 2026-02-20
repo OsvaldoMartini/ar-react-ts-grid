@@ -196,6 +196,7 @@
   border: 1px solid transparent;   // <-- reserve space always
 
   transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  white-space: nowrap; 
 }
 
 /* ACTIVE */
@@ -497,6 +498,7 @@
   display: flex;
   justify-content: flex-end; /* Align content to the right */
   margin-right: 8px; /* Add right margin of 3px */
+    white-space: nowrap; 
 }
 
 
