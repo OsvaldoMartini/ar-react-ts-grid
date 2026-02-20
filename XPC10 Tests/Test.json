@@ -3,357 +3,226 @@
   "elements": [
     {
       "typeElement": "tagName-Found",
-      "tagName": "input",
-      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/avq-payments-new-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/avq-web-banking-payment-entry-banklet[1]/avq-payment-entry[1]/div[1]/avq-payment-form-loader[1]/div[1]/avq-web-banking-stepper[1]/div[1]/mat-stepper[1]/div[1]/div[2]/div[1]/div[1]/avq-payment-form-step-layout[1]/div[1]/section[1]/avq-payment-form-loader[1]/div[1]/avq-payment-entry-beneficiary-form[1]/form[1]/avq-wb-form-group[1]/div[1]/mat-expansion-panel[1]/div[1]/div[1]/div[1]/fieldset[1]/div[1]/div[1]/avq-payment-form-optionally-searchable-field[1]/div[1]/div[1]/mat-form-field[1]/div[1]/div[1]/div[2]/input[1]",
-      "someText": "IBAN/numero di conto",
-      "attribId": "mat-input-6",
+      "tagName": "button",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/assl-dashboard-retail-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/div[1]/div[1]/div[1]/avq-web-banking-payment-recent-single-banklet[1]/avq-payment-recent-single[1]/avq-payments-list[1]/div[1]/avq-payment-overview-table[1]/div[1]/avq-table[1]/table[1]/thead[1]/tr[1]/th[1]/avq-selectable-checkbox[1]/mat-checkbox[1]/div[1]/div[1]/input[1]",
+      "someText": "",
+      "attribId": "mat-mdc-checkbox-35-input",
       "attribName": "",
-      "coordinates": "-621.08,307.25",
+      "coordinates": "435.50,743.25",
       "attributeData": [
-        { "name": "matinput", "value": "" },
-        {
-          "name": "class",
-          "value": "mat-mdc-input-element mat-mdc-form-field-input-control mdc-text-field__input cdk-text-field-autofill-monitored ng-dirty ng-touched ng-valid"
-        },
-        { "name": "id", "value": "mat-input-6" },
-        { "name": "required", "value": "" },
-        { "name": "aria-required", "value": "true" },
-        { "name": "aria-invalid", "value": "false" },
-        { "name": "someText", "value": "mat-input-6" }
+        { "name": "type", "value": "checkbox" },
+        { "name": "class", "value": "mdc-checkbox__native-control" },
+        { "name": "disabled", "value": "" },
+        { "name": "id", "value": "mat-mdc-checkbox-35-input" },
+        { "name": "tabindex", "value": "-1" },
+        { "name": "aria-label", "value": "Selezionare tutto" },
+        { "name": "aria-labelledby", "value": "" },
+        { "name": "someText", "value": "Selezionare tutto" }
       ],
       "customXPath": "",
       "iFrameXPath": "",
       "shadowHost": "",
       "shadowRoot": "false",
       "nestedShadow": "false",
-      "cssSelector": "input#mat-input-6.mat-mdc-input-element.mat-mdc-form-field-input-control.mdc-text-field__input.cdk-text-field-autofill-monitored.ng-dirty.ng-touched.ng-valid",
+      "cssSelector": "input#mat-mdc-checkbox-35-input.mdc-checkbox__native-control",
       "attributeValue": "",
       "attributeType": "",
       "searchAttributeValue": "",
-      "nameLabel": "mat-input-6",
-      "nameField": "mat-input-6",
-      "definedName": "mat-input-6",
+      "nameLabel": "Selezionare tutto",
+      "nameField": "Selezionare tutto",
+      "definedName": "Selezionare tutto",
       "id": 1
     },
     {
       "typeElement": "tagName-Found",
-      "tagName": "input",
-      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/avq-payments-new-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/avq-web-banking-payment-entry-banklet[1]/avq-payment-entry[1]/div[1]/avq-payment-form-loader[1]/div[1]/avq-web-banking-stepper[1]/div[1]/mat-stepper[1]/div[1]/div[2]/div[1]/div[1]/avq-payment-form-step-layout[1]/div[1]/section[1]/avq-payment-form-loader[1]/div[1]/avq-payment-entry-beneficiary-form[1]/form[1]/avq-wb-form-group[1]/div[1]/mat-expansion-panel[1]/div[1]/div[1]/div[1]/fieldset[1]/div[1]/div[2]/avq-payment-entry-beneficiary-bank-address[1]/fieldset[1]/avq-payment-beneficiary-bic-bank-code[1]/div[1]/div[1]/mat-form-field[1]/div[1]/div[1]/div[2]/input[1]",
-      "someText": "Codice della banca",
-      "attribId": "mat-input-7",
+      "tagName": "button",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/assl-dashboard-retail-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/div[1]/div[1]/div[1]/avq-web-banking-payment-recent-single-banklet[1]/avq-payment-recent-single[1]/avq-payments-list[1]/div[1]/avq-payment-overview-table[1]/div[1]/avq-table[1]/table[1]/tbody[1]/tr[1]/td[1]/avq-selectable-checkbox[1]/mat-checkbox[1]/div[1]/div[1]/input[1]",
+      "someText": "",
+      "attribId": "mat-mdc-checkbox-36-input",
       "attribName": "",
-      "coordinates": "-621.08,450.50",
+      "coordinates": "435.50,802.25",
       "attributeData": [
-        { "name": "matinput", "value": "" },
-        { "name": "type", "value": "text" },
-        {
-          "name": "class",
-          "value": "mat-mdc-input-element mat-mdc-form-field-input-control mdc-text-field__input ng-pristine cdk-text-field-autofill-monitored ng-valid ng-touched"
-        },
-        { "name": "id", "value": "mat-input-7" },
-        { "name": "required", "value": "" },
-        { "name": "aria-required", "value": "true" },
-        { "name": "aria-invalid", "value": "false" },
-        { "name": "someText", "value": "mat-input-7" }
+        { "name": "type", "value": "checkbox" },
+        { "name": "class", "value": "mdc-checkbox__native-control" },
+        { "name": "disabled", "value": "" },
+        { "name": "id", "value": "mat-mdc-checkbox-36-input" },
+        { "name": "tabindex", "value": "-1" },
+        { "name": "aria-label", "value": "Selezione" },
+        { "name": "aria-labelledby", "value": "" },
+        { "name": "someText", "value": "Selezione" }
       ],
       "customXPath": "",
       "iFrameXPath": "",
       "shadowHost": "",
       "shadowRoot": "false",
       "nestedShadow": "false",
-      "cssSelector": "input#mat-input-7.mat-mdc-input-element.mat-mdc-form-field-input-control.mdc-text-field__input.ng-pristine.cdk-text-field-autofill-monitored.ng-valid.ng-touched",
+      "cssSelector": "input#mat-mdc-checkbox-36-input.mdc-checkbox__native-control",
       "attributeValue": "",
       "attributeType": "",
       "searchAttributeValue": "",
-      "nameLabel": "mat-input-7",
-      "nameField": "mat-input-7",
-      "definedName": "mat-input-7",
+      "nameLabel": "Selezione",
+      "nameField": "Selezione",
+      "definedName": "Selezione",
       "id": 2
     },
     {
       "typeElement": "tagName-Found",
-      "tagName": "input",
-      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/avq-payments-new-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/avq-web-banking-payment-entry-banklet[1]/avq-payment-entry[1]/div[1]/avq-payment-form-loader[1]/div[1]/avq-web-banking-stepper[1]/div[1]/mat-stepper[1]/div[1]/div[2]/div[1]/div[1]/avq-payment-form-step-layout[1]/div[1]/section[1]/avq-payment-form-loader[1]/div[1]/avq-payment-entry-beneficiary-form[1]/form[1]/avq-wb-form-group[2]/div[1]/mat-expansion-panel[1]/div[1]/div[1]/div[1]/fieldset[1]/avq-payment-beneficiary-address-form[1]/div[1]/div[1]/mat-form-field[1]/div[1]/div[1]/div[2]/input[1]",
-      "someText": "Nome",
-      "attribId": "mat-input-2",
+      "tagName": "button",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/assl-dashboard-retail-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/div[1]/div[1]/div[1]/avq-web-banking-payment-recent-single-banklet[1]/avq-payment-recent-single[1]/avq-payments-list[1]/div[1]/avq-payment-overview-table[1]/div[1]/avq-table[1]/table[1]/tbody[1]/tr[2]/td[1]/avq-selectable-checkbox[1]/mat-checkbox[1]/div[1]/div[1]/input[1]",
+      "someText": "",
+      "attribId": "mat-mdc-checkbox-37-input",
       "attribName": "",
-      "coordinates": "-621.08,799.75",
+      "coordinates": "435.50,881.25",
       "attributeData": [
-        { "name": "matinput", "value": "" },
-        { "name": "formcontrolname", "value": "name" },
-        { "name": "avqpaymentconfigfield", "value": "beneficiary1" },
-        {
-          "name": "class",
-          "value": "mat-mdc-input-element mat-mdc-form-field-input-control mdc-text-field__input cdk-text-field-autofill-monitored ng-dirty ng-valid ng-touched"
-        },
-        { "name": "id", "value": "mat-input-2" },
-        { "name": "required", "value": "" },
-        { "name": "aria-required", "value": "true" },
-        { "name": "minlength", "value": "1" },
-        { "name": "maxlength", "value": "36" },
-        { "name": "aria-invalid", "value": "false" },
-        { "name": "someText", "value": "mat-input-2" }
+        { "name": "type", "value": "checkbox" },
+        { "name": "class", "value": "mdc-checkbox__native-control" },
+        { "name": "disabled", "value": "" },
+        { "name": "id", "value": "mat-mdc-checkbox-37-input" },
+        { "name": "tabindex", "value": "-1" },
+        { "name": "aria-label", "value": "Selezione" },
+        { "name": "aria-labelledby", "value": "" },
+        { "name": "someText", "value": "Selezione" }
       ],
       "customXPath": "",
       "iFrameXPath": "",
       "shadowHost": "",
       "shadowRoot": "false",
       "nestedShadow": "false",
-      "cssSelector": "input#mat-input-2.mat-mdc-input-element.mat-mdc-form-field-input-control.mdc-text-field__input.cdk-text-field-autofill-monitored.ng-dirty.ng-valid.ng-touched",
+      "cssSelector": "input#mat-mdc-checkbox-37-input.mdc-checkbox__native-control",
       "attributeValue": "",
       "attributeType": "",
       "searchAttributeValue": "",
-      "nameLabel": "name",
-      "nameField": "name",
-      "definedName": "mat-input-2",
+      "nameLabel": "Selezione",
+      "nameField": "Selezione",
+      "definedName": "Selezione",
       "id": 3
     },
     {
       "typeElement": "tagName-Found",
-      "tagName": "input",
-      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/avq-payments-new-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/avq-web-banking-payment-entry-banklet[1]/avq-payment-entry[1]/div[1]/avq-payment-form-loader[1]/div[1]/avq-web-banking-stepper[1]/div[1]/mat-stepper[1]/div[1]/div[2]/div[1]/div[1]/avq-payment-form-step-layout[1]/div[1]/section[1]/avq-payment-form-loader[1]/div[1]/avq-payment-entry-beneficiary-form[1]/form[1]/avq-wb-form-group[2]/div[1]/mat-expansion-panel[1]/div[1]/div[1]/div[1]/fieldset[1]/avq-payment-beneficiary-address-form[1]/div[1]/div[2]/mat-form-field[1]/div[1]/div[1]/div[2]/input[1]",
-      "someText": "Indirizzo",
-      "attribId": "mat-input-3",
+      "tagName": "button",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/assl-dashboard-retail-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/div[1]/div[1]/div[1]/avq-web-banking-payment-recent-single-banklet[1]/avq-payment-recent-single[1]/avq-payments-list[1]/div[1]/avq-payment-overview-table[1]/div[1]/avq-table[1]/table[1]/tbody[1]/tr[3]/td[1]/avq-selectable-checkbox[1]/mat-checkbox[1]/div[1]/div[1]/input[1]",
+      "someText": "",
+      "attribId": "mat-mdc-checkbox-38-input",
       "attribName": "",
-      "coordinates": "-621.08,885.00",
+      "coordinates": "435.50,960.25",
       "attributeData": [
-        { "name": "matinput", "value": "" },
-        { "name": "formcontrolname", "value": "unstructuredAddress1" },
-        { "name": "avqpaymentconfigfield", "value": "beneficiary2" },
-        {
-          "name": "class",
-          "value": "mat-mdc-input-element mat-mdc-form-field-input-control mdc-text-field__input cdk-text-field-autofill-monitored ng-dirty ng-valid ng-touched"
-        },
-        { "name": "id", "value": "mat-input-3" },
-        { "name": "required", "value": "" },
-        { "name": "aria-required", "value": "true" },
-        { "name": "minlength", "value": "1" },
-        { "name": "maxlength", "value": "36" },
-        { "name": "aria-invalid", "value": "false" },
-        { "name": "someText", "value": "mat-input-3" }
+        { "name": "type", "value": "checkbox" },
+        { "name": "class", "value": "mdc-checkbox__native-control" },
+        { "name": "disabled", "value": "" },
+        { "name": "id", "value": "mat-mdc-checkbox-38-input" },
+        { "name": "tabindex", "value": "-1" },
+        { "name": "aria-label", "value": "Selezione" },
+        { "name": "aria-labelledby", "value": "" },
+        { "name": "someText", "value": "Selezione" }
       ],
       "customXPath": "",
       "iFrameXPath": "",
       "shadowHost": "",
       "shadowRoot": "false",
       "nestedShadow": "false",
-      "cssSelector": "input#mat-input-3.mat-mdc-input-element.mat-mdc-form-field-input-control.mdc-text-field__input.cdk-text-field-autofill-monitored.ng-dirty.ng-valid.ng-touched",
+      "cssSelector": "input#mat-mdc-checkbox-38-input.mdc-checkbox__native-control",
       "attributeValue": "",
       "attributeType": "",
       "searchAttributeValue": "",
-      "nameLabel": "unstructuredAddress1",
-      "nameField": "unstructuredAddress1",
-      "definedName": "mat-input-3",
+      "nameLabel": "Selezione",
+      "nameField": "Selezione",
+      "definedName": "Selezione",
       "id": 4
     },
     {
       "typeElement": "tagName-Found",
-      "tagName": "input",
-      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/avq-payments-new-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/avq-web-banking-payment-entry-banklet[1]/avq-payment-entry[1]/div[1]/avq-payment-form-loader[1]/div[1]/avq-web-banking-stepper[1]/div[1]/mat-stepper[1]/div[1]/div[2]/div[1]/div[1]/avq-payment-form-step-layout[1]/div[1]/section[1]/avq-payment-form-loader[1]/div[1]/avq-payment-entry-beneficiary-form[1]/form[1]/avq-wb-form-group[2]/div[1]/mat-expansion-panel[1]/div[1]/div[1]/div[1]/fieldset[1]/avq-payment-beneficiary-address-form[1]/div[1]/div[3]/mat-form-field[1]/div[1]/div[1]/div[2]/input[1]",
-      "someText": "Città",
-      "attribId": "mat-input-4",
+      "tagName": "button",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/assl-dashboard-retail-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/div[1]/div[1]/div[1]/avq-web-banking-payment-recent-single-banklet[1]/avq-payment-recent-single[1]/avq-payments-list[1]/div[1]/avq-payment-overview-table[1]/div[1]/avq-table[1]/table[1]/tbody[1]/tr[4]/td[1]/avq-selectable-checkbox[1]/mat-checkbox[1]/div[1]/div[1]/input[1]",
+      "someText": "",
+      "attribId": "mat-mdc-checkbox-39-input",
       "attribName": "",
-      "coordinates": "-621.08,970.25",
+      "coordinates": "435.50,1039.25",
       "attributeData": [
-        { "name": "matinput", "value": "" },
-        { "name": "formcontrolname", "value": "unstructuredAddress2" },
-        { "name": "avqpaymentconfigfield", "value": "beneficiary3" },
-        {
-          "name": "class",
-          "value": "mat-mdc-input-element ng-valid mat-mdc-form-field-input-control mdc-text-field__input cdk-text-field-autofill-monitored ng-dirty ng-touched"
-        },
-        { "name": "id", "value": "mat-input-4" },
-        { "name": "aria-invalid", "value": "false" },
-        { "name": "aria-required", "value": "false" },
-        { "name": "maxlength", "value": "36" },
-        { "name": "someText", "value": "mat-input-4" }
+        { "name": "type", "value": "checkbox" },
+        { "name": "class", "value": "mdc-checkbox__native-control" },
+        { "name": "disabled", "value": "" },
+        { "name": "id", "value": "mat-mdc-checkbox-39-input" },
+        { "name": "tabindex", "value": "-1" },
+        { "name": "aria-label", "value": "Selezione" },
+        { "name": "aria-labelledby", "value": "" },
+        { "name": "someText", "value": "Selezione" }
       ],
       "customXPath": "",
       "iFrameXPath": "",
       "shadowHost": "",
       "shadowRoot": "false",
       "nestedShadow": "false",
-      "cssSelector": "input#mat-input-4.mat-mdc-input-element.ng-valid.mat-mdc-form-field-input-control.mdc-text-field__input.cdk-text-field-autofill-monitored.ng-dirty.ng-touched",
+      "cssSelector": "input#mat-mdc-checkbox-39-input.mdc-checkbox__native-control",
       "attributeValue": "",
       "attributeType": "",
       "searchAttributeValue": "",
-      "nameLabel": "unstructuredAddress2",
-      "nameField": "unstructuredAddress2",
-      "definedName": "mat-input-4",
+      "nameLabel": "Selezione",
+      "nameField": "Selezione",
+      "definedName": "Selezione",
       "id": 5
     },
     {
       "typeElement": "tagName-Found",
-      "tagName": "input",
-      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/avq-payments-new-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/avq-web-banking-payment-entry-banklet[1]/avq-payment-entry[1]/div[1]/avq-payment-form-loader[1]/div[1]/avq-web-banking-stepper[1]/div[1]/mat-stepper[1]/div[1]/div[2]/div[1]/div[1]/avq-payment-form-step-layout[1]/div[1]/section[1]/avq-payment-form-loader[1]/div[1]/avq-payment-entry-beneficiary-form[1]/form[1]/avq-wb-form-group[2]/div[1]/mat-expansion-panel[1]/div[1]/div[1]/div[1]/fieldset[1]/avq-payment-beneficiary-address-form[1]/div[1]/div[4]/mat-form-field[1]/div[1]/div[1]/div[2]/input[1]",
-      "someText": "Nazione",
-      "attribId": "mat-input-5",
+      "tagName": "button",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/assl-dashboard-retail-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/div[1]/div[1]/div[1]/avq-web-banking-payment-recent-single-banklet[1]/avq-payment-recent-single[1]/avq-payments-list[1]/div[1]/avq-payment-overview-table[1]/div[1]/avq-table[1]/table[1]/tbody[1]/tr[5]/td[1]/avq-selectable-checkbox[1]/mat-checkbox[1]/div[1]/div[1]/input[1]",
+      "someText": "",
+      "attribId": "mat-mdc-checkbox-40-input",
       "attribName": "",
-      "coordinates": "-621.08,1055.50",
+      "coordinates": "435.50,1118.25",
       "attributeData": [
-        { "name": "matinput", "value": "" },
-        { "name": "formcontrolname", "value": "countryName" },
-        { "name": "avqpaymentconfigfield", "value": "beneficiary4" },
-        {
-          "name": "class",
-          "value": "mat-mdc-input-element ng-valid mat-mdc-form-field-input-control mdc-text-field__input cdk-text-field-autofill-monitored ng-dirty ng-touched"
-        },
-        { "name": "id", "value": "mat-input-5" },
-        { "name": "aria-invalid", "value": "false" },
-        { "name": "aria-required", "value": "false" },
-        { "name": "maxlength", "value": "36" },
-        { "name": "someText", "value": "mat-input-5" }
+        { "name": "type", "value": "checkbox" },
+        { "name": "class", "value": "mdc-checkbox__native-control" },
+        { "name": "disabled", "value": "" },
+        { "name": "id", "value": "mat-mdc-checkbox-40-input" },
+        { "name": "tabindex", "value": "-1" },
+        { "name": "aria-label", "value": "Selezione" },
+        { "name": "aria-labelledby", "value": "" },
+        { "name": "someText", "value": "Selezione" }
       ],
       "customXPath": "",
       "iFrameXPath": "",
       "shadowHost": "",
       "shadowRoot": "false",
       "nestedShadow": "false",
-      "cssSelector": "input#mat-input-5.mat-mdc-input-element.ng-valid.mat-mdc-form-field-input-control.mdc-text-field__input.cdk-text-field-autofill-monitored.ng-dirty.ng-touched",
+      "cssSelector": "input#mat-mdc-checkbox-40-input.mdc-checkbox__native-control",
       "attributeValue": "",
       "attributeType": "",
       "searchAttributeValue": "",
-      "nameLabel": "countryName",
-      "nameField": "countryName",
-      "definedName": "mat-input-5",
+      "nameLabel": "Selezione",
+      "nameField": "Selezione",
+      "definedName": "Selezione",
       "id": 6
     },
     {
       "typeElement": "tagName-Found",
       "tagName": "input",
-      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/avq-payments-new-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/avq-web-banking-payment-entry-banklet[1]/avq-payment-entry[1]/div[1]/avq-payment-form-loader[1]/div[1]/avq-web-banking-stepper[1]/div[1]/mat-stepper[1]/div[1]/div[2]/div[1]/div[1]/avq-payment-form-step-layout[1]/div[1]/section[1]/avq-payment-form-loader[1]/div[1]/avq-payment-entry-beneficiary-form[1]/form[1]/input[1]",
-      "someText": "CSRFT759",
-      "attribId": "",
-      "attribName": "CSRFT759",
-      "coordinates": "0.00,0.00",
-      "attributeData": [
-        { "name": "type", "value": "hidden" },
-        { "name": "name", "value": "CSRFT759" },
-        { "name": "value", "value": "lIE7U_qqQJ2mdAbw_hyYgQ" }
-      ],
-      "customXPath": "",
-      "iFrameXPath": "",
-      "shadowHost": "",
-      "shadowRoot": "false",
-      "nestedShadow": "false",
-      "cssSelector": "input",
-      "attributeValue": "",
-      "attributeType": "",
-      "searchAttributeValue": "",
-      "nameLabel": "CSRFT759",
-      "nameField": "CSRFT759",
-      "definedName": "CSRFT759",
-      "id": 7
-    },
-    {
-      "typeElement": "tagName-Found",
-      "tagName": "input",
-      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/avq-payments-new-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/avq-web-banking-payment-entry-banklet[1]/avq-payment-entry[1]/div[1]/avq-payment-form-loader[1]/div[1]/avq-web-banking-stepper[1]/div[1]/mat-stepper[1]/div[1]/div[2]/div[2]/div[1]/avq-payment-form-step-layout[1]/div[1]/section[1]/avq-payment-entry-payment-details-form[1]/form[1]/avq-wb-form-group[2]/div[1]/mat-expansion-panel[1]/div[1]/div[1]/div[1]/fieldset[1]/div[1]/div[1]/avq-payment-amount-field[1]/div[1]/div[1]/mat-form-field[1]/div[1]/div[1]/div[2]/input[1]",
-      "someText": "Importo",
-      "attribId": "mat-input-10",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/assl-dashboard-retail-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/div[1]/avq-web-banking-wealth-account-list-table-banklet[1]/avq-wealth-account-list-table[1]/div[1]/div[1]/div[1]/mat-form-field[1]/div[1]/div[1]/div[3]/input[1]",
+      "someText": "Cercare conto",
+      "attribId": "mat-input-44",
       "attribName": "",
-      "coordinates": "1065.77,472.50",
+      "coordinates": "479.50,294.25",
       "attributeData": [
-        { "name": "type", "value": "text" },
-        { "name": "inputmode", "value": "decimal" },
-        { "name": "autocomplete", "value": "off" },
-        { "name": "dir", "value": "ltr" },
+        { "name": "_ngcontent-ng-c3969784259", "value": "" },
         { "name": "matinput", "value": "" },
-        { "name": "avqamount", "value": "" },
+        {
+          "name": "avqtestid",
+          "value": "wealth-account-list-table.header.search-input"
+        },
         {
           "name": "class",
-          "value": "mat-mdc-input-element avq-amount mat-mdc-form-field-input-control mdc-text-field__input cdk-text-field-autofill-monitored ng-dirty ng-touched ng-valid"
+          "value": "mat-mdc-input-element mat-mdc-form-field-input-control mdc-text-field__input ng-untouched ng-pristine ng-valid cdk-text-field-autofill-monitored"
         },
-        { "name": "style", "value": "vertical-align: baseline;" },
         {
           "name": "test-id",
-          "value": "web-banking-payment-form.payment-amount-field.amount"
+          "value": "wealth-account-list-table.header.search-input"
         },
-        { "name": "id", "value": "mat-input-10" },
-        { "name": "required", "value": "" },
-        { "name": "aria-required", "value": "true" },
-        { "name": "aria-invalid", "value": "false" },
-        { "name": "someText", "value": "mat-input-10" }
-      ],
-      "customXPath": "",
-      "iFrameXPath": "",
-      "shadowHost": "",
-      "shadowRoot": "false",
-      "nestedShadow": "false",
-      "cssSelector": "input#mat-input-10.mat-mdc-input-element.avq-amount.mat-mdc-form-field-input-control.mdc-text-field__input.cdk-text-field-autofill-monitored.ng-dirty.ng-touched.ng-valid",
-      "attributeValue": "",
-      "attributeType": "",
-      "searchAttributeValue": "",
-      "nameLabel": "web-banking-payment-form.payment-amount-field.amount",
-      "nameField": "web-banking-payment-form.payment-amount-field.amount",
-      "definedName": "mat-input-10",
-      "id": 8
-    },
-    {
-      "typeElement": "tagName-Found",
-      "tagName": "input",
-      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/avq-payments-new-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/avq-web-banking-payment-entry-banklet[1]/avq-payment-entry[1]/div[1]/avq-payment-form-loader[1]/div[1]/avq-web-banking-stepper[1]/div[1]/mat-stepper[1]/div[1]/div[2]/div[2]/div[1]/avq-payment-form-step-layout[1]/div[1]/section[1]/avq-payment-entry-payment-details-form[1]/form[1]/avq-wb-form-group[3]/div[1]/mat-expansion-panel[1]/div[1]/div[1]/div[1]/fieldset[1]/avq-payment-single-order-execution-date[1]/div[1]/div[1]/mat-form-field[1]/div[1]/div[1]/div[2]/input[1]",
-      "someText": "Data di esecuzione",
-      "attribId": "mat-input-12",
-      "attribName": "",
-      "coordinates": "770.92,925.88",
-      "attributeData": [
-        { "name": "matinput", "value": "" },
-        { "name": "avqpaymentconfigfield", "value": "executionDate" },
-        {
-          "name": "class",
-          "value": "avq-datepicker-input mat-mdc-input-element ng-touched ng-pristine ng-valid mat-mdc-form-field-input-control mdc-text-field__input cdk-text-field-autofill-monitored"
-        },
-        { "name": "aria-haspopup", "value": "dialog" },
-        { "name": "min", "value": "2026-02-10T00:00:00+01:00" },
-        { "name": "max", "value": "2027-02-04T00:00:00+01:00" },
-        { "name": "data-avq-calendar", "value": "avq-datepicker-0" },
-        { "name": "id", "value": "mat-input-12" },
-        { "name": "required", "value": "" },
-        { "name": "aria-invalid", "value": "false" },
-        { "name": "aria-required", "value": "true" },
-        { "name": "someText", "value": "mat-input-12" }
-      ],
-      "customXPath": "",
-      "iFrameXPath": "",
-      "shadowHost": "",
-      "shadowRoot": "false",
-      "nestedShadow": "false",
-      "cssSelector": "input#mat-input-12.avq-datepicker-input.mat-mdc-input-element.ng-touched.ng-pristine.ng-valid.mat-mdc-form-field-input-control.mdc-text-field__input.cdk-text-field-autofill-monitored",
-      "attributeValue": "",
-      "attributeType": "",
-      "searchAttributeValue": "",
-      "nameLabel": "mat-input-12",
-      "nameField": "mat-input-12",
-      "definedName": "mat-input-12",
-      "id": 9
-    },
-    {
-      "typeElement": "tagName-Found",
-      "tagName": "input",
-      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/avq-payments-new-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/avq-web-banking-payment-entry-banklet[1]/avq-payment-entry[1]/div[1]/avq-payment-form-loader[1]/div[1]/avq-web-banking-stepper[1]/div[1]/mat-stepper[1]/div[1]/div[2]/div[2]/div[1]/avq-payment-form-step-layout[1]/div[1]/section[1]/avq-payment-entry-payment-details-form[1]/form[1]/avq-wb-form-group[2]/div[1]/mat-expansion-panel[1]/div[1]/div[1]/div[1]/fieldset[1]/div[1]/div[1]/avq-payment-reason-field[1]/div[1]/avq-remittance-information-form[1]/div[1]/div[1]/mat-form-field[1]/div[1]/div[1]/div[2]/textarea[1]",
-      "someText": "Causale del pagamento",
-      "attribId": "mat-input-8",
-      "attribName": "",
-      "coordinates": "770.92,559.63",
-      "attributeData": [
-        { "name": "_ngcontent-ng-c2702157600", "value": "" },
-        { "name": "rows", "value": "1" },
-        { "name": "matinput", "value": "" },
-        { "name": "cdktextareaautosize", "value": "" },
-        {
-          "name": "class",
-          "value": "mat-mdc-input-element cdk-textarea-autosize ng-valid mat-mdc-form-field-textarea-control mat-mdc-form-field-input-control mdc-text-field__input cdk-text-field-autofill-monitored ng-dirty ng-touched"
-        },
-        { "name": "aria-describedby", "value": "mat-mdc-hint-13" },
-        { "name": "maxlength", "value": "143" },
-        { "name": "id", "value": "mat-input-8" },
+        { "name": "aria-describedby", "value": "mat-mdc-hint-123" },
+        { "name": "id", "value": "mat-input-44" },
         { "name": "aria-invalid", "value": "false" },
         { "name": "aria-required", "value": "false" },
-        { "name": "style", "value": "max-height: 144px; height: 24px;" },
         {
           "name": "someText",
-          "value": "Messaggio trasmesso al beneficiario 9/143 caratteri"
+          "value": "Verranno visualizzati i dati corrispondenti al testo della ricerca, ad es. numero di conto, titolare"
         }
       ],
       "customXPath": "",
@@ -361,14 +230,14 @@
       "shadowHost": "",
       "shadowRoot": "false",
       "nestedShadow": "false",
-      "cssSelector": "textarea#mat-input-8.mat-mdc-input-element.cdk-textarea-autosize.ng-valid.mat-mdc-form-field-textarea-control.mat-mdc-form-field-input-control.mdc-text-field__input.cdk-text-field-autofill-monitored.ng-dirty.ng-touched",
+      "cssSelector": "input#mat-input-44.mat-mdc-input-element.mat-mdc-form-field-input-control.mdc-text-field__input.ng-untouched.ng-pristine.ng-valid.cdk-text-field-autofill-monitored",
       "attributeValue": "",
       "attributeType": "",
       "searchAttributeValue": "",
-      "nameLabel": "mat-input-8",
-      "nameField": "mat-input-8",
-      "definedName": "Messaggio trasmesso al benefic",
-      "id": 10
+      "nameLabel": "wealth-account-list-table.header.search-input",
+      "nameField": "wealth-account-list-table.header.search-input",
+      "definedName": "Verranno visualizzati i dati c",
+      "id": 7
     },
     {
       "typeElement": "Shadow-Child",
@@ -407,7 +276,7 @@
       "nameLabel": "Apri interfaccia di chat e collaborazione",
       "nameField": "Apri interfaccia di chat e collaborazione",
       "definedName": "Apri interfaccia di chat e col",
-      "id": 11
+      "id": 8
     },
     {
       "typeElement": "tagName-Found",
@@ -443,7 +312,7 @@
       "nameLabel": "web-banking-portal.app-bar.user-account-menu.button",
       "nameField": "web-banking-portal.app-bar.user-account-menu.button",
       "definedName": "Menu conto utente",
-      "id": 12
+      "id": 9
     },
     {
       "typeElement": "tagName-Found",
@@ -474,7 +343,7 @@
       "nameLabel": "Conti e carte Contiene aggiornamenti; Conti e carte; Contiene aggiornamenti",
       "nameField": "button",
       "definedName": "Conti e carte Contiene aggiorn",
-      "id": 13
+      "id": 10
     },
     {
       "typeElement": "tagName-Found",
@@ -505,7 +374,7 @@
       "nameLabel": "Assistente Finanziario Contiene aggiornamenti; Assistente Finanziario; Contiene aggiornamenti",
       "nameField": "button",
       "definedName": "Assistente Finanziario Contien",
-      "id": 14
+      "id": 11
     },
     {
       "typeElement": "tagName-Found",
@@ -536,7 +405,7 @@
       "nameLabel": "Patrimonio Contiene aggiornamenti; Patrimonio; Contiene aggiornamenti",
       "nameField": "button",
       "definedName": "Patrimonio Contiene aggiorname",
-      "id": 15
+      "id": 12
     },
     {
       "typeElement": "tagName-Found",
@@ -552,7 +421,7 @@
           "name": "class",
           "value": "avq-list-item avq-list-item-node-toggle ng-tns-c577094672-0 avq-state-layer-host"
         },
-        { "name": "aria-expanded", "value": "true" },
+        { "name": "aria-expanded", "value": "false" },
         { "name": "data-with-leading-icon", "value": "asset_avq" }
       ],
       "customXPath": "",
@@ -567,7 +436,7 @@
       "nameLabel": "Pagamenti e fatture Contiene aggiornamenti; Pagamenti e fatture; Contiene aggiornamenti",
       "nameField": "button",
       "definedName": "Pagamenti e fatture Contiene a",
-      "id": 16
+      "id": 13
     },
     {
       "typeElement": "tagName-Found",
@@ -576,7 +445,7 @@
       "someText": "Mercati e divise Contiene aggiornamenti; Mercati e divise; Contiene aggiornamenti",
       "attribId": "",
       "attribName": "",
-      "coordinates": "12.00,693.00",
+      "coordinates": "12.00,469.00",
       "attributeData": [
         { "name": "avq-list-item", "value": "" },
         {
@@ -598,7 +467,41 @@
       "nameLabel": "Mercati e divise Contiene aggiornamenti; Mercati e divise; Contiene aggiornamenti",
       "nameField": "button",
       "definedName": "Mercati e divise Contiene aggi",
-      "id": 17
+      "id": 14
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "button",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/assl-dashboard-retail-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/div[1]/avq-quick-link-container[1]/div[1]/avq-quick-link[4]/button[1]",
+      "someText": "Documenti",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "1489.50,133.00",
+      "attributeData": [
+        { "name": "_ngcontent-ng-c4247900421", "value": "" },
+        { "name": "avq-outlined-button", "value": "" },
+        {
+          "name": "class",
+          "value": "avq-button avq-button-base avq-quick-link-button avq-padding-4 avq-state-layer-host avq-button--outlined"
+        },
+        {
+          "name": "test-id",
+          "value": "web-banking-portal.quick-link.quick-link-button"
+        }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "button.avq-button.avq-button-base.avq-quick-link-button.avq-padding-4.avq-state-layer-host.avq-button--outlined",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "web-banking-portal.quick-link.quick-link-button",
+      "nameField": "web-banking-portal.quick-link.quick-link-button",
+      "definedName": "Documenti",
+      "id": 15
     },
     {
       "typeElement": "tagName-Found",
@@ -607,7 +510,7 @@
       "someText": "Documenti e estratti elettronici Contiene aggiornamenti; Documenti e estratti elettronici; Contiene aggiornamenti",
       "attribId": "",
       "attribName": "",
-      "coordinates": "12.00,805.00",
+      "coordinates": "12.00,581.00",
       "attributeData": [
         { "name": "avq-list-item", "value": "" },
         {
@@ -629,7 +532,7 @@
       "nameLabel": "Documenti e estratti elettronici Contiene aggiornamenti; Documenti e estratti elettronici; Contiene aggiornamenti",
       "nameField": "button",
       "definedName": "Documenti e estratti elettroni",
-      "id": 18
+      "id": 16
     },
     {
       "typeElement": "tagName-Found",
@@ -638,7 +541,7 @@
       "someText": "Messaggi e notifiche Contiene aggiornamenti; Messaggi e notifiche; Contiene aggiornamenti",
       "attribId": "",
       "attribName": "",
-      "coordinates": "12.00,861.00",
+      "coordinates": "12.00,637.00",
       "attributeData": [
         { "name": "avq-list-item", "value": "" },
         {
@@ -660,29 +563,26 @@
       "nameLabel": "Messaggi e notifiche Contiene aggiornamenti; Messaggi e notifiche; Contiene aggiornamenti",
       "nameField": "button",
       "definedName": "Messaggi e notifiche Contiene ",
-      "id": 19
+      "id": 17
     },
     {
       "typeElement": "tagName-Found",
       "tagName": "button",
-      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/avq-payments-new-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/avq-web-banking-payment-entry-banklet[1]/avq-payment-entry[1]/div[1]/avq-payment-form-loader[1]/div[1]/avq-web-banking-stepper[1]/div[1]/mat-stepper[1]/div[1]/div[2]/div[1]/div[1]/avq-payment-form-step-layout[1]/div[1]/section[1]/avq-payment-form-loader[1]/div[1]/avq-payment-entry-beneficiary-form[1]/form[1]/avq-wb-form-group[1]/div[1]/mat-expansion-panel[1]/div[1]/div[1]/div[1]/fieldset[1]/div[1]/div[2]/avq-payment-entry-beneficiary-bank-address[1]/fieldset[1]/div[3]/avq-payment-beneficiary-bank-search-button[1]/div[1]/button[1]",
-      "someText": "Cercare banca",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/assl-dashboard-retail-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/div[1]/avq-quick-link-container[1]/div[1]/avq-quick-link[1]/button[1]",
+      "someText": "Nuovo pagamento",
       "attribId": "",
       "attribName": "",
-      "coordinates": "-637.08,610.50",
+      "coordinates": "427.50,133.00",
       "attributeData": [
+        { "name": "_ngcontent-ng-c4247900421", "value": "" },
         { "name": "avq-outlined-button", "value": "" },
-        { "name": "type", "value": "button" },
-        { "name": "color", "value": "primary" },
-        { "name": "aria-expanded", "value": "false" },
-        { "name": "aria-haspopup", "value": "dialog" },
         {
           "name": "class",
-          "value": "avq-button avq-button-base avq-state-layer-host avq-button--primary avq-button--outlined"
+          "value": "avq-button avq-button-base avq-quick-link-button avq-padding-4 avq-state-layer-host avq-button--outlined"
         },
         {
           "name": "test-id",
-          "value": "web-banking-payment-form.beneficiary-bank-search"
+          "value": "web-banking-portal.quick-link.quick-link-button"
         }
       ],
       "customXPath": "",
@@ -690,110 +590,132 @@
       "shadowHost": "",
       "shadowRoot": "false",
       "nestedShadow": "false",
-      "cssSelector": "button.avq-button.avq-button-base.avq-state-layer-host.avq-button--primary.avq-button--outlined",
+      "cssSelector": "button.avq-button.avq-button-base.avq-quick-link-button.avq-padding-4.avq-state-layer-host.avq-button--outlined",
       "attributeValue": "",
       "attributeType": "",
       "searchAttributeValue": "",
-      "nameLabel": "web-banking-payment-form.beneficiary-bank-search",
-      "nameField": "web-banking-payment-form.beneficiary-bank-search",
-      "definedName": "Cercare banca",
+      "nameLabel": "web-banking-portal.quick-link.quick-link-button",
+      "nameField": "web-banking-portal.quick-link.quick-link-button",
+      "definedName": "Nuovo pagamento",
+      "id": 18
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "button",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/assl-dashboard-retail-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/div[1]/avq-quick-link-container[1]/div[1]/avq-quick-link[2]/button[1]",
+      "someText": "ordine di; Nuovo ordine di borsa",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "781.50,133.00",
+      "attributeData": [
+        { "name": "_ngcontent-ng-c4247900421", "value": "" },
+        { "name": "avq-outlined-button", "value": "" },
+        {
+          "name": "class",
+          "value": "avq-button avq-button-base avq-quick-link-button avq-padding-4 avq-state-layer-host avq-button--outlined"
+        },
+        {
+          "name": "test-id",
+          "value": "web-banking-portal.quick-link.quick-link-button"
+        }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "button.avq-button.avq-button-base.avq-quick-link-button.avq-padding-4.avq-state-layer-host.avq-button--outlined",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "web-banking-portal.quick-link.quick-link-button",
+      "nameField": "web-banking-portal.quick-link.quick-link-button",
+      "definedName": "ordine di; Nuovo ordine di bor",
+      "id": 19
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "button",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/assl-dashboard-retail-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/div[1]/avq-web-banking-wealth-account-list-table-banklet[1]/avq-wealth-account-list-table[1]/mat-paginator[1]/div[1]/div[1]/div[2]/button[1]",
+      "someText": "Pagina precedente",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "1715.50,489.25",
+      "attributeData": [
+        { "name": "mat-icon-button", "value": "" },
+        { "name": "type", "value": "button" },
+        { "name": "mattooltipposition", "value": "above" },
+        { "name": "disabledinteractive", "value": "" },
+        {
+          "name": "class",
+          "value": "mat-mdc-tooltip-trigger mat-mdc-paginator-navigation-previous mdc-icon-button mat-mdc-icon-button mat-mdc-button-disabled mat-mdc-button-disabled-interactive mat-unthemed mat-mdc-button-base mat-mdc-tooltip-disabled"
+        },
+        { "name": "mat-ripple-loader-uninitialized", "value": "" },
+        {
+          "name": "mat-ripple-loader-class-name",
+          "value": "mat-mdc-button-ripple"
+        },
+        { "name": "mat-ripple-loader-centered", "value": "" },
+        { "name": "mat-ripple-loader-disabled", "value": "" },
+        { "name": "tabindex", "value": "-1" },
+        { "name": "aria-label", "value": "Pagina precedente" },
+        { "name": "aria-disabled", "value": "true" }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "button.mat-mdc-tooltip-trigger.mat-mdc-paginator-navigation-previous.mdc-icon-button.mat-mdc-icon-button.mat-mdc-button-disabled.mat-mdc-button-disabled-interactive.mat-unthemed.mat-mdc-button-base.mat-mdc-tooltip-disabled",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "Pagina precedente",
+      "nameField": "Pagina precedente",
+      "definedName": "Pagina precedente",
       "id": 20
     },
     {
       "typeElement": "tagName-Found",
       "tagName": "button",
-      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/avq-payments-new-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/avq-web-banking-payment-entry-banklet[1]/avq-payment-entry[1]/div[1]/avq-payment-form-loader[1]/div[1]/avq-web-banking-stepper[1]/div[1]/mat-stepper[1]/div[1]/div[2]/div[2]/div[1]/avq-payment-form-step-layout[1]/div[1]/section[1]/avq-payment-entry-payment-details-form[1]/form[1]/avq-wb-form-group[3]/div[1]/mat-expansion-panel[1]/div[1]/div[1]/div[1]/fieldset[1]/avq-payment-execution-selector[1]/div[1]/mat-slide-toggle[1]/div[1]/button[1]",
-      "someText": "Pagamento ricorrente",
-      "attribId": "mat-mdc-slide-toggle-0-button",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/assl-dashboard-retail-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/div[1]/avq-web-banking-wealth-account-list-table-banklet[1]/avq-wealth-account-list-table[1]/mat-paginator[1]/div[1]/div[1]/div[2]/button[2]",
+      "someText": "Pagina successiva",
+      "attribId": "",
       "attribName": "",
-      "coordinates": "754.92,861.63",
+      "coordinates": "1763.50,489.25",
       "attributeData": [
-        { "name": "role", "value": "switch" },
+        { "name": "mat-icon-button", "value": "" },
         { "name": "type", "value": "button" },
-        { "name": "class", "value": "mdc-switch mdc-switch--unselected" },
-        { "name": "tabindex", "value": "0" },
-        { "name": "id", "value": "mat-mdc-slide-toggle-0-button" },
-        { "name": "aria-labelledby", "value": "mat-mdc-slide-toggle-0-label" },
-        { "name": "aria-checked", "value": "false" },
-        { "name": "someText", "value": "Pagamento ricorrente" }
+        { "name": "mattooltipposition", "value": "above" },
+        { "name": "disabledinteractive", "value": "" },
+        {
+          "name": "class",
+          "value": "mat-mdc-tooltip-trigger mat-mdc-paginator-navigation-next mdc-icon-button mat-mdc-icon-button mat-mdc-button-disabled mat-mdc-button-disabled-interactive mat-unthemed mat-mdc-button-base mat-mdc-tooltip-disabled"
+        },
+        { "name": "mat-ripple-loader-uninitialized", "value": "" },
+        {
+          "name": "mat-ripple-loader-class-name",
+          "value": "mat-mdc-button-ripple"
+        },
+        { "name": "mat-ripple-loader-centered", "value": "" },
+        { "name": "mat-ripple-loader-disabled", "value": "" },
+        { "name": "tabindex", "value": "-1" },
+        { "name": "aria-label", "value": "Pagina successiva" },
+        { "name": "aria-disabled", "value": "true" }
       ],
       "customXPath": "",
       "iFrameXPath": "",
       "shadowHost": "",
       "shadowRoot": "false",
       "nestedShadow": "false",
-      "cssSelector": "button#mat-mdc-slide-toggle-0-button.mdc-switch.mdc-switch--unselected",
+      "cssSelector": "button.mat-mdc-tooltip-trigger.mat-mdc-paginator-navigation-next.mdc-icon-button.mat-mdc-icon-button.mat-mdc-button-disabled.mat-mdc-button-disabled-interactive.mat-unthemed.mat-mdc-button-base.mat-mdc-tooltip-disabled",
       "attributeValue": "",
       "attributeType": "",
       "searchAttributeValue": "",
-      "nameLabel": "mat-mdc-slide-toggle-0-button",
-      "nameField": "mat-mdc-slide-toggle-0-button",
-      "definedName": "Pagamento ricorrente",
+      "nameLabel": "Pagina successiva",
+      "nameField": "Pagina successiva",
+      "definedName": "Pagina successiva",
       "id": 21
-    },
-    {
-      "typeElement": "tagName-Found",
-      "tagName": "button",
-      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/avq-payments-new-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/avq-web-banking-payment-entry-banklet[1]/avq-payment-entry[1]/div[1]/avq-payment-form-loader[1]/div[1]/avq-web-banking-stepper[1]/div[1]/mat-stepper[1]/div[1]/div[2]/div[2]/div[1]/avq-payment-form-step-layout[1]/div[1]/section[1]/avq-payment-entry-payment-details-form[1]/form[1]/avq-wb-form-group[3]/div[1]/mat-expansion-panel[1]/div[1]/div[1]/div[1]/fieldset[1]/avq-payment-instant-selector[1]/div[1]/mat-slide-toggle[1]/div[1]/button[1]",
-      "someText": "Pagamento istantaneo",
-      "attribId": "mat-mdc-slide-toggle-3-button",
-      "attribName": "",
-      "coordinates": "754.92,996.75",
-      "attributeData": [
-        { "name": "role", "value": "switch" },
-        { "name": "type", "value": "button" },
-        { "name": "class", "value": "mdc-switch mdc-switch--unselected" },
-        { "name": "tabindex", "value": "0" },
-        { "name": "id", "value": "mat-mdc-slide-toggle-3-button" },
-        { "name": "aria-labelledby", "value": "mat-mdc-slide-toggle-3-label" },
-        { "name": "aria-checked", "value": "false" },
-        { "name": "someText", "value": "Pagamento istantaneo" }
-      ],
-      "customXPath": "",
-      "iFrameXPath": "",
-      "shadowHost": "",
-      "shadowRoot": "false",
-      "nestedShadow": "false",
-      "cssSelector": "button#mat-mdc-slide-toggle-3-button.mdc-switch.mdc-switch--unselected",
-      "attributeValue": "",
-      "attributeType": "",
-      "searchAttributeValue": "",
-      "nameLabel": "mat-mdc-slide-toggle-3-button",
-      "nameField": "mat-mdc-slide-toggle-3-button",
-      "definedName": "Pagamento istantaneo",
-      "id": 22
-    },
-    {
-      "typeElement": "tagName-Found",
-      "tagName": "button",
-      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/avq-payments-new-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/avq-web-banking-payment-entry-banklet[1]/avq-payment-entry[1]/div[1]/avq-payment-form-loader[1]/div[1]/avq-web-banking-stepper[1]/div[1]/mat-stepper[1]/div[1]/div[2]/div[2]/div[1]/avq-payment-form-step-layout[1]/div[1]/section[1]/avq-payment-entry-payment-details-form[1]/form[1]/avq-wb-form-group[3]/div[1]/mat-expansion-panel[1]/div[1]/div[1]/div[1]/fieldset[1]/avq-payment-priority-selector[1]/div[1]/mat-slide-toggle[1]/div[1]/button[1]",
-      "someText": "Urgente",
-      "attribId": "mat-mdc-slide-toggle-1-button",
-      "attribName": "",
-      "coordinates": "754.92,1022.63",
-      "attributeData": [
-        { "name": "role", "value": "switch" },
-        { "name": "type", "value": "button" },
-        { "name": "class", "value": "mdc-switch mdc-switch--unselected" },
-        { "name": "tabindex", "value": "0" },
-        { "name": "id", "value": "mat-mdc-slide-toggle-1-button" },
-        { "name": "aria-labelledby", "value": "mat-mdc-slide-toggle-1-label" },
-        { "name": "aria-checked", "value": "false" },
-        { "name": "someText", "value": "Urgente" }
-      ],
-      "customXPath": "",
-      "iFrameXPath": "",
-      "shadowHost": "",
-      "shadowRoot": "false",
-      "nestedShadow": "false",
-      "cssSelector": "button#mat-mdc-slide-toggle-1-button.mdc-switch.mdc-switch--unselected",
-      "attributeValue": "",
-      "attributeType": "",
-      "searchAttributeValue": "",
-      "nameLabel": "mat-mdc-slide-toggle-1-button",
-      "nameField": "mat-mdc-slide-toggle-1-button",
-      "definedName": "Urgente",
-      "id": 23
     },
     {
       "typeElement": "tagName-Found",
@@ -834,7 +756,7 @@
       "nameLabel": "web-banking-portal.app-bar.global-filter.button",
       "nameField": "web-banking-portal.app-bar.global-filter.button",
       "definedName": "Filtro",
-      "id": 24
+      "id": 22
     },
     {
       "typeElement": "tagName-Found",
@@ -869,135 +791,26 @@
       "nameLabel": "web-banking-portal.app-bar.logout.button",
       "nameField": "web-banking-portal.app-bar.logout.button",
       "definedName": "logoutDisconnetti; Disconnetti",
-      "id": 25
+      "id": 23
     },
     {
       "typeElement": "tagName-Found",
       "tagName": "button",
-      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/avq-payments-new-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/avq-web-banking-payment-entry-banklet[1]/avq-payment-entry[1]/div[1]/avq-payment-form-loader[1]/div[1]/avq-web-banking-stepper[1]/div[1]/mat-stepper[1]/div[1]/div[2]/div[2]/div[1]/avq-payment-form-step-layout[1]/div[1]/section[1]/avq-payment-entry-payment-details-form[1]/form[1]/avq-wb-form-group[2]/div[1]/mat-expansion-panel[1]/div[1]/div[1]/div[1]/fieldset[1]/div[1]/div[1]/avq-payment-debit-reference-field[1]/div[1]/div[1]/span[1]/avq-info-text[1]/span[1]/button[1]",
-      "someText": "Informazioni supplementari",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/assl-dashboard-retail-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/div[1]/avq-quick-link-container[1]/div[1]/avq-quick-link[3]/button[1]",
+      "someText": "eBill",
       "attribId": "",
       "attribName": "",
-      "coordinates": "1450.16,655.63",
+      "coordinates": "1135.50,133.00",
       "attributeData": [
-        { "name": "_ngcontent-ng-c1928684974", "value": "" },
-        { "name": "aria-haspopup", "value": "dialog" },
-        { "name": "avq-icon-button", "value": "" },
-        { "name": "type", "value": "button" },
-        {
-          "name": "class",
-          "value": "avq-icon-button avq-button-base avq-popover-trigger avq-state-layer-host avq-button--icon"
-        },
-        { "name": "aria-label", "value": "Informazioni supplementari" },
-        { "name": "aria-expanded", "value": "false" },
-        {
-          "name": "test-id",
-          "value": "web-banking-common.extended-information.info"
-        },
-        { "name": "style", "value": "height: 2.62rem; width: 2.62rem;" }
-      ],
-      "customXPath": "",
-      "iFrameXPath": "",
-      "shadowHost": "",
-      "shadowRoot": "false",
-      "nestedShadow": "false",
-      "cssSelector": "button.avq-icon-button.avq-button-base.avq-popover-trigger.avq-state-layer-host.avq-button--icon",
-      "attributeValue": "",
-      "attributeType": "",
-      "searchAttributeValue": "",
-      "nameLabel": "web-banking-common.extended-information.info",
-      "nameField": "web-banking-common.extended-information.info",
-      "definedName": "info",
-      "id": 26
-    },
-    {
-      "typeElement": "tagName-Found",
-      "tagName": "button",
-      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/avq-payments-new-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/avq-web-banking-payment-entry-banklet[1]/avq-payment-entry[1]/div[1]/avq-payment-form-loader[1]/div[1]/avq-web-banking-stepper[1]/div[1]/mat-stepper[1]/div[1]/div[2]/div[2]/div[1]/avq-payment-form-step-layout[1]/div[1]/section[1]/avq-payment-entry-payment-details-form[1]/form[1]/avq-wb-form-group[3]/div[1]/mat-expansion-panel[1]/div[1]/div[1]/div[1]/fieldset[1]/avq-payment-single-order-execution-date[1]/div[1]/div[1]/mat-form-field[1]/div[1]/div[1]/div[3]/avq-datepicker-toggle[1]/button[1]",
-      "someText": "Aprire il calendario ",
-      "attribId": "",
-      "attribName": "",
-      "coordinates": "1452.06,917.88",
-      "attributeData": [
-        { "name": "avq-icon-button", "value": "" },
-        { "name": "type", "value": "button" },
-        {
-          "name": "class",
-          "value": "avq-icon-button avq-button-base avq-datepicker-toggle-button avq-state-layer-host avq-button--icon"
-        },
-        { "name": "aria-haspopup", "value": "dialog" },
-        { "name": "aria-label", "value": "Aprire il calendario " }
-      ],
-      "customXPath": "",
-      "iFrameXPath": "",
-      "shadowHost": "",
-      "shadowRoot": "false",
-      "nestedShadow": "false",
-      "cssSelector": "button.avq-icon-button.avq-button-base.avq-datepicker-toggle-button.avq-state-layer-host.avq-button--icon",
-      "attributeValue": "",
-      "attributeType": "",
-      "searchAttributeValue": "",
-      "nameLabel": "Aprire il calendario",
-      "nameField": "Aprire il calendario",
-      "definedName": "Aprire il calendario",
-      "id": 27
-    },
-    {
-      "typeElement": "tagName-Found",
-      "tagName": "button",
-      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/footer[1]/div[1]/div[1]/div[1]/div[1]/avq-app-shell-outlet-receiver[2]/div[1]/div[1]/button[1]",
-      "someText": "Annullare",
-      "attribId": "",
-      "attribName": "",
-      "coordinates": "1531.75,861.00",
-      "attributeData": [
-        { "name": "_ngcontent-ng-c864354676", "value": "" },
-        { "name": "type", "value": "button" },
-        { "name": "avq-text-button", "value": "" },
-        { "name": "color", "value": "primary" },
-        {
-          "name": "class",
-          "value": "avq-button avq-button-base avq-state-layer-host avq-button--primary avq-button--text ng-star-inserted"
-        },
-        {
-          "name": "test-id",
-          "value": "web-banking-common.web-banking-stepper.cancel-button-1"
-        }
-      ],
-      "customXPath": "",
-      "iFrameXPath": "",
-      "shadowHost": "",
-      "shadowRoot": "false",
-      "nestedShadow": "false",
-      "cssSelector": "button.avq-button.avq-button-base.avq-state-layer-host.avq-button--primary.avq-button--text.ng-star-inserted",
-      "attributeValue": "",
-      "attributeType": "",
-      "searchAttributeValue": "",
-      "nameLabel": "web-banking-common.web-banking-stepper.cancel-button-1",
-      "nameField": "web-banking-common.web-banking-stepper.cancel-button-1",
-      "definedName": "Annullare",
-      "id": 28
-    },
-    {
-      "typeElement": "tagName-Found",
-      "tagName": "button",
-      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/footer[1]/div[1]/div[1]/div[1]/div[1]/avq-app-shell-outlet-receiver[2]/div[1]/div[1]/button[2]",
-      "someText": "Indietro",
-      "attribId": "",
-      "attribName": "",
-      "coordinates": "1626.14,861.00",
-      "attributeData": [
-        { "name": "_ngcontent-ng-c864354676", "value": "" },
-        { "name": "type", "value": "button" },
+        { "name": "_ngcontent-ng-c4247900421", "value": "" },
         { "name": "avq-outlined-button", "value": "" },
-        { "name": "color", "value": "primary" },
         {
           "name": "class",
-          "value": "avq-button avq-button-base avq-state-layer-host avq-button--primary avq-button--outlined ng-star-inserted"
+          "value": "avq-button avq-button-base avq-quick-link-button avq-padding-4 avq-state-layer-host avq-button--outlined"
         },
         {
           "name": "test-id",
-          "value": "web-banking-common.web-banking-stepper.back-button-1"
+          "value": "web-banking-portal.quick-link.quick-link-button"
         }
       ],
       "customXPath": "",
@@ -1005,334 +818,49 @@
       "shadowHost": "",
       "shadowRoot": "false",
       "nestedShadow": "false",
-      "cssSelector": "button.avq-button.avq-button-base.avq-state-layer-host.avq-button--primary.avq-button--outlined.ng-star-inserted",
+      "cssSelector": "button.avq-button.avq-button-base.avq-quick-link-button.avq-padding-4.avq-state-layer-host.avq-button--outlined",
       "attributeValue": "",
       "attributeType": "",
       "searchAttributeValue": "",
-      "nameLabel": "web-banking-common.web-banking-stepper.back-button-1",
-      "nameField": "web-banking-common.web-banking-stepper.back-button-1",
-      "definedName": "Indietro",
-      "id": 29
+      "nameLabel": "web-banking-portal.quick-link.quick-link-button",
+      "nameField": "web-banking-portal.quick-link.quick-link-button",
+      "definedName": "eBill",
+      "id": 24
     },
     {
       "typeElement": "tagName-Found",
       "tagName": "button",
-      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/footer[1]/div[1]/div[1]/div[1]/div[1]/avq-app-shell-outlet-receiver[2]/div[1]/div[1]/button[3]",
-      "someText": "Avanti",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/assl-dashboard-retail-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/div[1]/avq-web-banking-wealth-account-list-table-banklet[1]/avq-wealth-account-list-table[1]/div[2]/avq-table[1]/table[1]/tbody[1]/tr[1]/td[4]/avq-position-context-action[1]/div[1]/avq-context-action-menu[1]/button[1]",
+      "someText": "more_vert",
       "attribId": "",
       "attribName": "",
-      "coordinates": "1731.59,861.00",
+      "coordinates": "1763.50,424.25",
       "attributeData": [
-        { "name": "_ngcontent-ng-c864354676", "value": "" },
-        { "name": "avq-button", "value": "" },
-        { "name": "color", "value": "primary" },
+        { "name": "avq-icon-button", "value": "" },
+        { "name": "avqtestid", "value": "web-banking-common-menu-trigger" },
         {
           "name": "class",
-          "value": "avq-button avq-button-base avq-state-layer-host avq-button--primary avq-button--filled"
+          "value": "avq-icon-button avq-button-base mat-mdc-menu-trigger avq-state-layer-host avq-button--icon ng-star-inserted"
         },
-        {
-          "name": "test-id",
-          "value": "web-banking-common.web-banking-stepper.next-button-1"
-        }
+        { "name": "aria-label", "value": "Azioni" },
+        { "name": "test-id", "value": "web-banking-common-menu-trigger" },
+        { "name": "aria-haspopup", "value": "menu" },
+        { "name": "aria-expanded", "value": "false" },
+        { "name": "someText", "value": "more_vert" }
       ],
       "customXPath": "",
       "iFrameXPath": "",
       "shadowHost": "",
       "shadowRoot": "false",
       "nestedShadow": "false",
-      "cssSelector": "button.avq-button.avq-button-base.avq-state-layer-host.avq-button--primary.avq-button--filled",
+      "cssSelector": "button.avq-icon-button.avq-button-base.mat-mdc-menu-trigger.avq-state-layer-host.avq-button--icon.ng-star-inserted",
       "attributeValue": "",
       "attributeType": "",
       "searchAttributeValue": "",
-      "nameLabel": "web-banking-common.web-banking-stepper.next-button-1",
-      "nameField": "web-banking-common.web-banking-stepper.next-button-1",
-      "definedName": "Avanti",
-      "id": 30
-    },
-    {
-      "typeElement": "tagName-Found",
-      "tagName": "button",
-      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/avq-payments-new-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/avq-web-banking-payment-entry-banklet[1]/avq-payment-entry[1]/div[1]/avq-payment-form-loader[1]/div[1]/avq-web-banking-stepper[1]/div[1]/mat-stepper[1]/div[1]/div[2]/div[1]/div[1]/avq-payment-form-step-layout[1]/div[1]/section[1]/avq-payment-form-loader[1]/div[1]/avq-payment-entry-beneficiary-form[1]/form[1]/avq-wb-form-group[2]/div[1]/mat-expansion-panel[1]/div[1]/div[1]/div[1]/fieldset[1]/avq-payment-beneficiary-address-form[1]/div[1]/div[1]/mat-form-field[1]/div[1]/div[1]/div[1]/div[2]/label[1]",
-      "someText": "Nome",
-      "attribId": "mat-mdc-form-field-label-3",
-      "attribName": "",
-      "coordinates": "-621.08,777.00",
-      "attributeData": [
-        { "name": "matformfieldfloatinglabel", "value": "" },
-        {
-          "name": "class",
-          "value": "mdc-floating-label mat-mdc-floating-label ng-star-inserted mdc-floating-label--float-above"
-        },
-        { "name": "id", "value": "mat-mdc-form-field-label-3" },
-        { "name": "for", "value": "mat-input-2" },
-        { "name": "style", "value": "" }
-      ],
-      "customXPath": "",
-      "iFrameXPath": "",
-      "shadowHost": "",
-      "shadowRoot": "false",
-      "nestedShadow": "false",
-      "cssSelector": "label#mat-mdc-form-field-label-3.mdc-floating-label.mat-mdc-floating-label.ng-star-inserted.mdc-floating-label--float-above",
-      "attributeValue": "",
-      "attributeType": "",
-      "searchAttributeValue": "",
-      "nameLabel": "mat-input-2",
-      "nameField": "mat-input-2",
-      "definedName": "Nome",
-      "id": 31
-    },
-    {
-      "typeElement": "tagName-Found",
-      "tagName": "button",
-      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/avq-payments-new-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/avq-web-banking-payment-entry-banklet[1]/avq-payment-entry[1]/div[1]/avq-payment-form-loader[1]/div[1]/avq-web-banking-stepper[1]/div[1]/mat-stepper[1]/div[1]/div[2]/div[1]/div[1]/avq-payment-form-step-layout[1]/div[1]/section[1]/avq-payment-form-loader[1]/div[1]/avq-payment-entry-beneficiary-form[1]/form[1]/avq-wb-form-group[2]/div[1]/mat-expansion-panel[1]/div[1]/div[1]/div[1]/fieldset[1]/avq-payment-beneficiary-address-form[1]/div[1]/div[2]/mat-form-field[1]/div[1]/div[1]/div[1]/div[2]/label[1]",
-      "someText": "Indirizzo",
-      "attribId": "mat-mdc-form-field-label-4",
-      "attribName": "",
-      "coordinates": "-621.08,862.25",
-      "attributeData": [
-        { "name": "matformfieldfloatinglabel", "value": "" },
-        {
-          "name": "class",
-          "value": "mdc-floating-label mat-mdc-floating-label ng-star-inserted mdc-floating-label--float-above"
-        },
-        { "name": "id", "value": "mat-mdc-form-field-label-4" },
-        { "name": "for", "value": "mat-input-3" },
-        { "name": "style", "value": "" }
-      ],
-      "customXPath": "",
-      "iFrameXPath": "",
-      "shadowHost": "",
-      "shadowRoot": "false",
-      "nestedShadow": "false",
-      "cssSelector": "label#mat-mdc-form-field-label-4.mdc-floating-label.mat-mdc-floating-label.ng-star-inserted.mdc-floating-label--float-above",
-      "attributeValue": "",
-      "attributeType": "",
-      "searchAttributeValue": "",
-      "nameLabel": "mat-input-3",
-      "nameField": "mat-input-3",
-      "definedName": "Indirizzo",
-      "id": 32
-    },
-    {
-      "typeElement": "tagName-Found",
-      "tagName": "button",
-      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/avq-payments-new-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/avq-web-banking-payment-entry-banklet[1]/avq-payment-entry[1]/div[1]/avq-payment-form-loader[1]/div[1]/avq-web-banking-stepper[1]/div[1]/mat-stepper[1]/div[1]/div[2]/div[1]/div[1]/avq-payment-form-step-layout[1]/div[1]/section[1]/avq-payment-form-loader[1]/div[1]/avq-payment-entry-beneficiary-form[1]/form[1]/avq-wb-form-group[2]/div[1]/mat-expansion-panel[1]/div[1]/div[1]/div[1]/fieldset[1]/avq-payment-beneficiary-address-form[1]/div[1]/div[3]/mat-form-field[1]/div[1]/div[1]/div[1]/div[2]/label[1]",
-      "someText": "Città",
-      "attribId": "mat-mdc-form-field-label-5",
-      "attribName": "",
-      "coordinates": "-621.08,947.50",
-      "attributeData": [
-        { "name": "matformfieldfloatinglabel", "value": "" },
-        {
-          "name": "class",
-          "value": "mdc-floating-label mat-mdc-floating-label ng-star-inserted mdc-floating-label--float-above"
-        },
-        { "name": "id", "value": "mat-mdc-form-field-label-5" },
-        { "name": "for", "value": "mat-input-4" },
-        { "name": "style", "value": "" }
-      ],
-      "customXPath": "",
-      "iFrameXPath": "",
-      "shadowHost": "",
-      "shadowRoot": "false",
-      "nestedShadow": "false",
-      "cssSelector": "label#mat-mdc-form-field-label-5.mdc-floating-label.mat-mdc-floating-label.ng-star-inserted.mdc-floating-label--float-above",
-      "attributeValue": "",
-      "attributeType": "",
-      "searchAttributeValue": "",
-      "nameLabel": "mat-input-4",
-      "nameField": "mat-input-4",
-      "definedName": "Città",
-      "id": 33
-    },
-    {
-      "typeElement": "tagName-Found",
-      "tagName": "button",
-      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/avq-payments-new-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/avq-web-banking-payment-entry-banklet[1]/avq-payment-entry[1]/div[1]/avq-payment-form-loader[1]/div[1]/avq-web-banking-stepper[1]/div[1]/mat-stepper[1]/div[1]/div[2]/div[1]/div[1]/avq-payment-form-step-layout[1]/div[1]/section[1]/avq-payment-form-loader[1]/div[1]/avq-payment-entry-beneficiary-form[1]/form[1]/avq-wb-form-group[2]/div[1]/mat-expansion-panel[1]/div[1]/div[1]/div[1]/fieldset[1]/avq-payment-beneficiary-address-form[1]/div[1]/div[4]/mat-form-field[1]/div[1]/div[1]/div[1]/div[2]/label[1]",
-      "someText": "Nazione",
-      "attribId": "mat-mdc-form-field-label-6",
-      "attribName": "",
-      "coordinates": "-621.08,1032.75",
-      "attributeData": [
-        { "name": "matformfieldfloatinglabel", "value": "" },
-        {
-          "name": "class",
-          "value": "mdc-floating-label mat-mdc-floating-label ng-star-inserted mdc-floating-label--float-above"
-        },
-        { "name": "id", "value": "mat-mdc-form-field-label-6" },
-        { "name": "for", "value": "mat-input-5" },
-        { "name": "style", "value": "" }
-      ],
-      "customXPath": "",
-      "iFrameXPath": "",
-      "shadowHost": "",
-      "shadowRoot": "false",
-      "nestedShadow": "false",
-      "cssSelector": "label#mat-mdc-form-field-label-6.mdc-floating-label.mat-mdc-floating-label.ng-star-inserted.mdc-floating-label--float-above",
-      "attributeValue": "",
-      "attributeType": "",
-      "searchAttributeValue": "",
-      "nameLabel": "mat-input-5",
-      "nameField": "mat-input-5",
-      "definedName": "Nazione",
-      "id": 34
-    },
-    {
-      "typeElement": "tagName-Found",
-      "tagName": "button",
-      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/avq-payments-new-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/avq-web-banking-payment-entry-banklet[1]/avq-payment-entry[1]/div[1]/avq-payment-form-loader[1]/div[1]/avq-web-banking-stepper[1]/div[1]/mat-stepper[1]/div[1]/div[2]/div[2]/div[1]/avq-payment-form-step-layout[1]/div[1]/section[1]/avq-payment-entry-payment-details-form[1]/form[1]/avq-wb-form-group[1]/div[1]/mat-expansion-panel[1]/div[1]/div[1]/div[1]/fieldset[1]/div[1]/avq-payment-money-account-field[1]/div[1]/avq-payment-money-account-selector[1]/div[1]/mat-form-field[1]/div[1]/div[1]/div[1]/div[2]/label[1]",
-      "someText": "Conto",
-      "attribId": "mat-mdc-form-field-label-18",
-      "attribName": "",
-      "coordinates": "770.92,284.50",
-      "attributeData": [
-        { "name": "matformfieldfloatinglabel", "value": "" },
-        {
-          "name": "class",
-          "value": "mdc-floating-label mat-mdc-floating-label ng-star-inserted mdc-floating-label--float-above"
-        },
-        { "name": "id", "value": "mat-mdc-form-field-label-18" },
-        { "name": "style", "value": "" }
-      ],
-      "customXPath": "",
-      "iFrameXPath": "",
-      "shadowHost": "",
-      "shadowRoot": "false",
-      "nestedShadow": "false",
-      "cssSelector": "label#mat-mdc-form-field-label-18.mdc-floating-label.mat-mdc-floating-label.ng-star-inserted.mdc-floating-label--float-above",
-      "attributeValue": "",
-      "attributeType": "",
-      "searchAttributeValue": "",
-      "nameLabel": "mat-mdc-form-field-label-18",
-      "nameField": "mat-mdc-form-field-label-18",
-      "definedName": "Conto",
-      "id": 35
-    },
-    {
-      "typeElement": "tagName-Found",
-      "tagName": "button",
-      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/avq-payments-new-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/avq-web-banking-payment-entry-banklet[1]/avq-payment-entry[1]/div[1]/avq-payment-form-loader[1]/div[1]/avq-web-banking-stepper[1]/div[1]/mat-stepper[1]/div[1]/div[2]/div[2]/div[1]/avq-payment-form-step-layout[1]/div[1]/section[1]/avq-payment-entry-payment-details-form[1]/form[1]/avq-wb-form-group[2]/div[1]/mat-expansion-panel[1]/div[1]/div[1]/div[1]/fieldset[1]/div[1]/div[1]/avq-payment-currency-field[1]/div[1]/div[1]/mat-form-field[1]/div[1]/div[1]/div[1]/div[2]/label[1]",
-      "someText": "Valuta",
-      "attribId": "mat-mdc-form-field-label-10",
-      "attribName": "",
-      "coordinates": "770.92,449.75",
-      "attributeData": [
-        { "name": "matformfieldfloatinglabel", "value": "" },
-        {
-          "name": "class",
-          "value": "mdc-floating-label mat-mdc-floating-label ng-star-inserted mdc-floating-label--float-above"
-        },
-        { "name": "id", "value": "mat-mdc-form-field-label-10" },
-        { "name": "style", "value": "" }
-      ],
-      "customXPath": "",
-      "iFrameXPath": "",
-      "shadowHost": "",
-      "shadowRoot": "false",
-      "nestedShadow": "false",
-      "cssSelector": "label#mat-mdc-form-field-label-10.mdc-floating-label.mat-mdc-floating-label.ng-star-inserted.mdc-floating-label--float-above",
-      "attributeValue": "",
-      "attributeType": "",
-      "searchAttributeValue": "",
-      "nameLabel": "mat-mdc-form-field-label-10",
-      "nameField": "mat-mdc-form-field-label-10",
-      "definedName": "Valuta",
-      "id": 36
-    },
-    {
-      "typeElement": "tagName-Found",
-      "tagName": "button",
-      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/avq-payments-new-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/avq-web-banking-payment-entry-banklet[1]/avq-payment-entry[1]/div[1]/avq-payment-form-loader[1]/div[1]/avq-web-banking-stepper[1]/div[1]/mat-stepper[1]/div[1]/div[2]/div[2]/div[1]/avq-payment-form-step-layout[1]/div[1]/section[1]/avq-payment-entry-payment-details-form[1]/form[1]/avq-wb-form-group[2]/div[1]/mat-expansion-panel[1]/div[1]/div[1]/div[1]/fieldset[1]/div[1]/div[1]/avq-payment-amount-field[1]/div[1]/div[1]/mat-form-field[1]/div[1]/div[1]/div[1]/div[2]/label[1]",
-      "someText": "Importo",
-      "attribId": "mat-mdc-form-field-label-12",
-      "attribName": "",
-      "coordinates": "1065.77,449.75",
-      "attributeData": [
-        { "name": "matformfieldfloatinglabel", "value": "" },
-        {
-          "name": "class",
-          "value": "mdc-floating-label mat-mdc-floating-label ng-star-inserted mdc-floating-label--float-above"
-        },
-        { "name": "id", "value": "mat-mdc-form-field-label-12" },
-        { "name": "for", "value": "mat-input-10" },
-        { "name": "style", "value": "" }
-      ],
-      "customXPath": "",
-      "iFrameXPath": "",
-      "shadowHost": "",
-      "shadowRoot": "false",
-      "nestedShadow": "false",
-      "cssSelector": "label#mat-mdc-form-field-label-12.mdc-floating-label.mat-mdc-floating-label.ng-star-inserted.mdc-floating-label--float-above",
-      "attributeValue": "",
-      "attributeType": "",
-      "searchAttributeValue": "",
-      "nameLabel": "mat-input-10",
-      "nameField": "mat-input-10",
-      "definedName": "Importo",
-      "id": 37
-    },
-    {
-      "typeElement": "tagName-Found",
-      "tagName": "button",
-      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/avq-payments-new-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/avq-web-banking-payment-entry-banklet[1]/avq-payment-entry[1]/div[1]/avq-payment-form-loader[1]/div[1]/avq-web-banking-stepper[1]/div[1]/mat-stepper[1]/div[1]/div[2]/div[2]/div[1]/avq-payment-form-step-layout[1]/div[1]/section[1]/avq-payment-entry-payment-details-form[1]/form[1]/avq-wb-form-group[2]/div[1]/mat-expansion-panel[1]/div[1]/div[1]/div[1]/fieldset[1]/div[1]/div[1]/avq-payment-reason-field[1]/div[1]/avq-remittance-information-form[1]/div[1]/div[1]/mat-form-field[1]/div[1]/div[1]/div[1]/div[2]/label[1]",
-      "someText": "Causale del pagamento",
-      "attribId": "mat-mdc-form-field-label-9",
-      "attribName": "",
-      "coordinates": "770.92,535.00",
-      "attributeData": [
-        { "name": "matformfieldfloatinglabel", "value": "" },
-        {
-          "name": "class",
-          "value": "mdc-floating-label mat-mdc-floating-label ng-star-inserted mdc-floating-label--float-above"
-        },
-        { "name": "id", "value": "mat-mdc-form-field-label-9" },
-        { "name": "for", "value": "mat-input-8" },
-        { "name": "style", "value": "" }
-      ],
-      "customXPath": "",
-      "iFrameXPath": "",
-      "shadowHost": "",
-      "shadowRoot": "false",
-      "nestedShadow": "false",
-      "cssSelector": "label#mat-mdc-form-field-label-9.mdc-floating-label.mat-mdc-floating-label.ng-star-inserted.mdc-floating-label--float-above",
-      "attributeValue": "",
-      "attributeType": "",
-      "searchAttributeValue": "",
-      "nameLabel": "mat-input-8",
-      "nameField": "mat-input-8",
-      "definedName": "Causale del pagamento",
-      "id": 38
-    },
-    {
-      "typeElement": "tagName-Found",
-      "tagName": "button",
-      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/avq-payments-new-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/avq-web-banking-payment-entry-banklet[1]/avq-payment-entry[1]/div[1]/avq-payment-form-loader[1]/div[1]/avq-web-banking-stepper[1]/div[1]/mat-stepper[1]/div[1]/div[2]/div[2]/div[1]/avq-payment-form-step-layout[1]/div[1]/section[1]/avq-payment-entry-payment-details-form[1]/form[1]/avq-wb-form-group[4]/div[1]/mat-expansion-panel[1]/div[1]/div[1]/div[1]/fieldset[1]/avq-payment-advice[1]/div[1]/div[1]/mat-form-field[1]/div[1]/div[1]/div[1]/div[2]/label[1]",
-      "someText": "Avviso",
-      "attribId": "mat-mdc-form-field-label-15",
-      "attribName": "",
-      "coordinates": "770.92,1144.13",
-      "attributeData": [
-        { "name": "matformfieldfloatinglabel", "value": "" },
-        {
-          "name": "class",
-          "value": "mdc-floating-label mat-mdc-floating-label ng-star-inserted mdc-floating-label--float-above"
-        },
-        { "name": "id", "value": "mat-mdc-form-field-label-15" },
-        { "name": "style", "value": "" }
-      ],
-      "customXPath": "",
-      "iFrameXPath": "",
-      "shadowHost": "",
-      "shadowRoot": "false",
-      "nestedShadow": "false",
-      "cssSelector": "label#mat-mdc-form-field-label-15.mdc-floating-label.mat-mdc-floating-label.ng-star-inserted.mdc-floating-label--float-above",
-      "attributeValue": "",
-      "attributeType": "",
-      "searchAttributeValue": "",
-      "nameLabel": "mat-mdc-form-field-label-15",
-      "nameField": "mat-mdc-form-field-label-15",
-      "definedName": "Avviso",
-      "id": 39
+      "nameLabel": "web-banking-common-menu-trigger",
+      "nameField": "web-banking-common-menu-trigger",
+      "definedName": "Azioni",
+      "id": 25
     },
     {
       "typeElement": "tagName-Found",
@@ -1365,45 +893,7 @@
       "nameLabel": "Vai al contenuto principale",
       "nameField": "a",
       "definedName": "Vai al contenuto principale",
-      "id": 40
-    },
-    {
-      "typeElement": "tagName-Found",
-      "tagName": "a",
-      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav[1]/div[1]/avq-main-nav[1]/avq-nav-list[1]/cdk-tree[1]/cdk-nested-tree-node[1]/a[1]",
-      "someText": "Pagina iniziale",
-      "attribId": "",
-      "attribName": "",
-      "coordinates": "12.00,77.00",
-      "attributeData": [
-        { "name": "avq-list-item", "value": "" },
-        { "name": "avqaccessiblelink", "value": "" },
-        {
-          "name": "class",
-          "value": "avq-list-item avq-state-layer-host ng-star-inserted"
-        },
-        {
-          "name": "test-id",
-          "value": "web-banking-portal.main-nav.nav-item.web-banking-portal.main-nav.item.dashboard"
-        },
-        { "name": "data-with-leading-icon", "value": "home" },
-        { "name": "role", "value": "link" },
-        { "name": "tabindex", "value": "0" },
-        { "name": "style", "value": "cursor: pointer;" }
-      ],
-      "customXPath": "",
-      "iFrameXPath": "",
-      "shadowHost": "",
-      "shadowRoot": "false",
-      "nestedShadow": "false",
-      "cssSelector": "a.avq-list-item.avq-state-layer-host.ng-star-inserted",
-      "attributeValue": "",
-      "attributeType": "",
-      "searchAttributeValue": "",
-      "nameLabel": "web-banking-portal.main-nav.nav-item.web-banking-portal.main-nav.item.dashboard",
-      "nameField": "web-banking-portal.main-nav.nav-item.web-banking-portal.main-nav.item.dashboard",
-      "definedName": "Pagina iniziale",
-      "id": 41
+      "id": 26
     },
     {
       "typeElement": "tagName-Found",
@@ -1441,7 +931,7 @@
       "nameLabel": "web-banking-portal.main-nav.nav-item.web-banking-bscch.nav-item.personal-advisor",
       "nameField": "web-banking-portal.main-nav.nav-item.web-banking-bscch.nav-item.personal-advisor",
       "definedName": "Portafoglio MIO",
-      "id": 42
+      "id": 27
     },
     {
       "typeElement": "tagName-Found",
@@ -1479,121 +969,7 @@
       "nameLabel": "web-banking-portal.main-nav.nav-item.web-banking-bscch.nav-item.third-pillar",
       "nameField": "web-banking-portal.main-nav.nav-item.web-banking-bscch.nav-item.third-pillar",
       "definedName": "Previdenza",
-      "id": 43
-    },
-    {
-      "typeElement": "tagName-Found",
-      "tagName": "a",
-      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav[1]/div[1]/avq-main-nav[1]/avq-nav-list[1]/cdk-tree[1]/cdk-nested-tree-node[7]/div[1]/cdk-nested-tree-node[2]/a[1]",
-      "someText": "eBill",
-      "attribId": "",
-      "attribName": "",
-      "coordinates": "12.00,525.00",
-      "attributeData": [
-        { "name": "avq-list-item", "value": "" },
-        { "name": "avqaccessiblelink", "value": "" },
-        {
-          "name": "class",
-          "value": "avq-list-item avq-state-layer-host ng-star-inserted"
-        },
-        {
-          "name": "test-id",
-          "value": "web-banking-portal.main-nav.nav-item.web-banking-portal.main-nav.item.ebill"
-        },
-        { "name": "data-with-leading-icon", "value": "none" },
-        { "name": "role", "value": "link" },
-        { "name": "tabindex", "value": "0" },
-        { "name": "style", "value": "cursor: pointer;" }
-      ],
-      "customXPath": "",
-      "iFrameXPath": "",
-      "shadowHost": "",
-      "shadowRoot": "false",
-      "nestedShadow": "false",
-      "cssSelector": "a.avq-list-item.avq-state-layer-host.ng-star-inserted",
-      "attributeValue": "",
-      "attributeType": "",
-      "searchAttributeValue": "",
-      "nameLabel": "web-banking-portal.main-nav.nav-item.web-banking-portal.main-nav.item.ebill",
-      "nameField": "web-banking-portal.main-nav.nav-item.web-banking-portal.main-nav.item.ebill",
-      "definedName": "eBill",
-      "id": 44
-    },
-    {
-      "typeElement": "tagName-Found",
-      "tagName": "a",
-      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav[1]/div[1]/avq-main-nav[1]/avq-nav-list[1]/cdk-tree[1]/cdk-nested-tree-node[7]/div[1]/cdk-nested-tree-node[3]/a[1]",
-      "someText": "Trasmissione file pain/DTA",
-      "attribId": "",
-      "attribName": "",
-      "coordinates": "12.00,581.00",
-      "attributeData": [
-        { "name": "avq-list-item", "value": "" },
-        { "name": "avqaccessiblelink", "value": "" },
-        {
-          "name": "class",
-          "value": "avq-list-item avq-state-layer-host ng-star-inserted"
-        },
-        {
-          "name": "test-id",
-          "value": "web-banking-portal.main-nav.nav-item.web-banking-bscch.nav-item.payment-uploads"
-        },
-        { "name": "data-with-leading-icon", "value": "none" },
-        { "name": "role", "value": "link" },
-        { "name": "tabindex", "value": "0" },
-        { "name": "style", "value": "cursor: pointer;" }
-      ],
-      "customXPath": "",
-      "iFrameXPath": "",
-      "shadowHost": "",
-      "shadowRoot": "false",
-      "nestedShadow": "false",
-      "cssSelector": "a.avq-list-item.avq-state-layer-host.ng-star-inserted",
-      "attributeValue": "",
-      "attributeType": "",
-      "searchAttributeValue": "",
-      "nameLabel": "web-banking-portal.main-nav.nav-item.web-banking-bscch.nav-item.payment-uploads",
-      "nameField": "web-banking-portal.main-nav.nav-item.web-banking-bscch.nav-item.payment-uploads",
-      "definedName": "Trasmissione file pain/DTA",
-      "id": 45
-    },
-    {
-      "typeElement": "tagName-Found",
-      "tagName": "a",
-      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav[1]/div[1]/avq-main-nav[1]/avq-nav-list[1]/cdk-tree[1]/cdk-nested-tree-node[7]/div[1]/cdk-nested-tree-node[4]/a[1]",
-      "someText": "Addebiti diretti (LSV)",
-      "attribId": "",
-      "attribName": "",
-      "coordinates": "12.00,637.00",
-      "attributeData": [
-        { "name": "avq-list-item", "value": "" },
-        { "name": "avqaccessiblelink", "value": "" },
-        {
-          "name": "class",
-          "value": "avq-list-item avq-state-layer-host ng-star-inserted"
-        },
-        {
-          "name": "test-id",
-          "value": "web-banking-portal.main-nav.nav-item.web-banking-portal.main-nav.item.direct-debit-mandates"
-        },
-        { "name": "data-with-leading-icon", "value": "none" },
-        { "name": "role", "value": "link" },
-        { "name": "tabindex", "value": "0" },
-        { "name": "style", "value": "cursor: pointer;" }
-      ],
-      "customXPath": "",
-      "iFrameXPath": "",
-      "shadowHost": "",
-      "shadowRoot": "false",
-      "nestedShadow": "false",
-      "cssSelector": "a.avq-list-item.avq-state-layer-host.ng-star-inserted",
-      "attributeValue": "",
-      "attributeType": "",
-      "searchAttributeValue": "",
-      "nameLabel": "web-banking-portal.main-nav.nav-item.web-banking-portal.main-nav.item.direct-debit-mandates",
-      "nameField": "web-banking-portal.main-nav.nav-item.web-banking-portal.main-nav.item.direct-debit-mandates",
-      "definedName": "Addebiti diretti (LSV)",
-      "id": 46
+      "id": 28
     },
     {
       "typeElement": "tagName-Found",
@@ -1602,7 +978,7 @@
       "someText": "Crediti",
       "attribId": "",
       "attribName": "",
-      "coordinates": "12.00,749.00",
+      "coordinates": "12.00,525.00",
       "attributeData": [
         { "name": "avq-list-item", "value": "" },
         { "name": "avqaccessiblelink", "value": "" },
@@ -1631,7 +1007,7 @@
       "nameLabel": "web-banking-portal.main-nav.nav-item.web-banking-bscch.nav-group.credit-overview",
       "nameField": "web-banking-portal.main-nav.nav-item.web-banking-bscch.nav-group.credit-overview",
       "definedName": "Crediti",
-      "id": 47
+      "id": 29
     },
     {
       "typeElement": "tagName-Found",
@@ -1640,7 +1016,7 @@
       "someText": "Informazioni legali",
       "attribId": "",
       "attribName": "",
-      "coordinates": "28.00,935.00",
+      "coordinates": "28.00,711.00",
       "attributeData": [
         { "name": "avqaccessiblelink", "value": "" },
         { "name": "avq-link", "value": "" },
@@ -1660,7 +1036,7 @@
       "nameLabel": "Informazioni legali",
       "nameField": "a",
       "definedName": "Informazioni legali",
-      "id": 48
+      "id": 30
     },
     {
       "typeElement": "tagName-Found",
@@ -1669,7 +1045,7 @@
       "someText": "Contatti",
       "attribId": "",
       "attribName": "",
-      "coordinates": "162.73,935.00",
+      "coordinates": "162.73,711.00",
       "attributeData": [
         { "name": "avqaccessiblelink", "value": "" },
         { "name": "avq-link", "value": "" },
@@ -1689,7 +1065,7 @@
       "nameLabel": "Contatti",
       "nameField": "a",
       "definedName": "Contatti",
-      "id": 49
+      "id": 31
     },
     {
       "typeElement": "tagName-Found",
@@ -1698,7 +1074,7 @@
       "someText": "Aiuto",
       "attribId": "",
       "attribName": "",
-      "coordinates": "231.41,935.00",
+      "coordinates": "231.41,711.00",
       "attributeData": [
         { "name": "avqaccessiblelink", "value": "" },
         { "name": "avq-link", "value": "" },
@@ -1718,41 +1094,143 @@
       "nameLabel": "Aiuto",
       "nameField": "a",
       "definedName": "Aiuto",
-      "id": 50
+      "id": 32
     },
     {
       "typeElement": "tagName-Found",
       "tagName": "a",
-      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/avq-payments-new-page[1]/avq-portal-page-layout[1]/header[1]/div[1]/div[1]/avq-breadcrumbs[1]/avq-hierarchical-breadcrumbs[1]/nav[1]/avq-breadcrumb[1]/a[1]",
-      "someText": "Pagina iniziale",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/assl-dashboard-retail-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/div[1]/avq-page-navigation-button[1]/a[1]",
+      "someText": "Visualizzare; Visualizzare tutto",
       "attribId": "",
       "attribName": "",
-      "coordinates": "427.50,-90.00",
+      "coordinates": "427.50,549.25",
       "attributeData": [
         { "name": "avqaccessiblelink", "value": "" },
-        { "name": "class", "value": "avq-text-primary ng-star-inserted" },
+        { "name": "avq-text-button", "value": "" },
         {
-          "name": "test-id",
-          "value": "web-banking-portal.avq-breadcrumb.breadcrumb"
+          "name": "class",
+          "value": "avq-button avq-button-base avq-state-layer-host avq-anchor-button avq-button--text"
         },
         { "name": "role", "value": "link" },
-        { "name": "tabindex", "value": "0" },
-        { "name": "style", "value": "cursor: pointer;" }
+        { "name": "tabindex", "value": "0" }
       ],
       "customXPath": "",
       "iFrameXPath": "",
       "shadowHost": "",
       "shadowRoot": "false",
       "nestedShadow": "false",
-      "cssSelector": "a.avq-text-primary.ng-star-inserted",
+      "cssSelector": "a.avq-button.avq-button-base.avq-state-layer-host.avq-anchor-button.avq-button--text",
       "attributeValue": "",
       "attributeType": "",
       "searchAttributeValue": "",
-      "nameLabel": "web-banking-portal.avq-breadcrumb.breadcrumb",
-      "nameField": "web-banking-portal.avq-breadcrumb.breadcrumb",
+      "nameLabel": "Visualizzare; Visualizzare tutto",
+      "nameField": "a",
+      "definedName": "Visualizzare; Visualizzare tut",
+      "id": 33
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "a",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/assl-dashboard-retail-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/div[1]/div[1]/div[1]/avq-page-navigation-button[1]/a[1]",
+      "someText": "Visualizzare; Visualizzare tutto",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "427.50,1249.25",
+      "attributeData": [
+        { "name": "avqaccessiblelink", "value": "" },
+        { "name": "avq-text-button", "value": "" },
+        {
+          "name": "class",
+          "value": "avq-button avq-button-base avq-state-layer-host avq-anchor-button avq-button--text"
+        },
+        { "name": "role", "value": "link" },
+        { "name": "tabindex", "value": "0" }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "a.avq-button.avq-button-base.avq-state-layer-host.avq-anchor-button.avq-button--text",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "Visualizzare; Visualizzare tutto",
+      "nameField": "a",
+      "definedName": "Visualizzare; Visualizzare tut",
+      "id": 34
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "a",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/header[1]/avq-app-bar[1]/mat-toolbar[1]/mat-toolbar-row[1]/a[2]",
+      "someText": "",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "16.00,8.00",
+      "attributeData": [
+        { "name": "_ngcontent-ng-c374048722", "value": "" },
+        { "name": "avqaccessiblelink", "value": "" },
+        { "name": "avq-link", "value": "" },
+        { "name": "class", "value": "avq-link logo" },
+        { "name": "test-id", "value": "web-banking-portal.app-bar.logo" },
+        { "name": "role", "value": "link" },
+        { "name": "tabindex", "value": "0" },
+        { "name": "style", "value": "height: 48px;" }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "a.avq-link.logo",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "web-banking-portal.app-bar.logo",
+      "nameField": "web-banking-portal.app-bar.logo",
+      "definedName": "web-banking-portal.app-bar.logo",
+      "id": 35
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "a",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav[1]/div[1]/avq-main-nav[1]/avq-nav-list[1]/cdk-tree[1]/cdk-nested-tree-node[1]/a[1]",
+      "someText": "Pagina iniziale",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "12.00,77.00",
+      "attributeData": [
+        { "name": "avq-list-item", "value": "" },
+        { "name": "avqaccessiblelink", "value": "" },
+        {
+          "name": "class",
+          "value": "avq-list-item avq-state-layer-host ng-star-inserted avq-list-item--active"
+        },
+        {
+          "name": "test-id",
+          "value": "web-banking-portal.main-nav.nav-item.web-banking-portal.main-nav.item.dashboard"
+        },
+        { "name": "data-with-leading-icon", "value": "home" },
+        { "name": "role", "value": "link" },
+        { "name": "tabindex", "value": "0" },
+        { "name": "style", "value": "cursor: pointer;" },
+        { "name": "aria-current", "value": "page" }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "a.avq-list-item.avq-state-layer-host.ng-star-inserted.avq-list-item--active",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "web-banking-portal.main-nav.nav-item.web-banking-portal.main-nav.item.dashboard",
+      "nameField": "web-banking-portal.main-nav.nav-item.web-banking-portal.main-nav.item.dashboard",
       "definedName": "Pagina iniziale",
-      "id": 51
+      "id": 36
     }
   ],
-  "totalElements": 51
+  "totalElements": 36
 }

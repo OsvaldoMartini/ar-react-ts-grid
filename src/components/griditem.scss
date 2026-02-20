@@ -5,7 +5,9 @@
   display: flex;
   flex-direction: column;
   gap: 3px; /* Decreased gap */
-  height: 100vh;          /* NEW: take full viewport height */
+  // height: 100vh;          /* NEW: take full viewport height */
+   height: 100%;      // use container height, not viewport
+  min-height: 0;     // important
   box-sizing: border-box; /* make padding play nice with height */
 }
 
@@ -21,6 +23,17 @@
 
   width: 100%;
   border-bottom: 1px solid #c0c0c0;
+
+    position: sticky;  
+  top: 0;            
+  z-index: 1000;     
+  background: #fff;
+}
+
+.grid-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;   // ✅ scroll happens here
 }
 
 .grid-find-label {
