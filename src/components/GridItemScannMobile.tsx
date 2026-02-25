@@ -1281,6 +1281,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
                         />
                         <span className="validate-item-text">
                           <strong>{key}</strong>
+                          <span className="validate-item-value"> {field?.value}</span>
                         </span>
                       </label>
                     ))}
