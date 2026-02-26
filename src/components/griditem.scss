@@ -22,11 +22,7 @@
   padding-bottom: 4px;
 
   width: 100%;
-  border-bottom: 1px solid #c0c0c0;
-
-  position: sticky;  
-  top: 0;            
-  z-index: 1000;     
+  /* remove these: position: sticky; top: 0; z-index */
   background: #fff;
 }
 
@@ -577,11 +573,17 @@
 
 /* === Toolbar above all sections === */
 .controls-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: #fff;
+
   display: flex;
-  flex-direction: column; /* NEW: allow 2 toolbar rows (top + bottom) */
-  align-items: stretch;   /* NEW: rows take full width */
+  flex-direction: column;
+  align-items: stretch;
   justify-content: flex-start;
-  gap: 6px; /* keeps spacing (now between rows) */
+  gap: 6px;
+
   margin-top: 4px;
   margin-bottom: 2px;
   font-size: 12px;

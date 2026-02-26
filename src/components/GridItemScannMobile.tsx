@@ -1365,6 +1365,17 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
             </button>
           </div>
         </div>
+        {/* FIND ROW (same as GridItem) */}
+        <div className="grid-find-row">
+          <span className="grid-find-label">Find:</span>
+          <input
+            className="grid-find-input"
+            type="text"
+            value={findText}
+            onChange={(e) => setFindText(e.target.value)}
+            placeholder="Type to find…"
+          />
+        </div>
       </div>
 
       {/* === BELOW TOOLBAR === */}
@@ -1381,18 +1392,6 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
         </div>
       ) : (
         <>
-          {/* FIND ROW (same as GridItem) */}
-          <div className="grid-find-row">
-            <span className="grid-find-label">Find:</span>
-            <input
-              className="grid-find-input"
-              type="text"
-              value={findText}
-              onChange={(e) => setFindText(e.target.value)}
-              placeholder="Type to find…"
-            />
-          </div>
-
           {/* SECOND FIXED ROW: Insert All / Attributes / Pagination */}
           <div className="controls-row fixed-controls-row">
             <button
