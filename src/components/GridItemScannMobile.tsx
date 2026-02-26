@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { BotJobLoadDTO, ComplexMessage, ElementDTO } from './instructionsMockData';
+import { BlockData, BotJobLoadDTO, ComplexMessage, ElementDTO } from './instructionsMockData';
 import crossImage from '../assets/cross.png';
 import pickItemImage from '../assets/pick-item5.png';
 import saveImage from "../assets/save.png";
@@ -163,6 +163,9 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
   const [selectedJob, setSelectedJob] = useState<BotJobLoadDTO | null>(null);
   const [isBotJobRunning, setIsBotJobRunning] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [allBlocks, setAllBlocks] = useState<BlockData[]>([]);
+  const [blocks, setBlocks] = useState<BlockData[]>([]);
+  const [selectedBlock, setSelectedBlock] = useState<BlockData | null>(null);
 
   const handleNextBlockPage = (typeElement: string) => {
     setBlockCurrentPages((prev) => ({
@@ -302,7 +305,25 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
           //   const firstName = (list as BotJobLoadDTO[])[0].name ?? "Create New Bot Job";
           //   setSelectedJobOption(firstName);
           // }
+
+          // ✅ Extract blocks from each bot job (flatten blockLoadDTOList)
+          const flatBlocks: BlockData[] = (list as any[]).flatMap((job) => {
+            const botJobId = job?.id ?? job?.botJobId;
+            const blockList = Array.isArray(job?.blockLoadDTOList) ? job.blockLoadDTOList : [];
+
+            return blockList.map((b: any) => ({
+              name: b?.name ?? `Block ${b?.blockOrderNumber ?? b?.id ?? ""}`,
+              id: b?.id ?? b?.blockOrderNumber ?? 1,
+              botJobId: b?.botJobId ?? botJobId,
+            }));
+          });
+
+          setAllBlocks(flatBlocks);
+
           setSelectedJob(null);
+
+          setBlocks([]);
+          setSelectedBlock(null);
           setIsRefreshing(false);
           break;
         }
@@ -457,6 +478,23 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
     }
   }, [elementDTO, isElementGrouped]);
 
+  useEffect(() => {
+    const jobId = selectedJob?.id;
+
+    if (!jobId) {
+      setBlocks([]);
+      setSelectedBlock(null);
+      return;
+    }
+
+    const filtered = allBlocks.filter((b) => b.botJobId === jobId);
+    setBlocks(filtered);
+
+    setSelectedBlock((prev) => {
+      if (filtered.length === 0) return null;
+      return prev && filtered.some((b) => b.id === prev.id) ? prev : filtered[0];
+    });
+  }, [selectedJob?.id, allBlocks]);
 
   const handleClose = () => {
     setAlertDismissed(true); // Trigger re-execution of the effect
@@ -568,7 +606,19 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
     setAlertClass('construction-image');
     setAlertMessageHeader('No Bot Job selected');
     setAlertMessageBody(
-      'Please select or create a Bot Job using AR Web Server / Scanner, then try again.'
+      'Please select a Bot Job and then try again.'
+    );
+    setAlertMessageFooter(null);
+    setErrorFlag(true);
+  };
+
+  // 1) Add this small helper anywhere inside the component (top-level, before returns)
+  const showSelectBlockAlert = () => {
+    setAlertImage(warningRedImage);
+    setAlertClass('construction-image');
+    setAlertMessageHeader('No Block/Use Case selected');
+    setAlertMessageBody(
+      'Please select Block/Use Case and then try again.'
     );
     setAlertMessageFooter(null);
     setErrorFlag(true);
@@ -750,6 +800,12 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       return;
     }
 
+    // ❗ Block if no Bot Job is selected
+    if (!selectedBlock) {
+      showSelectBlockAlert();
+      return;
+    }
+
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
       console.warn("🚨 WebSocket is not connected. Cannot send message.");
       return;
@@ -763,7 +819,8 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
     const message = {
       type: "SEND_ALL_ELEMENTS_DTO",
       homeBankingId: homeBankingId,
-      botJobId: botJobId,
+      botJobId: selectedJob.id,
+      blockId: selectedBlock,
       botJobName: botJobName,
       sessionId: `mobile-return-server`,
       elementDetails: allElements.map(mapElementForSend),
@@ -807,6 +864,12 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
     //   return;
     // }
 
+    // ❗ Block if no Bot Job is selected
+    // if (!selectedBlock) {
+    //   showSelectBlockAlert();
+    //   return;
+    // }
+
     // Toggle logic: if already "active", clear it, otherwise set it
     setElementDTO((prev) =>
       prev.map((el) =>
@@ -831,6 +894,12 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
     // ❗ Block if no Bot Job is selected
     if (!selectedJob) {
       showSelectJobAlert();
+      return;
+    }
+
+    // ❗ Block if no Bot Job is selected
+    if (!selectedBlock) {
+      showSelectBlockAlert();
       return;
     }
 
@@ -859,6 +928,8 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       homeBankingId: homeBankingId,
       botJobId: selectedJob!.botJobId || botJobId,
       botJobName: selectedJob!.name || botJobName,
+      blockId: selectedBlock?.id,
+      blockName: selectedBlock?.name,
       sessionId: sessionDestine,
       elementDetails: [mapElementForSend(elementDTO)],
     };
@@ -1112,6 +1183,11 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
     });
   };
 
+  const handleBlockChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedId = Number(e.target.value);
+    setSelectedBlock(blocks.find(b => b.id === selectedId) ?? null);
+  };
+
   const handleRowLeave = () => {
     setHoveredRow(null);
   };
@@ -1319,6 +1395,26 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
             </div>
 
             <div className="toolbar-inline">
+
+              <select
+                className="toolbar-select"
+                value={selectedBlock?.id ?? ""}
+                onChange={handleBlockChange}
+                aria-label="Blocks"
+                disabled={!selectedJob || blocks.length === 0}
+              >
+                {!selectedJob ? (
+                  <option value={1}>Select Bot Job first</option>
+                ) : blocks.length === 0 ? (
+                  <option value={1}>No blocks</option>
+                ) : (
+                  blocks.map((b) => (
+                    <option key={`${b.botJobId}-${b.id}`} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))
+                )}
+              </select>
 
               <select
                 className="toolbar-select"

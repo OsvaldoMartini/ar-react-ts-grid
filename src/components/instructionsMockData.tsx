@@ -69,6 +69,13 @@ export interface ElementDTO {
   attributeType: string;
   autoScroll: string;
   autoEnter: string;
+  blockId?: number;
+}
+
+export interface BlockData {
+  id: number;
+  name: string;
+  botJobId: number;
 }
 
 export interface AttributeData {
