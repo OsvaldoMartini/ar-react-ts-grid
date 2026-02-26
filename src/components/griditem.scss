@@ -24,7 +24,7 @@
   width: 100%;
   border-bottom: 1px solid #c0c0c0;
 
-    position: sticky;  
+  position: sticky;  
   top: 0;            
   z-index: 1000;     
   background: #fff;
@@ -1033,6 +1033,15 @@
   margin-top: -2px;
   font-size: 12px;
 }
+
+/* Keep the controls row visible while .grid-scroll scrolls */
+.fixed-controls-row {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: #fff; /* use your page bg */
+}
+
 
 .pagination-controls {
   display: flex;

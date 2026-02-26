@@ -216,13 +216,21 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
   }, [isSendingAll, isSendingDevice, isSendingDiscovery, isSendingScanner, isSendingScanner, isBotJobRunning]);
 
   useEffect(() => {
+    const q = findText.trim().toLowerCase();
     const newBlockPages: Record<string, number> = {};
+
     Object.entries(elementGrouped).forEach(([typeElement, elementData]) => {
-      newBlockPages[typeElement] = Math.max(1, Math.ceil(elementData.elements.length / blockRowsPerPage));
+      const filteredElements = !q
+        ? elementData.elements
+        : elementData.elements.filter((el) =>
+          (el.someText ?? "").toLowerCase().includes(q)
+        );
+
+      newBlockPages[typeElement] = Math.max(1, Math.ceil(filteredElements.length / blockRowsPerPage));
     });
+
     setBlockPages(newBlockPages);
-    setBlockCurrentPages(Object.keys(elementGrouped).reduce((acc, key) => ({ ...acc, [key]: 1 }), {}));
-  }, [elementGrouped, blockRowsPerPage]);
+  }, [elementGrouped, blockRowsPerPage, findText]);
 
   useEffect(() => {
     console.log("Updated elementGrouped:", elementGrouped);
@@ -1108,6 +1116,25 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
     setHoveredRow(null);
   };
 
+  const filteredGroupedEntries = React.useMemo(() => {
+    const q = findText.trim().toLowerCase();
+    const entries = Object.entries(elementGrouped);
+
+    if (!q) return entries;
+
+    return entries.filter(([typeElement, elementData]) => {
+      // blockName match (string)
+      const blockName = (getElementBlockText(typeElement) ?? "").toLowerCase();
+      const blockMatch = blockName.includes(q);
+
+      // instruction name match (someText)
+      const instructionMatch = (elementData.elements ?? []).some((el) =>
+        (el.someText ?? "").toLowerCase().includes(q)
+      );
+
+      return blockMatch || instructionMatch;
+    });
+  }, [elementGrouped, findText]);
 
   return (
     <div className="grid-container">
@@ -1354,6 +1381,18 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
         </div>
       ) : (
         <>
+          {/* FIND ROW (same as GridItem) */}
+          <div className="grid-find-row">
+            <span className="grid-find-label">Find:</span>
+            <input
+              className="grid-find-input"
+              type="text"
+              value={findText}
+              onChange={(e) => setFindText(e.target.value)}
+              placeholder="Type to find…"
+            />
+          </div>
+
           {/* SECOND FIXED ROW: Insert All / Attributes / Pagination */}
           <div className="controls-row fixed-controls-row">
             <button
@@ -1385,25 +1424,23 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
             </div>
           </div>
 
-          {/* FIND ROW (same as GridItem) */}
-          <div className="grid-find-row">
-            <span className="grid-find-label">Find:</span>
-            <input
-              className="grid-find-input"
-              type="text"
-              value={findText}
-              onChange={(e) => setFindText(e.target.value)}
-              placeholder="Type to find…"
-            />
-          </div>
 
           {/* SCROLLABLE GRID ONLY */}
           <div className="grid-scroll">
             <div className="grid-content">
-              {Object.entries(elementGrouped).map(([typeElement, elementData], index) => {
-                const currentPage = blockCurrentPages[typeElement] || 1;
-                const totalPages = blockPages[typeElement] || 1;
-                const paginatedElements = elementData.elements.slice(
+              {filteredGroupedEntries.map(([typeElement, elementData], index) => {
+                const q = findText.trim().toLowerCase();
+
+                const filteredElements = !q
+                  ? elementData.elements
+                  : elementData.elements.filter((el) =>
+                    (el.someText ?? "").toLowerCase().includes(q)
+                  );
+
+                const totalPages = Math.max(1, Math.ceil(filteredElements.length / blockRowsPerPage));
+                const currentPage = Math.min(blockCurrentPages[typeElement] || 1, totalPages);
+
+                const paginatedElements = filteredElements.slice(
                   (currentPage - 1) * blockRowsPerPage,
                   currentPage * blockRowsPerPage
                 );
@@ -1414,10 +1451,10 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
                       <div className="block-header-left">
                         <span className="block-order-number">#{index + 1}</span>
                         <span className="block-name">{getInstructionTypeElement(typeElement)}</span>
-                        <span className="block-count">({elementData.elements.length})</span>
+                        <span className="block-count">({filteredElements.length})</span>
                       </div>
 
-                      {elementData.elements.length > blockRowsPerPage && (
+                      {filteredElements.length > blockRowsPerPage && (
                         <div className="bottom-pagination-controls">
                           <button
                             disabled={currentPage === 1}
