@@ -10,6 +10,8 @@ import AlertModal from './components/AlertModal';
 import constructionImage from './assets/construction.png';
 import GridItemComp from './components/GridItemComp';
 import GridItemScannMobile from './components/GridItemScannMobile';
+import ApiTestToolAI from './components/ApiTestToolAI';
+import ApiTestToolAINew from './components/ApiTestToolAINew';
 
 // Initialize the root
 const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
@@ -19,11 +21,11 @@ const App: React.FC = () => {
   const [componentsData, setComponentsData] = useState<ComponentsInstructionsDTO[]>([]);
   const [elementDTO, setElementDTO] = useState<ElementDTO[]>(elementsDTOMockData);
   const [botJobData, setBotJobData] = useState<BotJobData>(botJobMockData);
-  const [socketPort, setSocketPort] = useState<number>(0);
-  const [botJobId, setBotJobId] = useState<number>(0);
+  const [socketPort, setSocketPort] = useState<number>(52967);
+  const [botJobId, setBotJobId] = useState<number>(76);
   const [botJobName, setBotJobName] = useState<string>("");
-  const [homeBanking, setHomeBanking] = useState<number>(0);
-  const [sessionId, setSessionId] = useState<string>(""); // (SENDER: scannerTool) -> scannerGrid-1  -> componentTasks-1 -> mobileScannerGrid 
+  const [homeBanking, setHomeBanking] = useState<number>(46);
+  const [sessionId, setSessionId] = useState<string>("capiApiTestToolAI"); // (SENDER: scannerTool) -> scannerGrid-1  -> componentTasks-1 -> mobileScannerGrid 
   const [errorFlag, setErrorFlag] = useState<boolean>(false)  //(SENDER: insertTool) -> botJobTasks-1 -> componentTasks  
   const [alertImage, setAlertImage] = useState(constructionImage);
   const [alertClass, setAlertClass] = useState('construction-image')
@@ -124,6 +126,28 @@ const App: React.FC = () => {
       )}
       {sessionId && (sessionId.includes("mobileScannerGrid")) && (
         <GridItemScannMobile homeBankingIdInitial={homeBanking} dataDTO={elementDTO} socketPort={socketPort} sessionId={sessionId} botJobIdInitial={botJobId} botJobNameInitial={botJobName} />
+      )}
+
+      {/* ── NEW: ApiTestTool – same props shape as GridItem / GridItemComp ── */}
+      {sessionId && sessionId.includes("apiTestToolAI") && (  // ← NEW
+        <ApiTestToolAI                                         // ← NEW
+          homeBankingIdInitial={homeBanking}                 // ← NEW
+          socketPort={socketPort}                            // ← NEW
+          sessionId={sessionId}                              // ← NEW
+          botJobIdInitial={botJobId}                         // ← NEW
+          botJobNameInitial={botJobName}                     // ← NEW
+        />                                                   // ← NEW
+      )}
+
+      {/* ── Avaloq API Test Simulator ── */}
+      {sessionId && sessionId.includes("capiApiTestToolAI") && (
+        <ApiTestToolAINew
+          homeBankingIdInitial={homeBanking}
+          socketPort={socketPort}
+          sessionId={sessionId}
+          botJobIdInitial={botJobId}
+          botJobNameInitial={botJobName}
+        />
       )}
 
 
