@@ -1,20 +1,21 @@
 import React, { createRef } from "react";
 import { db, ApiSpec, DEFAULT_SPEC, CAT_COLORS } from "./utils";
 import { MethodBadge } from "./AtomComponents";
+import "./capi-upload.scss";
 
 // ═══════════════════════════════════════════════════════════════
 // FILE UPLOAD PANEL  — API spec file loader + spec list
 // ═══════════════════════════════════════════════════════════════
 interface FileUploadPanelProps {
   onSpecLoaded: (spec: ApiSpec) => void;
-  loadedSpecs: ApiSpec[];
-  onDeleteAll: () => void;
+  loadedSpecs:  ApiSpec[];
+  onDeleteAll:  () => void;
 }
 
 interface FileUploadPanelState {
-  drag: boolean;
-  parsing: boolean;
-  results: { ok: boolean; spec: ApiSpec }[];
+  drag:     boolean;
+  parsing:  boolean;
+  results:  { ok: boolean; spec: ApiSpec }[];
   expanded: number | null;
   showDeps: boolean;
 }
@@ -23,15 +24,11 @@ const ACCEPTED_EXTS = [".yaml", ".yml", ".json", ".schema", ".proto", ".pdf"];
 
 export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileUploadPanelState> {
   state: FileUploadPanelState = {
-    drag: false,
-    parsing: false,
-    results: [],
-    expanded: null,
-    showDeps: false,
+    drag: false, parsing: false, results: [], expanded: null, showDeps: false,
   };
 
   private folderRef = createRef<HTMLInputElement>();
-  private fileRef = createRef<HTMLInputElement>();
+  private fileRef   = createRef<HTMLInputElement>();
 
   private processFiles = async (files: FileList | null) => {
     if (!files) return;
@@ -45,7 +42,7 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
       try {
         let content = "";
         if (ext === "pdf") {
-          const buf = await f.arrayBuffer();
+          const buf   = await f.arrayBuffer();
           const bytes = new Uint8Array(buf);
           let text = "";
           for (let i = 0; i < bytes.length; i++) {
@@ -61,17 +58,15 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
         db.loadSpec(spec);
         this.props.onSpecLoaded(spec);
         newResults.push({ ok: !spec.parseError, spec });
-      } catch {
-        // skip
-      }
+      } catch { /* skip */ }
     }
     this.setState(s => ({ parsing: false, results: [...s.results, ...newResults] }));
   };
 
   private getCategory(spec: ApiSpec): string {
-    if (spec.tags?.length) return spec.tags[0];
-    if (spec.resourceName?.includes("addr")) return "Address Management";
-    if (spec.resourceName?.includes("client")) return "Client Management";
+    if (spec.tags?.length)                         return spec.tags[0];
+    if (spec.resourceName?.includes("addr"))       return "Address Management";
+    if (spec.resourceName?.includes("client"))     return "Client Management";
     return "General";
   }
 
@@ -86,9 +81,7 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
       if (!byCat[cat]) byCat[cat] = [];
       byCat[cat].push(s);
     });
-
-    const getCatColor = (cat: string) =>
-      CAT_COLORS[cat] || "#8b949e";
+    const getCatColor = (cat: string) => CAT_COLORS[cat] || "#8b949e";
 
     // Dependency graph
     const depNodes: Record<string, { type: string; endpoints: number; fields: number }> = {};
@@ -103,50 +96,30 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
     });
 
     return (
-      <div style={{ padding: "14px 18px" }}>
-        {/* ── Delete All button ─────────────────────────────────────────── */}
+      <div className="capi-upload">
+
+        {/* Delete All */}
         {loadedSpecs.length > 0 && (
-          <div style={{ marginBottom: 10, display: "flex", justifyContent: "flex-end" }}>
+          <div className="capi-upload__delete-row">
             <button
-              onClick={() => {
-                if (window.confirm("Delete all loaded API files?")) onDeleteAll();
-              }}
-              style={{
-                background: "#2b0d0d",
-                border: "1px solid #f8514966",
-                borderRadius: 5,
-                color: "#f85149",
-                padding: "5px 14px",
-                cursor: "pointer",
-                fontSize: 10,
-                fontFamily: "inherit",
-                fontWeight: 700,
-                display: "flex",
-                alignItems: "center",
-                gap: 5,
-              }}
-              onMouseEnter={e => (e.currentTarget.style.borderColor = "#f85149")}
-              onMouseLeave={e => (e.currentTarget.style.borderColor = "#f8514966")}
+              className="capi-btn-delete"
+              onClick={() => { if (window.confirm("Delete all loaded API files?")) onDeleteAll(); }}
             >
               🗑 Delete All
             </button>
           </div>
         )}
 
-        {/* Upload zone */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+        {/* Upload zones */}
+        <div className="capi-upload__zones">
+          {/* Folder zone */}
           <div
+            className="capi-zone"
             onClick={() => this.folderRef.current?.click()}
-            style={{
-              border: "2px dashed #30363d", borderRadius: 8, padding: 16,
-              textAlign: "center", cursor: "pointer", background: "#0d1117", transition: "border-color .2s",
-            }}
-            onMouseEnter={e => (e.currentTarget.style.borderColor = "#58a6ff")}
-            onMouseLeave={e => (e.currentTarget.style.borderColor = "#30363d")}
           >
-            <div style={{ fontSize: 22, marginBottom: 4 }}>📁</div>
-            <div style={{ fontSize: 11, color: "#e6edf3", fontWeight: 600, marginBottom: 2 }}>Carica Cartella</div>
-            <div style={{ fontSize: 9, color: "#555" }}>yaml yml json schema shape proto pdf</div>
+            <div className="capi-zone__icon">📁</div>
+            <div className="capi-zone__title">Carica Cartella</div>
+            <div className="capi-zone__subtitle">yaml yml json schema shape proto pdf</div>
             <input
               ref={this.folderRef}
               type="file"
@@ -157,21 +130,17 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
             />
           </div>
 
+          {/* Drop zone */}
           <div
-            onDragOver={e => { e.preventDefault(); this.setState({ drag: true }); }}
+            className={`capi-zone${drag ? " capi-zone--dragging" : ""}`}
+            onDragOver={e  => { e.preventDefault(); this.setState({ drag: true }); }}
             onDragLeave={() => this.setState({ drag: false })}
             onDrop={e => { e.preventDefault(); this.setState({ drag: false }); this.processFiles(e.dataTransfer.files); }}
             onClick={() => this.fileRef.current?.click()}
-            style={{
-              border: `2px dashed ${drag ? "#58a6ff" : "#30363d"}`,
-              borderRadius: 8, padding: 16, textAlign: "center",
-              cursor: "pointer", background: drag ? "#0d1e3a22" : "#0d1117",
-              transition: "all .2s",
-            }}
           >
-            <div style={{ fontSize: 22, marginBottom: 4 }}>🗂️</div>
-            <div style={{ fontSize: 11, color: "#e6edf3", fontWeight: 600, marginBottom: 2 }}>Drag & Drop / File</div>
-            <div style={{ fontSize: 9, color: "#555" }}>+ PDF per documentazione API</div>
+            <div className="capi-zone__icon">🗂️</div>
+            <div className="capi-zone__title">Drag &amp; Drop / File</div>
+            <div className="capi-zone__subtitle">+ PDF per documentazione API</div>
             <input
               ref={this.fileRef}
               type="file"
@@ -185,22 +154,12 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
 
         {/* Parse status */}
         {parsing && (
-          <div style={{
-            padding: "6px 12px", background: "#0d1e3a", border: "1px solid #1f6feb44",
-            borderRadius: 5, marginBottom: 10, fontSize: 10, color: "#58a6ff",
-          }}>
-            ⚙ Parsing in corso...
-          </div>
+          <div className="capi-upload__parsing">⚙ Parsing in corso...</div>
         )}
         {results.length > 0 && (
-          <div style={{ marginBottom: 10 }}>
+          <div className="capi-upload__results">
             {results.slice(0, 4).map((r, i) => (
-              <div key={i} style={{
-                padding: "4px 8px", borderRadius: 4, marginBottom: 3,
-                background: r.ok ? "#0d2b0d55" : "#2b0d0d55",
-                border: `1px solid ${r.ok ? "#23862044" : "#f8514944"}`,
-                fontSize: 9, color: r.ok ? "#3fb950" : "#f85149",
-              }}>
+              <div key={i} className={`capi-upload__result capi-upload__result--${r.ok ? "ok" : "err"}`}>
                 {r.ok
                   ? <><b>{r.spec.title}</b> · {r.spec.ext.toUpperCase()} · {r.spec.endpoints.length} endpoints{r.spec.dependencies?.length > 0 ? ` · ${r.spec.dependencies.length} deps` : ""}</>
                   : <>✗ {r.spec.fileName}: {r.spec.parseError}</>
@@ -212,36 +171,28 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
 
         {/* Dependency graph */}
         {loadedSpecs.length > 1 && (
-          <div style={{ marginBottom: 12 }}>
+          <div className="capi-deps">
             <button
+              className="capi-deps__toggle"
               onClick={() => this.setState(s => ({ showDeps: !s.showDeps }))}
-              style={{
-                background: "#161b22", border: "1px solid #30363d", borderRadius: 5,
-                color: "#8b949e", padding: "5px 12px", cursor: "pointer",
-                fontSize: 9, fontFamily: "inherit", fontWeight: 700,
-                width: "100%", textAlign: "left",
-              }}
             >
               {showDeps ? "▲" : "▼"} Grafo Dipendenze API ({depEdges.length} link tra {Object.keys(depNodes).length} risorse)
             </button>
             {showDeps && (
-              <div style={{
-                marginTop: 6, background: "#0d1117",
-                border: "1px solid #21262d", borderRadius: 6, padding: 10,
-              }}>
+              <div className="capi-deps__body">
                 {Object.entries(depNodes).map(([id, node]) => {
-                  const deps = depEdges.filter(e => e.from === id).map(e => e.to);
-                  const usedBy = depEdges.filter(e => e.to === id).map(e => e.from);
+                  const deps   = depEdges.filter(e => e.from === id).map(e => e.to);
+                  const usedBy = depEdges.filter(e => e.to   === id).map(e => e.from);
                   return (
-                    <div key={id} style={{ marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid #21262d22" }}>
-                      <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 3 }}>
-                        <span style={{ fontSize: 9, fontWeight: 700, color: "#e6edf3", fontFamily: "monospace" }}>/{id}</span>
-                        <span style={{ fontSize: 8, background: "#161b22", border: "1px solid #30363d", borderRadius: 2, padding: "0 4px", color: "#555" }}>{node.type}</span>
-                        <span style={{ fontSize: 8, color: "#555" }}>{node.endpoints} ep</span>
-                        {node.fields > 0 && <span style={{ fontSize: 8, color: "#555" }}>{node.fields} fields</span>}
+                    <div key={id} className="capi-deps__row">
+                      <div className="capi-deps__row-meta">
+                        <span className="capi-deps__path">/{id}</span>
+                        <span className="capi-deps__tag">{node.type}</span>
+                        <span className="capi-deps__meta">{node.endpoints} ep</span>
+                        {node.fields > 0 && <span className="capi-deps__meta">{node.fields} fields</span>}
                       </div>
-                      {deps.length > 0 && <div style={{ fontSize: 8, color: "#8b949e", marginLeft: 8 }}>→ dipende da: {deps.map(d => <code key={d} style={{ color: "#e5c07b", marginRight: 4 }}>{d}</code>)}</div>}
-                      {usedBy.length > 0 && <div style={{ fontSize: 8, color: "#8b949e", marginLeft: 8 }}>← usato da: {usedBy.map(d => <code key={d} style={{ color: "#61afef", marginRight: 4 }}>{d}</code>)}</div>}
+                      {deps.length   > 0 && <div className="capi-deps__links">→ dipende da: {deps.map(d   => <code key={d} className="capi-deps__code-y">{d}</code>)}</div>}
+                      {usedBy.length > 0 && <div className="capi-deps__links">← usato da: {usedBy.map(d  => <code key={d} className="capi-deps__code-b">{d}</code>)}</div>}
                     </div>
                   );
                 })}
@@ -250,64 +201,81 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
           </div>
         )}
 
-        {/* Spec list */}
-        <div style={{ fontSize: 9, color: "#8b949e", marginBottom: 8, letterSpacing: 2, textTransform: "uppercase" }}>
+        {/* API list */}
+        <div className="capi-api-label">
           API Caricate ({loadedSpecs.length}) · {Object.values(db.stores).reduce((a, s) => a + s.length, 0)} records
         </div>
+
         {Object.entries(byCat).map(([cat, specs]) => {
           const cc = getCatColor(cat);
           return (
-            <div key={cat} style={{ marginBottom: 10 }}>
-              <div style={{
-                display: "flex", alignItems: "center", gap: 6,
-                marginBottom: 4, paddingBottom: 3, borderBottom: `1px solid ${cc}33`,
-              }}>
-                <span style={{ width: 7, height: 7, borderRadius: "50%", background: cc, display: "inline-block", flexShrink: 0 }} />
-                <span style={{ fontSize: 8, fontWeight: 700, color: cc, letterSpacing: 1, textTransform: "uppercase" }}>{cat}</span>
-                <span style={{ fontSize: 8, color: "#555" }}>{specs.length}</span>
+            <div key={cat} className="capi-api-group">
+              {/* Category header — color dot + name are dynamic */}
+              <div
+                className="capi-api-group__header"
+                style={{ borderBottom: `1px solid ${cc}33` }}
+              >
+                <span className="capi-api-group__dot" style={{ background: cc }} />
+                <span className="capi-api-group__name" style={{ color: cc }}>{cat}</span>
+                <span className="capi-api-group__count">{specs.length}</span>
               </div>
+
               {specs.map((spec, i) => {
                 const gi = loadedSpecs.indexOf(spec);
                 return (
-                  <div key={i} style={{ background: "#0d1117", border: "1px solid #21262d", borderRadius: 5, marginBottom: 3 }}>
+                  <div key={i} className="capi-api-card">
+                    {/* Card header */}
                     <div
-                      style={{ padding: "7px 10px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}
+                      className="capi-api-card__header"
                       onClick={() => this.setState({ expanded: expanded === gi ? null : gi })}
                     >
-                      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                        <span style={{ fontSize: 10, fontWeight: 700, color: "#e6edf3" }}>{spec.title}</span>
-                        <span style={{ fontSize: 8, color: "#555" }}>v{spec.version}</span>
-                        <span style={{ fontSize: 7, background: "#161b22", border: "1px solid #30363d", color: "#555", borderRadius: 2, padding: "0 4px" }}>{spec.ext.toUpperCase()}</span>
-                        {spec.parseError && <span style={{ fontSize: 8, color: "#f85149" }}>⚠</span>}
+                      <div className="capi-api-card__name-row">
+                        <span className="capi-api-card__name">{spec.title}</span>
+                        <span className="capi-api-card__version">v{spec.version}</span>
+                        <span className="capi-api-card__ext">{spec.ext.toUpperCase()}</span>
+                        {spec.parseError && <span className="capi-api-card__warn">⚠</span>}
                       </div>
-                      <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                        {spec.dependencies?.length > 0 && <span style={{ fontSize: 8, color: "#e5c07b" }}>{spec.dependencies.length} deps</span>}
-                        {spec.authSchemes?.length > 0 && <span style={{ fontSize: 8, color: "#c678dd" }}>🔐</span>}
-                        <span style={{ fontSize: 8, color: "#555" }}>{expanded === gi ? "▲" : "▼"}</span>
+                      <div className="capi-api-card__controls">
+                        {spec.dependencies?.length > 0 && <span className="capi-api-card__deps">{spec.dependencies.length} deps</span>}
+                        {spec.authSchemes?.length  > 0 && <span className="capi-api-card__auth">🔐</span>}
+                        <span className="capi-api-card__chevron">{expanded === gi ? "▲" : "▼"}</span>
                       </div>
                     </div>
+
+                    {/* Expanded body */}
                     {expanded === gi && (
-                      <div style={{ padding: "0 10px 8px", borderTop: "1px solid #21262d22" }}>
-                        {spec.description && <div style={{ fontSize: 9, color: "#8b949e", marginBottom: 6, fontStyle: "italic", lineHeight: 1.4 }}>{spec.description.slice(0, 200)}</div>}
-                        {spec.servers?.length > 0 && <div style={{ fontSize: 8, color: "#555", marginBottom: 4 }}>Servers: {spec.servers.map(s => <code key={s} style={{ color: "#e5c07b", marginRight: 4 }}>{s}</code>)}</div>}
-                        <div style={{ fontSize: 8, color: "#555", marginBottom: 4 }}>
-                          Resource: <code style={{ color: "#e5c07b" }}>/{spec.resourceName}</code> · Records: <code style={{ color: "#3fb950" }}>{db.get(spec.resourceName || "").length}</code>
+                      <div className="capi-api-card__body">
+                        {spec.description && (
+                          <div className="capi-api-card__desc">{spec.description.slice(0, 200)}</div>
+                        )}
+                        {spec.servers?.length > 0 && (
+                          <div className="capi-api-card__srv">
+                            Servers: {spec.servers.map(s => <code key={s} className="capi-deps__code-y">{s}</code>)}
+                          </div>
+                        )}
+                        <div className="capi-api-card__res">
+                          Resource: <code className="capi-deps__code-y">/{spec.resourceName}</code>
+                          {" · "}Records: <code className="capi-deps__code-b">{db.get(spec.resourceName || "").length}</code>
                         </div>
+
                         {spec.endpoints.map((ep, j) => (
-                          <div key={j} style={{ display: "flex", gap: 6, alignItems: "center", padding: "2px 0" }}>
+                          <div key={j} className="capi-api-card__ep">
                             <MethodBadge method={ep.method} />
-                            <span style={{ fontSize: 9, color: "#8b949e", fontFamily: "monospace" }}>{ep.path}</span>
-                            {ep.summary && <span style={{ fontSize: 8, color: "#555" }}>— {ep.summary.slice(0, 40)}</span>}
+                            <span>{ep.path}</span>
+                            {ep.summary && <span className="capi-api-card__ep-sum">— {ep.summary.slice(0, 40)}</span>}
                           </div>
                         ))}
+
                         {spec.fields?.length > 0 && (
-                          <div style={{ marginTop: 6 }}>
-                            <div style={{ fontSize: 8, color: "#555", marginBottom: 3 }}>Campi schema ({spec.fields.length}):</div>
-                            <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
+                          <div className="capi-api-card__fields-wrap">
+                            <div className="capi-api-card__fields-label">Campi schema ({spec.fields.length}):</div>
+                            <div className="capi-api-card__fields">
                               {spec.fields.slice(0, 16).map(f => (
-                                <span key={f.name} style={{ fontSize: 7, background: "#161b22", border: "1px solid #30363d", borderRadius: 3, padding: "1px 5px", color: "#8b949e", fontFamily: "monospace" }}>{f.name}</span>
+                                <span key={f.name} className="capi-api-card__field-chip">{f.name}</span>
                               ))}
-                              {spec.fields.length > 16 && <span style={{ fontSize: 7, color: "#555" }}>+{spec.fields.length - 16} altri</span>}
+                              {spec.fields.length > 16 && (
+                                <span className="capi-api-card__more">+{spec.fields.length - 16} altri</span>
+                              )}
                             </div>
                           </div>
                         )}
@@ -328,7 +296,7 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
 // MINIMAL API SPEC PARSER (YAML / JSON / proto)
 // ═══════════════════════════════════════════════════════════════
 function parseApiSpec(fileName: string, content: string, fileType?: string): ApiSpec {
-  const ext = fileType || fileName.split(".").pop()!.toLowerCase();
+  const ext  = fileType || fileName.split(".").pop()!.toLowerCase();
   const spec: ApiSpec = {
     fileName, ext,
     title: fileName.replace(/\.[^.]+$/, ""),
@@ -340,19 +308,19 @@ function parseApiSpec(fileName: string, content: string, fileType?: string): Api
     rawContent: content.slice(0, 5000),
   };
   try {
-    if (["json", "schema", "shape"].includes(ext)) {
+    if (["json","schema","shape"].includes(ext)) {
       let p: any;
       try { p = JSON.parse(content); } catch (e: any) { spec.parseError = "JSON parse: " + e.message; }
       if (p) {
         if (p.openapi || p.swagger) {
-          spec.title = p.info?.title || spec.title;
-          spec.version = p.info?.version || spec.version;
+          spec.title       = p.info?.title       || spec.title;
+          spec.version     = p.info?.version     || spec.version;
           spec.description = p.info?.description || "";
-          spec.servers = (p.servers || []).map((s: any) => s.url);
+          spec.servers     = (p.servers || []).map((s: any) => s.url);
           spec.authSchemes = Object.keys(p.components?.securitySchemes || {});
           for (const [path, ms] of Object.entries(p.paths || {})) {
             for (const [m, op] of Object.entries(ms as any)) {
-              if (["get", "post", "put", "patch", "delete"].includes(m)) {
+              if (["get","post","put","patch","delete"].includes(m)) {
                 spec.endpoints.push({ method: m.toUpperCase(), path, summary: (op as any).summary || "", tags: (op as any).tags || [] });
               }
             }
@@ -360,17 +328,16 @@ function parseApiSpec(fileName: string, content: string, fileType?: string): Api
         }
       }
     }
-    if (["yaml", "yml"].includes(ext)) {
+    if (["yaml","yml"].includes(ext)) {
       const tM = content.match(/^\s*title:\s*["']?([^"'\n\r]+)/m);
       const vM = content.match(/^\s*version:\s*["']?([^"'\n\r]+)/m);
-      if (tM) spec.title = tM[1].trim();
+      if (tM) spec.title   = tM[1].trim();
       if (vM) spec.version = vM[1].trim();
       spec.authSchemes = content.includes("bearerAuth") ? ["Bearer"] : content.includes("apiKey") ? ["ApiKey"] : [];
-      // Extract paths
       const lines = content.split(/\r?\n/);
       let inPaths = false, curPath: string | null = null;
       for (const l of lines) {
-        if (/^paths:/.test(l)) { inPaths = true; continue; }
+        if (/^paths:/.test(l))                            { inPaths = true;  continue; }
         if (inPaths && /^[a-zA-Z]/.test(l) && !/^  /.test(l)) inPaths = false;
         if (!inPaths) continue;
         const pM = l.match(/^  (\/[^:\s#]+):\s*$/);
@@ -383,7 +350,6 @@ function parseApiSpec(fileName: string, content: string, fileType?: string): Api
       spec.endpoints = [...content.matchAll(/rpc\s+(\w+)\s*\(([^)]+)\)\s*returns\s*\(([^)]+)\)/g)]
         .map(m => ({ method: "RPC", path: m[1], summary: `${m[1]}(${m[2]})->${m[3]}` }));
     }
-    // Guess resource name
     for (const e of spec.endpoints) {
       const m = e.path?.match(/^\/(\w[\w-]*)/);
       if (m) { spec.resourceName = m[1]; break; }

@@ -1,5 +1,6 @@
 import React, { createRef } from "react";
 import { MethodBadge, StatusBadge, JsonBlock } from "./AtomComponents";
+import "./capi-debug.scss";
 
 // ═══════════════════════════════════════════════════════════════
 // DEBUG TAB  — shows all REST + AI log entries
@@ -31,106 +32,101 @@ export class DebugTab extends React.Component<DebugTabProps> {
   }
 
   private entryColor(type: string): string {
-    if (type === "rest_request") return "#e5c07b";
+    if (type === "rest_request")  return "#e5c07b";
     if (type === "rest_response") return "#98c379";
-    if (type.startsWith("ai")) return "#61afef";
-    if (type === "error") return "#e06c75";
-    if (type === "complete") return "#3fb950";
+    if (type.startsWith("ai"))   return "#61afef";
+    if (type === "error")        return "#e06c75";
+    if (type === "complete")     return "#3fb950";
     return "#c678dd";
   }
 
   render() {
     const { log, onClear } = this.props;
     return (
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        <div style={{
-          padding: "6px 18px", borderBottom: "1px solid #21262d",
-          display: "flex", gap: 8, alignItems: "center", background: "#0d1117",
-        }}>
-          <span style={{ fontSize: 9, color: "#8b949e" }}>{log.length} entries</span>
-          <button onClick={onClear} style={{
-            background: "none", border: "1px solid #30363d", borderRadius: 4,
-            color: "#8b949e", padding: "3px 8px", cursor: "pointer",
-            fontSize: 9, fontFamily: "inherit",
-          }}>
-            CLEAR
-          </button>
+      <div className="capi-debug">
+        {/* Toolbar */}
+        <div className="capi-debug__toolbar">
+          <span className="capi-debug__count">{log.length} entries</span>
+          <button className="capi-debug__clear" onClick={onClear}>CLEAR</button>
         </div>
 
-        <div style={{ flex: 1, overflowY: "auto", padding: "8px 18px" }}>
+        {/* Body */}
+        <div className="capi-debug__body">
           {log.length === 0 && (
-            <div style={{ color: "#30363d", textAlign: "center", padding: 36, fontSize: 11 }}>
-              Nessun log. Usa la Chat.
-            </div>
+            <div className="capi-debug__empty">Nessun log. Usa la Chat.</div>
           )}
+
           {log.map((e, i) => {
             const clr = this.entryColor(e.type);
             return (
-              <div key={i} style={{
-                marginBottom: 7, borderLeft: `3px solid ${clr}`,
-                paddingLeft: 9, paddingTop: 3, paddingBottom: 3,
-              }}>
-                <div style={{
-                  display: "flex", gap: 7, alignItems: "center",
-                  marginBottom: 2, flexWrap: "wrap",
-                }}>
-                  <span style={{ fontSize: 8, color: "#555" }}>
+              <div
+                key={i}
+                className="capi-debug__entry"
+                style={{ borderLeftColor: clr }}
+              >
+                {/* Meta row */}
+                <div className="capi-debug__entry-meta">
+                  <span className="capi-debug__entry-ts">
                     {e.ts?.split("T")[1]?.split(".")[0]}
                   </span>
-                  <span style={{
-                    fontSize: 8, fontWeight: 700, letterSpacing: 1, color: clr,
-                  }}>
+                  <span
+                    className="capi-debug__entry-type"
+                    style={{ color: clr }}
+                  >
                     {e.type.toUpperCase().replace(/_/g, " ")}
                   </span>
                   {e.method && <MethodBadge method={e.method} />}
-                  {e.path && (
-                    <span style={{ fontSize: 9, color: "#8b949e", fontFamily: "monospace" }}>{e.path}</span>
-                  )}
+                  {e.path   && <span className="capi-debug__entry-path">{e.path}</span>}
                   {e.status !== undefined && <StatusBadge status={e.status} />}
                 </div>
+
+                {/* Content */}
                 {e.content && (
-                  <div style={{ fontSize: 10, color: "#c9d1d9", marginBottom: 3 }}>{e.content}</div>
+                  <div className="capi-debug__entry-content">{e.content}</div>
                 )}
                 {e.description && (
-                  <div style={{ fontSize: 9, color: "#8b949e", fontStyle: "italic", marginBottom: 3 }}>
-                    {e.description}
-                  </div>
+                  <div className="capi-debug__entry-desc">{e.description}</div>
                 )}
+
+                {/* Params */}
                 {e.params && Object.keys(e.params).length > 0 && (
-                  <div style={{ marginBottom: 3 }}>
-                    <div style={{ fontSize: 8, color: "#555", marginBottom: 2 }}>PARAMS</div>
+                  <div className="capi-debug__section">
+                    <div className="capi-debug__section-label">PARAMS</div>
                     <JsonBlock data={e.params} />
                   </div>
                 )}
+
+                {/* Body */}
                 {e.body !== undefined && e.body !== null && (
-                  <div style={{ marginBottom: 3 }}>
-                    <div style={{ fontSize: 8, color: "#555", marginBottom: 2 }}>
+                  <div className="capi-debug__section">
+                    <div className="capi-debug__section-label">
                       {e.type === "rest_response" ? "RESPONSE" : "BODY"}
                     </div>
                     <JsonBlock data={e.body} />
                   </div>
                 )}
+
+                {/* Headers */}
                 {e.headers && (
-                  <div style={{ marginBottom: 3 }}>
-                    <div style={{ fontSize: 8, color: "#555", marginBottom: 2 }}>HEADERS</div>
+                  <div className="capi-debug__section">
+                    <div className="capi-debug__section-label">HEADERS</div>
                     <JsonBlock data={e.headers} />
                   </div>
                 )}
+
+                {/* Planned actions */}
                 {e.actions && (
                   <div>
-                    <div style={{ fontSize: 8, color: "#555", marginBottom: 3 }}>
+                    <div className="capi-debug__planned-label">
                       PLANNED ({e.actions.length})
                     </div>
                     {e.actions.map((a, j) => (
-                      <div key={j} style={{
-                        display: "flex", gap: 6, alignItems: "center",
-                        padding: "2px 0", fontSize: 10, color: "#8b949e",
-                      }}>
-                        <span style={{ color: "#444" }}>{j + 1}.</span>
+                      <div key={j} className="capi-debug__action-row">
+                        <span className="capi-debug__action-num">{j + 1}.</span>
                         <MethodBadge method={a.method} />
-                        <span style={{ fontFamily: "monospace" }}>{a.path}</span>
+                        <span className="capi-debug__action-path">{a.path}</span>
                         {a.description && (
-                          <span style={{ color: "#444", fontSize: 9 }}>— {a.description}</span>
+                          <span className="capi-debug__action-desc">— {a.description}</span>
                         )}
                       </div>
                     ))}

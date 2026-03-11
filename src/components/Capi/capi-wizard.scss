@@ -1,0 +1,398 @@
+// capi-wizard.scss
+// ─────────────────────────────────────────────────────────────────────────────
+// Styles for BizWizard modal
+// Dynamic category colors (CAT_COLORS) are kept as inline style on elements.
+// Everything else is SCSS.
+// ─────────────────────────────────────────────────────────────────────────────
+
+@import 'capi-tokens';
+
+// ── Overlay ───────────────────────────────────────────────────────────────────
+
+.capi-wizard-overlay {
+  position:        fixed;
+  inset:           0;
+  background:      rgba(0, 0, 0, .6);
+  z-index:         100;
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+}
+
+// ── Modal container ───────────────────────────────────────────────────────────
+
+.capi-wizard {
+  background:     var(--cs-bg, #0d1117);
+  border:         1px solid var(--cs-border-2, #30363d);
+  border-radius:  12px;
+  width:          min(560px, 95vw);
+  max-height:     88vh;
+  display:        flex;
+  flex-direction: column;
+  overflow:       hidden;
+}
+
+// ── Header ────────────────────────────────────────────────────────────────────
+
+.capi-wizard__header {
+  padding:       14px 18px;
+  background:    linear-gradient(90deg, var(--cs-bg, #0d1117), var(--cs-surface, #161b22));
+  border-bottom: 1px solid var(--cs-border, #21262d);
+  display:       flex;
+  align-items:   center;
+  gap:           10px;
+  flex-shrink:   0;
+}
+
+.capi-wizard__header-icon { font-size: 16px; }
+
+.capi-wizard__titles { flex: 1; }
+
+.capi-wizard__title {
+  font-size:     12px;
+  font-weight:   700;
+  color:         var(--cs-text, #e6edf3);
+  margin-bottom: 2px;
+}
+
+.capi-wizard__subtitle {
+  font-size: 9px;
+  color:     var(--cs-text2, #8b949e);
+}
+
+.capi-wizard__close {
+  margin-left:    auto;
+  background:     none;
+  border:         1px solid rgba(255, 255, 255, .2);
+  border-radius:  5px;
+  color:          var(--cs-text, #e6edf3);
+  cursor:         pointer;
+  font-size:      14px;
+  width:          28px;
+  height:         28px;
+  display:        flex;
+  align-items:    center;
+  justify-content: center;
+  flex-shrink:    0;
+  transition:     border-color .15s, background .15s;
+
+  &:hover {
+    border-color: var(--cs-red, #f85149);
+    background:   rgba(248, 81, 73, .08);
+  }
+}
+
+// ── Scrollable body ───────────────────────────────────────────────────────────
+
+.capi-wizard__body {
+  flex:       1;
+  overflow-y: auto;
+  padding:    16px;
+}
+
+// ── Category filter bar ───────────────────────────────────────────────────────
+
+.capi-wizard-cats {
+  display:       flex;
+  gap:           6px;
+  flex-wrap:     wrap;
+  margin-bottom: 12px;
+}
+
+.capi-wizard-cat-btn {
+  padding:       4px 10px;
+  background:    none;
+  border:        1px solid var(--cs-border-2, #30363d);
+  border-radius: 4px;
+  color:         var(--cs-dim-text, #555);
+  cursor:        pointer;
+  font-size:     9px;
+  font-family:   inherit;
+  font-weight:   600;
+  transition:    border-color .15s, color .15s;
+  // active state: borderColor + color set inline (per CAT_COLORS)
+}
+
+// ── Case list ─────────────────────────────────────────────────────────────────
+
+.capi-wizard-cases {
+  display:        flex;
+  flex-direction: column;
+  gap:            8px;
+}
+
+.capi-wizard-case {
+  background:    var(--cs-body-bg, #0a0e17);
+  border:        1px solid var(--cs-border, #21262d);
+  border-radius: 8px;
+  padding:       12px 14px;
+  cursor:        pointer;
+  transition:    border-color .2s;
+  // hover borderColor set inline (per CAT_COLORS)
+}
+
+.capi-wizard-case__row {
+  display:     flex;
+  gap:         8px;
+  align-items: flex-start;
+}
+
+.capi-wizard-case__icon { font-size: 18px; }
+.capi-wizard-case__info { flex: 1; }
+.capi-wizard-case__step-count {
+  font-size:  9px;
+  color:      var(--cs-dim-text, #555);
+  flex-shrink: 0;
+}
+
+.capi-wizard-case__title {
+  font-size:     11px;
+  font-weight:   700;
+  color:         var(--cs-text, #e6edf3);
+  margin-bottom: 3px;
+}
+
+.capi-wizard-case__desc {
+  font-size:   9px;
+  color:       var(--cs-text2, #8b949e);
+  line-height: 1.5;
+}
+
+.capi-wizard-case__tags {
+  display:    flex;
+  gap:        4px;
+  margin-top: 6px;
+  flex-wrap:  wrap;
+}
+
+// cat tag: bg/border/color inline (dynamic)
+.capi-wizard-case__tag {
+  font-size:     7px;
+  border-radius: 3px;
+  padding:       1px 5px;
+  border:        1px solid transparent;
+}
+
+.capi-wizard-case__tag--risk-high {
+  background:   rgba(248, 81, 73, .13);
+  border-color: rgba(248, 81, 73, .27);
+  color:        var(--cs-red, #f85149);
+}
+
+.capi-wizard-case__tag--risk-low {
+  background:   var(--cs-surface, #21262d);
+  border-color: transparent;
+  color:        var(--cs-dim-text, #555);
+}
+
+.capi-wizard-case__tag--domain {
+  background:   var(--cs-surface, #161b22);
+  border-color: var(--cs-border, #21262d);
+  color:        var(--cs-dim-text, #555);
+}
+
+// ── Configure step ────────────────────────────────────────────────────────────
+
+.capi-wizard-config {
+  display:        flex;
+  flex-direction: column;
+  gap:            14px;
+}
+
+.capi-wizard-config-info {
+  padding:       10px 14px;
+  background:    var(--cs-body-bg, #0a0e17);
+  border:        1px solid var(--cs-border, #21262d);
+  border-radius: 7px;
+}
+
+.capi-wizard-config-info__title {
+  font-size:     11px;
+  font-weight:   700;
+  color:         var(--cs-text, #e6edf3);
+  margin-bottom: 4px;
+}
+
+.capi-wizard-config-info__desc {
+  font-size: 9px;
+  color:     var(--cs-text2, #8b949e);
+}
+
+// ── Form fields ───────────────────────────────────────────────────────────────
+
+.capi-wizard-field__label {
+  font-size:      9px;
+  color:          var(--cs-text2, #8b949e);
+  display:        block;
+  margin-bottom:  4px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.capi-wizard-field__input,
+.capi-wizard-field__select {
+  width:         100%;
+  background:    var(--cs-surface, #161b22);
+  border:        1px solid var(--cs-border-2, #30363d);
+  color:         var(--cs-text, #e6edf3);
+  border-radius: 5px;
+  padding:       7px 10px;
+  font-size:     11px;
+  font-family:   inherit;
+  outline:       none;
+  box-sizing:    border-box;
+  transition:    border-color .15s;
+
+  &:focus { border-color: var(--cs-accent, #58a6ff); }
+}
+
+// ── Action buttons ────────────────────────────────────────────────────────────
+
+.capi-wizard-actions {
+  display: flex;
+  gap:     8px;
+}
+
+.capi-wizard-btn {
+  border-radius: 6px;
+  padding:       10px;
+  cursor:        pointer;
+  font-size:     11px;
+  font-family:   inherit;
+  transition:    background .15s, border-color .15s;
+
+  &--back, &--new {
+    flex:       1;
+    background: none;
+    border:     1px solid var(--cs-border-2, #30363d);
+    color:      var(--cs-text2, #8b949e);
+    &:hover { border-color: var(--cs-text2); color: var(--cs-text); }
+  }
+
+  &--run, &--rerun {
+    flex:        2;
+    background:  linear-gradient(135deg, #0a1628, #0d2347);
+    border:      2px solid var(--cs-green, #3fb950);
+    color:       var(--cs-green, #3fb950);
+    font-weight: 700;
+    &:hover { background: linear-gradient(135deg, #0d1e3a, #102d5a); }
+  }
+
+  &--rerun { flex: 1; }
+}
+
+// ── Running header ────────────────────────────────────────────────────────────
+
+.capi-wizard-running-header {
+  text-align: center;
+  padding:    20px 0 14px;
+}
+
+.capi-wizard-running-icon  { font-size: 32px; margin-bottom: 8px; }
+.capi-wizard-running-title {
+  font-size:     13px;
+  font-weight:   700;
+  color:         var(--cs-text, #e6edf3);
+  margin-bottom: 4px;
+}
+
+// ── Step rows (running + results) ─────────────────────────────────────────────
+
+.capi-wizard-steps {
+  display:        flex;
+  flex-direction: column;
+  gap:            4px;
+}
+
+.capi-wizard-step {
+  display:       flex;
+  gap:           8px;
+  align-items:   center;
+  padding:       7px 10px;
+  background:    var(--cs-bg, #0d1117);
+  border:        1px solid transparent;
+  border-left:   3px solid transparent;
+  border-radius: 5px;
+
+  &--running {
+    border-color:      rgba(210, 153, 34, .2);
+    border-left-color: #d29922;
+    .capi-wizard-step__label { color: #d29922; }
+  }
+  &--ok {
+    border-color:      rgba(63,  185, 80, .2);
+    border-left-color: #3fb950;
+    .capi-wizard-step__label { color: #3fb950; }
+  }
+  &--fail {
+    border-color:      rgba(248, 81, 73, .2);
+    border-left-color: #f85149;
+    .capi-wizard-step__label { color: #f85149; }
+  }
+
+  &__num   { font-size: 9px; color: var(--cs-dim-text, #555); width: 16px; flex-shrink: 0; }
+  &__icon  { font-size: 16px; }
+  &__label { font-size: 10px; flex: 1; transition: color .15s; }
+  &__lat   { font-size: 9px; color: var(--cs-dim-text, #555); }
+}
+
+// ── Results summary stats ─────────────────────────────────────────────────────
+
+.capi-wizard-results {
+  display:        flex;
+  flex-direction: column;
+  gap:            12px;
+}
+
+.capi-wizard-stats {
+  display:               grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap:                   8px;
+
+  @media (max-width: 400px) { grid-template-columns: repeat(2, 1fr); }
+}
+
+.capi-wizard-stat {
+  border-radius: 8px;
+  padding:       12px;
+  text-align:    center;
+  border:        1px solid transparent;
+
+  &--ok      { background: var(--cs-green-bg, #0d2b0d);  border-color: rgba(63,  185, 80,  .2); }
+  &--fail    { background: var(--cs-red-bg, #2b0d0d);    border-color: rgba(248, 81,  73,  .2); }
+  &--total   { background: var(--cs-blue-badge-bg, #0d1e3a); border-color: rgba(88, 166, 255, .2); }
+  &--latency { background: var(--cs-yellow-bg, #2b1f0d); border-color: rgba(210, 153, 34,  .2); }
+
+  &--ok      .capi-wizard-stat__value,
+  &--ok      .capi-wizard-stat__label  { color: var(--cs-green, #3fb950); }
+  &--fail    .capi-wizard-stat__value,
+  &--fail    .capi-wizard-stat__label  { color: var(--cs-red, #f85149); }
+  &--total   .capi-wizard-stat__value,
+  &--total   .capi-wizard-stat__label  { color: var(--cs-accent, #58a6ff); }
+  &--latency .capi-wizard-stat__value,
+  &--latency .capi-wizard-stat__label  { color: var(--cs-yellow, #d29922); }
+}
+
+.capi-wizard-stat__value {
+  font-size:     22px;
+  font-weight:   700;
+  margin-bottom: 2px;
+}
+
+.capi-wizard-stat__label {
+  font-size:      8px;
+  opacity:        .7;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.capi-wizard-result-list {
+  display:        flex;
+  flex-direction: column;
+  gap:            4px;
+}
+
+.capi-wizard-result-actions {
+  display: flex;
+  gap:     8px;
+}

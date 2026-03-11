@@ -1,19 +1,19 @@
 // capi-tokens.scss
-// ─────────────────────────────────────────────────────────────────────────────
 // CSS Custom Properties for CAPI — light (default) and dark themes.
 // Applied on [data-capi-theme] set by CapiShell on the root wrapper.
 // ALL components reference these vars so the full app responds to theme.
-// ─────────────────────────────────────────────────────────────────────────────
 
 [data-capi-theme="light"] {
   // ── Shell chrome ──────────────────────────────────────────────────────────
   --cs-bg:              #ffffff;
   --cs-surface:         #f1f5f9;
   --cs-border:          #cbd5e1;
+  --cs-border-2:        #e5e7eb;
   --cs-text:            #0f172a;
   --cs-text2:           #334155;
   --cs-muted:           #64748b;
   --cs-dim:             #94a3b8;
+  --cs-dim-text:        #9ca3af;
   --cs-accent:          #2563eb;
   --cs-accent-bg:       #eff6ff;
   --cs-accent-border:   #bfdbfe;
@@ -21,6 +21,7 @@
   // ── App body ──────────────────────────────────────────────────────────────
   --cs-body-bg:         #f8fafc;
   --cs-body-text:       #1e293b;
+  --cs-deep-bg:         #f0f9ff;
   --cs-header-bg:       linear-gradient(90deg, #f1f5f9, #e8edf4);
   --cs-header-border:   #cbd5e1;
   --cs-tabs-bg:         #ffffff;
@@ -62,6 +63,8 @@
   --cs-code-text:       #b45309;
   --cs-code-blue:       #1d4ed8;
   --cs-code-green:      #15803d;
+  --cs-json-bg:         #f8fafc;
+  --cs-json-text:       #15803d;
 }
 
 [data-capi-theme="dark"] {
@@ -69,10 +72,12 @@
   --cs-bg:              #0d1117;
   --cs-surface:         #161b22;
   --cs-border:          #21262d;
+  --cs-border-2:        #30363d;
   --cs-text:            #e6edf3;
   --cs-text2:           #8b949e;
   --cs-muted:           #6e7681;
   --cs-dim:             #484f58;
+  --cs-dim-text:        #555555;
   --cs-accent:          #58a6ff;
   --cs-accent-bg:       rgba(88, 166, 255, .09);
   --cs-accent-border:   rgba(88, 166, 255, .28);
@@ -80,6 +85,7 @@
   // ── App body ──────────────────────────────────────────────────────────────
   --cs-body-bg:         #0a0e17;
   --cs-body-text:       #c9d1d9;
+  --cs-deep-bg:         #070b12;
   --cs-header-bg:       linear-gradient(90deg, #0d1117, #161b22);
   --cs-header-border:   #21262d;
   --cs-tabs-bg:         #0d1117;
@@ -121,4 +127,6 @@
   --cs-code-text:       #e5c07b;
   --cs-code-blue:       #61afef;
   --cs-code-green:      #98c379;
+  --cs-json-bg:         #070b12;
+  --cs-json-text:       #98c379;
 }

@@ -1,0 +1,138 @@
+// capi-debug.scss
+// ─────────────────────────────────────────────────────────────────────────────
+// Styles for DebugTab
+// ─────────────────────────────────────────────────────────────────────────────
+
+@import 'capi-tokens';
+
+.capi-debug {
+  flex:           1;
+  display:        flex;
+  flex-direction: column;
+  overflow:       hidden;
+}
+
+// ── Toolbar ───────────────────────────────────────────────────────────────────
+
+.capi-debug__toolbar {
+  padding:       6px 18px;
+  border-bottom: 1px solid var(--cs-border, #21262d);
+  display:       flex;
+  gap:           8px;
+  align-items:   center;
+  background:    var(--cs-bg, #0d1117);
+  flex-shrink:   0;
+}
+
+.capi-debug__count {
+  font-size: 9px;
+  color:     var(--cs-text2, #8b949e);
+}
+
+.capi-debug__clear {
+  background:    none;
+  border:        1px solid var(--cs-border-2, #30363d);
+  border-radius: 4px;
+  color:         var(--cs-text2, #8b949e);
+  padding:       3px 8px;
+  cursor:        pointer;
+  font-size:     9px;
+  font-family:   inherit;
+  transition:    border-color .15s, color .15s;
+
+  &:hover {
+    border-color: var(--cs-accent, #58a6ff);
+    color:        var(--cs-text, #e6edf3);
+  }
+}
+
+// ── Scrollable body ───────────────────────────────────────────────────────────
+
+.capi-debug__body {
+  flex:       1;
+  overflow-y: auto;
+  padding:    8px 18px;
+}
+
+.capi-debug__empty {
+  color:      var(--cs-dim, #484f58);
+  text-align: center;
+  padding:    36px 0;
+  font-size:  11px;
+}
+
+// ── Log entry ─────────────────────────────────────────────────────────────────
+
+.capi-debug__entry {
+  margin-bottom:  7px;
+  padding-left:   9px;
+  padding-top:    3px;
+  padding-bottom: 3px;
+  border-left:    3px solid transparent; // color set inline (dynamic per type)
+}
+
+.capi-debug__entry-meta {
+  display:       flex;
+  gap:           7px;
+  align-items:   center;
+  margin-bottom: 2px;
+  flex-wrap:     wrap;
+}
+
+.capi-debug__entry-ts {
+  font-size: 8px;
+  color:     var(--cs-dim-text, #555);
+}
+
+.capi-debug__entry-type {
+  font-size:      8px;
+  font-weight:    700;
+  letter-spacing: 1px;
+  // color set inline (dynamic per entry type)
+}
+
+.capi-debug__entry-path {
+  font-size:   9px;
+  color:       var(--cs-text2, #8b949e);
+  font-family: monospace;
+}
+
+.capi-debug__entry-content {
+  font-size:     10px;
+  color:         var(--cs-body-text, #c9d1d9);
+  margin-bottom: 3px;
+}
+
+.capi-debug__entry-desc {
+  font-size:     9px;
+  color:         var(--cs-text2, #8b949e);
+  font-style:    italic;
+  margin-bottom: 3px;
+  line-height:   1.4;
+}
+
+// ── Section label (PARAMS / BODY / HEADERS) ───────────────────────────────────
+
+.capi-debug__section       { margin-bottom: 3px; }
+.capi-debug__section-label { font-size: 8px; color: var(--cs-dim-text, #555); margin-bottom: 2px; }
+
+// ── Planned actions ───────────────────────────────────────────────────────────
+
+.capi-debug__planned-label {
+  font-size:     8px;
+  color:         var(--cs-dim-text, #555);
+  margin-bottom: 3px;
+}
+
+.capi-debug__action-row {
+  display:     flex;
+  gap:         6px;
+  align-items: center;
+  padding:     2px 0;
+  font-size:   10px;
+  color:       var(--cs-text2, #8b949e);
+}
+
+.capi-debug__action-num  { color: #444; }
+.capi-debug__action-path { font-family: monospace; }
+.capi-debug__action-desc { color: #444; font-size: 9px; }

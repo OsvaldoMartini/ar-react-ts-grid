@@ -1,0 +1,100 @@
+// capi-atoms.scss
+// ─────────────────────────────────────────────────────────────────────────────
+// Styles for AtomComponents: MethodBadge, StatusBadge, JsonBlock, ResultRow
+// ─────────────────────────────────────────────────────────────────────────────
+
+@import 'capi-tokens';
+
+// ── Method Badge ─────────────────────────────────────────────────────────────
+
+.capi-method-badge {
+  font-size:      8px;
+  font-weight:    700;
+  letter-spacing: 1px;
+  border-radius:  3px;
+  padding:        1px 5px;
+  flex-shrink:    0;
+  border:         1px solid transparent;
+
+  &--get    { color: #3fb950; background: rgba(63,  185, 80,  .13); border-color: rgba(63,  185, 80,  .4); }
+  &--post   { color: #58a6ff; background: rgba(88,  166, 255, .13); border-color: rgba(88,  166, 255, .4); }
+  &--patch,
+  &--put    { color: #d29922; background: rgba(210, 153, 34,  .13); border-color: rgba(210, 153, 34,  .4); }
+  &--delete { color: #f85149; background: rgba(248, 81,  73,  .13); border-color: rgba(248, 81,  73,  .4); }
+  &--rpc    { color: #c678dd; background: rgba(198, 120, 221, .13); border-color: rgba(198, 120, 221, .4); }
+  &--default{ color: #8b949e; background: rgba(139, 148, 158, .13); border-color: rgba(139, 148, 158, .4); }
+}
+
+// ── Status Badge ──────────────────────────────────────────────────────────────
+
+.capi-status-badge {
+  font-size:     9px;
+  font-weight:   700;
+  border-radius: 3px;
+  padding:       1px 5px;
+  flex-shrink:   0;
+  border:        1px solid transparent;
+
+  &--ok      { color: #3fb950; background: rgba(63,  185, 80,  .13); border-color: rgba(63,  185, 80,  .27); }
+  &--warn    { color: #d29922; background: rgba(210, 153, 34,  .13); border-color: rgba(210, 153, 34,  .27); }
+  &--error   { color: #f85149; background: rgba(248, 81,  73,  .13); border-color: rgba(248, 81,  73,  .27); }
+  &--default { color: #8b949e; background: rgba(139, 148, 158, .13); border-color: rgba(139, 148, 158, .27); }
+}
+
+// ── JSON Block ────────────────────────────────────────────────────────────────
+
+.capi-json-block {
+  margin:        0;
+  font-size:     9px;
+  line-height:   1.6;
+  color:         var(--cs-json-text, #98c379);
+  background:    var(--cs-json-bg, #070b12);
+  border:        1px solid var(--cs-border, #21262d);
+  border-radius: 4px;
+  padding:       6px 8px;
+  overflow-x:    auto;
+  overflow-y:    auto;
+  font-family:   'IBM Plex Mono', 'Courier New', monospace;
+}
+
+// ── Result Row ────────────────────────────────────────────────────────────────
+
+.capi-result-row {
+  background:    var(--cs-bg, #0d1117);
+  border-radius: 6px;
+  overflow:      hidden;
+  border:        1px solid transparent;
+  border-left:   3px solid transparent;
+
+  &--ok   {
+    border-color:      rgba(63,  185, 80, .2);
+    border-left-color: #3fb950;
+  }
+  &--fail {
+    border-color:      rgba(248, 81, 73, .2);
+    border-left-color: #f85149;
+  }
+}
+
+.capi-result-row__header {
+  display:     flex;
+  gap:         8px;
+  align-items: center;
+  padding:     8px 10px;
+  cursor:      pointer;
+  user-select: none;
+}
+
+.capi-result-row__icon    { font-size: 12px; }
+.capi-result-row__step    { font-size: 9px;  color: var(--cs-dim-text, #555); width: 18px; flex-shrink: 0; }
+.capi-result-row__label   { font-size: 10px; color: var(--cs-text, #e6edf3); flex: 1; }
+.capi-result-row__latency { font-size: 9px;  color: var(--cs-dim-text, #555); }
+.capi-result-row__chevron { font-size: 9px;  color: var(--cs-border-2, #30363d); }
+
+.capi-result-row__body {
+  padding:    8px 10px;
+  border-top: 1px solid rgba(33, 38, 45, .13);
+}
+
+.capi-result-row__section       { margin-top: 6px; }
+.capi-result-row__section-label { font-size: 8px; color: var(--cs-dim-text, #555); margin-bottom: 3px; }
