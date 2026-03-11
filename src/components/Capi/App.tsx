@@ -1,10 +1,10 @@
 import React from "react";
-import { db, rest, SYNTH, ApiSpec, DEFAULT_SPEC } from "./utils";
+import { db, rest, SYNTH, ApiSpec } from "./utils";
 import { FileUploadPanel } from "./FileUploadPanel";
-import { ChatTab, ChatMessage } from "./ChatTab";
 import { DebugTab, LogEntry } from "./DebugTab";
 import { StoreTab } from "./StoreTab";
 import { BizWizard } from "./BizWizard";
+import { LanguagePicker } from "./LanguagePicker";
 
 // ═══════════════════════════════════════════════════════════════
 // SHARED PROPS — matches the shape used by GridItem, GridItemComp,
@@ -24,15 +24,11 @@ export interface CapiProps {
 // ═══════════════════════════════════════════════════════════════
 
 interface AppState {
-  tab: "apis" | "chat" | "debug" | "store";
+  tab: "apis" | "debug" | "store";
   specs: ApiSpec[];
-  history: ChatMessage[];
   log: LogEntry[];
   loading: boolean;
   showWizard: boolean;
-  showReport: boolean;
-  provider: string;
-  ollamaUrl: string;
   tick: number;
   // runtime values synced from props (may be updated later via receiveDataFromJava)
   homeBankingId: number;
@@ -49,14 +45,10 @@ export default class App extends React.Component<CapiProps, AppState> {
     super(props);
     this.state = {
       tab: "apis",
-      specs: [DEFAULT_SPEC],
-      history: [],
+      specs: [],
       log: [],
       loading: false,
       showWizard: false,
-      showReport: false,
-      provider: "anthropic",
-      ollamaUrl: "http://localhost:11434",
       tick: 0,
       homeBankingId: props.homeBankingIdInitial,
       socketPortLive: props.socketPort,
@@ -66,12 +58,6 @@ export default class App extends React.Component<CapiProps, AppState> {
     };
   }
 
-  componentDidMount() {
-    db.loadSpec(DEFAULT_SPEC);
-  }
-
-  // When the parent re-renders with updated props (e.g. after receiveDataFromJava),
-  // sync the live values into local state.
   componentDidUpdate(prevProps: CapiProps) {
     const { homeBankingIdInitial, socketPort, sessionId, botJobIdInitial, botJobNameInitial } = this.props;
     if (
@@ -91,94 +77,6 @@ export default class App extends React.Component<CapiProps, AppState> {
     }
   }
 
-  // ── AI call (Claude API via fetch) ──────────────────────────
-  private callAI = async (
-    userMsg: string,
-    history: ChatMessage[]
-  ): Promise<{ thought: string; actions: any[]; finalMessage: string }> => {
-    const { provider, ollamaUrl, specs } = this.state;
-    const specsSummary = specs
-      .map(s => `API: ${s.title} | Endpoints: ${s.endpoints.map(e => `${e.method} ${e.path}`).join(", ")}`)
-      .join("\n");
-
-    const systemPrompt = `Sei un assistente Avaloq API. Hai accesso a queste API:\n${specsSummary}\n\nRisorse disponibili: ${Object.keys(db.stores).join(", ") || "obj-addrs"}\n\nRispondi SOLO con JSON valido:\n{"thought":"ragionamento breve","actions":[{"method":"GET|POST|PATCH|DELETE","path":"/resource[/id]","body":null,"params":{},"description":""}],"finalMessage":"risposta utente"}`;
-
-    const messages = [
-      ...history.slice(-6).map(m => ({ role: m.role, content: m.content })),
-      { role: "user", content: userMsg },
-    ];
-
-    let rawText = "";
-
-    if (provider === "ollama") {
-      const resp = await fetch(`${ollamaUrl}/api/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "qwen2.5:14b", messages: [{ role: "system", content: systemPrompt }, ...messages], stream: false }),
-      });
-      const d = await resp.json();
-      rawText = d.message?.content || "";
-    } else {
-      const resp = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          system: systemPrompt,
-          messages,
-        }),
-      });
-      const d = await resp.json();
-      rawText = d.content?.[0]?.text || "";
-    }
-
-    try {
-      return JSON.parse(rawText.replace(/```json|```/g, "").trim());
-    } catch {
-      return {
-        thought: "Parsed fallback",
-        actions: [],
-        finalMessage: rawText || "Risposta AI ricevuta.",
-      };
-    }
-  };
-
-  // ── Send chat message ────────────────────────────────────────
-  private sendMessage = async (prompt: string) => {
-    this.setState(s => ({
-      loading: true,
-      history: [...s.history, { role: "user", content: prompt }],
-      log: [...s.log, { type: "user_prompt", content: prompt, ts: new Date().toISOString() }],
-    }));
-
-    try {
-      const plan = await this.callAI(prompt, this.state.history);
-      this.addLog({ type: "ai_plan", content: plan.thought, actions: plan.actions });
-      const res: { a: any; r: any }[] = [];
-
-      for (const a of plan.actions || []) {
-        this.addLog({ type: "rest_request", method: a.method, path: a.path, params: a.params, body: a.body, description: a.description });
-        const r = await rest.req(a.method, a.path, a.body, a.params || {});
-        this.addLog({ type: "rest_response", status: r.status, headers: r.headers, body: r.body });
-        res.push({ a, r });
-      }
-
-      this.setState(s => ({
-        tick: s.tick + 1,
-        history: [...s.history, {
-          role: "assistant",
-          content: `${plan.finalMessage}\n\n✅ ${res.length} op:\n${res.map((x, i) => `${i + 1}. ${x.a.method} ${x.a.path} → ${x.r.status}`).join("\n")}`,
-        }],
-      }));
-      this.addLog({ type: "complete", content: `✓ ${res.length} operazioni completate.` });
-    } catch (e: any) {
-      this.addLog({ type: "error", content: e.message });
-      this.setState(s => ({ history: [...s.history, { role: "assistant", content: `⚠ ${e.message}` }] }));
-    }
-    this.setState({ loading: false });
-  };
-
   private addLog = (entry: Omit<LogEntry, "ts">) => {
     this.setState(s => ({ log: [...s.log, { ...entry, ts: new Date().toISOString() }] }));
   };
@@ -187,22 +85,23 @@ export default class App extends React.Component<CapiProps, AppState> {
     this.setState(prev => ({ specs: [...db.specs], tick: prev.tick + 1 }));
   };
 
+  private onDeleteAll = () => {
+    db.specs = [];
+    db.stores = {};
+    this.setState({ specs: [], log: [], tick: 0 });
+  };
+
   render() {
     const {
-      tab, specs, history, log, loading, showWizard, provider, ollamaUrl,
-      homeBankingId, socketPortLive, sessionIdLive, botJobId, botJobName,
+      tab, specs, log, showWizard,
+      homeBankingId, socketPortLive, botJobId, botJobName,
     } = this.state;
     const tot = Object.values(db.stores).reduce((a, s) => a + s.length, 0);
     const TABS = [
       { id: "apis", l: `📁 API Files (${specs.length})` },
-      { id: "chat", l: "💬 Chat AI" },
       { id: "debug", l: `🔍 Debug${log.length > 0 ? ` (${log.length})` : ""}` },
       { id: "store", l: `🗄️ Store (${tot})` },
     ] as const;
-
-    const pBadge = provider === "ollama"
-      ? { label: "🖥 OLLAMA", bg: "#0d2b0d", border: "#3fb950", color: "#3fb950" }
-      : { label: "☁ CLAUDE", bg: "#0d1e3a", border: "#58a6ff", color: "#58a6ff" };
 
     return (
       <div style={{ fontFamily: "'IBM Plex Mono','Courier New',monospace", background: "#0a0e17", minHeight: "100vh", color: "#c9d1d9", display: "flex", flexDirection: "column" }}>
@@ -214,7 +113,7 @@ export default class App extends React.Component<CapiProps, AppState> {
           <div style={{ background: "linear-gradient(135deg,#0052cc,#00875a)", borderRadius: 6, width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: "white", flexShrink: 0 }}>A</div>
           <div>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#e6edf3", letterSpacing: 1 }}>AVALOQ API TEST SIMULATOR</div>
-            {/* Context badges — show values received from Java / index.tsx */}
+            {/* Context badges */}
             <div style={{ display: "flex", gap: 6, marginTop: 3, flexWrap: "wrap" }}>
               {botJobName && (
                 <span style={{ fontSize: 8, color: "#e5c07b", background: "#2b1f0d", border: "1px solid #e5c07b44", borderRadius: 8, padding: "1px 7px" }}>
@@ -240,12 +139,8 @@ export default class App extends React.Component<CapiProps, AppState> {
             <div style={{ fontSize: 9, color: "#3fb950", background: "#0d2b0d", border: "1px solid #238636", borderRadius: 10, padding: "2px 8px" }}>
               ● {specs.length} API
             </div>
-            <div
-              onClick={() => this.setState({ tab: "apis" })}
-              style={{ fontSize: 9, color: pBadge.color, background: pBadge.bg, border: `1px solid ${pBadge.border}`, borderRadius: 10, padding: "2px 8px", cursor: "pointer", fontWeight: 700 }}
-            >
-              {pBadge.label}
-            </div>
+            {/* Language picker — replaces CLAUDE/OLLAMA badge */}
+            <LanguagePicker />
           </div>
         </div>
 
@@ -276,23 +171,9 @@ export default class App extends React.Component<CapiProps, AppState> {
               <FileUploadPanel
                 onSpecLoaded={this.onSpecLoaded}
                 loadedSpecs={specs}
-                provider={provider}
-                setProvider={v => this.setState({ provider: v })}
-                ollamaUrl={ollamaUrl}
-                setOllamaUrl={v => this.setState({ ollamaUrl: v })}
+                onDeleteAll={this.onDeleteAll}
               />
             </div>
-          )}
-          {tab === "chat" && (
-            <ChatTab
-              history={history}
-              loading={loading}
-              provider={provider}
-              onSend={this.sendMessage}
-              onClear={() => this.setState({ history: [], log: [] })}
-              onOpenWizard={() => this.setState({ showWizard: true })}
-              onOpenReport={() => { }}
-            />
           )}
           {tab === "debug" && (
             <DebugTab

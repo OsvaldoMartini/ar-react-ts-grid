@@ -8,10 +8,7 @@ import { MethodBadge } from "./AtomComponents";
 interface FileUploadPanelProps {
   onSpecLoaded: (spec: ApiSpec) => void;
   loadedSpecs: ApiSpec[];
-  provider: string;
-  setProvider: (v: string) => void;
-  ollamaUrl: string;
-  setOllamaUrl: (v: string) => void;
+  onDeleteAll: () => void;
 }
 
 interface FileUploadPanelState {
@@ -79,7 +76,7 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
   }
 
   render() {
-    const { loadedSpecs, provider, setProvider, ollamaUrl, setOllamaUrl } = this.props;
+    const { loadedSpecs, onDeleteAll } = this.props;
     const { drag, parsing, results, expanded, showDeps } = this.state;
 
     // Group by category
@@ -107,48 +104,34 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
 
     return (
       <div style={{ padding: "14px 18px" }}>
-        {/* AI Provider selector */}
-        <div style={{
-          marginBottom: 12, padding: "10px 14px",
-          background: "#0d1117", border: "1px solid #21262d", borderRadius: 7,
-        }}>
-          <div style={{ fontSize: 9, color: "#8b949e", marginBottom: 6, letterSpacing: 2, textTransform: "uppercase" }}>
-            AI Provider
+        {/* ── Delete All button ─────────────────────────────────────────── */}
+        {loadedSpecs.length > 0 && (
+          <div style={{ marginBottom: 10, display: "flex", justifyContent: "flex-end" }}>
+            <button
+              onClick={() => {
+                if (window.confirm("Delete all loaded API files?")) onDeleteAll();
+              }}
+              style={{
+                background: "#2b0d0d",
+                border: "1px solid #f8514966",
+                borderRadius: 5,
+                color: "#f85149",
+                padding: "5px 14px",
+                cursor: "pointer",
+                fontSize: 10,
+                fontFamily: "inherit",
+                fontWeight: 700,
+                display: "flex",
+                alignItems: "center",
+                gap: 5,
+              }}
+              onMouseEnter={e => (e.currentTarget.style.borderColor = "#f85149")}
+              onMouseLeave={e => (e.currentTarget.style.borderColor = "#f8514966")}
+            >
+              🗑 Delete All
+            </button>
           </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            {[
-              { id: "anthropic", label: "☁ Claude (Anthropic)", clr: "#58a6ff" },
-              { id: "ollama", label: "🖥 Ollama (Local)", clr: "#3fb950" },
-            ].map(p => (
-              <button
-                key={p.id}
-                onClick={() => setProvider(p.id)}
-                style={{
-                  background: provider === p.id ? `${p.clr}22` : "none",
-                  border: `1px solid ${provider === p.id ? p.clr : "#30363d"}`,
-                  color: provider === p.id ? p.clr : "#555",
-                  borderRadius: 5, padding: "5px 12px", cursor: "pointer",
-                  fontSize: 10, fontFamily: "inherit", fontWeight: 600,
-                }}
-              >
-                {p.label}
-              </button>
-            ))}
-            {provider === "ollama" && (
-              <input
-                value={ollamaUrl}
-                onChange={e => setOllamaUrl(e.target.value)}
-                placeholder="http://localhost:11434"
-                style={{
-                  flex: 1, minWidth: 180,
-                  background: "#161b22", border: "1px solid #30363d",
-                  color: "#e6edf3", borderRadius: 5,
-                  padding: "5px 10px", fontSize: 10, fontFamily: "inherit", outline: "none",
-                }}
-              />
-            )}
-          </div>
-        </div>
+        )}
 
         {/* Upload zone */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
@@ -357,7 +340,7 @@ function parseApiSpec(fileName: string, content: string, fileType?: string): Api
     rawContent: content.slice(0, 5000),
   };
   try {
-    if (["json","schema","shape"].includes(ext)) {
+    if (["json", "schema", "shape"].includes(ext)) {
       let p: any;
       try { p = JSON.parse(content); } catch (e: any) { spec.parseError = "JSON parse: " + e.message; }
       if (p) {
@@ -369,7 +352,7 @@ function parseApiSpec(fileName: string, content: string, fileType?: string): Api
           spec.authSchemes = Object.keys(p.components?.securitySchemes || {});
           for (const [path, ms] of Object.entries(p.paths || {})) {
             for (const [m, op] of Object.entries(ms as any)) {
-              if (["get","post","put","patch","delete"].includes(m)) {
+              if (["get", "post", "put", "patch", "delete"].includes(m)) {
                 spec.endpoints.push({ method: m.toUpperCase(), path, summary: (op as any).summary || "", tags: (op as any).tags || [] });
               }
             }
@@ -377,7 +360,7 @@ function parseApiSpec(fileName: string, content: string, fileType?: string): Api
         }
       }
     }
-    if (["yaml","yml"].includes(ext)) {
+    if (["yaml", "yml"].includes(ext)) {
       const tM = content.match(/^\s*title:\s*["']?([^"'\n\r]+)/m);
       const vM = content.match(/^\s*version:\s*["']?([^"'\n\r]+)/m);
       if (tM) spec.title = tM[1].trim();

@@ -16,7 +16,10 @@ import React, {
   useEffect,
   useCallback,
 } from "react";
-import { useTranslation } from "react-i18next";
+// Direct import of the i18n instance — no React context needed, no timing issues.
+// useTranslation() requires initReactI18next to be registered BEFORE the component
+// mounts; importing i18n directly sidesteps that race entirely.
+import i18nInstance from "../../i18n";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Data
@@ -162,7 +165,8 @@ function CheckIcon() {
 export function LanguagePicker() {
   injectCss();
 
-  const { i18n, t } = useTranslation();
+  // Use the i18n instance directly — no hook, no context dependency
+  const i18n = i18nInstance;
   const [open, setOpen] = useState(false);
   const [activeLang, setActiveLang] = useState<string>(
     () => i18n.language?.slice(0, 2) ?? "en"
@@ -314,7 +318,7 @@ export function LanguagePicker() {
           <div style={headerStyle}>
             <span style={lineStyle} />
             <span style={headerTextStyle}>
-              {t("shell.language", "Language")}
+              {"Language"}
             </span>
             <span style={lineStyle} />
           </div>
@@ -349,8 +353,8 @@ export function LanguagePicker() {
                 overflow: "hidden",
                 flexShrink: 0,
                 border: `1.5px solid ${isActive
-                    ? "var(--cs-accent, #2563eb)"
-                    : "var(--cs-border, #e2e8f0)"
+                  ? "var(--cs-accent, #2563eb)"
+                  : "var(--cs-border, #e2e8f0)"
                   }`,
                 display: "flex",
                 alignItems: "center",

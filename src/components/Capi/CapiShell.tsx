@@ -17,11 +17,10 @@
 // The existing Capi/App.tsx is rendered unchanged inside the shell.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import "./i18n"; // ← initialize i18next (side-effect import, must be first)
+import "../../i18n"; // ← initialize i18next — lives at src/i18n.ts
 
 import React from "react";
 import { ThemeProvider, useTheme } from "./ThemeContext";
-import { LanguagePicker } from "./LanguagePicker";
 import App, { type CapiProps } from "./App";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -174,9 +173,6 @@ function ShellTopBar() {
 
       {/* Controls */}
       <div className="capi-shell-controls">
-        {/* Language picker */}
-        <LanguagePicker />
-
         {/* Theme toggle */}
         <button
           className="capi-shell-toggle"
