@@ -1,120 +1,144 @@
-// capi-app.scss
-// ─────────────────────────────────────────────────────────────────────────────
-// Styles for the main App layout: root wrapper, header, badge bar, tabs.
-// Background and text inherit from CSS vars so light/dark works everywhere.
-// ─────────────────────────────────────────────────────────────────────────────
-
+// capi-app.scss — App root, header, badge bar, tab bar
 @import 'capi-tokens';
 
 // ── Root ──────────────────────────────────────────────────────────────────────
 
 .capi-app {
-  font-family:    'IBM Plex Mono', 'Courier New', monospace;
-  background:     var(--cs-body-bg);
-  min-height:     100vh;
-  color:          var(--cs-body-text);
-  display:        flex;
-  flex-direction: column;
-  transition:     background .25s, color .25s;
+  font-family:             $font-ui;
+  background:              var(--cs-body-bg);
+  min-height:              100vh;
+  color:                   var(--cs-text);
+  display:                 flex;
+  flex-direction:          column;
+  -webkit-font-smoothing:  antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition:              $t-theme;
 
-  // Themed scrollbar
-  ::-webkit-scrollbar              { width: 4px; height: 4px; }
-  ::-webkit-scrollbar-track        { background: var(--cs-scroll-track); }
-  ::-webkit-scrollbar-thumb        { background: var(--cs-scroll-thumb); border-radius: 2px; }
+  ::-webkit-scrollbar       { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: var(--cs-body-bg); }
+  ::-webkit-scrollbar-thumb {
+    background:    var(--cs-scroll-thumb);
+    border-radius: $r-full;
+    &:hover { background: var(--cs-accent); }
+  }
+
   textarea:focus,
   input:focus,
-  select:focus                     { border-color: var(--cs-accent) !important; outline: none; }
+  select:focus {
+    border-color: var(--cs-accent) !important;
+    box-shadow:   var(--cs-shadow-glow) !important;
+    outline:      none;
+  }
 }
 
 // ── Header row ────────────────────────────────────────────────────────────────
 
 .capi-header {
-  background:   var(--cs-header-bg);
+  background:    var(--cs-header-bg);
   border-bottom: 1px solid var(--cs-header-border);
-  padding:      10px 18px;
-  display:      flex;
-  align-items:  center;
-  gap:          14px;
-  transition:   background .25s, border-color .25s;
+  padding:       14px 24px;
+  display:       flex;
+  align-items:   center;
+  gap:           16px;
+  transition:    $t-theme;
 
-  @media (max-width: 480px) { padding: 8px 10px; gap: 8px; }
+  @media (max-width: 480px) { padding: 10px 14px; gap: 10px; }
 }
 
+// Logo mark — mirrors PersonalProfile .logoMark
 .capi-header__logo {
-  background:     linear-gradient(135deg, #0052cc, #00875a);
-  border-radius:  6px;
-  width:          30px;
-  height:         30px;
-  display:        flex;
-  align-items:    center;
+  width:           38px;
+  height:          38px;
+  border-radius:   $r-sm;
+  background:      linear-gradient(135deg, #{$c-blue-500}, #{$c-blue-400});
+  display:         flex;
+  align-items:     center;
   justify-content: center;
-  font-size:      13px;
-  font-weight:    700;
-  color:          #fff;
-  flex-shrink:    0;
+  font-family:     $font-ui;
+  font-size:       15px;
+  font-weight:     800;
+  color:           #ffffff;
+  flex-shrink:     0;
+  box-shadow:      0 3px 12px rgba(10, 102, 194, .35);
+  letter-spacing:  -.5px;
 }
 
 .capi-header__title {
-  font-size:      12px;
+  font-family:    $font-ui;
+  font-size:      14px;
   font-weight:    700;
   color:          var(--cs-text);
-  letter-spacing: 1px;
-  transition:     color .25s;
+  letter-spacing: -.01em;
+  line-height:    1.2;
+  transition:     color .4s;
 }
 
-// Badge row (HB / port / job)
 .capi-header__badges {
   display:    flex;
-  gap:        6px;
-  margin-top: 3px;
+  gap:        5px;
+  margin-top: 4px;
   flex-wrap:  wrap;
 }
 
 .capi-badge {
-  font-size:     8px;
-  border-radius: 8px;
-  padding:       1px 7px;
-  border:        1px solid;
-  white-space:   nowrap;
+  font-family:    $font-mono;
+  font-size:      10px;
+  font-weight:    500;
+  border-radius:  $r-sm;
+  padding:        2px 8px;
+  border:         1px solid transparent;
+  white-space:    nowrap;
 
-  &--dim  { color: var(--cs-text2);       background: var(--cs-card-bg);      border-color: var(--cs-card-border); }
+  &--dim  { color: var(--cs-muted);       background: var(--cs-surface);      border-color: var(--cs-border-sub); }
   &--blue { color: var(--cs-blue-badge);  background: var(--cs-blue-badge-bg); border-color: var(--cs-blue-badge-bdr); }
   &--job  { color: var(--cs-yellow);      background: var(--cs-yellow-bg);     border-color: var(--cs-yellow-border); }
 }
 
-// Right-side controls cluster in header
 .capi-header__controls {
   margin-left: auto;
   display:     flex;
-  gap:         6px;
+  gap:         8px;
   align-items: center;
+  flex-shrink: 0;
 }
 
-// WIZARD button
+// Wizard button — ghost style with green accent
 .capi-btn-wizard {
-  background:  linear-gradient(135deg, #0d2347, #0a1628);
-  border:      2px solid var(--cs-green);
-  border-radius: 6px;
-  color:       var(--cs-green);
-  padding:     5px 12px;
-  cursor:      pointer;
-  font-size:   10px;
-  font-family: inherit;
-  font-weight: 700;
-  transition:  background .15s, border-color .15s;
+  display:        inline-flex;
+  align-items:    center;
+  gap:            6px;
+  background:     transparent;
+  border:         1.5px solid var(--cs-green-border);
+  border-radius:  $r-sm;
+  color:          var(--cs-green);
+  padding:        6px 14px;
+  cursor:         pointer;
+  font-family:    $font-ui;
+  font-size:      12px;
+  font-weight:    600;
+  letter-spacing: .01em;
+  white-space:    nowrap;
+  transition:     $t-fast;
 
-  &:hover { background: rgba(63, 185, 80, .08); }
+  &:hover {
+    background:   var(--cs-green-bg);
+    border-color: var(--cs-green);
+    box-shadow:   0 0 12px var(--cs-green-glow);
+  }
 }
 
-// "● N API" counter badge
+// "● N API" counter
 .capi-api-count {
-  font-size:     9px;
-  color:         var(--cs-green);
-  background:    var(--cs-green-bg);
-  border:        1px solid var(--cs-green-border);
-  border-radius: 10px;
-  padding:       2px 8px;
-  white-space:   nowrap;
+  font-family:    $font-ui;
+  font-size:      12px;
+  font-weight:    600;
+  color:          var(--cs-green);
+  background:     var(--cs-green-bg);
+  border:         1px solid var(--cs-green-border);
+  border-radius:  $r-full;
+  padding:        4px 12px;
+  white-space:    nowrap;
+  letter-spacing: .01em;
 }
 
 // ── Tab bar ───────────────────────────────────────────────────────────────────
@@ -122,33 +146,40 @@
 .capi-tabs {
   background:    var(--cs-tabs-bg);
   border-bottom: 1px solid var(--cs-tabs-border);
-  padding:       0 18px;
+  padding:       0 24px;
   display:       flex;
-  transition:    background .25s, border-color .25s;
+  gap:           2px;
+  transition:    $t-theme;
 }
 
 .capi-tab-btn {
-  background:    none;
-  border:        none;
-  border-bottom: 2px solid transparent;
-  color:         var(--cs-tab-text);
-  padding:       8px 14px;
-  cursor:        pointer;
-  font-size:     10px;
-  font-weight:   600;
-  letter-spacing: .5px;
-  font-family:   inherit;
-  transition:    color .15s, border-color .15s;
+  background:     none;
+  border:         none;
+  border-bottom:  2px solid transparent;
+  color:          var(--cs-tab-text);
+  padding:        12px 16px;
+  cursor:         pointer;
+  font-family:    $font-ui;
+  font-size:      13px;
+  font-weight:    500;
+  letter-spacing: .01em;
+  white-space:    nowrap;
+  transition:     $t-fast;
 
   &.active {
     border-bottom-color: var(--cs-tab-active-col);
     color:               var(--cs-tab-active-text);
+    font-weight:         600;
   }
 
-  &:hover:not(.active) { color: var(--cs-text); }
+  &:hover:not(.active) {
+    color:         var(--cs-text);
+    background:    var(--cs-accent-bg);
+    border-radius: $r-sm $r-sm 0 0;
+  }
 }
 
-// ── Content area ──────────────────────────────────────────────────────────────
+// ── Content / scroll ──────────────────────────────────────────────────────────
 
 .capi-content {
   flex:           1;

@@ -1,100 +1,131 @@
-// capi-atoms.scss
-// ─────────────────────────────────────────────────────────────────────────────
-// Styles for AtomComponents: MethodBadge, StatusBadge, JsonBlock, ResultRow
-// ─────────────────────────────────────────────────────────────────────────────
-
+// capi-atoms.scss — MethodBadge · StatusBadge · JsonBlock · ResultRow
 @import 'capi-tokens';
 
-// ── Method Badge ─────────────────────────────────────────────────────────────
+// ── Method Badge ──────────────────────────────────────────────────────────────
+// Up from 8px → 10px, clear uppercase monospace label
 
 .capi-method-badge {
-  font-size:      8px;
+  font-family:    $font-mono;
+  font-size:      10px;
   font-weight:    700;
-  letter-spacing: 1px;
-  border-radius:  3px;
-  padding:        1px 5px;
+  letter-spacing: .7px;
+  text-transform: uppercase;
+  border-radius:  $r-xs;
+  padding:        2px 7px;
   flex-shrink:    0;
   border:         1px solid transparent;
+  white-space:    nowrap;
 
-  &--get    { color: #3fb950; background: rgba(63,  185, 80,  .13); border-color: rgba(63,  185, 80,  .4); }
-  &--post   { color: #58a6ff; background: rgba(88,  166, 255, .13); border-color: rgba(88,  166, 255, .4); }
+  &--get     { color: #22c55e; background: rgba(34,  197,  94, .12); border-color: rgba(34,  197,  94, .30); }
+  &--post    { color: #378fe9; background: rgba(55,  143, 233, .12); border-color: rgba(55,  143, 233, .30); }
   &--patch,
-  &--put    { color: #d29922; background: rgba(210, 153, 34,  .13); border-color: rgba(210, 153, 34,  .4); }
-  &--delete { color: #f85149; background: rgba(248, 81,  73,  .13); border-color: rgba(248, 81,  73,  .4); }
-  &--rpc    { color: #c678dd; background: rgba(198, 120, 221, .13); border-color: rgba(198, 120, 221, .4); }
-  &--default{ color: #8b949e; background: rgba(139, 148, 158, .13); border-color: rgba(139, 148, 158, .4); }
+  &--put     { color: #f59e0b; background: rgba(245, 158,  11, .12); border-color: rgba(245, 158,  11, .30); }
+  &--delete  { color: #f87171; background: rgba(248, 113, 113, .12); border-color: rgba(248, 113, 113, .30); }
+  &--rpc     { color: #c084fc; background: rgba(192, 132, 252, .12); border-color: rgba(192, 132, 252, .30); }
+  &--default { color: #8b96b5; background: rgba(139, 150, 181, .10); border-color: rgba(139, 150, 181, .22); }
 }
 
 // ── Status Badge ──────────────────────────────────────────────────────────────
 
 .capi-status-badge {
-  font-size:     9px;
+  font-family:   $font-mono;
+  font-size:     10px;
   font-weight:   700;
-  border-radius: 3px;
-  padding:       1px 5px;
+  border-radius: $r-xs;
+  padding:       2px 7px;
   flex-shrink:   0;
   border:        1px solid transparent;
+  white-space:   nowrap;
 
-  &--ok      { color: #3fb950; background: rgba(63,  185, 80,  .13); border-color: rgba(63,  185, 80,  .27); }
-  &--warn    { color: #d29922; background: rgba(210, 153, 34,  .13); border-color: rgba(210, 153, 34,  .27); }
-  &--error   { color: #f85149; background: rgba(248, 81,  73,  .13); border-color: rgba(248, 81,  73,  .27); }
-  &--default { color: #8b949e; background: rgba(139, 148, 158, .13); border-color: rgba(139, 148, 158, .27); }
+  &--ok      { color: #22c55e; background: rgba(34,  197,  94, .12); border-color: rgba(34,  197,  94, .28); }
+  &--warn    { color: #f59e0b; background: rgba(245, 158,  11, .12); border-color: rgba(245, 158,  11, .28); }
+  &--error   { color: #f87171; background: rgba(248, 113, 113, .12); border-color: rgba(248, 113, 113, .28); }
+  &--default { color: #8b96b5; background: rgba(139, 150, 181, .10); border-color: rgba(139, 150, 181, .22); }
 }
 
 // ── JSON Block ────────────────────────────────────────────────────────────────
+// Up from 9px → 11.5px, proper rounded card with shadow
 
 .capi-json-block {
   margin:        0;
-  font-size:     9px;
-  line-height:   1.6;
-  color:         var(--cs-json-text, #98c379);
-  background:    var(--cs-json-bg, #070b12);
-  border:        1px solid var(--cs-border, #21262d);
-  border-radius: 4px;
-  padding:       6px 8px;
+  font-family:   $font-mono;
+  font-size:     11.5px;
+  line-height:   1.65;
+  color:         var(--cs-json-text);
+  background:    var(--cs-json-bg);
+  border:        1px solid var(--cs-json-border);
+  border-radius: $r-md;
+  padding:       10px 14px;
   overflow-x:    auto;
   overflow-y:    auto;
-  font-family:   'IBM Plex Mono', 'Courier New', monospace;
+  box-shadow:    var(--cs-shadow-sm);
+  transition:    $t-theme;
 }
 
 // ── Result Row ────────────────────────────────────────────────────────────────
 
 .capi-result-row {
-  background:    var(--cs-bg, #0d1117);
-  border-radius: 6px;
-  overflow:      hidden;
-  border:        1px solid transparent;
+  background:    var(--cs-surface);
+  border:        1px solid var(--cs-border-sub);
   border-left:   3px solid transparent;
+  border-radius: $r-md;
+  overflow:      hidden;
+  transition:    $t-fast;
 
-  &--ok   {
-    border-color:      rgba(63,  185, 80, .2);
-    border-left-color: #3fb950;
+  &--ok {
+    border-color:      var(--cs-green-border);
+    border-left-color: #22c55e;
+    &:hover { box-shadow: var(--cs-shadow-sm); }
   }
   &--fail {
-    border-color:      rgba(248, 81, 73, .2);
-    border-left-color: #f85149;
+    border-color:      var(--cs-red-border);
+    border-left-color: #f87171;
+    &:hover { box-shadow: var(--cs-shadow-sm); }
   }
 }
 
 .capi-result-row__header {
   display:     flex;
-  gap:         8px;
+  gap:         10px;
   align-items: center;
-  padding:     8px 10px;
+  padding:     10px 14px;
   cursor:      pointer;
   user-select: none;
+  transition:  background .12s;
+  &:hover { background: var(--cs-accent-bg); }
 }
 
-.capi-result-row__icon    { font-size: 12px; }
-.capi-result-row__step    { font-size: 9px;  color: var(--cs-dim-text, #555); width: 18px; flex-shrink: 0; }
-.capi-result-row__label   { font-size: 10px; color: var(--cs-text, #e6edf3); flex: 1; }
-.capi-result-row__latency { font-size: 9px;  color: var(--cs-dim-text, #555); }
-.capi-result-row__chevron { font-size: 9px;  color: var(--cs-border-2, #30363d); }
+.capi-result-row__icon    { font-size: 14px; }
+.capi-result-row__step    {
+  font-family: $font-mono;
+  font-size:   11px;
+  color:       var(--cs-dim);
+  width:       20px;
+  flex-shrink: 0;
+  text-align:  center;
+}
+.capi-result-row__label   {
+  font-family: $font-ui;
+  font-size:   13px;
+  font-weight: 500;
+  color:       var(--cs-text);
+  flex:        1;
+}
+.capi-result-row__latency { font-family: $font-mono; font-size: 11px; color: var(--cs-dim); }
+.capi-result-row__chevron { font-size: 10px; color: var(--cs-dim); }
 
 .capi-result-row__body {
-  padding:    8px 10px;
-  border-top: 1px solid rgba(33, 38, 45, .13);
+  padding:    10px 14px 14px;
+  border-top: 1px solid var(--cs-border-sub);
 }
 
-.capi-result-row__section       { margin-top: 6px; }
-.capi-result-row__section-label { font-size: 8px; color: var(--cs-dim-text, #555); margin-bottom: 3px; }
+.capi-result-row__section       { margin-top: 8px; }
+.capi-result-row__section-label {
+  font-family:    $font-ui;
+  font-size:      10px;
+  font-weight:    700;
+  letter-spacing: .6px;
+  text-transform: uppercase;
+  color:          var(--cs-dim);
+  margin-bottom:  5px;
+}

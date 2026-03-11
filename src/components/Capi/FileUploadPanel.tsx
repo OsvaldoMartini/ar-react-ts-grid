@@ -8,14 +8,14 @@ import "./capi-upload.scss";
 // ═══════════════════════════════════════════════════════════════
 interface FileUploadPanelProps {
   onSpecLoaded: (spec: ApiSpec) => void;
-  loadedSpecs:  ApiSpec[];
-  onDeleteAll:  () => void;
+  loadedSpecs: ApiSpec[];
+  onDeleteAll: () => void;
 }
 
 interface FileUploadPanelState {
-  drag:     boolean;
-  parsing:  boolean;
-  results:  { ok: boolean; spec: ApiSpec }[];
+  drag: boolean;
+  parsing: boolean;
+  results: { ok: boolean; spec: ApiSpec }[];
   expanded: number | null;
   showDeps: boolean;
 }
@@ -28,7 +28,7 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
   };
 
   private folderRef = createRef<HTMLInputElement>();
-  private fileRef   = createRef<HTMLInputElement>();
+  private fileRef = createRef<HTMLInputElement>();
 
   private processFiles = async (files: FileList | null) => {
     if (!files) return;
@@ -42,7 +42,7 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
       try {
         let content = "";
         if (ext === "pdf") {
-          const buf   = await f.arrayBuffer();
+          const buf = await f.arrayBuffer();
           const bytes = new Uint8Array(buf);
           let text = "";
           for (let i = 0; i < bytes.length; i++) {
@@ -64,9 +64,9 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
   };
 
   private getCategory(spec: ApiSpec): string {
-    if (spec.tags?.length)                         return spec.tags[0];
-    if (spec.resourceName?.includes("addr"))       return "Address Management";
-    if (spec.resourceName?.includes("client"))     return "Client Management";
+    if (spec.tags?.length) return spec.tags[0];
+    if (spec.resourceName?.includes("addr")) return "Address Management";
+    if (spec.resourceName?.includes("client")) return "Client Management";
     return "General";
   }
 
@@ -133,7 +133,7 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
           {/* Drop zone */}
           <div
             className={`capi-zone${drag ? " capi-zone--dragging" : ""}`}
-            onDragOver={e  => { e.preventDefault(); this.setState({ drag: true }); }}
+            onDragOver={e => { e.preventDefault(); this.setState({ drag: true }); }}
             onDragLeave={() => this.setState({ drag: false })}
             onDrop={e => { e.preventDefault(); this.setState({ drag: false }); this.processFiles(e.dataTransfer.files); }}
             onClick={() => this.fileRef.current?.click()}
@@ -181,8 +181,8 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
             {showDeps && (
               <div className="capi-deps__body">
                 {Object.entries(depNodes).map(([id, node]) => {
-                  const deps   = depEdges.filter(e => e.from === id).map(e => e.to);
-                  const usedBy = depEdges.filter(e => e.to   === id).map(e => e.from);
+                  const deps = depEdges.filter(e => e.from === id).map(e => e.to);
+                  const usedBy = depEdges.filter(e => e.to === id).map(e => e.from);
                   return (
                     <div key={id} className="capi-deps__row">
                       <div className="capi-deps__row-meta">
@@ -191,8 +191,8 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
                         <span className="capi-deps__meta">{node.endpoints} ep</span>
                         {node.fields > 0 && <span className="capi-deps__meta">{node.fields} fields</span>}
                       </div>
-                      {deps.length   > 0 && <div className="capi-deps__links">→ dipende da: {deps.map(d   => <code key={d} className="capi-deps__code-y">{d}</code>)}</div>}
-                      {usedBy.length > 0 && <div className="capi-deps__links">← usato da: {usedBy.map(d  => <code key={d} className="capi-deps__code-b">{d}</code>)}</div>}
+                      {deps.length > 0 && <div className="capi-deps__links">→ dipende da: {deps.map(d => <code key={d} className="capi-deps__code-y">{d}</code>)}</div>}
+                      {usedBy.length > 0 && <div className="capi-deps__links">← usato da: {usedBy.map(d => <code key={d} className="capi-deps__code-b">{d}</code>)}</div>}
                     </div>
                   );
                 })}
@@ -237,7 +237,7 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
                       </div>
                       <div className="capi-api-card__controls">
                         {spec.dependencies?.length > 0 && <span className="capi-api-card__deps">{spec.dependencies.length} deps</span>}
-                        {spec.authSchemes?.length  > 0 && <span className="capi-api-card__auth">🔐</span>}
+                        {spec.authSchemes?.length > 0 && <span className="capi-api-card__auth">🔐</span>}
                         <span className="capi-api-card__chevron">{expanded === gi ? "▲" : "▼"}</span>
                       </div>
                     </div>
@@ -296,7 +296,7 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
 // MINIMAL API SPEC PARSER (YAML / JSON / proto)
 // ═══════════════════════════════════════════════════════════════
 function parseApiSpec(fileName: string, content: string, fileType?: string): ApiSpec {
-  const ext  = fileType || fileName.split(".").pop()!.toLowerCase();
+  const ext = fileType || fileName.split(".").pop()!.toLowerCase();
   const spec: ApiSpec = {
     fileName, ext,
     title: fileName.replace(/\.[^.]+$/, ""),
@@ -308,19 +308,19 @@ function parseApiSpec(fileName: string, content: string, fileType?: string): Api
     rawContent: content.slice(0, 5000),
   };
   try {
-    if (["json","schema","shape"].includes(ext)) {
+    if (["json", "schema", "shape"].includes(ext)) {
       let p: any;
       try { p = JSON.parse(content); } catch (e: any) { spec.parseError = "JSON parse: " + e.message; }
       if (p) {
         if (p.openapi || p.swagger) {
-          spec.title       = p.info?.title       || spec.title;
-          spec.version     = p.info?.version     || spec.version;
+          spec.title = p.info?.title || spec.title;
+          spec.version = p.info?.version || spec.version;
           spec.description = p.info?.description || "";
-          spec.servers     = (p.servers || []).map((s: any) => s.url);
+          spec.servers = (p.servers || []).map((s: any) => s.url);
           spec.authSchemes = Object.keys(p.components?.securitySchemes || {});
           for (const [path, ms] of Object.entries(p.paths || {})) {
             for (const [m, op] of Object.entries(ms as any)) {
-              if (["get","post","put","patch","delete"].includes(m)) {
+              if (["get", "post", "put", "patch", "delete"].includes(m)) {
                 spec.endpoints.push({ method: m.toUpperCase(), path, summary: (op as any).summary || "", tags: (op as any).tags || [] });
               }
             }
@@ -328,16 +328,16 @@ function parseApiSpec(fileName: string, content: string, fileType?: string): Api
         }
       }
     }
-    if (["yaml","yml"].includes(ext)) {
+    if (["yaml", "yml"].includes(ext)) {
       const tM = content.match(/^\s*title:\s*["']?([^"'\n\r]+)/m);
       const vM = content.match(/^\s*version:\s*["']?([^"'\n\r]+)/m);
-      if (tM) spec.title   = tM[1].trim();
+      if (tM) spec.title = tM[1].trim();
       if (vM) spec.version = vM[1].trim();
       spec.authSchemes = content.includes("bearerAuth") ? ["Bearer"] : content.includes("apiKey") ? ["ApiKey"] : [];
       const lines = content.split(/\r?\n/);
       let inPaths = false, curPath: string | null = null;
       for (const l of lines) {
-        if (/^paths:/.test(l))                            { inPaths = true;  continue; }
+        if (/^paths:/.test(l)) { inPaths = true; continue; }
         if (inPaths && /^[a-zA-Z]/.test(l) && !/^  /.test(l)) inPaths = false;
         if (!inPaths) continue;
         const pM = l.match(/^  (\/[^:\s#]+):\s*$/);

@@ -1,29 +1,28 @@
-// capi-store.scss
-// ─────────────────────────────────────────────────────────────────────────────
-// Styles for StoreTab
-// ─────────────────────────────────────────────────────────────────────────────
-
+// capi-store.scss — StoreTab
 @import 'capi-tokens';
 
 .capi-store {
-  flex:       1;
-  overflow-y: auto;
-  padding:    14px 18px;
+  flex:        1;
+  overflow-y:  auto;
+  padding:     18px 24px;
+  font-family: $font-ui;
 }
 
-// ── Resource section ──────────────────────────────────────────────────────────
-
-.capi-store__resource {
-  margin-bottom: 20px;
-}
+.capi-store__resource { margin-bottom: 28px; }
 
 .capi-store__resource-header {
-  font-size:       10px;
-  color:           var(--cs-accent, #58a6ff);
-  margin-bottom:   8px;
   display:         flex;
   justify-content: space-between;
   align-items:     center;
+  margin-bottom:   10px;
+}
+
+.capi-store__resource-name {
+  font-family:    $font-mono;
+  font-size:      12px;
+  font-weight:    700;
+  color:          var(--cs-accent);
+  letter-spacing: .03em;
 }
 
 .capi-store__resource-actions {
@@ -35,126 +34,131 @@
 // ── Action buttons ────────────────────────────────────────────────────────────
 
 .capi-store-btn {
-  border-radius: 3px;
-  padding:       2px 7px;
-  cursor:        pointer;
-  font-family:   inherit;
-  font-weight:   700;
-  transition:    background .15s, border-color .15s;
+  border-radius:  $r-sm;
+  padding:        5px 12px;
+  cursor:         pointer;
+  font-family:    $font-ui;
+  font-size:      11px;
+  font-weight:    600;
+  letter-spacing: .01em;
+  border:         1px solid transparent;
+  transition:     $t-fast;
 
   &--test {
-    font-size:  8px;
-    background: var(--cs-blue-badge-bg, #0d2347);
-    border:     1px solid var(--cs-green-border, #238636);
-    color:      var(--cs-green, #3fb950);
-    &:hover { background: rgba(63, 185, 80, .08); }
+    color:        var(--cs-green);
+    background:   var(--cs-green-bg);
+    border-color: var(--cs-green-border);
+    &:hover { box-shadow: 0 0 10px var(--cs-green-glow); }
   }
-
   &--report {
-    font-size:  8px;
-    background: var(--cs-body-bg, #0a1628);
-    border:     1px solid #c9a84c;
-    color:      #c9a84c;
-    &:hover { background: rgba(201, 168, 76, .08); }
+    color:        var(--cs-yellow);
+    background:   var(--cs-yellow-bg);
+    border-color: var(--cs-yellow-border);
+    &:hover { opacity: .85; }
   }
-
   &--refresh {
-    font-size:   9px;
-    font-weight: 400;
-    background:  none;
-    border:      1px solid var(--cs-border-2, #30363d);
-    color:       var(--cs-text2, #8b949e);
-    &:hover {
-      border-color: var(--cs-accent, #58a6ff);
-      color:        var(--cs-text, #e6edf3);
-    }
+    color:        var(--cs-muted);
+    background:   transparent;
+    border-color: var(--cs-border-sub);
+    padding:      4px 8px;
+    font-size:    14px;
+    &:hover { border-color: var(--cs-accent); color: var(--cs-accent); }
   }
 }
-
-// ── Empty state ───────────────────────────────────────────────────────────────
 
 .capi-store__empty {
-  font-size: 10px;
-  color:     var(--cs-dim, #484f58);
-  padding:   12px 0;
+  font-family: $font-ui;
+  font-size:   13px;
+  color:       var(--cs-dim);
+  padding:     14px 0;
 }
 
-// ── Record grid ───────────────────────────────────────────────────────────────
+// ── Record cards — mirrors PersonalProfile .item card style ───────────────────
 
-.capi-store__records {
-  display: grid;
-  gap:     5px;
-}
+.capi-store__records { display: grid; gap: 6px; }
 
 .capi-store__record {
-  background:            var(--cs-bg, #0d1117);
-  border:                1px solid var(--cs-card-border, #21262d);
-  border-radius:         5px;
-  padding:               8px 12px;
+  background:            var(--cs-card-bg);
+  border:                1px solid var(--cs-card-border);
+  border-radius:         $r-lg;
+  padding:               13px 16px;
   display:               grid;
   grid-template-columns: auto 1fr auto;
-  gap:                   8px;
+  gap:                   12px;
   align-items:           start;
-  transition:            border-color .15s;
+  transition:            transform .2s ease, border-color .2s ease, box-shadow .2s ease;
 
-  &:hover { border-color: var(--cs-border-2, #30363d); }
+  &:hover {
+    transform:    translateX(3px);
+    border-color: var(--cs-accent-border);
+    box-shadow:   var(--cs-shadow-sm);
+  }
 }
 
 .capi-store__record-id {
-  background:    var(--cs-surface, #161b22);
-  border:        1px solid var(--cs-border-2, #30363d);
-  border-radius: 3px;
-  padding:       2px 6px;
-  font-size:     9px;
-  color:         var(--cs-accent, #58a6ff);
-  font-family:   monospace;
+  font-family:   $font-mono;
+  font-size:     10px;
+  font-weight:   500;
+  color:         var(--cs-accent);
+  background:    var(--cs-accent-bg);
+  border:        1px solid var(--cs-accent-border);
+  border-radius: $r-sm;
+  padding:       3px 8px;
   white-space:   nowrap;
+  align-self:    start;
+  margin-top:    2px;
 }
 
 .capi-store__record-name {
-  font-size:     11px;
-  font-weight:   700;
-  color:         var(--cs-text, #e6edf3);
-  margin-bottom: 2px;
+  font-family:   $font-ui;
+  font-size:     13px;
+  font-weight:   600;
+  color:         var(--cs-text);
+  margin-bottom: 3px;
+  line-height:   1.3;
 }
 
 .capi-store__record-firm {
-  font-size:   9px;
-  color:       var(--cs-text2, #8b949e);
-  margin-left: 6px;
+  font-family: $font-ui;
+  font-size:   11px;
+  color:       var(--cs-muted);
+  margin-left: 7px;
 }
 
 .capi-store__record-meta {
-  font-size:     9px;
-  color:         var(--cs-dim-text, #555);
-  font-family:   monospace;
+  font-family:   $font-mono;
+  font-size:     10px;
+  color:         var(--cs-dim);
   overflow:      hidden;
   white-space:   nowrap;
   text-overflow: ellipsis;
+  line-height:   1.5;
 }
 
 .capi-store__record-tags {
   display:        flex;
   flex-direction: column;
-  gap:            2px;
+  gap:            3px;
   flex-shrink:    0;
+  align-self:     start;
 }
 
 .capi-store__tag {
-  font-size:     8px;
-  border-radius: 3px;
-  padding:       1px 4px;
+  font-family:   $font-ui;
+  font-size:     10px;
+  font-weight:   500;
+  border-radius: $r-sm;
+  padding:       2px 7px;
   border:        1px solid transparent;
 
   &--addr {
-    background:   rgba(31, 111, 235, .13);
-    border-color: rgba(31, 111, 235, .27);
-    color:        var(--cs-accent, #58a6ff);
+    color:        var(--cs-accent);
+    background:   var(--cs-accent-bg);
+    border-color: var(--cs-accent-border);
   }
-
   &--country {
-    background:   var(--cs-green-bg, #0d2b0d);
-    border-color: rgba(35, 134, 32, .27);
-    color:        var(--cs-green, #3fb950);
+    color:        var(--cs-green);
+    background:   var(--cs-green-bg);
+    border-color: var(--cs-green-border);
   }
 }

@@ -1,132 +1,227 @@
 // capi-tokens.scss
-// CSS Custom Properties for CAPI — light (default) and dark themes.
-// Applied on [data-capi-theme] set by CapiShell on the root wrapper.
-// ALL components reference these vars so the full app responds to theme.
+// ─────────────────────────────────────────────────────────────────────────────
+// Design tokens for CAPI — aligned with PersonalProfile design system.
+// Font:    Inter (UI)  ·  JetBrains Mono (code / paths / IDs)
+// Palette: LinkedIn navy-blue  ·  deep navy darks  ·  clean slate light
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Google Fonts: Inter + JetBrains Mono
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+// ─── SCSS design constants ────────────────────────────────────────────────────
+
+// Typography
+$font-ui:   'Inter', system-ui, -apple-system, sans-serif;
+$font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+
+// Radii scale — mirrors PersonalProfile exactly
+$r-xs:   3px;
+$r-sm:   6px;
+$r-md:   10px;
+$r-lg:   14px;
+$r-xl:   20px;
+$r-full: 100px;
+
+// Transitions
+$t-fast:  all .15s ease;
+$t-base:  all .25s ease;
+$t-theme: background .4s ease, color .4s ease, border-color .4s ease, box-shadow .4s ease;
+
+// LinkedIn blue palette
+$c-blue-700: #004182;
+$c-blue-600: #005fa3;
+$c-blue-500: #0a66c2;
+$c-blue-400: #378fe9;
+$c-blue-300: #70b5f9;
+
+// ─── LIGHT THEME ─────────────────────────────────────────────────────────────
 
 [data-capi-theme="light"] {
-  // ── Shell chrome ──────────────────────────────────────────────────────────
-  --cs-bg:              #ffffff;
-  --cs-surface:         #f1f5f9;
-  --cs-border:          #cbd5e1;
-  --cs-border-2:        #e5e7eb;
-  --cs-text:            #0f172a;
-  --cs-text2:           #334155;
-  --cs-muted:           #64748b;
-  --cs-dim:             #94a3b8;
-  --cs-dim-text:        #9ca3af;
-  --cs-accent:          #2563eb;
-  --cs-accent-bg:       #eff6ff;
-  --cs-accent-border:   #bfdbfe;
 
-  // ── App body ──────────────────────────────────────────────────────────────
-  --cs-body-bg:         #f8fafc;
-  --cs-body-text:       #1e293b;
-  --cs-deep-bg:         #f0f9ff;
-  --cs-header-bg:       linear-gradient(90deg, #f1f5f9, #e8edf4);
-  --cs-header-border:   #cbd5e1;
+  // Canvas — same as PersonalProfile html.light
+  --cs-body-bg:   #f3f6fb;
+  --cs-bg:        #ffffff;
+  --cs-surface:   #f3f6fb;
+  --cs-surface-2: #eef3fa;
+  --cs-deep-bg:   #e2eaf6;
+
+  // Borders
+  --cs-border:     rgba(10, 102, 194, .15);
+  --cs-border-sub: rgba(0, 0, 0, .07);
+  --cs-border-2:   rgba(10, 102, 194, .22);
+
+  // Text hierarchy — PersonalProfile light vars
+  --cs-text:     #0c0d14;
+  --cs-text2:    #1a2743;
+  --cs-muted:    #4b5d80;
+  --cs-dim:      #7a8aaa;
+  --cs-dim-text: #9aa5bf;
+
+  // Accent
+  --cs-accent:        #{$c-blue-500};
+  --cs-accent-2:      #{$c-blue-400};
+  --cs-accent-bg:     rgba(10, 102, 194, .07);
+  --cs-accent-border: rgba(10, 102, 194, .22);
+
+  // Shell / nav chrome
+  --cs-shell-bg: rgba(243, 246, 251, .94);
+
+  // Header
+  --cs-header-bg:     linear-gradient(90deg, #f3f6fb 0%, #eef3fa 100%);
+  --cs-header-border: rgba(10, 102, 194, .14);
+
+  // Tabs
   --cs-tabs-bg:         #ffffff;
-  --cs-tabs-border:     #e2e8f0;
-  --cs-tab-active-col:  #2563eb;
-  --cs-tab-text:        #64748b;
-  --cs-tab-active-text: #0f172a;
+  --cs-tabs-border:     rgba(10, 102, 194, .12);
+  --cs-tab-active-col:  #{$c-blue-500};
+  --cs-tab-text:        #4b5d80;
+  --cs-tab-active-text: #0c0d14;
 
-  // ── Cards / panels ────────────────────────────────────────────────────────
-  --cs-card-bg:         #ffffff;
-  --cs-card-border:     #e2e8f0;
-  --cs-input-bg:        #ffffff;
+  // Cards / panels
+  --cs-card-bg:     #ffffff;
+  --cs-card-border: rgba(10, 102, 194, .12);
+  --cs-input-bg:    #ffffff;
 
-  // ── Scrollbar ─────────────────────────────────────────────────────────────
-  --cs-scroll-track:    #f1f5f9;
-  --cs-scroll-thumb:    #cbd5e1;
+  // Scrollbar
+  --cs-scroll-track: #eef3fa;
+  --cs-scroll-thumb: #c2cfe8;
 
-  // ── Status colours ────────────────────────────────────────────────────────
-  --cs-green:           #16a34a;
-  --cs-green-bg:        #f0fdf4;
-  --cs-green-border:    #bbf7d0;
-  --cs-yellow:          #b45309;
-  --cs-yellow-bg:       #fffbeb;
-  --cs-yellow-border:   #fde68a;
-  --cs-blue-badge:      #1d4ed8;
-  --cs-blue-badge-bg:   #eff6ff;
-  --cs-blue-badge-bdr:  #bfdbfe;
-  --cs-red:             #dc2626;
-  --cs-red-bg:          #fff1f2;
-  --cs-red-border:      #fecaca;
+  // Shadows
+  --cs-shadow-sm:   0 1px 4px rgba(0, 0, 0, .06);
+  --cs-shadow-md:   0 4px 16px rgba(10, 102, 194, .10), 0 2px 6px rgba(0, 0, 0, .05);
+  --cs-shadow-lg:   0 12px 40px rgba(10, 102, 194, .13), 0 4px 12px rgba(0, 0, 0, .07);
+  --cs-shadow-glow: 0 0 0 3px rgba(10, 102, 194, .12);
+  --cs-shadow-blue: 0 4px 24px rgba(10, 102, 194, .22);
 
-  // ── Upload zone ───────────────────────────────────────────────────────────
-  --cs-zone-bg:         #f8fafc;
-  --cs-zone-border:     #cbd5e1;
-  --cs-zone-hover-bdr:  #2563eb;
-  --cs-zone-drag-bg:    rgba(37, 99, 235, .06);
+  // Status — green
+  --cs-green:        #16a34a;
+  --cs-green-bg:     #f0fdf4;
+  --cs-green-border: #bbf7d0;
+  --cs-green-glow:   rgba(22, 163, 74, .18);
 
-  // ── Code / mono ───────────────────────────────────────────────────────────
-  --cs-code-text:       #b45309;
-  --cs-code-blue:       #1d4ed8;
-  --cs-code-green:      #15803d;
-  --cs-json-bg:         #f8fafc;
-  --cs-json-text:       #15803d;
+  // Status — amber/warn
+  --cs-yellow:        #92400e;
+  --cs-yellow-bg:     #fffbeb;
+  --cs-yellow-border: #fde68a;
+
+  // Status — blue badge
+  --cs-blue-badge:    #1d4ed8;
+  --cs-blue-badge-bg: #eff6ff;
+  --cs-blue-badge-bdr:#bfdbfe;
+
+  // Status — red
+  --cs-red:        #dc2626;
+  --cs-red-bg:     #fff1f2;
+  --cs-red-border: #fecaca;
+  --cs-red-glow:   rgba(220, 38, 38, .12);
+
+  // Upload
+  --cs-zone-bg:       #f8faff;
+  --cs-zone-border:   rgba(10, 102, 194, .20);
+  --cs-zone-hover-bdr:#{$c-blue-500};
+  --cs-zone-drag-bg:  rgba(10, 102, 194, .06);
+
+  // Code
+  --cs-code-text:  #92400e;
+  --cs-code-blue:  #1d4ed8;
+  --cs-code-green: #15803d;
+  --cs-json-bg:    #f8fafc;
+  --cs-json-text:  #15803d;
+  --cs-json-border:rgba(10, 102, 194, .10);
 }
 
+// ─── DARK THEME ──────────────────────────────────────────────────────────────
+
 [data-capi-theme="dark"] {
-  // ── Shell chrome ──────────────────────────────────────────────────────────
-  --cs-bg:              #0d1117;
-  --cs-surface:         #161b22;
-  --cs-border:          #21262d;
-  --cs-border-2:        #30363d;
-  --cs-text:            #e6edf3;
-  --cs-text2:           #8b949e;
-  --cs-muted:           #6e7681;
-  --cs-dim:             #484f58;
-  --cs-dim-text:        #555555;
-  --cs-accent:          #58a6ff;
-  --cs-accent-bg:       rgba(88, 166, 255, .09);
-  --cs-accent-border:   rgba(88, 166, 255, .28);
 
-  // ── App body ──────────────────────────────────────────────────────────────
-  --cs-body-bg:         #0a0e17;
-  --cs-body-text:       #c9d1d9;
-  --cs-deep-bg:         #070b12;
-  --cs-header-bg:       linear-gradient(90deg, #0d1117, #161b22);
-  --cs-header-border:   #21262d;
-  --cs-tabs-bg:         #0d1117;
-  --cs-tabs-border:     #21262d;
-  --cs-tab-active-col:  #58a6ff;
-  --cs-tab-text:        #8b949e;
-  --cs-tab-active-text: #e6edf3;
+  // Canvas — PersonalProfile exact navy scale
+  --cs-body-bg:   #07080f;
+  --cs-bg:        #0c0e1a;
+  --cs-surface:   #111424;
+  --cs-surface-2: #181c30;
+  --cs-deep-bg:   #050609;
 
-  // ── Cards / panels ────────────────────────────────────────────────────────
-  --cs-card-bg:         #0d1117;
-  --cs-card-border:     #21262d;
-  --cs-input-bg:        #161b22;
+  // Borders
+  --cs-border:     rgba(10, 102, 194, .18);
+  --cs-border-sub: rgba(255, 255, 255, .06);
+  --cs-border-2:   rgba(255, 255, 255, .09);
 
-  // ── Scrollbar ─────────────────────────────────────────────────────────────
-  --cs-scroll-track:    #0d1117;
-  --cs-scroll-thumb:    #30363d;
+  // Text hierarchy — PersonalProfile slate scale
+  --cs-text:     #eef0f8;
+  --cs-text2:    #c2c9df;
+  --cs-muted:    #8b96b5;
+  --cs-dim:      #55607e;
+  --cs-dim-text: #404860;
 
-  // ── Status colours ────────────────────────────────────────────────────────
-  --cs-green:           #3fb950;
-  --cs-green-bg:        #0d2b0d;
-  --cs-green-border:    #238636;
-  --cs-yellow:          #e5c07b;
-  --cs-yellow-bg:       #2b1f0d;
-  --cs-yellow-border:   rgba(229, 192, 123, .27);
-  --cs-blue-badge:      #61afef;
-  --cs-blue-badge-bg:   #0d1e3a;
-  --cs-blue-badge-bdr:  rgba(31, 111, 235, .27);
-  --cs-red:             #f85149;
-  --cs-red-bg:          #2b0d0d;
-  --cs-red-border:      rgba(248, 81, 73, .4);
+  // Accent — brighter blue in dark
+  --cs-accent:        #{$c-blue-400};
+  --cs-accent-2:      #{$c-blue-300};
+  --cs-accent-bg:     rgba(10, 102, 194, .13);
+  --cs-accent-border: rgba(55, 143, 233, .32);
 
-  // ── Upload zone ───────────────────────────────────────────────────────────
-  --cs-zone-bg:         #0d1117;
-  --cs-zone-border:     #30363d;
-  --cs-zone-hover-bdr:  #58a6ff;
-  --cs-zone-drag-bg:    rgba(13, 30, 58, .22);
+  // Shell / nav chrome
+  --cs-shell-bg: rgba(7, 8, 15, .92);
 
-  // ── Code / mono ───────────────────────────────────────────────────────────
-  --cs-code-text:       #e5c07b;
-  --cs-code-blue:       #61afef;
-  --cs-code-green:      #98c379;
-  --cs-json-bg:         #070b12;
-  --cs-json-text:       #98c379;
+  // Header
+  --cs-header-bg:     linear-gradient(90deg, #0c0e1a 0%, #111424 100%);
+  --cs-header-border: rgba(10, 102, 194, .18);
+
+  // Tabs
+  --cs-tabs-bg:         #0c0e1a;
+  --cs-tabs-border:     rgba(10, 102, 194, .14);
+  --cs-tab-active-col:  #{$c-blue-400};
+  --cs-tab-text:        #8b96b5;
+  --cs-tab-active-text: #eef0f8;
+
+  // Cards / panels
+  --cs-card-bg:     #0c0e1a;
+  --cs-card-border: rgba(10, 102, 194, .16);
+  --cs-input-bg:    #111424;
+
+  // Scrollbar
+  --cs-scroll-track: #07080f;
+  --cs-scroll-thumb: #1e2340;
+
+  // Shadows
+  --cs-shadow-sm:   0 1px 4px rgba(0, 0, 0, .4);
+  --cs-shadow-md:   0 4px 20px rgba(0, 0, 0, .5);
+  --cs-shadow-lg:   0 16px 56px rgba(0, 0, 0, .6);
+  --cs-shadow-glow: 0 0 0 3px rgba(55, 143, 233, .16);
+  --cs-shadow-blue: 0 4px 28px rgba(10, 102, 194, .28);
+
+  // Status — green
+  --cs-green:        #22c55e;
+  --cs-green-bg:     rgba(34, 197, 94, .09);
+  --cs-green-border: rgba(34, 197, 94, .28);
+  --cs-green-glow:   rgba(34, 197, 94, .18);
+
+  // Status — amber/warn
+  --cs-yellow:        #f59e0b;
+  --cs-yellow-bg:     rgba(245, 158, 11, .09);
+  --cs-yellow-border: rgba(245, 158, 11, .28);
+
+  // Status — blue badge
+  --cs-blue-badge:    #{$c-blue-300};
+  --cs-blue-badge-bg: rgba(10, 102, 194, .14);
+  --cs-blue-badge-bdr:rgba(55, 143, 233, .30);
+
+  // Status — red
+  --cs-red:        #f87171;
+  --cs-red-bg:     rgba(239, 68, 68, .09);
+  --cs-red-border: rgba(239, 68, 68, .30);
+  --cs-red-glow:   rgba(239, 68, 68, .16);
+
+  // Upload
+  --cs-zone-bg:       #0c0e1a;
+  --cs-zone-border:   rgba(10, 102, 194, .20);
+  --cs-zone-hover-bdr:#{$c-blue-400};
+  --cs-zone-drag-bg:  rgba(10, 102, 194, .09);
+
+  // Code
+  --cs-code-text:  #f59e0b;
+  --cs-code-blue:  #{$c-blue-300};
+  --cs-code-green: #4ade80;
+  --cs-json-bg:    #07080f;
+  --cs-json-text:  #4ade80;
+  --cs-json-border:rgba(10, 102, 194, .18);
 }
