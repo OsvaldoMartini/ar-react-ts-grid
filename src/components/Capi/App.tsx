@@ -4,6 +4,7 @@ import { FileUploadPanel } from "./FileUploadPanel";
 import { DebugTab, LogEntry } from "./DebugTab";
 import { StoreTab } from "./StoreTab";
 import { BizWizard } from "./BizWizard";
+import { ApiWorkflowTab } from "./ApiWorkflowTab";
 import "./capi-app.scss";
 
 // ═══════════════════════════════════════════════════════════════
@@ -11,6 +12,7 @@ import "./capi-app.scss";
 // ═══════════════════════════════════════════════════════════════
 export interface CapiProps {
   homeBankingIdInitial: number;
+  homeBankNameInitial: string;
   socketPort: number;
   sessionId: string;
   botJobIdInitial: number;
@@ -20,13 +22,14 @@ export interface CapiProps {
 }
 
 interface AppState {
-  tab: "apis" | "debug" | "store";
+  tab: "apis" | "workflow" | "debug" | "store";
   specs: ApiSpec[];
   log: LogEntry[];
   loading: boolean;
   showWizard: boolean;
   tick: number;
   homeBankingId: number;
+  homeBankName: string;
   socketPortLive: number;
   sessionIdLive: string;
   botJobId: number;
@@ -44,6 +47,7 @@ export default class App extends React.Component<CapiProps, AppState> {
       showWizard: false,
       tick: 0,
       homeBankingId: props.homeBankingIdInitial,
+      homeBankName: props.homeBankNameInitial,
       socketPortLive: props.socketPort,
       sessionIdLive: props.sessionId,
       botJobId: props.botJobIdInitial,
@@ -87,12 +91,13 @@ export default class App extends React.Component<CapiProps, AppState> {
   render() {
     const {
       tab, specs, log, showWizard,
-      homeBankingId, socketPortLive, botJobId, botJobName,
+      homeBankingId, homeBankName, socketPortLive, botJobId, botJobName,
     } = this.state;
     const { rightControls } = this.props;
     const tot = Object.values(db.stores).reduce((a, s) => a + s.length, 0);
     const TABS = [
       { id: "apis", l: `📁 API Files (${specs.length})` },
+      { id: "workflow", l: `⬡ Workflow` },
       { id: "debug", l: `🔍 Debug${log.length > 0 ? ` (${log.length})` : ""}` },
       { id: "store", l: `🗄️ Store (${tot})` },
     ] as const;
@@ -111,11 +116,10 @@ export default class App extends React.Component<CapiProps, AppState> {
             <div className="capi-header__title">AVALOQ API TEST SIMULATOR</div>
             <div className="capi-header__badges">
               {botJobName && (
-                <span className="capi-badge capi-badge--job">📋 {botJobName}</span>
+                <span className="capi-badge capi-badge--job">🏦 Banking Name:({homeBankingId})-{homeBankName}</span>
               )}
-              <span className="capi-badge capi-badge--dim">🏦 HB:{homeBankingId}</span>
-              <span className="capi-badge capi-badge--dim">🔌 :{socketPortLive}</span>
-              <span className="capi-badge capi-badge--blue">#{botJobId}</span>
+              {/* <span className="capi-badge capi-badge--dim">🔌Socket :{socketPortLive}</span> */}
+              <span className="capi-badge capi-badge--blue">📋 Bot Job:({botJobId})-{botJobName}</span>
             </div>
           </div>
           <div className="capi-header__controls">
@@ -153,6 +157,9 @@ export default class App extends React.Component<CapiProps, AppState> {
                 onDeleteAll={this.onDeleteAll}
               />
             </div>
+          )}
+          {tab === "workflow" && (
+            <ApiWorkflowTab loadedSpecs={specs} />
           )}
           {tab === "debug" && (
             <DebugTab

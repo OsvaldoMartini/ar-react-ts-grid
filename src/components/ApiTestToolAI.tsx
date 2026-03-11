@@ -1320,6 +1320,7 @@ function ConsoleTab({ messages, clear }: { messages: ConsoleMessage[]; clear: ()
 //                botJobNameInitial={botJobName} />
 interface ApiTestToolProps {
   homeBankingIdInitial: number;
+  homeBankNameInitial: string;
   socketPort: number;
   sessionId: string;
   botJobIdInitial: number;
@@ -1328,6 +1329,7 @@ interface ApiTestToolProps {
 
 const ApiTestToolAI: React.FC<ApiTestToolProps> = ({
   homeBankingIdInitial,
+  homeBankNameInitial,
   socketPort,
   sessionId,
   botJobIdInitial,
@@ -1335,11 +1337,15 @@ const ApiTestToolAI: React.FC<ApiTestToolProps> = ({
 }) => {
   // Mirror the pattern used by GridItem / GridItemComp
   const [homeBankingId, setHomeBankingId] = useState<number>(homeBankingIdInitial);
+  const [homeBankName, setHomeBankName] = useState<string>(homeBankNameInitial);
   const [botJobId, setBotJobId] = useState<number>(botJobIdInitial);
   const [botJobName, setBotJobName] = useState<string>(botJobNameInitial);
 
   // Keep local state in sync if parent re-renders with new props
-  useEffect(() => { setHomeBankingId(homeBankingIdInitial); }, [homeBankingIdInitial]);
+  useEffect(() => {
+    setHomeBankingId(homeBankingIdInitial);
+    setHomeBankName(homeBankNameInitial);
+  }, [homeBankingIdInitial, homeBankNameInitial]);
   useEffect(() => { setBotJobId(botJobIdInitial); }, [botJobIdInitial]);
   useEffect(() => { setBotJobName(botJobNameInitial); }, [botJobNameInitial]);
 

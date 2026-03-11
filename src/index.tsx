@@ -23,8 +23,9 @@ const App: React.FC = () => {
   const [botJobData, setBotJobData] = useState<BotJobData>(botJobMockData);
   const [socketPort, setSocketPort] = useState<number>(52967);
   const [botJobId, setBotJobId] = useState<number>(76);
-  const [botJobName, setBotJobName] = useState<string>("");
+  const [botJobName, setBotJobName] = useState<string>("CAPI Tests");
   const [homeBanking, setHomeBanking] = useState<number>(46);
+  const [homeBankName, setHomeBankName] = useState<string>("Banca Stato");
   const [sessionId, setSessionId] = useState<string>("capiApiTestToolAI"); // (SENDER: scannerTool) -> scannerGrid-1  -> componentTasks-1 -> mobileScannerGrid 
   const [errorFlag, setErrorFlag] = useState<boolean>(false)  //(SENDER: insertTool) -> botJobTasks-1 -> componentTasks  
   const [alertImage, setAlertImage] = useState(constructionImage);
@@ -60,6 +61,7 @@ const App: React.FC = () => {
         setSessionId(sessionIdFromJava);
         if (homeBanking !== -9999) {
           setHomeBanking(homeBanking);
+          setHomeBankName(homeBankName);
         }
         if (botJobId !== -9999) {
           setBotJobId(botJobId);
@@ -129,20 +131,22 @@ const App: React.FC = () => {
       )}
 
       {/* ── NEW: ApiTestTool – same props shape as GridItem / GridItemComp ── */}
-      {sessionId && sessionId.includes("apiTestToolAI") && (  // ← NEW
-        <ApiTestToolAI                                         // ← NEW
-          homeBankingIdInitial={homeBanking}                 // ← NEW
-          socketPort={socketPort}                            // ← NEW
-          sessionId={sessionId}                              // ← NEW
-          botJobIdInitial={botJobId}                         // ← NEW
-          botJobNameInitial={botJobName}                     // ← NEW
-        />                                                   // ← NEW
+      {sessionId && sessionId.includes("apiTestToolAI") && (
+        <ApiTestToolAI
+          homeBankingIdInitial={homeBanking}
+          homeBankNameInitial={homeBankName}
+          socketPort={socketPort}
+          sessionId={sessionId}
+          botJobIdInitial={botJobId}
+          botJobNameInitial={botJobName}
+        />
       )}
 
       {/* ── Avaloq API Test Simulator ── */}
       {sessionId && sessionId.includes("capiApiTestToolAI") && (
         <ApiTestToolAINew
           homeBankingIdInitial={homeBanking}
+          homeBankNameInitial={homeBankName}
           socketPort={socketPort}
           sessionId={sessionId}
           botJobIdInitial={botJobId}
