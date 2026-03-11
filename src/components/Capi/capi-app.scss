@@ -1,0 +1,163 @@
+// capi-app.scss
+// ─────────────────────────────────────────────────────────────────────────────
+// Styles for the main App layout: root wrapper, header, badge bar, tabs.
+// Background and text inherit from CSS vars so light/dark works everywhere.
+// ─────────────────────────────────────────────────────────────────────────────
+
+@import 'capi-tokens';
+
+// ── Root ──────────────────────────────────────────────────────────────────────
+
+.capi-app {
+  font-family:    'IBM Plex Mono', 'Courier New', monospace;
+  background:     var(--cs-body-bg);
+  min-height:     100vh;
+  color:          var(--cs-body-text);
+  display:        flex;
+  flex-direction: column;
+  transition:     background .25s, color .25s;
+
+  // Themed scrollbar
+  ::-webkit-scrollbar              { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track        { background: var(--cs-scroll-track); }
+  ::-webkit-scrollbar-thumb        { background: var(--cs-scroll-thumb); border-radius: 2px; }
+  textarea:focus,
+  input:focus,
+  select:focus                     { border-color: var(--cs-accent) !important; outline: none; }
+}
+
+// ── Header row ────────────────────────────────────────────────────────────────
+
+.capi-header {
+  background:   var(--cs-header-bg);
+  border-bottom: 1px solid var(--cs-header-border);
+  padding:      10px 18px;
+  display:      flex;
+  align-items:  center;
+  gap:          14px;
+  transition:   background .25s, border-color .25s;
+
+  @media (max-width: 480px) { padding: 8px 10px; gap: 8px; }
+}
+
+.capi-header__logo {
+  background:     linear-gradient(135deg, #0052cc, #00875a);
+  border-radius:  6px;
+  width:          30px;
+  height:         30px;
+  display:        flex;
+  align-items:    center;
+  justify-content: center;
+  font-size:      13px;
+  font-weight:    700;
+  color:          #fff;
+  flex-shrink:    0;
+}
+
+.capi-header__title {
+  font-size:      12px;
+  font-weight:    700;
+  color:          var(--cs-text);
+  letter-spacing: 1px;
+  transition:     color .25s;
+}
+
+// Badge row (HB / port / job)
+.capi-header__badges {
+  display:    flex;
+  gap:        6px;
+  margin-top: 3px;
+  flex-wrap:  wrap;
+}
+
+.capi-badge {
+  font-size:     8px;
+  border-radius: 8px;
+  padding:       1px 7px;
+  border:        1px solid;
+  white-space:   nowrap;
+
+  &--dim  { color: var(--cs-text2);       background: var(--cs-card-bg);      border-color: var(--cs-card-border); }
+  &--blue { color: var(--cs-blue-badge);  background: var(--cs-blue-badge-bg); border-color: var(--cs-blue-badge-bdr); }
+  &--job  { color: var(--cs-yellow);      background: var(--cs-yellow-bg);     border-color: var(--cs-yellow-border); }
+}
+
+// Right-side controls cluster in header
+.capi-header__controls {
+  margin-left: auto;
+  display:     flex;
+  gap:         6px;
+  align-items: center;
+}
+
+// WIZARD button
+.capi-btn-wizard {
+  background:  linear-gradient(135deg, #0d2347, #0a1628);
+  border:      2px solid var(--cs-green);
+  border-radius: 6px;
+  color:       var(--cs-green);
+  padding:     5px 12px;
+  cursor:      pointer;
+  font-size:   10px;
+  font-family: inherit;
+  font-weight: 700;
+  transition:  background .15s, border-color .15s;
+
+  &:hover { background: rgba(63, 185, 80, .08); }
+}
+
+// "● N API" counter badge
+.capi-api-count {
+  font-size:     9px;
+  color:         var(--cs-green);
+  background:    var(--cs-green-bg);
+  border:        1px solid var(--cs-green-border);
+  border-radius: 10px;
+  padding:       2px 8px;
+  white-space:   nowrap;
+}
+
+// ── Tab bar ───────────────────────────────────────────────────────────────────
+
+.capi-tabs {
+  background:    var(--cs-tabs-bg);
+  border-bottom: 1px solid var(--cs-tabs-border);
+  padding:       0 18px;
+  display:       flex;
+  transition:    background .25s, border-color .25s;
+}
+
+.capi-tab-btn {
+  background:    none;
+  border:        none;
+  border-bottom: 2px solid transparent;
+  color:         var(--cs-tab-text);
+  padding:       8px 14px;
+  cursor:        pointer;
+  font-size:     10px;
+  font-weight:   600;
+  letter-spacing: .5px;
+  font-family:   inherit;
+  transition:    color .15s, border-color .15s;
+
+  &.active {
+    border-bottom-color: var(--cs-tab-active-col);
+    color:               var(--cs-tab-active-text);
+  }
+
+  &:hover:not(.active) { color: var(--cs-text); }
+}
+
+// ── Content area ──────────────────────────────────────────────────────────────
+
+.capi-content {
+  flex:           1;
+  overflow:       hidden;
+  display:        flex;
+  flex-direction: column;
+}
+
+.capi-scroll {
+  flex:       1;
+  overflow-y: auto;
+}

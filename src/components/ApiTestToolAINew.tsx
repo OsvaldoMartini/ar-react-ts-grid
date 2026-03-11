@@ -14,9 +14,11 @@
  *       botJobNameInitial={botJobName}
  *     />
  *   )}
+ *
+ * Uses CapiShell (not App directly) so ThemeProvider + i18n are always mounted.
  */
 
-import CapiApp from "./Capi/App";
+import CapiShell from "./Capi/CapiShell";
 export type { CapiProps } from "./Capi/App";
 
-export default CapiApp;
+export default CapiShell;

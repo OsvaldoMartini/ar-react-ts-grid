@@ -1,0 +1,124 @@
+// capi-tokens.scss
+// ─────────────────────────────────────────────────────────────────────────────
+// CSS Custom Properties for CAPI — light (default) and dark themes.
+// Applied on [data-capi-theme] set by CapiShell on the root wrapper.
+// ALL components reference these vars so the full app responds to theme.
+// ─────────────────────────────────────────────────────────────────────────────
+
+[data-capi-theme="light"] {
+  // ── Shell chrome ──────────────────────────────────────────────────────────
+  --cs-bg:              #ffffff;
+  --cs-surface:         #f1f5f9;
+  --cs-border:          #cbd5e1;
+  --cs-text:            #0f172a;
+  --cs-text2:           #334155;
+  --cs-muted:           #64748b;
+  --cs-dim:             #94a3b8;
+  --cs-accent:          #2563eb;
+  --cs-accent-bg:       #eff6ff;
+  --cs-accent-border:   #bfdbfe;
+
+  // ── App body ──────────────────────────────────────────────────────────────
+  --cs-body-bg:         #f8fafc;
+  --cs-body-text:       #1e293b;
+  --cs-header-bg:       linear-gradient(90deg, #f1f5f9, #e8edf4);
+  --cs-header-border:   #cbd5e1;
+  --cs-tabs-bg:         #ffffff;
+  --cs-tabs-border:     #e2e8f0;
+  --cs-tab-active-col:  #2563eb;
+  --cs-tab-text:        #64748b;
+  --cs-tab-active-text: #0f172a;
+
+  // ── Cards / panels ────────────────────────────────────────────────────────
+  --cs-card-bg:         #ffffff;
+  --cs-card-border:     #e2e8f0;
+  --cs-input-bg:        #ffffff;
+
+  // ── Scrollbar ─────────────────────────────────────────────────────────────
+  --cs-scroll-track:    #f1f5f9;
+  --cs-scroll-thumb:    #cbd5e1;
+
+  // ── Status colours ────────────────────────────────────────────────────────
+  --cs-green:           #16a34a;
+  --cs-green-bg:        #f0fdf4;
+  --cs-green-border:    #bbf7d0;
+  --cs-yellow:          #b45309;
+  --cs-yellow-bg:       #fffbeb;
+  --cs-yellow-border:   #fde68a;
+  --cs-blue-badge:      #1d4ed8;
+  --cs-blue-badge-bg:   #eff6ff;
+  --cs-blue-badge-bdr:  #bfdbfe;
+  --cs-red:             #dc2626;
+  --cs-red-bg:          #fff1f2;
+  --cs-red-border:      #fecaca;
+
+  // ── Upload zone ───────────────────────────────────────────────────────────
+  --cs-zone-bg:         #f8fafc;
+  --cs-zone-border:     #cbd5e1;
+  --cs-zone-hover-bdr:  #2563eb;
+  --cs-zone-drag-bg:    rgba(37, 99, 235, .06);
+
+  // ── Code / mono ───────────────────────────────────────────────────────────
+  --cs-code-text:       #b45309;
+  --cs-code-blue:       #1d4ed8;
+  --cs-code-green:      #15803d;
+}
+
+[data-capi-theme="dark"] {
+  // ── Shell chrome ──────────────────────────────────────────────────────────
+  --cs-bg:              #0d1117;
+  --cs-surface:         #161b22;
+  --cs-border:          #21262d;
+  --cs-text:            #e6edf3;
+  --cs-text2:           #8b949e;
+  --cs-muted:           #6e7681;
+  --cs-dim:             #484f58;
+  --cs-accent:          #58a6ff;
+  --cs-accent-bg:       rgba(88, 166, 255, .09);
+  --cs-accent-border:   rgba(88, 166, 255, .28);
+
+  // ── App body ──────────────────────────────────────────────────────────────
+  --cs-body-bg:         #0a0e17;
+  --cs-body-text:       #c9d1d9;
+  --cs-header-bg:       linear-gradient(90deg, #0d1117, #161b22);
+  --cs-header-border:   #21262d;
+  --cs-tabs-bg:         #0d1117;
+  --cs-tabs-border:     #21262d;
+  --cs-tab-active-col:  #58a6ff;
+  --cs-tab-text:        #8b949e;
+  --cs-tab-active-text: #e6edf3;
+
+  // ── Cards / panels ────────────────────────────────────────────────────────
+  --cs-card-bg:         #0d1117;
+  --cs-card-border:     #21262d;
+  --cs-input-bg:        #161b22;
+
+  // ── Scrollbar ─────────────────────────────────────────────────────────────
+  --cs-scroll-track:    #0d1117;
+  --cs-scroll-thumb:    #30363d;
+
+  // ── Status colours ────────────────────────────────────────────────────────
+  --cs-green:           #3fb950;
+  --cs-green-bg:        #0d2b0d;
+  --cs-green-border:    #238636;
+  --cs-yellow:          #e5c07b;
+  --cs-yellow-bg:       #2b1f0d;
+  --cs-yellow-border:   rgba(229, 192, 123, .27);
+  --cs-blue-badge:      #61afef;
+  --cs-blue-badge-bg:   #0d1e3a;
+  --cs-blue-badge-bdr:  rgba(31, 111, 235, .27);
+  --cs-red:             #f85149;
+  --cs-red-bg:          #2b0d0d;
+  --cs-red-border:      rgba(248, 81, 73, .4);
+
+  // ── Upload zone ───────────────────────────────────────────────────────────
+  --cs-zone-bg:         #0d1117;
+  --cs-zone-border:     #30363d;
+  --cs-zone-hover-bdr:  #58a6ff;
+  --cs-zone-drag-bg:    rgba(13, 30, 58, .22);
+
+  // ── Code / mono ───────────────────────────────────────────────────────────
+  --cs-code-text:       #e5c07b;
+  --cs-code-blue:       #61afef;
+  --cs-code-green:      #98c379;
+}

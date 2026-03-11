@@ -4,11 +4,10 @@ import { FileUploadPanel } from "./FileUploadPanel";
 import { DebugTab, LogEntry } from "./DebugTab";
 import { StoreTab } from "./StoreTab";
 import { BizWizard } from "./BizWizard";
-import { LanguagePicker } from "./LanguagePicker";
+import "./capi-app.scss";
 
 // ═══════════════════════════════════════════════════════════════
-// SHARED PROPS — matches the shape used by GridItem, GridItemComp,
-// GridItemScann, GridItemScannMobile and ApiTestToolAI in index.tsx
+// SHARED PROPS
 // ═══════════════════════════════════════════════════════════════
 export interface CapiProps {
   homeBankingIdInitial: number;
@@ -16,12 +15,9 @@ export interface CapiProps {
   sessionId: string;
   botJobIdInitial: number;
   botJobNameInitial: string;
+  /** Controls rendered right of the API count badge (e.g. LanguagePicker + ThemeToggle from CapiShell) */
+  rightControls?: React.ReactNode;
 }
-
-// ═══════════════════════════════════════════════════════════════
-// MAIN APP — Avaloq API Test Simulator
-// Broken down into React Class Components
-// ═══════════════════════════════════════════════════════════════
 
 interface AppState {
   tab: "apis" | "debug" | "store";
@@ -30,7 +26,6 @@ interface AppState {
   loading: boolean;
   showWizard: boolean;
   tick: number;
-  // runtime values synced from props (may be updated later via receiveDataFromJava)
   homeBankingId: number;
   socketPortLive: number;
   sessionIdLive: string;
@@ -39,8 +34,6 @@ interface AppState {
 }
 
 export default class App extends React.Component<CapiProps, AppState> {
-  // Initialise state from props so the component is usable as a drop-in
-  // inside the existing index.tsx (same prop contract as GridItem et al.)
   constructor(props: CapiProps) {
     super(props);
     this.state = {
@@ -96,6 +89,7 @@ export default class App extends React.Component<CapiProps, AppState> {
       tab, specs, log, showWizard,
       homeBankingId, socketPortLive, botJobId, botJobName,
     } = this.state;
+    const { rightControls } = this.props;
     const tot = Object.values(db.stores).reduce((a, s) => a + s.length, 0);
     const TABS = [
       { id: "apis", l: `📁 API Files (${specs.length})` },
@@ -104,70 +98,55 @@ export default class App extends React.Component<CapiProps, AppState> {
     ] as const;
 
     return (
-      <div style={{ fontFamily: "'IBM Plex Mono','Courier New',monospace", background: "#0a0e17", minHeight: "100vh", color: "#c9d1d9", display: "flex", flexDirection: "column" }}>
+      <div className="capi-app">
         {/* Modals */}
-        {showWizard && <BizWizard onClose={() => this.setState({ showWizard: false })} loadedSpecs={specs} />}
+        {showWizard && (
+          <BizWizard onClose={() => this.setState({ showWizard: false })} loadedSpecs={specs} />
+        )}
 
-        {/* HEADER */}
-        <div style={{ background: "linear-gradient(90deg,#0d1117,#161b22)", borderBottom: "1px solid #21262d", padding: "10px 18px", display: "flex", alignItems: "center", gap: 14 }}>
-          <div style={{ background: "linear-gradient(135deg,#0052cc,#00875a)", borderRadius: 6, width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: "white", flexShrink: 0 }}>A</div>
+        {/* ── HEADER ── */}
+        <div className="capi-header">
+          <div className="capi-header__logo">A</div>
           <div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#e6edf3", letterSpacing: 1 }}>AVALOQ API TEST SIMULATOR</div>
-            {/* Context badges */}
-            <div style={{ display: "flex", gap: 6, marginTop: 3, flexWrap: "wrap" }}>
+            <div className="capi-header__title">AVALOQ API TEST SIMULATOR</div>
+            <div className="capi-header__badges">
               {botJobName && (
-                <span style={{ fontSize: 8, color: "#e5c07b", background: "#2b1f0d", border: "1px solid #e5c07b44", borderRadius: 8, padding: "1px 7px" }}>
-                  📋 {botJobName}
-                </span>
+                <span className="capi-badge capi-badge--job">📋 {botJobName}</span>
               )}
-              <span style={{ fontSize: 8, color: "#8b949e", background: "#161b22", border: "1px solid #30363d", borderRadius: 8, padding: "1px 7px" }}>
-                🏦 HB:{homeBankingId}
-              </span>
-              <span style={{ fontSize: 8, color: "#8b949e", background: "#161b22", border: "1px solid #30363d", borderRadius: 8, padding: "1px 7px" }}>
-                🔌 :{socketPortLive}
-              </span>
-              <span style={{ fontSize: 8, color: "#61afef", background: "#0d1e3a", border: "1px solid #1f6feb44", borderRadius: 8, padding: "1px 7px" }}>
-                #{botJobId}
-              </span>
+              <span className="capi-badge capi-badge--dim">🏦 HB:{homeBankingId}</span>
+              <span className="capi-badge capi-badge--dim">🔌 :{socketPortLive}</span>
+              <span className="capi-badge capi-badge--blue">#{botJobId}</span>
             </div>
           </div>
-          <div style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>
+          <div className="capi-header__controls">
             <button
+              className="capi-btn-wizard"
               onClick={() => this.setState({ showWizard: true })}
-              style={{ background: "linear-gradient(135deg,#0d2347,#0a1628)", border: "2px solid #3fb950", borderRadius: 6, color: "#3fb950", padding: "5px 12px", cursor: "pointer", fontSize: 10, fontFamily: "inherit", fontWeight: 700 }}
-            >🧪 WIZARD</button>
-            <div style={{ fontSize: 9, color: "#3fb950", background: "#0d2b0d", border: "1px solid #238636", borderRadius: 10, padding: "2px 8px" }}>
-              ● {specs.length} API
-            </div>
-            {/* Language picker — replaces CLAUDE/OLLAMA badge */}
-            <LanguagePicker />
+            >
+              🧪 WIZARD
+            </button>
+            <div className="capi-api-count">● {specs.length} API</div>
+            {rightControls}
           </div>
         </div>
 
-        {/* TABS */}
-        <div style={{ background: "#0d1117", borderBottom: "1px solid #21262d", padding: "0 18px", display: "flex" }}>
+        {/* ── TABS ── */}
+        <div className="capi-tabs">
           {TABS.map(t => (
             <button
               key={t.id}
               onClick={() => this.setState({ tab: t.id as any })}
-              style={{
-                background: "none", border: "none",
-                borderBottom: tab === t.id ? "2px solid #58a6ff" : "2px solid transparent",
-                color: tab === t.id ? "#e6edf3" : "#8b949e",
-                padding: "8px 14px", cursor: "pointer",
-                fontSize: 10, fontWeight: 600, letterSpacing: 0.5,
-                fontFamily: "inherit", transition: "all .15s",
-              }}
+              className={`capi-tab-btn${tab === t.id ? " active" : ""}`}
             >
               {t.l}
             </button>
           ))}
         </div>
 
-        {/* CONTENT */}
-        <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        {/* ── CONTENT ── */}
+        <div className="capi-content">
           {tab === "apis" && (
-            <div style={{ flex: 1, overflowY: "auto" }}>
+            <div className="capi-scroll">
               <FileUploadPanel
                 onSpecLoaded={this.onSpecLoaded}
                 loadedSpecs={specs}
@@ -188,14 +167,6 @@ export default class App extends React.Component<CapiProps, AppState> {
             />
           )}
         </div>
-
-        <style>{`
-          *{box-sizing:border-box;}
-          ::-webkit-scrollbar{width:4px;height:4px;}
-          ::-webkit-scrollbar-track{background:#0d1117;}
-          ::-webkit-scrollbar-thumb{background:#30363d;border-radius:2px;}
-          textarea:focus,input:focus,select:focus{border-color:#58a6ff!important;outline:none;}
-        `}</style>
       </div>
     );
   }

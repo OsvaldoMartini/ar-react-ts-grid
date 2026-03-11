@@ -1,13 +1,7 @@
 // Capi/LanguagePicker.tsx
 // ─────────────────────────────────────────────────────────────────────────────
-// Ported from AutoTraderAI/src/components/LanguagePicker/LanguagePicker.tsx
-//
-// Key differences from the original:
-//   • No SCSS / CSS modules — all styles are inline or via a <style> injection
-//   • CSS variables reference --cs-* tokens set by CapiShell (light & dark)
-//   • Flag images replaced with flagcdn.com URLs (zero local asset deps)
-//   • Compact trigger design to match CAPI's monospace/terminal aesthetic
-//   • Mobile: dropdown clamps to viewport width, min touch target 36px
+// Language picker for the CAPI shell top bar.
+// Styles live in capi-shell.scss (imported by CapiShell).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, {
@@ -16,9 +10,6 @@ import React, {
   useEffect,
   useCallback,
 } from "react";
-// Direct import of the i18n instance — no React context needed, no timing issues.
-// useTranslation() requires initReactI18next to be registered BEFORE the component
-// mounts; importing i18n directly sidesteps that race entirely.
 import i18nInstance from "../../i18n";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -46,71 +37,6 @@ function flagUrl(flagCode: string): string {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// One-time CSS injection (hover states + animation + mobile)
-// Must be class-based because inline styles cannot express :hover
-// ─────────────────────────────────────────────────────────────────────────────
-
-const LANG_CSS = `
-  .capi-lt { box-sizing:border-box; }
-
-  /* Trigger hover / open */
-  .capi-lt-trigger:hover,
-  .capi-lt-trigger.open {
-    border-color: var(--cs-accent, #2563eb) !important;
-    background:   var(--cs-accent-bg, #eff6ff) !important;
-    color:        var(--cs-accent, #2563eb) !important;
-    box-shadow: 0 0 0 3px rgba(37,99,235,.09);
-  }
-
-  /* Option hover */
-  .capi-lt-option:hover {
-    background: var(--cs-accent-bg, #eff6ff) !important;
-    color:      var(--cs-accent, #2563eb) !important;
-  }
-  .capi-lt-option:hover .capi-lt-code {
-    color: var(--cs-accent, #2563eb);
-    opacity: .65;
-  }
-
-  /* Dropdown entrance animation */
-  .capi-lt-dropdown {
-    animation: capiLtDrop .18s cubic-bezier(.22,.68,0,1.15) both;
-  }
-  @keyframes capiLtDrop {
-    from { opacity:0; transform:translateY(-5px) scale(.97); }
-    to   { opacity:1; transform:translateY(0) scale(1); }
-  }
-
-  /* Chevron rotation */
-  .capi-lt-chevron { transition: transform .22s cubic-bezier(.34,1.56,.64,1); }
-  .capi-lt-chevron.open { transform: rotate(180deg); }
-
-  /* Flag ring border transition */
-  .capi-lt-flag-ring { transition: border-color .15s; }
-  .capi-lt-trigger:hover .capi-lt-flag-ring,
-  .capi-lt-trigger.open  .capi-lt-flag-ring,
-  .capi-lt-option:hover  .capi-lt-flag-ring,
-  .capi-lt-opt-active    .capi-lt-flag-ring {
-    border-color: var(--cs-accent, #2563eb) !important;
-  }
-
-  /* Mobile tweaks */
-  @media (max-width: 480px) {
-    .capi-lt-dropdown { min-width: 168px !important; }
-    .capi-lt-native   { font-size: 12px !important; }
-    .capi-lt-trigger  { padding: 4px 8px 4px 4px !important; }
-  }
-`;
-
-let cssInjected = false;
-function injectCss() {
-  if (cssInjected || typeof document === "undefined") return;
-  const el = document.createElement("style");
-  el.textContent = LANG_CSS;
-  document.head.appendChild(el);
-  cssInjected = true;
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Sub-components
 // ─────────────────────────────────────────────────────────────────────────────
@@ -163,8 +89,6 @@ function CheckIcon() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function LanguagePicker() {
-  injectCss();
-
   // Use the i18n instance directly — no hook, no context dependency
   const i18n = i18nInstance;
   const [open, setOpen] = useState(false);
