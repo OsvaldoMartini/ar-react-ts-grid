@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<hierarchy>
+      
+    <element class="hierarchy">
+            
+        <element bounds="[0,0][1080,2400]" class="android.widget.LinearLayout" clickable="false" enabled="true" resource-id="ch.bsct.ebanking.mobile:id/action_bar_root">
+                  
+            <element bounds="[0,0][1080,2400]" class="android.widget.FrameLayout" clickable="false" enabled="true" resource-id="android:id/content">
+                        
+                <element bounds="[0,94][1080,2270]" class="android.widget.LinearLayout" clickable="false" enabled="true" resource-id="ch.bsct.ebanking.mobile:id/fragmentContainer">
+                              
+                    <element bounds="[0,94][1080,248]" class="android.view.ViewGroup" clickable="false" enabled="true" resource-id="ch.bsct.ebanking.mobile:id/registrationToolbar">
+                                    
+                        <element bounds="[0,97][138,248]" class="android.widget.ImageView" clickable="true" content-desc="Indietro" enabled="true" resource-id="ch.bsct.ebanking.mobile:id/drawer_back"/>
+                                    
+                        <element bounds="[138,136][1036,210]" class="android.widget.TextView" clickable="false" enabled="true" resource-id="ch.bsct.ebanking.mobile:id/title" text="Login"/>
+                                  
+                    </element>
+                              
+                    <element bounds="[0,248][1080,2050]" class="android.widget.ScrollView" clickable="false" enabled="true" resource-id="ch.bsct.ebanking.mobile:id/content">
+                                    
+                        <element bounds="[44,336][1036,501]" class="android.widget.LinearLayout" clickable="false" enabled="false" resource-id="ch.bsct.ebanking.mobile:id/username_input_wrapper">
+                                          
+                            <element bounds="[44,348][1036,501]" class="android.widget.EditText" clickable="true" enabled="false" text="•••212"/>
+                                        
+                        </element>
+                                    
+                        <element bounds="[44,545][1036,710]" class="android.widget.LinearLayout" clickable="false" enabled="true" resource-id="ch.bsct.ebanking.mobile:id/password_input_wrapper">
+                                          
+                            <element bounds="[44,557][1036,710]" class="android.widget.EditText" clickable="true" enabled="true" text="Parola d'ordine"/>
+                                          
+                            <element bounds="[904,567][1036,699]" class="android.widget.ImageButton" clickable="true" content-desc="Mostra password" enabled="true" resource-id="ch.bsct.ebanking.mobile:id/text_input_end_icon"/>
+                                        
+                        </element>
+                                  
+                    </element>
+                              
+                    <element bounds="[44,2094][1036,2226]" class="android.widget.Button" clickable="true" enabled="true" resource-id="ch.bsct.ebanking.mobile:id/offline_login_button" text="Inviare"/>
+                            
+                </element>
+                      
+            </element>
+                
+        </element>
+          
+    </element>
+    
+</hierarchy>
