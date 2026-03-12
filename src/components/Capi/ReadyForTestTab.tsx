@@ -1,11 +1,19 @@
 import React from "react";
-import { testStore, TestCase, rest } from "./utils";
+import { testStore, TestCase, rest, envStore, Environment, EnvTag } from "./utils";
 import { StatusBadge } from "./AtomComponents";
 
 // ═══════════════════════════════════════════════════════════════
 // CONSTANTS
 // ═══════════════════════════════════════════════════════════════
 const MONO = "'JetBrains Mono','Fira Code',monospace";
+
+// Inject spin keyframe once
+if (typeof document !== "undefined" && !document.getElementById("tc-row-spin")) {
+  const s = document.createElement("style");
+  s.id = "tc-row-spin";
+  s.textContent = `@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`;
+  document.head.appendChild(s);
+}
 
 const METHOD_COLORS: Record<string, string> = {
   POST: "#34d399", GET: "#60a5fa", PATCH: "#fb923c",
@@ -105,35 +113,124 @@ function StatCard({ value, label, color, icon }: {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// EXPANDABLE TEST CASE ROW
+// EXPANDABLE + EDITABLE TEST CASE ROW
 // ═══════════════════════════════════════════════════════════════
-interface TcRowState { open: boolean; }
-class TcRow extends React.Component<{ tc: TestCase; idx: number }, TcRowState> {
-  state: TcRowState = { open: false };
+interface TcRowState {
+  open: boolean;
+  editUrl: string;
+  editBody: string;
+  bodyError: string | null;
+  running: boolean;
+  dirty: boolean;    // user has edited url or body
+}
+
+class TcRow extends React.Component<{ tc: TestCase; onRefresh: () => void }, TcRowState> {
+  constructor(props: { tc: TestCase; onRefresh: () => void }) {
+    super(props);
+    const { tc } = props;
+    this.state = {
+      open: false,
+      editUrl: tc.resolvedUrl || envStore.resolve(tc.path),
+      editBody: tc.body ? JSON.stringify(tc.body, null, 2) : "",
+      bodyError: null,
+      running: false,
+      dirty: false,
+    };
+  }
+
+  componentDidUpdate(prev: { tc: TestCase }) {
+    // Sync editUrl if env changes and user hasn't manually edited
+    if (!this.state.dirty && prev.tc.path !== this.props.tc.path) {
+      this.setState({ editUrl: envStore.resolve(this.props.tc.path) });
+    }
+  }
+
+  private playOne = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const { tc, onRefresh } = this.props;
+    const { editUrl, editBody } = this.state;
+
+    // Validate JSON body if present
+    let parsedBody: Record<string, any> | null = null;
+    if (editBody.trim()) {
+      try { parsedBody = JSON.parse(editBody); }
+      catch { this.setState({ bodyError: "Invalid JSON — fix before running" }); return; }
+    }
+
+    this.setState({ running: true, bodyError: null });
+    tc.status = "running";
+    onRefresh();
+
+    const t0 = Date.now();
+    try {
+      await new Promise(r => setTimeout(r, 20 + Math.random() * 60));
+
+      // Extract just the path part from the full edited URL
+      let path = tc.path;
+      try {
+        const u = new URL(editUrl);
+        path = u.pathname + u.search;
+      } catch {
+        // not a full URL — treat as path directly
+        path = editUrl;
+      }
+
+      const r = await rest.req(tc.method, path, parsedBody || undefined);
+
+      tc.status = r.status >= 200 && r.status < 300 ? "passed" : "failed";
+      tc.httpStatus = r.status;
+      tc.latency = Date.now() - t0;
+      tc.result = r.body;
+      tc.headers = r.headers;
+      tc.resolvedUrl = editUrl;
+      if (parsedBody) tc.body = parsedBody;
+    } catch (err: any) {
+      tc.status = "failed";
+      tc.httpStatus = "ERR";
+      tc.latency = Date.now() - t0;
+      tc.result = { error: err.message };
+    }
+
+    this.setState({ running: false });
+    onRefresh();
+  };
+
+  private resetEdits = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const { tc } = this.props;
+    this.setState({
+      editUrl: envStore.resolve(tc.path),
+      editBody: tc.body ? JSON.stringify(tc.body, null, 2) : "",
+      bodyError: null,
+      dirty: false,
+    });
+  };
+
   render() {
-    const { tc, idx } = this.props;
-    const { open } = this.state;
-    const sc = STATUS_COLORS[tc.status];
+    const { tc } = this.props;
+    const { open, editUrl, editBody, bodyError, running, dirty } = this.state;
+    const sc = STATUS_COLORS[running ? "running" : tc.status];
+    const mc = METHOD_COLORS[tc.method.toUpperCase()] || "#8b949e";
+    const hasBody = ["POST", "PATCH", "PUT"].includes(tc.method.toUpperCase());
+    const isOk = tc.status === "passed";
+    const isFail = tc.status === "failed";
+
     return (
       <div style={{
         borderRadius: 8, border: `1px solid ${sc.border}`,
         borderLeft: `3px solid ${sc.dot}`, background: sc.bg,
-        overflow: "hidden", transition: "border .15s"
+        transition: "border .15s", fontFamily: MONO,
       }}>
 
-        {/* ── Header row ── */}
-        <div
-          onClick={() => this.setState(s => ({ open: !s.open }))}
-          style={{
-            display: "flex", alignItems: "center", gap: 10, padding: "9px 13px",
-            cursor: "pointer", userSelect: "none" as const
-          }}>
+        {/* ══ HEADER ROW ══ */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 10px 9px 13px" }}>
 
-          <StatusDot status={tc.status} />
+          {/* Status dot */}
+          <StatusDot status={running ? "running" : tc.status} />
 
-          {/* Seq badge */}
+          {/* Seq */}
           <span style={{
-            fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)",
+            fontSize: 10, color: "var(--cs-dim)",
             background: "var(--cs-surface-2)", border: "1px solid var(--cs-border-sub)",
             borderRadius: 4, padding: "1px 6px", flexShrink: 0
           }}>
@@ -141,85 +238,596 @@ class TcRow extends React.Component<{ tc: TestCase; idx: number }, TcRowState> {
           </span>
 
           {/* Run group */}
-          <span style={{
-            fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)",
-            flexShrink: 0, opacity: 0.7
-          }}>
+          <span style={{ fontSize: 9, color: "var(--cs-dim)", flexShrink: 0, opacity: 0.7 }}>
             R{tc.runGroup}
           </span>
 
           <MChip method={tc.method} />
           <SourceBadge source={tc.dataSource} />
 
-          {/* API + path */}
-          <div style={{ flex: 1, minWidth: 0 }}>
+          {/* API title + path */}
+          <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }}
+            onClick={() => this.setState(s => ({ open: !s.open }))}>
             <div style={{
-              fontFamily: MONO, fontSize: 11, fontWeight: 600,
-              color: "var(--cs-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"
+              fontSize: 11, fontWeight: 600, color: "var(--cs-text)",
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"
             }}>
               {tc.apiTitle}
             </div>
             <div style={{
-              fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)", marginTop: 1,
+              fontSize: 10, color: "var(--cs-dim)", marginTop: 1,
               overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"
             }}>
               {tc.path}
             </div>
           </div>
 
-          {/* Status & latency */}
+          {/* Status badge + latency */}
           {tc.httpStatus != null && <StatusBadge status={tc.httpStatus} />}
           {tc.latency != null && (
-            <span style={{
-              fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)",
-              flexShrink: 0
-            }}>{tc.latency}ms</span>
+            <span style={{ fontSize: 10, color: "var(--cs-dim)", flexShrink: 0 }}>
+              {tc.latency}ms
+            </span>
           )}
 
-          <span style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)", flexShrink: 0 }}>
+          {/* Dirty indicator */}
+          {dirty && (
+            <span title="Edited — original values changed" style={{
+              fontSize: 9, color: "#f59e0b", background: "#f59e0b15",
+              border: "1px solid #f59e0b33", borderRadius: 4, padding: "1px 6px",
+              flexShrink: 0, fontWeight: 700,
+            }}>EDITED</span>
+          )}
+
+          {/* ▶ PLAY button */}
+          <button
+            onClick={this.playOne}
+            disabled={running}
+            title="Run this request individually"
+            style={{
+              flexShrink: 0, width: 30, height: 30, borderRadius: 6,
+              border: `1.5px solid ${running ? "var(--cs-border)" : mc + "88"}`,
+              background: running ? "var(--cs-surface-2)" : mc + "18",
+              color: running ? "var(--cs-dim)" : mc,
+              cursor: running ? "not-allowed" : "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 13, transition: "all .15s",
+            }}
+            onMouseEnter={e => { if (!running) (e.currentTarget as HTMLButtonElement).style.background = mc + "35"; }}
+            onMouseLeave={e => { if (!running) (e.currentTarget as HTMLButtonElement).style.background = mc + "18"; }}
+          >
+            {running ? (
+              <span style={{ fontSize: 10, animation: "spin 1s linear infinite" }}>⟳</span>
+            ) : "▶"}
+          </button>
+
+          {/* Expand toggle */}
+          <button
+            onClick={() => this.setState(s => ({ open: !s.open }))}
+            style={{
+              flexShrink: 0, width: 26, height: 26, borderRadius: 5,
+              border: "1px solid var(--cs-border-sub)", background: "transparent",
+              color: "var(--cs-dim)", cursor: "pointer", fontSize: 9,
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
             {open ? "▲" : "▼"}
-          </span>
+          </button>
         </div>
 
-        {/* ── Expanded detail ── */}
+        {/* ══ EXPANDED EDITOR PANEL ══ */}
         {open && (
-          <div style={{ padding: "0 13px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
-            {tc.body && Object.keys(tc.body).length > 0 && (
+          <div style={{
+            borderTop: `1px solid ${sc.border}`, padding: "12px 14px",
+            display: "flex", flexDirection: "column" as const, gap: 12
+          }}>
+
+            {/* ── URL editor ── */}
+            <div>
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                marginBottom: 6
+              }}>
+                <span style={{
+                  fontSize: 9, fontWeight: 700, color: "var(--cs-dim)",
+                  textTransform: "uppercase" as const, letterSpacing: 0.8
+                }}>
+                  🌐 Request URL
+                </span>
+                {dirty && (
+                  <button onClick={this.resetEdits} style={{
+                    fontSize: 9, color: "#f59e0b", background: "transparent",
+                    border: "1px solid #f59e0b33", borderRadius: 4, padding: "1px 7px",
+                    cursor: "pointer", fontFamily: MONO,
+                  }}>↺ Reset to original</button>
+                )}
+              </div>
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                {/* Method badge */}
+                <span style={{
+                  fontSize: 10, fontWeight: 800, color: mc,
+                  background: mc + "18", border: `1px solid ${mc}40`,
+                  borderRadius: 5, padding: "6px 10px", flexShrink: 0
+                }}>
+                  {tc.method}
+                </span>
+                <input
+                  value={editUrl}
+                  onChange={e => this.setState({ editUrl: e.target.value, dirty: true })}
+                  onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); this.playOne(e as any); } }}
+                  spellCheck={false}
+                  style={{
+                    flex: 1, padding: "7px 12px", fontFamily: MONO, fontSize: 11,
+                    background: "var(--cs-bg)", border: `1px solid ${dirty ? "#f59e0b66" : "var(--cs-border)"}`,
+                    borderRadius: 7, color: "var(--cs-text)", outline: "none",
+                    transition: "border-color .15s",
+                  }}
+                  onFocus={e => (e.target.style.borderColor = mc + "88")}
+                  onBlur={e => (e.target.style.borderColor = dirty ? "#f59e0b66" : "var(--cs-border)")}
+                />
+              </div>
+            </div>
+
+            {/* ── Body editor (only for POST/PATCH/PUT) ── */}
+            {hasBody && (
               <div>
                 <div style={{
-                  fontFamily: MONO, fontSize: 9, fontWeight: 700, color: "var(--cs-dim)",
-                  textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 4
-                }}>Request Body</div>
-                <pre style={{
-                  fontFamily: MONO, fontSize: 10, color: "var(--cs-muted)",
-                  background: "var(--cs-bg)", border: "1px solid var(--cs-border-sub)",
-                  borderRadius: 6, padding: "8px 10px", overflowX: "auto",
-                  maxHeight: 180, margin: 0
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  marginBottom: 6
                 }}>
-                  {JSON.stringify(tc.body, null, 2)}
-                </pre>
+                  <span style={{
+                    fontSize: 9, fontWeight: 700, color: "var(--cs-dim)",
+                    textTransform: "uppercase" as const, letterSpacing: 0.8
+                  }}>
+                    📦 Request Body <span style={{ opacity: 0.5, fontWeight: 400 }}>JSON</span>
+                  </span>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    {bodyError && (
+                      <span style={{
+                        fontSize: 9, color: "#f87171",
+                        background: "#f8717115", border: "1px solid #f8717133",
+                        borderRadius: 4, padding: "2px 8px"
+                      }}>
+                        ⚠ {bodyError}
+                      </span>
+                    )}
+                    <button onClick={e => {
+                      e.stopPropagation();
+                      try {
+                        const pretty = JSON.stringify(JSON.parse(editBody), null, 2);
+                        this.setState({ editBody: pretty, bodyError: null });
+                      } catch { this.setState({ bodyError: "Cannot format — invalid JSON" }); }
+                    }} style={{
+                      fontSize: 9, color: "#60a5fa", background: "transparent",
+                      border: "1px solid #60a5fa33", borderRadius: 4,
+                      padding: "1px 7px", cursor: "pointer", fontFamily: MONO,
+                    }}>{ } Format</button>
+                  </div>
+                </div>
+                <textarea
+                  value={editBody}
+                  onChange={e => this.setState({ editBody: e.target.value, dirty: true, bodyError: null })}
+                  spellCheck={false}
+                  rows={Math.min(18, Math.max(4, editBody.split("\n").length + 1))}
+                  style={{
+                    width: "100%", padding: "10px 12px", fontFamily: MONO, fontSize: 11,
+                    background: "var(--cs-bg)", color: "var(--cs-text)",
+                    border: `1px solid ${bodyError ? "#f87171" : dirty ? "#f59e0b66" : "var(--cs-border)"}`,
+                    borderRadius: 7, outline: "none", resize: "vertical" as const,
+                    lineHeight: 1.6, transition: "border-color .15s", boxSizing: "border-box" as const,
+                  }}
+                  onFocus={e => (e.target.style.borderColor = mc + "88")}
+                  onBlur={e => (e.target.style.borderColor = bodyError ? "#f87171" : dirty ? "#f59e0b66" : "var(--cs-border)")}
+                />
               </div>
             )}
+
+            {/* ── Run button ── */}
+            <button
+              onClick={this.playOne}
+              disabled={running || !!bodyError}
+              style={{
+                alignSelf: "flex-start" as const,
+                padding: "8px 22px", borderRadius: 7, cursor: running || !!bodyError ? "not-allowed" : "pointer",
+                background: running || !!bodyError
+                  ? "var(--cs-surface-2)"
+                  : `linear-gradient(135deg, ${mc}22, ${mc}44)`,
+                border: `1.5px solid ${running || !!bodyError ? "var(--cs-border)" : mc + "88"}`,
+                color: running || !!bodyError ? "var(--cs-dim)" : mc,
+                fontFamily: MONO, fontSize: 12, fontWeight: 800,
+                display: "flex", alignItems: "center", gap: 8,
+                opacity: running || !!bodyError ? 0.6 : 1,
+                transition: "all .15s",
+              }}>
+              {running ? "⟳  Running…" : `▶  Run  ${tc.method}  ${tc.path}`}
+            </button>
+
+            {/* ── Response panel ── */}
             {tc.result != null && (
               <div>
-                <div style={{
-                  fontFamily: MONO, fontSize: 9, fontWeight: 700, color: "var(--cs-dim)",
-                  textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 4
-                }}>Response</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  <span style={{
+                    fontSize: 9, fontWeight: 700, color: "var(--cs-dim)",
+                    textTransform: "uppercase" as const, letterSpacing: 0.8
+                  }}>Response</span>
+                  {tc.httpStatus != null && <StatusBadge status={tc.httpStatus} />}
+                  {tc.latency != null && (
+                    <span style={{ fontSize: 10, color: "var(--cs-dim)" }}>{tc.latency}ms</span>
+                  )}
+                  {tc.resolvedUrl && (
+                    <span style={{
+                      fontSize: 9, color: "var(--cs-dim)", opacity: 0.6,
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1
+                    }}>
+                      → {tc.resolvedUrl}
+                    </span>
+                  )}
+                </div>
                 <pre style={{
-                  fontFamily: MONO, fontSize: 10, color: "var(--cs-muted)",
-                  background: "var(--cs-bg)", border: "1px solid var(--cs-border-sub)",
-                  borderRadius: 6, padding: "8px 10px", overflowX: "auto",
-                  maxHeight: 180, margin: 0
+                  fontFamily: MONO, fontSize: 10, margin: 0,
+                  background: isOk ? "#34d39908" : isFail ? "#f8717108" : "var(--cs-bg)",
+                  border: `1px solid ${isOk ? "#34d39933" : isFail ? "#f8717133" : "var(--cs-border-sub)"}`,
+                  borderRadius: 7, padding: "10px 12px", overflowX: "auto",
+                  maxHeight: 260, color: isOk ? "#34d399" : isFail ? "#f87171" : "var(--cs-muted)",
+                  lineHeight: 1.55,
                 }}>
                   {JSON.stringify(tc.result, null, 2)}
                 </pre>
               </div>
             )}
-            <div style={{ display: "flex", gap: 16, fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)" }}>
+
+            {/* ── Meta footer ── */}
+            <div style={{
+              display: "flex", gap: 14, fontSize: 9, color: "var(--cs-dim)",
+              flexWrap: "wrap" as const, paddingTop: 4, borderTop: "1px solid var(--cs-border-sub)"
+            }}>
               <span>Created: {new Date(tc.createdAt).toLocaleTimeString()}</span>
+              <span>Source: <strong style={{ color: "var(--cs-muted)" }}>{tc.dataSource}</strong></span>
               {tc.fileSource && <span>File: {tc.fileSource}</span>}
+              {dirty && <span style={{ color: "#f59e0b" }}>⚠ Request has unsaved edits</span>}
             </div>
+
+          </div>
+        )}
+      </div>
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ENVIRONMENT SELECTOR BAR
+// ═══════════════════════════════════════════════════════════════
+const ENV_TAG_LABELS: Record<EnvTag, string> = {
+  local: "LOCAL",
+  development: "DEV",
+  staging: "STAGING",
+  production: "PROD",
+  custom: "CUSTOM",
+};
+
+interface EnvBarState {
+  open: boolean;
+  editingId: string | null;
+  editUrl: string;
+  addingNew: boolean;
+  newName: string;
+  newUrl: string;
+  envTick: number;
+}
+
+class EnvBar extends React.Component<{ onChange?: () => void }, EnvBarState> {
+  state: EnvBarState = {
+    open: false, editingId: null, editUrl: "",
+    addingNew: false, newName: "", newUrl: "", envTick: 0,
+  };
+
+  private dropRef = React.createRef<HTMLDivElement>();
+
+  componentDidMount() { document.addEventListener("mousedown", this.handleOutside); }
+  componentWillUnmount() { document.removeEventListener("mousedown", this.handleOutside); }
+
+  private handleOutside = (e: MouseEvent) => {
+    if (this.dropRef.current && !this.dropRef.current.contains(e.target as Node)) {
+      this.setState({ open: false, editingId: null, addingNew: false });
+    }
+  };
+
+  private selectEnv = (id: string) => {
+    envStore.select(id);
+    this.setState({ open: false, editingId: null, envTick: this.state.envTick + 1 });
+    this.props.onChange?.();
+  };
+
+  private startEdit = (e: React.MouseEvent, env: Environment) => {
+    e.stopPropagation();
+    this.setState({ editingId: env.id, editUrl: env.baseUrl });
+  };
+
+  private commitEdit = (id: string) => {
+    envStore.updateUrl(id, this.state.editUrl.trim());
+    this.setState({ editingId: null, envTick: this.state.envTick + 1 });
+    this.props.onChange?.();
+  };
+
+  private addCustom = () => {
+    const { newName, newUrl } = this.state;
+    if (!newName.trim() || !newUrl.trim()) return;
+    const e = envStore.addCustom(newName.trim(), newUrl.trim());
+    envStore.select(e.id);
+    this.setState({
+      addingNew: false, newName: "", newUrl: "",
+      open: false, envTick: this.state.envTick + 1
+    });
+    this.props.onChange?.();
+  };
+
+  render() {
+    const { open, editingId, editUrl, addingNew, newName, newUrl } = this.state;
+    const sel = envStore.selected;
+    const isProd = sel.tag === "production";
+
+    return (
+      <div ref={this.dropRef} style={{ position: "relative" as const }}>
+
+        {/* ── Trigger bar ── */}
+        <div style={{
+          display: "flex", alignItems: "center", gap: 0,
+          borderRadius: 10, border: `1.5px solid ${isProd ? "#f8717155" : "var(--cs-border)"}`,
+          background: isProd ? "#f8717108" : "var(--cs-surface-2)",
+          transition: "border-color .15s",
+        }}>
+
+          {/* Left: env label */}
+          <div style={{
+            padding: "10px 14px", borderRight: "1px solid var(--cs-border-sub)",
+            display: "flex", alignItems: "center", gap: 8, flexShrink: 0
+          }}>
+            <span style={{
+              width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
+              background: sel.color,
+              boxShadow: isProd ? `0 0 6px ${sel.color}` : "none",
+              display: "inline-block",
+            }} />
+            <span style={{
+              fontFamily: MONO, fontSize: 10, fontWeight: 800,
+              color: sel.color, letterSpacing: 0.8
+            }}>
+              {ENV_TAG_LABELS[sel.tag]}
+            </span>
+            <span style={{
+              fontFamily: MONO, fontSize: 11, fontWeight: 600,
+              color: "var(--cs-text)"
+            }}>{sel.name}</span>
+          </div>
+
+          {/* Middle: resolved URL */}
+          <div style={{
+            flex: 1, padding: "10px 16px", fontFamily: MONO, fontSize: 11,
+            color: "var(--cs-muted)", overflow: "hidden", textOverflow: "ellipsis",
+            whiteSpace: "nowrap", minWidth: 0
+          }}>
+            {sel.baseUrl}
+            <span style={{ color: "var(--cs-dim)", opacity: 0.5 }}>/&lt;resource&gt;/&lt;id&gt;</span>
+          </div>
+
+          {/* Right: dropdown toggle */}
+          <button
+            onClick={() => this.setState(s => ({ open: !s.open, editingId: null }))}
+            style={{
+              padding: "10px 16px", background: "transparent",
+              border: "none", borderLeft: "1px solid var(--cs-border-sub)",
+              color: "var(--cs-muted)", cursor: "pointer", fontFamily: MONO,
+              fontSize: 13, flexShrink: 0, display: "flex", alignItems: "center", gap: 6
+            }}>
+            <span style={{ fontSize: 10 }}>▼ Switch</span>
+          </button>
+        </div>
+
+        {/* PROD warning strip */}
+        {isProd && (
+          <div style={{
+            display: "flex", alignItems: "center", gap: 8, marginTop: 6,
+            padding: "6px 12px", borderRadius: 7, background: "#f8717110",
+            border: "1px solid #f8717133"
+          }}>
+            <span style={{ fontSize: 13 }}>⚠️</span>
+            <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, color: "#f87171" }}>
+              PRODUCTION endpoint selected — test execution will hit live data
+            </span>
+          </div>
+        )}
+
+        {/* ── Dropdown ── */}
+        {open && (
+          <div style={{
+            position: "absolute" as const, top: "calc(100% + 6px)", left: 0, right: 0,
+            zIndex: 9000, background: "var(--cs-surface)", border: "1px solid var(--cs-border)",
+            borderRadius: 10, boxShadow: "0 16px 48px rgba(0,0,0,0.35)",
+          }}>
+            {/* Header */}
+            <div style={{
+              padding: "10px 16px", borderBottom: "1px solid var(--cs-border-sub)",
+              background: "var(--cs-surface-2)", fontFamily: MONO, fontSize: 10,
+              fontWeight: 700, color: "var(--cs-dim)", letterSpacing: 0.8,
+              textTransform: "uppercase" as const
+            }}>
+              Select Environment
+            </div>
+
+            {/* Env list */}
+            {envStore.envs.map(env => {
+              const isSelected = env.id === envStore.selectedId;
+              const isEditing = editingId === env.id;
+              const isProdEnv = env.tag === "production";
+              return (
+                <div key={env.id}
+                  onClick={() => !isEditing && this.selectEnv(env.id)}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 10,
+                    padding: "10px 16px", cursor: isEditing ? "default" : "pointer",
+                    borderBottom: "1px solid var(--cs-border-sub)",
+                    background: isSelected ? env.color + "0c" : "transparent",
+                    transition: "background .1s",
+                  }}
+                  onMouseEnter={e => { if (!isEditing) (e.currentTarget as HTMLDivElement).style.background = env.color + "0c"; }}
+                  onMouseLeave={e => { if (!isEditing) (e.currentTarget as HTMLDivElement).style.background = isSelected ? env.color + "0c" : "transparent"; }}
+                >
+                  {/* Dot */}
+                  <span style={{
+                    width: 9, height: 9, borderRadius: "50%", flexShrink: 0,
+                    background: env.color, boxShadow: isProdEnv ? `0 0 5px ${env.color}` : "none",
+                    display: "inline-block"
+                  }} />
+
+                  {/* Tag */}
+                  <span style={{
+                    fontFamily: MONO, fontSize: 9, fontWeight: 800,
+                    color: env.color, letterSpacing: 0.8, flexShrink: 0, width: 60
+                  }}>
+                    {ENV_TAG_LABELS[env.tag]}
+                  </span>
+
+                  {/* Name */}
+                  <span style={{
+                    fontFamily: MONO, fontSize: 12, fontWeight: 600,
+                    color: isSelected ? "var(--cs-text)" : "var(--cs-muted)",
+                    flexShrink: 0, width: 110
+                  }}>
+                    {env.name}
+                  </span>
+
+                  {/* URL (editable) */}
+                  {isEditing ? (
+                    <input
+                      autoFocus
+                      value={editUrl}
+                      onChange={e => this.setState({ editUrl: e.target.value })}
+                      onKeyDown={e => {
+                        if (e.key === "Enter") this.commitEdit(env.id);
+                        if (e.key === "Escape") this.setState({ editingId: null });
+                        e.stopPropagation();
+                      }}
+                      onClick={e => e.stopPropagation()}
+                      style={{
+                        flex: 1, padding: "4px 8px", fontFamily: MONO, fontSize: 11,
+                        background: "var(--cs-input-bg)", border: `1px solid ${env.color}`,
+                        borderRadius: 5, color: "var(--cs-text)", outline: "none"
+                      }}
+                    />
+                  ) : (
+                    <span style={{
+                      flex: 1, fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)",
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const
+                    }}>
+                      {env.baseUrl}
+                    </span>
+                  )}
+
+                  {/* Actions */}
+                  <div style={{ display: "flex", gap: 4, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+                    {isEditing ? (
+                      <>
+                        <button onClick={() => this.commitEdit(env.id)} style={{
+                          background: env.color + "20", border: `1px solid ${env.color}`,
+                          color: env.color, borderRadius: 5, padding: "2px 8px",
+                          fontFamily: MONO, fontSize: 10, cursor: "pointer", fontWeight: 700
+                        }}>✓ Save</button>
+                        <button onClick={() => this.setState({ editingId: null })} style={{
+                          background: "transparent", border: "1px solid var(--cs-border-sub)",
+                          color: "var(--cs-dim)", borderRadius: 5, padding: "2px 8px",
+                          fontFamily: MONO, fontSize: 10, cursor: "pointer"
+                        }}>✕</button>
+                      </>
+                    ) : (
+                      <>
+                        <button onClick={e => this.startEdit(e, env)} style={{
+                          background: "transparent", border: "1px solid var(--cs-border-sub)",
+                          color: "var(--cs-dim)", borderRadius: 5, padding: "2px 8px",
+                          fontFamily: MONO, fontSize: 10, cursor: "pointer"
+                        }}>✎</button>
+                        {!env.builtIn && (
+                          <button onClick={e => {
+                            e.stopPropagation(); envStore.remove(env.id);
+                            this.setState(s => ({ envTick: s.envTick + 1 })); this.props.onChange?.();
+                          }}
+                            style={{
+                              background: "transparent", border: "1px solid #f8717133",
+                              color: "#f87171", borderRadius: 5, padding: "2px 6px",
+                              fontFamily: MONO, fontSize: 10, cursor: "pointer"
+                            }}>✕</button>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  {/* Selected tick */}
+                  {isSelected && !isEditing && (
+                    <span style={{ color: env.color, fontWeight: 900, fontSize: 13, flexShrink: 0 }}>✓</span>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Add custom */}
+            {addingNew ? (
+              <div style={{
+                padding: "12px 16px", borderTop: "1px solid var(--cs-border-sub)",
+                display: "flex", flexDirection: "column" as const, gap: 8,
+                background: "#a78bfa08"
+              }}>
+                <div style={{
+                  fontFamily: MONO, fontSize: 10, fontWeight: 700,
+                  color: "#a78bfa", letterSpacing: 0.8
+                }}>ADD CUSTOM ENVIRONMENT</div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input placeholder="Name (e.g. QA)"
+                    value={newName}
+                    onChange={e => this.setState({ newName: e.target.value })}
+                    onKeyDown={e => e.stopPropagation()}
+                    style={{
+                      width: 130, padding: "6px 10px", fontFamily: MONO, fontSize: 11,
+                      background: "var(--cs-input-bg)", border: "1px solid var(--cs-border)",
+                      borderRadius: 6, color: "var(--cs-text)", outline: "none"
+                    }} />
+                  <input placeholder="https://api.example.com"
+                    value={newUrl}
+                    onChange={e => this.setState({ newUrl: e.target.value })}
+                    onKeyDown={e => { if (e.key === "Enter") this.addCustom(); e.stopPropagation(); }}
+                    style={{
+                      flex: 1, padding: "6px 10px", fontFamily: MONO, fontSize: 11,
+                      background: "var(--cs-input-bg)", border: "1px solid var(--cs-border)",
+                      borderRadius: 6, color: "var(--cs-text)", outline: "none"
+                    }} />
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={this.addCustom} disabled={!newName.trim() || !newUrl.trim()}
+                    style={{
+                      padding: "6px 16px", borderRadius: 6, cursor: "pointer",
+                      background: newName.trim() && newUrl.trim() ? "#a78bfa20" : "var(--cs-surface-2)",
+                      border: `1px solid ${newName.trim() && newUrl.trim() ? "#a78bfa" : "var(--cs-border)"}`,
+                      color: newName.trim() && newUrl.trim() ? "#a78bfa" : "var(--cs-dim)",
+                      fontFamily: MONO, fontSize: 11, fontWeight: 700
+                    }}>+ Add</button>
+                  <button onClick={() => this.setState({ addingNew: false, newName: "", newUrl: "" })}
+                    style={{
+                      padding: "6px 12px", borderRadius: 6, cursor: "pointer",
+                      background: "transparent", border: "1px solid var(--cs-border-sub)",
+                      color: "var(--cs-dim)", fontFamily: MONO, fontSize: 11
+                    }}>Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={e => { e.stopPropagation(); this.setState({ addingNew: true }); }}
+                style={{
+                  width: "100%", padding: "10px 16px", background: "transparent",
+                  border: "none", borderTop: "1px solid var(--cs-border-sub)",
+                  color: "#a78bfa", fontFamily: MONO, fontSize: 11, fontWeight: 700,
+                  cursor: "pointer", textAlign: "left" as const, display: "flex",
+                  alignItems: "center", gap: 8
+                }}>
+                <span style={{ fontSize: 14 }}>+</span> Add custom environment
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -575,13 +1183,14 @@ interface RftState {
   methodFilter: string;
   expandReport: boolean;
   showModal: boolean;
+  envTick: number;   // bumped when env changes, triggers re-render
 }
 
 export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }, RftState> {
   state: RftState = {
     tick: 0, pageSize: 10, pageIndex: 0, running: false,
     runProgress: 0, filter: "all", methodFilter: "ALL",
-    expandReport: false, showModal: false,
+    expandReport: false, showModal: false, envTick: 0,
   };
 
   private scrollRef = React.createRef<HTMLDivElement>();
@@ -620,6 +1229,10 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
         } else if (["GET", "PATCH", "PUT", "DELETE"].includes(tc.method) && pid) {
           path = `/${res}/${pid}`;
         }
+
+        // Prepend selected environment base URL
+        const fullUrl = envStore.resolve(path);
+        tc.resolvedUrl = fullUrl;
 
         const r = await rest.req(tc.method, path, tc.body || undefined);
         if (tc.method === "POST" && (r.body as any)?.id) ctx[res] = (r.body as any).id;
@@ -664,6 +1277,10 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
         let path = tc.path;
         if (path.includes("{id}") && pid) path = path.replace("{id}", String(pid));
         else if (["GET", "PATCH", "PUT", "DELETE"].includes(tc.method) && pid) path = `/${res}/${pid}`;
+
+        // Prepend selected environment base URL
+        const fullUrl = envStore.resolve(path);
+        tc.resolvedUrl = fullUrl;
 
         const r = await rest.req(tc.method, path, tc.body || undefined);
         if (tc.method === "POST" && (r.body as any)?.id) ctx[res] = (r.body as any).id;
@@ -760,6 +1377,72 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
             onClose={() => this.setState({ showModal: false })}
           />
         )}
+
+        {/* ══════════════════════════════════════════════════════
+            ENVIRONMENT ENDPOINT SELECTOR
+            Select target environment before executing tests
+        ══════════════════════════════════════════════════════ */}
+        <div style={{
+          borderRadius: 12,
+          border: "1px solid var(--cs-border)",
+          position: "relative" as const,
+        }}>
+          {/* Section label */}
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            padding: "10px 16px",
+            background: "var(--cs-surface-2)",
+            borderBottom: "1px solid var(--cs-border-sub)",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 14 }}>🌐</span>
+              <span style={{
+                fontFamily: MONO, fontSize: 11, fontWeight: 800,
+                color: "var(--cs-text)", letterSpacing: 0.3
+              }}>
+                Environment Endpoint
+              </span>
+              <span style={{
+                fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)",
+                background: "var(--cs-bg)", border: "1px solid var(--cs-border-sub)",
+                borderRadius: 4, padding: "1px 7px"
+              }}>
+                Target for test execution
+              </span>
+            </div>
+            <div style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)" }}>
+              All REST calls will be sent to the selected base URL
+            </div>
+          </div>
+
+          {/* EnvBar */}
+          <div style={{ padding: "12px 16px", background: "var(--cs-bg)" }}>
+            <EnvBar onChange={() => this.setState(s => ({ envTick: s.envTick + 1 }))} />
+          </div>
+
+          {/* Resolved URL preview */}
+          <div style={{
+            padding: "8px 16px",
+            borderTop: "1px solid var(--cs-border-sub)",
+            background: "var(--cs-surface-2)",
+            display: "flex", alignItems: "center", gap: 8,
+          }}>
+            <span style={{
+              fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)",
+              textTransform: "uppercase", letterSpacing: 0.8, flexShrink: 0
+            }}>
+              Full URL preview
+            </span>
+            <code style={{
+              fontFamily: MONO, fontSize: 10, color: "var(--cs-muted)",
+              background: "var(--cs-bg)", border: "1px solid var(--cs-border-sub)",
+              borderRadius: 5, padding: "3px 10px", flex: 1,
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const
+            }}>
+              {envStore.resolve("/&lt;resource&gt;/&lt;id&gt;")}
+            </code>
+          </div>
+        </div>
 
         {/* ── Header banner ── */}
         <div style={{
@@ -918,9 +1601,25 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
           }}>
             <div style={{
               display: "flex", justifyContent: "space-between",
-              fontSize: 11, color: "#f59e0b", marginBottom: 6
+              fontSize: 11, color: "#f59e0b", marginBottom: 6, flexWrap: "wrap", gap: 6
             }}>
-              <span>⏳ Executing…</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span>⏳ Executing…</span>
+                <span style={{
+                  display: "flex", alignItems: "center", gap: 5,
+                  background: envStore.selected.color + "18",
+                  border: `1px solid ${envStore.selected.color}44`,
+                  borderRadius: 4, padding: "1px 8px",
+                  color: envStore.selected.color, fontSize: 10, fontWeight: 700
+                }}>
+                  <span style={{
+                    width: 6, height: 6, borderRadius: "50%",
+                    background: envStore.selected.color, display: "inline-block",
+                    boxShadow: envStore.selected.tag === "production" ? `0 0 4px ${envStore.selected.color}` : "none"
+                  }} />
+                  {envStore.selected.name}
+                </span>
+              </div>
               <span>{runProgress} completed</span>
             </div>
             <div style={{ height: 4, borderRadius: 2, background: "var(--cs-surface-2)", overflow: "hidden" }}>
@@ -1099,7 +1798,7 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
               No cases match the current filter
             </div>
           ) : (
-            pageSlice.map((tc, i) => <TcRow key={tc.id} tc={tc} idx={pageStart + i} />)
+            pageSlice.map((tc, i) => <TcRow key={tc.id} tc={tc} onRefresh={this.refresh} />)
           )}
         </div>
 

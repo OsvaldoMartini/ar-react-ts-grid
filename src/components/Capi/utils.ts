@@ -170,6 +170,7 @@ export interface TestCase {
   latency?:     number;
   result?:      any;
   headers?:     any;
+  resolvedUrl?: string;  // full URL used during execution (base + path)
 }
 
 export class TestCaseStore {
@@ -194,6 +195,69 @@ export class TestCaseStore {
 }
 
 export const testStore = new TestCaseStore();
+
+// ═══════════════════════════════════════════════════════════════
+// ENVIRONMENT STORE
+// Shared singleton: selected base URL used during test execution
+// ═══════════════════════════════════════════════════════════════
+export type EnvTag = "local" | "development" | "staging" | "production" | "custom";
+
+export interface Environment {
+  id:      string;
+  tag:     EnvTag;
+  name:    string;
+  baseUrl: string;
+  color:   string;   // indicator dot color
+  builtIn: boolean;  // false = user-added
+}
+
+const DEFAULT_ENVS: Environment[] = [
+  { id: "env-local",  tag: "local",       name: "Local",       baseUrl: "http://localhost:8080",               color: "#8b949e", builtIn: true },
+  { id: "env-dev",    tag: "development", name: "Development", baseUrl: "https://api-dev.avaloq.internal",    color: "#60a5fa", builtIn: true },
+  { id: "env-stg",    tag: "staging",     name: "Staging",     baseUrl: "https://api-staging.avaloq.internal",color: "#f59e0b", builtIn: true },
+  { id: "env-prod",   tag: "production",  name: "Production",  baseUrl: "https://api.avaloq.com",             color: "#f87171", builtIn: true },
+];
+
+export class EnvironmentStore {
+  envs:        Environment[] = DEFAULT_ENVS.map(e => ({ ...e }));
+  selectedId:  string = "env-local";
+
+  get selected(): Environment {
+    return this.envs.find(e => e.id === this.selectedId) || this.envs[0];
+  }
+
+  select(id: string) { this.selectedId = id; }
+
+  updateUrl(id: string, url: string) {
+    const e = this.envs.find(x => x.id === id);
+    if (e) e.baseUrl = url;
+  }
+
+  addCustom(name: string, baseUrl: string): Environment {
+    const e: Environment = {
+      id: `env-custom-${Date.now()}`, tag: "custom",
+      name, baseUrl, color: "#a78bfa", builtIn: false,
+    };
+    this.envs.push(e);
+    return e;
+  }
+
+  remove(id: string) {
+    const e = this.envs.find(x => x.id === id);
+    if (!e || e.builtIn) return;
+    this.envs = this.envs.filter(x => x.id !== id);
+    if (this.selectedId === id) this.selectedId = this.envs[0].id;
+  }
+
+  /** Full URL for a given API path */
+  resolve(path: string): string {
+    const base = this.selected.baseUrl.replace(/\/$/, "");
+    const p    = path.startsWith("/") ? path : "/" + path;
+    return base + p;
+  }
+}
+
+export const envStore = new EnvironmentStore();
 
 // ═══════════════════════════════════════════════════════════════
 // MOCK REST ENGINE
