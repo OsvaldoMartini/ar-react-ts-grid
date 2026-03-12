@@ -122,19 +122,6 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
 
     return (
       <div className="capi-upload">
-
-        {/* Delete All */}
-        {loadedSpecs.length > 0 && (
-          <div className="capi-upload__delete-row">
-            <button
-              className="capi-btn-delete"
-              onClick={() => { if (window.confirm("Delete all loaded API files?")) onDeleteAll(); }}
-            >
-              🗑 Delete All
-            </button>
-          </div>
-        )}
-
         {/* Upload zones */}
         <div className="capi-upload__zones">
 
@@ -174,7 +161,17 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
             />
           </div>
         </div>
-
+        {/* Delete All */}
+        {loadedSpecs.length > 0 && (
+          <div className="capi-upload__delete-row">
+            <button
+              className="capi-btn-delete"
+              onClick={() => { if (window.confirm("Delete all loaded API files?")) onDeleteAll(); }}
+            >
+              🗑 Delete All
+            </button>
+          </div>
+        )}
         {/* Parse status */}
         {parsing && (
           <div className="capi-upload__parsing">⚙ Parsing in corso...</div>
