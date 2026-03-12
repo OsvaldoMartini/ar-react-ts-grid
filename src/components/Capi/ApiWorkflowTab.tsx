@@ -1,9 +1,11 @@
 import React from "react";
 import { useTheme } from "./ThemeContext";
 import {
-  ApiSpec, buildDynamicWorkflow,
+  ApiSpec, buildDynamicWorkflow, rest, SYNTH,
+  rndInt, rndFloat, rndPick, isoDate,
   WfNode, WfEdge, WfFieldRow, WfStage, WfTransfer, DynamicWorkflow,
 } from "./utils";
+import { StatusBadge, ResultRow } from "./AtomComponents";
 
 // Local re-exports of classification types (also exported from utils)
 // These are re-declared locally to avoid import chain issues
@@ -631,33 +633,25 @@ function FieldBadge({ meta, small }: {
       {hover && pos && (
         <div style={{
           position: "fixed", top: pos.top, left: pos.left, zIndex: 9999,
-          width: 300,
-          maxWidth: "min(300px, calc(100vw - 32px))",
-          background: "var(--cs-surface)",
+          width: 320, background: "var(--cs-surface)",
           border: `1.5px solid ${meta.border}`,
           borderRadius: 10, padding: "12px 16px",
           boxShadow: `0 8px 32px rgba(0,0,0,.45), 0 0 0 1px ${meta.border}`,
           pointerEvents: "none",
-          boxSizing: "border-box",
-          // Clamp to viewport right edge
-          transform: `translateX(min(0px, calc(100vw - ${pos.left}px - 316px)))`,
         }}>
           <div style={{
             fontFamily: MONO, fontSize: 12, fontWeight: 800,
             color: meta.color, marginBottom: 6,
-            whiteSpace: "normal", wordBreak: "break-word", lineHeight: 1.5,
           }}>
             <span style={{
               background: meta.bg, border: `1.5px solid ${meta.border}`,
               borderRadius: 5, padding: "2px 8px", marginRight: 8,
-              whiteSpace: "nowrap", display: "inline-block",
             }}>{meta.label}</span>
             {meta.title}
           </div>
           <div style={{
             fontFamily: MONO, fontSize: 11, color: "var(--cs-muted)",
-            lineHeight: 1.65, marginBottom: 8,
-            whiteSpace: "normal", wordBreak: "break-word",
+            lineHeight: 1.6, marginBottom: 8,
           }}>
             {meta.detail}
           </div>
@@ -665,7 +659,6 @@ function FieldBadge({ meta, small }: {
             fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)",
             background: "var(--cs-surface-2)", borderRadius: 5,
             padding: "5px 9px", fontStyle: "italic",
-            whiteSpace: "normal", wordBreak: "break-word", lineHeight: 1.5,
           }}>
             {meta.example}
           </div>
@@ -1322,6 +1315,741 @@ class WorkflowDiagram extends React.Component<WFProps, WFState> {
 
 // ─────────────────────────────────────────────────────────────
 // ROOT — ApiWorkflowTab
+// ─────────────────────────────────────────────────────────────
+// DATA GENERATOR TAB
+// Inline DSG: field detection, synth data, execution plan + runner
+// ─────────────────────────────────────────────────────────────
+
+// ── Method colours ──
+const DG_METHOD_COLORS: Record<string, string> = {
+  POST: "#34d399", GET: "#60a5fa", PATCH: "#fb923c",
+  PUT: "#f59e0b", DELETE: "#f87171", RPC: "#a78bfa",
+};
+const DG_METHOD_ORDER: Record<string, number> = {
+  POST: 0, GET: 1, PATCH: 2, PUT: 3, DELETE: 4,
+};
+
+// ── Synth value engine ──
+function dgSynthValue(name: string, type: string): any {
+  const n = name.toLowerCase();
+  const t = type.toLowerCase().replace(/\[\]$/, "");
+  if (n.includes("eladdr") || n.includes("email")) return SYNTH.email(SYNTH.firstName(), SYNTH.lastName());
+  if (n === "firstname") return SYNTH.firstName();
+  if (n === "name" || n === "lastname") return SYNTH.lastName();
+  if (n === "firm" || n.includes("company")) return SYNTH.firm();
+  if (n.includes("street") && !n.includes("nr")) return SYNTH.street();
+  if (n === "streetnr" || n === "housenr") return String(rndInt(1, 200));
+  if (n === "zip" || n.includes("postal")) return String(rndInt(1000, 9999));
+  if (n === "city") return SYNTH.city();
+  if (n.includes("iban")) return SYNTH.iban();
+  if (n.includes("bic") || n.includes("swift")) return SYNTH.bic();
+  if (n.includes("phone") || n.includes("tel")) return SYNTH.phone();
+  if (n === "currency" || n === "ccy") return SYNTH.currency();
+  if (n.includes("amount") || n.includes("amt")) return rndFloat(1000, 1000000, 2);
+  if (n.includes("rate") || n.includes("yield")) return rndFloat(0.1, 8.5, 3);
+  if (n.includes("isin")) return SYNTH.isin();
+  if (n.includes("portfolio")) return SYNTH.portfolio();
+  if (n.includes("date")) return isoDate(0);
+  if (n.includes("maturity")) return isoDate(rndInt(30, 1825));
+  if (n === "country" || n.includes("country")) return SYNTH.country();
+  if (n.includes("addrtype")) return SYNTH.addrType();
+  if (n.includes("addrkind")) return SYNTH.addrKind();
+  if (n.includes("riskclass")) return SYNTH.riskClass();
+  if (n.includes("assetclass")) return SYNTH.assetClass();
+  if (n.includes("txtype")) return SYNTH.txType();
+  if (n === "description" || n === "note") return `Test ${name} ${rndInt(100, 999)}`;
+  if (n === "id" || n.endsWith("id")) return null;
+  if (t === "integer" || t === "number") return rndInt(1, 9999);
+  if (t === "boolean") return true;
+  if (t === "string") return `${name}-${rndInt(100, 999)}`;
+  if (t === "object") return { id: rndInt(1, 100) };
+  return null;
+}
+
+function dgBuildBody(spec: ApiSpec, ctx: Record<string, number>, all: ApiSpec[]): Record<string, any> {
+  const pathPs = new Set(spec.pathParams || []);
+  const body: Record<string, any> = {};
+  for (const f of spec.fields) {
+    if (f.readOnly) continue;
+    if (pathPs.has(f.name) || f.isParam) continue;
+    const base = f.type.replace(/\[\]$/, "");
+    const isArr = f.type.endsWith("[]");
+    const dep = all.find(s => s.schemaName === base || s.resourceName === base);
+    if (dep?.resourceName && ctx[dep.resourceName] != null) {
+      body[f.name] = isArr ? [{ id: ctx[dep.resourceName] }] : { id: ctx[dep.resourceName] };
+      continue;
+    }
+    const v = dgSynthValue(f.name, f.type);
+    if (v !== null) body[f.name] = v;
+  }
+  return body;
+}
+
+function dgTopoSort(specs: ApiSpec[]): ApiSpec[] {
+  const bySchema: Record<string, ApiSpec> = {};
+  const byRes: Record<string, ApiSpec> = {};
+  for (const s of specs) {
+    if (s.schemaName) bySchema[s.schemaName] = s;
+    if (s.resourceName) byRes[s.resourceName] = s;
+  }
+  const visited = new Set<string>();
+  const out: ApiSpec[] = [];
+  function visit(s: ApiSpec) {
+    if (visited.has(s.fileName)) return;
+    visited.add(s.fileName);
+    for (const d of s.dependencies || []) {
+      const ds = bySchema[d] || byRes[d];
+      if (ds && ds.fileName !== s.fileName) visit(ds);
+    }
+    out.push(s);
+  }
+  specs.forEach(visit);
+  return out;
+}
+
+interface DgStep {
+  id: string; spec: ApiSpec; method: string; summary: string;
+  synthBody: Record<string, any>; producesId: boolean;
+  dependsOn: string[];
+}
+
+function dgBuildPlan(specs: ApiSpec[]): DgStep[] {
+  const sorted = dgTopoSort(specs);
+  const steps: DgStep[] = [];
+  for (const spec of sorted) {
+    if (!spec.resourceName) continue;
+    const res = spec.resourceName;
+    const methods = [...new Set(
+      spec.endpoints.map(e => e.method.toUpperCase())
+        .filter(m => ["POST", "GET", "PATCH", "PUT", "DELETE"].includes(m))
+    )].sort((a, b) => (DG_METHOD_ORDER[a] ?? 9) - (DG_METHOD_ORDER[b] ?? 9));
+
+    for (const method of methods) {
+      const ep = spec.endpoints.find(e => e.method.toUpperCase() === method)!;
+      const dependsOn: string[] = [];
+      if (method !== "POST") {
+        const postId = `${res}__POST`;
+        if (steps.find(s => s.id === postId)) dependsOn.push(postId);
+      }
+      for (const dep of spec.dependencies || []) {
+        const ds = sorted.find(s => s.schemaName === dep || s.resourceName === dep);
+        if (ds?.resourceName) {
+          const pid = `${ds.resourceName}__POST`;
+          if (!dependsOn.includes(pid) && steps.find(s => s.id === pid)) dependsOn.push(pid);
+        }
+      }
+      const synthBody = ["POST", "PATCH", "PUT"].includes(method) ? dgBuildBody(spec, {}, sorted) : {};
+      steps.push({
+        id: `${res}__${method}`, spec, method,
+        summary: ep?.summary || `${method} ${res}`,
+        synthBody, producesId: method === "POST", dependsOn,
+      });
+    }
+  }
+  return steps;
+}
+
+// ── DataGenTab UI ──
+interface DgEntry {
+  step: number; label: string; method: string;
+  status: number | string; latency: number;
+  result: any; headers: any; ok: boolean;
+}
+
+type DgView = "setup" | "running" | "report";
+
+interface DataGenTabState {
+  selNames: string[];
+  testCount: number;
+  dgView: DgView;
+  plan: DgStep[];
+  previews: Record<string, any>[];
+  log: DgEntry[];
+  results: DgEntry[];
+  running: boolean;
+}
+
+const DG_PRESETS = [1, 5, 10, 50, 100, 500, 1000, 2000];
+
+export class DataGenTab extends React.Component<{ loadedSpecs: ApiSpec[] }, DataGenTabState> {
+  state: DataGenTabState = {
+    selNames: [], testCount: 1, dgView: "setup",
+    plan: [], previews: [], log: [], results: [], running: false,
+  };
+  private logRef = React.createRef<HTMLDivElement>();
+
+  componentDidUpdate(_: any, prev: DataGenTabState) {
+    if (prev.log !== this.state.log) this.logRef.current?.scrollIntoView({ behavior: "smooth" });
+  }
+
+  private toggle = (fn: string) =>
+    this.setState(s => ({
+      selNames: s.selNames.includes(fn) ? s.selNames.filter(n => n !== fn) : [...s.selNames, fn],
+    }));
+
+  private buildPreview = (sel: ApiSpec[]) =>
+    Array.from({ length: 3 }, () => dgBuildBody(sel[0] || sel[0], {}, sel));
+
+  private run = async () => {
+    const { selNames, testCount } = this.state;
+    const { loadedSpecs } = this.props;
+    const sel = loadedSpecs.filter(s => selNames.includes(s.fileName));
+    const plan = dgBuildPlan(sel);
+    this.setState({ plan, dgView: "running", running: true, log: [], results: [] });
+
+    const results: DgEntry[] = [];
+    const ctx: Record<string, number> = {};
+    let stepNum = 0;
+    const runs = Math.min(testCount, 5);
+
+    for (let run = 0; run < runs; run++) {
+      for (const step of plan) {
+        stepNum++;
+        const label = run > 0 ? `[Run ${run + 1}] ${step.summary}` : step.summary;
+        this.setState(s => ({
+          log: [...s.log, {
+            step: stepNum, label, method: step.method,
+            status: "running", latency: 0, result: null, headers: null, ok: false
+          }],
+        }));
+        const t0 = Date.now();
+        try {
+          await new Promise(r => setTimeout(r, 30 + Math.random() * 70));
+          const res = step.spec.resourceName || "obj-addrs";
+          const pid = ctx[res] || null;
+          const body = ["POST", "PATCH", "PUT"].includes(step.method)
+            ? dgBuildBody(step.spec, ctx, sel) : null;
+          const path = ["GET", "PATCH", "PUT", "DELETE"].includes(step.method)
+            && step.spec.pathParams.length > 0 && pid
+            ? `/${res}/${pid}` : `/${res}`;
+          const r = await rest.req(step.method, path, body);
+          if (step.producesId && (r.body as any)?.id) ctx[res] = (r.body as any).id;
+          const latency = Date.now() - t0;
+          const ok = r.status >= 200 && r.status < 300;
+          const entry: DgEntry = {
+            step: stepNum, label, method: step.method,
+            status: r.status, latency, result: r.body, headers: r.headers, ok
+          };
+          results.push(entry);
+          this.setState(s => ({ log: s.log.map((x, i) => i === s.log.length - 1 ? entry : x) }));
+        } catch (e: any) {
+          const entry: DgEntry = {
+            step: stepNum, label, method: step.method,
+            status: "ERR", latency: Date.now() - t0,
+            result: { error: e.message }, headers: null, ok: false
+          };
+          results.push(entry);
+          this.setState(s => ({ log: s.log.map((x, i) => i === s.log.length - 1 ? entry : x) }));
+        }
+      }
+    }
+    this.setState({ results, running: false, dgView: "report" });
+  };
+
+  render() {
+    const { loadedSpecs } = this.props;
+    const { selNames, testCount, dgView, plan, previews, log, results } = this.state;
+    const sel = loadedSpecs.filter(s => selNames.includes(s.fileName));
+    const ok = results.filter(r => r.ok).length;
+    const fail = results.filter(r => !r.ok).length;
+    const avgLat = results.length
+      ? Math.round(results.reduce((a, r) => a + r.latency, 0) / results.length) : 0;
+    const pct = results.length ? Math.round((ok / results.length) * 100) : 0;
+    const pctCol = pct === 100 ? "#34d399" : pct >= 50 ? "#f59e0b" : "#f87171";
+
+    // ── helper components ──
+    const SLbl = ({ text }: { text: string }) => (
+      <div style={{
+        fontFamily: MONO, fontSize: 10, fontWeight: 700, color: "var(--cs-dim)",
+        letterSpacing: 1, textTransform: "uppercase" as const, marginBottom: 8
+      }}>{text}</div>
+    );
+    const MChip = ({ m }: { m: string }) => {
+      const c = DG_METHOD_COLORS[m] || "#8b949e";
+      return (
+        <span style={{
+          background: c + "18", border: `1px solid ${c}40`, color: c,
+          borderRadius: 5, padding: "1px 7px", fontFamily: MONO, fontSize: 10,
+          fontWeight: 700, whiteSpace: "nowrap" as const, flexShrink: 0
+        }}>{m}</span>
+      );
+    };
+
+    return (
+      <div style={{ display: "flex", flexDirection: "column" as const, gap: 20 }}>
+
+        {/* ── Phase banner ── */}
+        {dgView === "setup" && (
+          <div style={{
+            padding: "12px 16px", borderRadius: 10,
+            background: "#34d39910", border: "1px solid #34d39933"
+          }}>
+            <div style={{
+              fontFamily: MONO, fontSize: 13, fontWeight: 800,
+              color: "#34d399", marginBottom: 5
+            }}>⬡ Data Synthetic Generator</div>
+            <div style={{ fontFamily: MONO, fontSize: 11, color: "var(--cs-muted)", lineHeight: 1.6 }}>
+              Select APIs, configure test count, and run. The engine auto-detects IN/IN·OUT fields,
+              generates banking-domain synthetic data, resolves cross-API ID dependencies,
+              and executes in the correct POST → GET → PATCH → DELETE order.
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════ SETUP ══════════════ */}
+        {dgView === "setup" && (
+          <>
+            {/* API selector */}
+            <div>
+              <div style={{
+                display: "flex", justifyContent: "space-between",
+                alignItems: "center", marginBottom: 10
+              }}>
+                <SLbl text={`${loadedSpecs.length} loaded spec${loadedSpecs.length !== 1 ? "s" : ""}`} />
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button onClick={() => this.setState({ selNames: loadedSpecs.map(s => s.fileName) })}
+                    style={{
+                      background: "transparent", border: "1px solid var(--cs-border)",
+                      color: "#34d399", borderRadius: 6, padding: "3px 10px",
+                      fontFamily: MONO, fontSize: 11, cursor: "pointer"
+                    }}>All</button>
+                  <button onClick={() => this.setState({ selNames: [] })}
+                    style={{
+                      background: "transparent", border: "1px solid var(--cs-border)",
+                      color: "var(--cs-muted)", borderRadius: 6, padding: "3px 10px",
+                      fontFamily: MONO, fontSize: 11, cursor: "pointer"
+                    }}>Clear</button>
+                </div>
+              </div>
+
+              {loadedSpecs.length === 0 ? (
+                <div style={{
+                  padding: "20px", textAlign: "center" as const,
+                  fontFamily: MONO, fontSize: 12, color: "var(--cs-dim)",
+                  border: "1px dashed var(--cs-border)", borderRadius: 8
+                }}>
+                  No API specs loaded — upload files in the API Files tab
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column" as const, gap: 4 }}>
+                  {loadedSpecs.map(spec => {
+                    const active = selNames.includes(spec.fileName);
+                    const pathPs = new Set(spec.pathParams || []);
+                    const inCount = spec.fields.filter(f => !f.readOnly && !pathPs.has(f.name) && !f.isParam).length;
+                    const outCount = spec.fields.filter(f => f.readOnly).length;
+                    const methods = [...new Set(spec.endpoints.map(e => e.method.toUpperCase()))];
+                    return (
+                      <div key={spec.fileName} onClick={() => this.toggle(spec.fileName)} style={{
+                        display: "flex", alignItems: "center", gap: 12, padding: "10px 14px",
+                        borderRadius: 8, cursor: "pointer",
+                        background: active ? "#34d39910" : "var(--cs-surface)",
+                        border: `1.5px solid ${active ? "#34d39955" : "var(--cs-border-sub)"}`,
+                        transition: "all .12s",
+                      }}>
+                        {/* Checkbox */}
+                        <div style={{
+                          width: 18, height: 18, borderRadius: 4, flexShrink: 0,
+                          border: `2px solid ${active ? "#34d399" : "var(--cs-border)"}`,
+                          background: active ? "#34d399" : "transparent",
+                          display: "flex", alignItems: "center", justifyContent: "center"
+                        }}>
+                          {active && <span style={{ color: "#0a0e1a", fontSize: 11, fontWeight: 900 }}>✓</span>}
+                        </div>
+                        {/* Name */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{
+                            fontFamily: MONO, fontSize: 12, fontWeight: 700,
+                            color: active ? "var(--cs-text)" : "var(--cs-muted)",
+                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const
+                          }}>
+                            {spec.title}
+                          </div>
+                          <div style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)", marginTop: 2 }}>
+                            {spec.resourceName} · {spec.fields.length} fields
+                          </div>
+                        </div>
+                        {/* Field counts */}
+                        <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
+                          <span style={{
+                            background: "#60a5fa15", border: "1px solid #60a5fa33",
+                            color: "#60a5fa", borderRadius: 5, padding: "1px 7px",
+                            fontFamily: MONO, fontSize: 9, fontWeight: 600
+                          }}>IN {inCount}</span>
+                          <span style={{
+                            background: "#f8717115", border: "1px solid #f8717133",
+                            color: "#f87171", borderRadius: 5, padding: "1px 7px",
+                            fontFamily: MONO, fontSize: 9, fontWeight: 600
+                          }}>OUT {outCount}</span>
+                        </div>
+                        {/* Methods */}
+                        <div style={{ display: "flex", gap: 3, flexShrink: 0 }}>
+                          {methods.slice(0, 4).map(m => <MChip key={m} m={m} />)}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Dependency preview */}
+            {sel.length > 1 && (() => {
+              const pairs: { from: string; to: string }[] = [];
+              for (const s of sel)
+                for (const d of s.dependencies || []) {
+                  const ds = sel.find(x => x.schemaName === d || x.resourceName === d);
+                  if (ds && ds.fileName !== s.fileName)
+                    pairs.push({ from: ds.title, to: s.title });
+                }
+              if (pairs.length === 0) return null;
+              return (
+                <div style={{
+                  padding: "10px 14px", borderRadius: 8,
+                  background: "var(--cs-surface-2)", border: "1px solid var(--cs-border-sub)"
+                }}>
+                  <SLbl text="Detected dependencies — IDs will be chained automatically" />
+                  {pairs.map((p, i) => (
+                    <div key={i} style={{
+                      fontFamily: MONO, fontSize: 11,
+                      color: "var(--cs-muted)", display: "flex", gap: 6, marginBottom: 3,
+                      alignItems: "center"
+                    }}>
+                      <span style={{ color: "#34d399", fontWeight: 700 }}>{p.from}</span>
+                      <span>→ id →</span>
+                      <span style={{ color: "#60a5fa", fontWeight: 700 }}>{p.to}</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+
+            {/* Synth data preview */}
+            {sel.length > 0 && (() => {
+              const preview = dgBuildBody(sel[0], {}, sel);
+              const keys = Object.keys(preview).slice(0, 6);
+              if (keys.length === 0) return null;
+              return (
+                <div>
+                  <div style={{
+                    display: "flex", justifyContent: "space-between",
+                    alignItems: "center", marginBottom: 8
+                  }}>
+                    <SLbl text={`Sample payload — ${sel[0].title}`} />
+                    <button onClick={() => this.forceUpdate()}
+                      style={{
+                        background: "transparent", border: "1px solid var(--cs-border)",
+                        color: "#34d399", borderRadius: 6, padding: "3px 10px",
+                        fontFamily: MONO, fontSize: 11, cursor: "pointer", marginBottom: 8
+                      }}>
+                      ↻ Refresh
+                    </button>
+                  </div>
+                  <div style={{
+                    overflowX: "auto", borderRadius: 8,
+                    border: "1px solid var(--cs-border-sub)"
+                  }}>
+                    <table style={{
+                      width: "100%", borderCollapse: "collapse" as const,
+                      background: "var(--cs-bg)"
+                    }}>
+                      <thead>
+                        <tr>{keys.map(k => (
+                          <th key={k} style={{
+                            padding: "7px 12px", background: "var(--cs-surface-2)",
+                            fontFamily: MONO, fontSize: 10, color: "var(--cs-muted)",
+                            textTransform: "uppercase" as const, letterSpacing: 0.7,
+                            borderBottom: "1px solid var(--cs-border-sub)", textAlign: "left" as const,
+                            whiteSpace: "nowrap" as const
+                          }}>{k}</th>
+                        ))}</tr>
+                      </thead>
+                      <tbody>
+                        {Array.from({ length: 3 }).map((_, ri) => {
+                          const row = dgBuildBody(sel[0], {}, sel);
+                          return (
+                            <tr key={ri} style={{ background: ri % 2 === 0 ? "var(--cs-bg)" : "var(--cs-surface)" }}>
+                              {keys.map(k => {
+                                const v = row[k];
+                                const d = v == null ? "—"
+                                  : typeof v === "object" ? ((v as any).ident || (v as any).id || JSON.stringify(v))
+                                    : String(v);
+                                return (
+                                  <td key={k} title={d} style={{
+                                    padding: "7px 12px",
+                                    fontFamily: MONO, fontSize: 11, color: "var(--cs-text)",
+                                    borderBottom: "1px solid var(--cs-border-sub)",
+                                    maxWidth: 130, overflow: "hidden", textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap" as const
+                                  }}>{d}</td>
+                                );
+                              })}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Execution plan preview */}
+            {sel.length > 0 && (() => {
+              const p = dgBuildPlan(sel);
+              if (p.length === 0) return null;
+              return (
+                <div>
+                  <SLbl text={`Execution plan — ${p.length} steps`} />
+                  <div style={{ display: "flex", flexDirection: "column" as const, gap: 4 }}>
+                    {p.map((step, i) => {
+                      const col = DG_METHOD_COLORS[step.method] || "#8b949e";
+                      return (
+                        <div key={step.id} style={{
+                          display: "flex", alignItems: "center",
+                          gap: 10, padding: "8px 12px", borderRadius: 7,
+                          background: "var(--cs-surface)",
+                          border: `1px solid ${col}20`, borderLeft: `3px solid ${col}66`
+                        }}>
+                          <span style={{
+                            fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)",
+                            width: 18, flexShrink: 0
+                          }}>{i + 1}</span>
+                          <MChip m={step.method} />
+                          <span style={{
+                            fontFamily: MONO, fontSize: 12, color: "var(--cs-text)",
+                            flex: 1
+                          }}>{step.summary}</span>
+                          {step.producesId && (
+                            <span style={{ fontFamily: MONO, fontSize: 9, color: col, opacity: 0.7 }}>
+                              → {step.spec.resourceName}_id
+                            </span>
+                          )}
+                          {step.dependsOn.length > 0 && (
+                            <span style={{ fontFamily: MONO, fontSize: 9, color: "#60a5fa", opacity: 0.7 }}>
+                              ← uses prev id
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Test count + run button */}
+            <div style={{ borderTop: "1px solid var(--cs-border-sub)", paddingTop: 16 }}>
+              <div style={{
+                display: "flex", justifyContent: "space-between",
+                alignItems: "center", marginBottom: 8
+              }}>
+                <SLbl text="Number of test runs" />
+                <input type="number" min={1} max={2000} value={testCount}
+                  onChange={e => this.setState({ testCount: Math.min(2000, Math.max(1, +e.target.value || 1)) })}
+                  style={{
+                    width: 80, padding: "4px 8px",
+                    background: "var(--cs-input-bg)", border: "1px solid var(--cs-border)",
+                    borderRadius: 6, color: "var(--cs-text)",
+                    fontFamily: MONO, fontSize: 13, textAlign: "right" as const, outline: "none"
+                  }} />
+              </div>
+              <input type="range" min={1} max={2000} value={testCount}
+                onChange={e => this.setState({ testCount: +e.target.value })}
+                style={{ width: "100%", accentColor: "var(--cs-accent)", marginBottom: 10 }} />
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" as const, marginBottom: 14 }}>
+                {DG_PRESETS.map(n => (
+                  <button key={n} onClick={() => this.setState({ testCount: n })} style={{
+                    background: testCount === n ? "var(--cs-accent-bg,#34d39918)" : "var(--cs-surface-2)",
+                    border: `1px solid ${testCount === n ? "#34d399" : "var(--cs-border)"}`,
+                    color: testCount === n ? "#34d399" : "var(--cs-muted)",
+                    borderRadius: 6, padding: "3px 11px", fontFamily: MONO, fontSize: 11,
+                    cursor: "pointer", fontWeight: testCount === n ? 700 : 400, transition: "all .12s",
+                  }}>{n >= 1000 ? `${n / 1000}k` : n}</button>
+                ))}
+              </div>
+              <button
+                disabled={selNames.length === 0}
+                onClick={this.run}
+                style={{
+                  width: "100%", padding: "13px", borderRadius: 8, cursor: selNames.length === 0 ? "not-allowed" : "pointer",
+                  background: selNames.length === 0 ? "var(--cs-surface-2)"
+                    : "linear-gradient(135deg, #1a7a50, #34d399)",
+                  border: `1.5px solid ${selNames.length === 0 ? "var(--cs-border)" : "#34d399"}`,
+                  color: selNames.length === 0 ? "var(--cs-dim)" : "#0a1f15",
+                  fontFamily: MONO, fontSize: 13, fontWeight: 800, letterSpacing: 0.5,
+                  opacity: selNames.length === 0 ? 0.4 : 1, transition: "all .15s",
+                }}>
+                {selNames.length === 0
+                  ? "Select at least one API to run"
+                  : `▶ Generate & Execute — ${selNames.length} API${selNames.length > 1 ? "s" : ""} · ${testCount} run${testCount > 1 ? "s" : ""}`
+                }
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* ══════════════ RUNNING ══════════════ */}
+        {dgView === "running" && (
+          <div>
+            <div style={{
+              textAlign: "center" as const, padding: "20px 0 16px",
+              fontFamily: MONO
+            }}>
+              <div style={{ fontSize: 36, marginBottom: 10 }}>⚙️</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "var(--cs-text)", marginBottom: 4 }}>
+                Executing {plan.length} API steps…
+              </div>
+              <div style={{ fontSize: 11, color: "var(--cs-dim)" }}>
+                {Math.min(testCount, 5)} run{Math.min(testCount, 5) > 1 ? "s" : ""} · chaining POST → id → GET/PATCH/DELETE
+              </div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column" as const, gap: 5 }}>
+              {log.map((e, i) => {
+                const isRun = e.status === "running";
+                const col = isRun ? "#f59e0b" : e.ok ? "#22c55e" : "#f87171";
+                return (
+                  <div key={i} style={{
+                    display: "flex", alignItems: "center", gap: 10,
+                    padding: "9px 13px", borderRadius: 8, background: "var(--cs-surface)",
+                    border: `1px solid ${col}22`, borderLeft: `3px solid ${col}`
+                  }}>
+                    <span style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)", width: 20 }}>{e.step}</span>
+                    <span style={{ fontSize: 15 }}>{isRun ? "⏳" : e.ok ? "✅" : "❌"}</span>
+                    <span style={{ fontFamily: MONO, fontSize: 12, flex: 1, color: col }}>{e.label}</span>
+                    {!isRun && <StatusBadge status={e.status} />}
+                    {!isRun && <span style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)" }}>{e.latency}ms</span>}
+                  </div>
+                );
+              })}
+              <div ref={this.logRef} />
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════ REPORT ══════════════ */}
+        {dgView === "report" && (
+          <div style={{ display: "flex", flexDirection: "column" as const, gap: 14 }}>
+
+            <div style={{
+              padding: "11px 15px", borderRadius: 10,
+              background: "#a78bfa10", border: "1px solid #a78bfa33"
+            }}>
+              <div style={{
+                fontFamily: MONO, fontSize: 12, fontWeight: 800,
+                color: "#a78bfa", marginBottom: 4
+              }}>📊 Execution Report</div>
+              <div style={{ fontFamily: MONO, fontSize: 11, color: "var(--cs-muted)" }}>
+                {sel.length} API{sel.length > 1 ? "s" : ""} · {plan.length} steps ·{" "}
+                {Math.min(testCount, 5)} run{Math.min(testCount, 5) > 1 ? "s" : ""} ·{" "}
+                {results.length} calls · {pct}% success
+              </div>
+            </div>
+
+            {/* Stats grid */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+              {([
+                { v: ok, l: "✓ PASS", bg: "var(--cs-green-bg)", bd: "var(--cs-green-border)", c: "var(--cs-green)" },
+                { v: fail, l: "✗ FAIL", bg: "var(--cs-red-bg)", bd: "var(--cs-red-border)", c: "var(--cs-red)" },
+                { v: results.length, l: "Total", bg: "var(--cs-blue-badge-bg)", bd: "var(--cs-blue-badge-bdr)", c: "var(--cs-blue-badge)" },
+                { v: avgLat + "ms", l: "Avg Lat", bg: "var(--cs-yellow-bg)", bd: "var(--cs-yellow-border)", c: "var(--cs-yellow)" },
+              ] as const).map(({ v, l, bg, bd, c }) => (
+                <div key={l} style={{
+                  borderRadius: 10, padding: "14px 12px", textAlign: "center" as const,
+                  background: bg, border: `1px solid ${bd}`
+                }}>
+                  <div style={{
+                    fontFamily: MONO, fontSize: 24, fontWeight: 800, color: c,
+                    lineHeight: 1, marginBottom: 5
+                  }}>{v}</div>
+                  <div style={{
+                    fontFamily: MONO, fontSize: 10, fontWeight: 600, color: c,
+                    opacity: 0.7, textTransform: "uppercase" as const, letterSpacing: 0.8
+                  }}>{l}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Success bar */}
+            <div>
+              <div style={{
+                display: "flex", justifyContent: "space-between",
+                fontFamily: MONO, fontSize: 11, color: "var(--cs-muted)", marginBottom: 5
+              }}>
+                <span>Success rate</span>
+                <span style={{ fontWeight: 700, color: pctCol }}>{pct}%</span>
+              </div>
+              <div style={{ height: 8, borderRadius: 4, background: "var(--cs-surface-2)", overflow: "hidden" }}>
+                <div style={{
+                  height: "100%", borderRadius: 4, width: `${pct}%`,
+                  background: pctCol, transition: "width .6s ease"
+                }} />
+              </div>
+            </div>
+
+            {/* Method breakdown */}
+            <div>
+              <SLbl text="By HTTP method" />
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const }}>
+                {(["POST", "GET", "PATCH", "PUT", "DELETE"] as const).map(m => {
+                  const mr = results.filter(r => r.method === m);
+                  if (mr.length === 0) return null;
+                  const mOk = mr.filter(r => r.ok).length;
+                  const col = DG_METHOD_COLORS[m];
+                  const mAvg = Math.round(mr.reduce((a, r) => a + r.latency, 0) / mr.length);
+                  return (
+                    <div key={m} style={{
+                      padding: "8px 13px", borderRadius: 8,
+                      background: col + "0a", border: `1px solid ${col}30`
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                        <MChip m={m} />
+                        <span style={{ fontFamily: MONO, fontSize: 10, color: col, fontWeight: 700 }}>
+                          {mOk}/{mr.length}
+                        </span>
+                      </div>
+                      <div style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)" }}>{mAvg}ms avg</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Step results */}
+            <div>
+              <SLbl text="Step results" />
+              <div style={{ display: "flex", flexDirection: "column" as const, gap: 5 }}>
+                {results.map((r, i) => <ResultRow key={i} r={r} i={i} />)}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => this.setState({ dgView: "setup", results: [], log: [] })}
+                style={{
+                  flex: 1, padding: "11px", borderRadius: 8, cursor: "pointer",
+                  background: "transparent", border: "1px solid var(--cs-border-sub)",
+                  color: "var(--cs-muted)", fontFamily: MONO, fontSize: 13, fontWeight: 600
+                }}>
+                ← Configure
+              </button>
+              <button onClick={this.run}
+                style={{
+                  flex: 2, padding: "11px", borderRadius: 8, cursor: "pointer",
+                  background: "linear-gradient(135deg, #1a7a50, #34d399)",
+                  border: "1.5px solid #34d399", color: "#0a1f15",
+                  fontFamily: MONO, fontSize: 13, fontWeight: 800
+                }}>
+                ↻ Re-run
+              </button>
+            </div>
+          </div>
+        )}
+
+      </div>
+    );
+  }
+}
+
 // ─────────────────────────────────────────────────────────────
 interface ApiWorkflowTabProps { loadedSpecs?: ApiSpec[]; }
 

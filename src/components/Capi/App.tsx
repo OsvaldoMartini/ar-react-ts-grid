@@ -4,7 +4,7 @@ import { FileUploadPanel } from "./FileUploadPanel";
 import { DebugTab, LogEntry } from "./DebugTab";
 import { StoreTab } from "./StoreTab";
 import { BizWizard } from "./BizWizard";
-import { ApiWorkflowTab } from "./ApiWorkflowTab";
+import { ApiWorkflowTab, DataGenTab } from "./ApiWorkflowTab";
 import "./capi-app.scss";
 
 // ═══════════════════════════════════════════════════════════════
@@ -22,7 +22,7 @@ export interface CapiProps {
 }
 
 interface AppState {
-  tab: "apis" | "workflow" | "debug" | "store";
+  tab: "apis" | "workflow" | "datagen" | "debug" | "store";
   specs: ApiSpec[];
   log: LogEntry[];
   loading: boolean;
@@ -98,6 +98,7 @@ export default class App extends React.Component<CapiProps, AppState> {
     const TABS = [
       { id: "apis", l: `📁 API Files (${specs.length})` },
       { id: "workflow", l: `⬡ Workflow` },
+      { id: "datagen", l: `⚗ Data Generator` },
       { id: "debug", l: `🔍 Debug${log.length > 0 ? ` (${log.length})` : ""}` },
       { id: "store", l: `🗄️ Store (${tot})` },
     ] as const;
@@ -160,6 +161,11 @@ export default class App extends React.Component<CapiProps, AppState> {
           )}
           {tab === "workflow" && (
             <ApiWorkflowTab loadedSpecs={specs} />
+          )}
+          {tab === "datagen" && (
+            <div className="capi-scroll" style={{ padding: "24px 28px" }}>
+              <DataGenTab loadedSpecs={specs} />
+            </div>
           )}
           {tab === "debug" && (
             <DebugTab
