@@ -1253,11 +1253,14 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
           path = `/${res}/${pid}`;
         }
 
-        // Prepend selected environment base URL
-        const fullUrl = envStore.resolve(path);
-        tc.resolvedUrl = fullUrl;
+        // Use the URL frozen at generation/apply time — never overwrite it during execution.
+        // Extract just the path portion from the stored resolvedUrl so the mock engine works.
+        const execPath = (() => {
+          if (!tc.resolvedUrl) return path;
+          try { return new URL(tc.resolvedUrl).pathname; } catch { return tc.resolvedUrl; }
+        })();
 
-        const r = await rest.req(tc.method, path, tc.body || undefined);
+        const r = await rest.req(tc.method, execPath, tc.body || undefined);
         if (tc.method === "POST" && (r.body as any)?.id) ctx[res] = (r.body as any).id;
 
         tc.status = r.status >= 200 && r.status < 300 ? "passed" : "failed";
@@ -1301,11 +1304,13 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
         if (path.includes("{id}") && pid) path = path.replace("{id}", String(pid));
         else if (["GET", "PATCH", "PUT", "DELETE"].includes(tc.method) && pid) path = `/${res}/${pid}`;
 
-        // Prepend selected environment base URL
-        const fullUrl = envStore.resolve(path);
-        tc.resolvedUrl = fullUrl;
+        // Use the URL frozen at generation/apply time — never overwrite it during execution.
+        const execPath = (() => {
+          if (!tc.resolvedUrl) return path;
+          try { return new URL(tc.resolvedUrl).pathname; } catch { return tc.resolvedUrl; }
+        })();
 
-        const r = await rest.req(tc.method, path, tc.body || undefined);
+        const r = await rest.req(tc.method, execPath, tc.body || undefined);
         if (tc.method === "POST" && (r.body as any)?.id) ctx[res] = (r.body as any).id;
 
         tc.status = r.status >= 200 && r.status < 300 ? "passed" : "failed";
