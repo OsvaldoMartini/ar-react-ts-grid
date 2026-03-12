@@ -1593,6 +1593,92 @@ export class DataGenTab extends React.Component<
               </div>
             </div>
 
+            {/* ══ TEST COUNT + GENERATE ══ */}
+            <div style={{
+              borderRadius: 10, border: "1px solid var(--cs-border)",
+              overflow: "hidden",
+            }}>
+              {/* Header row */}
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "9px 14px", background: "var(--cs-surface-2)",
+                borderBottom: "1px solid var(--cs-border-sub)",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 13 }}>⚡</span>
+                  <span style={{
+                    fontFamily: MONO, fontSize: 11, fontWeight: 800,
+                    color: "var(--cs-text)", letterSpacing: 0.3
+                  }}>
+                    Number of Test Runs
+                  </span>
+                </div>
+                <input type="number" min={1} max={2000} value={testCount}
+                  onChange={e => this.setState({ testCount: Math.min(2000, Math.max(1, +e.target.value || 1)) })}
+                  style={{
+                    width: 72, padding: "3px 8px", background: "var(--cs-input-bg)",
+                    border: "1px solid var(--cs-border)", borderRadius: 6,
+                    color: "var(--cs-text)", fontFamily: MONO, fontSize: 13, fontWeight: 700,
+                    textAlign: "right" as const, outline: "none"
+                  }} />
+              </div>
+
+              {/* Slider + presets */}
+              <div style={{ padding: "12px 14px 14px", background: "var(--cs-bg)" }}>
+                <input type="range" min={1} max={2000} value={testCount}
+                  onChange={e => this.setState({ testCount: +e.target.value })}
+                  style={{ width: "100%", accentColor: "var(--cs-accent)", marginBottom: 10 }} />
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" as const, marginBottom: 12 }}>
+                  {DG_PRESETS.map(n => (
+                    <button key={n} onClick={() => this.setState({ testCount: n })} style={{
+                      background: testCount === n ? "#34d39918" : "var(--cs-surface-2)",
+                      border: `1px solid ${testCount === n ? "#34d399" : "var(--cs-border)"}`,
+                      color: testCount === n ? "#34d399" : "var(--cs-muted)",
+                      borderRadius: 6, padding: "3px 11px", fontFamily: MONO, fontSize: 11,
+                      cursor: "pointer", fontWeight: testCount === n ? 700 : 400,
+                    }}>{n >= 1000 ? `${n / 1000}k` : n}</button>
+                  ))}
+                </div>
+
+                {/* Live preview count — shows when specs are selected */}
+                {sel.length > 0 && (() => {
+                  const p = dgBuildPlan(sel);
+                  const total = p.length * testCount;
+                  return (
+                    <div style={{
+                      padding: "8px 12px", borderRadius: 8, marginBottom: 12,
+                      background: "var(--cs-surface-2)", border: "1px solid var(--cs-border-sub)",
+                      fontFamily: MONO, fontSize: 11, color: "var(--cs-muted)"
+                    }}>
+                      <span style={{ color: "#34d399", fontWeight: 800, fontSize: 18 }}>{total.toLocaleString()}</span>
+                      {" "}test case{total !== 1 ? "s" : ""} will be queued
+                      <span style={{ opacity: 0.6 }}> — {p.length} step{p.length !== 1 ? "s" : ""} × {testCount} run{testCount !== 1 ? "s" : ""}</span>
+                    </div>
+                  );
+                })()}
+
+                {/* Generate button */}
+                <button
+                  disabled={selNames.length === 0}
+                  onClick={this.generate}
+                  style={{
+                    width: "100%", padding: "13px", borderRadius: 8,
+                    cursor: selNames.length === 0 ? "not-allowed" : "pointer",
+                    background: selNames.length === 0 ? "var(--cs-surface-2)"
+                      : "linear-gradient(135deg, #1a4a7a, #34d399)",
+                    border: `1.5px solid ${selNames.length === 0 ? "var(--cs-border)" : "#34d399"}`,
+                    color: selNames.length === 0 ? "var(--cs-dim)" : "#fff",
+                    fontFamily: MONO, fontSize: 13, fontWeight: 800, letterSpacing: 0.5,
+                    opacity: selNames.length === 0 ? 0.4 : 1, transition: "all .15s",
+                  }}>
+                  {selNames.length === 0
+                    ? "Select at least one API spec below"
+                    : `⬡ Generate Test Cases → Ready for Test`
+                  }
+                </button>
+              </div>
+            </div>
+
             {/* API selector */}
             <div>
               <div style={{
@@ -1874,74 +1960,6 @@ export class DataGenTab extends React.Component<
                 </div>
               );
             })()}
-
-            {/* Test count + generate button */}
-            <div style={{ borderTop: "1px solid var(--cs-border-sub)", paddingTop: 16 }}>
-              <div style={{
-                display: "flex", justifyContent: "space-between",
-                alignItems: "center", marginBottom: 8
-              }}>
-                <SLbl text="Number of test runs" />
-                <input type="number" min={1} max={2000} value={testCount}
-                  onChange={e => this.setState({ testCount: Math.min(2000, Math.max(1, +e.target.value || 1)) })}
-                  style={{
-                    width: 80, padding: "4px 8px", background: "var(--cs-input-bg)",
-                    border: "1px solid var(--cs-border)", borderRadius: 6,
-                    color: "var(--cs-text)", fontFamily: MONO, fontSize: 13,
-                    textAlign: "right" as const, outline: "none"
-                  }} />
-              </div>
-              <input type="range" min={1} max={2000} value={testCount}
-                onChange={e => this.setState({ testCount: +e.target.value })}
-                style={{ width: "100%", accentColor: "var(--cs-accent)", marginBottom: 10 }} />
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" as const, marginBottom: 14 }}>
-                {DG_PRESETS.map(n => (
-                  <button key={n} onClick={() => this.setState({ testCount: n })} style={{
-                    background: testCount === n ? "#34d39918" : "var(--cs-surface-2)",
-                    border: `1px solid ${testCount === n ? "#34d399" : "var(--cs-border)"}`,
-                    color: testCount === n ? "#34d399" : "var(--cs-muted)",
-                    borderRadius: 6, padding: "3px 11px", fontFamily: MONO, fontSize: 11,
-                    cursor: "pointer", fontWeight: testCount === n ? 700 : 400,
-                  }}>{n >= 1000 ? `${n / 1000}k` : n}</button>
-                ))}
-              </div>
-
-              {/* Preview count */}
-              {sel.length > 0 && (() => {
-                const p = dgBuildPlan(sel);
-                const total = p.length * testCount;
-                return (
-                  <div style={{
-                    padding: "10px 14px", borderRadius: 8, marginBottom: 14,
-                    background: "var(--cs-surface-2)", border: "1px solid var(--cs-border-sub)",
-                    fontFamily: MONO, fontSize: 11, color: "var(--cs-muted)"
-                  }}>
-                    <span style={{ color: "#34d399", fontWeight: 800, fontSize: 20 }}>{total.toLocaleString()}</span>
-                    {" "}test case{total !== 1 ? "s" : ""} will be queued
-                    <span style={{ opacity: 0.6 }}> — {p.length} step{p.length !== 1 ? "s" : ""} × {testCount} run{testCount !== 1 ? "s" : ""}</span>
-                  </div>
-                );
-              })()}
-
-              <button
-                disabled={selNames.length === 0}
-                onClick={this.generate}
-                style={{
-                  width: "100%", padding: "13px", borderRadius: 8,
-                  cursor: selNames.length === 0 ? "not-allowed" : "pointer",
-                  background: selNames.length === 0 ? "var(--cs-surface-2)"
-                    : "linear-gradient(135deg, #1a4a7a, #34d399)",
-                  border: `1.5px solid ${selNames.length === 0 ? "var(--cs-border)" : "#34d399"}`,
-                  color: selNames.length === 0 ? "var(--cs-dim)" : "#fff",
-                  fontFamily: MONO, fontSize: 13, fontWeight: 800, letterSpacing: 0.5,
-                  opacity: selNames.length === 0 ? 0.4 : 1, transition: "all .15s",
-                }}>
-                {selNames.length === 0
-                  ? "Select at least one API spec"
-                  : `⬡ Generate Test Cases → Ready for Test`
-                }
-              </button>
-            </div>
           </>
         )}
 
