@@ -251,3 +251,517 @@ export const DEFAULT_SPEC: ApiSpec = {
   tags: ["Addresses"],
   rawContent: "",
 };
+
+// ═══════════════════════════════════════════════════════════════
+// PARSE API SPEC  — shared by FileUploadPanel and tests
+// Handles: OpenAPI 3.x / Swagger 2.x JSON/YAML, plain JSON data,
+//          Protobuf .proto, and raw JSON Schema/Shape files.
+// Populates spec.fields and spec.dependencies fully.
+// ═══════════════════════════════════════════════════════════════
+
+const SCALAR_TYPES = new Set(["string","integer","number","boolean","null","any","object","array","void","empty"]);
+
+function refName(ref: string): string {
+  return ref.split("/").pop() || ref;
+}
+
+function collectRefs(obj: any, out: Set<string>): void {
+  if (!obj || typeof obj !== "object") return;
+  if (Array.isArray(obj)) { obj.forEach(v => collectRefs(v, out)); return; }
+  for (const [k, v] of Object.entries(obj)) {
+    if (k === "$ref" && typeof v === "string") out.add(refName(v));
+    else collectRefs(v, out);
+  }
+}
+
+function fieldsFromSchema(schema: any): { name: string; type: string; description: string; required: boolean }[] {
+  const fields: { name: string; type: string; description: string; required: boolean }[] = [];
+  if (!schema || typeof schema !== "object") return fields;
+  const required = new Set((schema.required || []) as string[]);
+  for (const [prop, def] of Object.entries(schema.properties || {})) {
+    const d = def as any;
+    let type: string;
+    if (d.$ref) {
+      type = refName(d.$ref);
+    } else if (d.type === "array") {
+      const itemRef = d.items?.$ref ? refName(d.items.$ref) : (d.items?.type || "any");
+      type = `${itemRef}[]`;
+    } else if (d.allOf || d.oneOf || d.anyOf) {
+      const variants = (d.allOf || d.oneOf || d.anyOf) as any[];
+      const firstRef = variants.find((v: any) => v.$ref);
+      type = firstRef ? refName(firstRef.$ref) : "object";
+    } else {
+      type = d.type || "object";
+    }
+    fields.push({ name: prop, type, description: d.description || "", required: required.has(prop) });
+  }
+  return fields;
+}
+
+function fieldsFromSample(sample: Record<string, any>): { name: string; type: string; description: string; required: boolean }[] {
+  return Object.entries(sample).map(([name, val]) => ({
+    name,
+    type: Array.isArray(val) ? "array" : (val === null ? "null" : typeof val),
+    description: "",
+    required: false,
+  }));
+}
+
+function resourceFromTitle(title: string): string {
+  return "obj-" + title.toLowerCase().replace(/[^a-z0-9]/g, "-").replace(/-api$/, "").replace(/-+$/, "");
+}
+
+function yamlScalarVal(line: string, key: string): string | null {
+  const m = line.match(new RegExp(`^\\s*${key}:\\s*[\"']?([^\"'\\n\\r#]+)`));
+  return m ? m[1].trim() : null;
+}
+
+/** Lightweight YAML → ApiSpec extractor (no full YAML parse library needed). */
+function parseYamlSpec(content: string, spec: ApiSpec): void {
+  const lines = content.split(/\r?\n/);
+
+  // Top-level scalars
+  for (const l of lines) {
+    if (!spec.title || spec.title === spec.fileName.replace(/\.[^.]+$/, "")) {
+      const t = yamlScalarVal(l, "title"); if (t) spec.title = t;
+    }
+    const v = yamlScalarVal(l, "version"); if (v && v !== spec.version) spec.version = v;
+    const d = yamlScalarVal(l, "description"); if (d && !spec.description) spec.description = d;
+  }
+
+  spec.authSchemes = content.includes("bearerAuth") ? ["Bearer"]
+    : content.includes("apiKey") ? ["ApiKey"] : [];
+
+  // Servers
+  const srvRx = /^\s*-\s*url:\s*['"]{0,1}([^'">\n\r]+)/gm;
+  let sm: RegExpExecArray | null;
+  while ((sm = srvRx.exec(content)) !== null) spec.servers.push(sm[1].trim());
+
+  // Tags block
+  const tagM = content.match(/^tags:\s*\n((?:\s*-\s*.+\n?)*)/m);
+  if (tagM) {
+    spec.tags = tagM[1].split("\n")
+      .map(l => l.replace(/^\s*-\s*name:\s*/, "").replace(/^\s*-\s*/, "").trim())
+      .filter(Boolean);
+  }
+
+  // Paths → endpoints
+  let inPaths = false, curPath: string | null = null;
+  for (let li = 0; li < lines.length; li++) {
+    const l = lines[li];
+    if (/^paths:/.test(l))                             { inPaths = true; continue; }
+    if (inPaths && /^[a-zA-Z$]/.test(l) && !/^\s/.test(l)) inPaths = false;
+    if (!inPaths) continue;
+    const pM = l.match(/^  (\/[^:\s#]+):\s*$/);
+    if (pM)  { curPath = pM[1]; continue; }
+    const mM = l.match(/^    (get|post|put|patch|delete):\s*$/i);
+    if (mM && curPath) {
+      const nextLine   = lines[li + 1] || "";
+      const sum        = yamlScalarVal(nextLine, "summary") || "";
+      spec.endpoints.push({ method: mM[1].toUpperCase(), path: curPath, summary: sum, tags: [] });
+    }
+  }
+
+  // components.schemas → fields + dependencies
+  const schemaBlockIdx = content.search(/^  schemas:\s*$/m);
+  if (schemaBlockIdx >= 0) {
+    const after      = content.slice(schemaBlockIdx);
+    const schNameRx  = /^    (\w[\w-]*):\s*$/gm;
+    let nm: RegExpExecArray | null;
+    const schemaNames: string[] = [];
+    while ((nm = schNameRx.exec(after)) !== null) schemaNames.push(nm[1]);
+
+    const allRefs = new Set<string>();
+
+    for (let si = 0; si < schemaNames.length; si++) {
+      const sname = schemaNames[si];
+      const start = after.indexOf(`    ${sname}:\n`);
+      const end   = si < schemaNames.length - 1
+        ? after.indexOf(`    ${schemaNames[si + 1]}:\n`, start + 1)
+        : after.length;
+      const block = after.slice(start, end);
+
+      // Collect $refs
+      const refRx = /\$ref:\s*['"]?#\/components\/schemas\/([\w-]+)/g;
+      let rr: RegExpExecArray | null;
+      while ((rr = refRx.exec(block)) !== null) allRefs.add(rr[1]);
+
+      // Collect properties at exactly 8-space indent
+      const propRx = /^        (\w[\w-]*):/gm;
+      let pm: RegExpExecArray | null;
+      while ((pm = propRx.exec(block)) !== null) {
+        const propName = pm[1];
+        if (["type","description","required","example","format","minimum","maximum","default","enum","nullable"].includes(propName)) continue;
+        const after2 = block.slice(pm.index + pm[0].length, pm.index + pm[0].length + 300);
+        const typeM  = after2.match(/\n\s+type:\s*(\w+)/);
+        const refM   = after2.match(/\n\s+\$ref:\s*['"]?#\/components\/schemas\/([\w-]+)/);
+        const itemM  = after2.match(/items:\s*\n\s+\$ref:\s*['"]?#\/components\/schemas\/([\w-]+)/);
+        const itemTypeM = after2.match(/items:\s*\n\s+type:\s*(\w+)/);
+        let type = "object";
+        if (refM)         { type = refM[1]; allRefs.add(refM[1]); }
+        else if (itemM)   { type = itemM[1] + "[]"; allRefs.add(itemM[1]); }
+        else if (itemTypeM) { type = itemTypeM[1] + "[]"; }
+        else if (typeM)   { type = typeM[1]; }
+        spec.fields.push({ name: propName, type, description: "", required: false });
+      }
+    }
+
+    spec.dependencies = [...allRefs];
+    if (!spec.schemaName && schemaNames.length > 0) spec.schemaName = schemaNames[0];
+  }
+}
+
+export function parseApiSpec(fileName: string, content: string, fileType?: string): ApiSpec {
+  const ext = fileType || fileName.split(".").pop()!.toLowerCase();
+  const spec: ApiSpec = {
+    fileName, ext,
+    title: fileName.replace(/\.[^.]+$/, ""),
+    version: "1.0",
+    endpoints: [], schemas: {},
+    resourceName: null, schemaName: null,
+    parseError: null, category: null, folder: null,
+    dependencies: [], fields: [], description: "",
+    authSchemes: [], servers: [], tags: [],
+    rawContent: content.slice(0, 5000),
+  };
+
+  try {
+    if (["json","schema","shape"].includes(ext)) {
+      let parsed: any;
+      try { parsed = JSON.parse(content); }
+      catch (e: any) { spec.parseError = "JSON parse error: " + e.message; return spec; }
+
+      if (parsed?.openapi || parsed?.swagger) {
+        // ── OpenAPI 3.x / Swagger 2.x ──────────────────────────
+        spec.title       = parsed.info?.title       || spec.title;
+        spec.version     = parsed.info?.version     || spec.version;
+        spec.description = parsed.info?.description || "";
+        spec.servers     = (parsed.servers || []).map((s: any) => s.url).filter(Boolean);
+        spec.authSchemes = Object.keys(parsed.components?.securitySchemes || {});
+        spec.tags        = (parsed.tags || []).map((t: any) => (typeof t === "string" ? t : t.name)).filter(Boolean);
+
+        const schemas: Record<string, any> =
+          parsed.components?.schemas || parsed.definitions || {};
+        spec.schemas = schemas;
+
+        // Collect all $ref names across entire document
+        const allDocRefs = new Set<string>();
+        collectRefs(parsed.paths, allDocRefs);
+        collectRefs(parsed.components, allDocRefs);
+        collectRefs(parsed.definitions, allDocRefs);
+
+        // Extract endpoints
+        for (const [path, pathItem] of Object.entries(parsed.paths || {})) {
+          for (const [method, op] of Object.entries(pathItem as any)) {
+            if (!["get","post","put","patch","delete"].includes(method)) continue;
+            const o = op as any;
+            spec.endpoints.push({
+              method: method.toUpperCase(), path,
+              summary: o.summary || "",
+              tags: o.tags || [],
+              operationId: o.operationId,
+            });
+          }
+        }
+
+        // Identify primary schema (from POST request body ref or name matching)
+        let primarySchema: string | null = null;
+        for (const ep of spec.endpoints) {
+          if (ep.method !== "POST") continue;
+          const pathItem = (parsed.paths || {})[ep.path];
+          const postOp   = pathItem?.post;
+          // OpenAPI 3.x
+          const bodyRef = postOp?.requestBody?.content?.["application/json"]?.schema?.$ref
+            ?? postOp?.requestBody?.content?.["application/json"]?.schema?.allOf?.[0]?.$ref;
+          if (bodyRef) { primarySchema = refName(bodyRef); break; }
+          // Swagger 2.x
+          const bodyParam = (postOp?.parameters || []).find((p: any) => p.in === "body");
+          if (bodyParam?.schema?.$ref) { primarySchema = refName(bodyParam.schema.$ref); break; }
+          // Fallback: name match
+          const resource = ep.path.replace(/^\//, "").split("/")[0].replace(/[{}/]/g, "");
+          const match = Object.keys(schemas).find(k =>
+            k.toLowerCase().replace(/[_-]/g, "") === resource.toLowerCase().replace(/[_-]/g, "")
+          );
+          if (match) { primarySchema = match; break; }
+        }
+        if (!primarySchema && Object.keys(schemas).length > 0) primarySchema = Object.keys(schemas)[0];
+
+        if (primarySchema && schemas[primarySchema]) {
+          spec.schemaName = primarySchema;
+          spec.fields     = fieldsFromSchema(schemas[primarySchema]);
+        } else {
+          for (const schema of Object.values(schemas)) {
+            spec.fields.push(...fieldsFromSchema(schema as any));
+          }
+        }
+
+        // Dependencies = $refs pointing to OTHER known schemas
+        spec.dependencies = [...allDocRefs].filter(r => schemas[r] && r !== primarySchema);
+
+      } else if (Array.isArray(parsed) || typeof parsed === "object") {
+        // ── Plain JSON data file — seed db store ───────────────
+        const arr = Array.isArray(parsed) ? parsed : [parsed];
+        if (arr.length > 0 && arr[0] !== null && typeof arr[0] === "object") {
+          spec.fields = fieldsFromSample(arr[0]);
+          const resourceName = resourceFromTitle(spec.title);
+          spec.resourceName  = resourceName;
+          // Seed in-memory store with the data records
+          arr.forEach(item => {
+            db.add(resourceName, (typeof item === "object" && item !== null) ? item : { data: item });
+          });
+        }
+      }
+    }
+
+    if (["yaml","yml"].includes(ext)) {
+      parseYamlSpec(content, spec);
+    }
+
+    if (ext === "proto") {
+      spec.endpoints = [...content.matchAll(/rpc\s+(\w+)\s*\(([^)]+)\)\s*returns\s*\(([^)]+)\)/g)]
+        .map(m => ({ method: "RPC", path: m[1], summary: `${m[1]}(${m[2].trim()}) → ${m[3].trim()}`, tags: [] }));
+      const msgRx = /message\s+\w+\s*\{([^}]+)\}/gm;
+      let mm: RegExpExecArray | null;
+      while ((mm = msgRx.exec(content)) !== null) {
+        const fieldRx = /(?:repeated\s+)?(\w+)\s+(\w+)\s*=/gm;
+        let fm: RegExpExecArray | null;
+        while ((fm = fieldRx.exec(mm[1])) !== null) {
+          if (!["reserved","option"].includes(fm[2])) {
+            spec.fields.push({ name: fm[2], type: fm[1], description: "", required: false });
+          }
+        }
+      }
+    }
+
+    // Resolve resourceName from endpoints if not set yet
+    if (!spec.resourceName) {
+      for (const ep of spec.endpoints) {
+        const m = ep.path?.match(/^\/([\w-]+)/);
+        if (m) { spec.resourceName = m[1]; break; }
+      }
+    }
+    if (!spec.resourceName) {
+      spec.resourceName = resourceFromTitle(spec.title);
+    }
+
+    // Trim scalar-only entries from dependencies
+    spec.dependencies = spec.dependencies.filter(d => !SCALAR_TYPES.has(d.toLowerCase()));
+
+  } catch (e: any) {
+    spec.parseError = e.message;
+  }
+
+  return spec;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DYNAMIC WORKFLOW BUILDER
+// Derives graph nodes, edges, schema-field table, workflow stages,
+// and data-transfer arrows from the currently loaded ApiSpec[].
+// ═══════════════════════════════════════════════════════════════
+
+export interface WfNode {
+  id: string; label: string; schema: string; resource: string;
+  method: "POST"|"PATCH"|"GET"|"DELETE"|"PUT"|"RPC";
+  path: string; group: string; produces?: string; color: string;
+  x: number; y: number;
+}
+export interface WfEdge {
+  from: string; to: string; field: string; type: "object"|"array"; label: string;
+}
+export interface WfFieldRow {
+  sourceSchema: string; field: string; fieldType: string;
+  referencesSchema: string; sourceApi: string; isArray: boolean;
+}
+export interface WfStage {
+  id: string; label: string; api: string; produces: string|null;
+  color: string; step: number;
+}
+export interface WfTransfer {
+  from: string; to: string; via: string; label: string;
+}
+export interface DynamicWorkflow {
+  nodes: WfNode[];
+  edges: WfEdge[];
+  schemaFields: WfFieldRow[];
+  stages: WfStage[];
+  transfers: WfTransfer[];
+  isEmpty: boolean;
+}
+
+const METHOD_COLORS: Record<string, string> = {
+  POST:   "#34d399",
+  GET:    "#60a5fa",
+  PATCH:  "#fb923c",
+  PUT:    "#f59e0b",
+  DELETE: "#f87171",
+  RPC:    "#a78bfa",
+};
+
+const PALETTE = [
+  "#818cf8","#34d399","#fb923c","#a78bfa","#f472b6",
+  "#64748b","#60a5fa","#f59e0b","#e06c75","#56b6c2",
+];
+
+export function buildDynamicWorkflow(specs: ApiSpec[]): DynamicWorkflow {
+  if (!specs || specs.length === 0) {
+    return { nodes: [], edges: [], schemaFields: [], stages: [], transfers: [], isEmpty: true };
+  }
+
+  const nodes: WfNode[]          = [];
+  const edges: WfEdge[]          = [];
+  const schemaFields: WfFieldRow[] = [];
+  const stages: WfStage[]        = [];
+  const transfers: WfTransfer[]  = [];
+
+  // Stable color per resource group
+  const resourceColors: Record<string, string> = {};
+  const uniqueResources = [...new Set(
+    specs.map(s => s.resourceName).filter(Boolean) as string[]
+  )];
+  uniqueResources.forEach((r, i) => { resourceColors[r] = PALETTE[i % PALETTE.length]; });
+
+  const X_STEP  = 210;
+  const Y_BASE  = 80;
+  const Y_PATCH = 200;
+
+  // POST node by resource — used when building edges
+  const postNodeByResource: Record<string, WfNode> = {};
+  let col = 0;
+  let step = 1;
+
+  for (const spec of specs) {
+    if (!spec.resourceName) continue;
+    const res   = spec.resourceName;
+    const color = resourceColors[res] ?? "#8b949e";
+    const schema = spec.schemaName || res;
+
+    // De-duplicate: one node per resource+method combination
+    for (const ep of spec.endpoints) {
+      const method = ep.method as WfNode["method"];
+      const isPatch = ["PATCH","PUT"].includes(method);
+      const nodeId  = `${res}__${method}`;
+      if (nodes.find(n => n.id === nodeId)) continue;
+
+      const x = col * X_STEP + 40;
+      const y = isPatch ? Y_PATCH : Y_BASE;
+
+      const node: WfNode = {
+        id: nodeId, label: spec.title.slice(0, 15),
+        schema, resource: res, method, path: ep.path, group: res,
+        produces: method === "POST" ? `${res}Id` : undefined,
+        color, x, y,
+      };
+      nodes.push(node);
+
+      if (method === "POST") {
+        postNodeByResource[res] = node;
+        stages.push({
+          id: res,
+          label: spec.title.slice(0, 16),
+          api: `POST ${ep.path}`,
+          produces: `${res}_id`,
+          color,
+          step: step++,
+        });
+        col++;
+      }
+    }
+
+    // Schema field rows — only non-scalar cross-refs
+    for (const field of spec.fields) {
+      const baseType = field.type.replace(/\[\]$/, "");
+      if (SCALAR_TYPES.has(baseType.toLowerCase())) continue;
+      schemaFields.push({
+        sourceSchema: schema,
+        field: field.name,
+        fieldType: field.type.includes("[]") ? "array" : "object",
+        referencesSchema: baseType,
+        sourceApi: spec.title,
+        isArray: field.type.includes("[]"),
+      });
+    }
+  }
+
+  // Build edges + transfers from explicit spec.dependencies
+  const specBySchema:   Record<string, ApiSpec> = {};
+  const specByResource: Record<string, ApiSpec> = {};
+  for (const s of specs) {
+    if (s.schemaName)   specBySchema[s.schemaName]   = s;
+    if (s.resourceName) specByResource[s.resourceName] = s;
+  }
+
+  for (const spec of specs) {
+    if (!spec.resourceName) continue;
+    const toNode = postNodeByResource[spec.resourceName];
+    if (!toNode) continue;
+
+    for (const dep of spec.dependencies) {
+      const providerSpec =
+        specBySchema[dep] ??
+        specByResource[dep] ??
+        specs.find(s => s.fields.some(f => f.type === dep || f.type === dep + "[]"));
+      if (!providerSpec || providerSpec.resourceName === spec.resourceName) continue;
+
+      const fromNode = postNodeByResource[providerSpec.resourceName!];
+      if (!fromNode) continue;
+
+      const refField = spec.fields.find(f => {
+        const base = f.type.replace(/\[\]$/, "");
+        return base === dep;
+      });
+      const isArr = refField?.type.includes("[]") ?? false;
+
+      if (!edges.find(e => e.from === fromNode.id && e.to === toNode.id && e.field === dep)) {
+        edges.push({
+          from: fromNode.id, to: toNode.id,
+          field: refField?.name || dep,
+          type: isArr ? "array" : "object",
+          label: `${providerSpec.resourceName}Id → ${refField?.name || dep}`,
+        });
+      }
+      if (!transfers.find(t => t.from === providerSpec.resourceName && t.to === spec.resourceName)) {
+        transfers.push({
+          from: providerSpec.resourceName!,
+          to:   spec.resourceName,
+          via:  refField?.name || dep,
+          label: `${providerSpec.resourceName}Id`,
+        });
+      }
+    }
+  }
+
+  // Also derive edges from schemaField cross-refs not captured above
+  for (const row of schemaFields) {
+    const depSpec =
+      specBySchema[row.referencesSchema] ??
+      specs.find(s => s.resourceName === row.referencesSchema);
+    const srcSpec = specs.find(s =>
+      (s.schemaName || s.resourceName) === row.sourceSchema
+    );
+    if (!depSpec || !srcSpec || depSpec.resourceName === srcSpec.resourceName) continue;
+
+    const fromNode = depSpec.resourceName ? postNodeByResource[depSpec.resourceName] : null;
+    const toNode   = srcSpec.resourceName  ? postNodeByResource[srcSpec.resourceName]  : null;
+    if (!fromNode || !toNode) continue;
+
+    if (!edges.find(e => e.from === fromNode.id && e.to === toNode.id && e.field === row.field)) {
+      edges.push({
+        from: fromNode.id, to: toNode.id,
+        field: row.field,
+        type: row.isArray ? "array" : "object",
+        label: `${row.referencesSchema} → ${row.field}`,
+      });
+    }
+    if (!transfers.find(t => t.from === depSpec.resourceName && t.to === srcSpec.resourceName)) {
+      transfers.push({
+        from: depSpec.resourceName!,
+        to:   srcSpec.resourceName!,
+        via:  row.field,
+        label: `${depSpec.resourceName}Id`,
+      });
+    }
+  }
+
+  return { nodes, edges, schemaFields, stages, transfers, isEmpty: nodes.length === 0 };
+}
