@@ -1504,6 +1504,7 @@ export class DataGenTab extends React.Component<
           path,
           body,
           dataSource: "synthetic",
+          resolvedUrl: envStore.resolve(path),   // frozen at generation time
         });
         added++;
       }

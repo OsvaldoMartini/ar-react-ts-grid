@@ -130,7 +130,9 @@ class TcRow extends React.Component<{ tc: TestCase; onRefresh: () => void; envAp
     const { tc } = props;
     this.state = {
       open: false,
-      editUrl: tc.resolvedUrl || envStore.resolve(tc.path),
+      // Use the frozen URL stamped at generation/apply time — never read live envStore here.
+      // This prevents pagination from silently updating URLs when env has changed.
+      editUrl: tc.resolvedUrl ?? tc.path,
       editBody: tc.body ? JSON.stringify(tc.body, null, 2) : "",
       bodyError: null,
       running: false,
@@ -139,13 +141,10 @@ class TcRow extends React.Component<{ tc: TestCase; onRefresh: () => void; envAp
   }
 
   componentDidUpdate(prev: { tc: TestCase; envAppliedKey?: string }) {
-    // When env is applied to all, reset editUrl (only if user hasn't manually dirtied it)
+    // Only reset editUrl when "Apply to All" is explicitly clicked (envAppliedKey bumped)
+    // and the user hasn't manually edited this row's URL.
     if (prev.envAppliedKey !== this.props.envAppliedKey && !this.state.dirty) {
-      this.setState({ editUrl: envStore.resolve(this.props.tc.path) });
-    }
-    // Sync editUrl if path changes and user hasn't manually edited
-    if (!this.state.dirty && prev.tc.path !== this.props.tc.path) {
-      this.setState({ editUrl: envStore.resolve(this.props.tc.path) });
+      this.setState({ editUrl: this.props.tc.resolvedUrl ?? this.props.tc.path });
     }
   }
 
@@ -203,7 +202,7 @@ class TcRow extends React.Component<{ tc: TestCase; onRefresh: () => void; envAp
     e.stopPropagation();
     const { tc } = this.props;
     this.setState({
-      editUrl: envStore.resolve(tc.path),
+      editUrl: tc.resolvedUrl ?? tc.path,
       editBody: tc.body ? JSON.stringify(tc.body, null, 2) : "",
       bodyError: null,
       dirty: false,
