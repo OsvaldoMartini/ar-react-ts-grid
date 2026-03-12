@@ -124,8 +124,8 @@ interface TcRowState {
   dirty: boolean;    // user has edited url or body
 }
 
-class TcRow extends React.Component<{ tc: TestCase; onRefresh: () => void }, TcRowState> {
-  constructor(props: { tc: TestCase; onRefresh: () => void }) {
+class TcRow extends React.Component<{ tc: TestCase; onRefresh: () => void; envAppliedKey?: string }, TcRowState> {
+  constructor(props: { tc: TestCase; onRefresh: () => void; envAppliedKey?: string }) {
     super(props);
     const { tc } = props;
     this.state = {
@@ -138,8 +138,12 @@ class TcRow extends React.Component<{ tc: TestCase; onRefresh: () => void }, TcR
     };
   }
 
-  componentDidUpdate(prev: { tc: TestCase }) {
-    // Sync editUrl if env changes and user hasn't manually edited
+  componentDidUpdate(prev: { tc: TestCase; envAppliedKey?: string }) {
+    // When env is applied to all, reset editUrl (only if user hasn't manually dirtied it)
+    if (prev.envAppliedKey !== this.props.envAppliedKey && !this.state.dirty) {
+      this.setState({ editUrl: envStore.resolve(this.props.tc.path) });
+    }
+    // Sync editUrl if path changes and user hasn't manually edited
     if (!this.state.dirty && prev.tc.path !== this.props.tc.path) {
       this.setState({ editUrl: envStore.resolve(this.props.tc.path) });
     }
@@ -1183,7 +1187,9 @@ interface RftState {
   methodFilter: string;
   expandReport: boolean;
   showModal: boolean;
-  envTick: number;   // bumped when env changes, triggers re-render
+  envTick: number;
+  lastAppliedEnvId: string;    // which env was last applied to all cases
+  envAppliedKey: string;     // bumped string passed to TcRow to trigger reset
 }
 
 export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }, RftState> {
@@ -1191,12 +1197,30 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
     tick: 0, pageSize: 10, pageIndex: 0, running: false,
     runProgress: 0, filter: "all", methodFilter: "ALL",
     expandReport: false, showModal: false, envTick: 0,
+    lastAppliedEnvId: envStore.selectedId,
+    envAppliedKey: envStore.selectedId,
   };
 
   private scrollRef = React.createRef<HTMLDivElement>();
 
   // Refresh from store
   private refresh = () => this.setState(s => ({ tick: s.tick + 1 }));
+
+  // Re-resolve all test case URLs to the currently selected environment
+  private applyEnvToAll = () => {
+    const newBase = envStore.selected.baseUrl;
+    let updated = 0;
+    for (const tc of testStore.cases) {
+      tc.resolvedUrl = envStore.resolve(tc.path);
+      updated++;
+    }
+    const key = `${envStore.selectedId}-${Date.now()}`;
+    this.setState(s => ({
+      lastAppliedEnvId: envStore.selectedId,
+      envAppliedKey: key,
+      tick: s.tick + 1,
+    }));
+  };
 
   // ── EXECUTE a page of cases ──
   private executeBlock = async () => {
@@ -1313,7 +1337,7 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
   }
 
   render() {
-    const { tick, pageSize, pageIndex, running, runProgress, filter, methodFilter, expandReport, showModal } = this.state;
+    const { tick, pageSize, pageIndex, running, runProgress, filter, methodFilter, expandReport, showModal, envTick, lastAppliedEnvId, envAppliedKey } = this.state;
     const allCases = testStore.cases;
     const total = allCases.length;
     const pending = allCases.filter(c => c.status === "pending").length;
@@ -1420,28 +1444,78 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
             <EnvBar onChange={() => this.setState(s => ({ envTick: s.envTick + 1 }))} />
           </div>
 
-          {/* Resolved URL preview */}
-          <div style={{
-            padding: "8px 16px",
-            borderTop: "1px solid var(--cs-border-sub)",
-            background: "var(--cs-surface-2)",
-            display: "flex", alignItems: "center", gap: 8,
-          }}>
-            <span style={{
-              fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)",
-              textTransform: "uppercase", letterSpacing: 0.8, flexShrink: 0
-            }}>
-              Full URL preview
-            </span>
-            <code style={{
-              fontFamily: MONO, fontSize: 10, color: "var(--cs-muted)",
-              background: "var(--cs-bg)", border: "1px solid var(--cs-border-sub)",
-              borderRadius: 5, padding: "3px 10px", flex: 1,
-              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const
-            }}>
-              {envStore.resolve("/&lt;resource&gt;/&lt;id&gt;")}
-            </code>
-          </div>
+          {/* Apply env to all tests — action strip */}
+          {(() => {
+            const { lastAppliedEnvId, envAppliedKey } = this.state;
+            const sel = envStore.selected;
+            const isStale = lastAppliedEnvId !== sel.id;
+            const count = testStore.total;
+            return (
+              <div style={{
+                padding: "8px 16px",
+                borderTop: "1px solid var(--cs-border-sub)",
+                background: isStale ? "#f59e0b08" : "var(--cs-surface-2)",
+                display: "flex", alignItems: "center", gap: 10,
+                transition: "background .2s",
+              }}>
+                {/* Status badge */}
+                {isStale ? (
+                  <span style={{
+                    fontFamily: MONO, fontSize: 9, fontWeight: 700,
+                    color: "#f59e0b", background: "#f59e0b15",
+                    border: "1px solid #f59e0b44", borderRadius: 4,
+                    padding: "2px 8px", flexShrink: 0, whiteSpace: "nowrap" as const
+                  }}>
+                    ⚠ {count.toLocaleString()} test{count !== 1 ? "s" : ""} use old endpoint
+                  </span>
+                ) : count > 0 ? (
+                  <span style={{
+                    fontFamily: MONO, fontSize: 9, color: "#34d399",
+                    background: "#34d39912", border: "1px solid #34d39930",
+                    borderRadius: 4, padding: "2px 8px", flexShrink: 0, whiteSpace: "nowrap" as const
+                  }}>
+                    ✓ {count.toLocaleString()} tests synced
+                  </span>
+                ) : null}
+
+                {/* URL */}
+                <code style={{
+                  fontFamily: MONO, fontSize: 10, color: "var(--cs-muted)",
+                  background: "var(--cs-bg)", border: "1px solid var(--cs-border-sub)",
+                  borderRadius: 5, padding: "3px 10px", flex: 1, minWidth: 0,
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const
+                }}>
+                  {sel.baseUrl}<span style={{ opacity: 0.4 }}>/<em>resource</em></span>
+                </code>
+
+                {/* Apply button */}
+                {count > 0 && (
+                  <button
+                    onClick={this.applyEnvToAll}
+                    style={{
+                      flexShrink: 0, padding: "5px 13px", borderRadius: 6,
+                      cursor: "pointer", fontFamily: MONO, fontSize: 10, fontWeight: 800,
+                      transition: "all .15s",
+                      background: isStale
+                        ? "linear-gradient(135deg, #7a4a00, #f59e0b)"
+                        : sel.color + "18",
+                      border: `1.5px solid ${isStale ? "#f59e0b" : sel.color + "55"}`,
+                      color: isStale ? "#0a0800" : sel.color,
+                      boxShadow: isStale ? "0 0 12px #f59e0b44" : "none",
+                    }}
+                    onMouseEnter={e => {
+                      if (isStale) (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 20px #f59e0b66";
+                    }}
+                    onMouseLeave={e => {
+                      (e.currentTarget as HTMLButtonElement).style.boxShadow = isStale ? "0 0 12px #f59e0b44" : "none";
+                    }}
+                  >
+                    {isStale ? `⟳ Apply to all ${count.toLocaleString()} tests` : `✓ Re-apply ${sel.name}`}
+                  </button>
+                )}
+              </div>
+            );
+          })()}
         </div>
 
         {/* ── Header banner ── */}
@@ -1798,7 +1872,7 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
               No cases match the current filter
             </div>
           ) : (
-            pageSlice.map((tc, i) => <TcRow key={tc.id} tc={tc} onRefresh={this.refresh} />)
+            pageSlice.map((tc, i) => <TcRow key={tc.id} tc={tc} onRefresh={this.refresh} envAppliedKey={this.state.envAppliedKey} />)
           )}
         </div>
 
