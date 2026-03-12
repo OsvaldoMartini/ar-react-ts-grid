@@ -7,6 +7,7 @@ import {
   WfNode, WfEdge, WfFieldRow, WfStage, WfTransfer, DynamicWorkflow,
 } from "./utils";
 import { StatusBadge, ResultRow } from "./AtomComponents";
+import { EnvBar } from "./ReadyForTestTab";
 
 // Local re-exports of classification types (also exported from utils)
 // These are re-declared locally to avoid import chain issues
@@ -1556,6 +1557,41 @@ export class DataGenTab extends React.Component<
               </div>
             </div>
 
+            {/* ══ ENVIRONMENT ENDPOINT ══ */}
+            <div style={{ borderRadius: 10, border: "1px solid var(--cs-border)", overflow: "visible" as const }}>
+              {/* Section header */}
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "9px 14px", background: "var(--cs-surface-2)",
+                borderBottom: "1px solid var(--cs-border-sub)",
+                borderRadius: "10px 10px 0 0",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 14 }}>🌐</span>
+                  <span style={{
+                    fontFamily: MONO, fontSize: 11, fontWeight: 800,
+                    color: "var(--cs-text)", letterSpacing: 0.3
+                  }}>
+                    Target Environment
+                  </span>
+                </div>
+                <span style={{
+                  fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)",
+                  background: "var(--cs-bg)", border: "1px solid var(--cs-border-sub)",
+                  borderRadius: 4, padding: "1px 7px"
+                }}>
+                  Generated URIs will be bound to this endpoint
+                </span>
+              </div>
+              {/* EnvBar dropdown */}
+              <div style={{
+                padding: "10px 14px", background: "var(--cs-bg)",
+                borderRadius: "0 0 10px 10px"
+              }}>
+                <EnvBar onChange={() => this.setState(s => ({ envTick: s.envTick + 1 }))} />
+              </div>
+            </div>
+
             {/* API selector */}
             <div>
               <div style={{
@@ -1830,137 +1866,6 @@ export class DataGenTab extends React.Component<
                   </div>
                 );
               })()}
-
-              {/* ── Environment selector ── */}
-              <div style={{
-                marginBottom: 14, borderRadius: 9,
-                border: "1px solid var(--cs-border)", overflow: "visible" as const
-              }}>
-
-                {/* Header */}
-                <div style={{
-                  display: "flex", alignItems: "center", gap: 8,
-                  padding: "8px 12px", background: "var(--cs-surface-2)",
-                  borderBottom: "1px solid var(--cs-border-sub)",
-                  borderRadius: "9px 9px 0 0"
-                }}>
-                  <span style={{ fontSize: 13 }}>🌐</span>
-                  <span style={{
-                    fontFamily: MONO, fontSize: 10, fontWeight: 800,
-                    color: "var(--cs-text)", letterSpacing: 0.3
-                  }}>
-                    Target Environment
-                  </span>
-                  <span style={{
-                    fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)",
-                    background: "var(--cs-bg)", border: "1px solid var(--cs-border-sub)",
-                    borderRadius: 4, padding: "1px 6px", marginLeft: "auto"
-                  }}>
-                    URIs will be bound to this endpoint
-                  </span>
-                </div>
-
-                {/* Inline env picker — compact row list */}
-                <div style={{
-                  padding: "8px 12px", background: "var(--cs-bg)",
-                  borderRadius: "0 0 9px 9px", display: "flex", flexDirection: "column" as const, gap: 4
-                }}>
-                  {envStore.envs.map(env => {
-                    const active = envStore.selectedId === env.id;
-                    const isProd = env.tag === "production";
-                    return (
-                      <div key={env.id}
-                        onClick={() => { envStore.select(env.id); this.setState(s => ({ envTick: s.envTick + 1 })); }}
-                        style={{
-                          display: "flex", alignItems: "center", gap: 10,
-                          padding: "7px 12px", borderRadius: 7, cursor: "pointer",
-                          background: active ? env.color + "10" : "var(--cs-surface)",
-                          border: `1.5px solid ${active ? env.color + "55" : "var(--cs-border-sub)"}`,
-                          transition: "all .12s",
-                        }}>
-                        {/* Radio dot */}
-                        <div style={{
-                          width: 14, height: 14, borderRadius: "50%", flexShrink: 0,
-                          border: `2px solid ${active ? env.color : "var(--cs-border)"}`,
-                          background: active ? env.color : "transparent",
-                          display: "flex", alignItems: "center", justifyContent: "center"
-                        }}>
-                          {active && <div style={{
-                            width: 5, height: 5, borderRadius: "50%",
-                            background: "#0a0e1a"
-                          }} />}
-                        </div>
-
-                        {/* Env colour dot */}
-                        <span style={{
-                          width: 7, height: 7, borderRadius: "50%", flexShrink: 0,
-                          background: env.color,
-                          boxShadow: isProd ? `0 0 5px ${env.color}` : "none",
-                          display: "inline-block"
-                        }} />
-
-                        {/* Tag */}
-                        <span style={{
-                          fontFamily: MONO, fontSize: 9, fontWeight: 800,
-                          color: env.color, letterSpacing: 0.8, flexShrink: 0, width: 56
-                        }}>
-                          {env.tag === "local" ? "LOCAL" : env.tag === "development" ? "DEV"
-                            : env.tag === "staging" ? "STAGING" : env.tag === "production" ? "PROD" : "CUSTOM"}
-                        </span>
-
-                        {/* Name */}
-                        <span style={{
-                          fontFamily: MONO, fontSize: 11, fontWeight: active ? 700 : 400,
-                          color: active ? "var(--cs-text)" : "var(--cs-muted)", flexShrink: 0, width: 90
-                        }}>
-                          {env.name}
-                        </span>
-
-                        {/* Base URL */}
-                        <span style={{
-                          fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)",
-                          flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const
-                        }}>
-                          {env.baseUrl}
-                        </span>
-
-                        {/* PROD warning */}
-                        {isProd && active && (
-                          <span style={{
-                            fontFamily: MONO, fontSize: 9, fontWeight: 700,
-                            color: "#f87171", background: "#f8717112",
-                            border: "1px solid #f8717133", borderRadius: 4,
-                            padding: "1px 6px", flexShrink: 0
-                          }}>
-                            ⚠ LIVE
-                          </span>
-                        )}
-
-                        {/* Selected tick */}
-                        {active && (
-                          <span style={{
-                            color: env.color, fontWeight: 900,
-                            fontSize: 12, flexShrink: 0
-                          }}>✓</span>
-                        )}
-                      </div>
-                    );
-                  })}
-
-                  {/* Selected summary */}
-                  <div style={{
-                    marginTop: 4, padding: "6px 10px", borderRadius: 6,
-                    background: "var(--cs-surface-2)", border: "1px solid var(--cs-border-sub)",
-                    fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)",
-                    display: "flex", alignItems: "center", gap: 6
-                  }}>
-                    <span>Generated tests will target:</span>
-                    <code style={{ color: envStore.selected.color, fontWeight: 700 }}>
-                      {envStore.selected.baseUrl}
-                    </code>
-                  </div>
-                </div>
-              </div>
 
               <button
                 disabled={selNames.length === 0}

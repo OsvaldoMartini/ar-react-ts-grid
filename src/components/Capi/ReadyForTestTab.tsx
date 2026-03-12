@@ -518,7 +518,7 @@ interface EnvBarState {
   envTick: number;
 }
 
-class EnvBar extends React.Component<{ onChange?: () => void }, EnvBarState> {
+export class EnvBar extends React.Component<{ onChange?: () => void }, EnvBarState> {
   state: EnvBarState = {
     open: false, editingId: null, editUrl: "",
     addingNew: false, newName: "", newUrl: "", envTick: 0,
