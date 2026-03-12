@@ -33,22 +33,48 @@ function EmptyWorkflow() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// SEARCHABLE API DROPDOWN  (replaces pills in SchemaFieldTable)
+// SEARCHABLE MULTI-SELECT API DROPDOWN
 // ─────────────────────────────────────────────────────────────
 interface ApiDropdownProps {
   apis: string[];
-  value: string;
-  onChange: (v: string) => void;
+  selected: string[];           // empty = ALL selected
+  onChange: (v: string[]) => void;
   isDark: boolean;
   apiColor: (name: string) => string;
 }
 
-function ApiDropdown({ apis, value, onChange, isDark, apiColor }: ApiDropdownProps) {
+function Checkbox({ checked, indeterminate, color }: { checked: boolean; indeterminate?: boolean; color: string }) {
+  const ref = React.useRef<HTMLDivElement>(null);
+  const bg = checked || indeterminate ? color : "transparent";
+  return (
+    <div ref={ref} style={{
+      width: 16, height: 16, borderRadius: 4, flexShrink: 0,
+      border: `2px solid ${checked || indeterminate ? color : "var(--cs-border)"}`,
+      background: bg, display: "flex", alignItems: "center", justifyContent: "center",
+      transition: "all .1s",
+    }}>
+      {indeterminate && !checked && (
+        <div style={{ width: 8, height: 2, background: "#fff", borderRadius: 1 }} />
+      )}
+      {checked && (
+        <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+          <path d="M1 4L3.5 6.5L9 1" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )}
+    </div>
+  );
+}
+
+function ApiDropdown({ apis, selected, onChange, isDark, apiColor }: ApiDropdownProps) {
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
   const ref = React.useRef<HTMLDivElement>(null);
 
-  // close on outside click
+  const isAll = selected.length === 0;
+  const isNone = selected.length === 0;
+  const allChecked = isAll;
+  const someChecked = !isAll && selected.length < apis.length;
+
   React.useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
@@ -58,50 +84,99 @@ function ApiDropdown({ apis, value, onChange, isDark, apiColor }: ApiDropdownPro
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
-  const filtered = search
-    ? apis.filter(a => a.toLowerCase().includes(search.toLowerCase()))
-    : apis;
+  const filtered = search ? apis.filter(a => a.toLowerCase().includes(search.toLowerCase())) : apis;
 
-  const col = value !== "ALL" ? apiColor(value) : "var(--cs-accent)";
+  const toggle = (api: string) => {
+    if (selected.includes(api)) {
+      const next = selected.filter(x => x !== api);
+      onChange(next.length === apis.length ? [] : next);
+    } else {
+      const next = [...selected, api];
+      onChange(next.length === apis.length ? [] : next);
+    }
+  };
+
+  const toggleAll = () => {
+    if (isAll) {
+      // all → deselect all (show none — shouldn't happen, so instead select none means "all")
+      // Do nothing or reset to all
+    } else {
+      onChange([]); // back to all
+    }
+  };
+
+  const toggleFiltered = () => {
+    // Select only filtered subset
+    const allFilteredSelected = filtered.every(a => selected.includes(a) || isAll);
+    if (allFilteredSelected && !isAll) {
+      // deselect all filtered
+      const next = selected.filter(x => !filtered.includes(x));
+      onChange(next.length === 0 || next.length === apis.length ? [] : next);
+    } else {
+      // select all filtered (merge)
+      const merged = [...new Set([...selected, ...filtered])];
+      onChange(merged.length === apis.length ? [] : merged);
+    }
+  };
+
+  // Trigger label
+  let triggerLabel: React.ReactNode;
+  let triggerColor = "var(--cs-accent)";
+  if (isAll) {
+    triggerLabel = <span>⊞&nbsp;&nbsp;All APIs <span style={{ opacity: 0.5, fontWeight: 400 }}>({apis.length})</span></span>;
+  } else if (selected.length === 1) {
+    triggerColor = apiColor(selected[0]);
+    triggerLabel = (
+      <>
+        <span style={{ width: 8, height: 8, borderRadius: "50%", background: triggerColor, flexShrink: 0, display: "inline-block" }} />
+        &nbsp;{selected[0]}
+      </>
+    );
+  } else {
+    triggerLabel = (
+      <span>
+        <span style={{
+          background: "var(--cs-accent)", color: "#000", borderRadius: 5,
+          padding: "1px 7px", fontSize: 11, fontWeight: 800, marginRight: 6,
+        }}>{selected.length}</span>
+        APIs selected
+      </span>
+    );
+  }
 
   return (
     <div ref={ref} style={{ position: "relative", userSelect: "none" }}>
-      {/* ── Trigger button ── */}
+      {/* ── Trigger ── */}
       <button
         onClick={() => setOpen(o => !o)}
         style={{
-          display: "flex", alignItems: "center", gap: 10,
+          display: "flex", alignItems: "center", gap: 8,
           background: "var(--cs-surface-2)",
-          border: `1.5px solid ${col}66`,
+          border: `1.5px solid ${isAll ? "var(--cs-border)" : triggerColor + "88"}`,
           borderRadius: 8, color: "var(--cs-text)",
           fontFamily: MONO, fontSize: 13, fontWeight: 600,
-          padding: "9px 14px", cursor: "pointer", minWidth: 220,
+          padding: "9px 14px", cursor: "pointer", minWidth: 240,
           transition: "border-color .15s",
         }}
       >
-        {value !== "ALL" && (
-          <span style={{
-            width: 10, height: 10, borderRadius: "50%",
-            background: col, flexShrink: 0,
-          }} />
-        )}
         <span style={{ flex: 1, textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {value === "ALL" ? "⊞  All APIs" : value}
+          {triggerLabel}
         </span>
-        <span style={{ opacity: 0.5, fontSize: 10 }}>{open ? "▲" : "▼"}</span>
+        <span style={{ opacity: 0.45, fontSize: 10 }}>{open ? "▲" : "▼"}</span>
       </button>
 
-      {/* ── Dropdown panel ── */}
+      {/* ── Panel ── */}
       {open && (
         <div style={{
-          position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 200,
-          width: 360, maxWidth: "90vw",
+          position: "absolute", top: "calc(100% + 5px)", left: 0, zIndex: 300,
+          width: 380, maxWidth: "92vw",
           background: "var(--cs-surface)", border: "1px solid var(--cs-border)",
-          borderRadius: 10, boxShadow: "0 8px 32px rgba(0,0,0,.35)",
-          overflow: "hidden",
+          borderRadius: 12, boxShadow: "0 12px 40px rgba(0,0,0,.42)",
+          overflow: "hidden", display: "flex", flexDirection: "column",
         }}>
-          {/* Search */}
-          <div style={{ padding: 10, borderBottom: "1px solid var(--cs-border-sub)" }}>
+
+          {/* Search bar */}
+          <div style={{ padding: 10, borderBottom: "1px solid var(--cs-border-sub)", flexShrink: 0 }}>
             <input
               autoFocus
               value={search}
@@ -109,68 +184,106 @@ function ApiDropdown({ apis, value, onChange, isDark, apiColor }: ApiDropdownPro
               placeholder="🔍  Search API name…"
               style={{
                 width: "100%", background: "var(--cs-input-bg)",
-                border: "1px solid var(--cs-border)", borderRadius: 6,
+                border: "1px solid var(--cs-border)", borderRadius: 7,
                 color: "var(--cs-text)", fontFamily: MONO, fontSize: 12,
-                padding: "7px 10px", outline: "none", boxSizing: "border-box",
+                padding: "8px 12px", outline: "none", boxSizing: "border-box",
               }}
             />
           </div>
 
-          {/* Options list */}
-          <div style={{ maxHeight: 300, overflowY: "auto" }}>
-            {/* ALL */}
+          {/* Select-all row */}
+          <div
+            onClick={() => { if (isAll) { /* already all, do nothing */ } else onChange([]); }}
+            style={{
+              padding: "10px 14px", cursor: "pointer", fontFamily: MONO, fontSize: 12,
+              borderBottom: "1px solid var(--cs-border-sub)",
+              display: "flex", alignItems: "center", gap: 10,
+              background: isAll ? "var(--cs-accent)0d" : "transparent",
+              transition: "background .1s",
+            }}
+            onMouseEnter={e => { if (!isAll) (e.currentTarget as HTMLDivElement).style.background = "var(--cs-surface-2)"; }}
+            onMouseLeave={e => { if (!isAll) (e.currentTarget as HTMLDivElement).style.background = "transparent"; }}
+          >
+            <Checkbox checked={isAll} indeterminate={someChecked} color="var(--cs-accent)" />
+            <span style={{ color: isAll ? "var(--cs-accent)" : "var(--cs-text)", fontWeight: isAll ? 700 : 500 }}>
+              All APIs
+            </span>
+            <span style={{ marginLeft: "auto", color: "var(--cs-dim)", fontSize: 11 }}>
+              {apis.length} total
+            </span>
+          </div>
+
+          {/* "Select visible" shortcut when search is active */}
+          {search && filtered.length > 0 && (
             <div
-              onClick={() => { onChange("ALL"); setOpen(false); setSearch(""); }}
+              onClick={toggleFiltered}
               style={{
-                padding: "9px 14px", cursor: "pointer", fontFamily: MONO, fontSize: 12,
-                background: value === "ALL" ? "var(--cs-surface-2)" : "transparent",
-                color: "var(--cs-text)", fontWeight: value === "ALL" ? 700 : 400,
+                padding: "7px 14px", cursor: "pointer", fontFamily: MONO, fontSize: 11,
                 borderBottom: "1px solid var(--cs-border-sub)",
-                display: "flex", alignItems: "center", gap: 8,
+                color: "var(--cs-accent)", background: "var(--cs-accent)08",
+                display: "flex", alignItems: "center", gap: 6,
               }}
             >
-              <span style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--cs-accent)", flexShrink: 0 }} />
-              All APIs ({apis.length})
+              <span>⊞</span>
+              <span>Select all matching "{search}" ({filtered.length})</span>
             </div>
+          )}
 
+          {/* API list */}
+          <div style={{ maxHeight: 310, overflowY: "auto" }}>
             {filtered.map(api => {
               const c = apiColor(api);
-              const active = value === api;
+              const active = isAll || selected.includes(api);
               return (
                 <div
                   key={api}
-                  onClick={() => { onChange(api); setOpen(false); setSearch(""); }}
+                  onClick={() => toggle(api)}
                   style={{
                     padding: "8px 14px", cursor: "pointer", fontFamily: MONO, fontSize: 12,
-                    background: active ? c + "18" : "transparent",
-                    color: active ? c : "var(--cs-text)",
-                    fontWeight: active ? 700 : 400,
-                    display: "flex", alignItems: "center", gap: 8,
-                    borderLeft: active ? `3px solid ${c}` : "3px solid transparent",
+                    display: "flex", alignItems: "center", gap: 10,
+                    background: active && !isAll ? c + "10" : "transparent",
+                    borderLeft: active && !isAll ? `3px solid ${c}` : "3px solid transparent",
                     transition: "background .1s",
                   }}
-                  onMouseEnter={e => { if (!active) (e.currentTarget as HTMLDivElement).style.background = "var(--cs-surface-2)"; }}
-                  onMouseLeave={e => { if (!active) (e.currentTarget as HTMLDivElement).style.background = "transparent"; }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = active && !isAll ? c + "1a" : "var(--cs-surface-2)"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = active && !isAll ? c + "10" : "transparent"; }}
                 >
+                  <Checkbox checked={active} color={c} />
                   <span style={{ width: 8, height: 8, borderRadius: "50%", background: c, flexShrink: 0 }} />
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{api}</span>
+                  <span style={{
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    color: active && !isAll ? c : "var(--cs-text)",
+                    fontWeight: active && !isAll ? 600 : 400,
+                  }}>{api}</span>
                 </div>
               );
             })}
-
             {filtered.length === 0 && (
-              <div style={{ padding: "16px", color: "var(--cs-dim)", textAlign: "center", fontFamily: MONO, fontSize: 12 }}>
+              <div style={{ padding: 20, color: "var(--cs-dim)", textAlign: "center", fontFamily: MONO, fontSize: 12 }}>
                 No APIs match "{search}"
               </div>
             )}
           </div>
 
-          {/* Footer count */}
+          {/* Footer */}
           <div style={{
-            padding: "6px 14px", borderTop: "1px solid var(--cs-border-sub)",
-            color: "var(--cs-dim)", fontSize: 11, fontFamily: MONO,
+            padding: "8px 14px", borderTop: "1px solid var(--cs-border-sub)",
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+            flexShrink: 0,
           }}>
-            {filtered.length} of {apis.length} APIs
+            <span style={{ color: "var(--cs-dim)", fontSize: 11, fontFamily: MONO }}>
+              {isAll ? `All ${apis.length} APIs shown` : `${selected.length} of ${apis.length} selected`}
+            </span>
+            {!isAll && (
+              <button
+                onClick={() => onChange([])}
+                style={{
+                  background: "transparent", border: "1px solid var(--cs-border)",
+                  color: "var(--cs-muted)", borderRadius: 5, padding: "3px 10px",
+                  fontFamily: MONO, fontSize: 11, cursor: "pointer",
+                }}
+              >Reset to All</button>
+            )}
           </div>
         </div>
       )}
@@ -408,7 +521,7 @@ class DependencyGraph extends React.Component<GraphProps, GraphState> {
 const TABLE_PAGE_SIZE = 50;
 
 interface TableProps { isDark: boolean; wf: DynamicWorkflow; }
-interface TableState { filter: string; filterApi: string; page: number; }
+interface TableState { filter: string; filterApis: string[]; page: number; }
 
 const API_PALETTE = ["#818cf8", "#34d399", "#fb923c", "#a78bfa", "#f472b6", "#60a5fa", "#f59e0b", "#e06c75", "#56b6c2", "#d19a66"];
 const apiColor = (name: string): string =>
@@ -422,19 +535,20 @@ const schemaColor = (name: string): string =>
   SCHEMA_COLORS[name] ?? API_PALETTE[Math.abs(name.split("").reduce((a, c) => a + c.charCodeAt(0), 0)) % API_PALETTE.length];
 
 class SchemaFieldTable extends React.Component<TableProps, TableState> {
-  state: TableState = { filter: "", filterApi: "ALL", page: 0 };
+  state: TableState = { filter: "", filterApis: [], page: 0 };
 
   render() {
-    const { filter, filterApi, page } = this.state;
+    const { filter, filterApis, page } = this.state;
     const { schemaFields } = this.props.wf;
+    const isAll = filterApis.length === 0;
 
     const apis = [...new Set(schemaFields.map(r => r.sourceApi))].sort();
 
     const allRows = schemaFields.filter(r => {
       const txt = filter.toLowerCase();
       return (
-        (!txt || r.field.includes(txt) || r.sourceSchema.includes(txt) || r.referencesSchema.includes(txt)) &&
-        (filterApi === "ALL" || r.sourceApi === filterApi)
+        (!txt || r.field.toLowerCase().includes(txt) || r.sourceSchema.toLowerCase().includes(txt) || r.referencesSchema.toLowerCase().includes(txt)) &&
+        (isAll || filterApis.includes(r.sourceApi))
       );
     });
 
@@ -471,14 +585,14 @@ class SchemaFieldTable extends React.Component<TableProps, TableState> {
           />
           <ApiDropdown
             apis={apis}
-            value={filterApi}
-            onChange={v => this.setState({ filterApi: v, page: 0 })}
+            selected={filterApis}
+            onChange={v => this.setState({ filterApis: v, page: 0 })}
             isDark={this.props.isDark}
             apiColor={apiColor}
           />
-          {filterApi !== "ALL" && (
+          {!isAll && (
             <button
-              onClick={() => this.setState({ filterApi: "ALL", page: 0 })}
+              onClick={() => this.setState({ filterApis: [], page: 0 })}
               style={{
                 background: "transparent", border: "1px solid var(--cs-border)",
                 color: "var(--cs-dim)", borderRadius: 6, padding: "6px 12px",
@@ -488,19 +602,32 @@ class SchemaFieldTable extends React.Component<TableProps, TableState> {
           )}
         </div>
 
-        {/* ── Active filter badge ── */}
-        {filterApi !== "ALL" && (
-          <div style={{
-            marginBottom: 12, padding: "6px 14px",
-            background: apiColor(filterApi) + "18",
-            border: `1px solid ${apiColor(filterApi)}44`,
-            borderRadius: 8, color: apiColor(filterApi),
-            fontFamily: MONO, fontSize: 12, fontWeight: 600,
-            display: "inline-flex", alignItems: "center", gap: 8,
-          }}>
-            <span style={{ width: 8, height: 8, borderRadius: "50%", background: apiColor(filterApi) }} />
-            {filterApi}
-            <span style={{ opacity: 0.6, fontWeight: 400 }}>— {allRows.length} fields</span>
+        {/* ── Active filter badges ── */}
+        {!isAll && (
+          <div style={{ marginBottom: 12, display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {filterApis.map(api => (
+              <span
+                key={api}
+                style={{
+                  background: apiColor(api) + "18",
+                  border: `1px solid ${apiColor(api)}44`,
+                  color: apiColor(api),
+                  borderRadius: 6, padding: "4px 10px",
+                  fontFamily: MONO, fontSize: 11, fontWeight: 600,
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                  cursor: "pointer",
+                }}
+                onClick={() => this.setState({ filterApis: filterApis.filter(x => x !== api), page: 0 })}
+                title="Click to remove"
+              >
+                <span style={{ width: 7, height: 7, borderRadius: "50%", background: apiColor(api) }} />
+                {api}
+                <span style={{ opacity: 0.5, fontSize: 10 }}>✕</span>
+              </span>
+            ))}
+            <span style={{ color: "var(--cs-dim)", fontSize: 11, fontFamily: MONO, alignSelf: "center" }}>
+              — {allRows.length} fields
+            </span>
           </div>
         )}
 
