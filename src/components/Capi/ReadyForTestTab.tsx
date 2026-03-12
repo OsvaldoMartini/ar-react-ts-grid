@@ -1187,8 +1187,9 @@ interface RftState {
   expandReport: boolean;
   showModal: boolean;
   envTick: number;
-  lastAppliedEnvId: string;    // which env was last applied to all cases
-  envAppliedKey: string;     // bumped string passed to TcRow to trigger reset
+  lastAppliedEnvId: string;
+  envAppliedKey: string;
+  currentExecUrl: string | null;  // resolvedUrl of the test case currently executing
 }
 
 export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }, RftState> {
@@ -1198,6 +1199,7 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
     expandReport: false, showModal: false, envTick: 0,
     lastAppliedEnvId: envStore.selectedId,
     envAppliedKey: envStore.selectedId,
+    currentExecUrl: null,
   };
 
   private scrollRef = React.createRef<HTMLDivElement>();
@@ -1236,6 +1238,7 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
     for (let i = 0; i < block.length; i++) {
       const tc = block[i];
       tc.status = "running";
+      this.setState(s => ({ currentExecUrl: tc.resolvedUrl || tc.path }));
       this.refresh();
 
       const t0 = Date.now();
@@ -1279,7 +1282,7 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
       this.refresh();
     }
 
-    this.setState({ running: false });
+    this.setState({ running: false, currentExecUrl: null });
   };
 
   // ── EXECUTE ALL pending ──
@@ -1293,6 +1296,7 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
     for (let i = 0; i < pending.length; i++) {
       const tc = pending[i];
       tc.status = "running";
+      this.setState(s => ({ currentExecUrl: tc.resolvedUrl || tc.path }));
       this.refresh();
 
       const t0 = Date.now();
@@ -1329,7 +1333,7 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
       this.refresh();
     }
 
-    this.setState({ running: false });
+    this.setState({ running: false, currentExecUrl: null });
   };
 
   private getFiltered(): TestCase[] {
@@ -1341,7 +1345,7 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
   }
 
   render() {
-    const { tick, pageSize, pageIndex, running, runProgress, filter, methodFilter, expandReport, showModal, envTick, lastAppliedEnvId, envAppliedKey } = this.state;
+    const { tick, pageSize, pageIndex, running, runProgress, filter, methodFilter, expandReport, showModal, envTick, lastAppliedEnvId, envAppliedKey, currentExecUrl } = this.state;
     const allCases = testStore.cases;
     const total = allCases.length;
     const pending = allCases.filter(c => c.status === "pending").length;
@@ -1683,20 +1687,34 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
             }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span>⏳ Executing…</span>
-                <span style={{
-                  display: "flex", alignItems: "center", gap: 5,
-                  background: envStore.selected.color + "18",
-                  border: `1px solid ${envStore.selected.color}44`,
-                  borderRadius: 4, padding: "1px 8px",
-                  color: envStore.selected.color, fontSize: 10, fontWeight: 700
-                }}>
-                  <span style={{
-                    width: 6, height: 6, borderRadius: "50%",
-                    background: envStore.selected.color, display: "inline-block",
-                    boxShadow: envStore.selected.tag === "production" ? `0 0 4px ${envStore.selected.color}` : "none"
-                  }} />
-                  {envStore.selected.name}
-                </span>
+                {(() => {
+                  // Resolve env from the current test case's frozen URL
+                  const url = this.state.currentExecUrl;
+                  if (!url) return null;
+                  const matchedEnv = envStore.envs.find(e =>
+                    url.startsWith(e.baseUrl)
+                  ) || null;
+                  const color = matchedEnv?.color || "#8b949e";
+                  const label = matchedEnv?.name || (() => {
+                    try { return new URL(url).hostname; } catch { return url; }
+                  })();
+                  const isProd = matchedEnv?.tag === "production";
+                  return (
+                    <span style={{
+                      display: "flex", alignItems: "center", gap: 5,
+                      background: color + "18", border: `1px solid ${color}44`,
+                      borderRadius: 4, padding: "1px 8px",
+                      color, fontSize: 10, fontWeight: 700
+                    }}>
+                      <span style={{
+                        width: 6, height: 6, borderRadius: "50%",
+                        background: color, display: "inline-block",
+                        boxShadow: isProd ? `0 0 4px ${color}` : "none"
+                      }} />
+                      {label}
+                    </span>
+                  );
+                })()}
               </div>
               <span>{runProgress} completed</span>
             </div>
