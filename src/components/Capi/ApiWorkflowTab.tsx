@@ -1599,7 +1599,62 @@ export class DataGenTab extends React.Component<
                 display: "flex", justifyContent: "space-between",
                 alignItems: "center", marginBottom: 10
               }}>
-                <SLbl text={`${loadedSpecs.length} loaded spec${loadedSpecs.length !== 1 ? "s" : ""}`} />
+
+                {/* Left: checkbox + label */}
+                <div style={{ display: "flex", alignItems: "center", gap: 10, lineHeight: 1 }}>
+                  {/* Custom tri-state checkbox */}
+                  <div
+                    onClick={() => {
+                      const allSel = loadedSpecs.every(s => selNames.includes(s.fileName));
+                      this.setState({ selNames: allSel ? [] : loadedSpecs.map(s => s.fileName) });
+                    }}
+                    title={
+                      loadedSpecs.every(s => selNames.includes(s.fileName)) ? "Deselect all"
+                        : selNames.length > 0 ? "Select all" : "Select all"
+                    }
+                    style={{
+                      width: 16, height: 16, borderRadius: 4, flexShrink: 0,
+                      cursor: "pointer", display: "flex", alignItems: "center",
+                      justifyContent: "center", transition: "all .15s",
+                      border: selNames.length === 0
+                        ? "1.5px solid var(--cs-border)"
+                        : `1.5px solid #34d399`,
+                      background: loadedSpecs.length > 0 && selNames.length === loadedSpecs.length
+                        ? "#34d399"
+                        : selNames.length > 0
+                          ? "#34d39940"
+                          : "transparent",
+                    }}>
+                    {loadedSpecs.length > 0 && selNames.length === loadedSpecs.length && (
+                      <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                        <path d="M1 4L3.5 6.5L9 1" stroke="#0a1f15" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                    {selNames.length > 0 && selNames.length < loadedSpecs.length && (
+                      <svg width="8" height="2" viewBox="0 0 8 2" fill="none">
+                        <path d="M1 1H7" stroke="#34d399" strokeWidth="1.8" strokeLinecap="round" />
+                      </svg>
+                    )}
+                  </div>
+                  <span style={{
+                    fontFamily: MONO, fontSize: 10, fontWeight: 700,
+                    color: "var(--cs-dim)", letterSpacing: 1,
+                    textTransform: "uppercase" as const
+                  }}>
+                    {loadedSpecs.length} loaded spec{loadedSpecs.length !== 1 ? "s" : ""}
+                  </span>
+                  {selNames.length > 0 && (
+                    <span style={{
+                      fontFamily: MONO, fontSize: 9, color: "#34d399",
+                      background: "#34d39915", border: "1px solid #34d39930",
+                      borderRadius: 4, padding: "1px 7px"
+                    }}>
+                      {selNames.length} selected
+                    </span>
+                  )}
+                </div>
+
+                {/* Right: All / Clear */}
                 <div style={{ display: "flex", gap: 6 }}>
                   <button onClick={() => this.setState({ selNames: loadedSpecs.map(s => s.fileName) })}
                     style={{
