@@ -5,6 +5,9 @@ import {
   WfNode, WfEdge, WfFieldRow, WfStage, WfTransfer, DynamicWorkflow,
 } from "./utils";
 
+// Local re-exports of classification types (also exported from utils)
+// These are re-declared locally to avoid import chain issues
+
 const MONO = "'JetBrains Mono','Fira Code',monospace";
 
 function curvePath(x1: number, y1: number, x2: number, y2: number): string {
@@ -516,29 +519,207 @@ class DependencyGraph extends React.Component<GraphProps, GraphState> {
 }
 
 // ─────────────────────────────────────────────────────────────
+// FIELD CLASSIFICATION  —  Direction + Kind badges with hints
+// ─────────────────────────────────────────────────────────────
+
+// Import types (they come from utils via WfFieldRow, but we define local meta here)
+type FieldDirection = "OUT" | "IN" | "IN_OUT" | "PARAM";
+type FieldKind = "REF" | "ARR_REF" | "ARR_VAL" | "VAL" | "OBJ";
+
+const DIR_META: Record<FieldDirection, {
+  label: string; color: string; bg: string; border: string;
+  title: string; detail: string; example: string;
+}> = {
+  OUT: {
+    label: "OUT", color: "#f87171", bg: "#f8717118", border: "#f8717166",
+    title: "Output — Server-generated, never send this in requests",
+    detail: "Marked readOnly in OpenAPI. The server computes or resolves this field. Sending it in a POST/PATCH body will be ignored or rejected.",
+    example: "e.g. grossAmount, agingId, bankBp, outpayDoc",
+  },
+  IN: {
+    label: "IN", color: "#34d399", bg: "#34d39918", border: "#34d39966",
+    title: "Input — Client-only, never returned in responses",
+    detail: "Marked writeOnly in OpenAPI. You send this to trigger behaviour (actions, passwords). It will never appear in a GET response.",
+    example: "e.g. action (PATCH trigger), password, confirmPin",
+  },
+  IN_OUT: {
+    label: "IN·OUT", color: "#60a5fa", bg: "#60a5fa18", border: "#60a5fa66",
+    title: "Bidirectional — You set it, server echoes it back",
+    detail: "No readOnly/writeOnly marker. This is a normal settable field. Include it in POST/PATCH bodies to set a value, and it will appear in GET responses.",
+    example: "e.g. invcDate, advNr, extlRefNr, intlRefNr",
+  },
+  PARAM: {
+    label: "PARAM", color: "#f59e0b", bg: "#f59e0b18", border: "#f59e0b66",
+    title: "Path Parameter — URL routing key",
+    detail: "Appears in the URL path as {paramName}. Used to identify a specific resource. Never goes in the request body.",
+    example: "e.g. doc_accpay_id in GET /doc-accpays/{doc_accpay_id}",
+  },
+};
+
+const KIND_META: Record<FieldKind, {
+  label: string; color: string; bg: string; border: string;
+  title: string; detail: string; example: string;
+}> = {
+  REF: {
+    label: "REF", color: "#a78bfa", bg: "#a78bfa18", border: "#a78bfa66",
+    title: "Object Reference — $ref link to another schema",
+    detail: "This field holds a reference to a complex object from another schema. It is a foreign key / object link. It drives the dependency graph edges.",
+    example: "e.g. benefBp → doc_bp, bank → doc_bank_account",
+  },
+  ARR_REF: {
+    label: "ARR[]", color: "#c084fc", bg: "#c084fc18", border: "#c084fc66",
+    title: "Array Reference — collection of $ref objects",
+    detail: "An array of references to another schema. Represents one-to-many relationships. Each element is a linked object.",
+    example: "e.g. workItemList → DocTabWorkItem[], addList → doc_add[]",
+  },
+  ARR_VAL: {
+    label: "ARR", color: "#fb923c", bg: "#fb923c18", border: "#fb923c66",
+    title: "Array of Scalars — list of plain values",
+    detail: "An array of primitive values (strings, integers). No cross-schema reference involved.",
+    example: "e.g. tags[], allowedValues[], errorCodes[]",
+  },
+  VAL: {
+    label: "VAL", color: "#94a3b8", bg: "#94a3b818", border: "#94a3b866",
+    title: "Scalar Value — plain data field",
+    detail: "A simple primitive: string, integer, number, or boolean. No foreign key, no schema link.",
+    example: "e.g. invcDate (string), advNr (integer), grossAmount (number)",
+  },
+  OBJ: {
+    label: "OBJ", color: "#64748b", bg: "#64748b18", border: "#64748b66",
+    title: "Inline Object — nested structure without $ref",
+    detail: "A nested object defined inline, without a named $ref. Often used for freeform extension blocks.",
+    example: "e.g. extn (extension object), metadata",
+  },
+};
+
+// Tooltip-enhanced badge component
+function FieldBadge({ meta, small }: {
+  meta: { label: string; color: string; bg: string; border: string; title: string; detail: string; example: string };
+  small?: boolean;
+}) {
+  const [hover, setHover] = React.useState(false);
+  const ref = React.useRef<HTMLSpanElement>(null);
+  const [pos, setPos] = React.useState<{ top: number; left: number } | null>(null);
+
+  const showTip = (e: React.MouseEvent) => {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setPos({ top: r.bottom + 6, left: r.left });
+    setHover(true);
+  };
+
+  return (
+    <>
+      <span
+        ref={ref}
+        onMouseEnter={showTip}
+        onMouseLeave={() => setHover(false)}
+        style={{
+          background: meta.bg,
+          border: `1.5px solid ${meta.border}`,
+          color: meta.color,
+          borderRadius: 5,
+          padding: small ? "1px 6px" : "2px 8px",
+          fontSize: small ? 9 : 10,
+          fontFamily: MONO, fontWeight: 800,
+          letterSpacing: 0.5, whiteSpace: "nowrap",
+          cursor: "help", userSelect: "none",
+        }}
+      >
+        {meta.label}
+      </span>
+
+      {hover && pos && (
+        <div style={{
+          position: "fixed", top: pos.top, left: pos.left, zIndex: 9999,
+          width: 300,
+          maxWidth: "min(300px, calc(100vw - 32px))",
+          background: "var(--cs-surface)",
+          border: `1.5px solid ${meta.border}`,
+          borderRadius: 10, padding: "12px 16px",
+          boxShadow: `0 8px 32px rgba(0,0,0,.45), 0 0 0 1px ${meta.border}`,
+          pointerEvents: "none",
+          boxSizing: "border-box",
+          // Clamp to viewport right edge
+          transform: `translateX(min(0px, calc(100vw - ${pos.left}px - 316px)))`,
+        }}>
+          <div style={{
+            fontFamily: MONO, fontSize: 12, fontWeight: 800,
+            color: meta.color, marginBottom: 6,
+            whiteSpace: "normal", wordBreak: "break-word", lineHeight: 1.5,
+          }}>
+            <span style={{
+              background: meta.bg, border: `1.5px solid ${meta.border}`,
+              borderRadius: 5, padding: "2px 8px", marginRight: 8,
+              whiteSpace: "nowrap", display: "inline-block",
+            }}>{meta.label}</span>
+            {meta.title}
+          </div>
+          <div style={{
+            fontFamily: MONO, fontSize: 11, color: "var(--cs-muted)",
+            lineHeight: 1.65, marginBottom: 8,
+            whiteSpace: "normal", wordBreak: "break-word",
+          }}>
+            {meta.detail}
+          </div>
+          <div style={{
+            fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)",
+            background: "var(--cs-surface-2)", borderRadius: 5,
+            padding: "5px 9px", fontStyle: "italic",
+            whiteSpace: "normal", wordBreak: "break-word", lineHeight: 1.5,
+          }}>
+            {meta.example}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// Combined direction + kind cell
+function ClassificationCell({ direction, kind, required }: {
+  direction: FieldDirection; kind: FieldKind; required: boolean;
+}) {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, flexWrap: "nowrap" }}>
+      <FieldBadge meta={DIR_META[direction]} />
+      <FieldBadge meta={KIND_META[kind]} />
+      {required && (
+        <span title="Required field — must be provided in request body" style={{
+          color: "#f87171", fontSize: 13, fontWeight: 900, lineHeight: 1,
+          cursor: "help",
+        }}>*</span>
+      )}
+    </span>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
 // VIEW 2 — SCHEMA FIELD TABLE  (with dropdown + pagination)
 // ─────────────────────────────────────────────────────────────
 const TABLE_PAGE_SIZE = 50;
 
+type DirFilter = "ALL" | "OUT" | "IN" | "IN_OUT" | "PARAM";
+type KindFilter = "ALL" | "REF" | "ARR_REF" | "ARR_VAL" | "VAL" | "OBJ";
+
 interface TableProps { isDark: boolean; wf: DynamicWorkflow; }
-interface TableState { filter: string; filterApis: string[]; page: number; }
+interface TableState {
+  filter: string; filterApis: string[];
+  dirFilter: DirFilter; kindFilter: KindFilter;
+  page: number;
+}
 
 const API_PALETTE = ["#818cf8", "#34d399", "#fb923c", "#a78bfa", "#f472b6", "#60a5fa", "#f59e0b", "#e06c75", "#56b6c2", "#d19a66"];
 const apiColor = (name: string): string =>
   API_PALETTE[Math.abs(name.split("").reduce((a, c) => a + c.charCodeAt(0), 0)) % API_PALETTE.length];
 
-const SCHEMA_COLORS: Record<string, string> = {
-  "doc_ref": "#00d4ff", "doc_stex": "#34d399", "obj_ref": "#f59e0b",
-  "code_tab_ref": "#a78bfa", "code_tab_ref_action": "#f472b6",
-};
 const schemaColor = (name: string): string =>
-  SCHEMA_COLORS[name] ?? API_PALETTE[Math.abs(name.split("").reduce((a, c) => a + c.charCodeAt(0), 0)) % API_PALETTE.length];
+  API_PALETTE[Math.abs(name.split("").reduce((a, c) => a + c.charCodeAt(0), 0)) % API_PALETTE.length];
 
 class SchemaFieldTable extends React.Component<TableProps, TableState> {
-  state: TableState = { filter: "", filterApis: [], page: 0 };
+  state: TableState = { filter: "", filterApis: [], dirFilter: "ALL", kindFilter: "ALL", page: 0 };
 
   render() {
-    const { filter, filterApis, page } = this.state;
+    const { filter, filterApis, dirFilter, kindFilter, page } = this.state;
     const { schemaFields } = this.props.wf;
     const isAll = filterApis.length === 0;
 
@@ -547,9 +728,22 @@ class SchemaFieldTable extends React.Component<TableProps, TableState> {
     const allRows = schemaFields.filter(r => {
       const txt = filter.toLowerCase();
       return (
-        (!txt || r.field.toLowerCase().includes(txt) || r.sourceSchema.toLowerCase().includes(txt) || r.referencesSchema.toLowerCase().includes(txt)) &&
-        (isAll || filterApis.includes(r.sourceApi))
+        (!txt || r.field.toLowerCase().includes(txt)
+          || r.sourceSchema.toLowerCase().includes(txt)
+          || r.referencesSchema.toLowerCase().includes(txt)
+          || r.description?.toLowerCase().includes(txt)) &&
+        (isAll || filterApis.includes(r.sourceApi)) &&
+        (dirFilter === "ALL" || r.direction === dirFilter) &&
+        (kindFilter === "ALL" || r.kind === kindFilter)
       );
+    });
+
+    // Counts for filter tabs
+    const dirCounts: Record<string, number> = {};
+    const kindCounts: Record<string, number> = {};
+    schemaFields.forEach(r => {
+      dirCounts[r.direction] = (dirCounts[r.direction] || 0) + 1;
+      kindCounts[r.kind] = (kindCounts[r.kind] || 0) + 1;
     });
 
     const totalPages = Math.ceil(allRows.length / TABLE_PAGE_SIZE);
@@ -557,25 +751,149 @@ class SchemaFieldTable extends React.Component<TableProps, TableState> {
     const rows = allRows.slice(safePage * TABLE_PAGE_SIZE, (safePage + 1) * TABLE_PAGE_SIZE);
 
     const TH: React.CSSProperties = {
-      padding: "11px 16px", background: "var(--cs-surface-2)",
-      color: "var(--cs-muted)", fontSize: 12, fontFamily: MONO,
+      padding: "10px 14px", background: "var(--cs-surface-2)",
+      color: "var(--cs-muted)", fontSize: 11, fontFamily: MONO,
       textTransform: "uppercase", letterSpacing: 1,
       borderBottom: "2px solid var(--cs-border)", textAlign: "left",
       whiteSpace: "nowrap",
     };
     const TD: React.CSSProperties = {
-      padding: "9px 14px", borderBottom: "1px solid var(--cs-border-sub)",
+      padding: "7px 12px", borderBottom: "1px solid var(--cs-border-sub)",
       fontSize: 12, fontFamily: MONO, verticalAlign: "middle",
+    };
+
+    // Quick filter tab renderer
+    const FilterTab = ({ val, label, count, meta }: {
+      val: string; label: string; count: number;
+      meta?: { color: string; bg: string; border: string; title: string };
+    }) => {
+      const isActive = (dirFilter === val || kindFilter === val);
+      return (
+        <button
+          title={meta?.title}
+          onClick={() => {
+            // Determine which axis this belongs to
+            if (["ALL", "OUT", "IN", "IN_OUT", "PARAM"].includes(val)) {
+              this.setState({ dirFilter: val as DirFilter, page: 0 });
+            } else {
+              this.setState({ kindFilter: val as KindFilter, page: 0 });
+            }
+          }}
+          style={{
+            display: "flex", alignItems: "center", gap: 5,
+            background: isActive ? (meta?.bg ?? "var(--cs-accent)18") : "var(--cs-surface-2)",
+            border: `1.5px solid ${isActive ? (meta?.border ?? "var(--cs-accent)") : "var(--cs-border)"}`,
+            color: isActive ? (meta?.color ?? "var(--cs-accent)") : "var(--cs-muted)",
+            borderRadius: 7, padding: "5px 11px", cursor: "pointer",
+            fontFamily: MONO, fontSize: 11, fontWeight: isActive ? 700 : 400,
+            transition: "all .12s",
+          }}
+        >
+          {label}
+          <span style={{
+            background: isActive ? (meta?.border ?? "var(--cs-accent)") : "var(--cs-border)",
+            color: "#fff", borderRadius: 10, padding: "0px 5px",
+            fontSize: 9, fontWeight: 800,
+          }}>{count}</span>
+        </button>
+      );
     };
 
     return (
       <div>
-        {/* ── Filter bar: text input + API dropdown ── */}
-        <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap", alignItems: "center" }}>
+        {/* ── LEGEND PANEL ── */}
+        <div style={{
+          marginBottom: 16, padding: "12px 16px",
+          background: "var(--cs-surface)", border: "1px solid var(--cs-border)",
+          borderRadius: 10, display: "flex", flexWrap: "wrap", gap: 18,
+        }}>
+          {/* Direction legend */}
+          <div>
+            <div style={{
+              color: "var(--cs-dim)", fontSize: 10, fontFamily: MONO, fontWeight: 700,
+              letterSpacing: 1, marginBottom: 6, textTransform: "uppercase"
+            }}>Direction</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {(Object.keys(DIR_META) as FieldDirection[]).map(d => (
+                <FieldBadge key={d} meta={DIR_META[d]} />
+              ))}
+            </div>
+          </div>
+          <div style={{ width: 1, background: "var(--cs-border)", alignSelf: "stretch" }} />
+          {/* Kind legend */}
+          <div>
+            <div style={{
+              color: "var(--cs-dim)", fontSize: 10, fontFamily: MONO, fontWeight: 700,
+              letterSpacing: 1, marginBottom: 6, textTransform: "uppercase"
+            }}>Kind</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {(Object.keys(KIND_META) as FieldKind[]).map(k => (
+                <FieldBadge key={k} meta={KIND_META[k]} />
+              ))}
+            </div>
+          </div>
+          <div style={{ width: 1, background: "var(--cs-border)", alignSelf: "stretch" }} />
+          {/* Required hint */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: 6,
+            color: "var(--cs-dim)", fontFamily: MONO, fontSize: 11
+          }}>
+            <span style={{ color: "#f87171", fontSize: 14, fontWeight: 900 }}>*</span>
+            Required field
+          </div>
+        </div>
+
+        {/* ── DIRECTION filter row ── */}
+        <div style={{ display: "flex", gap: 5, marginBottom: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <span style={{
+            color: "var(--cs-dim)", fontSize: 10, fontFamily: MONO,
+            fontWeight: 700, letterSpacing: 1, marginRight: 4, textTransform: "uppercase"
+          }}>
+            Direction:
+          </span>
+          <FilterTab val="ALL" label="⊞ All" count={schemaFields.length} />
+          {(Object.keys(DIR_META) as FieldDirection[]).map(d => (
+            <FilterTab key={d} val={d} label={DIR_META[d].label}
+              count={dirCounts[d] || 0} meta={DIR_META[d]} />
+          ))}
+        </div>
+
+        {/* ── KIND filter row ── */}
+        <div style={{ display: "flex", gap: 5, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+          <span style={{
+            color: "var(--cs-dim)", fontSize: 10, fontFamily: MONO,
+            fontWeight: 700, letterSpacing: 1, marginRight: 4, textTransform: "uppercase"
+          }}>
+            Kind:
+          </span>
+          <button
+            onClick={() => this.setState({ kindFilter: "ALL", page: 0 })}
+            style={{
+              display: "flex", alignItems: "center", gap: 5,
+              background: kindFilter === "ALL" ? "var(--cs-accent)18" : "var(--cs-surface-2)",
+              border: `1.5px solid ${kindFilter === "ALL" ? "var(--cs-accent)" : "var(--cs-border)"}`,
+              color: kindFilter === "ALL" ? "var(--cs-accent)" : "var(--cs-muted)",
+              borderRadius: 7, padding: "5px 11px", cursor: "pointer",
+              fontFamily: MONO, fontSize: 11, fontWeight: kindFilter === "ALL" ? 700 : 400,
+            }}
+          >
+            ⊞ All
+            <span style={{ background: "var(--cs-border)", color: "#fff", borderRadius: 10, padding: "0 5px", fontSize: 9, fontWeight: 800 }}>
+              {schemaFields.length}
+            </span>
+          </button>
+          {(Object.keys(KIND_META) as FieldKind[]).map(k => (
+            <FilterTab key={k} val={k} label={KIND_META[k].label}
+              count={kindCounts[k] || 0} meta={KIND_META[k]} />
+          ))}
+        </div>
+
+        {/* ── Search + API dropdown ── */}
+        <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
           <input
             value={filter}
             onChange={e => this.setState({ filter: e.target.value, page: 0 })}
-            placeholder="🔍  filter field / schema…"
+            placeholder="🔍  filter field / schema / description…"
             style={{
               flex: 1, minWidth: 200, background: "var(--cs-input-bg)",
               border: "1px solid var(--cs-border)", borderRadius: 8,
@@ -590,35 +908,30 @@ class SchemaFieldTable extends React.Component<TableProps, TableState> {
             isDark={this.props.isDark}
             apiColor={apiColor}
           />
-          {!isAll && (
+          {(!isAll || dirFilter !== "ALL" || kindFilter !== "ALL") && (
             <button
-              onClick={() => this.setState({ filterApis: [], page: 0 })}
+              onClick={() => this.setState({ filterApis: [], dirFilter: "ALL", kindFilter: "ALL", page: 0 })}
               style={{
                 background: "transparent", border: "1px solid var(--cs-border)",
                 color: "var(--cs-dim)", borderRadius: 6, padding: "6px 12px",
                 fontFamily: MONO, fontSize: 12, cursor: "pointer",
               }}
-            >✕ Clear</button>
+            >✕ Reset all</button>
           )}
         </div>
 
-        {/* ── Active filter badges ── */}
+        {/* ── Active API filter chips ── */}
         {!isAll && (
           <div style={{ marginBottom: 12, display: "flex", flexWrap: "wrap", gap: 6 }}>
             {filterApis.map(api => (
-              <span
-                key={api}
-                style={{
-                  background: apiColor(api) + "18",
-                  border: `1px solid ${apiColor(api)}44`,
-                  color: apiColor(api),
-                  borderRadius: 6, padding: "4px 10px",
-                  fontFamily: MONO, fontSize: 11, fontWeight: 600,
-                  display: "inline-flex", alignItems: "center", gap: 6,
-                  cursor: "pointer",
-                }}
-                onClick={() => this.setState({ filterApis: filterApis.filter(x => x !== api), page: 0 })}
+              <span key={api} onClick={() => this.setState({ filterApis: filterApis.filter(x => x !== api), page: 0 })}
                 title="Click to remove"
+                style={{
+                  background: apiColor(api) + "18", border: `1px solid ${apiColor(api)}44`,
+                  color: apiColor(api), borderRadius: 6, padding: "4px 10px",
+                  fontFamily: MONO, fontSize: 11, fontWeight: 600,
+                  display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer",
+                }}
               >
                 <span style={{ width: 7, height: 7, borderRadius: "50%", background: apiColor(api) }} />
                 {api}
@@ -635,43 +948,66 @@ class SchemaFieldTable extends React.Component<TableProps, TableState> {
         <div style={{ overflowX: "auto", borderRadius: 10, border: "1px solid var(--cs-border)", boxShadow: "var(--cs-shadow-md)" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", background: "var(--cs-bg)" }}>
             <thead>
-              <tr>{["Source API", "Schema", "Field", "Type", "References"].map(h => (
-                <th key={h} style={TH}>{h}</th>
-              ))}</tr>
+              <tr>
+                <th style={TH}>Classification</th>
+                <th style={TH}>Source API</th>
+                <th style={TH}>Schema</th>
+                <th style={TH}>Field</th>
+                <th style={TH}>Raw Type</th>
+                <th style={TH}>References</th>
+              </tr>
             </thead>
             <tbody>
               {rows.map((r, i) => (
                 <tr key={i} style={{ background: i % 2 === 0 ? "var(--cs-bg)" : "var(--cs-surface)" }}>
+                  <td style={{ ...TD, whiteSpace: "nowrap" }}>
+                    <ClassificationCell
+                      direction={r.direction ?? "IN_OUT"}
+                      kind={r.kind ?? "VAL"}
+                      required={r.required ?? false}
+                    />
+                  </td>
                   <td style={TD}>
                     <span style={{
                       background: apiColor(r.sourceApi) + "22", color: apiColor(r.sourceApi),
                       border: `1.5px solid ${apiColor(r.sourceApi)}66`,
-                      borderRadius: 5, padding: "3px 9px", fontSize: 11, fontFamily: MONO,
-                      whiteSpace: "nowrap",
+                      borderRadius: 5, padding: "3px 9px", fontSize: 11, fontFamily: MONO, whiteSpace: "nowrap",
                     }}>{r.sourceApi}</span>
                   </td>
-                  <td style={{ ...TD, color: "var(--cs-muted)" }}>{r.sourceSchema}</td>
-                  <td style={{ ...TD, color: "var(--cs-text)", fontWeight: 600 }}>{r.field}</td>
+                  <td style={{ ...TD, color: "var(--cs-muted)", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {r.sourceSchema}
+                  </td>
+                  <td style={{ ...TD, fontWeight: 600, color: "var(--cs-text)" }}>
+                    {r.field}
+                    {r.description && (
+                      <span title={r.description} style={{
+                        marginLeft: 6, color: "var(--cs-dim)", fontSize: 10,
+                        cursor: "help", opacity: 0.6,
+                      }}>ⓘ</span>
+                    )}
+                  </td>
                   <td style={TD}>
-                    <span style={{ color: r.isArray ? "#fb923c" : "var(--cs-dim)" }}>
-                      {r.isArray ? `${r.fieldType}[]` : r.fieldType}
+                    <span style={{ color: r.isArray ? "#fb923c" : "var(--cs-dim)", fontFamily: MONO }}>
+                      {r.fieldType || "—"}
                     </span>
                   </td>
                   <td style={TD}>
-                    <span style={{
-                      background: schemaColor(r.referencesSchema) + "1a",
-                      color: schemaColor(r.referencesSchema),
-                      border: `1.5px solid ${schemaColor(r.referencesSchema)}55`,
-                      borderRadius: 5, padding: "3px 9px", fontSize: 11, fontFamily: MONO,
-                    }}>→ {r.referencesSchema}</span>
+                    {r.referencesSchema ? (
+                      <span style={{
+                        background: schemaColor(r.referencesSchema) + "1a",
+                        color: schemaColor(r.referencesSchema),
+                        border: `1.5px solid ${schemaColor(r.referencesSchema)}55`,
+                        borderRadius: 5, padding: "3px 9px", fontSize: 11, fontFamily: MONO,
+                      }}>→ {r.referencesSchema}</span>
+                    ) : (
+                      <span style={{ color: "var(--cs-dim)", opacity: 0.35 }}>—</span>
+                    )}
                   </td>
                 </tr>
               ))}
               {rows.length === 0 && (
-                <tr><td colSpan={5} style={{ ...TD, color: "var(--cs-dim)", textAlign: "center", padding: 32 }}>
-                  {schemaFields.length === 0
-                    ? "No schema cross-references found. Load files with $ref fields."
-                    : "No fields match this filter."}
+                <tr><td colSpan={6} style={{ ...TD, color: "var(--cs-dim)", textAlign: "center", padding: 32 }}>
+                  No fields match the current filters.
                 </td></tr>
               )}
             </tbody>
@@ -679,10 +1015,7 @@ class SchemaFieldTable extends React.Component<TableProps, TableState> {
         </div>
 
         {/* ── Pagination footer ── */}
-        <div style={{
-          marginTop: 12, display: "flex", justifyContent: "space-between",
-          alignItems: "center", flexWrap: "wrap", gap: 10,
-        }}>
+        <div style={{ marginTop: 12, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
           <span style={{ color: "var(--cs-dim)", fontSize: 12, fontFamily: MONO }}>
             {rows.length > 0
               ? `Showing ${safePage * TABLE_PAGE_SIZE + 1}–${Math.min((safePage + 1) * TABLE_PAGE_SIZE, allRows.length)} of ${allRows.length} fields`
@@ -690,53 +1023,39 @@ class SchemaFieldTable extends React.Component<TableProps, TableState> {
           </span>
           {totalPages > 1 && (
             <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-              <button
-                disabled={safePage === 0}
-                onClick={() => this.setState({ page: safePage - 1 })}
+              <button disabled={safePage === 0} onClick={() => this.setState({ page: safePage - 1 })}
                 style={{
                   background: "var(--cs-surface-2)", border: "1px solid var(--cs-border)",
                   color: safePage === 0 ? "var(--cs-dim)" : "var(--cs-text)",
                   borderRadius: 6, padding: "5px 12px", cursor: safePage === 0 ? "default" : "pointer",
-                  fontFamily: MONO, fontSize: 12,
-                }}
-              >◀</button>
-              {/* Page number pills — show max 7 */}
+                  fontFamily: MONO, fontSize: 12
+                }}>◀</button>
               {Array.from({ length: totalPages }, (_, i) => i)
                 .filter(i => Math.abs(i - safePage) < 4 || i === 0 || i === totalPages - 1)
                 .reduce<(number | "…")[]>((acc, i, idx, arr) => {
                   if (idx > 0 && (i as number) - (arr[idx - 1] as number) > 1) acc.push("…");
-                  acc.push(i);
-                  return acc;
+                  acc.push(i); return acc;
                 }, [])
                 .map((item, idx) =>
                   item === "…"
                     ? <span key={`e${idx}`} style={{ color: "var(--cs-dim)", padding: "0 4px" }}>…</span>
-                    : (
-                      <button
-                        key={item}
-                        onClick={() => this.setState({ page: item as number })}
-                        style={{
-                          width: 30, height: 28, borderRadius: 6, padding: 0,
-                          background: item === safePage ? "var(--cs-accent)" : "var(--cs-surface-2)",
-                          border: `1px solid ${item === safePage ? "var(--cs-accent)" : "var(--cs-border)"}`,
-                          color: item === safePage ? "#000" : "var(--cs-muted)",
-                          fontFamily: MONO, fontSize: 11, fontWeight: item === safePage ? 700 : 400,
-                          cursor: "pointer",
-                        }}
-                      >{(item as number) + 1}</button>
-                    )
-                )
-              }
-              <button
-                disabled={safePage >= totalPages - 1}
-                onClick={() => this.setState({ page: safePage + 1 })}
+                    : <button key={item} onClick={() => this.setState({ page: item as number })}
+                      style={{
+                        width: 30, height: 28, borderRadius: 6, padding: 0,
+                        background: item === safePage ? "var(--cs-accent)" : "var(--cs-surface-2)",
+                        border: `1px solid ${item === safePage ? "var(--cs-accent)" : "var(--cs-border)"}`,
+                        color: item === safePage ? "#000" : "var(--cs-muted)",
+                        fontFamily: MONO, fontSize: 11, fontWeight: item === safePage ? 700 : 400,
+                        cursor: "pointer"
+                      }}>{(item as number) + 1}</button>
+                )}
+              <button disabled={safePage >= totalPages - 1} onClick={() => this.setState({ page: safePage + 1 })}
                 style={{
                   background: "var(--cs-surface-2)", border: "1px solid var(--cs-border)",
                   color: safePage >= totalPages - 1 ? "var(--cs-dim)" : "var(--cs-text)",
                   borderRadius: 6, padding: "5px 12px", cursor: safePage >= totalPages - 1 ? "default" : "pointer",
-                  fontFamily: MONO, fontSize: 12,
-                }}
-              >▶</button>
+                  fontFamily: MONO, fontSize: 12
+                }}>▶</button>
             </div>
           )}
         </div>
@@ -744,7 +1063,6 @@ class SchemaFieldTable extends React.Component<TableProps, TableState> {
     );
   }
 }
-
 // ─────────────────────────────────────────────────────────────
 // VIEW 3 — WORKFLOW DIAGRAM  (horizontal pipeline, no diagonal)
 // ─────────────────────────────────────────────────────────────

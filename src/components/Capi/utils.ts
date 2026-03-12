@@ -84,7 +84,8 @@ export interface ApiSpec {
   category: string | null;
   folder: string | null;
   dependencies: string[];
-  fields: { name: string; type: string; description: string; required: boolean }[];
+  fields: { name: string; type: string; description: string; required: boolean; readOnly?: boolean; writeOnly?: boolean; isParam?: boolean }[];
+  pathParams: string[];
   description: string;
   authSchemes: string[];
   servers: string[];
@@ -197,61 +198,12 @@ export const CAT_COLORS: Record<string, string> = {
   "Regulatory": "#be5046",
 };
 
-export const DEFAULT_SPEC: ApiSpec = {
-  fileName: "obj-addrs-api.yaml",
-  ext: "yaml",
-  title: "OBJ-ADDRS API",
-  version: "1.0.0",
-  description: "Avaloq Address Management API — obj-addrs resource",
-  endpoints: [
-    { method: "GET", path: "/api1/obj-addrs", summary: "List addresses" },
-    { method: "POST", path: "/api1/obj-addrs", summary: "Create address" },
-    { method: "GET", path: "/api1/obj-addrs/{id}", summary: "Get address by ID" },
-    { method: "PATCH", path: "/api1/obj-addrs/{id}", summary: "Update address" },
-    { method: "DELETE", path: "/api1/obj-addrs/{id}", summary: "Delete address" },
-  ],
-  schemas: {
-    obj_addr: {
-      type: "object",
-      properties: {
-        id: { type: "integer" },
-        firstName: { type: "string" },
-        name: { type: "string" },
-        firm: { type: "string" },
-        street: { type: "string" },
-        streetNr: { type: "string" },
-        zip: { type: "string" },
-        city: { type: "string" },
-        country: { type: "object" },
-        addrType: { type: "object" },
-        addrKind: { type: "object" },
-        elAddr: { type: "string" },
-        openDate: { type: "string", format: "date" },
-        bdeRecVersion: { type: "integer" },
-      }
-    }
-  },
-  resourceName: "obj-addrs",
-  schemaName: "obj_addr",
-  parseError: null,
-  category: "Address Management",
-  folder: null,
-  dependencies: [],
-  fields: [
-    { name: "id", type: "integer", description: "Unique identifier", required: true },
-    { name: "firstName", type: "string", description: "First name", required: false },
-    { name: "name", type: "string", description: "Last name / company name", required: true },
-    { name: "firm", type: "string", description: "Firm / company", required: false },
-    { name: "city", type: "string", description: "City", required: false },
-    { name: "country", type: "object", description: "Country with id/ident", required: false },
-    { name: "elAddr", type: "string", description: "Email address", required: false },
-  ],
-  authSchemes: ["Bearer"],
-  servers: ["http://localhost:8080"],
-  tags: ["Addresses"],
-  rawContent: "",
-};
-
+// ═══════════════════════════════════════════════════════════════
+// DEFAULT SPEC  — parsed dynamically, never hardcoded
+// This is the fallback shown before any files are loaded.
+// All fields, schemas, endpoints and pathParams are derived
+// by running the same parseApiSpec() pipeline as uploaded files.
+// ═══════════════════════════════════════════════════════════════
 // ═══════════════════════════════════════════════════════════════
 // PARSE API SPEC  — shared by FileUploadPanel and tests
 // Handles: OpenAPI 3.x / Swagger 2.x JSON/YAML, plain JSON data,
@@ -274,8 +226,8 @@ function collectRefs(obj: any, out: Set<string>): void {
   }
 }
 
-function fieldsFromSchema(schema: any): { name: string; type: string; description: string; required: boolean }[] {
-  const fields: { name: string; type: string; description: string; required: boolean }[] = [];
+function fieldsFromSchema(schema: any): { name: string; type: string; description: string; required: boolean; readOnly?: boolean; writeOnly?: boolean }[] {
+  const fields: { name: string; type: string; description: string; required: boolean; readOnly?: boolean; writeOnly?: boolean }[] = [];
   if (!schema || typeof schema !== "object") return fields;
   const required = new Set((schema.required || []) as string[]);
   for (const [prop, def] of Object.entries(schema.properties || {})) {
@@ -293,7 +245,13 @@ function fieldsFromSchema(schema: any): { name: string; type: string; descriptio
     } else {
       type = d.type || "object";
     }
-    fields.push({ name: prop, type, description: d.description || "", required: required.has(prop) });
+    fields.push({
+      name: prop, type,
+      description: d.description || "",
+      required: required.has(prop),
+      readOnly: d.readOnly === true ? true : undefined,
+      writeOnly: d.writeOnly === true ? true : undefined,
+    });
   }
   return fields;
 }
@@ -420,7 +378,7 @@ export function parseApiSpec(fileName: string, content: string, fileType?: strin
     endpoints: [], schemas: {},
     resourceName: null, schemaName: null,
     parseError: null, category: null, folder: null,
-    dependencies: [], fields: [], description: "",
+    dependencies: [], fields: [], pathParams: [], description: "",
     authSchemes: [], servers: [], tags: [],
     rawContent: content.slice(0, 5000),
   };
@@ -450,7 +408,8 @@ export function parseApiSpec(fileName: string, content: string, fileType?: strin
         collectRefs(parsed.components, allDocRefs);
         collectRefs(parsed.definitions, allDocRefs);
 
-        // Extract endpoints
+        // Extract endpoints + collect path params
+        const allPathParams = new Set<string>();
         for (const [path, pathItem] of Object.entries(parsed.paths || {})) {
           for (const [method, op] of Object.entries(pathItem as any)) {
             if (!["get","post","put","patch","delete"].includes(method)) continue;
@@ -461,8 +420,17 @@ export function parseApiSpec(fileName: string, content: string, fileType?: strin
               tags: o.tags || [],
               operationId: o.operationId,
             });
+            // Collect parameters from each operation AND path-level params
+            const params = [
+              ...((pathItem as any).parameters || []),
+              ...(o.parameters || []),
+            ];
+            for (const p of params) {
+              if (p.in === "path" && p.name) allPathParams.add(p.name);
+            }
           }
         }
+        spec.pathParams = [...allPathParams];
 
         // Identify primary schema (from POST request body ref or name matching)
         let primarySchema: string | null = null;
@@ -555,6 +523,138 @@ export function parseApiSpec(fileName: string, content: string, fileType?: strin
 }
 
 // ═══════════════════════════════════════════════════════════════
+// DEFAULT SPEC  — parsed dynamically, never hardcoded.
+// Placed AFTER parseApiSpec so the IIFE call is valid.
+// All fields, schemas, endpoints and pathParams are derived by
+// the same pipeline used for real uploaded files.
+// ═══════════════════════════════════════════════════════════════
+const DEFAULT_SPEC_YAML = `
+openapi: "3.0.2"
+info:
+  title: "OBJ-ADDRS API"
+  version: "1.0.0"
+  description: "Avaloq Address Management API — obj-addrs resource"
+servers:
+  - url: "http://localhost:8080"
+paths:
+  /api1/obj-addrs:
+    get:
+      summary: "List addresses"
+      parameters:
+        - name: filter
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+    post:
+      summary: "Create address"
+  /api1/obj-addrs/{id}:
+    get:
+      summary: "Get address by ID"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+    patch:
+      summary: "Update address"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+    delete:
+      summary: "Delete address"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    obj_addr:
+      type: object
+      required:
+        - name
+      properties:
+        id:
+          type: integer
+          readOnly: true
+          description: "Unique identifier (server-assigned)"
+        firstName:
+          type: string
+          description: "First name"
+        name:
+          type: string
+          description: "Last name or company name"
+        firm:
+          type: string
+          description: "Firm or company"
+        street:
+          type: string
+          description: "Street name"
+        streetNr:
+          type: string
+          description: "Street number"
+        zip:
+          type: string
+          description: "Postal code"
+        city:
+          type: string
+          description: "City"
+        country:
+          $ref: "#/components/schemas/code_tab_ref"
+        addrType:
+          $ref: "#/components/schemas/code_tab_ref"
+        addrKind:
+          $ref: "#/components/schemas/code_tab_ref"
+        elAddr:
+          type: string
+          description: "Email address"
+        openDate:
+          type: string
+          readOnly: true
+          description: "Date address was opened (server-set)"
+        bdeRecVersion:
+          type: integer
+          readOnly: true
+          description: "Optimistic locking version (server-managed)"
+    code_tab_ref:
+      type: object
+      properties:
+        _href:
+          type: string
+          readOnly: true
+          description: "Reference link"
+        id:
+          type: integer
+          description: "Numeric reference"
+        ident:
+          type: string
+          description: "Unique symbolic reference"
+        intlId:
+          type: string
+          readOnly: true
+          description: "Symbolic reference (read-only)"
+`;
+
+export const DEFAULT_SPEC: ApiSpec = (() => {
+  const spec = parseApiSpec("obj-addrs-api.yaml", DEFAULT_SPEC_YAML, "yaml");
+  spec.category = "Address Management";
+  return spec;
+})();
+
+// ═══════════════════════════════════════════════════════════════
 // DYNAMIC WORKFLOW BUILDER
 // Derives graph nodes, edges, schema-field table, workflow stages,
 // and data-transfer arrows from the currently loaded ApiSpec[].
@@ -569,9 +669,17 @@ export interface WfNode {
 export interface WfEdge {
   from: string; to: string; field: string; type: "object"|"array"; label: string;
 }
+export type FieldDirection = "OUT" | "IN" | "IN_OUT" | "PARAM";
+export type FieldKind      = "REF" | "ARR_REF" | "ARR_VAL" | "VAL" | "OBJ";
+
 export interface WfFieldRow {
   sourceSchema: string; field: string; fieldType: string;
   referencesSchema: string; sourceApi: string; isArray: boolean;
+  // Classification
+  direction: FieldDirection;
+  kind: FieldKind;
+  required: boolean;
+  description: string;
 }
 export interface WfStage {
   id: string; label: string; api: string; produces: string|null;
@@ -668,17 +776,50 @@ export function buildDynamicWorkflow(specs: ApiSpec[]): DynamicWorkflow {
       }
     }
 
-    // Schema field rows — only non-scalar cross-refs
+    // Schema field rows — ALL fields with full direction+kind classification
+    const pathParamSet = new Set(spec.pathParams || []);
     for (const field of spec.fields) {
-      const baseType = field.type.replace(/\[\]$/, "");
-      if (SCALAR_TYPES.has(baseType.toLowerCase())) continue;
+      const baseType  = field.type.replace(/\[\]$/, "");
+      const isArrType = field.type.includes("[]");
+      const isScalar  = SCALAR_TYPES.has(baseType.toLowerCase());
+
+      // Direction
+      let direction: FieldDirection;
+      if (pathParamSet.has(field.name) || field.isParam) {
+        direction = "PARAM";
+      } else if (field.readOnly) {
+        direction = "OUT";
+      } else if (field.writeOnly) {
+        direction = "IN";
+      } else {
+        direction = "IN_OUT";
+      }
+
+      // Kind
+      let kind: FieldKind;
+      if (!isScalar && !isArrType) {
+        kind = "REF";
+      } else if (!isScalar && isArrType) {
+        kind = "ARR_REF";
+      } else if (isArrType) {
+        kind = "ARR_VAL";
+      } else if (baseType === "object") {
+        kind = "OBJ";
+      } else {
+        kind = "VAL";
+      }
+
       schemaFields.push({
         sourceSchema: schema,
         field: field.name,
-        fieldType: field.type.includes("[]") ? "array" : "object",
-        referencesSchema: baseType,
+        fieldType: field.type,
+        referencesSchema: isScalar ? "" : baseType,
         sourceApi: spec.title,
-        isArray: field.type.includes("[]"),
+        isArray: isArrType,
+        direction,
+        kind,
+        required: field.required || false,
+        description: field.description || "",
       });
     }
   }
