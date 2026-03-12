@@ -3,6 +3,7 @@ import { useTheme } from "./ThemeContext";
 import {
   ApiSpec, buildDynamicWorkflow, rest, SYNTH,
   rndInt, rndFloat, rndPick, isoDate,
+  testStore, TestCase,
   WfNode, WfEdge, WfFieldRow, WfStage, WfTransfer, DynamicWorkflow,
 } from "./utils";
 import { StatusBadge, ResultRow } from "./AtomComponents";
@@ -1450,114 +1451,71 @@ function dgBuildPlan(specs: ApiSpec[]): DgStep[] {
 }
 
 // ── DataGenTab UI ──
-interface DgEntry {
-  step: number; label: string; method: string;
-  status: number | string; latency: number;
-  result: any; headers: any; ok: boolean;
-}
-
-type DgView = "setup" | "running" | "report";
+type DgView = "setup" | "generated";
 
 interface DataGenTabState {
   selNames: string[];
   testCount: number;
   dgView: DgView;
   plan: DgStep[];
-  previews: Record<string, any>[];
-  log: DgEntry[];
-  results: DgEntry[];
-  running: boolean;
+  generatedN: number;   // how many cases were just pushed to testStore
 }
 
 const DG_PRESETS = [1, 5, 10, 50, 100, 500, 1000, 2000];
 
-export class DataGenTab extends React.Component<{ loadedSpecs: ApiSpec[] }, DataGenTabState> {
+export class DataGenTab extends React.Component<
+  { loadedSpecs: ApiSpec[]; onGenerate?: () => void },
+  DataGenTabState
+> {
   state: DataGenTabState = {
     selNames: [], testCount: 1, dgView: "setup",
-    plan: [], previews: [], log: [], results: [], running: false,
+    plan: [], generatedN: 0,
   };
-  private logRef = React.createRef<HTMLDivElement>();
-
-  componentDidUpdate(_: any, prev: DataGenTabState) {
-    if (prev.log !== this.state.log) this.logRef.current?.scrollIntoView({ behavior: "smooth" });
-  }
 
   private toggle = (fn: string) =>
     this.setState(s => ({
       selNames: s.selNames.includes(fn) ? s.selNames.filter(n => n !== fn) : [...s.selNames, fn],
     }));
 
-  private buildPreview = (sel: ApiSpec[]) =>
-    Array.from({ length: 3 }, () => dgBuildBody(sel[0] || sel[0], {}, sel));
-
-  private run = async () => {
+  private generate = () => {
     const { selNames, testCount } = this.state;
-    const { loadedSpecs } = this.props;
+    const { loadedSpecs, onGenerate } = this.props;
     const sel = loadedSpecs.filter(s => selNames.includes(s.fileName));
     const plan = dgBuildPlan(sel);
-    this.setState({ plan, dgView: "running", running: true, log: [], results: [] });
+    if (plan.length === 0) return;
 
-    const results: DgEntry[] = [];
-    const ctx: Record<string, number> = {};
-    let stepNum = 0;
-    const runs = Math.min(testCount, 5);
-
-    for (let run = 0; run < runs; run++) {
+    // Generate testCount iterations × plan steps into testStore
+    let added = 0;
+    for (let run = 1; run <= testCount; run++) {
       for (const step of plan) {
-        stepNum++;
-        const label = run > 0 ? `[Run ${run + 1}] ${step.summary}` : step.summary;
-        this.setState(s => ({
-          log: [...s.log, {
-            step: stepNum, label, method: step.method,
-            status: "running", latency: 0, result: null, headers: null, ok: false
-          }],
-        }));
-        const t0 = Date.now();
-        try {
-          await new Promise(r => setTimeout(r, 30 + Math.random() * 70));
-          const res = step.spec.resourceName || "obj-addrs";
-          const pid = ctx[res] || null;
-          const body = ["POST", "PATCH", "PUT"].includes(step.method)
-            ? dgBuildBody(step.spec, ctx, sel) : null;
-          const path = ["GET", "PATCH", "PUT", "DELETE"].includes(step.method)
-            && step.spec.pathParams.length > 0 && pid
-            ? `/${res}/${pid}` : `/${res}`;
-          const r = await rest.req(step.method, path, body);
-          if (step.producesId && (r.body as any)?.id) ctx[res] = (r.body as any).id;
-          const latency = Date.now() - t0;
-          const ok = r.status >= 200 && r.status < 300;
-          const entry: DgEntry = {
-            step: stepNum, label, method: step.method,
-            status: r.status, latency, result: r.body, headers: r.headers, ok
-          };
-          results.push(entry);
-          this.setState(s => ({ log: s.log.map((x, i) => i === s.log.length - 1 ? entry : x) }));
-        } catch (e: any) {
-          const entry: DgEntry = {
-            step: stepNum, label, method: step.method,
-            status: "ERR", latency: Date.now() - t0,
-            result: { error: e.message }, headers: null, ok: false
-          };
-          results.push(entry);
-          this.setState(s => ({ log: s.log.map((x, i) => i === s.log.length - 1 ? entry : x) }));
-        }
+        const res = step.spec.resourceName || "unknown";
+        const body = ["POST", "PATCH", "PUT"].includes(step.method)
+          ? dgBuildBody(step.spec, {}, sel) : null;
+        const path = ["GET", "PATCH", "PUT", "DELETE"].includes(step.method)
+          && step.spec.pathParams.length > 0
+          ? `/${res}/{id}` : `/${res}`;
+        testStore.add({
+          runGroup: run,
+          apiTitle: step.spec.title,
+          resourceName: res,
+          method: step.method,
+          path,
+          body,
+          dataSource: "synthetic",
+        });
+        added++;
       }
     }
-    this.setState({ results, running: false, dgView: "report" });
+
+    this.setState({ plan, generatedN: added, dgView: "generated" });
+    onGenerate?.();
   };
 
   render() {
     const { loadedSpecs } = this.props;
-    const { selNames, testCount, dgView, plan, previews, log, results } = this.state;
+    const { selNames, testCount, dgView, plan, generatedN } = this.state;
     const sel = loadedSpecs.filter(s => selNames.includes(s.fileName));
-    const ok = results.filter(r => r.ok).length;
-    const fail = results.filter(r => !r.ok).length;
-    const avgLat = results.length
-      ? Math.round(results.reduce((a, r) => a + r.latency, 0) / results.length) : 0;
-    const pct = results.length ? Math.round((ok / results.length) * 100) : 0;
-    const pctCol = pct === 100 ? "#34d399" : pct >= 50 ? "#f59e0b" : "#f87171";
 
-    // ── helper components ──
     const SLbl = ({ text }: { text: string }) => (
       <div style={{
         fontFamily: MONO, fontSize: 10, fontWeight: 700, color: "var(--cs-dim)",
@@ -1578,27 +1536,25 @@ export class DataGenTab extends React.Component<{ loadedSpecs: ApiSpec[] }, Data
     return (
       <div style={{ display: "flex", flexDirection: "column" as const, gap: 20 }}>
 
-        {/* ── Phase banner ── */}
-        {dgView === "setup" && (
-          <div style={{
-            padding: "12px 16px", borderRadius: 10,
-            background: "#34d39910", border: "1px solid #34d39933"
-          }}>
-            <div style={{
-              fontFamily: MONO, fontSize: 13, fontWeight: 800,
-              color: "#34d399", marginBottom: 5
-            }}>⬡ Data Synthetic Generator</div>
-            <div style={{ fontFamily: MONO, fontSize: 11, color: "var(--cs-muted)", lineHeight: 1.6 }}>
-              Select APIs, configure test count, and run. The engine auto-detects IN/IN·OUT fields,
-              generates banking-domain synthetic data, resolves cross-API ID dependencies,
-              and executes in the correct POST → GET → PATCH → DELETE order.
-            </div>
-          </div>
-        )}
-
-        {/* ══════════════ SETUP ══════════════ */}
+        {/* ══ SETUP ══ */}
         {dgView === "setup" && (
           <>
+            {/* Banner */}
+            <div style={{
+              padding: "12px 16px", borderRadius: 10,
+              background: "#34d39910", border: "1px solid #34d39933"
+            }}>
+              <div style={{
+                fontFamily: MONO, fontSize: 13, fontWeight: 800,
+                color: "#34d399", marginBottom: 5
+              }}>⚗ Data Synthetic Generator</div>
+              <div style={{ fontFamily: MONO, fontSize: 11, color: "var(--cs-muted)", lineHeight: 1.6 }}>
+                Configure APIs and iteration count. The engine auto-detects IN / IN·OUT fields,
+                generates banking-domain synthetic data and resolves cross-API dependencies.
+                Generated test cases are queued in <strong style={{ color: "var(--cs-text)" }}>Ready for Test</strong> — no execution happens here.
+              </div>
+            </div>
+
             {/* API selector */}
             <div>
               <div style={{
@@ -1646,7 +1602,6 @@ export class DataGenTab extends React.Component<{ loadedSpecs: ApiSpec[] }, Data
                         border: `1.5px solid ${active ? "#34d39955" : "var(--cs-border-sub)"}`,
                         transition: "all .12s",
                       }}>
-                        {/* Checkbox */}
                         <div style={{
                           width: 18, height: 18, borderRadius: 4, flexShrink: 0,
                           border: `2px solid ${active ? "#34d399" : "var(--cs-border)"}`,
@@ -1655,7 +1610,6 @@ export class DataGenTab extends React.Component<{ loadedSpecs: ApiSpec[] }, Data
                         }}>
                           {active && <span style={{ color: "#0a0e1a", fontSize: 11, fontWeight: 900 }}>✓</span>}
                         </div>
-                        {/* Name */}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{
                             fontFamily: MONO, fontSize: 12, fontWeight: 700,
@@ -1668,7 +1622,6 @@ export class DataGenTab extends React.Component<{ loadedSpecs: ApiSpec[] }, Data
                             {spec.resourceName} · {spec.fields.length} fields
                           </div>
                         </div>
-                        {/* Field counts */}
                         <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
                           <span style={{
                             background: "#60a5fa15", border: "1px solid #60a5fa33",
@@ -1681,7 +1634,6 @@ export class DataGenTab extends React.Component<{ loadedSpecs: ApiSpec[] }, Data
                             fontFamily: MONO, fontSize: 9, fontWeight: 600
                           }}>OUT {outCount}</span>
                         </div>
-                        {/* Methods */}
                         <div style={{ display: "flex", gap: 3, flexShrink: 0 }}>
                           {methods.slice(0, 4).map(m => <MChip key={m} m={m} />)}
                         </div>
@@ -1698,8 +1650,7 @@ export class DataGenTab extends React.Component<{ loadedSpecs: ApiSpec[] }, Data
               for (const s of sel)
                 for (const d of s.dependencies || []) {
                   const ds = sel.find(x => x.schemaName === d || x.resourceName === d);
-                  if (ds && ds.fileName !== s.fileName)
-                    pairs.push({ from: ds.title, to: s.title });
+                  if (ds && ds.fileName !== s.fileName) pairs.push({ from: ds.title, to: s.title });
                 }
               if (pairs.length === 0) return null;
               return (
@@ -1707,12 +1658,11 @@ export class DataGenTab extends React.Component<{ loadedSpecs: ApiSpec[] }, Data
                   padding: "10px 14px", borderRadius: 8,
                   background: "var(--cs-surface-2)", border: "1px solid var(--cs-border-sub)"
                 }}>
-                  <SLbl text="Detected dependencies — IDs will be chained automatically" />
+                  <SLbl text="Detected dependencies — IDs will be chained at execution time" />
                   {pairs.map((p, i) => (
                     <div key={i} style={{
                       fontFamily: MONO, fontSize: 11,
-                      color: "var(--cs-muted)", display: "flex", gap: 6, marginBottom: 3,
-                      alignItems: "center"
+                      color: "var(--cs-muted)", display: "flex", gap: 6, marginBottom: 3, alignItems: "center"
                     }}>
                       <span style={{ color: "#34d399", fontWeight: 700 }}>{p.from}</span>
                       <span>→ id →</span>
@@ -1744,14 +1694,8 @@ export class DataGenTab extends React.Component<{ loadedSpecs: ApiSpec[] }, Data
                       ↻ Refresh
                     </button>
                   </div>
-                  <div style={{
-                    overflowX: "auto", borderRadius: 8,
-                    border: "1px solid var(--cs-border-sub)"
-                  }}>
-                    <table style={{
-                      width: "100%", borderCollapse: "collapse" as const,
-                      background: "var(--cs-bg)"
-                    }}>
+                  <div style={{ overflowX: "auto", borderRadius: 8, border: "1px solid var(--cs-border-sub)" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse" as const, background: "var(--cs-bg)" }}>
                       <thead>
                         <tr>{keys.map(k => (
                           <th key={k} style={{
@@ -1789,6 +1733,9 @@ export class DataGenTab extends React.Component<{ loadedSpecs: ApiSpec[] }, Data
                       </tbody>
                     </table>
                   </div>
+                  <div style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)", marginTop: 5, opacity: 0.7 }}>
+                    Source: <strong>Synthetic</strong> — fresh values generated per test case
+                  </div>
                 </div>
               );
             })()}
@@ -1799,15 +1746,14 @@ export class DataGenTab extends React.Component<{ loadedSpecs: ApiSpec[] }, Data
               if (p.length === 0) return null;
               return (
                 <div>
-                  <SLbl text={`Execution plan — ${p.length} steps`} />
+                  <SLbl text={`Execution plan — ${p.length} step${p.length !== 1 ? "s" : ""} per run`} />
                   <div style={{ display: "flex", flexDirection: "column" as const, gap: 4 }}>
                     {p.map((step, i) => {
                       const col = DG_METHOD_COLORS[step.method] || "#8b949e";
                       return (
                         <div key={step.id} style={{
                           display: "flex", alignItems: "center",
-                          gap: 10, padding: "8px 12px", borderRadius: 7,
-                          background: "var(--cs-surface)",
+                          gap: 10, padding: "8px 12px", borderRadius: 7, background: "var(--cs-surface)",
                           border: `1px solid ${col}20`, borderLeft: `3px solid ${col}66`
                         }}>
                           <span style={{
@@ -1815,10 +1761,9 @@ export class DataGenTab extends React.Component<{ loadedSpecs: ApiSpec[] }, Data
                             width: 18, flexShrink: 0
                           }}>{i + 1}</span>
                           <MChip m={step.method} />
-                          <span style={{
-                            fontFamily: MONO, fontSize: 12, color: "var(--cs-text)",
-                            flex: 1
-                          }}>{step.summary}</span>
+                          <span style={{ fontFamily: MONO, fontSize: 12, color: "var(--cs-text)", flex: 1 }}>
+                            {step.summary}
+                          </span>
                           {step.producesId && (
                             <span style={{ fontFamily: MONO, fontSize: 9, color: col, opacity: 0.7 }}>
                               → {step.spec.resourceName}_id
@@ -1837,7 +1782,7 @@ export class DataGenTab extends React.Component<{ loadedSpecs: ApiSpec[] }, Data
               );
             })()}
 
-            {/* Test count + run button */}
+            {/* Test count + generate button */}
             <div style={{ borderTop: "1px solid var(--cs-border-sub)", paddingTop: 16 }}>
               <div style={{
                 display: "flex", justifyContent: "space-between",
@@ -1847,10 +1792,10 @@ export class DataGenTab extends React.Component<{ loadedSpecs: ApiSpec[] }, Data
                 <input type="number" min={1} max={2000} value={testCount}
                   onChange={e => this.setState({ testCount: Math.min(2000, Math.max(1, +e.target.value || 1)) })}
                   style={{
-                    width: 80, padding: "4px 8px",
-                    background: "var(--cs-input-bg)", border: "1px solid var(--cs-border)",
-                    borderRadius: 6, color: "var(--cs-text)",
-                    fontFamily: MONO, fontSize: 13, textAlign: "right" as const, outline: "none"
+                    width: 80, padding: "4px 8px", background: "var(--cs-input-bg)",
+                    border: "1px solid var(--cs-border)", borderRadius: 6,
+                    color: "var(--cs-text)", fontFamily: MONO, fontSize: 13,
+                    textAlign: "right" as const, outline: "none"
                   }} />
               </div>
               <input type="range" min={1} max={2000} value={testCount}
@@ -1859,187 +1804,115 @@ export class DataGenTab extends React.Component<{ loadedSpecs: ApiSpec[] }, Data
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" as const, marginBottom: 14 }}>
                 {DG_PRESETS.map(n => (
                   <button key={n} onClick={() => this.setState({ testCount: n })} style={{
-                    background: testCount === n ? "var(--cs-accent-bg,#34d39918)" : "var(--cs-surface-2)",
+                    background: testCount === n ? "#34d39918" : "var(--cs-surface-2)",
                     border: `1px solid ${testCount === n ? "#34d399" : "var(--cs-border)"}`,
                     color: testCount === n ? "#34d399" : "var(--cs-muted)",
                     borderRadius: 6, padding: "3px 11px", fontFamily: MONO, fontSize: 11,
-                    cursor: "pointer", fontWeight: testCount === n ? 700 : 400, transition: "all .12s",
+                    cursor: "pointer", fontWeight: testCount === n ? 700 : 400,
                   }}>{n >= 1000 ? `${n / 1000}k` : n}</button>
                 ))}
               </div>
+
+              {/* Preview count */}
+              {sel.length > 0 && (() => {
+                const p = dgBuildPlan(sel);
+                const total = p.length * testCount;
+                return (
+                  <div style={{
+                    padding: "10px 14px", borderRadius: 8, marginBottom: 14,
+                    background: "var(--cs-surface-2)", border: "1px solid var(--cs-border-sub)",
+                    fontFamily: MONO, fontSize: 11, color: "var(--cs-muted)"
+                  }}>
+                    <span style={{ color: "#34d399", fontWeight: 800, fontSize: 20 }}>{total.toLocaleString()}</span>
+                    {" "}test case{total !== 1 ? "s" : ""} will be queued
+                    <span style={{ opacity: 0.6 }}> — {p.length} step{p.length !== 1 ? "s" : ""} × {testCount} run{testCount !== 1 ? "s" : ""}</span>
+                  </div>
+                );
+              })()}
+
               <button
                 disabled={selNames.length === 0}
-                onClick={this.run}
+                onClick={this.generate}
                 style={{
-                  width: "100%", padding: "13px", borderRadius: 8, cursor: selNames.length === 0 ? "not-allowed" : "pointer",
+                  width: "100%", padding: "13px", borderRadius: 8,
+                  cursor: selNames.length === 0 ? "not-allowed" : "pointer",
                   background: selNames.length === 0 ? "var(--cs-surface-2)"
-                    : "linear-gradient(135deg, #1a7a50, #34d399)",
+                    : "linear-gradient(135deg, #1a4a7a, #34d399)",
                   border: `1.5px solid ${selNames.length === 0 ? "var(--cs-border)" : "#34d399"}`,
-                  color: selNames.length === 0 ? "var(--cs-dim)" : "#0a1f15",
+                  color: selNames.length === 0 ? "var(--cs-dim)" : "#fff",
                   fontFamily: MONO, fontSize: 13, fontWeight: 800, letterSpacing: 0.5,
                   opacity: selNames.length === 0 ? 0.4 : 1, transition: "all .15s",
                 }}>
                 {selNames.length === 0
-                  ? "Select at least one API to run"
-                  : `▶ Generate & Execute — ${selNames.length} API${selNames.length > 1 ? "s" : ""} · ${testCount} run${testCount > 1 ? "s" : ""}`
+                  ? "Select at least one API spec"
+                  : `⬡ Generate Test Cases → Ready for Test`
                 }
               </button>
             </div>
           </>
         )}
 
-        {/* ══════════════ RUNNING ══════════════ */}
-        {dgView === "running" && (
-          <div>
+        {/* ══ GENERATED CONFIRMATION ══ */}
+        {dgView === "generated" && (
+          <div style={{ display: "flex", flexDirection: "column" as const, gap: 16 }}>
             <div style={{
-              textAlign: "center" as const, padding: "20px 0 16px",
-              fontFamily: MONO
+              padding: "20px", borderRadius: 12, textAlign: "center" as const,
+              background: "#34d39910", border: "2px solid #34d39944"
             }}>
-              <div style={{ fontSize: 36, marginBottom: 10 }}>⚙️</div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "var(--cs-text)", marginBottom: 4 }}>
-                Executing {plan.length} API steps…
-              </div>
-              <div style={{ fontSize: 11, color: "var(--cs-dim)" }}>
-                {Math.min(testCount, 5)} run{Math.min(testCount, 5) > 1 ? "s" : ""} · chaining POST → id → GET/PATCH/DELETE
-              </div>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column" as const, gap: 5 }}>
-              {log.map((e, i) => {
-                const isRun = e.status === "running";
-                const col = isRun ? "#f59e0b" : e.ok ? "#22c55e" : "#f87171";
-                return (
-                  <div key={i} style={{
-                    display: "flex", alignItems: "center", gap: 10,
-                    padding: "9px 13px", borderRadius: 8, background: "var(--cs-surface)",
-                    border: `1px solid ${col}22`, borderLeft: `3px solid ${col}`
-                  }}>
-                    <span style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)", width: 20 }}>{e.step}</span>
-                    <span style={{ fontSize: 15 }}>{isRun ? "⏳" : e.ok ? "✅" : "❌"}</span>
-                    <span style={{ fontFamily: MONO, fontSize: 12, flex: 1, color: col }}>{e.label}</span>
-                    {!isRun && <StatusBadge status={e.status} />}
-                    {!isRun && <span style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)" }}>{e.latency}ms</span>}
-                  </div>
-                );
-              })}
-              <div ref={this.logRef} />
-            </div>
-          </div>
-        )}
-
-        {/* ══════════════ REPORT ══════════════ */}
-        {dgView === "report" && (
-          <div style={{ display: "flex", flexDirection: "column" as const, gap: 14 }}>
-
-            <div style={{
-              padding: "11px 15px", borderRadius: 10,
-              background: "#a78bfa10", border: "1px solid #a78bfa33"
-            }}>
+              <div style={{ fontSize: 40, marginBottom: 10 }}>✅</div>
               <div style={{
-                fontFamily: MONO, fontSize: 12, fontWeight: 800,
-                color: "#a78bfa", marginBottom: 4
-              }}>📊 Execution Report</div>
-              <div style={{ fontFamily: MONO, fontSize: 11, color: "var(--cs-muted)" }}>
-                {sel.length} API{sel.length > 1 ? "s" : ""} · {plan.length} steps ·{" "}
-                {Math.min(testCount, 5)} run{Math.min(testCount, 5) > 1 ? "s" : ""} ·{" "}
-                {results.length} calls · {pct}% success
-              </div>
-            </div>
-
-            {/* Stats grid */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
-              {([
-                { v: ok, l: "✓ PASS", bg: "var(--cs-green-bg)", bd: "var(--cs-green-border)", c: "var(--cs-green)" },
-                { v: fail, l: "✗ FAIL", bg: "var(--cs-red-bg)", bd: "var(--cs-red-border)", c: "var(--cs-red)" },
-                { v: results.length, l: "Total", bg: "var(--cs-blue-badge-bg)", bd: "var(--cs-blue-badge-bdr)", c: "var(--cs-blue-badge)" },
-                { v: avgLat + "ms", l: "Avg Lat", bg: "var(--cs-yellow-bg)", bd: "var(--cs-yellow-border)", c: "var(--cs-yellow)" },
-              ] as const).map(({ v, l, bg, bd, c }) => (
-                <div key={l} style={{
-                  borderRadius: 10, padding: "14px 12px", textAlign: "center" as const,
-                  background: bg, border: `1px solid ${bd}`
-                }}>
-                  <div style={{
-                    fontFamily: MONO, fontSize: 24, fontWeight: 800, color: c,
-                    lineHeight: 1, marginBottom: 5
-                  }}>{v}</div>
-                  <div style={{
-                    fontFamily: MONO, fontSize: 10, fontWeight: 600, color: c,
-                    opacity: 0.7, textTransform: "uppercase" as const, letterSpacing: 0.8
-                  }}>{l}</div>
-                </div>
-              ))}
-            </div>
-
-            {/* Success bar */}
-            <div>
-              <div style={{
-                display: "flex", justifyContent: "space-between",
-                fontFamily: MONO, fontSize: 11, color: "var(--cs-muted)", marginBottom: 5
+                fontFamily: MONO, fontSize: 16, fontWeight: 800,
+                color: "#34d399", marginBottom: 6
               }}>
-                <span>Success rate</span>
-                <span style={{ fontWeight: 700, color: pctCol }}>{pct}%</span>
+                {generatedN.toLocaleString()} test case{generatedN !== 1 ? "s" : ""} queued
               </div>
-              <div style={{ height: 8, borderRadius: 4, background: "var(--cs-surface-2)", overflow: "hidden" }}>
-                <div style={{
-                  height: "100%", borderRadius: 4, width: `${pct}%`,
-                  background: pctCol, transition: "width .6s ease"
-                }} />
+              <div style={{ fontFamily: MONO, fontSize: 11, color: "var(--cs-muted)", lineHeight: 1.7 }}>
+                {plan.length} step{plan.length !== 1 ? "s" : ""} × {testCount} run{testCount !== 1 ? "s" : ""}<br />
+                Data source: <strong style={{ color: "#34d399" }}>Synthetic</strong><br />
+                Switch to <strong style={{ color: "var(--cs-text)" }}>Ready for Test</strong> to review and execute.
               </div>
             </div>
 
-            {/* Method breakdown */}
+            {/* Summary by method */}
             <div>
-              <SLbl text="By HTTP method" />
+              <SLbl text="Cases by method" />
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const }}>
                 {(["POST", "GET", "PATCH", "PUT", "DELETE"] as const).map(m => {
-                  const mr = results.filter(r => r.method === m);
-                  if (mr.length === 0) return null;
-                  const mOk = mr.filter(r => r.ok).length;
+                  const cnt = plan.filter(s => s.method === m).length * testCount;
+                  if (cnt === 0) return null;
                   const col = DG_METHOD_COLORS[m];
-                  const mAvg = Math.round(mr.reduce((a, r) => a + r.latency, 0) / mr.length);
                   return (
                     <div key={m} style={{
-                      padding: "8px 13px", borderRadius: 8,
+                      padding: "8px 14px", borderRadius: 8,
                       background: col + "0a", border: `1px solid ${col}30`
                     }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
                         <MChip m={m} />
-                        <span style={{ fontFamily: MONO, fontSize: 10, color: col, fontWeight: 700 }}>
-                          {mOk}/{mr.length}
-                        </span>
+                        <span style={{ fontFamily: MONO, fontSize: 13, color: col, fontWeight: 800 }}>{cnt}</span>
                       </div>
-                      <div style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)" }}>{mAvg}ms avg</div>
+                      <div style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)" }}>cases</div>
                     </div>
                   );
                 })}
               </div>
             </div>
 
-            {/* Step results */}
-            <div>
-              <SLbl text="Step results" />
-              <div style={{ display: "flex", flexDirection: "column" as const, gap: 5 }}>
-                {results.map((r, i) => <ResultRow key={i} r={r} i={i} />)}
-              </div>
-            </div>
-
-            {/* Actions */}
             <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => this.setState({ dgView: "setup", results: [], log: [] })}
+              <button onClick={() => this.setState({ dgView: "setup" })}
                 style={{
                   flex: 1, padding: "11px", borderRadius: 8, cursor: "pointer",
                   background: "transparent", border: "1px solid var(--cs-border-sub)",
-                  color: "var(--cs-muted)", fontFamily: MONO, fontSize: 13, fontWeight: 600
+                  color: "var(--cs-muted)", fontFamily: MONO, fontSize: 12, fontWeight: 600
                 }}>
-                ← Configure
+                ← Configure more
               </button>
-              <button onClick={this.run}
+              <button onClick={() => { testStore.clear(); this.setState({ dgView: "setup", generatedN: 0 }); }}
                 style={{
-                  flex: 2, padding: "11px", borderRadius: 8, cursor: "pointer",
-                  background: "linear-gradient(135deg, #1a7a50, #34d399)",
-                  border: "1.5px solid #34d399", color: "#0a1f15",
-                  fontFamily: MONO, fontSize: 13, fontWeight: 800
+                  flex: 1, padding: "11px", borderRadius: 8, cursor: "pointer",
+                  background: "transparent", border: "1px solid #f8717133",
+                  color: "#f87171", fontFamily: MONO, fontSize: 12, fontWeight: 600
                 }}>
-                ↻ Re-run
+                🗑 Clear queue
               </button>
             </div>
           </div>
@@ -2049,6 +1922,25 @@ export class DataGenTab extends React.Component<{ loadedSpecs: ApiSpec[] }, Data
     );
   }
 }
+
+// ── helper components ──
+const SLbl = ({ text }: { text: string }) => (
+  <div style={{
+    fontFamily: MONO, fontSize: 10, fontWeight: 700, color: "var(--cs-dim)",
+    letterSpacing: 1, textTransform: "uppercase" as const, marginBottom: 8
+  }}>{text}</div>
+);
+const MChip = ({ m }: { m: string }) => {
+  const c = DG_METHOD_COLORS[m] || "#8b949e";
+  return (
+    <span style={{
+      background: c + "18", border: `1px solid ${c}40`, color: c,
+      borderRadius: 5, padding: "1px 7px", fontFamily: MONO, fontSize: 10,
+      fontWeight: 700, whiteSpace: "nowrap" as const, flexShrink: 0
+    }}>{m}</span>
+  );
+};
+
 
 // ─────────────────────────────────────────────────────────────
 interface ApiWorkflowTabProps { loadedSpecs?: ApiSpec[]; }

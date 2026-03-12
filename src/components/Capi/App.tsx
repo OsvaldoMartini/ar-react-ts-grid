@@ -5,6 +5,8 @@ import { DebugTab, LogEntry } from "./DebugTab";
 import { StoreTab } from "./StoreTab";
 import { BizWizard } from "./BizWizard";
 import { ApiWorkflowTab, DataGenTab } from "./ApiWorkflowTab";
+import { ReadyForTestTab } from "./ReadyForTestTab";
+import { testStore } from "./utils";
 import "./capi-app.scss";
 
 // ═══════════════════════════════════════════════════════════════
@@ -22,7 +24,7 @@ export interface CapiProps {
 }
 
 interface AppState {
-  tab: "apis" | "workflow" | "datagen" | "debug" | "store";
+  tab: "apis" | "workflow" | "datagen" | "ready" | "debug" | "store";
   specs: ApiSpec[];
   log: LogEntry[];
   loading: boolean;
@@ -95,10 +97,12 @@ export default class App extends React.Component<CapiProps, AppState> {
     } = this.state;
     const { rightControls } = this.props;
     const tot = Object.values(db.stores).reduce((a, s) => a + s.length, 0);
+    const queuedCount = testStore.total;
     const TABS = [
       { id: "apis", l: `📁 API Files (${specs.length})` },
       { id: "workflow", l: `⬡ Workflow` },
       { id: "datagen", l: `⚗ Data Generator` },
+      { id: "ready", l: `🧪 Ready for Test${queuedCount > 0 ? ` (${queuedCount.toLocaleString()})` : ""}` },
       { id: "debug", l: `🔍 Debug${log.length > 0 ? ` (${log.length})` : ""}` },
       { id: "store", l: `🗄️ Store (${tot})` },
     ] as const;
@@ -164,7 +168,17 @@ export default class App extends React.Component<CapiProps, AppState> {
           )}
           {tab === "datagen" && (
             <div className="capi-scroll" style={{ padding: "24px 28px" }}>
-              <DataGenTab loadedSpecs={specs} />
+              <DataGenTab
+                loadedSpecs={specs}
+                onGenerate={() => this.setState(s => ({ tick: s.tick + 1 }))}
+              />
+            </div>
+          )}
+          {tab === "ready" && (
+            <div className="capi-scroll" style={{ padding: "24px 28px" }}>
+              <ReadyForTestTab
+                onClearAll={() => this.setState(s => ({ tick: s.tick + 1 }))}
+              />
             </div>
           )}
           {tab === "debug" && (

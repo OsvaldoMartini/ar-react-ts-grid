@@ -147,6 +147,55 @@ export class ApiStore {
 export const db = new ApiStore();
 
 // ═══════════════════════════════════════════════════════════════
+// TEST CASE STORE
+// Shared singleton: DataGenTab writes, ReadyForTestTab reads+runs
+// ═══════════════════════════════════════════════════════════════
+export type TestDataSource = "synthetic" | "file";
+
+export interface TestCase {
+  id:           string;
+  seq:          number;          // global sequence (1-based)
+  runGroup:     number;          // which iteration/run (1-based)
+  apiTitle:     string;
+  resourceName: string;
+  method:       string;
+  path:         string;
+  body:         Record<string, any> | null;
+  dataSource:   TestDataSource;
+  fileSource?:  string;          // original filename when source === "file"
+  createdAt:    string;
+  // execution state (mutated in-place during test run)
+  status:       "pending" | "running" | "passed" | "failed";
+  httpStatus?:  number | string;
+  latency?:     number;
+  result?:      any;
+  headers?:     any;
+}
+
+export class TestCaseStore {
+  private _seq = 0;
+  cases: TestCase[] = [];
+
+  add(tc: Omit<TestCase, "id" | "seq" | "createdAt" | "status">): TestCase {
+    const entry: TestCase = {
+      ...tc,
+      id:        `tc-${++this._seq}`,
+      seq:       this._seq,
+      createdAt: new Date().toISOString(),
+      status:    "pending",
+    };
+    this.cases.push(entry);
+    return entry;
+  }
+
+  clear()   { this.cases = []; this._seq = 0; }
+  pending() { return this.cases.filter(c => c.status === "pending"); }
+  get total() { return this.cases.length; }
+}
+
+export const testStore = new TestCaseStore();
+
+// ═══════════════════════════════════════════════════════════════
 // MOCK REST ENGINE
 // ═══════════════════════════════════════════════════════════════
 export const rest = {
