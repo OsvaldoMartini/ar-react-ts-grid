@@ -1223,6 +1223,21 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
     }));
   };
 
+  // Reset all executed cases back to pending — preserves test cases, clears results only
+  private resetToPending = () => {
+    for (const tc of testStore.cases) {
+      if (tc.status === "passed" || tc.status === "failed" || tc.status === "running") {
+        tc.status = "pending";
+        tc.httpStatus = undefined;
+        tc.latency = undefined;
+        tc.result = undefined;
+        tc.headers = undefined;
+        // resolvedUrl intentionally preserved — URL ownership doesn't change on reset
+      }
+    }
+    this.setState(s => ({ tick: s.tick + 1, runProgress: 0 }));
+  };
+
   // ── EXECUTE a page of cases ──
   private executeBlock = async () => {
     const { pageSize, pageIndex } = this.state;
@@ -1636,8 +1651,79 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
           </div>
         )}
 
-        {/* ── Run buttons ── */}
-        {pending > 0 && (
+        {/* ── Run buttons / Completion panel ── */}
+        {!running && pending === 0 && (passed + failed) > 0 ? (
+          /* ── All done — show summary + reset option ── */
+          <div style={{
+            borderRadius: 10, border: `1px solid ${failed > 0 ? "#f8717133" : "#34d39933"}`,
+            background: failed > 0 ? "#f8717108" : "#34d39908",
+            padding: "14px 18px",
+            display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" as const,
+          }}>
+            {/* Result summary */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{
+                fontFamily: MONO, fontSize: 13, fontWeight: 800,
+                color: failed > 0 ? "#f87171" : "#34d399", marginBottom: 4
+              }}>
+                {failed > 0 ? "⚠ Execution complete with failures" : "✓ All tests passed"}
+              </div>
+              <div style={{
+                display: "flex", gap: 14, fontFamily: MONO, fontSize: 10,
+                color: "var(--cs-dim)", flexWrap: "wrap" as const
+              }}>
+                <span style={{ color: "#34d399" }}>✓ {passed} passed</span>
+                {failed > 0 && <span style={{ color: "#f87171" }}>✗ {failed} failed</span>}
+                <span>⚡ avg {avgLat > 0 ? avgLat + "ms" : "—"}</span>
+                <span style={{ opacity: 0.6 }}>Results are preserved</span>
+              </div>
+            </div>
+
+            {/* Reset to Pending */}
+            <button
+              onClick={this.resetToPending}
+              title="Reset all results back to pending — test cases are preserved, only execution state is cleared"
+              style={{
+                padding: "9px 20px", borderRadius: 8, cursor: "pointer",
+                background: "var(--cs-surface-2)",
+                border: "1.5px solid var(--cs-border)",
+                color: "var(--cs-muted)", fontFamily: MONO, fontSize: 12, fontWeight: 700,
+                display: "flex", alignItems: "center", gap: 8, flexShrink: 0,
+                transition: "all .15s",
+              }}
+              onMouseEnter={e => {
+                const b = e.currentTarget as HTMLButtonElement;
+                b.style.borderColor = "#60a5fa88";
+                b.style.color = "#60a5fa";
+                b.style.background = "#60a5fa10";
+              }}
+              onMouseLeave={e => {
+                const b = e.currentTarget as HTMLButtonElement;
+                b.style.borderColor = "var(--cs-border)";
+                b.style.color = "var(--cs-muted)";
+                b.style.background = "var(--cs-surface-2)";
+              }}
+            >
+              ↺ Reset to Pending
+            </button>
+
+            {/* Re-run All */}
+            <button
+              onClick={this.executeAll}
+              title="Re-run all tests from scratch using stored URLs"
+              style={{
+                padding: "9px 20px", borderRadius: 8, cursor: "pointer",
+                background: "linear-gradient(135deg, #1a4a7a, #34d399)",
+                border: "1.5px solid #34d399",
+                color: "#0a1f15", fontFamily: MONO, fontSize: 12, fontWeight: 800,
+                display: "flex", alignItems: "center", gap: 8, flexShrink: 0,
+                transition: "all .15s",
+              }}>
+              ▶▶ Re-run All — {total.toLocaleString()} tests
+            </button>
+          </div>
+        ) : pending > 0 ? (
+          /* ── Pending tests exist — show execute buttons ── */
           <div style={{ display: "flex", gap: 10 }}>
             <button
               disabled={running || pendingInBlock === 0}
@@ -1673,7 +1759,7 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
               {running ? "⏳ Running…" : `▶▶ Execute All  —  ${pending.toLocaleString()} pending`}
             </button>
           </div>
-        )}
+        ) : null}
 
         {/* Running progress bar */}
         {running && (
@@ -1770,7 +1856,19 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
             })}
           </div>
 
-          <div style={{ marginLeft: "auto" }}>
+          <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+            {(passed + failed) > 0 && (
+              <button
+                onClick={this.resetToPending}
+                title="Reset execution results — test cases stay, only status/results are cleared"
+                style={{
+                  background: "transparent", border: "1px solid #60a5fa33",
+                  color: "#60a5fa", borderRadius: 6, padding: "4px 12px",
+                  fontFamily: MONO, fontSize: 11, cursor: "pointer"
+                }}>
+                ↺ Reset
+              </button>
+            )}
             <button onClick={() => { testStore.clear(); this.refresh(); this.props.onClearAll?.(); }}
               style={{
                 background: "transparent", border: "1px solid #f8717133",
