@@ -260,11 +260,412 @@ export class EnvironmentStore {
 export const envStore = new EnvironmentStore();
 
 // ═══════════════════════════════════════════════════════════════
+// MOCK SERVER STORE
+// In-browser mock: intercepts rest.req() when running.
+// Also generates a downloadable zero-dependency Node.js server.
+// ═══════════════════════════════════════════════════════════════
+export type MockServerStatus = "stopped" | "starting" | "running" | "error";
+
+export interface MockRoute {
+  method:       string;
+  path:         string;
+  resourceName: string;
+  apiTitle:     string;
+  seedData:     any[];          // 50 pre-generated records
+}
+
+function mockSynthField(name: string, type: string): any {
+  const n = name.toLowerCase();
+  if (/date|^dt|dt$|trxdate|valdate|expir/.test(n))  return isoDate(rndInt(-30, 30));
+  if (/amount|price|value|total|sum|fee|trl/.test(n)) return rndFloat(100, 100000);
+  if (/rate|yield|percent|ratio|trig/.test(n))        return rndFloat(0.001, 0.15, 4);
+  if (/curr|ccy/.test(n))                             return rndPick(["CHF","EUR","USD","GBP","JPY"]);
+  if (/isin/.test(n))                                 return SYNTH.isin();
+  if (/portfolio|portf/.test(n))                      return SYNTH.portfolio();
+  if (/client|customer|partner/.test(n))              return SYNTH.clientId();
+  if (/iban/.test(n))                                 return SYNTH.iban();
+  if (/bic|swift/.test(n))                            return SYNTH.bic();
+  if (/^name$|surname|firstname|lastname/.test(n))    return `${SYNTH.firstName()} ${SYNTH.lastName()}`;
+  if (/type$|kind$|typeid/.test(n))                   return rndPick(["TYPE_A","TYPE_B","TYPE_C","TYPE_D"]);
+  if (/status/.test(n))                               return rndPick(["ACTIVE","PENDING","INACTIVE","CLOSED"]);
+  if (/qty|quantity|count|num|limit/.test(n))         return rndInt(1, 10000);
+  if (/flag|enabled|active$/.test(n))                 return Math.random() > 0.5;
+  if (/desc|comment|note|remark/.test(n))             return `Mock ${name}`;
+  if (/code$/.test(n))                                return `${rndPick(["A","B","C","D"])}${rndInt(100,999)}`;
+  if (/asset/.test(n))                                return SYNTH.assetClass();
+  if (/risk/.test(n))                                 return SYNTH.riskClass();
+  if (/sign$|side$/.test(n))                          return SYNTH.posSign();
+  if (/stex|pool|alloc|place/.test(n))                return rndInt(1000, 999999);
+  if (type === "integer" || type === "number")         return rndInt(1, 9999);
+  if (type === "boolean")                              return Math.random() > 0.5;
+  return `val-${rndInt(100, 999)}`;
+}
+
+function generateSeedRecord(
+  fields: { name: string; type: string }[],
+  id: number
+): any {
+  const rec: any = { id };
+  for (const f of fields) {
+    if (f.name === "id") continue;
+    rec[f.name] = mockSynthField(f.name, f.type);
+  }
+  return rec;
+}
+
+export class MockServerStore {
+  port:   number           = 8855;
+  status: MockServerStatus = "stopped";
+  routes: MockRoute[]      = [];
+  envId:  string | null    = null;
+  logs:   string[]         = [];
+
+  private log(msg: string) {
+    this.logs.push(`[${new Date().toLocaleTimeString()}] ${msg}`);
+    if (this.logs.length > 300) this.logs = this.logs.slice(-300);
+  }
+
+  /** Build seed data from loaded ApiSpecs */
+  buildFromSpecs(specs: ApiSpec[]) {
+    // Group endpoints by resourceName to share seedData per resource
+    const seedCache = new Map<string, any[]>();
+    this.routes = [];
+
+    for (const spec of specs) {
+      const res = spec.resourceName || spec.fileName;
+      if (!res) continue;
+
+      if (!seedCache.has(res)) {
+        const writableFields = spec.fields.filter(f => !f.readOnly && !f.isParam);
+        const seed = Array.from({ length: 50 }, (_, i) =>
+          generateSeedRecord(writableFields, i + 1)
+        );
+        seedCache.set(res, seed);
+      }
+
+      for (const ep of spec.endpoints) {
+        this.routes.push({
+          method:       ep.method.toUpperCase(),
+          path:         ep.path,
+          resourceName: res,
+          apiTitle:     spec.title,
+          seedData:     seedCache.get(res)!,
+        });
+      }
+    }
+  }
+
+  /** Build seed data from existing testStore cases (when no specs available) */
+  buildFromTestCases() {
+    const resMap = new Map<string, { title: string; methods: string[]; fields: Set<string> }>();
+    for (const tc of testStore.cases) {
+      if (!resMap.has(tc.resourceName)) {
+        resMap.set(tc.resourceName, { title: tc.apiTitle, methods: [], fields: new Set() });
+      }
+      const e = resMap.get(tc.resourceName)!;
+      if (!e.methods.includes(tc.method)) e.methods.push(tc.method);
+      if (tc.body) Object.keys(tc.body).forEach(k => e.fields.add(k));
+    }
+
+    const seedCache = new Map<string, any[]>();
+    this.routes = [];
+
+    for (const [res, info] of resMap) {
+      if (!seedCache.has(res)) {
+        const fields = Array.from(info.fields).map(name => ({ name, type: "string" }));
+        const seed = Array.from({ length: 50 }, (_, i) => generateSeedRecord(fields, i + 1));
+        seedCache.set(res, seed);
+      }
+      for (const method of info.methods) {
+        const hasId = ["GET","PATCH","PUT","DELETE"].includes(method);
+        this.routes.push({
+          method, resourceName: res, apiTitle: info.title,
+          path: hasId ? `/${res}/{id}` : `/${res}`,
+          seedData: seedCache.get(res)!,
+        });
+      }
+    }
+  }
+
+  start() {
+    this.status = "starting";
+    this.log(`Starting mock server on http://localhost:${this.port}`);
+
+    // Add (or reuse) env entry
+    const url = `http://localhost:${this.port}`;
+    const existing = envStore.envs.find(e => e.baseUrl === url);
+    if (existing) {
+      this.envId = existing.id;
+    } else {
+      const e: Environment = {
+        id: `env-mock-${this.port}`, tag: "custom",
+        name: `Mock :${this.port}`, baseUrl: url,
+        color: "#a78bfa", builtIn: false,
+      };
+      envStore.envs.push(e);
+      this.envId = e.id;
+    }
+    envStore.select(this.envId!);
+
+    this.status = "running";
+    this.log(`✓ Mock server running — ${this.routes.length} routes, ${this._totalRecords()} seed records`);
+    const byRes = this._routesByResource();
+    for (const [res, routes] of byRes) {
+      this.log(`  /${res.padEnd(28)} ${routes.map(r => r.method).join(" | ")}  (${routes[0].seedData.length} records)`);
+    }
+  }
+
+  stop() {
+    this.status = "stopped";
+    this.log("Mock server stopped");
+    if (this.envId) {
+      const e = envStore.envs.find(x => x.id === this.envId);
+      if (e && !e.builtIn) envStore.remove(this.envId);
+      this.envId = null;
+    }
+    if (envStore.selectedId.startsWith("env-mock-")) {
+      envStore.selectedId = "env-local";
+    }
+  }
+
+  handleRequest(method: string, path: string, body?: any): { status: number; body: any; headers?: any } {
+    const clean  = path.replace(/\?.*$/, "").replace(/^\//, "");
+    const parts  = clean.split("/");
+    const res    = parts[0];
+    const idRaw  = parts[1];
+    const id     = idRaw ? parseInt(idRaw) : null;
+    const headers = { "Content-Type": "application/json", "X-Mock-Server": `localhost:${this.port}` };
+
+    const route  = this.routes.find(r =>
+      r.resourceName === res && r.method === method.toUpperCase()
+    );
+
+    if (!route) {
+      this.log(`404 ${method.padEnd(6)} /${clean} — no route`);
+      return { status: 404, body: { error: `No mock route: ${method} /${clean}` }, headers };
+    }
+
+    const col = route.seedData;
+
+    if (method === "GET" && !id) {
+      this.log(`200 GET    /${res} → [${col.length}]`);
+      return { status: 200, body: col, headers };
+    }
+    if (method === "GET" && id) {
+      const item = col.find(r => r.id === id);
+      this.log(`${item ? 200 : 404} GET    /${res}/${id}`);
+      return { status: item ? 200 : 404, body: item ?? { error: "Not found", id }, headers };
+    }
+    if (method === "POST") {
+      const newId  = Math.max(...col.map(r => r.id), 50) + 1;
+      const newRec = { id: newId, ...body };
+      col.push(newRec);
+      this.log(`201 POST   /${res} → id=${newId}`);
+      return { status: 201, body: newRec, headers };
+    }
+    if ((method === "PATCH" || method === "PUT") && id) {
+      const idx = col.findIndex(r => r.id === id);
+      if (idx < 0) {
+        this.log(`404 ${method.padEnd(6)} /${res}/${id}`);
+        return { status: 404, body: { error: "Not found", id }, headers };
+      }
+      col[idx] = method === "PUT" ? { id, ...body } : { ...col[idx], ...body };
+      this.log(`200 ${method.padEnd(6)} /${res}/${id}`);
+      return { status: 200, body: col[idx], headers };
+    }
+    if (method === "DELETE" && id) {
+      const idx = col.findIndex(r => r.id === id);
+      if (idx < 0) {
+        this.log(`404 DELETE /${res}/${id}`);
+        return { status: 404, body: { error: "Not found", id }, headers };
+      }
+      col.splice(idx, 1);
+      this.log(`204 DELETE /${res}/${id}`);
+      return { status: 204, body: null, headers };
+    }
+
+    this.log(`405 ${method.padEnd(6)} /${clean}`);
+    return { status: 405, body: { error: "Method not allowed" }, headers };
+  }
+
+  private _totalRecords(): number {
+    const seen = new Set<string>();
+    let n = 0;
+    for (const r of this.routes) {
+      if (!seen.has(r.resourceName)) { seen.add(r.resourceName); n += r.seedData.length; }
+    }
+    return n;
+  }
+
+  _routesByResource(): Map<string, MockRoute[]> {
+    const m = new Map<string, MockRoute[]>();
+    for (const r of this.routes) {
+      if (!m.has(r.resourceName)) m.set(r.resourceName, []);
+      m.get(r.resourceName)!.push(r);
+    }
+    return m;
+  }
+
+  /** Generate a zero-dependency Node.js server script */
+  generateNodeScript(): string {
+    const byRes = this._routesByResource();
+    const dbObj: Record<string, any[]> = {};
+    for (const [res, routes] of byRes) dbObj[res] = routes[0].seedData;
+    const totalRec = Object.values(dbObj).reduce((s, a) => s + a.length, 0);
+    const nextId   = Math.max(...Object.values(dbObj).flat().map(r => r.id ?? 0), 50) + 1;
+
+    return `// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// CAPI MOCK SERVER  ·  Avaloq API Test Simulator
+// Generated: ${new Date().toLocaleString()}
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Run:   node mock-server.js
+// Deps:  NONE (pure Node.js built-ins only)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+'use strict';
+const http = require('http');
+const PORT = ${this.port};
+
+// ── Seed database (${totalRec} records across ${Object.keys(dbObj).length} resources) ──
+const db = ${JSON.stringify(dbObj, null, 2)};
+
+let nextId = ${nextId};
+
+// ── Helpers ──
+const CORS = {
+  'Access-Control-Allow-Origin':  '*',
+  'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Requested-With',
+};
+
+function send(res, status, data) {
+  const body = data !== null ? JSON.stringify(data, null, 2) : '';
+  res.writeHead(status, { 'Content-Type': 'application/json', ...CORS });
+  res.end(body);
+}
+
+function parsePath(url) {
+  return url.split('?')[0].split('/').filter(Boolean);
+}
+
+function log(method, url, status, extra) {
+  const ts  = new Date().toLocaleTimeString();
+  const sts = status >= 400 ? \`\\x1b[31m\${status}\\x1b[0m\` : \`\\x1b[32m\${status}\\x1b[0m\`;
+  console.log(\`  \${ts}  \${method.padEnd(7)} \${url.padEnd(40)} \${sts} \${extra || ''}\`);
+}
+
+// ── Router ──
+const server = http.createServer((req, res) => {
+  // CORS preflight
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, CORS);
+    return res.end();
+  }
+
+  const parts    = parsePath(req.url);
+  const resource = parts[0];
+  const id       = parts[1] ? parseInt(parts[1]) : null;
+
+  if (!resource || !db[resource]) {
+    log(req.method, req.url, 404);
+    return send(res, 404, { error: \`Unknown resource: \${resource}\`, available: Object.keys(db) });
+  }
+
+  // Buffer body
+  let raw = '';
+  req.on('data', c => raw += c);
+  req.on('end', () => {
+    let body = {};
+    try { if (raw.trim()) body = JSON.parse(raw); } catch (e) {
+      return send(res, 400, { error: 'Invalid JSON body', detail: e.message });
+    }
+
+    const col = db[resource];
+
+    // ── GET list ──
+    if (req.method === 'GET' && !id) {
+      log(req.method, req.url, 200, \`[\${col.length}]\`);
+      return send(res, 200, col);
+    }
+
+    // ── GET by id ──
+    if (req.method === 'GET' && id) {
+      const item = col.find(r => r.id === id);
+      log(req.method, req.url, item ? 200 : 404, item ? \`id=\${id}\` : '');
+      return send(res, item ? 200 : 404, item ?? { error: 'Not found', id });
+    }
+
+    // ── POST (create) ──
+    if (req.method === 'POST') {
+      const newItem = { id: nextId++, ...body };
+      col.push(newItem);
+      log(req.method, req.url, 201, \`id=\${newItem.id}\`);
+      return send(res, 201, newItem);
+    }
+
+    // ── PATCH (partial update) ──
+    if (req.method === 'PATCH' && id) {
+      const i = col.findIndex(r => r.id === id);
+      if (i < 0) { log(req.method, req.url, 404); return send(res, 404, { error: 'Not found', id }); }
+      col[i] = { ...col[i], ...body };
+      log(req.method, req.url, 200, \`id=\${id}\`);
+      return send(res, 200, col[i]);
+    }
+
+    // ── PUT (replace) ──
+    if (req.method === 'PUT' && id) {
+      const i = col.findIndex(r => r.id === id);
+      if (i < 0) { log(req.method, req.url, 404); return send(res, 404, { error: 'Not found', id }); }
+      col[i] = { id, ...body };
+      log(req.method, req.url, 200, \`id=\${id}\`);
+      return send(res, 200, col[i]);
+    }
+
+    // ── DELETE ──
+    if (req.method === 'DELETE' && id) {
+      const i = col.findIndex(r => r.id === id);
+      if (i < 0) { log(req.method, req.url, 404); return send(res, 404, { error: 'Not found', id }); }
+      col.splice(i, 1);
+      log(req.method, req.url, 204, \`id=\${id}\`);
+      return send(res, 204, null);
+    }
+
+    log(req.method, req.url, 405);
+    send(res, 405, { error: 'Method Not Allowed' });
+  });
+});
+
+server.listen(PORT, () => {
+  console.log('\\n\\x1b[35m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\\x1b[0m');
+  console.log('\\x1b[35m  CAPI MOCK SERVER  ·  Avaloq API Test Simulator\\x1b[0m');
+  console.log('\\x1b[35m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\\x1b[0m');
+  console.log(\`  \\x1b[32m📡  http://localhost:\${PORT}\\x1b[0m\`);
+  console.log(\`  📦  \${Object.keys(db).length} resources  ·  \${Object.values(db).reduce((s,a) => s+a.length,0)} seed records\\n\`);
+  Object.entries(db).forEach(([r, rows]) => {
+    console.log(\`  /\${r.padEnd(30)} \\x1b[36m\${rows.length} records\\x1b[0m\`);
+  });
+  console.log('\\nRequests:\\n');
+});
+
+process.on('SIGINT', () => { console.log('\\n\\x1b[33m  Mock server stopped.\\x1b[0m'); process.exit(0); });
+`;
+  }
+}
+
+export const mockServerStore = new MockServerStore();
+
+// ═══════════════════════════════════════════════════════════════
 // MOCK REST ENGINE
 // ═══════════════════════════════════════════════════════════════
 export const rest = {
   async req(method: string, path: string, body?: any, params?: Record<string, any>) {
     await new Promise(r => setTimeout(r, 30 + Math.random() * 70));
+
+    // ── Delegate to mock server when running ──
+    if (mockServerStore.status === "running") {
+      return mockServerStore.handleRequest(method, path, body);
+    }
+
     const parts = path.replace(/^\//, "").split("/");
     const resource = parts[0];
     const id = parts[1] ? parseInt(parts[1]) : null;

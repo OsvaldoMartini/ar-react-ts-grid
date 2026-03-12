@@ -1,6 +1,7 @@
 import React from "react";
-import { testStore, TestCase, rest, envStore, Environment, EnvTag } from "./utils";
+import { testStore, TestCase, rest, envStore, Environment, EnvTag, mockServerStore } from "./utils";
 import { StatusBadge } from "./AtomComponents";
+import { MockServerModal } from "./MockServerModal";
 
 // ═══════════════════════════════════════════════════════════════
 // CONSTANTS
@@ -1186,17 +1187,19 @@ interface RftState {
   methodFilter: string;
   expandReport: boolean;
   showModal: boolean;
+  showMockModal: boolean;
   envTick: number;
   lastAppliedEnvId: string;
   envAppliedKey: string;
-  currentExecUrl: string | null;  // resolvedUrl of the test case currently executing
+  currentExecUrl: string | null;
 }
 
 export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }, RftState> {
   state: RftState = {
     tick: 0, pageSize: 10, pageIndex: 0, running: false,
     runProgress: 0, filter: "all", methodFilter: "ALL",
-    expandReport: false, showModal: false, envTick: 0,
+    expandReport: false, showModal: false, showMockModal: false,
+    envTick: 0,
     lastAppliedEnvId: envStore.selectedId,
     envAppliedKey: envStore.selectedId,
     currentExecUrl: null,
@@ -1360,7 +1363,7 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
   }
 
   render() {
-    const { tick, pageSize, pageIndex, running, runProgress, filter, methodFilter, expandReport, showModal, envTick, lastAppliedEnvId, envAppliedKey, currentExecUrl } = this.state;
+    const { tick, pageSize, pageIndex, running, runProgress, filter, methodFilter, expandReport, showModal, showMockModal, envTick, lastAppliedEnvId, envAppliedKey, currentExecUrl } = this.state;
     const allCases = testStore.cases;
     const total = allCases.length;
     const pending = allCases.filter(c => c.status === "pending").length;
@@ -1416,6 +1419,14 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
 
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 20, fontFamily: MONO }}>
+
+        {/* ── Mock Server Modal (floating, non-blocking) ── */}
+        {showMockModal && (
+          <MockServerModal
+            onClose={() => this.setState({ showMockModal: false })}
+            onEnvChanged={() => this.setState(s => ({ envTick: s.envTick + 1 }))}
+          />
+        )}
 
         {/* ── Synthetic data modal ── */}
         {showModal && synthCases.length > 0 && (
@@ -1857,6 +1868,30 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
           </div>
 
           <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+            {/* Mock Server button */}
+            <button
+              onClick={() => this.setState(s => ({ showMockModal: !s.showMockModal }))}
+              title="Open Mock Server panel — start a local in-browser mock and download a Node.js server script"
+              style={{
+                background: showMockModal || mockServerStore.status === "running"
+                  ? "#a78bfa22" : "transparent",
+                border: `1px solid ${mockServerStore.status === "running" ? "#a78bfa88" : "#a78bfa44"}`,
+                color: mockServerStore.status === "running" ? "#a78bfa" : "var(--cs-muted)",
+                borderRadius: 6, padding: "4px 12px",
+                fontFamily: MONO, fontSize: 11, cursor: "pointer",
+                display: "flex", alignItems: "center", gap: 5,
+                transition: "all .15s",
+              }}>
+              {mockServerStore.status === "running" && (
+                <span style={{
+                  width: 6, height: 6, borderRadius: "50%",
+                  background: "#a78bfa", display: "inline-block",
+                  boxShadow: "0 0 5px #a78bfa",
+                }} />
+              )}
+              ⚡ Mock Server
+            </button>
+
             {(passed + failed) > 0 && (
               <button
                 onClick={this.resetToPending}
