@@ -228,23 +228,360 @@ class TcRow extends React.Component<{ tc: TestCase; idx: number }, TcRowState> {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// READY FOR TEST TAB
+// SYNTHETIC DATA MODAL
+// ═══════════════════════════════════════════════════════════════
+const MODAL_PAGE_SIZES = [50, 100] as const;
+
+// Build a flat union of all field keys across all test case bodies
+function getBodyColumns(cases: TestCase[]): string[] {
+  const keys = new Set<string>();
+  for (const tc of cases) {
+    if (tc.body && typeof tc.body === "object") {
+      Object.keys(tc.body).forEach(k => keys.add(k));
+    }
+  }
+  return ["#", "run", "method", "api", "path", ...Array.from(keys)];
+}
+
+function flatCell(v: any): string {
+  if (v == null) return "";
+  if (typeof v === "object") return (v as any).ident ?? (v as any).id ?? JSON.stringify(v);
+  return String(v);
+}
+
+interface ModalState { page: number; pageSize: typeof MODAL_PAGE_SIZES[number]; }
+
+class SyntheticDataModal extends React.Component<{ cases: TestCase[]; onClose: () => void }, ModalState> {
+  state: ModalState = { page: 0, pageSize: 50 };
+
+  private downloadCSV = () => {
+    const { cases } = this.props;
+    const cols = getBodyColumns(cases);
+
+    // Build CSV rows
+    const header = cols.join(",");
+    const rows = cases.map(tc => {
+      return cols.map(col => {
+        let val = "";
+        if (col === "#") val = String(tc.seq);
+        else if (col === "run") val = String(tc.runGroup);
+        else if (col === "method") val = tc.method;
+        else if (col === "api") val = tc.apiTitle;
+        else if (col === "path") val = tc.path;
+        else if (tc.body) val = flatCell((tc.body as any)[col]);
+        // Escape CSV: wrap in quotes if contains comma/newline/quote
+        if (/[",\n\r]/.test(val)) val = `"${val.replace(/"/g, '""')}"`;
+        return val;
+      }).join(",");
+    });
+
+    const csv = [header, ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+
+    // Trigger browser save-as dialog via <a download>
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `synthetic-test-data-${new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-")}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  render() {
+    const { cases, onClose } = this.props;
+    const { page, pageSize } = this.state;
+    const cols = getBodyColumns(cases);
+    const totalPages = Math.max(1, Math.ceil(cases.length / pageSize));
+    const safePage = Math.min(page, totalPages - 1);
+    const start = safePage * pageSize;
+    const slice = cases.slice(start, start + pageSize);
+
+    // Fixed columns (meta) vs body columns
+    const metaCols = ["#", "run", "method", "api", "path"];
+    const bodyCols = cols.filter(c => !metaCols.includes(c));
+
+    return (
+      <div style={{
+        position: "fixed", inset: 0, zIndex: 9999,
+        background: "rgba(0,0,0,0.55)", backdropFilter: "blur(3px)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: 20,
+      }}
+        onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+      >
+        <div style={{
+          width: "min(1200px, 96vw)", maxHeight: "92vh",
+          background: "var(--cs-surface)", border: "1px solid var(--cs-border)",
+          borderRadius: 14, display: "flex", flexDirection: "column",
+          boxShadow: "0 24px 80px rgba(0,0,0,0.4)",
+          overflow: "hidden",
+        }}>
+
+          {/* ── Modal header ── */}
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            padding: "16px 20px", borderBottom: "1px solid var(--cs-border)",
+            background: "var(--cs-surface-2)", flexShrink: 0,
+          }}>
+            <div>
+              <div style={{
+                fontFamily: MONO, fontSize: 14, fontWeight: 800,
+                color: "#34d399", marginBottom: 4
+              }}>
+                ⚗ Synthetic Test Data
+              </div>
+              <div style={{ fontFamily: MONO, fontSize: 11, color: "var(--cs-muted)" }}>
+                {cases.length.toLocaleString()} cases · {bodyCols.length} body field{bodyCols.length !== 1 ? "s" : ""}
+                · {cols.length} total columns
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              {/* CSV download */}
+              <button onClick={this.downloadCSV} style={{
+                display: "flex", alignItems: "center", gap: 8,
+                padding: "9px 18px", borderRadius: 8, cursor: "pointer",
+                background: "linear-gradient(135deg, #1a4a2a, #34d399)",
+                border: "1.5px solid #34d399", color: "#0a1f15",
+                fontFamily: MONO, fontSize: 12, fontWeight: 800,
+              }}>
+                ↓ Save as CSV
+              </button>
+
+              {/* Close */}
+              <button onClick={onClose} style={{
+                width: 34, height: 34, borderRadius: 8, cursor: "pointer",
+                background: "transparent", border: "1px solid var(--cs-border)",
+                color: "var(--cs-muted)", fontFamily: MONO, fontSize: 16,
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>✕</button>
+            </div>
+          </div>
+
+          {/* ── Pagination controls ── */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: 12, padding: "10px 20px",
+            borderBottom: "1px solid var(--cs-border-sub)", flexShrink: 0,
+            background: "var(--cs-bg)", flexWrap: "wrap",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontFamily: MONO, fontSize: 11, color: "var(--cs-dim)" }}>Rows per page:</span>
+              {MODAL_PAGE_SIZES.map(n => {
+                const active = pageSize === n;
+                return (
+                  <button key={n} onClick={() => this.setState({ pageSize: n, page: 0 })} style={{
+                    background: active ? "#34d39920" : "var(--cs-surface-2)",
+                    border: `1px solid ${active ? "#34d399" : "var(--cs-border-sub)"}`,
+                    color: active ? "#34d399" : "var(--cs-muted)",
+                    borderRadius: 6, padding: "3px 12px", fontFamily: MONO, fontSize: 11,
+                    fontWeight: active ? 700 : 400, cursor: "pointer",
+                  }}>{n}</button>
+                );
+              })}
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
+              <button disabled={safePage === 0}
+                onClick={() => this.setState({ page: 0 })}
+                style={{
+                  background: "transparent", border: "1px solid var(--cs-border-sub)",
+                  color: "var(--cs-muted)", borderRadius: 6, padding: "3px 8px",
+                  fontFamily: MONO, fontSize: 11, cursor: safePage === 0 ? "not-allowed" : "pointer",
+                  opacity: safePage === 0 ? 0.4 : 1
+                }}>«</button>
+              <button disabled={safePage === 0}
+                onClick={() => this.setState({ page: safePage - 1 })}
+                style={{
+                  background: "transparent", border: "1px solid var(--cs-border-sub)",
+                  color: "var(--cs-muted)", borderRadius: 6, padding: "3px 10px",
+                  fontFamily: MONO, fontSize: 11, cursor: safePage === 0 ? "not-allowed" : "pointer",
+                  opacity: safePage === 0 ? 0.4 : 1
+                }}>‹ Prev</button>
+
+              <span style={{
+                fontFamily: MONO, fontSize: 11, color: "var(--cs-muted)",
+                padding: "3px 10px", background: "var(--cs-surface-2)",
+                border: "1px solid var(--cs-border-sub)", borderRadius: 6
+              }}>
+                {start + 1}–{Math.min(start + pageSize, cases.length)} of {cases.length.toLocaleString()}
+              </span>
+
+              <button disabled={safePage >= totalPages - 1}
+                onClick={() => this.setState({ page: safePage + 1 })}
+                style={{
+                  background: "transparent", border: "1px solid var(--cs-border-sub)",
+                  color: "var(--cs-muted)", borderRadius: 6, padding: "3px 10px",
+                  fontFamily: MONO, fontSize: 11,
+                  cursor: safePage >= totalPages - 1 ? "not-allowed" : "pointer",
+                  opacity: safePage >= totalPages - 1 ? 0.4 : 1
+                }}>Next ›</button>
+              <button disabled={safePage >= totalPages - 1}
+                onClick={() => this.setState({ page: totalPages - 1 })}
+                style={{
+                  background: "transparent", border: "1px solid var(--cs-border-sub)",
+                  color: "var(--cs-muted)", borderRadius: 6, padding: "3px 8px",
+                  fontFamily: MONO, fontSize: 11,
+                  cursor: safePage >= totalPages - 1 ? "not-allowed" : "pointer",
+                  opacity: safePage >= totalPages - 1 ? 0.4 : 1
+                }}>»</button>
+            </div>
+
+            <span style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)" }}>
+              Page {safePage + 1} / {totalPages}
+            </span>
+          </div>
+
+          {/* ── Grid ── */}
+          <div style={{ overflowX: "auto", overflowY: "auto", flex: 1 }}>
+            <table style={{
+              width: "100%", borderCollapse: "collapse",
+              background: "var(--cs-bg)", tableLayout: "auto"
+            }}>
+              <thead style={{ position: "sticky", top: 0, zIndex: 2 }}>
+                <tr>
+                  {/* Meta columns */}
+                  {metaCols.map(col => (
+                    <th key={col} style={{
+                      padding: "9px 12px", background: "var(--cs-surface-2)",
+                      borderBottom: "2px solid var(--cs-border)",
+                      borderRight: col === "path" ? "2px solid var(--cs-border)" : "1px solid var(--cs-border-sub)",
+                      fontFamily: MONO, fontSize: 9, fontWeight: 700,
+                      color: "var(--cs-dim)", textTransform: "uppercase",
+                      letterSpacing: 0.8, textAlign: "left", whiteSpace: "nowrap",
+                      position: "sticky", top: 0,
+                    }}>{col}</th>
+                  ))}
+                  {/* Body field columns */}
+                  {bodyCols.map(col => (
+                    <th key={col} style={{
+                      padding: "9px 12px", background: "#34d39908",
+                      borderBottom: "2px solid var(--cs-border)",
+                      borderRight: "1px solid var(--cs-border-sub)",
+                      fontFamily: MONO, fontSize: 9, fontWeight: 700,
+                      color: "#34d399", textTransform: "uppercase",
+                      letterSpacing: 0.8, textAlign: "left", whiteSpace: "nowrap",
+                      position: "sticky", top: 0,
+                    }}>{col}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {slice.map((tc, ri) => {
+                  const isEven = ri % 2 === 0;
+                  const mc = METHOD_COLORS[tc.method] || "#8b949e";
+                  return (
+                    <tr key={tc.id} style={{
+                      background: isEven ? "var(--cs-bg)" : "var(--cs-surface)",
+                    }}>
+                      {/* # */}
+                      <td style={{
+                        padding: "7px 12px", fontFamily: MONO, fontSize: 10,
+                        color: "var(--cs-dim)", borderBottom: "1px solid var(--cs-border-sub)",
+                        borderRight: "1px solid var(--cs-border-sub)", whiteSpace: "nowrap"
+                      }}>
+                        {tc.seq}
+                      </td>
+                      {/* run */}
+                      <td style={{
+                        padding: "7px 12px", fontFamily: MONO, fontSize: 10,
+                        color: "var(--cs-dim)", borderBottom: "1px solid var(--cs-border-sub)",
+                        borderRight: "1px solid var(--cs-border-sub)", whiteSpace: "nowrap"
+                      }}>
+                        R{tc.runGroup}
+                      </td>
+                      {/* method */}
+                      <td style={{
+                        padding: "7px 12px", borderBottom: "1px solid var(--cs-border-sub)",
+                        borderRight: "1px solid var(--cs-border-sub)", whiteSpace: "nowrap"
+                      }}>
+                        <MChip method={tc.method} />
+                      </td>
+                      {/* api */}
+                      <td style={{
+                        padding: "7px 12px", fontFamily: MONO, fontSize: 11,
+                        color: "var(--cs-text)", fontWeight: 600,
+                        borderBottom: "1px solid var(--cs-border-sub)",
+                        borderRight: "1px solid var(--cs-border-sub)", whiteSpace: "nowrap",
+                        maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis"
+                      }}>
+                        {tc.apiTitle}
+                      </td>
+                      {/* path */}
+                      <td style={{
+                        padding: "7px 12px", fontFamily: MONO, fontSize: 10,
+                        color: "var(--cs-muted)", borderBottom: "1px solid var(--cs-border-sub)",
+                        borderRight: "2px solid var(--cs-border)", whiteSpace: "nowrap"
+                      }}>
+                        {tc.path}
+                      </td>
+                      {/* body field cells */}
+                      {bodyCols.map(col => {
+                        const raw = tc.body ? (tc.body as any)[col] : undefined;
+                        const val = raw == null ? "" : flatCell(raw);
+                        const isEmpty = val === "";
+                        return (
+                          <td key={col} title={val} style={{
+                            padding: "7px 12px", fontFamily: MONO, fontSize: 11,
+                            color: isEmpty ? "var(--cs-border)" : "var(--cs-text)",
+                            borderBottom: "1px solid var(--cs-border-sub)",
+                            borderRight: "1px solid var(--cs-border-sub)",
+                            maxWidth: 160, overflow: "hidden",
+                            textOverflow: "ellipsis", whiteSpace: "nowrap",
+                          }}>
+                            {isEmpty ? "—" : val}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* ── Modal footer ── */}
+          <div style={{
+            padding: "12px 20px", borderTop: "1px solid var(--cs-border)",
+            background: "var(--cs-surface-2)", flexShrink: 0,
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+          }}>
+            <span style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)" }}>
+              {bodyCols.length} fields: {bodyCols.slice(0, 8).join(" · ")}{bodyCols.length > 8 ? ` · +${bodyCols.length - 8} more` : ""}
+            </span>
+            <button onClick={this.downloadCSV} style={{
+              padding: "7px 16px", borderRadius: 7, cursor: "pointer",
+              background: "transparent", border: "1px solid #34d39944",
+              color: "#34d399", fontFamily: MONO, fontSize: 11, fontWeight: 700,
+            }}>↓ Save as CSV</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RFT STATE
 // ═══════════════════════════════════════════════════════════════
 interface RftState {
-  tick: number;    // force re-render when testStore mutates
+  tick: number;
   pageSize: typeof PAGE_SIZES[number];
-  pageIndex: number;    // 0-based block index (block = pageSize cases)
+  pageIndex: number;
   running: boolean;
-  runProgress: number;   // cases completed this run
+  runProgress: number;
   filter: "all" | "pending" | "passed" | "failed";
-  methodFilter: string;  // "ALL" or specific method
+  methodFilter: string;
   expandReport: boolean;
+  showModal: boolean;
 }
 
 export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }, RftState> {
   state: RftState = {
     tick: 0, pageSize: 10, pageIndex: 0, running: false,
-    runProgress: 0, filter: "all", methodFilter: "ALL", expandReport: false,
+    runProgress: 0, filter: "all", methodFilter: "ALL",
+    expandReport: false, showModal: false,
   };
 
   private scrollRef = React.createRef<HTMLDivElement>();
@@ -359,7 +696,7 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
   }
 
   render() {
-    const { tick, pageSize, pageIndex, running, runProgress, filter, methodFilter, expandReport } = this.state;
+    const { tick, pageSize, pageIndex, running, runProgress, filter, methodFilter, expandReport, showModal } = this.state;
     const allCases = testStore.cases;
     const total = allCases.length;
     const pending = allCases.filter(c => c.status === "pending").length;
@@ -411,8 +748,18 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
       );
     }
 
+    const synthCases = allCases.filter(c => c.dataSource === "synthetic");
+
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 20, fontFamily: MONO }}>
+
+        {/* ── Synthetic data modal ── */}
+        {showModal && synthCases.length > 0 && (
+          <SyntheticDataModal
+            cases={synthCases}
+            onClose={() => this.setState({ showModal: false })}
+          />
+        )}
 
         {/* ── Header banner ── */}
         <div style={{
@@ -442,16 +789,30 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
               </div>
             </div>
 
-            {/* Data source legend */}
+            {/* Data source legend / buttons */}
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {synthCount > 0 && (
-                <div style={{
-                  padding: "6px 12px", borderRadius: 8,
-                  background: "#34d39912", border: "1px solid #34d39933",
-                  fontSize: 11, color: "#34d399", fontFamily: MONO
-                }}>
+                <button
+                  onClick={() => this.setState({ showModal: true })}
+                  style={{
+                    padding: "8px 16px", borderRadius: 8, cursor: "pointer",
+                    background: "#34d39912", border: "1px solid #34d39944",
+                    fontSize: 11, color: "#34d399", fontFamily: MONO, fontWeight: 700,
+                    display: "flex", alignItems: "center", gap: 8,
+                    transition: "all .15s",
+                  }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLButtonElement).style.background = "#34d39922";
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = "#34d399";
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLButtonElement).style.background = "#34d39912";
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = "#34d39944";
+                  }}
+                >
                   ⚗ Synthetic · auto-generated banking data
-                </div>
+                  <span style={{ opacity: 0.6, fontSize: 10 }}>↗ View data</span>
+                </button>
               )}
               {fileCount > 0 && (
                 <div style={{
