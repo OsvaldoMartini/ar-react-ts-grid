@@ -1461,6 +1461,8 @@ interface DataGenTabState {
   plan: DgStep[];
   generatedN: number;
   envTick: number;   // bumps when env selection changes
+  specsPage: number;
+  specsPageSize: number;
 }
 
 const DG_PRESETS = [1, 5, 10, 50, 100, 500, 1000, 2000];
@@ -1472,6 +1474,7 @@ export class DataGenTab extends React.Component<
   state: DataGenTabState = {
     selNames: [], testCount: 1, dgView: "setup",
     plan: [], generatedN: 0, envTick: 0,
+    specsPage: 0, specsPageSize: 20,
   };
 
   private toggle = (fn: string) =>
@@ -1516,7 +1519,11 @@ export class DataGenTab extends React.Component<
 
   render() {
     const { loadedSpecs } = this.props;
-    const { selNames, testCount, dgView, plan, generatedN } = this.state;
+    const { selNames, testCount, dgView, plan, generatedN, specsPage, specsPageSize } = this.state;
+    const SPEC_PAGE_SIZES = [10, 20, 50, 100];
+    const specsTotalPages = Math.ceil(loadedSpecs.length / specsPageSize);
+    const specsPageStart = specsPage * specsPageSize;
+    const pagedSpecs = loadedSpecs.slice(specsPageStart, specsPageStart + specsPageSize);
     const sel = loadedSpecs.filter(s => selNames.includes(s.fileName));
 
     const SLbl = ({ text }: { text: string }) => (
@@ -1682,66 +1689,104 @@ export class DataGenTab extends React.Component<
             {/* API selector */}
             <div>
               <div style={{
-                display: "flex", justifyContent: "space-between",
-                alignItems: "center", marginBottom: 10
+                display: "flex", alignItems: "center", gap: 8, marginBottom: 10,
               }}>
 
-                {/* Left: checkbox + label */}
-                <div style={{ display: "flex", alignItems: "center", gap: 10, lineHeight: 1 }}>
-                  {/* Custom tri-state checkbox */}
-                  <div
-                    onClick={() => {
-                      const allSel = loadedSpecs.every(s => selNames.includes(s.fileName));
-                      this.setState({ selNames: allSel ? [] : loadedSpecs.map(s => s.fileName) });
-                    }}
-                    title={
-                      loadedSpecs.every(s => selNames.includes(s.fileName)) ? "Deselect all"
-                        : selNames.length > 0 ? "Select all" : "Select all"
-                    }
-                    style={{
-                      width: 16, height: 16, borderRadius: 4, flexShrink: 0,
-                      cursor: "pointer", display: "flex", alignItems: "center",
-                      justifyContent: "center", transition: "all .15s",
-                      border: selNames.length === 0
-                        ? "1.5px solid var(--cs-border)"
-                        : `1.5px solid #34d399`,
-                      background: loadedSpecs.length > 0 && selNames.length === loadedSpecs.length
-                        ? "#34d399"
-                        : selNames.length > 0
-                          ? "#34d39940"
-                          : "transparent",
-                    }}>
-                    {loadedSpecs.length > 0 && selNames.length === loadedSpecs.length && (
-                      <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                        <path d="M1 4L3.5 6.5L9 1" stroke="#0a1f15" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    )}
-                    {selNames.length > 0 && selNames.length < loadedSpecs.length && (
-                      <svg width="8" height="2" viewBox="0 0 8 2" fill="none">
-                        <path d="M1 1H7" stroke="#34d399" strokeWidth="1.8" strokeLinecap="round" />
-                      </svg>
-                    )}
-                  </div>
-                  <span style={{
-                    fontFamily: MONO, fontSize: 10, fontWeight: 700,
-                    color: "var(--cs-dim)", letterSpacing: 1,
-                    textTransform: "uppercase" as const
+                {/* Tri-state checkbox */}
+                <div
+                  onClick={() => {
+                    const allSel = loadedSpecs.every(s => selNames.includes(s.fileName));
+                    this.setState({ selNames: allSel ? [] : loadedSpecs.map(s => s.fileName) });
+                  }}
+                  title={loadedSpecs.every(s => selNames.includes(s.fileName)) ? "Deselect all" : "Select all"}
+                  style={{
+                    width: 16, height: 16, borderRadius: 4, flexShrink: 0,
+                    cursor: "pointer", display: "flex", alignItems: "center",
+                    justifyContent: "center", transition: "all .15s",
+                    border: selNames.length === 0 ? "1.5px solid var(--cs-border)" : "1.5px solid #34d399",
+                    background: loadedSpecs.length > 0 && selNames.length === loadedSpecs.length
+                      ? "#34d399" : selNames.length > 0 ? "#34d39940" : "transparent",
                   }}>
-                    {loadedSpecs.length} loaded spec{loadedSpecs.length !== 1 ? "s" : ""}
-                  </span>
-                  {selNames.length > 0 && (
-                    <span style={{
-                      fontFamily: MONO, fontSize: 9, color: "#34d399",
-                      background: "#34d39915", border: "1px solid #34d39930",
-                      borderRadius: 4, padding: "1px 7px"
-                    }}>
-                      {selNames.length} selected
-                    </span>
+                  {loadedSpecs.length > 0 && selNames.length === loadedSpecs.length && (
+                    <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                      <path d="M1 4L3.5 6.5L9 1" stroke="#0a1f15" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                  {selNames.length > 0 && selNames.length < loadedSpecs.length && (
+                    <svg width="8" height="2" viewBox="0 0 8 2" fill="none">
+                      <path d="M1 1H7" stroke="#34d399" strokeWidth="1.8" strokeLinecap="round" />
+                    </svg>
                   )}
                 </div>
 
-                {/* Right: All / Clear */}
-                <div style={{ display: "flex", gap: 6 }}>
+                {/* Green label pill */}
+                <span style={{
+                  fontFamily: MONO, fontSize: 10, fontWeight: 700,
+                  color: "#34d399", letterSpacing: 1, textTransform: "uppercase" as const,
+                  background: "#34d39915", border: "1px solid #34d39933",
+                  borderRadius: 5, padding: "2px 9px", whiteSpace: "nowrap" as const,
+                }}>
+                  {loadedSpecs.length} loaded specs
+                </span>
+
+                {/* Selected badge */}
+                {selNames.length > 0 && (
+                  <span style={{
+                    fontFamily: MONO, fontSize: 9, color: "#34d399",
+                    background: "#34d39915", border: "1px solid #34d39930",
+                    borderRadius: 4, padding: "1px 7px", whiteSpace: "nowrap" as const,
+                  }}>
+                    {selNames.length} selected
+                  </span>
+                )}
+
+                {/* Page-size + pagination — centered flex-1 */}
+                {specsTotalPages > 1 && (
+                  <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                    {/* Page-size chips */}
+                    <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)" }}>per page</span>
+                    {SPEC_PAGE_SIZES.map(n => (
+                      <button key={n} onClick={() => this.setState({ specsPageSize: n, specsPage: 0 })} style={{
+                        background: specsPageSize === n ? "#34d39918" : "var(--cs-surface-2)",
+                        border: `1px solid ${specsPageSize === n ? "#34d399" : "var(--cs-border)"}`,
+                        color: specsPageSize === n ? "#34d399" : "var(--cs-muted)",
+                        borderRadius: 5, padding: "2px 7px", fontFamily: MONO, fontSize: 10,
+                        cursor: "pointer", fontWeight: specsPageSize === n ? 700 : 400,
+                      }}>{n}</button>
+                    ))}
+
+                    {/* Separator */}
+                    <span style={{ width: 1, height: 14, background: "var(--cs-border)", margin: "0 2px" }} />
+
+                    {/* Page nav */}
+                    <button onClick={() => this.setState({ specsPage: specsPage - 1 })} disabled={specsPage === 0}
+                      style={{ background: "transparent", border: "1px solid var(--cs-border)", color: "var(--cs-muted)", borderRadius: 5, padding: "2px 7px", fontFamily: MONO, fontSize: 10, cursor: specsPage === 0 ? "default" : "pointer", opacity: specsPage === 0 ? 0.4 : 1 }}>‹</button>
+                    {Array.from({ length: specsTotalPages }, (_, pi) => {
+                      const near = pi === 0 || pi === specsTotalPages - 1 || Math.abs(pi - specsPage) <= 1;
+                      if (!near) return (pi === 1 || pi === specsTotalPages - 2)
+                        ? <span key={pi} style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)" }}>…</span>
+                        : null;
+                      return (
+                        <button key={pi} onClick={() => this.setState({ specsPage: pi })} style={{
+                          background: pi === specsPage ? "#34d399" : "var(--cs-surface-2)",
+                          border: `1px solid ${pi === specsPage ? "#34d399" : "var(--cs-border)"}`,
+                          color: pi === specsPage ? "#0a1f15" : "var(--cs-muted)",
+                          borderRadius: 5, padding: "2px 6px", fontFamily: MONO, fontSize: 10,
+                          cursor: "pointer", fontWeight: pi === specsPage ? 700 : 400, minWidth: 24,
+                        }}>{pi + 1}</button>
+                      );
+                    })}
+                    <button onClick={() => this.setState({ specsPage: specsPage + 1 })} disabled={specsPage === specsTotalPages - 1}
+                      style={{ background: "transparent", border: "1px solid var(--cs-border)", color: "var(--cs-muted)", borderRadius: 5, padding: "2px 7px", fontFamily: MONO, fontSize: 10, cursor: specsPage === specsTotalPages - 1 ? "default" : "pointer", opacity: specsPage === specsTotalPages - 1 ? 0.4 : 1 }}>›</button>
+                    <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)", marginLeft: 2 }}>
+                      {specsPageStart + 1}–{Math.min(specsPageStart + specsPageSize, loadedSpecs.length)} of {loadedSpecs.length}
+                    </span>
+                  </div>
+                )}
+                {specsTotalPages <= 1 && <div style={{ flex: 1 }} />}
+
+                {/* All / Clear — far right */}
+                <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                   <button onClick={() => this.setState({ selNames: loadedSpecs.map(s => s.fileName) })}
                     style={{
                       background: "transparent", border: "1px solid var(--cs-border)",
@@ -1767,7 +1812,7 @@ export class DataGenTab extends React.Component<
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column" as const, gap: 4 }}>
-                  {loadedSpecs.map(spec => {
+                  {pagedSpecs.map(spec => {
                     const active = selNames.includes(spec.fileName);
                     const pathPs = new Set(spec.pathParams || []);
                     const inCount = spec.fields.filter(f => !f.readOnly && !pathPs.has(f.name) && !f.isParam).length;
@@ -1819,6 +1864,7 @@ export class DataGenTab extends React.Component<
                       </div>
                     );
                   })}
+
                 </div>
               )}
             </div>
