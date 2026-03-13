@@ -1947,7 +1947,10 @@ export class DataGenTab extends React.Component<
                               overflow: "hidden", transition: "all .15s",
                               flexBasis: isOpen ? "100%" : "auto", minWidth: isOpen ? "100%" : 0,
                             }}>
-                              <div onClick={() => this.setState({ depOpenCard: isOpen ? null : target })}
+                              <div onClick={() => this.setState({
+                                depOpenCard: isOpen ? null : target,
+                                depGraphNode: isOpen ? null : target,
+                              })}
                                 style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 12px", cursor: "pointer", borderBottom: isOpen ? `1px solid ${c.border}` : "none" }}>
                                 <span style={{ width: 7, height: 7, borderRadius: "50%", flexShrink: 0, background: c.label }} />
                                 <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: isOpen ? c.label : "var(--cs-text)", flex: 1, whiteSpace: "nowrap" as const, overflow: "hidden", textOverflow: "ellipsis" }}>{target}</span>
@@ -1963,6 +1966,19 @@ export class DataGenTab extends React.Component<
                                       <span style={{ color: "var(--cs-text)", fontWeight: 600 }}>{target}</span>
                                     </div>
                                   ))}
+                                  {/* View in graph button */}
+                                  <div style={{ marginTop: 6, paddingTop: 8, borderTop: `1px solid ${c.border}` }}>
+                                    <button onClick={(e) => { e.stopPropagation(); this.setState({ depView: "graph", depGraphNode: target }); }}
+                                      style={{
+                                        fontFamily: MONO, fontSize: 9, fontWeight: 700,
+                                        color: c.label, background: c.bg,
+                                        border: `1px solid ${c.border}`, borderRadius: 5,
+                                        padding: "3px 10px", cursor: "pointer",
+                                        letterSpacing: 0.3,
+                                      }}>
+                                      🗺 View in Graph →
+                                    </button>
+                                  </div>
                                 </div>
                               )}
                             </div>
@@ -1974,109 +1990,135 @@ export class DataGenTab extends React.Component<
 
                   {/* ── TAB: GRAPH ── */}
                   {depView === "graph" && (() => {
-                    // Connection counts per node
                     const connCount: Record<string, number> = {};
                     for (const n of allNodes) connCount[n] = (inEdges[n]?.length || 0) + (outEdges[n]?.length || 0);
                     const maxConn = Math.max(...Object.values(connCount), 1);
 
-                    // Bubble radius proportional to connections
-                    const radius = (n: string) => 28 + (connCount[n] / maxConn) * 36;
+                    // Radius: tighter range so small nodes are still visible
+                    const radius = (n: string) => 22 + (connCount[n] / maxConn) * 28;
 
-                    // Deterministic force-directed layout — spiral seed + repulsion iterations
-                    const W = 820, H = 560, CX = W / 2, CY = H / 2;
-                    const pos2: Record<string, { x: number; y: number }> = {};
+                    // Canvas fixed size — fills the card width nicely
+                    const W = 780, H = 500;
 
-                    // Seed: arrange by connection count in concentric rings
+                    // ── Grid-seeded layout ──────────────────────────────
+                    // Sort by connections desc, place in a grid pattern across full canvas
                     const sorted = [...allNodes].sort((a, b) => connCount[b] - connCount[a]);
+                    const cols2 = Math.ceil(Math.sqrt(sorted.length * (W / H)));
+                    const rows2 = Math.ceil(sorted.length / cols2);
+                    const cellW = W / cols2;
+                    const cellH = H / rows2;
+
+                    const pos2: Record<string, { x: number; y: number }> = {};
                     sorted.forEach((n, i) => {
-                      if (i === 0) { pos2[n] = { x: CX, y: CY }; return; }
-                      const ring = Math.floor(Math.sqrt(i));
-                      const angle = (i * 2.618) * (Math.PI * 2); // golden angle
-                      const r = 80 + ring * 110;
-                      pos2[n] = { x: CX + Math.cos(angle) * r, y: CY + Math.sin(angle) * r };
+                      const col = i % cols2;
+                      const row = Math.floor(i / cols2);
+                      // Slight stagger on odd rows for honeycomb feel
+                      const xOffset = row % 2 === 1 ? cellW * 0.5 : 0;
+                      pos2[n] = {
+                        x: cellW * 0.5 + col * cellW + xOffset,
+                        y: cellH * 0.5 + row * cellH,
+                      };
                     });
 
-                    // Simple repulsion passes
-                    for (let iter = 0; iter < 80; iter++) {
+                    // ── Repulsion + attraction passes ───────────────────
+                    for (let iter = 0; iter < 120; iter++) {
+                      // Repulsion between all pairs
                       for (let a = 0; a < allNodes.length; a++) {
                         for (let b = a + 1; b < allNodes.length; b++) {
                           const na = allNodes[a], nb = allNodes[b];
                           const pa = pos2[na], pb = pos2[nb];
                           const dx = pb.x - pa.x, dy = pb.y - pa.y;
-                          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-                          const minDist = radius(na) + radius(nb) + 16;
-                          if (dist < minDist) {
-                            const force = (minDist - dist) / dist * 0.5;
-                            pos2[na] = { x: pa.x - dx * force, y: pa.y - dy * force };
-                            pos2[nb] = { x: pb.x + dx * force, y: pb.y + dy * force };
+                          const dist = Math.sqrt(dx * dx + dy * dy) || 0.1;
+                          const minD = radius(na) + radius(nb) + 12;
+                          if (dist < minD) {
+                            const f = (minD - dist) / dist * 0.55;
+                            pos2[na] = { x: pa.x - dx * f, y: pa.y - dy * f };
+                            pos2[nb] = { x: pb.x + dx * f, y: pb.y + dy * f };
                           }
                         }
                       }
-                      // Edge attraction
+                      // Light center gravity so they don't fly off
+                      for (const n of allNodes) {
+                        const p = pos2[n];
+                        pos2[n] = {
+                          x: p.x + (W / 2 - p.x) * 0.005,
+                          y: p.y + (H / 2 - p.y) * 0.005,
+                        };
+                      }
+                      // Edge attraction — pull connected nodes slightly closer
                       for (const p of pairs) {
                         const pa = pos2[p.from], pb = pos2[p.to];
                         if (!pa || !pb) continue;
                         const dx = pb.x - pa.x, dy = pb.y - pa.y;
-                        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-                        const target = radius(p.from) + radius(p.to) + 60;
-                        if (dist > target) {
-                          const f = (dist - target) / dist * 0.04;
+                        const dist = Math.sqrt(dx * dx + dy * dy) || 0.1;
+                        const ideal = radius(p.from) + radius(p.to) + 50;
+                        if (dist > ideal) {
+                          const f = (dist - ideal) / dist * 0.025;
                           pos2[p.from] = { x: pa.x + dx * f, y: pa.y + dy * f };
                           pos2[p.to] = { x: pb.x - dx * f, y: pb.y - dy * f };
                         }
                       }
                     }
 
-                    // Clamp to canvas with padding
+                    // Clamp with padding
                     for (const n of allNodes) {
-                      const r = radius(n);
+                      const r = radius(n) + 4;
                       pos2[n] = {
-                        x: Math.max(r + 10, Math.min(W - r - 10, pos2[n].x)),
-                        y: Math.max(r + 10, Math.min(H - r - 10, pos2[n].y)),
+                        x: Math.max(r, Math.min(W - r, pos2[n].x)),
+                        y: Math.max(r, Math.min(H - r, pos2[n].y)),
                       };
                     }
 
-                    // Node color by in-degree
+                    // Color by role — vivid, works on dark bg
                     const bubbleColor = (n: string) => {
                       const ind = inEdges[n]?.length || 0;
                       const outd = outEdges[n]?.length || 0;
-                      if (ind === 0) return "#34d399"; // source — green
+                      if (ind === 0) return "#34d399";  // source — green
                       if (outd === 0) return "#60a5fa"; // sink — blue
-                      return "#a78bfa";                 // hub — purple
+                      return "#c084fc";                 // hub — purple
                     };
 
                     return (
                       <div style={{ display: "flex", gap: 0 }}>
-                        {/* Canvas */}
-                        <div style={{ flex: 1, background: "var(--cs-bg)", position: "relative" as const, overflow: "hidden" }}>
+                        {/* Dark canvas */}
+                        <div style={{ flex: 1, background: "#0d1117", position: "relative" as const, overflow: "hidden" }}>
+
                           {/* Legend */}
-                          <div style={{ position: "absolute" as const, top: 10, left: 12, display: "flex", gap: 10, zIndex: 2 }}>
-                            {[["#34d399", "Source (sends ID)"], ["#a78bfa", "Hub (sends & receives)"], ["#60a5fa", "Sink (receives ID)"]].map(([col, lbl]) => (
+                          <div style={{
+                            position: "absolute" as const, top: 10, left: 12, zIndex: 2,
+                            display: "flex", gap: 14, alignItems: "center",
+                            background: "#00000055", borderRadius: 6, padding: "4px 10px",
+                            backdropFilter: "blur(4px)",
+                          }}>
+                            {([["#34d399", "Source"], ["#c084fc", "Hub"], ["#60a5fa", "Sink"]] as const).map(([col, lbl]) => (
                               <div key={lbl} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                                <span style={{ width: 8, height: 8, borderRadius: "50%", background: col, display: "inline-block" }} />
-                                <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)" }}>{lbl}</span>
+                                <span style={{ width: 8, height: 8, borderRadius: "50%", background: col, display: "inline-block", boxShadow: `0 0 6px ${col}` }} />
+                                <span style={{ fontFamily: MONO, fontSize: 9, color: "#aaa" }}>{lbl}</span>
                               </div>
                             ))}
+                            <span style={{ fontFamily: MONO, fontSize: 9, color: "#555", marginLeft: 4 }}>click bubble for details</span>
                           </div>
 
                           <svg width={W} height={H} style={{ display: "block" }}>
                             <defs>
-                              <marker id="arr2" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
-                                <polygon points="0 0,7 2.5,0 5" fill="#ffffff22" />
+                              <marker id="arr3" markerWidth="6" markerHeight="5" refX="6" refY="2.5" orient="auto">
+                                <polygon points="0 0,6 2.5,0 5" fill="#ffffff40" />
                               </marker>
                               {allNodes.map(n => {
                                 const col = bubbleColor(n);
                                 const isSel = selNode === n;
+                                const gid = `g_${n.replace(/\W/g, "_")}`;
                                 return (
-                                  <radialGradient key={n} id={`grad_${n.replace(/\W/g, "_")}`} cx="35%" cy="30%" r="65%">
-                                    <stop offset="0%" stopColor={col} stopOpacity={isSel ? 0.9 : 0.55} />
-                                    <stop offset="100%" stopColor={col} stopOpacity={isSel ? 0.5 : 0.18} />
+                                  <radialGradient key={gid} id={gid} cx="38%" cy="28%" r="68%">
+                                    <stop offset="0%" stopColor={col} stopOpacity={isSel ? 0.85 : 0.65} />
+                                    <stop offset="60%" stopColor={col} stopOpacity={isSel ? 0.45 : 0.28} />
+                                    <stop offset="100%" stopColor={col} stopOpacity={isSel ? 0.25 : 0.10} />
                                   </radialGradient>
                                 );
                               })}
                             </defs>
 
-                            {/* Edges — draw behind bubbles */}
+                            {/* Edges */}
                             {pairs.map((p, ei) => {
                               const pa = pos2[p.from], pb = pos2[p.to];
                               if (!pa || !pb) return null;
@@ -2084,18 +2126,19 @@ export class DataGenTab extends React.Component<
                               const dx = pb.x - pa.x, dy = pb.y - pa.y;
                               const dist = Math.sqrt(dx * dx + dy * dy) || 1;
                               const ux = dx / dist, uy = dy / dist;
-                              const sx = pa.x + ux * ra, sy = pa.y + uy * ra;
-                              const tx = pb.x - ux * rb, ty = pb.y - uy * rb;
                               const isHl = selNode === p.from || selNode === p.to;
-                              const isDim = selNode && !isHl;
+                              const isDim = !!selNode && !isHl;
+                              const col = isHl ? (selNode === p.from ? bubbleColor(p.to) : bubbleColor(p.from)) : "#ffffff";
                               return (
                                 <line key={ei}
-                                  x1={sx} y1={sy} x2={tx} y2={ty}
-                                  stroke={isHl ? "#ffffff66" : "#ffffff18"}
-                                  strokeWidth={isHl ? 1.5 : 0.8}
-                                  markerEnd="url(#arr2)"
-                                  opacity={isDim ? 0.15 : 1}
-                                  style={{ transition: "opacity .2s, stroke .2s" }}
+                                  x1={pa.x + ux * ra} y1={pa.y + uy * ra}
+                                  x2={pb.x - ux * rb} y2={pb.y - uy * rb}
+                                  stroke={col}
+                                  strokeWidth={isHl ? 1.8 : 0.6}
+                                  strokeOpacity={isHl ? 0.6 : 0.12}
+                                  opacity={isDim ? 0.08 : 1}
+                                  markerEnd="url(#arr3)"
+                                  style={{ transition: "opacity .2s" }}
                                 />
                               );
                             })}
@@ -2109,123 +2152,144 @@ export class DataGenTab extends React.Component<
                               const isSel = selNode === n;
                               const isConn = !!selNode && (outEdges[selNode]?.includes(n) || inEdges[selNode]?.includes(n));
                               const isDim = !!selNode && !isSel && !isConn;
+                              const gid = `g_${n.replace(/\W/g, "_")}`;
+
+                              // Label: strip " API", split to lines
                               const label = n.replace(/ API$/, "");
                               const words = label.split(" ");
-                              // Split into up to 2 lines
                               const mid = Math.ceil(words.length / 2);
-                              const line1 = words.slice(0, mid).join(" ");
-                              const line2 = words.slice(mid).join(" ");
-                              const fontSize = r > 50 ? 11 : r > 38 ? 9 : 8;
+                              const lines = r >= 36
+                                ? [words.slice(0, mid).join(" "), words.slice(mid).join(" ")].filter(Boolean)
+                                : [label.slice(0, 12) + (label.length > 12 ? "…" : "")];
+                              const fs = r >= 42 ? 10 : r >= 32 ? 9 : 8;
+                              const lineH = fs + 3;
+                              const textTop = p.y - (lines.length - 1) * lineH / 2;
 
                               return (
                                 <g key={n}
-                                  onClick={() => this.setState({ depGraphNode: isSel ? null : n })}
+                                  onClick={() => this.setState({
+                                    depGraphNode: isSel ? null : n,
+                                    depOpenCard: isSel ? null : (byTarget[n] ? n : depOpenCard),
+                                  })}
                                   style={{ cursor: "pointer" }}>
-                                  {/* Outer glow ring when selected */}
-                                  {isSel && (
-                                    <circle cx={p.x} cy={p.y} r={r + 8}
-                                      fill="none" stroke={col} strokeWidth={2} opacity={0.4} />
+
+                                  {/* Glow ring */}
+                                  {(isSel || isConn) && (
+                                    <circle cx={p.x} cy={p.y} r={r + (isSel ? 10 : 5)}
+                                      fill="none" stroke={col}
+                                      strokeWidth={isSel ? 2 : 1}
+                                      opacity={isSel ? 0.6 : 0.3} />
                                   )}
-                                  {/* Bubble */}
-                                  <circle
-                                    cx={p.x} cy={p.y} r={r}
-                                    fill={`url(#grad_${n.replace(/\W/g, "_")})`}
+
+                                  {/* Main bubble */}
+                                  <circle cx={p.x} cy={p.y} r={r}
+                                    fill={`url(#${gid})`}
                                     stroke={col}
-                                    strokeWidth={isSel ? 2 : isConn ? 1.5 : 0.8}
-                                    opacity={isDim ? 0.2 : 1}
-                                    style={{ transition: "opacity .2s, stroke-width .15s" }}
+                                    strokeWidth={isSel ? 2 : isConn ? 1.5 : 1}
+                                    strokeOpacity={isSel ? 1 : isConn ? 0.8 : 0.5}
+                                    opacity={isDim ? 0.15 : 1}
+                                    style={{ transition: "opacity .2s" }}
                                   />
-                                  {/* Connection count badge */}
-                                  {!isDim && connCount[n] > 0 && (
-                                    <text x={p.x} y={p.y - r + 12}
+
+                                  {/* Highlight shine */}
+                                  {!isDim && (
+                                    <ellipse cx={p.x - r * 0.22} cy={p.y - r * 0.28} rx={r * 0.35} ry={r * 0.22}
+                                      fill="#ffffff" opacity={0.12} />
+                                  )}
+
+                                  {/* Connection count top */}
+                                  {!isDim && (
+                                    <text x={p.x} y={p.y - r + 11}
                                       textAnchor="middle" fontFamily="monospace"
-                                      fontSize={7} fontWeight={700} fill={col} opacity={0.9}>
+                                      fontSize={7} fontWeight={800}
+                                      fill={col} opacity={0.85}>
                                       {connCount[n]}
                                     </text>
                                   )}
-                                  {/* Label */}
-                                  {!isDim && (
-                                    <>
-                                      <text x={p.x} y={line2 ? p.y - 5 : p.y + 4}
-                                        textAnchor="middle" fontFamily="monospace"
-                                        fontSize={fontSize} fontWeight={isSel ? 800 : 600}
-                                        fill="#fff" opacity={isDim ? 0 : isSel ? 1 : 0.9}
-                                        style={{ userSelect: "none" as const }}>
-                                        {line1}
-                                      </text>
-                                      {line2 && (
-                                        <text x={p.x} y={p.y + 9}
-                                          textAnchor="middle" fontFamily="monospace"
-                                          fontSize={fontSize} fontWeight={isSel ? 800 : 600}
-                                          fill="#fff" opacity={isDim ? 0 : isSel ? 1 : 0.85}
-                                          style={{ userSelect: "none" as const }}>
-                                          {line2}
-                                        </text>
-                                      )}
-                                    </>
-                                  )}
+
+                                  {/* Label lines */}
+                                  {!isDim && lines.map((line, li) => (
+                                    <text key={li}
+                                      x={p.x} y={textTop + li * lineH}
+                                      textAnchor="middle" dominantBaseline="middle"
+                                      fontFamily="monospace"
+                                      fontSize={fs} fontWeight={isSel ? 800 : 700}
+                                      fill={col}
+                                      opacity={isSel ? 1 : 0.95}
+                                      style={{ userSelect: "none" as const, textShadow: "0 1px 3px #000" }}>
+                                      {line}
+                                    </text>
+                                  ))}
                                 </g>
                               );
                             })}
                           </svg>
                         </div>
 
-                        {/* Detail panel */}
+                        {/* Detail panel — slides open */}
                         <div style={{
-                          width: selNode ? 240 : 0, overflow: "hidden",
-                          transition: "width .2s", flexShrink: 0,
-                          borderLeft: selNode ? "1px solid var(--cs-border-sub)" : "none",
-                          background: "var(--cs-surface-2)",
+                          width: selNode ? 230 : 0, overflow: "hidden",
+                          transition: "width .2s ease", flexShrink: 0,
+                          borderLeft: selNode ? "1px solid #1e2a1e" : "none",
+                          background: "#111a11",
                         }}>
-                          {selNode && (
-                            <div style={{ padding: "14px", width: 240 }}>
-                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                                <span style={{ fontFamily: MONO, fontSize: 9, fontWeight: 800, color: bubbleColor(selNode), textTransform: "uppercase" as const, letterSpacing: 0.5 }}>
-                                  {(inEdges[selNode]?.length || 0) === 0 ? "⬤ Source" : (outEdges[selNode]?.length || 0) === 0 ? "⬤ Sink" : "⬤ Hub"}
-                                </span>
-                                <button onClick={() => this.setState({ depGraphNode: null })}
-                                  style={{ background: "transparent", border: "none", color: "var(--cs-dim)", cursor: "pointer", fontSize: 14 }}>✕</button>
-                              </div>
-                              <div style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: "var(--cs-text)", marginBottom: 12, lineHeight: 1.4 }}>
-                                {selNode}
-                              </div>
-                              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-                                <div style={{ flex: 1, background: "#34d39912", border: "1px solid #34d39933", borderRadius: 6, padding: "6px 8px", textAlign: "center" as const }}>
-                                  <div style={{ fontFamily: MONO, fontSize: 16, fontWeight: 800, color: "#34d399" }}>{outEdges[selNode]?.length || 0}</div>
-                                  <div style={{ fontFamily: MONO, fontSize: 8, color: "var(--cs-dim)" }}>sends ID to</div>
+                          {selNode && (() => {
+                            const col = bubbleColor(selNode);
+                            const role = (inEdges[selNode]?.length || 0) === 0 ? "Source"
+                              : (outEdges[selNode]?.length || 0) === 0 ? "Sink" : "Hub";
+                            return (
+                              <div style={{ padding: "14px", width: 230 }}>
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                                  <span style={{ fontFamily: MONO, fontSize: 9, fontWeight: 800, color: col, textTransform: "uppercase" as const, letterSpacing: 1 }}>
+                                    ⬤ {role}
+                                  </span>
+                                  <button onClick={() => this.setState({ depGraphNode: null })}
+                                    style={{ background: "transparent", border: "none", color: "#555", cursor: "pointer", fontSize: 14 }}>✕</button>
                                 </div>
-                                <div style={{ flex: 1, background: "#60a5fa12", border: "1px solid #60a5fa33", borderRadius: 6, padding: "6px 8px", textAlign: "center" as const }}>
-                                  <div style={{ fontFamily: MONO, fontSize: 16, fontWeight: 800, color: "#60a5fa" }}>{inEdges[selNode]?.length || 0}</div>
-                                  <div style={{ fontFamily: MONO, fontSize: 8, color: "var(--cs-dim)" }}>receives from</div>
-                                </div>
-                              </div>
 
-                              {inEdges[selNode]?.length > 0 && (
-                                <div style={{ marginBottom: 10 }}>
-                                  <div style={{ fontFamily: MONO, fontSize: 8, color: "var(--cs-dim)", letterSpacing: 0.5, textTransform: "uppercase" as const, marginBottom: 5 }}>← receives ID from</div>
-                                  {inEdges[selNode].map(src => (
-                                    <div key={src} onClick={() => this.setState({ depGraphNode: src })}
-                                      style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, cursor: "pointer", padding: "3px 6px", borderRadius: 4, background: "var(--cs-bg)" }}>
-                                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: bubbleColor(src), flexShrink: 0 }} />
-                                      <span style={{ fontFamily: MONO, fontSize: 10, color: bubbleColor(src), fontWeight: 600 }}>{src.replace(/ API$/, "")}</span>
-                                    </div>
-                                  ))}
+                                <div style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: col, marginBottom: 12, lineHeight: 1.5, borderLeft: `3px solid ${col}`, paddingLeft: 8 }}>
+                                  {selNode.replace(/ API$/, "")}
+                                  <div style={{ fontSize: 8, color: "#555", fontWeight: 400, marginTop: 2 }}>API</div>
                                 </div>
-                              )}
-                              {outEdges[selNode]?.length > 0 && (
-                                <div>
-                                  <div style={{ fontFamily: MONO, fontSize: 8, color: "var(--cs-dim)", letterSpacing: 0.5, textTransform: "uppercase" as const, marginBottom: 5 }}>→ sends ID to</div>
-                                  {outEdges[selNode].map(tgt => (
-                                    <div key={tgt} onClick={() => this.setState({ depGraphNode: tgt })}
-                                      style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, cursor: "pointer", padding: "3px 6px", borderRadius: 4, background: "var(--cs-bg)" }}>
-                                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: bubbleColor(tgt), flexShrink: 0 }} />
-                                      <span style={{ fontFamily: MONO, fontSize: 10, color: bubbleColor(tgt), fontWeight: 600 }}>{tgt.replace(/ API$/, "")}</span>
-                                    </div>
-                                  ))}
+
+                                <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+                                  <div style={{ flex: 1, background: "#34d39910", border: "1px solid #34d39930", borderRadius: 6, padding: "6px 8px", textAlign: "center" as const }}>
+                                    <div style={{ fontFamily: MONO, fontSize: 18, fontWeight: 800, color: "#34d399" }}>{outEdges[selNode]?.length || 0}</div>
+                                    <div style={{ fontFamily: MONO, fontSize: 8, color: "#555" }}>sends to</div>
+                                  </div>
+                                  <div style={{ flex: 1, background: "#60a5fa10", border: "1px solid #60a5fa30", borderRadius: 6, padding: "6px 8px", textAlign: "center" as const }}>
+                                    <div style={{ fontFamily: MONO, fontSize: 18, fontWeight: 800, color: "#60a5fa" }}>{inEdges[selNode]?.length || 0}</div>
+                                    <div style={{ fontFamily: MONO, fontSize: 8, color: "#555" }}>receives from</div>
+                                  </div>
                                 </div>
-                              )}
-                            </div>
-                          )}
+
+                                {inEdges[selNode]?.length > 0 && (
+                                  <div style={{ marginBottom: 10 }}>
+                                    <div style={{ fontFamily: MONO, fontSize: 8, color: "#555", letterSpacing: 1, textTransform: "uppercase" as const, marginBottom: 6 }}>← receives ID from</div>
+                                    {inEdges[selNode].map(src => (
+                                      <div key={src} onClick={() => this.setState({ depGraphNode: src })}
+                                        style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3, cursor: "pointer", padding: "4px 7px", borderRadius: 4, background: "#ffffff08", border: "1px solid #ffffff08" }}>
+                                        <span style={{ width: 5, height: 5, borderRadius: "50%", background: bubbleColor(src), flexShrink: 0 }} />
+                                        <span style={{ fontFamily: MONO, fontSize: 10, color: bubbleColor(src), fontWeight: 600 }}>{src.replace(/ API$/, "")}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                {outEdges[selNode]?.length > 0 && (
+                                  <div>
+                                    <div style={{ fontFamily: MONO, fontSize: 8, color: "#555", letterSpacing: 1, textTransform: "uppercase" as const, marginBottom: 6 }}>→ sends ID to</div>
+                                    {outEdges[selNode].map(tgt => (
+                                      <div key={tgt} onClick={() => this.setState({ depGraphNode: tgt })}
+                                        style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3, cursor: "pointer", padding: "4px 7px", borderRadius: 4, background: "#ffffff08", border: "1px solid #ffffff08" }}>
+                                        <span style={{ width: 5, height: 5, borderRadius: "50%", background: bubbleColor(tgt), flexShrink: 0 }} />
+                                        <span style={{ fontFamily: MONO, fontSize: 10, color: bubbleColor(tgt), fontWeight: 600 }}>{tgt.replace(/ API$/, "")}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
                       </div>
                     );
