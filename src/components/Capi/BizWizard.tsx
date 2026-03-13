@@ -858,11 +858,51 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
                 />
 
                 <div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                    {/* Tri-state checkbox — select all / deselect all */}
+                    <div
+                      onClick={() => {
+                        const allSel = loadedSpecs.every(s => selSpecNames.includes(s.fileName));
+                        this.setState({ selSpecNames: allSel ? [] : loadedSpecs.map(s => s.fileName) });
+                      }}
+                      title={loadedSpecs.every(s => selSpecNames.includes(s.fileName)) ? "Deselect all" : "Select all"}
+                      style={{
+                        width: 16, height: 16, borderRadius: 4, flexShrink: 0,
+                        cursor: "pointer", display: "flex", alignItems: "center",
+                        justifyContent: "center", transition: "all .15s",
+                        border: selSpecNames.length === 0
+                          ? "1.5px solid var(--cs-border)"
+                          : "1.5px solid #34d399",
+                        background: loadedSpecs.length > 0 && selSpecNames.length === loadedSpecs.length
+                          ? "#34d399"
+                          : selSpecNames.length > 0
+                            ? "#34d39940"
+                            : "transparent",
+                      }}>
+                      {loadedSpecs.length > 0 && selSpecNames.length === loadedSpecs.length && (
+                        <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                          <path d="M1 4L3.5 6.5L9 1" stroke="#0a1f15" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                      {selSpecNames.length > 0 && selSpecNames.length < loadedSpecs.length && (
+                        <svg width="8" height="2" viewBox="0 0 8 2" fill="none">
+                          <path d="M1 1H7" stroke="#34d399" strokeWidth="1.8" strokeLinecap="round" />
+                        </svg>
+                      )}
+                    </div>
                     <SLabel style={{ marginBottom: 0 }}>
                       {loadedSpecs.length} loaded spec{loadedSpecs.length !== 1 ? "s" : ""}
                     </SLabel>
-                    <div style={{ display: "flex", gap: 6 }}>
+                    {selSpecNames.length > 0 && (
+                      <span style={{
+                        fontFamily: MONO, fontSize: 9, color: "#34d399",
+                        background: "#34d39915", border: "1px solid #34d39930",
+                        borderRadius: 4, padding: "1px 7px",
+                      }}>
+                        {selSpecNames.length} selected
+                      </span>
+                    )}
+                    <div style={{ display: "flex", gap: 6, marginLeft: "auto" }}>
                       <button onClick={() => this.setState({ selSpecNames: loadedSpecs.map(s => s.fileName) })}
                         style={{
                           background: "transparent", border: "1px solid var(--cs-border)", color: "#34d399",
