@@ -1207,103 +1207,6 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
                   desc={`${dynPlan.length} API calls ordered by dependency graph and HTTP method logic (POST → GET → PATCH → DELETE). IDs produced by each POST are automatically chained into subsequent calls.`}
                 />
 
-                {/* Execution plan */}
-                <div>
-                  <SLabel>Execution sequence — {dynPlan.length} steps · {testCount} run{testCount > 1 ? "s" : ""}</SLabel>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    {dynPlan.map((step, i) => {
-                      const col = METHOD_COLORS[step.method] || "#8b949e";
-                      const hasDeps = step.dependsOnIds.length > 0;
-                      const produces = step.producesId;
-                      const needsId = step.needsIdFrom.length > 0;
-                      const inFieldCount = Object.keys(step.synthBody).length;
-                      return (
-                        <div key={step.id} style={{
-                          display: "flex", alignItems: "flex-start", gap: 10,
-                          padding: "10px 13px", borderRadius: 8,
-                          background: "var(--cs-surface)", border: `1px solid ${col}20`,
-                          borderLeft: `3px solid ${col}80`,
-                        }}>
-                          {/* Step number */}
-                          <div style={{
-                            width: 24, height: 24, borderRadius: "50%", flexShrink: 0,
-                            background: col + "20", border: `1.5px solid ${col}44`,
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            fontFamily: MONO, fontSize: 10, fontWeight: 800, color: col
-                          }}>
-                            {i + 1}
-                          </div>
-
-                          {/* Method + summary */}
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 4 }}>
-                              <MethodChip method={step.method} />
-                              <span style={{ fontFamily: MONO, fontSize: 12, color: "var(--cs-text)", fontWeight: 600 }}>
-                                {step.summary}
-                              </span>
-                            </div>
-                            <div style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)", display: "flex", gap: 10, flexWrap: "wrap" }}>
-                              <span>{step.spec.resourceName}</span>
-                              {inFieldCount > 0 && (
-                                <span style={{ color: "#34d399" }}>⬡ {inFieldCount} synth fields</span>
-                              )}
-                              {hasDeps && (
-                                <span style={{ color: "#60a5fa" }}>
-                                  ← needs ID from: {step.dependsOnIds.map(d => d.split("__")[0]).join(", ")}
-                                </span>
-                              )}
-                              {produces && (
-                                <span style={{ color: col }}>→ produces {step.spec.resourceName}_id</span>
-                              )}
-                              {needsId && !produces && (
-                                <span style={{ color: "#fb923c" }}>
-                                  uses {step.needsIdFrom[0]}_id in path
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Dependency chain summary */}
-                {(() => {
-                  const producers = dynPlan.filter(s => s.producesId);
-                  const consumers = dynPlan.filter(s => s.dependsOnIds.length > 0);
-                  if (producers.length === 0 && consumers.length === 0) return null;
-                  return (
-                    <div style={{
-                      padding: "12px 14px", borderRadius: 8,
-                      background: "var(--cs-surface-2)", border: "1px solid var(--cs-border-sub)"
-                    }}>
-                      <SLabel>ID chaining</SLabel>
-                      {producers.map(p => {
-                        const deps = dynPlan.filter(s => s.dependsOnIds.includes(p.id));
-                        if (deps.length === 0) return null;
-                        const col = METHOD_COLORS[p.method];
-                        return (
-                          <div key={p.id} style={{
-                            display: "flex", alignItems: "center", gap: 6,
-                            fontFamily: MONO, fontSize: 11, color: "var(--cs-muted)", marginBottom: 4
-                          }}>
-                            <span style={{ color: col, fontWeight: 700 }}>
-                              {p.spec.resourceName}_id
-                            </span>
-                            <span>→</span>
-                            {deps.map(d => (
-                              <span key={d.id} style={{ color: "var(--cs-text)", fontWeight: 600 }}>
-                                {d.spec.resourceName} {d.method}
-                              </span>
-                            ))}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })()}
-
                 {/* ── Execution Mode Selector ── */}
                 {(() => {
                   const { execMode, flowTimeout } = this.state;
@@ -1433,6 +1336,103 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
                           </span>
                         </div>
                       )}
+                    </div>
+                  );
+                })()}
+
+                {/* Execution plan */}
+                <div>
+                  <SLabel>Execution sequence — {dynPlan.length} steps · {testCount} run{testCount > 1 ? "s" : ""}</SLabel>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    {dynPlan.map((step, i) => {
+                      const col = METHOD_COLORS[step.method] || "#8b949e";
+                      const hasDeps = step.dependsOnIds.length > 0;
+                      const produces = step.producesId;
+                      const needsId = step.needsIdFrom.length > 0;
+                      const inFieldCount = Object.keys(step.synthBody).length;
+                      return (
+                        <div key={step.id} style={{
+                          display: "flex", alignItems: "flex-start", gap: 10,
+                          padding: "10px 13px", borderRadius: 8,
+                          background: "var(--cs-surface)", border: `1px solid ${col}20`,
+                          borderLeft: `3px solid ${col}80`,
+                        }}>
+                          {/* Step number */}
+                          <div style={{
+                            width: 24, height: 24, borderRadius: "50%", flexShrink: 0,
+                            background: col + "20", border: `1.5px solid ${col}44`,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontFamily: MONO, fontSize: 10, fontWeight: 800, color: col
+                          }}>
+                            {i + 1}
+                          </div>
+
+                          {/* Method + summary */}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 4 }}>
+                              <MethodChip method={step.method} />
+                              <span style={{ fontFamily: MONO, fontSize: 12, color: "var(--cs-text)", fontWeight: 600 }}>
+                                {step.summary}
+                              </span>
+                            </div>
+                            <div style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)", display: "flex", gap: 10, flexWrap: "wrap" }}>
+                              <span>{step.spec.resourceName}</span>
+                              {inFieldCount > 0 && (
+                                <span style={{ color: "#34d399" }}>⬡ {inFieldCount} synth fields</span>
+                              )}
+                              {hasDeps && (
+                                <span style={{ color: "#60a5fa" }}>
+                                  ← needs ID from: {step.dependsOnIds.map(d => d.split("__")[0]).join(", ")}
+                                </span>
+                              )}
+                              {produces && (
+                                <span style={{ color: col }}>→ produces {step.spec.resourceName}_id</span>
+                              )}
+                              {needsId && !produces && (
+                                <span style={{ color: "#fb923c" }}>
+                                  uses {step.needsIdFrom[0]}_id in path
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Dependency chain summary */}
+                {(() => {
+                  const producers = dynPlan.filter(s => s.producesId);
+                  const consumers = dynPlan.filter(s => s.dependsOnIds.length > 0);
+                  if (producers.length === 0 && consumers.length === 0) return null;
+                  return (
+                    <div style={{
+                      padding: "12px 14px", borderRadius: 8,
+                      background: "var(--cs-surface-2)", border: "1px solid var(--cs-border-sub)"
+                    }}>
+                      <SLabel>ID chaining</SLabel>
+                      {producers.map(p => {
+                        const deps = dynPlan.filter(s => s.dependsOnIds.includes(p.id));
+                        if (deps.length === 0) return null;
+                        const col = METHOD_COLORS[p.method];
+                        return (
+                          <div key={p.id} style={{
+                            display: "flex", alignItems: "center", gap: 6,
+                            fontFamily: MONO, fontSize: 11, color: "var(--cs-muted)", marginBottom: 4
+                          }}>
+                            <span style={{ color: col, fontWeight: 700 }}>
+                              {p.spec.resourceName}_id
+                            </span>
+                            <span>→</span>
+                            {deps.map(d => (
+                              <span key={d.id} style={{ color: "var(--cs-text)", fontWeight: 600 }}>
+                                {d.spec.resourceName} {d.method}
+                              </span>
+                            ))}
+                          </div>
+                        );
+                      })}
                     </div>
                   );
                 })()}
