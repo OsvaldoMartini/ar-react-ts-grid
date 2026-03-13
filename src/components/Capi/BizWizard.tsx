@@ -1,6 +1,6 @@
 import React, { createRef } from "react";
 import {
-  SYNTH, rest, ApiSpec,
+  SYNTH, rest, ApiSpec, envStore,
   rndInt, rndFloat, rndPick, isoDate,
 } from "./utils";
 import { StatusBadge, ResultRow } from "./AtomComponents";
@@ -37,6 +37,10 @@ interface ExecEntry {
   step: number; label: string; method: string;
   status: number | string; latency: number;
   result: any; headers: any; ok: boolean;
+  // Request snapshot (captured before the call)
+  reqUrl?: string;
+  reqHeaders?: Record<string, string>;
+  reqBody?: any;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -531,6 +535,19 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
         }));
 
         const t0 = Date.now();
+        // Hoist body + callPath so the catch block can reference them
+        const resource = step.spec.resourceName || "obj-addrs";
+        const pathId = execMode === "flow" ? (context[resource] || null) : null;
+        let callPath: string;
+        if (execMode === "flow" && ["GET", "PATCH", "PUT", "DELETE"].includes(step.method) && step.spec.pathParams.length > 0 && pathId) {
+          callPath = `/${resource}/${pathId}`;
+        } else {
+          callPath = `/${resource}`;
+        }
+        const body = (step.method === "POST" || step.method === "PATCH" || step.method === "PUT")
+          ? buildSynthBody(step.spec, execMode === "flow" ? context : {}, selected)
+          : null;
+
         try {
           // In flow mode: simulate real network latency + honour flowTimeout
           // In independent mode: fast mock, no chaining, use pure synth data
@@ -538,23 +555,6 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
             ? 40 + Math.random() * 120
             : 20 + Math.random() * 50;
           await new Promise(r => setTimeout(r, mockDelay));
-
-          // Body: flow mode uses context for ID chaining; independent uses fresh synth only
-          const body = (step.method === "POST" || step.method === "PATCH" || step.method === "PUT")
-            ? buildSynthBody(step.spec, execMode === "flow" ? context : {}, selected)
-            : null;
-
-          // Path: flow mode injects chained IDs; independent mode always uses collection path
-          const resource = step.spec.resourceName || "obj-addrs";
-          const pathId = execMode === "flow" ? (context[resource] || null) : null;
-          let callPath: string;
-          if (execMode === "flow" && ["GET", "PATCH", "PUT", "DELETE"].includes(step.method) && step.spec.pathParams.length > 0 && pathId) {
-            callPath = `/${resource}/${pathId}`;
-          } else if (execMode === "flow" && step.method === "GET" && step.spec.pathParams.length === 0) {
-            callPath = `/${resource}`;
-          } else {
-            callPath = `/${resource}`;
-          }
 
           // Flow mode: apply per-step timeout guard
           const timeoutMs = execMode === "flow" ? flowTimeout * 1000 : 10000;
@@ -575,6 +575,9 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
             step: stepNum, label, method: step.method,
             status: r.status, latency, result: r.body,
             headers: r.headers, ok: expectOk,
+            reqUrl: envStore.resolve(callPath),
+            reqHeaders: { "Content-Type": "application/json", "Accept": "application/json" },
+            reqBody: body ?? undefined,
           };
           results.push(entry);
           this.setState(s => ({
@@ -585,6 +588,9 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
             step: stepNum, label, method: step.method,
             status: "ERR", latency: Date.now() - t0,
             result: { error: e.message }, headers: null, ok: false,
+            reqUrl: envStore.resolve(callPath),
+            reqHeaders: { "Content-Type": "application/json", "Accept": "application/json" },
+            reqBody: body ?? undefined,
           };
           results.push(entry);
           this.setState(s => ({
@@ -613,29 +619,48 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
         }],
       }));
       const t0 = Date.now();
+      const staticReqHeaders = { "Content-Type": "application/json", "Accept": "application/json" };
       try {
         await new Promise(r => setTimeout(r, 40 + Math.random() * 80));
         let r: any;
+        let staticCallPath: string;
+        let staticReqBody: any = undefined;
         if (step.method === "POST" && step.synth === "address") {
-          r = await rest.req("POST", "/" + step.resource, SYNTH.address());
+          staticCallPath = "/" + step.resource;
+          staticReqBody = SYNTH.address();
+          r = await rest.req("POST", staticCallPath, staticReqBody);
           if (r.body?.id) lastId = r.body.id;
         } else if (step.method === "GET") {
-          const path = step.dep && lastId ? `/${step.resource}/${lastId}` : `/${step.resource}`;
-          r = await rest.req("GET", path, null, step.params || {});
+          staticCallPath = step.dep && lastId ? `/${step.resource}/${lastId}` : `/${step.resource}`;
+          r = await rest.req("GET", staticCallPath, null, step.params || {});
         } else if (step.method === "PATCH") {
-          r = await rest.req("PATCH", `/${step.resource}/${step.path?.replace("/", "") || lastId || 0}`, SYNTH.address());
+          staticCallPath = `/${step.resource}/${step.path?.replace("/", "") || lastId || 0}`;
+          staticReqBody = SYNTH.address();
+          r = await rest.req("PATCH", staticCallPath, staticReqBody);
         } else if (step.method === "DELETE") {
-          r = await rest.req("DELETE", `/${step.resource}/${step.path?.replace("/", "") || lastId || 999999999}`);
+          staticCallPath = `/${step.resource}/${step.path?.replace("/", "") || lastId || 999999999}`;
+          r = await rest.req("DELETE", staticCallPath);
         } else {
+          staticCallPath = "/" + (step.resource || "");
           r = { status: step.expectStatus || 200, body: {}, headers: {} };
         }
         const latency = Date.now() - t0;
         const expectOk = step.expectStatus ? r.status === step.expectStatus : r.status >= 200 && r.status < 300;
-        const entry: ExecEntry = { step: i + 1, label: step.label, method: step.method, status: r.status, latency, result: r.body, headers: r.headers, ok: expectOk };
+        const entry: ExecEntry = {
+          step: i + 1, label: step.label, method: step.method, status: r.status, latency,
+          result: r.body, headers: r.headers, ok: expectOk,
+          reqUrl: envStore.resolve(staticCallPath),
+          reqHeaders: staticReqHeaders,
+          reqBody: staticReqBody,
+        };
         results.push(entry);
         this.setState(s => ({ execLog: s.execLog.map((x, xi) => xi === s.execLog.length - 1 ? entry : x) }));
       } catch (e: any) {
-        const entry: ExecEntry = { step: i + 1, label: step.label, method: step.method, status: "ERR", latency: Date.now() - t0, result: { error: e.message }, headers: null, ok: false };
+        const entry: ExecEntry = {
+          step: i + 1, label: step.label, method: step.method, status: "ERR",
+          latency: Date.now() - t0, result: { error: e.message }, headers: null, ok: false,
+          reqHeaders: staticReqHeaders,
+        };
         results.push(entry);
         this.setState(s => ({ execLog: s.execLog.map((x, xi) => xi === s.execLog.length - 1 ? entry : x) }));
       }
