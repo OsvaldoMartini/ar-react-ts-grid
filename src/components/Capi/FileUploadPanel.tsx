@@ -18,6 +18,8 @@ interface FileUploadPanelState {
   results: { ok: boolean; spec: ApiSpec }[];
   expanded: number | null;
   showDeps: boolean;
+  apiPage: number;
+  apiPageSize: number;
 }
 
 const ACCEPTED_EXTS = [".yaml", ".yml", ".json", ".schema", ".shape", ".proto", ".pdf"];
@@ -25,6 +27,7 @@ const ACCEPTED_EXTS = [".yaml", ".yml", ".json", ".schema", ".shape", ".proto", 
 export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileUploadPanelState> {
   state: FileUploadPanelState = {
     drag: false, parsing: false, results: [], expanded: null, showDeps: false,
+    apiPage: 0, apiPageSize: 20,
   };
 
   private folderRef = createRef<HTMLInputElement>();
@@ -87,11 +90,17 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
 
   render() {
     const { loadedSpecs, onDeleteAll } = this.props;
-    const { drag, parsing, results, expanded, showDeps } = this.state;
+    const { drag, parsing, results, expanded, showDeps, apiPage, apiPageSize } = this.state;
+
+    // Pagination slice — applied before grouping
+    const PAGE_SIZES = [10, 20, 50, 100];
+    const totalPages = Math.ceil(loadedSpecs.length / apiPageSize);
+    const pageStart = apiPage * apiPageSize;
+    const pagedSpecs = loadedSpecs.slice(pageStart, pageStart + apiPageSize);
 
     // Group specs by category
     const byCat: Record<string, ApiSpec[]> = {};
-    loadedSpecs.forEach(s => {
+    pagedSpecs.forEach(s => {
       const cat = this.getCategory(s);
       if (!byCat[cat]) byCat[cat] = [];
       byCat[cat].push(s);
@@ -242,8 +251,22 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
         )}
 
         {/* API list */}
-        <div className="capi-api-label">
-          API Caricate ({loadedSpecs.length}) · {Object.values(db.stores).reduce((a, s) => a + s.length, 0)} records
+        <div className="capi-api-label" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span>API Caricate ({loadedSpecs.length}) · {Object.values(db.stores).reduce((a, s) => a + s.length, 0)} records</span>
+          {/* Page-size picker */}
+          {loadedSpecs.length > 10 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              {PAGE_SIZES.map(n => (
+                <button key={n} onClick={() => this.setState({ apiPageSize: n, apiPage: 0 })} style={{
+                  background: apiPageSize === n ? "#34d39918" : "transparent",
+                  border: `1px solid ${apiPageSize === n ? "#34d399" : "var(--cs-border)"}`,
+                  color: apiPageSize === n ? "#34d399" : "var(--cs-muted)",
+                  borderRadius: 5, padding: "1px 7px", fontSize: 10, fontFamily: "monospace",
+                  cursor: "pointer", fontWeight: apiPageSize === n ? 700 : 400,
+                }}>{n}</button>
+              ))}
+            </div>
+          )}
         </div>
 
         {Object.entries(byCat).map(([cat, specs]) => {
@@ -363,6 +386,37 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
             </div>
           );
         })}
+
+        {/* Pagination bar */}
+        {totalPages > 1 && (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, padding: "10px 0 4px" }}>
+            <button onClick={() => this.setState({ apiPage: apiPage - 1 })} disabled={apiPage === 0}
+              style={{ background: "transparent", border: "1px solid var(--cs-border)", color: "var(--cs-muted)", borderRadius: 5, padding: "3px 9px", fontSize: 10, fontFamily: "monospace", cursor: apiPage === 0 ? "default" : "pointer", opacity: apiPage === 0 ? 0.4 : 1 }}>‹ Prev</button>
+
+            {Array.from({ length: totalPages }, (_, pi) => {
+              const near = pi === 0 || pi === totalPages - 1 || Math.abs(pi - apiPage) <= 1;
+              if (!near) return (pi === 1 || pi === totalPages - 2)
+                ? <span key={pi} style={{ fontSize: 10, color: "var(--cs-dim)", fontFamily: "monospace" }}>…</span>
+                : null;
+              return (
+                <button key={pi} onClick={() => this.setState({ apiPage: pi })} style={{
+                  background: pi === apiPage ? "#34d399" : "var(--cs-surface-2)",
+                  border: `1px solid ${pi === apiPage ? "#34d399" : "var(--cs-border)"}`,
+                  color: pi === apiPage ? "#0a1f15" : "var(--cs-muted)",
+                  borderRadius: 5, padding: "3px 8px", fontSize: 10, fontFamily: "monospace",
+                  cursor: "pointer", fontWeight: pi === apiPage ? 700 : 400, minWidth: 28,
+                }}>{pi + 1}</button>
+              );
+            })}
+
+            <button onClick={() => this.setState({ apiPage: apiPage + 1 })} disabled={apiPage === totalPages - 1}
+              style={{ background: "transparent", border: "1px solid var(--cs-border)", color: "var(--cs-muted)", borderRadius: 5, padding: "3px 9px", fontSize: 10, fontFamily: "monospace", cursor: apiPage === totalPages - 1 ? "default" : "pointer", opacity: apiPage === totalPages - 1 ? 0.4 : 1 }}>Next ›</button>
+
+            <span style={{ fontSize: 9, color: "var(--cs-dim)", fontFamily: "monospace", marginLeft: 6 }}>
+              {pageStart + 1}–{Math.min(pageStart + apiPageSize, loadedSpecs.length)} of {loadedSpecs.length}
+            </span>
+          </div>
+        )}
       </div>
     );
   }
