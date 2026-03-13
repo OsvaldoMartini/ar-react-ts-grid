@@ -1192,6 +1192,8 @@ interface RftState {
   lastAppliedEnvId: string;
   envAppliedKey: string;
   currentExecUrl: string | null;
+  executionMode: "flow" | "independent";
+  flowTimeoutSec: number;
 }
 
 export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }, RftState> {
@@ -1203,6 +1205,8 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
     lastAppliedEnvId: envStore.selectedId,
     envAppliedKey: envStore.selectedId,
     currentExecUrl: null,
+    executionMode: "flow",
+    flowTimeoutSec: 15,
   };
 
   private scrollRef = React.createRef<HTMLDivElement>();
@@ -1241,22 +1245,25 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
     this.setState(s => ({ tick: s.tick + 1, runProgress: 0 }));
   };
 
-  // ── EXECUTE a page of cases ──
-  private executeBlock = async () => {
-    const { pageSize, pageIndex } = this.state;
-    const visible = this.getFiltered();
-    const start = pageIndex * pageSize;
-    const block = visible.slice(start, start + pageSize).filter(c => c.status === "pending");
+  private getSafeFlowTimeoutSec = () => {
+    const n = Number(this.state.flowTimeoutSec);
+    if (!Number.isFinite(n)) return 15;
+    return Math.min(120, Math.max(1, Math.round(n)));
+  };
 
-    if (block.length === 0) return;
+  private executeCases = async (cases: TestCase[]) => {
+    if (cases.length === 0) return;
+    const { executionMode } = this.state;
+    const isFlow = executionMode === "flow";
+    const timeoutMs = this.getSafeFlowTimeoutSec() * 1000;
+
     this.setState({ running: true, runProgress: 0 });
-
     const ctx: Record<string, number> = {};
 
-    for (let i = 0; i < block.length; i++) {
-      const tc = block[i];
+    for (let i = 0; i < cases.length; i++) {
+      const tc = cases[i];
       tc.status = "running";
-      this.setState(s => ({ currentExecUrl: tc.resolvedUrl || tc.path }));
+      this.setState({ currentExecUrl: tc.resolvedUrl || tc.path });
       this.refresh();
 
       const t0 = Date.now();
@@ -1264,25 +1271,35 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
         await new Promise(r => setTimeout(r, 20 + Math.random() * 60));
 
         const res = tc.resourceName;
-        const pid = ctx[res] || null;
-
-        // Resolve path: replace {id} template or inject known ID
+        const pid = isFlow ? (ctx[res] || null) : null;
         let path = tc.path;
-        if (path.includes("{id}") && pid) {
-          path = path.replace("{id}", String(pid));
-        } else if (["GET", "PATCH", "PUT", "DELETE"].includes(tc.method) && pid) {
-          path = `/${res}/${pid}`;
+
+        if (isFlow) {
+          if (path.includes("{id}") && pid) path = path.replace("{id}", String(pid));
+          else if (["GET", "PATCH", "PUT", "DELETE"].includes(tc.method) && pid) path = `/${res}/${pid}`;
         }
 
-        // Use the URL frozen at generation/apply time — never overwrite it during execution.
-        // Extract just the path portion from the stored resolvedUrl so the mock engine works.
         const execPath = (() => {
           if (!tc.resolvedUrl) return path;
-          try { return new URL(tc.resolvedUrl).pathname; } catch { return tc.resolvedUrl; }
+          try {
+            const url = new URL(tc.resolvedUrl);
+            return url.pathname + url.search;
+          } catch {
+            return tc.resolvedUrl;
+          }
         })();
 
-        const r = await rest.req(tc.method, execPath, tc.body || undefined);
-        if (tc.method === "POST" && (r.body as any)?.id) ctx[res] = (r.body as any).id;
+        const request = rest.req(tc.method, execPath, tc.body || undefined);
+        const r = isFlow
+          ? await Promise.race([
+              request,
+              new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error(`Flow timeout after ${this.getSafeFlowTimeoutSec()}s`)), timeoutMs)
+              ),
+            ])
+          : await request;
+
+        if (isFlow && tc.method === "POST" && (r.body as any)?.id) ctx[res] = (r.body as any).id;
 
         tc.status = r.status >= 200 && r.status < 300 ? "passed" : "failed";
         tc.httpStatus = r.status;
@@ -1293,7 +1310,7 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
         tc.status = "failed";
         tc.httpStatus = "ERR";
         tc.latency = Date.now() - t0;
-        tc.result = { error: e.message };
+        tc.result = { error: e.message, mode: executionMode };
       }
 
       this.setState(s => ({ runProgress: s.runProgress + 1 }));
@@ -1303,55 +1320,19 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
     this.setState({ running: false, currentExecUrl: null });
   };
 
+  // ── EXECUTE a page of cases ──
+  private executeBlock = async () => {
+    const { pageSize, pageIndex } = this.state;
+    const visible = this.getFiltered();
+    const start = pageIndex * pageSize;
+    const block = visible.slice(start, start + pageSize).filter(c => c.status === "pending");
+    await this.executeCases(block);
+  };
+
   // ── EXECUTE ALL pending ──
   private executeAll = async () => {
     const pending = testStore.cases.filter(c => c.status === "pending");
-    if (pending.length === 0) return;
-    this.setState({ running: true, runProgress: 0 });
-
-    const ctx: Record<string, number> = {};
-
-    for (let i = 0; i < pending.length; i++) {
-      const tc = pending[i];
-      tc.status = "running";
-      this.setState(s => ({ currentExecUrl: tc.resolvedUrl || tc.path }));
-      this.refresh();
-
-      const t0 = Date.now();
-      try {
-        await new Promise(r => setTimeout(r, 20 + Math.random() * 60));
-        const res = tc.resourceName;
-        const pid = ctx[res] || null;
-        let path = tc.path;
-        if (path.includes("{id}") && pid) path = path.replace("{id}", String(pid));
-        else if (["GET", "PATCH", "PUT", "DELETE"].includes(tc.method) && pid) path = `/${res}/${pid}`;
-
-        // Use the URL frozen at generation/apply time — never overwrite it during execution.
-        const execPath = (() => {
-          if (!tc.resolvedUrl) return path;
-          try { return new URL(tc.resolvedUrl).pathname; } catch { return tc.resolvedUrl; }
-        })();
-
-        const r = await rest.req(tc.method, execPath, tc.body || undefined);
-        if (tc.method === "POST" && (r.body as any)?.id) ctx[res] = (r.body as any).id;
-
-        tc.status = r.status >= 200 && r.status < 300 ? "passed" : "failed";
-        tc.httpStatus = r.status;
-        tc.latency = Date.now() - t0;
-        tc.result = r.body;
-        tc.headers = r.headers;
-      } catch (e: any) {
-        tc.status = "failed";
-        tc.httpStatus = "ERR";
-        tc.latency = Date.now() - t0;
-        tc.result = { error: e.message };
-      }
-
-      this.setState(s => ({ runProgress: s.runProgress + 1 }));
-      this.refresh();
-    }
-
-    this.setState({ running: false, currentExecUrl: null });
+    await this.executeCases(pending);
   };
 
   private getFiltered(): TestCase[] {
@@ -1363,7 +1344,7 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
   }
 
   render() {
-    const { tick, pageSize, pageIndex, running, runProgress, filter, methodFilter, expandReport, showModal, showMockModal, envTick, lastAppliedEnvId, envAppliedKey, currentExecUrl } = this.state;
+    const { tick, pageSize, pageIndex, running, runProgress, filter, methodFilter, expandReport, showModal, showMockModal, envTick, lastAppliedEnvId, envAppliedKey, currentExecUrl, executionMode, flowTimeoutSec } = this.state;
     const allCases = testStore.cases;
     const total = allCases.length;
     const pending = allCases.filter(c => c.status === "pending").length;
@@ -1618,6 +1599,151 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
           </div>
         </div>
 
+        {/* ── Execution mode ── */}
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+          gap: 12,
+        }}>
+          <button
+            type="button"
+            disabled={running}
+            onClick={() => this.setState({ executionMode: "flow" })}
+            style={{
+              textAlign: "left",
+              padding: "16px 18px",
+              borderRadius: 12,
+              cursor: running ? "not-allowed" : "pointer",
+              background: executionMode === "flow"
+                ? "linear-gradient(135deg, #7a4a00, #f59e0b)"
+                : "var(--cs-surface-2)",
+              border: `1.5px solid ${executionMode === "flow" ? "#f59e0b" : "var(--cs-border)"}`,
+              color: executionMode === "flow" ? "#1b1200" : "var(--cs-text)",
+              boxShadow: executionMode === "flow" ? "0 0 18px #f59e0b33" : "none",
+              opacity: running ? 0.75 : 1,
+              transition: "all .15s",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 8 }}>
+              <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 800 }}>
+                ▶ Execution Flow {executionMode === "flow" ? "· Default" : ""}
+              </span>
+              <span style={{
+                fontFamily: MONO, fontSize: 10, fontWeight: 800,
+                borderRadius: 999, padding: "3px 9px",
+                background: executionMode === "flow" ? "#fff3" : "#f59e0b15",
+                color: executionMode === "flow" ? "#fff" : "#f59e0b",
+                border: `1px solid ${executionMode === "flow" ? "#fff4" : "#f59e0b33"}`,
+              }}>
+                {executionMode === "flow" ? "ACTIVE" : "Select"}
+              </span>
+            </div>
+            <div style={{ fontFamily: MONO, fontSize: 11, lineHeight: 1.65, color: executionMode === "flow" ? "#fff8" : "var(--cs-muted)" }}>
+              10 API calls executed according to the dependency graph and HTTP method order
+              (POST → GET → PATCH → DELETE).
+              <br /><br />
+              IDs generated by each POST request are automatically propagated and reused in subsequent API calls.
+              <br /><br />
+              In this mode, each request waits for the previous response before executing the next one.
+            </div>
+          </button>
+
+          <button
+            type="button"
+            disabled={running}
+            onClick={() => this.setState({ executionMode: "independent" })}
+            style={{
+              textAlign: "left",
+              padding: "16px 18px",
+              borderRadius: 12,
+              cursor: running ? "not-allowed" : "pointer",
+              background: executionMode === "independent"
+                ? "linear-gradient(135deg, #dff7f4, #95d7d1)"
+                : "var(--cs-surface-2)",
+              border: `1.5px solid ${executionMode === "independent" ? "#95d7d1" : "var(--cs-border)"}`,
+              color: executionMode === "independent" ? "#0d3733" : "var(--cs-text)",
+              boxShadow: executionMode === "independent" ? "0 0 18px rgba(149, 215, 209, .28)" : "none",
+              opacity: running ? 0.75 : 1,
+              transition: "all .15s",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 8 }}>
+              <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 800 }}>
+                ⚗ Independent Execution
+              </span>
+              <span style={{
+                fontFamily: MONO, fontSize: 10, fontWeight: 800,
+                borderRadius: 999, padding: "3px 9px",
+                background: executionMode === "independent" ? "#ffffff55" : "rgba(149, 215, 209, .14)",
+                color: executionMode === "independent" ? "#0d3733" : "#95d7d1",
+                border: `1px solid ${executionMode === "independent" ? "#ffffff66" : "rgba(149, 215, 209, .35)"}`,
+              }}>
+                {executionMode === "independent" ? "ACTIVE" : "Select"}
+              </span>
+            </div>
+            <div style={{ fontFamily: MONO, fontSize: 11, lineHeight: 1.65, color: executionMode === "independent" ? "#0d3733" : "var(--cs-muted)" }}>
+              Executes each API independently, without dependency chaining.
+              <br /><br />
+              Synthetic data generated by the system is attached directly to each request.
+              <br /><br />
+              No previous response is required before the next API request can be executed.
+            </div>
+          </button>
+        </div>
+
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          gap: 12, flexWrap: "wrap",
+          padding: "12px 14px", borderRadius: 10,
+          background: executionMode === "flow" ? "#f59e0b0d" : "#95d7d112",
+          border: `1px solid ${executionMode === "flow" ? "#f59e0b2f" : "rgba(149, 215, 209, .32)"}`,
+        }}>
+          <div style={{ minWidth: 260 }}>
+            <div style={{ fontFamily: MONO, fontSize: 11, fontWeight: 800, color: executionMode === "flow" ? "#f59e0b" : "#95d7d1", marginBottom: 4 }}>
+              {executionMode === "flow" ? "Flow execution is active" : "Independent execution is active"}
+            </div>
+            <div style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-muted)", lineHeight: 1.6 }}>
+              {executionMode === "flow"
+                ? "Each API call waits for the previous response. Timeout applies per request in the dependency chain."
+                : "Each request runs with its own generated payload and does not depend on IDs or responses from previous calls."}
+            </div>
+          </div>
+
+          <label style={{
+            display: "flex", alignItems: "center", gap: 8,
+            fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)",
+            opacity: executionMode === "flow" ? 1 : 0.55,
+          }}>
+            <span style={{ fontWeight: 800, letterSpacing: 0.5 }}>FLOW TIMEOUT</span>
+            <input
+              type="number"
+              min={1}
+              max={120}
+              step={1}
+              value={flowTimeoutSec}
+              disabled={running || executionMode !== "flow"}
+              onChange={e => {
+                const next = Number(e.target.value);
+                this.setState({ flowTimeoutSec: Number.isFinite(next) ? next : 15 });
+              }}
+              onBlur={() => this.setState({ flowTimeoutSec: this.getSafeFlowTimeoutSec() })}
+              style={{
+                width: 72,
+                padding: "7px 10px",
+                borderRadius: 8,
+                border: `1px solid ${executionMode === "flow" ? "#f59e0b55" : "var(--cs-border)"}`,
+                background: "var(--cs-bg)",
+                color: "var(--cs-text)",
+                fontFamily: MONO,
+                fontSize: 12,
+                fontWeight: 700,
+                outline: "none",
+              }}
+            />
+            <span style={{ fontSize: 11, color: executionMode === "flow" ? "#f59e0b" : "var(--cs-dim)" }}>sec</span>
+          </label>
+        </div>
+
         {/* ── Stats row ── */}
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           <StatCard value={total.toLocaleString()} label="Total" color="#8b949e" icon="📋" />
@@ -1752,7 +1878,7 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
               }}>
               {running
                 ? `⏳ Running… (${runProgress})`
-                : `▶ Execute Page  —  ${pendingInBlock} pending case${pendingInBlock !== 1 ? "s" : ""}`
+                : `${executionMode === "flow" ? "▶ Execute Flow Page" : "⚗ Execute Independent Page"}  —  ${pendingInBlock} pending case${pendingInBlock !== 1 ? "s" : ""}`
               }
             </button>
             <button
@@ -1767,7 +1893,7 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
                 fontFamily: MONO, fontSize: 12, fontWeight: 800, transition: "all .15s",
                 opacity: running ? 0.5 : 1,
               }}>
-              {running ? "⏳ Running…" : `▶▶ Execute All  —  ${pending.toLocaleString()} pending`}
+              {running ? "⏳ Running…" : `${executionMode === "flow" ? "▶▶ Execute Flow" : "⚗ Execute Independent"}  —  ${pending.toLocaleString()} pending`}
             </button>
           </div>
         ) : null}
@@ -1783,7 +1909,7 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
               fontSize: 11, color: "#f59e0b", marginBottom: 6, flexWrap: "wrap", gap: 6
             }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span>⏳ Executing…</span>
+                <span>⏳ Executing {executionMode === "flow" ? "flow" : "independent mode"}…</span>
                 {(() => {
                   // Resolve env from the current test case's frozen URL
                   const url = this.state.currentExecUrl;
@@ -1813,7 +1939,7 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
                   );
                 })()}
               </div>
-              <span>{runProgress} completed</span>
+              <span>{runProgress} completed{executionMode === "flow" ? ` · timeout ${this.getSafeFlowTimeoutSec()}s` : ""}</span>
             </div>
             <div style={{ height: 4, borderRadius: 2, background: "var(--cs-surface-2)", overflow: "hidden" }}>
               <div style={{
