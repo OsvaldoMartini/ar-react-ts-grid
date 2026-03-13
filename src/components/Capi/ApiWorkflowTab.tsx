@@ -1465,6 +1465,7 @@ interface DataGenTabState {
   specsPageSize: number;
   planPage: number;
   planPageSize: number;
+  depOpenCard: string | null;
 }
 
 const DG_PRESETS = [1, 5, 10, 50, 100, 500, 1000, 2000];
@@ -1476,7 +1477,7 @@ export class DataGenTab extends React.Component<
   state: DataGenTabState = {
     selNames: [], testCount: 1, dgView: "setup",
     plan: [], generatedN: 0, envTick: 0,
-    specsPage: 0, specsPageSize: 20, planPage: 0, planPageSize: 20,
+    specsPage: 0, specsPageSize: 20, planPage: 0, planPageSize: 20, depOpenCard: null,
   };
 
   private toggle = (fn: string) =>
@@ -1521,7 +1522,7 @@ export class DataGenTab extends React.Component<
 
   render() {
     const { loadedSpecs } = this.props;
-    const { selNames, testCount, dgView, plan, generatedN, specsPage, specsPageSize, planPage, planPageSize } = this.state;
+    const { selNames, testCount, dgView, plan, generatedN, specsPage, specsPageSize, planPage, planPageSize, depOpenCard } = this.state;
     const SPEC_PAGE_SIZES = [10, 20, 50, 100];
     const specsTotalPages = Math.ceil(loadedSpecs.length / specsPageSize);
     const specsPageStart = specsPage * specsPageSize;
@@ -1871,7 +1872,7 @@ export class DataGenTab extends React.Component<
               )}
             </div>
 
-            {/* Dependency preview */}
+            {/* Dependency preview — grouped cards */}
             {sel.length > 1 && (() => {
               const pairs: { from: string; to: string }[] = [];
               for (const s of sel)
@@ -1880,22 +1881,110 @@ export class DataGenTab extends React.Component<
                   if (ds && ds.fileName !== s.fileName) pairs.push({ from: ds.title, to: s.title });
                 }
               if (pairs.length === 0) return null;
+
+              // Group by TARGET (to), sort by chain count desc
+              const byTarget: Record<string, string[]> = {};
+              for (const p of pairs) {
+                if (!byTarget[p.to]) byTarget[p.to] = [];
+                if (!byTarget[p.to].includes(p.from)) byTarget[p.to].push(p.from);
+              }
+              const groups = Object.entries(byTarget).sort((a, b) => b[1].length - a[1].length);
+
+              // Color palette cycling
+              const CARD_COLORS = [
+                { bg: "#34d39912", border: "#34d39933", label: "#34d399", dot: "#34d399" },
+                { bg: "#60a5fa12", border: "#60a5fa33", label: "#60a5fa", dot: "#60a5fa" },
+                { bg: "#fb923c12", border: "#fb923c33", label: "#fb923c", dot: "#fb923c" },
+                { bg: "#a78bfa12", border: "#a78bfa33", label: "#a78bfa", dot: "#a78bfa" },
+                { bg: "#f472b612", border: "#f472b633", label: "#f472b6", dot: "#f472b6" },
+                { bg: "#facc1512", border: "#facc1533", label: "#facc15", dot: "#facc15" },
+                { bg: "#38bdf812", border: "#38bdf833", label: "#38bdf8", dot: "#38bdf8" },
+              ];
+
               return (
-                <div style={{
-                  padding: "10px 14px", borderRadius: 8,
-                  background: "var(--cs-surface-2)", border: "1px solid var(--cs-border-sub)"
-                }}>
-                  <SLbl text="Detected dependencies — IDs will be chained at execution time" />
-                  {pairs.map((p, i) => (
-                    <div key={i} style={{
-                      fontFamily: MONO, fontSize: 11,
-                      color: "var(--cs-muted)", display: "flex", gap: 6, marginBottom: 3, alignItems: "center"
+                <div>
+                  {/* Header */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                    <span style={{
+                      fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: 1,
+                      textTransform: "uppercase" as const, color: "#60a5fa",
+                      background: "#60a5fa12", border: "1px solid #60a5fa33",
+                      borderRadius: 5, padding: "2px 9px",
                     }}>
-                      <span style={{ color: "#34d399", fontWeight: 700 }}>{p.from}</span>
-                      <span>→ id →</span>
-                      <span style={{ color: "#60a5fa", fontWeight: 700 }}>{p.to}</span>
-                    </div>
-                  ))}
+                      Detected dependencies
+                    </span>
+                    <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)" }}>
+                      {pairs.length} chains · {groups.length} targets · click to expand
+                    </span>
+                  </div>
+
+                  {/* Cards grid */}
+                  <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 8 }}>
+                    {groups.map(([target, sources], gi) => {
+                      const c = CARD_COLORS[gi % CARD_COLORS.length];
+                      const isOpen = depOpenCard === target;
+                      return (
+                        <div key={target} style={{
+                          borderRadius: 8, border: `1px solid ${isOpen ? c.border : "var(--cs-border-sub)"}`,
+                          background: isOpen ? c.bg : "var(--cs-surface)",
+                          overflow: "hidden", transition: "all .15s",
+                          flexBasis: isOpen ? "100%" : "auto",
+                          minWidth: isOpen ? "100%" : 0,
+                        }}>
+                          {/* Card header — always visible, clickable */}
+                          <div
+                            onClick={() => this.setState({ depOpenCard: isOpen ? null : target })}
+                            style={{
+                              display: "flex", alignItems: "center", gap: 8,
+                              padding: "7px 12px", cursor: "pointer",
+                              borderBottom: isOpen ? `1px solid ${c.border}` : "none",
+                            }}>
+                            <span style={{
+                              width: 7, height: 7, borderRadius: "50%", flexShrink: 0,
+                              background: c.dot,
+                            }} />
+                            <span style={{
+                              fontFamily: MONO, fontSize: 11, fontWeight: 700,
+                              color: isOpen ? c.label : "var(--cs-text)",
+                              flex: 1, whiteSpace: "nowrap" as const,
+                              overflow: "hidden", textOverflow: "ellipsis",
+                            }}>{target}</span>
+                            <span style={{
+                              fontFamily: MONO, fontSize: 9, color: isOpen ? c.label : "var(--cs-dim)",
+                              background: isOpen ? c.bg : "var(--cs-surface-2)",
+                              border: `1px solid ${isOpen ? c.border : "var(--cs-border)"}`,
+                              borderRadius: 4, padding: "1px 6px", flexShrink: 0,
+                            }}>{sources.length}</span>
+                            <span style={{
+                              fontSize: 9, color: isOpen ? c.label : "var(--cs-dim)",
+                              transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+                              transition: "transform .15s", lineHeight: 1,
+                            }}>▼</span>
+                          </div>
+
+                          {/* Expanded: source list */}
+                          {isOpen && (
+                            <div style={{ padding: "10px 14px", display: "flex", flexDirection: "column" as const, gap: 5 }}>
+                              {sources.map((src, si) => (
+                                <div key={si} style={{
+                                  display: "flex", alignItems: "center", gap: 8,
+                                  fontFamily: MONO, fontSize: 11,
+                                }}>
+                                  <span style={{
+                                    color: c.label, fontWeight: 700,
+                                    background: c.bg, border: `1px solid ${c.border}`,
+                                    borderRadius: 4, padding: "2px 8px",
+                                  }}>{src}</span>
+                                  <span style={{ color: "var(--cs-dim)", fontSize: 10 }}>→ id →</span>
+                                  <span style={{ color: "var(--cs-text)", fontWeight: 600 }}>{target}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               );
             })()}
