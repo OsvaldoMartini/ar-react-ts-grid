@@ -709,7 +709,7 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
 
     return (
       <div className="capi-wizard-overlay">
-        <div className="capi-wizard" style={{ width: "min(660px, 96vw)", maxHeight: "92vh" }}>
+        <div className="capi-wizard" style={{ width: "min(800px, 96vw)", maxHeight: "92vh" }}>
 
           {/* ── Header ── */}
           <div className="capi-wizard__header">
@@ -959,7 +959,7 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
                           background: "transparent", border: "1px solid var(--cs-border)", color: "#34d399",
                           borderRadius: 6, padding: "3px 10px", fontFamily: MONO, fontSize: 11, cursor: "pointer"
                         }}>
-                        Select all
+                        All
                       </button>
                       <button onClick={() => this.setState({ selSpecNames: [] })}
                         style={{
