@@ -1673,7 +1673,7 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
                 cursor: running ? "not-allowed" : "pointer",
                 background: running ? "var(--cs-surface-2)" : "linear-gradient(135deg, #1a4a7a, #34d399)",
                 border: `1.5px solid ${running ? "var(--cs-border)" : "#34d399"}`,
-                color: running ? "var(--cs-dim)" : "#0a1f15",
+                color: running ? "var(--cs-dim)" : "#ffffff",
                 fontFamily: MONO, fontSize: 12, fontWeight: 800, transition: "all .15s",
                 opacity: running ? 0.5 : 1,
               }}>
