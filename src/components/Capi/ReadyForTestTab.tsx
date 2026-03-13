@@ -1408,7 +1408,7 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
             <div className="rft-exec-strip__label rft-exec-strip__label--flow">
               {executionMode === "flow" ? "Flow execution is active" : "Independent execution is active"}
             </div>
-            <div style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-muted)", lineHeight: 1.6 }}>
+            <div style={{ fontFamily: MONO, fontSize: 10, color: "#0d3733", lineHeight: 1.6 }}>
               {executionMode === "flow"
                 ? "Each API call waits for the previous response. Timeout applies per request in the dependency chain."
                 : "Each request runs with its own generated payload and does not depend on IDs or responses from previous calls."}

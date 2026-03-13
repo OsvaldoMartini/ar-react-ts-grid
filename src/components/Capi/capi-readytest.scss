@@ -115,8 +115,8 @@ $purple: #a78bfa;
 
   &--flow,
   &--indep {
-    background: rgba($teal, 0.07);
-    border: 1px solid rgba($teal, 0.2);
+    background: linear-gradient(135deg, #dff7f4, $teal);
+    border: 1px solid $teal;
   }
 
   &__label {
@@ -126,7 +126,7 @@ $purple: #a78bfa;
     margin-bottom: 4px;
 
     &--flow,
-    &--indep { color: $teal; }
+    &--indep { color: $amber; }
   }
 }
 
@@ -137,13 +137,14 @@ $purple: #a78bfa;
   gap: 8px;
   font-family: $mono;
   font-size: 10px;
-  color: var(--cs-dim);
+  color: #0d3733;
 
   &--disabled { opacity: 0.55; }
 
   &__text {
     font-weight: 800;
     letter-spacing: 0.5px;
+    color: #0d3733;
   }
 }
 
@@ -151,24 +152,24 @@ $purple: #a78bfa;
   width: 72px;
   padding: 7px 10px;
   border-radius: 8px;
-  border: 1px solid var(--cs-border);
-  background: var(--cs-bg);
-  color: var(--cs-text);
+  border: 1px solid rgba(#0d3733, 0.2);
+  background: rgba(#ffffff, 0.35);
+  color: #0d3733;
   font-family: $mono;
   font-size: 12px;
   font-weight: 700;
   outline: none;
 
   &--flow {
-    border-color: rgba($teal, 0.33);
+    border-color: rgba(#0d3733, 0.3);
   }
 }
 
 .rft-timeout-unit {
   font-size: 11px;
-  color: var(--cs-dim);
+  color: #0d3733;
 
-  &--flow { color: $teal; }
+  &--flow { color: #0d3733; }
 }
 
 // ── SYNC / APPLY ENV BADGES ─────────────────────────────────────
