@@ -1,0 +1,302 @@
+// ═══════════════════════════════════════════════════════════════
+// capi-readytest.scss
+// Styles for ReadyForTestTab — extracted from inline style props
+// ═══════════════════════════════════════════════════════════════
+
+// ── Token aliases (mirrors capi CSS custom properties) ──────────
+$mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+$teal:   #95d7d1;
+$amber:  #f59e0b;
+$green:  #34d399;
+$blue:   #60a5fa;
+$red:    #f87171;
+$purple: #a78bfa;
+
+// ── EXECUTION MODE GRID ─────────────────────────────────────────
+.rft-exec-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+// ── EXECUTION CARD (base) ───────────────────────────────────────
+.rft-exec-card {
+  text-align: left;
+  padding: 16px 18px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: $mono;
+
+  &:disabled {
+    opacity: 0.75;
+    cursor: not-allowed;
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  &__title {
+    font-family: $mono;
+    font-size: 13px;
+    font-weight: 800;
+  }
+
+  &__desc {
+    font-family: $mono;
+    font-size: 11px;
+    line-height: 1.65;
+    color: var(--cs-muted);
+
+    &--flow-active,
+    &--indep-active {
+      color: #0d3733;
+    }
+  }
+
+  // ── Flow active ──
+  &--flow-active {
+    background: linear-gradient(135deg, #dff7f4, $teal);
+    border: 1.5px solid $teal;
+    color: #0d3733;
+    box-shadow: 0 0 18px rgba(149, 215, 209, 0.28);
+
+    .rft-exec-card__title { color: #0d3733; }
+  }
+
+  // ── Independent active ──
+  &--indep-active {
+    background: linear-gradient(135deg, #dff7f4, $teal);
+    border: 1.5px solid $teal;
+    color: #0d3733;
+    box-shadow: 0 0 18px rgba(149, 215, 209, 0.28);
+
+    .rft-exec-card__title { color: #0d3733; }
+    .rft-exec-card__desc  { color: #0d3733; }
+  }
+
+  // ── Inactive ──
+  &--inactive {
+    background: var(--cs-surface-2);
+    border: 1.5px solid var(--cs-border);
+    color: var(--cs-text);
+    box-shadow: none;
+  }
+}
+
+// ── ACTIVE / SELECT BADGE ───────────────────────────────────────
+// White pill · orange text — identical for both states & both cards
+.rft-exec-badge {
+  font-family: $mono;
+  font-size: 10px;
+  font-weight: 800;
+  border-radius: 999px;
+  padding: 3px 9px;
+  background: #ffffff;
+  color: $amber;
+  border: 1px solid #ffffff;
+}
+
+// ── STATUS + TIMEOUT STRIP ──────────────────────────────────────
+.rft-exec-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border-radius: 10px;
+
+  &--flow {
+    background: rgba($amber, 0.05);
+    border: 1px solid rgba($amber, 0.18);
+  }
+
+  &--indep {
+    background: rgba($teal, 0.07);
+    border: 1px solid rgba($teal, 0.2);
+  }
+
+  &__label {
+    font-family: $mono;
+    font-size: 11px;
+    font-weight: 800;
+    margin-bottom: 4px;
+
+    &--flow  { color: $amber; }
+    &--indep { color: $teal;  }
+  }
+}
+
+// ── TIMEOUT INPUT ───────────────────────────────────────────────
+.rft-timeout-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: $mono;
+  font-size: 10px;
+  color: var(--cs-dim);
+
+  &--disabled { opacity: 0.55; }
+
+  &__text {
+    font-weight: 800;
+    letter-spacing: 0.5px;
+  }
+}
+
+.rft-timeout-input {
+  width: 72px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--cs-border);
+  background: var(--cs-bg);
+  color: var(--cs-text);
+  font-family: $mono;
+  font-size: 12px;
+  font-weight: 700;
+  outline: none;
+
+  &--flow {
+    border-color: rgba($amber, 0.33);
+  }
+}
+
+.rft-timeout-unit {
+  font-size: 11px;
+  color: var(--cs-dim);
+
+  &--flow { color: $amber; }
+}
+
+// ── SYNC / APPLY ENV BADGES ─────────────────────────────────────
+.rft-sync-badge {
+  font-family: $mono;
+  font-size: 9px;
+  font-weight: 700;
+  border-radius: 4px;
+  padding: 2px 8px;
+  flex-shrink: 0;
+  white-space: nowrap;
+
+  &--stale {
+    color: $amber;
+    background: rgba($amber, 0.08);
+    border: 1px solid rgba($amber, 0.27);
+  }
+
+  &--ok {
+    color: $green;
+    background: rgba($green, 0.07);
+    border: 1px solid rgba($green, 0.19);
+  }
+}
+
+.rft-apply-btn {
+  flex-shrink: 0;
+  padding: 5px 13px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: $mono;
+  font-size: 10px;
+  font-weight: 800;
+  transition: all 0.15s;
+
+  &--stale:hover {
+    box-shadow: 0 0 20px rgba($amber, 0.4) !important;
+  }
+}
+
+// ── DATA SOURCE BUTTONS ─────────────────────────────────────────
+.rft-source-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: $mono;
+  font-size: 11px;
+  font-weight: 700;
+  transition: all 0.15s;
+
+  &--synth {
+    background: rgba($green, 0.07);
+    border: 1px solid rgba($green, 0.27);
+    color: $green;
+
+    &:hover {
+      background: rgba($green, 0.13);
+      border-color: $green;
+    }
+  }
+}
+
+.rft-source-badge {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-family: $mono;
+  font-size: 11px;
+
+  &--file {
+    background: rgba($blue, 0.07);
+    border: 1px solid rgba($blue, 0.2);
+    color: $blue;
+  }
+}
+
+// ── RUN / ACTION BUTTONS ────────────────────────────────────────
+.rft-btn {
+  padding: 9px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: $mono;
+  font-size: 12px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  transition: all 0.15s;
+  flex: 1;
+
+  &--reset {
+    background: var(--cs-surface-2);
+    border: 1.5px solid var(--cs-border);
+    color: var(--cs-muted);
+  }
+
+  &--run-all {
+    background: linear-gradient(135deg, #1a4a7a, $green);
+    border: 1.5px solid $green;
+    color: #0a1f15;
+  }
+
+  &--exec-page {
+    background: linear-gradient(135deg, #1a3a5a, $blue);
+    border: 1.5px solid $blue;
+    color: #fff;
+  }
+
+  &--exec-all {
+    background: linear-gradient(135deg, #1a4a7a, $green);
+    border: 1.5px solid $green;
+    color: #0a1f15;
+  }
+
+  &--disabled {
+    background: var(--cs-surface-2) !important;
+    border-color: var(--cs-border) !important;
+    color: var(--cs-dim) !important;
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+}

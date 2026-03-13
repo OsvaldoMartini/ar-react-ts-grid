@@ -2,6 +2,7 @@ import React from "react";
 import { testStore, TestCase, rest, envStore, Environment, EnvTag, mockServerStore } from "./utils";
 import { StatusBadge } from "./AtomComponents";
 import { MockServerModal } from "./MockServerModal";
+import "./capi-readytest.scss";
 
 // ═══════════════════════════════════════════════════════════════
 // CONSTANTS
@@ -122,7 +123,7 @@ interface TcRowState {
   editBody: string;
   bodyError: string | null;
   running: boolean;
-  dirty: boolean;    // user has edited url or body
+  dirty: boolean;
 }
 
 class TcRow extends React.Component<{ tc: TestCase; onRefresh: () => void; envAppliedKey?: string }, TcRowState> {
@@ -131,8 +132,6 @@ class TcRow extends React.Component<{ tc: TestCase; onRefresh: () => void; envAp
     const { tc } = props;
     this.state = {
       open: false,
-      // Use the frozen URL stamped at generation/apply time — never read live envStore here.
-      // This prevents pagination from silently updating URLs when env has changed.
       editUrl: tc.resolvedUrl ?? tc.path,
       editBody: tc.body ? JSON.stringify(tc.body, null, 2) : "",
       bodyError: null,
@@ -142,8 +141,6 @@ class TcRow extends React.Component<{ tc: TestCase; onRefresh: () => void; envAp
   }
 
   componentDidUpdate(prev: { tc: TestCase; envAppliedKey?: string }) {
-    // Only reset editUrl when "Apply to All" is explicitly clicked (envAppliedKey bumped)
-    // and the user hasn't manually edited this row's URL.
     if (prev.envAppliedKey !== this.props.envAppliedKey && !this.state.dirty) {
       this.setState({ editUrl: this.props.tc.resolvedUrl ?? this.props.tc.path });
     }
@@ -154,7 +151,6 @@ class TcRow extends React.Component<{ tc: TestCase; onRefresh: () => void; envAp
     const { tc, onRefresh } = this.props;
     const { editUrl, editBody } = this.state;
 
-    // Validate JSON body if present
     let parsedBody: Record<string, any> | null = null;
     if (editBody.trim()) {
       try { parsedBody = JSON.parse(editBody); }
@@ -169,13 +165,11 @@ class TcRow extends React.Component<{ tc: TestCase; onRefresh: () => void; envAp
     try {
       await new Promise(r => setTimeout(r, 20 + Math.random() * 60));
 
-      // Extract just the path part from the full edited URL
       let path = tc.path;
       try {
         const u = new URL(editUrl);
         path = u.pathname + u.search;
       } catch {
-        // not a full URL — treat as path directly
         path = editUrl;
       }
 
@@ -228,11 +222,7 @@ class TcRow extends React.Component<{ tc: TestCase; onRefresh: () => void; envAp
 
         {/* ══ HEADER ROW ══ */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 10px 9px 13px" }}>
-
-          {/* Status dot */}
           <StatusDot status={running ? "running" : tc.status} />
-
-          {/* Seq */}
           <span style={{
             fontSize: 10, color: "var(--cs-dim)",
             background: "var(--cs-surface-2)", border: "1px solid var(--cs-border-sub)",
@@ -240,16 +230,11 @@ class TcRow extends React.Component<{ tc: TestCase; onRefresh: () => void; envAp
           }}>
             #{tc.seq}
           </span>
-
-          {/* Run group */}
           <span style={{ fontSize: 9, color: "var(--cs-dim)", flexShrink: 0, opacity: 0.7 }}>
             R{tc.runGroup}
           </span>
-
           <MChip method={tc.method} />
           <SourceBadge source={tc.dataSource} />
-
-          {/* API title + path */}
           <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }}
             onClick={() => this.setState(s => ({ open: !s.open }))}>
             <div style={{
@@ -265,16 +250,12 @@ class TcRow extends React.Component<{ tc: TestCase; onRefresh: () => void; envAp
               {tc.path}
             </div>
           </div>
-
-          {/* Status badge + latency */}
           {tc.httpStatus != null && <StatusBadge status={tc.httpStatus} />}
           {tc.latency != null && (
             <span style={{ fontSize: 10, color: "var(--cs-dim)", flexShrink: 0 }}>
               {tc.latency}ms
             </span>
           )}
-
-          {/* Dirty indicator */}
           {dirty && (
             <span title="Edited — original values changed" style={{
               fontSize: 9, color: "#f59e0b", background: "#f59e0b15",
@@ -282,8 +263,6 @@ class TcRow extends React.Component<{ tc: TestCase; onRefresh: () => void; envAp
               flexShrink: 0, fontWeight: 700,
             }}>EDITED</span>
           )}
-
-          {/* ▶ PLAY button */}
           <button
             onClick={this.playOne}
             disabled={running}
@@ -304,8 +283,6 @@ class TcRow extends React.Component<{ tc: TestCase; onRefresh: () => void; envAp
               <span style={{ fontSize: 10, animation: "spin 1s linear infinite" }}>⟳</span>
             ) : "▶"}
           </button>
-
-          {/* Expand toggle */}
           <button
             onClick={() => this.setState(s => ({ open: !s.open }))}
             style={{
@@ -324,7 +301,6 @@ class TcRow extends React.Component<{ tc: TestCase; onRefresh: () => void; envAp
             borderTop: `1px solid ${sc.border}`, padding: "12px 14px",
             display: "flex", flexDirection: "column" as const, gap: 12
           }}>
-
             {/* ── URL editor ── */}
             <div>
               <div style={{
@@ -346,7 +322,6 @@ class TcRow extends React.Component<{ tc: TestCase; onRefresh: () => void; envAp
                 )}
               </div>
               <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                {/* Method badge */}
                 <span style={{
                   fontSize: 10, fontWeight: 800, color: mc,
                   background: mc + "18", border: `1px solid ${mc}40`,
@@ -371,7 +346,7 @@ class TcRow extends React.Component<{ tc: TestCase; onRefresh: () => void; envAp
               </div>
             </div>
 
-            {/* ── Body editor (only for POST/PATCH/PUT) ── */}
+            {/* ── Body editor ── */}
             {hasBody && (
               <div>
                 <div style={{
@@ -489,7 +464,6 @@ class TcRow extends React.Component<{ tc: TestCase; onRefresh: () => void; envAp
               {tc.fileSource && <span>File: {tc.fileSource}</span>}
               {dirty && <span style={{ color: "#f59e0b" }}>⚠ Request has unsaved edits</span>}
             </div>
-
           </div>
         )}
       </div>
@@ -501,21 +475,13 @@ class TcRow extends React.Component<{ tc: TestCase; onRefresh: () => void; envAp
 // ENVIRONMENT SELECTOR BAR
 // ═══════════════════════════════════════════════════════════════
 const ENV_TAG_LABELS: Record<EnvTag, string> = {
-  local: "LOCAL",
-  development: "DEV",
-  staging: "STAGING",
-  production: "PROD",
-  custom: "CUSTOM",
+  local: "LOCAL", development: "DEV", staging: "STAGING",
+  production: "PROD", custom: "CUSTOM",
 };
 
 interface EnvBarState {
-  open: boolean;
-  editingId: string | null;
-  editUrl: string;
-  addingNew: boolean;
-  newName: string;
-  newUrl: string;
-  envTick: number;
+  open: boolean; editingId: string | null; editUrl: string;
+  addingNew: boolean; newName: string; newUrl: string; envTick: number;
 }
 
 export class EnvBar extends React.Component<{ onChange?: () => void }, EnvBarState> {
@@ -557,10 +523,7 @@ export class EnvBar extends React.Component<{ onChange?: () => void }, EnvBarSta
     if (!newName.trim() || !newUrl.trim()) return;
     const e = envStore.addCustom(newName.trim(), newUrl.trim());
     envStore.select(e.id);
-    this.setState({
-      addingNew: false, newName: "", newUrl: "",
-      open: false, envTick: this.state.envTick + 1
-    });
+    this.setState({ addingNew: false, newName: "", newUrl: "", open: false, envTick: this.state.envTick + 1 });
     this.props.onChange?.();
   };
 
@@ -571,7 +534,6 @@ export class EnvBar extends React.Component<{ onChange?: () => void }, EnvBarSta
 
     return (
       <div ref={this.dropRef} style={{ position: "relative" as const }}>
-
         {/* ── Trigger bar ── */}
         <div style={{
           display: "flex", alignItems: "center", gap: 0,
@@ -579,31 +541,22 @@ export class EnvBar extends React.Component<{ onChange?: () => void }, EnvBarSta
           background: isProd ? "#f8717108" : "var(--cs-surface-2)",
           transition: "border-color .15s",
         }}>
-
-          {/* Left: env label */}
           <div style={{
             padding: "10px 14px", borderRight: "1px solid var(--cs-border-sub)",
             display: "flex", alignItems: "center", gap: 8, flexShrink: 0
           }}>
             <span style={{
               width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
-              background: sel.color,
-              boxShadow: isProd ? `0 0 6px ${sel.color}` : "none",
+              background: sel.color, boxShadow: isProd ? `0 0 6px ${sel.color}` : "none",
               display: "inline-block",
             }} />
-            <span style={{
-              fontFamily: MONO, fontSize: 10, fontWeight: 800,
-              color: sel.color, letterSpacing: 0.8
-            }}>
+            <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 800, color: sel.color, letterSpacing: 0.8 }}>
               {ENV_TAG_LABELS[sel.tag]}
             </span>
-            <span style={{
-              fontFamily: MONO, fontSize: 11, fontWeight: 600,
-              color: "var(--cs-text)"
-            }}>{sel.name}</span>
+            <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 600, color: "var(--cs-text)" }}>
+              {sel.name}
+            </span>
           </div>
-
-          {/* Middle: resolved URL */}
           <div style={{
             flex: 1, padding: "10px 16px", fontFamily: MONO, fontSize: 11,
             color: "var(--cs-muted)", overflow: "hidden", textOverflow: "ellipsis",
@@ -612,8 +565,6 @@ export class EnvBar extends React.Component<{ onChange?: () => void }, EnvBarSta
             {sel.baseUrl}
             <span style={{ color: "var(--cs-dim)", opacity: 0.5 }}>/&lt;resource&gt;/&lt;id&gt;</span>
           </div>
-
-          {/* Right: dropdown toggle */}
           <button
             onClick={() => this.setState(s => ({ open: !s.open, editingId: null }))}
             style={{
@@ -647,7 +598,6 @@ export class EnvBar extends React.Component<{ onChange?: () => void }, EnvBarSta
             zIndex: 9000, background: "var(--cs-surface)", border: "1px solid var(--cs-border)",
             borderRadius: 10, boxShadow: "0 16px 48px rgba(0,0,0,0.35)",
           }}>
-            {/* Header */}
             <div style={{
               padding: "10px 16px", borderBottom: "1px solid var(--cs-border-sub)",
               background: "var(--cs-surface-2)", fontFamily: MONO, fontSize: 10,
@@ -657,7 +607,6 @@ export class EnvBar extends React.Component<{ onChange?: () => void }, EnvBarSta
               Select Environment
             </div>
 
-            {/* Env list */}
             {envStore.envs.map(env => {
               const isSelected = env.id === envStore.selectedId;
               const isEditing = editingId === env.id;
@@ -675,22 +624,17 @@ export class EnvBar extends React.Component<{ onChange?: () => void }, EnvBarSta
                   onMouseEnter={e => { if (!isEditing) (e.currentTarget as HTMLDivElement).style.background = env.color + "0c"; }}
                   onMouseLeave={e => { if (!isEditing) (e.currentTarget as HTMLDivElement).style.background = isSelected ? env.color + "0c" : "transparent"; }}
                 >
-                  {/* Dot */}
                   <span style={{
                     width: 9, height: 9, borderRadius: "50%", flexShrink: 0,
                     background: env.color, boxShadow: isProdEnv ? `0 0 5px ${env.color}` : "none",
                     display: "inline-block"
                   }} />
-
-                  {/* Tag */}
                   <span style={{
                     fontFamily: MONO, fontSize: 9, fontWeight: 800,
                     color: env.color, letterSpacing: 0.8, flexShrink: 0, width: 60
                   }}>
                     {ENV_TAG_LABELS[env.tag]}
                   </span>
-
-                  {/* Name */}
                   <span style={{
                     fontFamily: MONO, fontSize: 12, fontWeight: 600,
                     color: isSelected ? "var(--cs-text)" : "var(--cs-muted)",
@@ -698,8 +642,6 @@ export class EnvBar extends React.Component<{ onChange?: () => void }, EnvBarSta
                   }}>
                     {env.name}
                   </span>
-
-                  {/* URL (editable) */}
                   {isEditing ? (
                     <input
                       autoFocus
@@ -725,8 +667,6 @@ export class EnvBar extends React.Component<{ onChange?: () => void }, EnvBarSta
                       {env.baseUrl}
                     </span>
                   )}
-
-                  {/* Actions */}
                   <div style={{ display: "flex", gap: 4, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
                     {isEditing ? (
                       <>
@@ -752,18 +692,15 @@ export class EnvBar extends React.Component<{ onChange?: () => void }, EnvBarSta
                           <button onClick={e => {
                             e.stopPropagation(); envStore.remove(env.id);
                             this.setState(s => ({ envTick: s.envTick + 1 })); this.props.onChange?.();
-                          }}
-                            style={{
-                              background: "transparent", border: "1px solid #f8717133",
-                              color: "#f87171", borderRadius: 5, padding: "2px 6px",
-                              fontFamily: MONO, fontSize: 10, cursor: "pointer"
-                            }}>✕</button>
+                          }} style={{
+                            background: "transparent", border: "1px solid #f8717133",
+                            color: "#f87171", borderRadius: 5, padding: "2px 6px",
+                            fontFamily: MONO, fontSize: 10, cursor: "pointer"
+                          }}>✕</button>
                         )}
                       </>
                     )}
                   </div>
-
-                  {/* Selected tick */}
                   {isSelected && !isEditing && (
                     <span style={{ color: env.color, fontWeight: 900, fontSize: 13, flexShrink: 0 }}>✓</span>
                   )}
@@ -771,20 +708,17 @@ export class EnvBar extends React.Component<{ onChange?: () => void }, EnvBarSta
               );
             })}
 
-            {/* Add custom */}
             {addingNew ? (
               <div style={{
                 padding: "12px 16px", borderTop: "1px solid var(--cs-border-sub)",
                 display: "flex", flexDirection: "column" as const, gap: 8,
                 background: "#a78bfa08"
               }}>
-                <div style={{
-                  fontFamily: MONO, fontSize: 10, fontWeight: 700,
-                  color: "#a78bfa", letterSpacing: 0.8
-                }}>ADD CUSTOM ENVIRONMENT</div>
+                <div style={{ fontFamily: MONO, fontSize: 10, fontWeight: 700, color: "#a78bfa", letterSpacing: 0.8 }}>
+                  ADD CUSTOM ENVIRONMENT
+                </div>
                 <div style={{ display: "flex", gap: 8 }}>
-                  <input placeholder="Name (e.g. QA)"
-                    value={newName}
+                  <input placeholder="Name (e.g. QA)" value={newName}
                     onChange={e => this.setState({ newName: e.target.value })}
                     onKeyDown={e => e.stopPropagation()}
                     style={{
@@ -792,8 +726,7 @@ export class EnvBar extends React.Component<{ onChange?: () => void }, EnvBarSta
                       background: "var(--cs-input-bg)", border: "1px solid var(--cs-border)",
                       borderRadius: 6, color: "var(--cs-text)", outline: "none"
                     }} />
-                  <input placeholder="https://api.example.com"
-                    value={newUrl}
+                  <input placeholder="https://api.example.com" value={newUrl}
                     onChange={e => this.setState({ newUrl: e.target.value })}
                     onKeyDown={e => { if (e.key === "Enter") this.addCustom(); e.stopPropagation(); }}
                     style={{
@@ -844,7 +777,6 @@ export class EnvBar extends React.Component<{ onChange?: () => void }, EnvBarSta
 // ═══════════════════════════════════════════════════════════════
 const MODAL_PAGE_SIZES = [50, 100] as const;
 
-// Build a flat union of all field keys across all test case bodies
 function getBodyColumns(cases: TestCase[]): string[] {
   const keys = new Set<string>();
   for (const tc of cases) {
@@ -869,8 +801,6 @@ class SyntheticDataModal extends React.Component<{ cases: TestCase[]; onClose: (
   private downloadCSV = () => {
     const { cases } = this.props;
     const cols = getBodyColumns(cases);
-
-    // Build CSV rows
     const header = cols.join(",");
     const rows = cases.map(tc => {
       return cols.map(col => {
@@ -881,17 +811,13 @@ class SyntheticDataModal extends React.Component<{ cases: TestCase[]; onClose: (
         else if (col === "api") val = tc.apiTitle;
         else if (col === "path") val = tc.path;
         else if (tc.body) val = flatCell((tc.body as any)[col]);
-        // Escape CSV: wrap in quotes if contains comma/newline/quote
         if (/[",\n\r]/.test(val)) val = `"${val.replace(/"/g, '""')}"`;
         return val;
       }).join(",");
     });
-
     const csv = [header, ...rows].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
-
-    // Trigger browser save-as dialog via <a download>
     const a = document.createElement("a");
     a.href = url;
     a.download = `synthetic-test-data-${new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-")}.csv`;
@@ -909,8 +835,6 @@ class SyntheticDataModal extends React.Component<{ cases: TestCase[]; onClose: (
     const safePage = Math.min(page, totalPages - 1);
     const start = safePage * pageSize;
     const slice = cases.slice(start, start + pageSize);
-
-    // Fixed columns (meta) vs body columns
     const metaCols = ["#", "run", "method", "api", "path"];
     const bodyCols = cols.filter(c => !metaCols.includes(c));
 
@@ -918,8 +842,7 @@ class SyntheticDataModal extends React.Component<{ cases: TestCase[]; onClose: (
       <div style={{
         position: "fixed", inset: 0, zIndex: 9999,
         background: "rgba(0,0,0,0.55)", backdropFilter: "blur(3px)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        padding: 20,
+        display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
       }}
         onClick={e => { if (e.target === e.currentTarget) onClose(); }}
       >
@@ -927,21 +850,16 @@ class SyntheticDataModal extends React.Component<{ cases: TestCase[]; onClose: (
           width: "min(1200px, 96vw)", maxHeight: "92vh",
           background: "var(--cs-surface)", border: "1px solid var(--cs-border)",
           borderRadius: 14, display: "flex", flexDirection: "column",
-          boxShadow: "0 24px 80px rgba(0,0,0,0.4)",
-          overflow: "hidden",
+          boxShadow: "0 24px 80px rgba(0,0,0,0.4)", overflow: "hidden",
         }}>
-
-          {/* ── Modal header ── */}
+          {/* Header */}
           <div style={{
             display: "flex", alignItems: "center", justifyContent: "space-between",
             padding: "16px 20px", borderBottom: "1px solid var(--cs-border)",
             background: "var(--cs-surface-2)", flexShrink: 0,
           }}>
             <div>
-              <div style={{
-                fontFamily: MONO, fontSize: 14, fontWeight: 800,
-                color: "#34d399", marginBottom: 4
-              }}>
+              <div style={{ fontFamily: MONO, fontSize: 14, fontWeight: 800, color: "#34d399", marginBottom: 4 }}>
                 ⚗ Synthetic Test Data
               </div>
               <div style={{ fontFamily: MONO, fontSize: 11, color: "var(--cs-muted)" }}>
@@ -949,9 +867,7 @@ class SyntheticDataModal extends React.Component<{ cases: TestCase[]; onClose: (
                 · {cols.length} total columns
               </div>
             </div>
-
             <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-              {/* CSV download */}
               <button onClick={this.downloadCSV} style={{
                 display: "flex", alignItems: "center", gap: 8,
                 padding: "9px 18px", borderRadius: 8, cursor: "pointer",
@@ -961,8 +877,6 @@ class SyntheticDataModal extends React.Component<{ cases: TestCase[]; onClose: (
               }}>
                 ↓ Save as CSV
               </button>
-
-              {/* Close */}
               <button onClick={onClose} style={{
                 width: 34, height: 34, borderRadius: 8, cursor: "pointer",
                 background: "transparent", border: "1px solid var(--cs-border)",
@@ -972,7 +886,7 @@ class SyntheticDataModal extends React.Component<{ cases: TestCase[]; onClose: (
             </div>
           </div>
 
-          {/* ── Pagination controls ── */}
+          {/* Pagination controls */}
           <div style={{
             display: "flex", alignItems: "center", gap: 12, padding: "10px 20px",
             borderBottom: "1px solid var(--cs-border-sub)", flexShrink: 0,
@@ -993,25 +907,18 @@ class SyntheticDataModal extends React.Component<{ cases: TestCase[]; onClose: (
                 );
               })}
             </div>
-
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
-              <button disabled={safePage === 0}
-                onClick={() => this.setState({ page: 0 })}
-                style={{
-                  background: "transparent", border: "1px solid var(--cs-border-sub)",
-                  color: "var(--cs-muted)", borderRadius: 6, padding: "3px 8px",
-                  fontFamily: MONO, fontSize: 11, cursor: safePage === 0 ? "not-allowed" : "pointer",
-                  opacity: safePage === 0 ? 0.4 : 1
-                }}>«</button>
-              <button disabled={safePage === 0}
-                onClick={() => this.setState({ page: safePage - 1 })}
-                style={{
+              {[
+                { label: "«", disabled: safePage === 0, onClick: () => this.setState({ page: 0 }) },
+                { label: "‹ Prev", disabled: safePage === 0, onClick: () => this.setState({ page: safePage - 1 }) },
+              ].map(({ label, disabled, onClick }) => (
+                <button key={label} disabled={disabled} onClick={onClick} style={{
                   background: "transparent", border: "1px solid var(--cs-border-sub)",
                   color: "var(--cs-muted)", borderRadius: 6, padding: "3px 10px",
-                  fontFamily: MONO, fontSize: 11, cursor: safePage === 0 ? "not-allowed" : "pointer",
-                  opacity: safePage === 0 ? 0.4 : 1
-                }}>‹ Prev</button>
-
+                  fontFamily: MONO, fontSize: 11, cursor: disabled ? "not-allowed" : "pointer",
+                  opacity: disabled ? 0.4 : 1
+                }}>{label}</button>
+              ))}
               <span style={{
                 fontFamily: MONO, fontSize: 11, color: "var(--cs-muted)",
                 padding: "3px 10px", background: "var(--cs-surface-2)",
@@ -1019,62 +926,46 @@ class SyntheticDataModal extends React.Component<{ cases: TestCase[]; onClose: (
               }}>
                 {start + 1}–{Math.min(start + pageSize, cases.length)} of {cases.length.toLocaleString()}
               </span>
-
-              <button disabled={safePage >= totalPages - 1}
-                onClick={() => this.setState({ page: safePage + 1 })}
-                style={{
+              {[
+                { label: "Next ›", disabled: safePage >= totalPages - 1, onClick: () => this.setState({ page: safePage + 1 }) },
+                { label: "»", disabled: safePage >= totalPages - 1, onClick: () => this.setState({ page: totalPages - 1 }) },
+              ].map(({ label, disabled, onClick }) => (
+                <button key={label} disabled={disabled} onClick={onClick} style={{
                   background: "transparent", border: "1px solid var(--cs-border-sub)",
                   color: "var(--cs-muted)", borderRadius: 6, padding: "3px 10px",
-                  fontFamily: MONO, fontSize: 11,
-                  cursor: safePage >= totalPages - 1 ? "not-allowed" : "pointer",
-                  opacity: safePage >= totalPages - 1 ? 0.4 : 1
-                }}>Next ›</button>
-              <button disabled={safePage >= totalPages - 1}
-                onClick={() => this.setState({ page: totalPages - 1 })}
-                style={{
-                  background: "transparent", border: "1px solid var(--cs-border-sub)",
-                  color: "var(--cs-muted)", borderRadius: 6, padding: "3px 8px",
-                  fontFamily: MONO, fontSize: 11,
-                  cursor: safePage >= totalPages - 1 ? "not-allowed" : "pointer",
-                  opacity: safePage >= totalPages - 1 ? 0.4 : 1
-                }}>»</button>
+                  fontFamily: MONO, fontSize: 11, cursor: disabled ? "not-allowed" : "pointer",
+                  opacity: disabled ? 0.4 : 1
+                }}>{label}</button>
+              ))}
             </div>
-
             <span style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)" }}>
               Page {safePage + 1} / {totalPages}
             </span>
           </div>
 
-          {/* ── Grid ── */}
+          {/* Grid */}
           <div style={{ overflowX: "auto", overflowY: "auto", flex: 1 }}>
-            <table style={{
-              width: "100%", borderCollapse: "collapse",
-              background: "var(--cs-bg)", tableLayout: "auto"
-            }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", background: "var(--cs-bg)", tableLayout: "auto" }}>
               <thead style={{ position: "sticky", top: 0, zIndex: 2 }}>
                 <tr>
-                  {/* Meta columns */}
                   {metaCols.map(col => (
                     <th key={col} style={{
                       padding: "9px 12px", background: "var(--cs-surface-2)",
                       borderBottom: "2px solid var(--cs-border)",
                       borderRight: col === "path" ? "2px solid var(--cs-border)" : "1px solid var(--cs-border-sub)",
-                      fontFamily: MONO, fontSize: 9, fontWeight: 700,
-                      color: "var(--cs-dim)", textTransform: "uppercase",
-                      letterSpacing: 0.8, textAlign: "left", whiteSpace: "nowrap",
-                      position: "sticky", top: 0,
+                      fontFamily: MONO, fontSize: 9, fontWeight: 700, color: "var(--cs-dim)",
+                      textTransform: "uppercase", letterSpacing: 0.8, textAlign: "left",
+                      whiteSpace: "nowrap", position: "sticky", top: 0,
                     }}>{col}</th>
                   ))}
-                  {/* Body field columns */}
                   {bodyCols.map(col => (
                     <th key={col} style={{
                       padding: "9px 12px", background: "#34d39908",
                       borderBottom: "2px solid var(--cs-border)",
                       borderRight: "1px solid var(--cs-border-sub)",
-                      fontFamily: MONO, fontSize: 9, fontWeight: 700,
-                      color: "#34d399", textTransform: "uppercase",
-                      letterSpacing: 0.8, textAlign: "left", whiteSpace: "nowrap",
-                      position: "sticky", top: 0,
+                      fontFamily: MONO, fontSize: 9, fontWeight: 700, color: "#34d399",
+                      textTransform: "uppercase", letterSpacing: 0.8, textAlign: "left",
+                      whiteSpace: "nowrap", position: "sticky", top: 0,
                     }}>{col}</th>
                   ))}
                 </tr>
@@ -1082,53 +973,13 @@ class SyntheticDataModal extends React.Component<{ cases: TestCase[]; onClose: (
               <tbody>
                 {slice.map((tc, ri) => {
                   const isEven = ri % 2 === 0;
-                  const mc = METHOD_COLORS[tc.method] || "#8b949e";
                   return (
-                    <tr key={tc.id} style={{
-                      background: isEven ? "var(--cs-bg)" : "var(--cs-surface)",
-                    }}>
-                      {/* # */}
-                      <td style={{
-                        padding: "7px 12px", fontFamily: MONO, fontSize: 10,
-                        color: "var(--cs-dim)", borderBottom: "1px solid var(--cs-border-sub)",
-                        borderRight: "1px solid var(--cs-border-sub)", whiteSpace: "nowrap"
-                      }}>
-                        {tc.seq}
-                      </td>
-                      {/* run */}
-                      <td style={{
-                        padding: "7px 12px", fontFamily: MONO, fontSize: 10,
-                        color: "var(--cs-dim)", borderBottom: "1px solid var(--cs-border-sub)",
-                        borderRight: "1px solid var(--cs-border-sub)", whiteSpace: "nowrap"
-                      }}>
-                        R{tc.runGroup}
-                      </td>
-                      {/* method */}
-                      <td style={{
-                        padding: "7px 12px", borderBottom: "1px solid var(--cs-border-sub)",
-                        borderRight: "1px solid var(--cs-border-sub)", whiteSpace: "nowrap"
-                      }}>
-                        <MChip method={tc.method} />
-                      </td>
-                      {/* api */}
-                      <td style={{
-                        padding: "7px 12px", fontFamily: MONO, fontSize: 11,
-                        color: "var(--cs-text)", fontWeight: 600,
-                        borderBottom: "1px solid var(--cs-border-sub)",
-                        borderRight: "1px solid var(--cs-border-sub)", whiteSpace: "nowrap",
-                        maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis"
-                      }}>
-                        {tc.apiTitle}
-                      </td>
-                      {/* path */}
-                      <td style={{
-                        padding: "7px 12px", fontFamily: MONO, fontSize: 10,
-                        color: "var(--cs-muted)", borderBottom: "1px solid var(--cs-border-sub)",
-                        borderRight: "2px solid var(--cs-border)", whiteSpace: "nowrap"
-                      }}>
-                        {tc.path}
-                      </td>
-                      {/* body field cells */}
+                    <tr key={tc.id} style={{ background: isEven ? "var(--cs-bg)" : "var(--cs-surface)" }}>
+                      <td style={{ padding: "7px 12px", fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)", borderBottom: "1px solid var(--cs-border-sub)", borderRight: "1px solid var(--cs-border-sub)", whiteSpace: "nowrap" }}>{tc.seq}</td>
+                      <td style={{ padding: "7px 12px", fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)", borderBottom: "1px solid var(--cs-border-sub)", borderRight: "1px solid var(--cs-border-sub)", whiteSpace: "nowrap" }}>R{tc.runGroup}</td>
+                      <td style={{ padding: "7px 12px", borderBottom: "1px solid var(--cs-border-sub)", borderRight: "1px solid var(--cs-border-sub)", whiteSpace: "nowrap" }}><MChip method={tc.method} /></td>
+                      <td style={{ padding: "7px 12px", fontFamily: MONO, fontSize: 11, color: "var(--cs-text)", fontWeight: 600, borderBottom: "1px solid var(--cs-border-sub)", borderRight: "1px solid var(--cs-border-sub)", whiteSpace: "nowrap", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis" }}>{tc.apiTitle}</td>
+                      <td style={{ padding: "7px 12px", fontFamily: MONO, fontSize: 10, color: "var(--cs-muted)", borderBottom: "1px solid var(--cs-border-sub)", borderRight: "2px solid var(--cs-border)", whiteSpace: "nowrap" }}>{tc.path}</td>
                       {bodyCols.map(col => {
                         const raw = tc.body ? (tc.body as any)[col] : undefined;
                         const val = raw == null ? "" : flatCell(raw);
@@ -1139,8 +990,7 @@ class SyntheticDataModal extends React.Component<{ cases: TestCase[]; onClose: (
                             color: isEmpty ? "var(--cs-border)" : "var(--cs-text)",
                             borderBottom: "1px solid var(--cs-border-sub)",
                             borderRight: "1px solid var(--cs-border-sub)",
-                            maxWidth: 160, overflow: "hidden",
-                            textOverflow: "ellipsis", whiteSpace: "nowrap",
+                            maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                           }}>
                             {isEmpty ? "—" : val}
                           </td>
@@ -1153,7 +1003,7 @@ class SyntheticDataModal extends React.Component<{ cases: TestCase[]; onClose: (
             </table>
           </div>
 
-          {/* ── Modal footer ── */}
+          {/* Footer */}
           <div style={{
             padding: "12px 20px", borderTop: "1px solid var(--cs-border)",
             background: "var(--cs-surface-2)", flexShrink: 0,
@@ -1210,27 +1060,16 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
   };
 
   private scrollRef = React.createRef<HTMLDivElement>();
-
-  // Refresh from store
   private refresh = () => this.setState(s => ({ tick: s.tick + 1 }));
 
-  // Re-resolve all test case URLs to the currently selected environment
   private applyEnvToAll = () => {
-    const newBase = envStore.selected.baseUrl;
-    let updated = 0;
     for (const tc of testStore.cases) {
       tc.resolvedUrl = envStore.resolve(tc.path);
-      updated++;
     }
     const key = `${envStore.selectedId}-${Date.now()}`;
-    this.setState(s => ({
-      lastAppliedEnvId: envStore.selectedId,
-      envAppliedKey: key,
-      tick: s.tick + 1,
-    }));
+    this.setState(s => ({ lastAppliedEnvId: envStore.selectedId, envAppliedKey: key, tick: s.tick + 1 }));
   };
 
-  // Reset all executed cases back to pending — preserves test cases, clears results only
   private resetToPending = () => {
     for (const tc of testStore.cases) {
       if (tc.status === "passed" || tc.status === "failed" || tc.status === "running") {
@@ -1239,7 +1078,6 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
         tc.latency = undefined;
         tc.result = undefined;
         tc.headers = undefined;
-        // resolvedUrl intentionally preserved — URL ownership doesn't change on reset
       }
     }
     this.setState(s => ({ tick: s.tick + 1, runProgress: 0 }));
@@ -1284,9 +1122,7 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
           try {
             const url = new URL(tc.resolvedUrl);
             return url.pathname + url.search;
-          } catch {
-            return tc.resolvedUrl;
-          }
+          } catch { return tc.resolvedUrl; }
         })();
 
         const request = rest.req(tc.method, execPath, tc.body || undefined);
@@ -1320,7 +1156,6 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
     this.setState({ running: false, currentExecUrl: null });
   };
 
-  // ── EXECUTE a page of cases ──
   private executeBlock = async () => {
     const { pageSize, pageIndex } = this.state;
     const visible = this.getFiltered();
@@ -1329,7 +1164,6 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
     await this.executeCases(block);
   };
 
-  // ── EXECUTE ALL pending ──
   private executeAll = async () => {
     const pending = testStore.cases.filter(c => c.status === "pending");
     await this.executeCases(pending);
@@ -1344,7 +1178,12 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
   }
 
   render() {
-    const { tick, pageSize, pageIndex, running, runProgress, filter, methodFilter, expandReport, showModal, showMockModal, envTick, lastAppliedEnvId, envAppliedKey, currentExecUrl, executionMode, flowTimeoutSec } = this.state;
+    const {
+      tick, pageSize, pageIndex, running, runProgress, filter, methodFilter,
+      expandReport, showModal, showMockModal, envTick, lastAppliedEnvId,
+      envAppliedKey, currentExecUrl, executionMode, flowTimeoutSec
+    } = this.state;
+
     const allCases = testStore.cases;
     const total = allCases.length;
     const pending = allCases.filter(c => c.status === "pending").length;
@@ -1352,29 +1191,21 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
     const failed = allCases.filter(c => c.status === "failed").length;
     const running_n = allCases.filter(c => c.status === "running").length;
     const avgLat = passed + failed > 0
-      ? Math.round(allCases.filter(c => c.latency != null)
-        .reduce((a, c) => a + (c.latency || 0), 0) / (passed + failed))
+      ? Math.round(allCases.filter(c => c.latency != null).reduce((a, c) => a + (c.latency || 0), 0) / (passed + failed))
       : 0;
-    const pct = total - pending > 0
-      ? Math.round((passed / (total - pending - running_n)) * 100)
-      : 0;
+    const pct = total - pending > 0 ? Math.round((passed / (total - pending - running_n)) * 100) : 0;
     const pctCol = pct === 100 ? "#34d399" : pct >= 70 ? "#f59e0b" : "#f87171";
 
-    // Source breakdown
     const synthCount = allCases.filter(c => c.dataSource === "synthetic").length;
     const fileCount = allCases.filter(c => c.dataSource === "file").length;
-
-    // Method list for filter
     const methods = ["ALL", ...new Set(allCases.map(c => c.method))];
 
-    // Filtered + paginated
     const filtered = this.getFiltered();
     const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
     const safePage = Math.min(pageIndex, totalPages - 1);
     const pageStart = safePage * pageSize;
     const pageEnd = Math.min(pageStart + pageSize, filtered.length);
     const pageSlice = filtered.slice(pageStart, pageEnd);
-
     const pendingInBlock = pageSlice.filter(c => c.status === "pending").length;
 
     if (total === 0) {
@@ -1385,12 +1216,10 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
           color: "var(--cs-dim)", fontFamily: MONO
         }}>
           <div style={{ fontSize: 52, opacity: 0.25 }}>🧪</div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: "var(--cs-muted)" }}>
-            No test cases queued
-          </div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "var(--cs-muted)" }}>No test cases queued</div>
           <div style={{ fontSize: 11, opacity: 0.6, textAlign: "center", maxWidth: 380, lineHeight: 1.7 }}>
             Go to <strong style={{ color: "var(--cs-text)" }}>⚗ Data Generator</strong> to select APIs
-            and generate synthetic test cases,<br />or import test data from a file.
+            and generate synthetic test cases, or import test data from a file.
           </div>
         </div>
       );
@@ -1401,44 +1230,27 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 20, fontFamily: MONO }}>
 
-        {/* ── Mock Server Modal (floating, non-blocking) ── */}
+        {/* ── Modals ── */}
         {showMockModal && (
           <MockServerModal
             onClose={() => this.setState({ showMockModal: false })}
             onEnvChanged={() => this.setState(s => ({ envTick: s.envTick + 1 }))}
           />
         )}
-
-        {/* ── Synthetic data modal ── */}
         {showModal && synthCases.length > 0 && (
-          <SyntheticDataModal
-            cases={synthCases}
-            onClose={() => this.setState({ showModal: false })}
-          />
+          <SyntheticDataModal cases={synthCases} onClose={() => this.setState({ showModal: false })} />
         )}
 
-        {/* ══════════════════════════════════════════════════════
-            ENVIRONMENT ENDPOINT SELECTOR
-            Select target environment before executing tests
-        ══════════════════════════════════════════════════════ */}
-        <div style={{
-          borderRadius: 12,
-          border: "1px solid var(--cs-border)",
-          position: "relative" as const,
-        }}>
-          {/* Section label */}
+        {/* ══ ENVIRONMENT ENDPOINT SELECTOR ══ */}
+        <div style={{ borderRadius: 12, border: "1px solid var(--cs-border)", position: "relative" as const }}>
           <div style={{
             display: "flex", alignItems: "center", justifyContent: "space-between",
-            padding: "10px 16px",
-            background: "var(--cs-surface-2)",
+            padding: "10px 16px", background: "var(--cs-surface-2)",
             borderBottom: "1px solid var(--cs-border-sub)",
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 14 }}>🌐</span>
-              <span style={{
-                fontFamily: MONO, fontSize: 11, fontWeight: 800,
-                color: "var(--cs-text)", letterSpacing: 0.3
-              }}>
+              <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 800, color: "var(--cs-text)", letterSpacing: 0.3 }}>
                 Environment Endpoint
               </span>
               <span style={{
@@ -1453,47 +1265,28 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
               All REST calls will be sent to the selected base URL
             </div>
           </div>
-
-          {/* EnvBar */}
           <div style={{ padding: "12px 16px", background: "var(--cs-bg)" }}>
             <EnvBar onChange={() => this.setState(s => ({ envTick: s.envTick + 1 }))} />
           </div>
-
-          {/* Apply env to all tests — action strip */}
           {(() => {
-            const { lastAppliedEnvId, envAppliedKey } = this.state;
             const sel = envStore.selected;
             const isStale = lastAppliedEnvId !== sel.id;
             const count = testStore.total;
             return (
               <div style={{
-                padding: "8px 16px",
-                borderTop: "1px solid var(--cs-border-sub)",
+                padding: "8px 16px", borderTop: "1px solid var(--cs-border-sub)",
                 background: isStale ? "#f59e0b08" : "var(--cs-surface-2)",
-                display: "flex", alignItems: "center", gap: 10,
-                transition: "background .2s",
+                display: "flex", alignItems: "center", gap: 10, transition: "background .2s",
               }}>
-                {/* Status badge */}
                 {isStale ? (
-                  <span style={{
-                    fontFamily: MONO, fontSize: 9, fontWeight: 700,
-                    color: "#f59e0b", background: "#f59e0b15",
-                    border: "1px solid #f59e0b44", borderRadius: 4,
-                    padding: "2px 8px", flexShrink: 0, whiteSpace: "nowrap" as const
-                  }}>
+                  <span className="rft-sync-badge rft-sync-badge--stale">
                     ⚠ {count.toLocaleString()} test{count !== 1 ? "s" : ""} use old endpoint
                   </span>
                 ) : count > 0 ? (
-                  <span style={{
-                    fontFamily: MONO, fontSize: 9, color: "#34d399",
-                    background: "#34d39912", border: "1px solid #34d39930",
-                    borderRadius: 4, padding: "2px 8px", flexShrink: 0, whiteSpace: "nowrap" as const
-                  }}>
+                  <span className="rft-sync-badge rft-sync-badge--ok">
                     ✓ {count.toLocaleString()} tests synced
                   </span>
                 ) : null}
-
-                {/* URL */}
                 <code style={{
                   fontFamily: MONO, fontSize: 10, color: "var(--cs-muted)",
                   background: "var(--cs-bg)", border: "1px solid var(--cs-border-sub)",
@@ -1502,27 +1295,15 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
                 }}>
                   {sel.baseUrl}<span style={{ opacity: 0.4 }}>/<em>resource</em></span>
                 </code>
-
-                {/* Apply button */}
                 {count > 0 && (
                   <button
                     onClick={this.applyEnvToAll}
+                    className={`rft-apply-btn${isStale ? " rft-apply-btn--stale" : ""}`}
                     style={{
-                      flexShrink: 0, padding: "5px 13px", borderRadius: 6,
-                      cursor: "pointer", fontFamily: MONO, fontSize: 10, fontWeight: 800,
-                      transition: "all .15s",
-                      background: isStale
-                        ? "linear-gradient(135deg, #7a4a00, #f59e0b)"
-                        : sel.color + "18",
+                      background: isStale ? "linear-gradient(135deg, #7a4a00, #f59e0b)" : sel.color + "18",
                       border: `1.5px solid ${isStale ? "#f59e0b" : sel.color + "55"}`,
                       color: isStale ? "#0a0800" : sel.color,
                       boxShadow: isStale ? "0 0 12px #f59e0b44" : "none",
-                    }}
-                    onMouseEnter={e => {
-                      if (isStale) (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 20px #f59e0b66";
-                    }}
-                    onMouseLeave={e => {
-                      (e.currentTarget as HTMLButtonElement).style.boxShadow = isStale ? "0 0 12px #f59e0b44" : "none";
                     }}
                   >
                     {isStale ? `⟳ Apply to all ${count.toLocaleString()} tests` : `✓ Re-apply ${sel.name}`}
@@ -1536,13 +1317,9 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
         {/* ── Header banner ── */}
         <div style={{
           padding: "14px 18px", borderRadius: 12,
-          background: "var(--cs-surface-2)",
-          border: "1px solid var(--cs-border)"
+          background: "var(--cs-surface-2)", border: "1px solid var(--cs-border)"
         }}>
-          <div style={{
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-            flexWrap: "wrap", gap: 10
-          }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
             <div>
               <div style={{ fontSize: 15, fontWeight: 800, color: "var(--cs-text)", marginBottom: 5, fontFamily: MONO }}>
                 🧪 Ready for Test
@@ -1551,47 +1328,20 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
                 {total.toLocaleString()} test case{total !== 1 ? "s" : ""} queued
                 <span style={{ marginLeft: 10, opacity: 0.5 }}>·</span>
                 <span style={{ marginLeft: 10 }}>
-                  {synthCount > 0 && (
-                    <span style={{ color: "#34d399", marginRight: 8 }}>⚗ {synthCount.toLocaleString()} Synthetic</span>
-                  )}
-                  {fileCount > 0 && (
-                    <span style={{ color: "#60a5fa" }}>📄 {fileCount.toLocaleString()} File</span>
-                  )}
+                  {synthCount > 0 && <span style={{ color: "#34d399", marginRight: 8 }}>⚗ {synthCount.toLocaleString()} Synthetic</span>}
+                  {fileCount > 0 && <span style={{ color: "#60a5fa" }}>📄 {fileCount.toLocaleString()} File</span>}
                 </span>
               </div>
             </div>
-
-            {/* Data source legend / buttons */}
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {synthCount > 0 && (
-                <button
-                  onClick={() => this.setState({ showModal: true })}
-                  style={{
-                    padding: "8px 16px", borderRadius: 8, cursor: "pointer",
-                    background: "#34d39912", border: "1px solid #34d39944",
-                    fontSize: 11, color: "#34d399", fontFamily: MONO, fontWeight: 700,
-                    display: "flex", alignItems: "center", gap: 8,
-                    transition: "all .15s",
-                  }}
-                  onMouseEnter={e => {
-                    (e.currentTarget as HTMLButtonElement).style.background = "#34d39922";
-                    (e.currentTarget as HTMLButtonElement).style.borderColor = "#34d399";
-                  }}
-                  onMouseLeave={e => {
-                    (e.currentTarget as HTMLButtonElement).style.background = "#34d39912";
-                    (e.currentTarget as HTMLButtonElement).style.borderColor = "#34d39944";
-                  }}
-                >
+                <button onClick={() => this.setState({ showModal: true })} className="rft-source-btn rft-source-btn--synth">
                   ⚗ Synthetic · auto-generated banking data
                   <span style={{ opacity: 0.6, fontSize: 10 }}>↗ View data</span>
                 </button>
               )}
               {fileCount > 0 && (
-                <div style={{
-                  padding: "6px 12px", borderRadius: 8,
-                  background: "#60a5fa12", border: "1px solid #60a5fa33",
-                  fontSize: 11, color: "#60a5fa", fontFamily: MONO
-                }}>
+                <div className="rft-source-badge rft-source-badge--file">
                   📄 File · imported from upload
                 </div>
               )}
@@ -1599,46 +1349,26 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
           </div>
         </div>
 
-        {/* ── Execution mode ── */}
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
-          gap: 12,
-        }}>
+        {/* ══ EXECUTION MODE ══ */}
+        <div className="rft-exec-grid">
+
+          {/* ── Flow card ── */}
           <button
             type="button"
             disabled={running}
             onClick={() => this.setState({ executionMode: "flow" })}
-            style={{
-              textAlign: "left",
-              padding: "16px 18px",
-              borderRadius: 12,
-              cursor: running ? "not-allowed" : "pointer",
-              background: executionMode === "flow"
-                ? "linear-gradient(135deg, #dff7f4, #95d7d1)"
-                : "var(--cs-surface-2)",
-              border: `1.5px solid ${executionMode === "flow" ? "#95d7d1" : "var(--cs-border)"}`,
-              color: executionMode === "flow" ? "#0d3733" : "var(--cs-text)",
-              boxShadow: executionMode === "flow" ? "0 0 18px rgba(149, 215, 209, .28)" : "none",
-              opacity: running ? 0.75 : 1,
-              transition: "all .15s",
-            }}
+            className={`rft-exec-card${executionMode === "flow" ? " rft-exec-card--flow-active" : " rft-exec-card--inactive"}`}
           >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 8 }}>
-              <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 800 }}>
+            <div className="rft-exec-card__header">
+              <span className="rft-exec-card__title">
                 ▶ Execution Flow {executionMode === "flow" ? "· Default" : ""}
               </span>
-              <span style={{
-                fontFamily: MONO, fontSize: 10, fontWeight: 800,
-                borderRadius: 999, padding: "3px 9px",
-                background: executionMode === "flow" ? "#ffffff" : "#f59e0b15",
-                color: executionMode === "flow" ? "#f59e0b" : "#f59e0b",
-                border: `1px solid ${executionMode === "flow" ? "#fff4" : "#f59e0b33"}`,
-              }}>
+              {/* ── ACTIVE / Select badge ── */}
+              <span className="rft-exec-badge">
                 {executionMode === "flow" ? "ACTIVE" : "Select"}
               </span>
             </div>
-            <div style={{ fontFamily: MONO, fontSize: 11, lineHeight: 1.65, color: executionMode === "flow" ? "#0d3733" : "var(--cs-muted)" }}>
+            <div className={`rft-exec-card__desc${executionMode === "flow" ? " rft-exec-card__desc--flow-active" : ""}`}>
               10 API calls executed according to the dependency graph and HTTP method order
               (POST → GET → PATCH → DELETE).
               <br /><br />
@@ -1648,40 +1378,21 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
             </div>
           </button>
 
+          {/* ── Independent card ── */}
           <button
             type="button"
             disabled={running}
             onClick={() => this.setState({ executionMode: "independent" })}
-            style={{
-              textAlign: "left",
-              padding: "16px 18px",
-              borderRadius: 12,
-              cursor: running ? "not-allowed" : "pointer",
-              background: executionMode === "independent"
-                ? "linear-gradient(135deg, #dff7f4, #95d7d1)"
-                : "var(--cs-surface-2)",
-              border: `1.5px solid ${executionMode === "independent" ? "#95d7d1" : "var(--cs-border)"}`,
-              color: executionMode === "independent" ? "#0d3733" : "var(--cs-text)",
-              boxShadow: executionMode === "independent" ? "0 0 18px rgba(149, 215, 209, .28)" : "none",
-              opacity: running ? 0.75 : 1,
-              transition: "all .15s",
-            }}
+            className={`rft-exec-card${executionMode === "independent" ? " rft-exec-card--indep-active" : " rft-exec-card--inactive"}`}
           >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 8 }}>
-              <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 800 }}>
-                ⚗ Independent Execution
-              </span>
-              <span style={{
-                fontFamily: MONO, fontSize: 10, fontWeight: 800,
-                borderRadius: 999, padding: "3px 9px",
-                background: executionMode === "independent" ? "#ffffff" : "#f59e0b15",
-                color: executionMode === "independent" ? "#f59e0b" : "#f59e0b",
-                border: `1px solid ${executionMode === "independent" ? "#fff4" : "#f59e0b33"}`,
-              }}>
+            <div className="rft-exec-card__header">
+              <span className="rft-exec-card__title">⚗ Independent Execution</span>
+              {/* ── ACTIVE / Select badge ── */}
+              <span className="rft-exec-badge">
                 {executionMode === "independent" ? "ACTIVE" : "Select"}
               </span>
             </div>
-            <div style={{ fontFamily: MONO, fontSize: 11, lineHeight: 1.65, color: executionMode === "independent" ? "#0d3733" : "var(--cs-muted)" }}>
+            <div className={`rft-exec-card__desc${executionMode === "independent" ? " rft-exec-card__desc--indep-active" : ""}`}>
               Executes each API independently, without dependency chaining.
               <br /><br />
               Synthetic data generated by the system is attached directly to each request.
@@ -1691,15 +1402,10 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
           </button>
         </div>
 
-        <div style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          gap: 12, flexWrap: "wrap",
-          padding: "12px 14px", borderRadius: 10,
-          background: executionMode === "flow" ? "#f59e0b0d" : "#95d7d112",
-          border: `1px solid ${executionMode === "flow" ? "#f59e0b2f" : "rgba(149, 215, 209, .32)"}`,
-        }}>
+        {/* ── Status + timeout strip ── */}
+        <div className={`rft-exec-strip${executionMode === "flow" ? " rft-exec-strip--flow" : " rft-exec-strip--indep"}`}>
           <div style={{ minWidth: 260 }}>
-            <div style={{ fontFamily: MONO, fontSize: 11, fontWeight: 800, color: executionMode === "flow" ? "#f59e0b" : "#95d7d1", marginBottom: 4 }}>
+            <div className={`rft-exec-strip__label${executionMode === "flow" ? " rft-exec-strip__label--flow" : " rft-exec-strip__label--indep"}`}>
               {executionMode === "flow" ? "Flow execution is active" : "Independent execution is active"}
             </div>
             <div style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-muted)", lineHeight: 1.6 }}>
@@ -1708,18 +1414,10 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
                 : "Each request runs with its own generated payload and does not depend on IDs or responses from previous calls."}
             </div>
           </div>
-
-          <label style={{
-            display: "flex", alignItems: "center", gap: 8,
-            fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)",
-            opacity: executionMode === "flow" ? 1 : 0.55,
-          }}>
-            <span style={{ fontWeight: 800, letterSpacing: 0.5 }}>FLOW TIMEOUT</span>
+          <label className={`rft-timeout-label${executionMode === "flow" ? "" : " rft-timeout-label--disabled"}`}>
+            <span className="rft-timeout-label__text">FLOW TIMEOUT</span>
             <input
-              type="number"
-              min={1}
-              max={120}
-              step={1}
+              type="number" min={1} max={120} step={1}
               value={flowTimeoutSec}
               disabled={running || executionMode !== "flow"}
               onChange={e => {
@@ -1727,20 +1425,9 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
                 this.setState({ flowTimeoutSec: Number.isFinite(next) ? next : 15 });
               }}
               onBlur={() => this.setState({ flowTimeoutSec: this.getSafeFlowTimeoutSec() })}
-              style={{
-                width: 72,
-                padding: "7px 10px",
-                borderRadius: 8,
-                border: `1px solid ${executionMode === "flow" ? "#f59e0b55" : "var(--cs-border)"}`,
-                background: "var(--cs-bg)",
-                color: "var(--cs-text)",
-                fontFamily: MONO,
-                fontSize: 12,
-                fontWeight: 700,
-                outline: "none",
-              }}
+              className={`rft-timeout-input${executionMode === "flow" ? " rft-timeout-input--flow" : ""}`}
             />
-            <span style={{ fontSize: 11, color: executionMode === "flow" ? "#f59e0b" : "var(--cs-dim)" }}>sec</span>
+            <span className={`rft-timeout-unit${executionMode === "flow" ? " rft-timeout-unit--flow" : ""}`}>sec</span>
           </label>
         </div>
 
@@ -1756,29 +1443,13 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
         {/* ── Progress bar ── */}
         {(passed + failed) > 0 && (
           <div>
-            <div style={{
-              display: "flex", justifyContent: "space-between",
-              fontSize: 11, color: "var(--cs-muted)", marginBottom: 5
-            }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--cs-muted)", marginBottom: 5 }}>
               <span>Execution progress ({passed + failed} / {total - running_n} executed)</span>
               <span style={{ fontWeight: 700, color: pctCol }}>{pct}% pass</span>
             </div>
-            <div style={{
-              height: 10, borderRadius: 5, background: "var(--cs-surface-2)",
-              overflow: "hidden", display: "flex"
-            }}>
-              {passed > 0 && (
-                <div style={{
-                  height: "100%", background: "#34d399",
-                  width: `${(passed / total) * 100}%`, transition: "width .4s ease"
-                }} />
-              )}
-              {failed > 0 && (
-                <div style={{
-                  height: "100%", background: "#f87171",
-                  width: `${(failed / total) * 100}%`, transition: "width .4s ease"
-                }} />
-              )}
+            <div style={{ height: 10, borderRadius: 5, background: "var(--cs-surface-2)", overflow: "hidden", display: "flex" }}>
+              {passed > 0 && <div style={{ height: "100%", background: "#34d399", width: `${(passed / total) * 100}%`, transition: "width .4s ease" }} />}
+              {failed > 0 && <div style={{ height: "100%", background: "#f87171", width: `${(failed / total) * 100}%`, transition: "width .4s ease" }} />}
             </div>
             <div style={{ display: "flex", gap: 16, fontSize: 10, color: "var(--cs-dim)", marginTop: 4 }}>
               <span style={{ color: "#34d399" }}>■ {passed} passed</span>
@@ -1790,92 +1461,41 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
 
         {/* ── Run buttons / Completion panel ── */}
         {!running && pending === 0 && (passed + failed) > 0 ? (
-          /* ── All done — show summary + reset option ── */
           <div style={{
-            borderRadius: 10, border: `1px solid ${failed > 0 ? "#f8717133" : "#34d39933"}`,
+            borderRadius: 10,
+            border: `1px solid ${failed > 0 ? "#f8717133" : "#34d39933"}`,
             background: failed > 0 ? "#f8717108" : "#34d39908",
             padding: "14px 18px",
             display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" as const,
           }}>
-            {/* Result summary */}
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{
-                fontFamily: MONO, fontSize: 13, fontWeight: 800,
-                color: failed > 0 ? "#f87171" : "#34d399", marginBottom: 4
-              }}>
+              <div style={{ fontFamily: MONO, fontSize: 13, fontWeight: 800, color: failed > 0 ? "#f87171" : "#34d399", marginBottom: 4 }}>
                 {failed > 0 ? "⚠ Execution complete with failures" : "✓ All tests passed"}
               </div>
-              <div style={{
-                display: "flex", gap: 14, fontFamily: MONO, fontSize: 10,
-                color: "var(--cs-dim)", flexWrap: "wrap" as const
-              }}>
+              <div style={{ display: "flex", gap: 14, fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)", flexWrap: "wrap" as const }}>
                 <span style={{ color: "#34d399" }}>✓ {passed} passed</span>
                 {failed > 0 && <span style={{ color: "#f87171" }}>✗ {failed} failed</span>}
                 <span>⚡ avg {avgLat > 0 ? avgLat + "ms" : "—"}</span>
                 <span style={{ opacity: 0.6 }}>Results are preserved</span>
               </div>
             </div>
-
-            {/* Reset to Pending */}
-            <button
-              onClick={this.resetToPending}
-              title="Reset all results back to pending — test cases are preserved, only execution state is cleared"
-              style={{
-                padding: "9px 20px", borderRadius: 8, cursor: "pointer",
-                background: "var(--cs-surface-2)",
-                border: "1.5px solid var(--cs-border)",
-                color: "var(--cs-muted)", fontFamily: MONO, fontSize: 12, fontWeight: 700,
-                display: "flex", alignItems: "center", gap: 8, flexShrink: 0,
-                transition: "all .15s",
-              }}
-              onMouseEnter={e => {
-                const b = e.currentTarget as HTMLButtonElement;
-                b.style.borderColor = "#60a5fa88";
-                b.style.color = "#60a5fa";
-                b.style.background = "#60a5fa10";
-              }}
-              onMouseLeave={e => {
-                const b = e.currentTarget as HTMLButtonElement;
-                b.style.borderColor = "var(--cs-border)";
-                b.style.color = "var(--cs-muted)";
-                b.style.background = "var(--cs-surface-2)";
-              }}
+            <button onClick={this.resetToPending} className="rft-btn rft-btn--reset"
+              onMouseEnter={e => { const b = e.currentTarget as HTMLButtonElement; b.style.borderColor = "#60a5fa88"; b.style.color = "#60a5fa"; b.style.background = "#60a5fa10"; }}
+              onMouseLeave={e => { const b = e.currentTarget as HTMLButtonElement; b.style.borderColor = "var(--cs-border)"; b.style.color = "var(--cs-muted)"; b.style.background = "var(--cs-surface-2)"; }}
             >
               ↺ Reset to Pending
             </button>
-
-            {/* Re-run All */}
-            <button
-              onClick={this.executeAll}
-              title="Re-run all tests from scratch using stored URLs"
-              style={{
-                padding: "9px 20px", borderRadius: 8, cursor: "pointer",
-                background: "linear-gradient(135deg, #1a4a7a, #34d399)",
-                border: "1.5px solid #34d399",
-                color: "#0a1f15", fontFamily: MONO, fontSize: 12, fontWeight: 800,
-                display: "flex", alignItems: "center", gap: 8, flexShrink: 0,
-                transition: "all .15s",
-              }}>
+            <button onClick={this.executeAll} className="rft-btn rft-btn--run-all">
               ▶▶ Re-run All — {total.toLocaleString()} tests
             </button>
           </div>
         ) : pending > 0 ? (
-          /* ── Pending tests exist — show execute buttons ── */
           <div style={{ display: "flex", gap: 10 }}>
             <button
               disabled={running || pendingInBlock === 0}
               onClick={this.executeBlock}
-              style={{
-                flex: 1, padding: "12px 16px", borderRadius: 8,
-                cursor: running || pendingInBlock === 0 ? "not-allowed" : "pointer",
-                background: running || pendingInBlock === 0
-                  ? "var(--cs-surface-2)"
-                  : "linear-gradient(135deg, #1a3a5a, #60a5fa)",
-                border: `1.5px solid ${running || pendingInBlock === 0 ? "var(--cs-border)" : "#60a5fa"}`,
-                color: running || pendingInBlock === 0 ? "var(--cs-dim)" : "#fff",
-                fontFamily: MONO, fontSize: 12, fontWeight: 800, transition: "all .15s",
-                opacity: running || pendingInBlock === 0 ? 0.5 : 1,
-              }}>
+              className={`rft-btn rft-btn--exec-page${running || pendingInBlock === 0 ? " rft-btn--disabled" : ""}`}
+            >
               {running
                 ? `⏳ Running… (${runProgress})`
                 : `${executionMode === "flow" ? "▶ Execute Flow Page" : "⚗ Execute Independent Page"}  —  ${pendingInBlock} pending case${pendingInBlock !== 1 ? "s" : ""}`
@@ -1884,56 +1504,33 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
             <button
               disabled={running}
               onClick={this.executeAll}
-              style={{
-                flex: 1, padding: "12px 16px", borderRadius: 8,
-                cursor: running ? "not-allowed" : "pointer",
-                background: running ? "var(--cs-surface-2)" : "linear-gradient(135deg, #1a4a7a, #34d399)",
-                border: `1.5px solid ${running ? "var(--cs-border)" : "#34d399"}`,
-                color: running ? "var(--cs-dim)" : "#0a1f15",
-                fontFamily: MONO, fontSize: 12, fontWeight: 800, transition: "all .15s",
-                opacity: running ? 0.5 : 1,
-              }}>
+              className={`rft-btn rft-btn--exec-all${running ? " rft-btn--disabled" : ""}`}
+            >
               {running ? "⏳ Running…" : `${executionMode === "flow" ? "▶▶ Execute Flow" : "⚗ Execute Independent"}  —  ${pending.toLocaleString()} pending`}
             </button>
           </div>
         ) : null}
 
-        {/* Running progress bar */}
+        {/* ── Running progress bar ── */}
         {running && (
-          <div style={{
-            padding: "10px 14px", borderRadius: 8,
-            background: "#f59e0b10", border: "1px solid #f59e0b33"
-          }}>
-            <div style={{
-              display: "flex", justifyContent: "space-between",
-              fontSize: 11, color: "#f59e0b", marginBottom: 6, flexWrap: "wrap", gap: 6
-            }}>
+          <div style={{ padding: "10px 14px", borderRadius: 8, background: "#f59e0b10", border: "1px solid #f59e0b33" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#f59e0b", marginBottom: 6, flexWrap: "wrap", gap: 6 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span>⏳ Executing {executionMode === "flow" ? "flow" : "independent mode"}…</span>
                 {(() => {
-                  // Resolve env from the current test case's frozen URL
                   const url = this.state.currentExecUrl;
                   if (!url) return null;
-                  const matchedEnv = envStore.envs.find(e =>
-                    url.startsWith(e.baseUrl)
-                  ) || null;
+                  const matchedEnv = envStore.envs.find(e => url.startsWith(e.baseUrl)) || null;
                   const color = matchedEnv?.color || "#8b949e";
-                  const label = matchedEnv?.name || (() => {
-                    try { return new URL(url).hostname; } catch { return url; }
-                  })();
+                  const label = matchedEnv?.name || (() => { try { return new URL(url).hostname; } catch { return url; } })();
                   const isProd = matchedEnv?.tag === "production";
                   return (
                     <span style={{
                       display: "flex", alignItems: "center", gap: 5,
                       background: color + "18", border: `1px solid ${color}44`,
-                      borderRadius: 4, padding: "1px 8px",
-                      color, fontSize: 10, fontWeight: 700
+                      borderRadius: 4, padding: "1px 8px", color, fontSize: 10, fontWeight: 700
                     }}>
-                      <span style={{
-                        width: 6, height: 6, borderRadius: "50%",
-                        background: color, display: "inline-block",
-                        boxShadow: isProd ? `0 0 4px ${color}` : "none"
-                      }} />
+                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: color, display: "inline-block", boxShadow: isProd ? `0 0 4px ${color}` : "none" }} />
                       {label}
                     </span>
                   );
@@ -1953,12 +1550,10 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
 
         {/* ── Filters ── */}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-          {/* Status filter */}
           <div style={{ display: "flex", gap: 4 }}>
             {(["all", "pending", "passed", "failed"] as const).map(f => {
               const active = filter === f;
-              const cols = f === "passed" ? "#34d399" : f === "failed" ? "#f87171"
-                : f === "pending" ? "#8b949e" : "var(--cs-accent)";
+              const cols = f === "passed" ? "#34d399" : f === "failed" ? "#f87171" : f === "pending" ? "#8b949e" : "var(--cs-accent)";
               const cnt = f === "all" ? total : allCases.filter(c => c.status === f).length;
               return (
                 <button key={f} onClick={() => this.setState({ filter: f, pageIndex: 0 })} style={{
@@ -1973,8 +1568,6 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
               );
             })}
           </div>
-
-          {/* Method filter */}
           <div style={{ display: "flex", gap: 4 }}>
             {methods.map(m => {
               const active = methodFilter === m;
@@ -1992,50 +1585,35 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
               );
             })}
           </div>
-
           <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
-            {/* Mock Server button */}
             <button
               onClick={() => this.setState(s => ({ showMockModal: !s.showMockModal }))}
-              title="Open Mock Server panel — start a local in-browser mock and download a Node.js server script"
               style={{
-                background: showMockModal || mockServerStore.status === "running"
-                  ? "#a78bfa22" : "transparent",
+                background: showMockModal || mockServerStore.status === "running" ? "#a78bfa22" : "transparent",
                 border: `1px solid ${mockServerStore.status === "running" ? "#a78bfa88" : "#a78bfa44"}`,
                 color: mockServerStore.status === "running" ? "#a78bfa" : "var(--cs-muted)",
-                borderRadius: 6, padding: "4px 12px",
-                fontFamily: MONO, fontSize: 11, cursor: "pointer",
-                display: "flex", alignItems: "center", gap: 5,
-                transition: "all .15s",
+                borderRadius: 6, padding: "4px 12px", fontFamily: MONO, fontSize: 11, cursor: "pointer",
+                display: "flex", alignItems: "center", gap: 5, transition: "all .15s",
               }}>
               {mockServerStore.status === "running" && (
-                <span style={{
-                  width: 6, height: 6, borderRadius: "50%",
-                  background: "#a78bfa", display: "inline-block",
-                  boxShadow: "0 0 5px #a78bfa",
-                }} />
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#a78bfa", display: "inline-block", boxShadow: "0 0 5px #a78bfa" }} />
               )}
               ⚡ Mock Server
             </button>
-
             {(passed + failed) > 0 && (
-              <button
-                onClick={this.resetToPending}
-                title="Reset execution results — test cases stay, only status/results are cleared"
-                style={{
-                  background: "transparent", border: "1px solid #60a5fa33",
-                  color: "#60a5fa", borderRadius: 6, padding: "4px 12px",
-                  fontFamily: MONO, fontSize: 11, cursor: "pointer"
-                }}>
+              <button onClick={this.resetToPending} style={{
+                background: "transparent", border: "1px solid #60a5fa33",
+                color: "#60a5fa", borderRadius: 6, padding: "4px 12px",
+                fontFamily: MONO, fontSize: 11, cursor: "pointer"
+              }}>
                 ↺ Reset
               </button>
             )}
-            <button onClick={() => { testStore.clear(); this.refresh(); this.props.onClearAll?.(); }}
-              style={{
-                background: "transparent", border: "1px solid #f8717133",
-                color: "#f87171", borderRadius: 6, padding: "4px 12px",
-                fontFamily: MONO, fontSize: 11, cursor: "pointer"
-              }}>
+            <button onClick={() => { testStore.clear(); this.refresh(); this.props.onClearAll?.(); }} style={{
+              background: "transparent", border: "1px solid #f8717133",
+              color: "#f87171", borderRadius: 6, padding: "4px 12px",
+              fontFamily: MONO, fontSize: 11, cursor: "pointer"
+            }}>
               🗑 Clear all
             </button>
           </div>
@@ -2043,7 +1621,6 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
 
         {/* ── Pagination controls ── */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          {/* Page size */}
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ fontSize: 11, color: "var(--cs-dim)" }}>Cases per page:</span>
             <div style={{ display: "flex", gap: 4 }}>
@@ -2061,35 +1638,10 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
               })}
             </div>
           </div>
-
-          {/* Page nav */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
-            <button
-              disabled={safePage === 0}
-              onClick={() => this.setState({ pageIndex: 0 })}
-              style={{
-                background: "transparent", border: "1px solid var(--cs-border-sub)",
-                color: safePage === 0 ? "var(--cs-dim)" : "var(--cs-muted)",
-                borderRadius: 6, padding: "3px 8px", fontFamily: MONO, fontSize: 11,
-                cursor: safePage === 0 ? "not-allowed" : "pointer", opacity: safePage === 0 ? 0.4 : 1
-              }}>
-              «
-            </button>
-            <button
-              disabled={safePage === 0}
-              onClick={() => this.setState({ pageIndex: safePage - 1 })}
-              style={{
-                background: "transparent", border: "1px solid var(--cs-border-sub)",
-                color: safePage === 0 ? "var(--cs-dim)" : "var(--cs-muted)",
-                borderRadius: 6, padding: "3px 10px", fontFamily: MONO, fontSize: 11,
-                cursor: safePage === 0 ? "not-allowed" : "pointer", opacity: safePage === 0 ? 0.4 : 1
-              }}>
-              ‹ Prev
-            </button>
-
-            {/* Page number chips */}
+            <button disabled={safePage === 0} onClick={() => this.setState({ pageIndex: 0 })} style={{ background: "transparent", border: "1px solid var(--cs-border-sub)", color: safePage === 0 ? "var(--cs-dim)" : "var(--cs-muted)", borderRadius: 6, padding: "3px 8px", fontFamily: MONO, fontSize: 11, cursor: safePage === 0 ? "not-allowed" : "pointer", opacity: safePage === 0 ? 0.4 : 1 }}>«</button>
+            <button disabled={safePage === 0} onClick={() => this.setState({ pageIndex: safePage - 1 })} style={{ background: "transparent", border: "1px solid var(--cs-border-sub)", color: safePage === 0 ? "var(--cs-dim)" : "var(--cs-muted)", borderRadius: 6, padding: "3px 10px", fontFamily: MONO, fontSize: 11, cursor: safePage === 0 ? "not-allowed" : "pointer", opacity: safePage === 0 ? 0.4 : 1 }}>‹ Prev</button>
             {Array.from({ length: Math.min(totalPages, 9) }, (_, i) => {
-              // Window of pages around current
               const half = 4;
               let start = Math.max(0, safePage - half);
               const end = Math.min(totalPages, start + 9);
@@ -2109,33 +1661,9 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
                 </button>
               );
             })}
-
-            <button
-              disabled={safePage >= totalPages - 1}
-              onClick={() => this.setState({ pageIndex: safePage + 1 })}
-              style={{
-                background: "transparent", border: "1px solid var(--cs-border-sub)",
-                color: safePage >= totalPages - 1 ? "var(--cs-dim)" : "var(--cs-muted)",
-                borderRadius: 6, padding: "3px 10px", fontFamily: MONO, fontSize: 11,
-                cursor: safePage >= totalPages - 1 ? "not-allowed" : "pointer",
-                opacity: safePage >= totalPages - 1 ? 0.4 : 1
-              }}>
-              Next ›
-            </button>
-            <button
-              disabled={safePage >= totalPages - 1}
-              onClick={() => this.setState({ pageIndex: totalPages - 1 })}
-              style={{
-                background: "transparent", border: "1px solid var(--cs-border-sub)",
-                color: safePage >= totalPages - 1 ? "var(--cs-dim)" : "var(--cs-muted)",
-                borderRadius: 6, padding: "3px 8px", fontFamily: MONO, fontSize: 11,
-                cursor: safePage >= totalPages - 1 ? "not-allowed" : "pointer",
-                opacity: safePage >= totalPages - 1 ? 0.4 : 1
-              }}>
-              »
-            </button>
+            <button disabled={safePage >= totalPages - 1} onClick={() => this.setState({ pageIndex: safePage + 1 })} style={{ background: "transparent", border: "1px solid var(--cs-border-sub)", color: safePage >= totalPages - 1 ? "var(--cs-dim)" : "var(--cs-muted)", borderRadius: 6, padding: "3px 10px", fontFamily: MONO, fontSize: 11, cursor: safePage >= totalPages - 1 ? "not-allowed" : "pointer", opacity: safePage >= totalPages - 1 ? 0.4 : 1 }}>Next ›</button>
+            <button disabled={safePage >= totalPages - 1} onClick={() => this.setState({ pageIndex: totalPages - 1 })} style={{ background: "transparent", border: "1px solid var(--cs-border-sub)", color: safePage >= totalPages - 1 ? "var(--cs-dim)" : "var(--cs-muted)", borderRadius: 6, padding: "3px 8px", fontFamily: MONO, fontSize: 11, cursor: safePage >= totalPages - 1 ? "not-allowed" : "pointer", opacity: safePage >= totalPages - 1 ? 0.4 : 1 }}>»</button>
           </div>
-
           <span style={{ fontSize: 11, color: "var(--cs-dim)" }}>
             {filtered.length > 0
               ? `${pageStart + 1}–${pageEnd} of ${filtered.length.toLocaleString()} case${filtered.length !== 1 ? "s" : ""}`
@@ -2153,35 +1681,16 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
               No cases match the current filter
             </div>
           ) : (
-            pageSlice.map((tc, i) => <TcRow key={tc.id} tc={tc} onRefresh={this.refresh} envAppliedKey={this.state.envAppliedKey} />)
+            pageSlice.map(tc => <TcRow key={tc.id} tc={tc} onRefresh={this.refresh} envAppliedKey={this.state.envAppliedKey} />)
           )}
         </div>
 
-        {/* ── Bottom pagination repeat ── */}
+        {/* ── Bottom pagination ── */}
         {filtered.length > pageSize && (
           <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
-            <button disabled={safePage === 0}
-              onClick={() => this.setState({ pageIndex: safePage - 1 })} style={{
-                background: "transparent", border: "1px solid var(--cs-border-sub)",
-                color: safePage === 0 ? "var(--cs-dim)" : "var(--cs-muted)",
-                borderRadius: 6, padding: "5px 14px", fontFamily: MONO, fontSize: 12,
-                cursor: safePage === 0 ? "not-allowed" : "pointer", opacity: safePage === 0 ? 0.4 : 1
-              }}>
-              ‹ Prev
-            </button>
-            <span style={{ fontFamily: MONO, fontSize: 11, color: "var(--cs-dim)" }}>
-              Page {safePage + 1} / {totalPages}
-            </span>
-            <button disabled={safePage >= totalPages - 1}
-              onClick={() => this.setState({ pageIndex: safePage + 1 })} style={{
-                background: "transparent", border: "1px solid var(--cs-border-sub)",
-                color: safePage >= totalPages - 1 ? "var(--cs-dim)" : "var(--cs-muted)",
-                borderRadius: 6, padding: "5px 14px", fontFamily: MONO, fontSize: 12,
-                cursor: safePage >= totalPages - 1 ? "not-allowed" : "pointer",
-                opacity: safePage >= totalPages - 1 ? 0.4 : 1
-              }}>
-              Next ›
-            </button>
+            <button disabled={safePage === 0} onClick={() => this.setState({ pageIndex: safePage - 1 })} style={{ background: "transparent", border: "1px solid var(--cs-border-sub)", color: safePage === 0 ? "var(--cs-dim)" : "var(--cs-muted)", borderRadius: 6, padding: "5px 14px", fontFamily: MONO, fontSize: 12, cursor: safePage === 0 ? "not-allowed" : "pointer", opacity: safePage === 0 ? 0.4 : 1 }}>‹ Prev</button>
+            <span style={{ fontFamily: MONO, fontSize: 11, color: "var(--cs-dim)" }}>Page {safePage + 1} / {totalPages}</span>
+            <button disabled={safePage >= totalPages - 1} onClick={() => this.setState({ pageIndex: safePage + 1 })} style={{ background: "transparent", border: "1px solid var(--cs-border-sub)", color: safePage >= totalPages - 1 ? "var(--cs-dim)" : "var(--cs-muted)", borderRadius: 6, padding: "5px 14px", fontFamily: MONO, fontSize: 12, cursor: safePage >= totalPages - 1 ? "not-allowed" : "pointer", opacity: safePage >= totalPages - 1 ? 0.4 : 1 }}>Next ›</button>
           </div>
         )}
 
