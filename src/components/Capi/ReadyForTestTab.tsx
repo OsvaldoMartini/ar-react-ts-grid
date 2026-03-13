@@ -1615,11 +1615,11 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
               borderRadius: 12,
               cursor: running ? "not-allowed" : "pointer",
               background: executionMode === "flow"
-                ? "linear-gradient(135deg, #7a4a00, #f59e0b)"
+                ? "linear-gradient(135deg, #dff7f4, #95d7d1)"
                 : "var(--cs-surface-2)",
-              border: `1.5px solid ${executionMode === "flow" ? "#f59e0b" : "var(--cs-border)"}`,
-              color: executionMode === "flow" ? "#1b1200" : "var(--cs-text)",
-              boxShadow: executionMode === "flow" ? "0 0 18px #f59e0b33" : "none",
+              border: `1.5px solid ${executionMode === "flow" ? "#95d7d1" : "var(--cs-border)"}`,
+              color: executionMode === "flow" ? "#0d3733" : "var(--cs-text)",
+              boxShadow: executionMode === "flow" ? "0 0 18px rgba(149, 215, 209, .28)" : "none",
               opacity: running ? 0.75 : 1,
               transition: "all .15s",
             }}
@@ -1631,14 +1631,14 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
               <span style={{
                 fontFamily: MONO, fontSize: 10, fontWeight: 800,
                 borderRadius: 999, padding: "3px 9px",
-                background: executionMode === "flow" ? "#fff3" : "#f59e0b15",
-                color: executionMode === "flow" ? "#fff" : "#f59e0b",
+                background: executionMode === "flow" ? "#ffffff" : "#f59e0b15",
+                color: executionMode === "flow" ? "#f59e0b" : "#f59e0b",
                 border: `1px solid ${executionMode === "flow" ? "#fff4" : "#f59e0b33"}`,
               }}>
                 {executionMode === "flow" ? "ACTIVE" : "Select"}
               </span>
             </div>
-            <div style={{ fontFamily: MONO, fontSize: 11, lineHeight: 1.65, color: executionMode === "flow" ? "#fff8" : "var(--cs-muted)" }}>
+            <div style={{ fontFamily: MONO, fontSize: 11, lineHeight: 1.65, color: executionMode === "flow" ? "#0d3733" : "var(--cs-muted)" }}>
               10 API calls executed according to the dependency graph and HTTP method order
               (POST → GET → PATCH → DELETE).
               <br /><br />
@@ -1674,9 +1674,9 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
               <span style={{
                 fontFamily: MONO, fontSize: 10, fontWeight: 800,
                 borderRadius: 999, padding: "3px 9px",
-                background: executionMode === "independent" ? "#ffffff55" : "rgba(149, 215, 209, .14)",
-                color: executionMode === "independent" ? "#0d3733" : "#95d7d1",
-                border: `1px solid ${executionMode === "independent" ? "#ffffff66" : "rgba(149, 215, 209, .35)"}`,
+                background: executionMode === "independent" ? "#ffffff" : "#f59e0b15",
+                color: executionMode === "independent" ? "#f59e0b" : "#f59e0b",
+                border: `1px solid ${executionMode === "independent" ? "#fff4" : "#f59e0b33"}`,
               }}>
                 {executionMode === "independent" ? "ACTIVE" : "Select"}
               </span>
