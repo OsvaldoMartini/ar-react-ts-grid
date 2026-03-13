@@ -1292,11 +1292,11 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
         const request = rest.req(tc.method, execPath, tc.body || undefined);
         const r = isFlow
           ? await Promise.race([
-              request,
-              new Promise<never>((_, reject) =>
-                setTimeout(() => reject(new Error(`Flow timeout after ${this.getSafeFlowTimeoutSec()}s`)), timeoutMs)
-              ),
-            ])
+            request,
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error(`Flow timeout after ${this.getSafeFlowTimeoutSec()}s`)), timeoutMs)
+            ),
+          ])
           : await request;
 
         if (isFlow && tc.method === "POST" && (r.body as any)?.id) ctx[res] = (r.body as any).id;
