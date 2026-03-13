@@ -1479,13 +1479,33 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
                 <span style={{ opacity: 0.6 }}>Results are preserved</span>
               </div>
             </div>
-            <button onClick={this.resetToPending} className="rft-btn rft-btn--reset"
+            <button
+              onClick={this.resetToPending}
+              title="Reset all results back to pending — test cases are preserved, only execution state is cleared"
+              style={{
+                padding: "9px 20px", borderRadius: 8, cursor: "pointer",
+                background: "var(--cs-surface-2)",
+                border: "1.5px solid var(--cs-border)",
+                color: "var(--cs-muted)", fontFamily: MONO, fontSize: 12, fontWeight: 700,
+                display: "flex", alignItems: "center", gap: 8, flexShrink: 0,
+                transition: "all .15s",
+              }}
               onMouseEnter={e => { const b = e.currentTarget as HTMLButtonElement; b.style.borderColor = "#60a5fa88"; b.style.color = "#60a5fa"; b.style.background = "#60a5fa10"; }}
               onMouseLeave={e => { const b = e.currentTarget as HTMLButtonElement; b.style.borderColor = "var(--cs-border)"; b.style.color = "var(--cs-muted)"; b.style.background = "var(--cs-surface-2)"; }}
             >
               ↺ Reset to Pending
             </button>
-            <button onClick={this.executeAll} className="rft-btn rft-btn--run-all">
+            <button
+              onClick={this.executeAll}
+              title="Re-run all tests from scratch using stored URLs"
+              style={{
+                padding: "9px 20px", borderRadius: 8, cursor: "pointer",
+                background: "linear-gradient(135deg, #1a4a7a, #34d399)",
+                border: "1.5px solid #34d399",
+                color: "#0a1f15", fontFamily: MONO, fontSize: 12, fontWeight: 800,
+                display: "flex", alignItems: "center", gap: 8, flexShrink: 0,
+                transition: "all .15s",
+              }}>
               ▶▶ Re-run All — {total.toLocaleString()} tests
             </button>
           </div>
@@ -1494,8 +1514,17 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
             <button
               disabled={running || pendingInBlock === 0}
               onClick={this.executeBlock}
-              className={`rft-btn rft-btn--exec-page${running || pendingInBlock === 0 ? " rft-btn--disabled" : ""}`}
-            >
+              style={{
+                flex: 1, padding: "12px 16px", borderRadius: 8,
+                cursor: running || pendingInBlock === 0 ? "not-allowed" : "pointer",
+                background: running || pendingInBlock === 0
+                  ? "var(--cs-surface-2)"
+                  : "linear-gradient(135deg, #1a3a5a, #60a5fa)",
+                border: `1.5px solid ${running || pendingInBlock === 0 ? "var(--cs-border)" : "#60a5fa"}`,
+                color: running || pendingInBlock === 0 ? "var(--cs-dim)" : "#fff",
+                fontFamily: MONO, fontSize: 12, fontWeight: 800, transition: "all .15s",
+                opacity: running || pendingInBlock === 0 ? 0.5 : 1,
+              }}>
               {running
                 ? `⏳ Running… (${runProgress})`
                 : `${executionMode === "flow" ? "▶ Execute Flow Page" : "⚗ Execute Independent Page"}  —  ${pendingInBlock} pending case${pendingInBlock !== 1 ? "s" : ""}`
@@ -1504,8 +1533,15 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
             <button
               disabled={running}
               onClick={this.executeAll}
-              className={`rft-btn rft-btn--exec-all${running ? " rft-btn--disabled" : ""}`}
-            >
+              style={{
+                flex: 1, padding: "12px 16px", borderRadius: 8,
+                cursor: running ? "not-allowed" : "pointer",
+                background: running ? "var(--cs-surface-2)" : "linear-gradient(135deg, #1a4a7a, #34d399)",
+                border: `1.5px solid ${running ? "var(--cs-border)" : "#34d399"}`,
+                color: running ? "var(--cs-dim)" : "#0a1f15",
+                fontFamily: MONO, fontSize: 12, fontWeight: 800, transition: "all .15s",
+                opacity: running ? 0.5 : 1,
+              }}>
               {running ? "⏳ Running…" : `${executionMode === "flow" ? "▶▶ Execute Flow" : "⚗ Execute Independent"}  —  ${pending.toLocaleString()} pending`}
             </button>
           </div>
