@@ -1466,6 +1466,8 @@ interface DataGenTabState {
   planPage: number;
   planPageSize: number;
   depOpenCard: string | null;
+  depView: "cards" | "graph";
+  depGraphNode: string | null;
 }
 
 const DG_PRESETS = [1, 5, 10, 50, 100, 500, 1000, 2000];
@@ -1477,7 +1479,7 @@ export class DataGenTab extends React.Component<
   state: DataGenTabState = {
     selNames: [], testCount: 1, dgView: "setup",
     plan: [], generatedN: 0, envTick: 0,
-    specsPage: 0, specsPageSize: 20, planPage: 0, planPageSize: 20, depOpenCard: null,
+    specsPage: 0, specsPageSize: 20, planPage: 0, planPageSize: 20, depOpenCard: null, depView: "cards", depGraphNode: null,
   };
 
   private toggle = (fn: string) =>
@@ -1522,7 +1524,7 @@ export class DataGenTab extends React.Component<
 
   render() {
     const { loadedSpecs } = this.props;
-    const { selNames, testCount, dgView, plan, generatedN, specsPage, specsPageSize, planPage, planPageSize, depOpenCard } = this.state;
+    const { selNames, testCount, dgView, plan, generatedN, specsPage, specsPageSize, planPage, planPageSize, depOpenCard, depView, depGraphNode } = this.state;
     const SPEC_PAGE_SIZES = [10, 20, 50, 100];
     const specsTotalPages = Math.ceil(loadedSpecs.length / specsPageSize);
     const specsPageStart = specsPage * specsPageSize;
@@ -1872,7 +1874,7 @@ export class DataGenTab extends React.Component<
               )}
             </div>
 
-            {/* Dependency preview — grouped cards */}
+            {/* Dependency preview — tabbed: cards + DAG graph */}
             {sel.length > 1 && (() => {
               const pairs: { from: string; to: string }[] = [];
               for (const s of sel)
@@ -1882,7 +1884,7 @@ export class DataGenTab extends React.Component<
                 }
               if (pairs.length === 0) return null;
 
-              // Group by TARGET (to), sort by chain count desc
+              // Group by TARGET
               const byTarget: Record<string, string[]> = {};
               for (const p of pairs) {
                 if (!byTarget[p.to]) byTarget[p.to] = [];
@@ -1890,101 +1892,259 @@ export class DataGenTab extends React.Component<
               }
               const groups = Object.entries(byTarget).sort((a, b) => b[1].length - a[1].length);
 
-              // Color palette cycling
               const CARD_COLORS = [
-                { bg: "#34d39912", border: "#34d39933", label: "#34d399", dot: "#34d399" },
-                { bg: "#60a5fa12", border: "#60a5fa33", label: "#60a5fa", dot: "#60a5fa" },
-                { bg: "#fb923c12", border: "#fb923c33", label: "#fb923c", dot: "#fb923c" },
-                { bg: "#a78bfa12", border: "#a78bfa33", label: "#a78bfa", dot: "#a78bfa" },
-                { bg: "#f472b612", border: "#f472b633", label: "#f472b6", dot: "#f472b6" },
-                { bg: "#facc1512", border: "#facc1533", label: "#facc15", dot: "#facc15" },
-                { bg: "#38bdf812", border: "#38bdf833", label: "#38bdf8", dot: "#38bdf8" },
+                { bg: "#34d39912", border: "#34d39933", label: "#34d399" },
+                { bg: "#60a5fa12", border: "#60a5fa33", label: "#60a5fa" },
+                { bg: "#fb923c12", border: "#fb923c33", label: "#fb923c" },
+                { bg: "#a78bfa12", border: "#a78bfa33", label: "#a78bfa" },
+                { bg: "#f472b612", border: "#f472b633", label: "#f472b6" },
+                { bg: "#facc1512", border: "#facc1533", label: "#facc15" },
+                { bg: "#38bdf812", border: "#38bdf833", label: "#38bdf8" },
               ];
 
+              // ── DAG layout ──────────────────────────────────────
+              // Assign each node a column (rank) by BFS from sources
+              const allNodes = [...new Set(pairs.flatMap(p => [p.from, p.to]))];
+              const rank: Record<string, number> = {};
+              const inEdges: Record<string, string[]> = {};
+              const outEdges: Record<string, string[]> = {};
+              for (const n of allNodes) { inEdges[n] = []; outEdges[n] = []; }
+              for (const p of pairs) { outEdges[p.from].push(p.to); inEdges[p.to].push(p.from); }
+              // BFS rank
+              const queue = allNodes.filter(n => inEdges[n].length === 0);
+              for (const n of queue) rank[n] = 0;
+              const visited = new Set(queue);
+              let qi = 0;
+              while (qi < queue.length) {
+                const cur = queue[qi++];
+                for (const nxt of outEdges[cur]) {
+                  rank[nxt] = Math.max(rank[nxt] ?? 0, (rank[cur] ?? 0) + 1);
+                  if (!visited.has(nxt)) { visited.add(nxt); queue.push(nxt); }
+                }
+              }
+              for (const n of allNodes) if (rank[n] === undefined) rank[n] = 0;
+
+              // Group by rank column
+              const cols: Record<number, string[]> = {};
+              for (const n of allNodes) {
+                const r = rank[n];
+                if (!cols[r]) cols[r] = [];
+                cols[r].push(n);
+              }
+              const maxRank = Math.max(...Object.keys(cols).map(Number));
+              const NODE_W = 160, NODE_H = 32, COL_GAP = 80, ROW_GAP = 14;
+
+              // Position nodes
+              const pos: Record<string, { x: number; y: number }> = {};
+              for (let c = 0; c <= maxRank; c++) {
+                const col = cols[c] || [];
+                col.forEach((n, i) => {
+                  pos[n] = { x: c * (NODE_W + COL_GAP), y: i * (NODE_H + ROW_GAP) };
+                });
+              }
+              const svgW = (maxRank + 1) * (NODE_W + COL_GAP) - COL_GAP + 20;
+              const svgH = Math.max(...Object.values(cols).map(c => c.length)) * (NODE_H + ROW_GAP) - ROW_GAP + 20;
+
+              // Node colors by rank
+              const nodeColor = (n: string) => {
+                const r = rank[n] ?? 0;
+                const palette = ["#34d399", "#60a5fa", "#fb923c", "#a78bfa", "#f472b6", "#facc15", "#38bdf8"];
+                return palette[r % palette.length];
+              };
+
+              const selNode = depGraphNode;
+
               return (
-                <div>
-                  {/* Header */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                    <span style={{
-                      fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: 1,
-                      textTransform: "uppercase" as const, color: "#60a5fa",
-                      background: "#60a5fa12", border: "1px solid #60a5fa33",
-                      borderRadius: 5, padding: "2px 9px",
-                    }}>
-                      Detected dependencies
-                    </span>
-                    <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)" }}>
-                      {pairs.length} chains · {groups.length} targets · click to expand
+                <div style={{ borderRadius: 10, border: "1px solid var(--cs-border-sub)", overflow: "hidden" }}>
+
+                  {/* Tab bar */}
+                  <div style={{ display: "flex", alignItems: "center", background: "var(--cs-surface-2)", borderBottom: "1px solid var(--cs-border-sub)" }}>
+                    {(["cards", "graph"] as const).map(tab => (
+                      <button key={tab} onClick={() => this.setState({ depView: tab, depGraphNode: null })} style={{
+                        padding: "8px 16px", fontFamily: MONO, fontSize: 10, fontWeight: 700,
+                        background: depView === tab ? "var(--cs-bg)" : "transparent",
+                        border: "none", borderBottom: depView === tab ? "2px solid #60a5fa" : "2px solid transparent",
+                        color: depView === tab ? "#60a5fa" : "var(--cs-dim)",
+                        cursor: "pointer", letterSpacing: 0.5, textTransform: "uppercase" as const,
+                        transition: "all .12s",
+                      }}>
+                        {tab === "cards" ? "🔗 Detected Dependencies" : "🗺 Graph — Dependency Relations"}
+                      </button>
+                    ))}
+                    <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)", paddingRight: 14 }}>
+                      {pairs.length} chains · {allNodes.length} nodes
                     </span>
                   </div>
 
-                  {/* Cards grid */}
-                  <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 8 }}>
-                    {groups.map(([target, sources], gi) => {
-                      const c = CARD_COLORS[gi % CARD_COLORS.length];
-                      const isOpen = depOpenCard === target;
-                      return (
-                        <div key={target} style={{
-                          borderRadius: 8, border: `1px solid ${isOpen ? c.border : "var(--cs-border-sub)"}`,
-                          background: isOpen ? c.bg : "var(--cs-surface)",
-                          overflow: "hidden", transition: "all .15s",
-                          flexBasis: isOpen ? "100%" : "auto",
-                          minWidth: isOpen ? "100%" : 0,
-                        }}>
-                          {/* Card header — always visible, clickable */}
-                          <div
-                            onClick={() => this.setState({ depOpenCard: isOpen ? null : target })}
-                            style={{
-                              display: "flex", alignItems: "center", gap: 8,
-                              padding: "7px 12px", cursor: "pointer",
-                              borderBottom: isOpen ? `1px solid ${c.border}` : "none",
+                  {/* ── TAB: CARDS ── */}
+                  {depView === "cards" && (
+                    <div style={{ padding: "12px 14px" }}>
+                      <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 8 }}>
+                        {groups.map(([target, sources], gi) => {
+                          const c = CARD_COLORS[gi % CARD_COLORS.length];
+                          const isOpen = depOpenCard === target;
+                          return (
+                            <div key={target} style={{
+                              borderRadius: 8, border: `1px solid ${isOpen ? c.border : "var(--cs-border-sub)"}`,
+                              background: isOpen ? c.bg : "var(--cs-surface)",
+                              overflow: "hidden", transition: "all .15s",
+                              flexBasis: isOpen ? "100%" : "auto", minWidth: isOpen ? "100%" : 0,
                             }}>
-                            <span style={{
-                              width: 7, height: 7, borderRadius: "50%", flexShrink: 0,
-                              background: c.dot,
-                            }} />
-                            <span style={{
-                              fontFamily: MONO, fontSize: 11, fontWeight: 700,
-                              color: isOpen ? c.label : "var(--cs-text)",
-                              flex: 1, whiteSpace: "nowrap" as const,
-                              overflow: "hidden", textOverflow: "ellipsis",
-                            }}>{target}</span>
-                            <span style={{
-                              fontFamily: MONO, fontSize: 9, color: isOpen ? c.label : "var(--cs-dim)",
-                              background: isOpen ? c.bg : "var(--cs-surface-2)",
-                              border: `1px solid ${isOpen ? c.border : "var(--cs-border)"}`,
-                              borderRadius: 4, padding: "1px 6px", flexShrink: 0,
-                            }}>{sources.length}</span>
-                            <span style={{
-                              fontSize: 9, color: isOpen ? c.label : "var(--cs-dim)",
-                              transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
-                              transition: "transform .15s", lineHeight: 1,
-                            }}>▼</span>
-                          </div>
-
-                          {/* Expanded: source list */}
-                          {isOpen && (
-                            <div style={{ padding: "10px 14px", display: "flex", flexDirection: "column" as const, gap: 5 }}>
-                              {sources.map((src, si) => (
-                                <div key={si} style={{
-                                  display: "flex", alignItems: "center", gap: 8,
-                                  fontFamily: MONO, fontSize: 11,
-                                }}>
-                                  <span style={{
-                                    color: c.label, fontWeight: 700,
-                                    background: c.bg, border: `1px solid ${c.border}`,
-                                    borderRadius: 4, padding: "2px 8px",
-                                  }}>{src}</span>
-                                  <span style={{ color: "var(--cs-dim)", fontSize: 10 }}>→ id →</span>
-                                  <span style={{ color: "var(--cs-text)", fontWeight: 600 }}>{target}</span>
+                              <div onClick={() => this.setState({ depOpenCard: isOpen ? null : target })}
+                                style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 12px", cursor: "pointer", borderBottom: isOpen ? `1px solid ${c.border}` : "none" }}>
+                                <span style={{ width: 7, height: 7, borderRadius: "50%", flexShrink: 0, background: c.label }} />
+                                <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: isOpen ? c.label : "var(--cs-text)", flex: 1, whiteSpace: "nowrap" as const, overflow: "hidden", textOverflow: "ellipsis" }}>{target}</span>
+                                <span style={{ fontFamily: MONO, fontSize: 9, color: isOpen ? c.label : "var(--cs-dim)", background: isOpen ? c.bg : "var(--cs-surface-2)", border: `1px solid ${isOpen ? c.border : "var(--cs-border)"}`, borderRadius: 4, padding: "1px 6px", flexShrink: 0 }}>{sources.length}</span>
+                                <span style={{ fontSize: 9, color: isOpen ? c.label : "var(--cs-dim)", transform: isOpen ? "rotate(180deg)" : "rotate(0)", transition: "transform .15s" }}>▼</span>
+                              </div>
+                              {isOpen && (
+                                <div style={{ padding: "10px 14px", display: "flex", flexDirection: "column" as const, gap: 5 }}>
+                                  {sources.map((src, si) => (
+                                    <div key={si} style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: MONO, fontSize: 11 }}>
+                                      <span style={{ color: c.label, fontWeight: 700, background: c.bg, border: `1px solid ${c.border}`, borderRadius: 4, padding: "2px 8px" }}>{src}</span>
+                                      <span style={{ color: "var(--cs-dim)", fontSize: 10 }}>→ id →</span>
+                                      <span style={{ color: "var(--cs-text)", fontWeight: 600 }}>{target}</span>
+                                    </div>
+                                  ))}
                                 </div>
-                              ))}
+                              )}
                             </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── TAB: DAG GRAPH ── */}
+                  {depView === "graph" && (
+                    <div style={{ display: "flex", gap: 0 }}>
+                      {/* SVG canvas */}
+                      <div style={{ flex: 1, overflowX: "auto", overflowY: "auto", maxHeight: 520, background: "var(--cs-bg)", padding: "16px" }}>
+                        <svg width={svgW} height={svgH} style={{ display: "block" }}>
+                          <defs>
+                            <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                              <polygon points="0 0, 8 3, 0 6" fill="#34d39966" />
+                            </marker>
+                          </defs>
+
+                          {/* Edges */}
+                          {pairs.map((p, ei) => {
+                            const s = pos[p.from], t = pos[p.to];
+                            if (!s || !t) return null;
+                            const sx = s.x + NODE_W, sy = s.y + NODE_H / 2;
+                            const tx = t.x, ty = t.y + NODE_H / 2;
+                            const mx = (sx + tx) / 2;
+                            const isHighlighted = selNode === p.from || selNode === p.to;
+                            return (
+                              <path key={ei}
+                                d={`M${sx},${sy} C${mx},${sy} ${mx},${ty} ${tx},${ty}`}
+                                fill="none"
+                                stroke={isHighlighted ? "#60a5fa" : "#34d39930"}
+                                strokeWidth={isHighlighted ? 2 : 1}
+                                markerEnd="url(#arrowhead)"
+                                style={{ transition: "stroke .15s" }}
+                              />
+                            );
+                          })}
+
+                          {/* Nodes */}
+                          {allNodes.map(n => {
+                            const p = pos[n];
+                            if (!p) return null;
+                            const col = nodeColor(n);
+                            const isSel = selNode === n;
+                            const isConnected = selNode && (
+                              outEdges[selNode]?.includes(n) || inEdges[selNode]?.includes(n)
+                            );
+                            const dimmed = selNode && !isSel && !isConnected;
+                            const label = n.replace(/ API$/, "").slice(0, 22) + (n.replace(/ API$/, "").length > 22 ? "…" : "");
+                            return (
+                              <g key={n} onClick={() => this.setState({ depGraphNode: isSel ? null : n })}
+                                style={{ cursor: "pointer" }}>
+                                <rect
+                                  x={p.x} y={p.y} width={NODE_W} height={NODE_H}
+                                  rx={6}
+                                  fill={isSel ? col + "33" : isConnected ? col + "18" : "var(--cs-surface)"}
+                                  stroke={isSel ? col : isConnected ? col + "88" : col + "44"}
+                                  strokeWidth={isSel ? 2 : 1}
+                                  opacity={dimmed ? 0.25 : 1}
+                                  style={{ transition: "all .15s" }}
+                                />
+                                <text
+                                  x={p.x + 10} y={p.y + 20}
+                                  fontFamily="monospace" fontSize={10} fontWeight={isSel ? 800 : 600}
+                                  fill={isSel ? col : col + "cc"}
+                                  opacity={dimmed ? 0.25 : 1}
+                                  style={{ transition: "opacity .15s", userSelect: "none" as const }}
+                                >{label}</text>
+                              </g>
+                            );
+                          })}
+                        </svg>
+                      </div>
+
+                      {/* Detail panel */}
+                      <div style={{
+                        width: selNode ? 260 : 0, overflow: "hidden",
+                        transition: "width .2s", flexShrink: 0,
+                        borderLeft: selNode ? "1px solid var(--cs-border-sub)" : "none",
+                        background: "var(--cs-surface-2)",
+                      }}>
+                        {selNode && (
+                          <div style={{ padding: "14px", width: 260 }}>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                              <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 800, color: nodeColor(selNode), textTransform: "uppercase" as const, letterSpacing: 0.5 }}>
+                                Node detail
+                              </span>
+                              <button onClick={() => this.setState({ depGraphNode: null })}
+                                style={{ background: "transparent", border: "none", color: "var(--cs-dim)", cursor: "pointer", fontSize: 14, lineHeight: 1 }}>✕</button>
+                            </div>
+                            <div style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700, color: "var(--cs-text)", marginBottom: 12, lineHeight: 1.4 }}>
+                              {selNode}
+                            </div>
+
+                            {inEdges[selNode]?.length > 0 && (
+                              <div style={{ marginBottom: 10 }}>
+                                <div style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)", letterSpacing: 0.5, textTransform: "uppercase" as const, marginBottom: 5 }}>
+                                  ← receives ID from ({inEdges[selNode].length})
+                                </div>
+                                {inEdges[selNode].map(src => (
+                                  <div key={src} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: nodeColor(src), flexShrink: 0 }} />
+                                    <span style={{ fontFamily: MONO, fontSize: 10, color: nodeColor(src), fontWeight: 600 }}>{src.replace(/ API$/, "")}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {outEdges[selNode]?.length > 0 && (
+                              <div>
+                                <div style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)", letterSpacing: 0.5, textTransform: "uppercase" as const, marginBottom: 5 }}>
+                                  → sends ID to ({outEdges[selNode].length})
+                                </div>
+                                {outEdges[selNode].map(tgt => (
+                                  <div key={tgt} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: nodeColor(tgt), flexShrink: 0 }} />
+                                    <span style={{ fontFamily: MONO, fontSize: 10, color: nodeColor(tgt), fontWeight: 600 }}>{tgt.replace(/ API$/, "")}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            <div style={{ marginTop: 14, padding: "8px 10px", borderRadius: 6, background: "var(--cs-bg)", border: "1px solid var(--cs-border-sub)" }}>
+                              <div style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)", marginBottom: 4 }}>RANK / COLUMN</div>
+                              <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 800, color: nodeColor(selNode) }}>
+                                {rank[selNode] ?? 0}
+                              </span>
+                              <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)", marginLeft: 6 }}>
+                                (depth in chain)
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })()}
