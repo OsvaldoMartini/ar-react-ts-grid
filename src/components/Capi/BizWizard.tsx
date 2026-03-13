@@ -1042,6 +1042,54 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
                   desc="IN and IN·OUT fields are auto-detected from the spec schemas. Values are generated using banking-domain heuristics. OUT (readOnly) fields are excluded — the server produces those."
                 />
 
+                {/* ── Number of Test Runs card — ApiWorkflowTab style ── */}
+                <div style={{ borderRadius: 10, border: "1px solid var(--cs-border)", overflow: "hidden" }}>
+                  {/* Header row */}
+                  <div style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    padding: "9px 14px", background: "var(--cs-surface-2)",
+                    borderBottom: "1px solid var(--cs-border-sub)",
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: 13 }}>⚡</span>
+                      <span style={{
+                        fontFamily: MONO, fontSize: 11, fontWeight: 800,
+                        color: "var(--cs-text)", letterSpacing: 0.3,
+                      }}>
+                        Number of Test Runs
+                      </span>
+                    </div>
+                    <input type="number" min={1} max={2000} value={testCount}
+                      onChange={e => this.setState({ testCount: Math.min(2000, Math.max(1, +e.target.value || 1)) })}
+                      style={{
+                        width: 72, padding: "3px 8px", background: "var(--cs-input-bg)",
+                        border: "1px solid var(--cs-border)", borderRadius: 6,
+                        color: "var(--cs-text)", fontFamily: MONO, fontSize: 13, fontWeight: 700,
+                        textAlign: "right" as const, outline: "none",
+                      }} />
+                  </div>
+                  {/* Slider + presets */}
+                  <div style={{ padding: "12px 14px 14px", background: "var(--cs-bg)" }}>
+                    <input type="range" min={1} max={2000} value={testCount}
+                      onChange={e => this.setState({ testCount: +e.target.value })}
+                      style={{ width: "100%", accentColor: "var(--cs-accent)", marginBottom: 10 }} />
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" as const, marginBottom: 6 }}>
+                      {[1, 5, 10, 50, 100, 500, 1000, 2000].map(n => (
+                        <button key={n} onClick={() => this.setState({ testCount: n })} style={{
+                          background: testCount === n ? "#34d39918" : "var(--cs-surface-2)",
+                          border: `1px solid ${testCount === n ? "#34d399" : "var(--cs-border)"}`,
+                          color: testCount === n ? "#34d399" : "var(--cs-muted)",
+                          borderRadius: 6, padding: "3px 11px", fontFamily: MONO, fontSize: 11,
+                          cursor: "pointer", fontWeight: testCount === n ? 700 : 400,
+                        }}>{n >= 1000 ? `${n / 1000}k` : n}</button>
+                      ))}
+                    </div>
+                    <div style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)", opacity: 0.7 }}>
+                      {testCount === 1 ? "Single test run" : `${testCount} test runs — each run executes the full plan once`}
+                    </div>
+                  </div>
+                </div>
+
                 {/* Per-spec field breakdown */}
                 {selectedSpecs.map(spec => {
                   const pathParamSet = new Set(spec.pathParams || []);
@@ -1137,11 +1185,6 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
                     </div>
                   </div>
                 )}
-
-                <div style={{ borderTop: "1px solid var(--cs-border-sub)", paddingTop: 14 }}>
-                  <TestCountPicker value={testCount}
-                    onChange={n => this.setState({ testCount: n })} />
-                </div>
 
                 <div className="capi-wizard-actions">
                   <button className="capi-wizard-btn capi-wizard-btn--back"
