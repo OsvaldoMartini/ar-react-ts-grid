@@ -10,122 +10,6 @@ import { testStore } from "./utils";
 import "./capi-app.scss";
 
 // ═══════════════════════════════════════════════════════════════
-// WORKFLOW STEPPER
-// ═══════════════════════════════════════════════════════════════
-const STEPS = [
-  { label: "APIs" },
-  { label: "Synth Data" },
-  { label: "Exec Flow" },
-  { label: "Running" },
-  { label: "Report" },
-];
-
-const TAB_STEP: Record<string, number> = {
-  apis: 1,
-  workflow: 1,
-  datagen: 2,
-  ready: 3,
-  debug: 4,
-  store: 5,
-};
-
-function WorkflowStepper({ activeStep }: { activeStep: number }) {
-  return (
-    <div style={{
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      padding: "10px 24px 8px",
-      background: "var(--cs-header-bg, var(--cs-surface))",
-      borderBottom: "1px solid var(--cs-border-sub)",
-      gap: 0,
-      userSelect: "none",
-    }}>
-      {STEPS.map((step, i) => {
-        const n = i + 1;
-        const done = n < activeStep;
-        const current = n === activeStep;
-
-        const circleColor = done
-          ? "#34d399"
-          : current
-            ? "var(--cs-accent)"
-            : "transparent";
-
-        const circleBorder = done || current
-          ? "none"
-          : "2px solid var(--cs-border)";
-
-        const textColor = done
-          ? "#34d399"
-          : current
-            ? "var(--cs-text)"
-            : "var(--cs-dim)";
-
-        const lineColor = done ? "#34d399" : "var(--cs-border)";
-
-        return (
-          <React.Fragment key={n}>
-            {/* Step node */}
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-              <div style={{
-                width: 28,
-                height: 28,
-                borderRadius: "50%",
-                background: circleColor,
-                border: circleBorder,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontFamily: "'JetBrains Mono','Fira Code',monospace",
-                fontSize: 11,
-                fontWeight: 800,
-                color: done ? "#0a1f15" : current ? "#fff" : "var(--cs-dim)",
-                flexShrink: 0,
-                boxShadow: current ? "0 0 0 3px var(--cs-accent-bg, rgba(10,102,194,.18))" : "none",
-                transition: "all .25s",
-              }}>
-                {done
-                  ? <svg width="12" height="10" viewBox="0 0 12 10" fill="none">
-                    <path d="M1 5L4.5 8.5L11 1.5" stroke="#0a1f15" strokeWidth="2"
-                      strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  : n
-                }
-              </div>
-              <span style={{
-                fontFamily: "'JetBrains Mono','Fira Code',monospace",
-                fontSize: 9,
-                fontWeight: current ? 800 : 500,
-                color: textColor,
-                letterSpacing: 0.3,
-                whiteSpace: "nowrap",
-                transition: "color .25s",
-              }}>
-                {step.label}
-              </span>
-            </div>
-
-            {/* Connector line (not after last step) */}
-            {i < STEPS.length - 1 && (
-              <div style={{
-                flex: 1,
-                minWidth: 28,
-                maxWidth: 80,
-                height: 2,
-                background: lineColor,
-                marginBottom: 16,
-                transition: "background .25s",
-              }} />
-            )}
-          </React.Fragment>
-        );
-      })}
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════
 // SHARED PROPS
 // ═══════════════════════════════════════════════════════════════
 export interface CapiProps {
@@ -215,13 +99,14 @@ export default class App extends React.Component<CapiProps, AppState> {
     const tot = Object.values(db.stores).reduce((a, s) => a + s.length, 0);
     const queuedCount = testStore.total;
     const TABS = [
-      { id: "apis", l: `📁 API Files (${specs.length})` },
-      { id: "workflow", l: `⬡ Workflow` },
-      { id: "datagen", l: `⚗ Data Generator` },
-      { id: "ready", l: `🧪 Ready for Test${queuedCount > 0 ? ` (${queuedCount.toLocaleString()})` : ""}` },
-      { id: "debug", l: `🔍 Debug${log.length > 0 ? ` (${log.length})` : ""}` },
-      { id: "store", l: `🗄️ Store (${tot})` },
+      { id: "apis", l: `📁 API Files (${specs.length})`, stepLabel: "API Files" },
+      { id: "workflow", l: `⬡ Workflow`, stepLabel: "Workflow" },
+      { id: "datagen", l: `⚗ Data Generator`, stepLabel: "Data Generator" },
+      { id: "ready", l: `🧪 Ready for Test${queuedCount > 0 ? ` (${queuedCount.toLocaleString()})` : ""}`, stepLabel: "Ready for Test" },
+      { id: "debug", l: `🔍 Debug${log.length > 0 ? ` (${log.length})` : ""}`, stepLabel: "Debug" },
+      { id: "store", l: `🗄️ Store (${tot})`, stepLabel: "Store" },
     ] as const;
+    const activeTabIndex = TABS.findIndex(t => t.id === tab);
 
     return (
       <div className="capi-app">
@@ -255,20 +140,41 @@ export default class App extends React.Component<CapiProps, AppState> {
           </div>
         </div>
 
-        {/* ── WORKFLOW STEPPER ── */}
-        <WorkflowStepper activeStep={TAB_STEP[tab] ?? 1} />
+        {/* ── STEP INDICATOR + TABS ── */}
+        <div className="capi-nav-shell">
+          <div className="capi-stepper" aria-label="Workflow progress">
+            {TABS.map((t, index) => {
+              const stateClass = index < activeTabIndex ? "is-complete" : index === activeTabIndex ? "is-active" : "is-upcoming";
+              return (
+                <React.Fragment key={t.id}>
+                  <button
+                    type="button"
+                    onClick={() => this.setState({ tab: t.id as any })}
+                    className={`capi-step ${stateClass}`}
+                    aria-current={index === activeTabIndex ? "step" : undefined}
+                  >
+                    <span className="capi-step__circle">{index + 1}</span>
+                    <span className="capi-step__label">{t.stepLabel}</span>
+                  </button>
+                  {index < TABS.length - 1 && (
+                    <div className={`capi-step__connector ${index < activeTabIndex ? "is-complete" : ""}`} aria-hidden="true" />
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </div>
 
-        {/* ── TABS ── */}
-        <div className="capi-tabs">
-          {TABS.map(t => (
-            <button
-              key={t.id}
-              onClick={() => this.setState({ tab: t.id as any })}
-              className={`capi-tab-btn${tab === t.id ? " active" : ""}`}
-            >
-              {t.l}
-            </button>
-          ))}
+          <div className="capi-tabs">
+            {TABS.map(t => (
+              <button
+                key={t.id}
+                onClick={() => this.setState({ tab: t.id as any })}
+                className={`capi-tab-btn${tab === t.id ? " active" : ""}`}
+              >
+                {t.l}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* ── CONTENT ── */}

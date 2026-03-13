@@ -141,14 +141,123 @@
   letter-spacing: .01em;
 }
 
-// ── Tab bar ───────────────────────────────────────────────────────────────────
+// ── Stepper + tab bar ───────────────────────────────────────────────────────────
 
-.capi-tabs {
+
+.capi-nav-shell {
   background:    var(--cs-tabs-bg);
   border-bottom: 1px solid var(--cs-tabs-border);
+  transition:    $t-theme;
+}
+
+.capi-stepper {
+  padding:        14px 24px 10px;
+  display:        flex;
+  align-items:    flex-start;
+  overflow-x:     auto;
+  overflow-y:     hidden;
+  gap:            0;
+  scrollbar-width: thin;
+}
+
+.capi-step {
+  appearance:      none;
+  background:      transparent;
+  border:          none;
+  padding:         0;
+  min-width:       86px;
+  display:         flex;
+  flex-direction:  column;
+  align-items:     center;
+  gap:             8px;
+  cursor:          pointer;
+  color:           var(--cs-muted);
+  font-family:     $font-ui;
+  transition:      $t-fast;
+  flex:            0 0 auto;
+
+  &:hover .capi-step__circle {
+    transform:   translateY(-1px);
+    box-shadow:  0 0 0 4px var(--cs-accent-bg);
+  }
+
+  &:hover .capi-step__label {
+    color: var(--cs-text);
+  }
+}
+
+.capi-step__circle {
+  width:           30px;
+  height:          30px;
+  border-radius:   999px;
+  border:          2px solid var(--cs-tabs-border);
+  background:      var(--cs-header-bg);
+  display:         inline-flex;
+  align-items:     center;
+  justify-content: center;
+  font-size:       12px;
+  font-weight:     700;
+  line-height:     1;
+  transition:      $t-fast;
+}
+
+.capi-step__label {
+  font-size:      12px;
+  font-weight:    600;
+  letter-spacing: .01em;
+  white-space:    nowrap;
+  transition:     $t-fast;
+}
+
+.capi-step__connector {
+  height:         2px;
+  min-width:      64px;
+  margin:         14px 10px 0;
+  background:     var(--cs-tabs-border);
+  border-radius:  $r-full;
+  transition:     $t-fast;
+  flex:           1 0 48px;
+}
+
+.capi-step.is-complete {
+  color: var(--cs-green);
+
+  .capi-step__circle {
+    border-color: var(--cs-green);
+    background:   var(--cs-green-bg);
+    color:        var(--cs-green);
+  }
+
+  .capi-step__label {
+    color: var(--cs-green);
+  }
+}
+
+.capi-step.is-active {
+  color: var(--cs-tab-active-text);
+
+  .capi-step__circle {
+    border-color: var(--cs-tab-active-col);
+    background:   var(--cs-tab-active-col);
+    color:        #fff;
+    box-shadow:   0 6px 16px rgba(10, 102, 194, .24);
+  }
+
+  .capi-step__label {
+    color: var(--cs-tab-active-text);
+  }
+}
+
+.capi-step__connector.is-complete {
+  background: var(--cs-green);
+}
+
+
+.capi-tabs {
   padding:       0 24px;
   display:       flex;
   gap:           2px;
+  overflow-x:    auto;
   transition:    $t-theme;
 }
 
@@ -191,4 +300,10 @@
 .capi-scroll {
   flex:       1;
   overflow-y: auto;
+}
+
+@media (max-width: 900px) {
+  .capi-stepper { padding: 12px 16px 8px; }
+  .capi-tabs { padding: 0 16px; }
+  .capi-step__connector { min-width: 40px; margin-inline: 8px; }
 }
