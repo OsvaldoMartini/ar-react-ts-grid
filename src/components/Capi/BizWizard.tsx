@@ -432,10 +432,10 @@ interface BizWizardState {
   wizMode: WizMode | null;
   wizStep: WizStep;
   // DSG state
-  selSpecNames: string[];                  // selected spec fileNames
+  selSpecNames: string[];
   dynPlan: DynStep[];
   testCount: number;
-  synthPreviews: Record<string, any>[];      // sample rows for data preview
+  synthPreviews: Record<string, any>[];
   // Static case state
   selStaticCase: typeof STATIC_CASES[0] | null;
   staticParams: Record<string, any>;
@@ -443,6 +443,9 @@ interface BizWizardState {
   execLog: ExecEntry[];
   execResults: ExecEntry[];
   running: boolean;
+  // Execution mode
+  execMode: "flow" | "independent";
+  flowTimeout: number;          // seconds — only used in flow mode
   // UI
   selCat: string;
 }
@@ -453,6 +456,7 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
     selSpecNames: [], dynPlan: [], testCount: 1, synthPreviews: [],
     selStaticCase: null, staticParams: {},
     execLog: [], execResults: [], running: false,
+    execMode: "flow", flowTimeout: 15,
     selCat: "ALL",
   };
   private logRef = createRef<HTMLDivElement>();
@@ -502,17 +506,18 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
 
   // ── Execution ─────────────────────────────────────────────────
   private execDynPlan = async () => {
-    const { dynPlan, testCount } = this.state;
+    const { dynPlan, testCount, execMode, flowTimeout } = this.state;
     const { loadedSpecs } = this.props;
     const { selSpecNames } = this.state;
     const selected = loadedSpecs.filter(s => selSpecNames.includes(s.fileName));
 
     this.setState({ wizStep: "running", running: true, execLog: [], execResults: [] });
     const results: ExecEntry[] = [];
-    const context: Record<string, number> = {};   // resourceName → last created ID
+    // context is only populated/used in flow mode — in independent mode it stays empty
+    const context: Record<string, number> = {};
     let stepNum = 0;
 
-    const runCount = Math.min(testCount, 5); // cap at 5 actual HTTP runs in simulator
+    const runCount = Math.min(testCount, 5);
 
     for (let run = 0; run < runCount; run++) {
       for (const step of dynPlan) {
@@ -527,29 +532,42 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
 
         const t0 = Date.now();
         try {
-          await new Promise(r => setTimeout(r, 30 + Math.random() * 70));
+          // In flow mode: simulate real network latency + honour flowTimeout
+          // In independent mode: fast mock, no chaining, use pure synth data
+          const mockDelay = execMode === "flow"
+            ? 40 + Math.random() * 120
+            : 20 + Math.random() * 50;
+          await new Promise(r => setTimeout(r, mockDelay));
 
-          // Build fresh synth body with current context (for ID chaining)
+          // Body: flow mode uses context for ID chaining; independent uses fresh synth only
           const body = (step.method === "POST" || step.method === "PATCH" || step.method === "PUT")
-            ? buildSynthBody(step.spec, context, selected)
+            ? buildSynthBody(step.spec, execMode === "flow" ? context : {}, selected)
             : null;
 
-          // Build path (inject ID for GET/{id}, PATCH/{id}, DELETE/{id})
+          // Path: flow mode injects chained IDs; independent mode always uses collection path
           const resource = step.spec.resourceName || "obj-addrs";
-          const pathId = context[resource] || null;
+          const pathId = execMode === "flow" ? (context[resource] || null) : null;
           let callPath: string;
-          if (["GET", "PATCH", "PUT", "DELETE"].includes(step.method) && step.spec.pathParams.length > 0 && pathId) {
+          if (execMode === "flow" && ["GET", "PATCH", "PUT", "DELETE"].includes(step.method) && step.spec.pathParams.length > 0 && pathId) {
             callPath = `/${resource}/${pathId}`;
-          } else if (step.method === "GET" && step.spec.pathParams.length === 0) {
+          } else if (execMode === "flow" && step.method === "GET" && step.spec.pathParams.length === 0) {
             callPath = `/${resource}`;
           } else {
             callPath = `/${resource}`;
           }
 
-          const r = await rest.req(step.method, callPath, body);
+          // Flow mode: apply per-step timeout guard
+          const timeoutMs = execMode === "flow" ? flowTimeout * 1000 : 10000;
+          const reqPromise = rest.req(step.method, callPath, body);
+          const timeoutPromise = new Promise<never>((_, rej) =>
+            setTimeout(() => rej(new Error(`Timeout after ${flowTimeout}s`)), timeoutMs)
+          );
+          const r = await Promise.race([reqPromise, timeoutPromise]) as Awaited<ReturnType<typeof rest.req>>;
 
-          // Store produced ID for chaining
-          if (step.producesId && (r.body as any)?.id) context[resource] = (r.body as any).id;
+          // Only chain IDs in flow mode
+          if (execMode === "flow" && step.producesId && (r.body as any)?.id) {
+            context[resource] = (r.body as any).id;
+          }
 
           const latency = Date.now() - t0;
           const expectOk = r.status >= 200 && r.status < 300;
@@ -1178,12 +1196,148 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
                   );
                 })()}
 
+                {/* ── Execution Mode Selector ── */}
+                {(() => {
+                  const { execMode, flowTimeout } = this.state;
+                  const isFlow = execMode === "flow";
+                  return (
+                    <div style={{
+                      borderRadius: 10, border: "1px solid var(--cs-border)",
+                      overflow: "hidden",
+                    }}>
+                      {/* Header */}
+                      <div style={{
+                        padding: "8px 14px",
+                        background: "var(--cs-surface-2)",
+                        borderBottom: "1px solid var(--cs-border-sub)",
+                        fontFamily: MONO, fontSize: 10, fontWeight: 700,
+                        color: "var(--cs-dim)", letterSpacing: 0.5,
+                      }}>
+                        EXECUTION MODE
+                      </div>
+
+                      {/* Two buttons row */}
+                      <div style={{ display: "flex", padding: "10px 12px", gap: 8, background: "var(--cs-bg)" }}>
+
+                        {/* ── Flow (default) ── */}
+                        <button
+                          onClick={() => this.setState({ execMode: "flow" })}
+                          style={{
+                            flex: 1, padding: "9px 12px", borderRadius: 7, cursor: "pointer",
+                            fontFamily: MONO, fontSize: 10, fontWeight: 800, textAlign: "left" as const,
+                            transition: "all .15s",
+                            background: isFlow
+                              ? "linear-gradient(135deg, #7a4a00, #f59e0b)"
+                              : "var(--cs-surface-2)",
+                            border: `1.5px solid ${isFlow ? "#f59e0b" : "var(--cs-border)"}`,
+                            color: isFlow ? "#0a0800" : "var(--cs-muted)",
+                            boxShadow: isFlow ? "0 0 12px #f59e0b44" : "none",
+                          }}
+                          onMouseEnter={e => {
+                            if (isFlow) (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 20px #f59e0b66";
+                          }}
+                          onMouseLeave={e => {
+                            (e.currentTarget as HTMLButtonElement).style.boxShadow = isFlow ? "0 0 12px #f59e0b44" : "none";
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                            {isFlow && <span style={{ fontSize: 9 }}>●</span>}
+                            <span>▶ Execution Flow</span>
+                            {isFlow && (
+                              <span style={{
+                                fontSize: 8, background: "#0a080044", borderRadius: 3,
+                                padding: "1px 5px", marginLeft: "auto",
+                              }}>DEFAULT</span>
+                            )}
+                          </div>
+                          <div style={{
+                            fontSize: 9, fontWeight: 400, lineHeight: 1.5,
+                            color: isFlow ? "#0a080099" : "var(--cs-dim)", marginTop: 2,
+                          }}>
+                            {dynPlan.length} calls · dependency graph · POST→GET→PATCH→DELETE.
+                            IDs from each POST auto-chained into next call.
+                            Each request waits for the previous response.
+                          </div>
+                        </button>
+
+                        {/* ── Independent ── */}
+                        <button
+                          onClick={() => this.setState({ execMode: "independent" })}
+                          style={{
+                            flex: 1, padding: "9px 12px", borderRadius: 7, cursor: "pointer",
+                            fontFamily: MONO, fontSize: 10, fontWeight: 800, textAlign: "left" as const,
+                            transition: "all .15s",
+                            background: !isFlow
+                              ? "#0d2e2b"
+                              : "var(--cs-surface-2)",
+                            border: `1.5px solid ${!isFlow ? "#95d7d1" : "var(--cs-border)"}`,
+                            color: !isFlow ? "#95d7d1" : "var(--cs-muted)",
+                            boxShadow: !isFlow ? "0 0 12px #95d7d133" : "none",
+                          }}
+                          onMouseEnter={e => {
+                            if (!isFlow) (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 20px #95d7d155";
+                          }}
+                          onMouseLeave={e => {
+                            (e.currentTarget as HTMLButtonElement).style.boxShadow = !isFlow ? "0 0 12px #95d7d133" : "none";
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                            {!isFlow && <span style={{ fontSize: 9 }}>●</span>}
+                            <span style={{ color: !isFlow ? "#95d7d1" : "var(--cs-muted)" }}>
+                              ⊞ Independent
+                            </span>
+                          </div>
+                          <div style={{
+                            fontSize: 9, fontWeight: 400, lineHeight: 1.5,
+                            color: !isFlow ? "#95d7d188" : "var(--cs-dim)", marginTop: 2,
+                          }}>
+                            Each API runs individually with synthetic data.
+                            No dependency chain — no waiting for other responses.
+                            Requests execute in parallel using generated payloads.
+                          </div>
+                        </button>
+                      </div>
+
+                      {/* Timeout field — only visible in flow mode */}
+                      {isFlow && (
+                        <div style={{
+                          display: "flex", alignItems: "center", gap: 10,
+                          padding: "8px 14px",
+                          background: "#f59e0b08",
+                          borderTop: "1px solid #f59e0b22",
+                        }}>
+                          <span style={{ fontFamily: MONO, fontSize: 9, color: "#f59e0b88", fontWeight: 700, letterSpacing: 0.5 }}>
+                            ⏱ STEP TIMEOUT
+                          </span>
+                          <input
+                            type="number" min={1} max={120} value={flowTimeout}
+                            onChange={e => this.setState({ flowTimeout: Math.min(120, Math.max(1, +e.target.value || 15)) })}
+                            style={{
+                              width: 52, padding: "3px 7px", borderRadius: 5,
+                              background: "var(--cs-bg)", border: "1px solid #f59e0b55",
+                              color: "#f59e0b", fontFamily: MONO, fontSize: 12, fontWeight: 700,
+                              textAlign: "center" as const, outline: "none",
+                            }}
+                          />
+                          <span style={{ fontFamily: MONO, fontSize: 9, color: "#f59e0b66" }}>seconds per request</span>
+                          <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)", marginLeft: "auto" }}>
+                            max {flowTimeout * dynPlan.length}s total
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
                 <div className="capi-wizard-actions">
                   <button className="capi-wizard-btn capi-wizard-btn--back"
                     onClick={() => this.setState({ wizStep: "data" })}>← Back</button>
                   <button className="capi-wizard-btn capi-wizard-btn--run"
                     onClick={this.execDynPlan}>
-                    ▶ Execute {dynPlan.length} steps × {testCount} run{testCount > 1 ? "s" : ""}
+                    {this.state.execMode === "flow"
+                      ? `▶ Execute Flow · ${dynPlan.length} steps × ${testCount} run${testCount > 1 ? "s" : ""}`
+                      : `⊞ Execute Independent · ${dynPlan.length} APIs × ${testCount} run${testCount > 1 ? "s" : ""}`
+                    }
                   </button>
                 </div>
               </div>
