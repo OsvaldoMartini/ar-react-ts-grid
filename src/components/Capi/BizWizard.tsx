@@ -452,6 +452,9 @@ interface BizWizardState {
   flowTimeout: number;          // seconds — only used in flow mode
   // UI
   selCat: string;
+  flowPage: number;
+  flowPageSize: number;
+  chainExpanded: boolean;
 }
 
 export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
@@ -461,7 +464,7 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
     selStaticCase: null, staticParams: {},
     execLog: [], execResults: [], running: false,
     execMode: "flow", flowTimeout: 15,
-    selCat: "ALL",
+    selCat: "ALL", flowPage: 0, flowPageSize: 20, chainExpanded: false,
   };
   private logRef = createRef<HTMLDivElement>();
 
@@ -1340,99 +1343,227 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
                   );
                 })()}
 
-                {/* Execution plan */}
-                <div>
-                  <SLabel>Execution sequence — {dynPlan.length} steps · {testCount} run{testCount > 1 ? "s" : ""}</SLabel>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    {dynPlan.map((step, i) => {
-                      const col = METHOD_COLORS[step.method] || "#8b949e";
-                      const hasDeps = step.dependsOnIds.length > 0;
-                      const produces = step.producesId;
-                      const needsId = step.needsIdFrom.length > 0;
-                      const inFieldCount = Object.keys(step.synthBody).length;
-                      return (
-                        <div key={step.id} style={{
-                          display: "flex", alignItems: "flex-start", gap: 10,
-                          padding: "10px 13px", borderRadius: 8,
-                          background: "var(--cs-surface)", border: `1px solid ${col}20`,
-                          borderLeft: `3px solid ${col}80`,
-                        }}>
-                          {/* Step number */}
-                          <div style={{
-                            width: 24, height: 24, borderRadius: "50%", flexShrink: 0,
-                            background: col + "20", border: `1.5px solid ${col}44`,
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            fontFamily: MONO, fontSize: 10, fontWeight: 800, color: col
-                          }}>
-                            {i + 1}
-                          </div>
-
-                          {/* Method + summary */}
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 4 }}>
-                              <MethodChip method={step.method} />
-                              <span style={{ fontFamily: MONO, fontSize: 12, color: "var(--cs-text)", fontWeight: 600 }}>
-                                {step.summary}
-                              </span>
-                            </div>
-                            <div style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)", display: "flex", gap: 10, flexWrap: "wrap" }}>
-                              <span>{step.spec.resourceName}</span>
-                              {inFieldCount > 0 && (
-                                <span style={{ color: "#34d399" }}>⬡ {inFieldCount} synth fields</span>
-                              )}
-                              {hasDeps && (
-                                <span style={{ color: "#60a5fa" }}>
-                                  ← needs ID from: {step.dependsOnIds.map(d => d.split("__")[0]).join(", ")}
-                                </span>
-                              )}
-                              {produces && (
-                                <span style={{ color: col }}>→ produces {step.spec.resourceName}_id</span>
-                              )}
-                              {needsId && !produces && (
-                                <span style={{ color: "#fb923c" }}>
-                                  uses {step.needsIdFrom[0]}_id in path
-                                </span>
-                              )}
-                            </div>
-                          </div>
+                {/* Execution plan — paginated */}
+                {(() => {
+                  const { flowPage, flowPageSize } = this.state;
+                  const PAGE_SIZES = [10, 20, 50, 100, 500];
+                  const totalPages = Math.ceil(dynPlan.length / flowPageSize);
+                  const pageStart = flowPage * flowPageSize;
+                  const pageItems = dynPlan.slice(pageStart, pageStart + flowPageSize);
+                  return (
+                    <div>
+                      {/* Header row with label + page-size picker */}
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                        <SLabel style={{ marginBottom: 0 }}>
+                          Execution sequence — {dynPlan.length} steps · {testCount} run{testCount > 1 ? "s" : ""}
+                        </SLabel>
+                        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                          <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)", marginRight: 2 }}>per page</span>
+                          {PAGE_SIZES.map(n => (
+                            <button key={n} onClick={() => this.setState({ flowPageSize: n, flowPage: 0 })} style={{
+                              background: flowPageSize === n ? "#34d39918" : "var(--cs-surface-2)",
+                              border: `1px solid ${flowPageSize === n ? "#34d399" : "var(--cs-border)"}`,
+                              color: flowPageSize === n ? "#34d399" : "var(--cs-muted)",
+                              borderRadius: 5, padding: "2px 7px", fontFamily: MONO, fontSize: 10,
+                              cursor: "pointer", fontWeight: flowPageSize === n ? 700 : 400,
+                            }}>{n}</button>
+                          ))}
                         </div>
-                      );
-                    })}
-                  </div>
-                </div>
+                      </div>
 
-                {/* Dependency chain summary */}
+                      {/* Step rows */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                        {pageItems.map((step, i) => {
+                          const globalIdx = pageStart + i;
+                          const col = METHOD_COLORS[step.method] || "#8b949e";
+                          const hasDeps = step.dependsOnIds.length > 0;
+                          const produces = step.producesId;
+                          const needsId = step.needsIdFrom.length > 0;
+                          const inFieldCount = Object.keys(step.synthBody).length;
+                          return (
+                            <div key={step.id} style={{
+                              display: "flex", alignItems: "flex-start", gap: 10,
+                              padding: "10px 13px", borderRadius: 8,
+                              background: "var(--cs-surface)", border: `1px solid ${col}20`,
+                              borderLeft: `3px solid ${col}80`,
+                            }}>
+                              <div style={{
+                                width: 24, height: 24, borderRadius: "50%", flexShrink: 0,
+                                background: col + "20", border: `1.5px solid ${col}44`,
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                fontFamily: MONO, fontSize: 10, fontWeight: 800, color: col
+                              }}>
+                                {globalIdx + 1}
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 4 }}>
+                                  <MethodChip method={step.method} />
+                                  <span style={{ fontFamily: MONO, fontSize: 12, color: "var(--cs-text)", fontWeight: 600 }}>
+                                    {step.summary}
+                                  </span>
+                                </div>
+                                <div style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)", display: "flex", gap: 10, flexWrap: "wrap" }}>
+                                  <span>{step.spec.resourceName}</span>
+                                  {inFieldCount > 0 && <span style={{ color: "#34d399" }}>⬡ {inFieldCount} synth fields</span>}
+                                  {hasDeps && <span style={{ color: "#60a5fa" }}>← needs ID from: {step.dependsOnIds.map(d => d.split("__")[0]).join(", ")}</span>}
+                                  {produces && <span style={{ color: col }}>→ produces {step.spec.resourceName}_id</span>}
+                                  {needsId && !produces && <span style={{ color: "#fb923c" }}>uses {step.needsIdFrom[0]}_id in path</span>}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Pagination bar */}
+                      {totalPages > 1 && (
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, marginTop: 10 }}>
+                          <button
+                            onClick={() => this.setState({ flowPage: 0 })}
+                            disabled={flowPage === 0}
+                            style={{
+                              background: "transparent", border: "1px solid var(--cs-border)",
+                              color: flowPage === 0 ? "var(--cs-dim)" : "var(--cs-muted)",
+                              borderRadius: 5, padding: "3px 7px", fontFamily: MONO, fontSize: 10,
+                              cursor: flowPage === 0 ? "default" : "pointer", opacity: flowPage === 0 ? 0.4 : 1,
+                            }}>«</button>
+                          <button
+                            onClick={() => this.setState({ flowPage: flowPage - 1 })}
+                            disabled={flowPage === 0}
+                            style={{
+                              background: "transparent", border: "1px solid var(--cs-border)",
+                              color: flowPage === 0 ? "var(--cs-dim)" : "var(--cs-muted)",
+                              borderRadius: 5, padding: "3px 9px", fontFamily: MONO, fontSize: 10,
+                              cursor: flowPage === 0 ? "default" : "pointer", opacity: flowPage === 0 ? 0.4 : 1,
+                            }}>‹ Prev</button>
+
+                          {Array.from({ length: totalPages }, (_, pi) => {
+                            const near = pi === 0 || pi === totalPages - 1 || Math.abs(pi - flowPage) <= 1;
+                            if (!near) {
+                              if (pi === 1 || pi === totalPages - 2) return (
+                                <span key={pi} style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)", padding: "0 2px" }}>…</span>
+                              );
+                              return null;
+                            }
+                            return (
+                              <button key={pi} onClick={() => this.setState({ flowPage: pi })} style={{
+                                background: pi === flowPage ? "#34d399" : "var(--cs-surface-2)",
+                                border: `1px solid ${pi === flowPage ? "#34d399" : "var(--cs-border)"}`,
+                                color: pi === flowPage ? "#0a1f15" : "var(--cs-muted)",
+                                borderRadius: 5, padding: "3px 8px", fontFamily: MONO, fontSize: 10,
+                                cursor: "pointer", fontWeight: pi === flowPage ? 700 : 400, minWidth: 28,
+                              }}>{pi + 1}</button>
+                            );
+                          })}
+
+                          <button
+                            onClick={() => this.setState({ flowPage: flowPage + 1 })}
+                            disabled={flowPage === totalPages - 1}
+                            style={{
+                              background: "transparent", border: "1px solid var(--cs-border)",
+                              color: flowPage === totalPages - 1 ? "var(--cs-dim)" : "var(--cs-muted)",
+                              borderRadius: 5, padding: "3px 9px", fontFamily: MONO, fontSize: 10,
+                              cursor: flowPage === totalPages - 1 ? "default" : "pointer",
+                              opacity: flowPage === totalPages - 1 ? 0.4 : 1,
+                            }}>Next ›</button>
+                          <button
+                            onClick={() => this.setState({ flowPage: totalPages - 1 })}
+                            disabled={flowPage === totalPages - 1}
+                            style={{
+                              background: "transparent", border: "1px solid var(--cs-border)",
+                              color: flowPage === totalPages - 1 ? "var(--cs-dim)" : "var(--cs-muted)",
+                              borderRadius: 5, padding: "3px 7px", fontFamily: MONO, fontSize: 10,
+                              cursor: flowPage === totalPages - 1 ? "default" : "pointer",
+                              opacity: flowPage === totalPages - 1 ? 0.4 : 1,
+                            }}>»</button>
+
+                          <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)", marginLeft: 6 }}>
+                            {pageStart + 1}–{Math.min(pageStart + flowPageSize, dynPlan.length)} of {dynPlan.length}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Dependency chain summary — collapsible */}
                 {(() => {
                   const producers = dynPlan.filter(s => s.producesId);
                   const consumers = dynPlan.filter(s => s.dependsOnIds.length > 0);
                   if (producers.length === 0 && consumers.length === 0) return null;
+                  const rows = producers.map(p => {
+                    const deps = dynPlan.filter(s => s.dependsOnIds.includes(p.id));
+                    if (deps.length === 0) return null;
+                    const col = METHOD_COLORS[p.method];
+                    return { p, deps, col };
+                  }).filter(Boolean) as { p: any; deps: any[]; col: string }[];
+                  if (rows.length === 0) return null;
+                  const PREVIEW = 20;
+                  const { chainExpanded } = this.state;
+                  const visible = chainExpanded ? rows : rows.slice(0, PREVIEW);
+                  const hasMore = rows.length > PREVIEW;
                   return (
                     <div style={{
-                      padding: "12px 14px", borderRadius: 8,
-                      background: "var(--cs-surface-2)", border: "1px solid var(--cs-border-sub)"
+                      borderRadius: 8, border: "1px solid var(--cs-border-sub)",
+                      background: "var(--cs-surface-2)", overflow: "hidden",
                     }}>
-                      <SLabel>ID chaining</SLabel>
-                      {producers.map(p => {
-                        const deps = dynPlan.filter(s => s.dependsOnIds.includes(p.id));
-                        if (deps.length === 0) return null;
-                        const col = METHOD_COLORS[p.method];
-                        return (
+                      {/* Header */}
+                      <div style={{
+                        padding: "8px 14px", borderBottom: "1px solid var(--cs-border-sub)",
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                      }}>
+                        <SLabel style={{ marginBottom: 0 }}>ID chaining</SLabel>
+                        <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)" }}>
+                          {rows.length} chain{rows.length !== 1 ? "s" : ""}
+                        </span>
+                      </div>
+
+                      {/* Rows */}
+                      <div style={{ padding: "10px 14px 4px" }}>
+                        {visible.map(({ p, deps, col }) => (
                           <div key={p.id} style={{
-                            display: "flex", alignItems: "center", gap: 6,
-                            fontFamily: MONO, fontSize: 11, color: "var(--cs-muted)", marginBottom: 4
+                            display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap",
+                            fontFamily: MONO, fontSize: 11, color: "var(--cs-muted)", marginBottom: 6,
                           }}>
-                            <span style={{ color: col, fontWeight: 700 }}>
-                              {p.spec.resourceName}_id
-                            </span>
-                            <span>→</span>
-                            {deps.map(d => (
-                              <span key={d.id} style={{ color: "var(--cs-text)", fontWeight: 600 }}>
-                                {d.spec.resourceName} {d.method}
+                            <span style={{ color: col, fontWeight: 700 }}>{p.spec.resourceName}_id</span>
+                            <span style={{ color: "var(--cs-dim)" }}>→</span>
+                            {deps.map((d: any) => (
+                              <span key={d.id} style={{
+                                background: "var(--cs-bg)", border: "1px solid var(--cs-border-sub)",
+                                borderRadius: 4, padding: "1px 6px",
+                                color: "var(--cs-text)", fontWeight: 600,
+                              }}>
+                                {d.spec.resourceName}
+                                <span style={{ color: METHOD_COLORS[d.method] || "#8b949e", marginLeft: 4 }}>{d.method}</span>
                               </span>
                             ))}
                           </div>
-                        );
-                      })}
+                        ))}
+                      </div>
+
+                      {/* Expand / collapse toggle */}
+                      {hasMore && (
+                        <button
+                          onClick={() => this.setState({ chainExpanded: !chainExpanded })}
+                          style={{
+                            width: "100%", padding: "7px 14px",
+                            background: "var(--cs-surface)", border: "none",
+                            borderTop: "1px solid var(--cs-border-sub)",
+                            display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                            fontFamily: MONO, fontSize: 10, color: "#34d399",
+                            cursor: "pointer", fontWeight: 600,
+                          }}>
+                          <span style={{
+                            display: "inline-block",
+                            transform: chainExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                            transition: "transform .2s",
+                            fontSize: 12, lineHeight: 1,
+                          }}>▼</span>
+                          {chainExpanded
+                            ? `Collapse — showing all ${rows.length}`
+                            : `Show ${rows.length - PREVIEW} more chains`}
+                        </button>
+                      )}
                     </div>
                   );
                 })()}
