@@ -1403,9 +1403,9 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
         </div>
 
         {/* ── Status + timeout strip ── */}
-        <div className={`rft-exec-strip${executionMode === "flow" ? " rft-exec-strip--flow" : " rft-exec-strip--indep"}`}>
+        <div className="rft-exec-strip rft-exec-strip--flow">
           <div style={{ minWidth: 260 }}>
-            <div className={`rft-exec-strip__label${executionMode === "flow" ? " rft-exec-strip__label--flow" : " rft-exec-strip__label--indep"}`}>
+            <div className="rft-exec-strip__label rft-exec-strip__label--flow">
               {executionMode === "flow" ? "Flow execution is active" : "Independent execution is active"}
             </div>
             <div style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-muted)", lineHeight: 1.6 }}>
