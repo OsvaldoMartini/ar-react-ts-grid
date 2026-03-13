@@ -121,7 +121,9 @@ interface TcRowState {
   open: boolean;
   editUrl: string;
   editBody: string;
+  editHeaders: string;
   bodyError: string | null;
+  headersError: string | null;
   running: boolean;
   dirty: boolean;
 }
@@ -134,7 +136,9 @@ class TcRow extends React.Component<{ tc: TestCase; onRefresh: () => void; envAp
       open: false,
       editUrl: tc.resolvedUrl ?? tc.path,
       editBody: tc.body ? JSON.stringify(tc.body, null, 2) : "",
+      editHeaders: JSON.stringify({ "Content-Type": "application/json", "Accept": "application/json" }, null, 2),
       bodyError: null,
+      headersError: null,
       running: false,
       dirty: false,
     };
@@ -149,13 +153,20 @@ class TcRow extends React.Component<{ tc: TestCase; onRefresh: () => void; envAp
   private playOne = async (e: React.MouseEvent) => {
     e.stopPropagation();
     const { tc, onRefresh } = this.props;
-    const { editUrl, editBody } = this.state;
+    const { editUrl, editBody, editHeaders } = this.state;
 
     let parsedBody: Record<string, any> | null = null;
     if (editBody.trim()) {
       try { parsedBody = JSON.parse(editBody); }
       catch { this.setState({ bodyError: "Invalid JSON — fix before running" }); return; }
     }
+
+    let parsedHeaders: Record<string, string> = {};
+    if (editHeaders.trim()) {
+      try { parsedHeaders = JSON.parse(editHeaders); }
+      catch { this.setState({ headersError: "Invalid JSON — fix headers before running" }); return; }
+    }
+    this.setState({ headersError: null });
 
     this.setState({ running: true, bodyError: null });
     tc.status = "running";
@@ -199,14 +210,16 @@ class TcRow extends React.Component<{ tc: TestCase; onRefresh: () => void; envAp
     this.setState({
       editUrl: tc.resolvedUrl ?? tc.path,
       editBody: tc.body ? JSON.stringify(tc.body, null, 2) : "",
+      editHeaders: JSON.stringify({ "Content-Type": "application/json", "Accept": "application/json" }, null, 2),
       bodyError: null,
+      headersError: null,
       dirty: false,
     });
   };
 
   render() {
     const { tc } = this.props;
-    const { open, editUrl, editBody, bodyError, running, dirty } = this.state;
+    const { open, editUrl, editBody, editHeaders, bodyError, headersError, running, dirty } = this.state;
     const sc = STATUS_COLORS[running ? "running" : tc.status];
     const mc = METHOD_COLORS[tc.method.toUpperCase()] || "#8b949e";
     const hasBody = ["POST", "PATCH", "PUT"].includes(tc.method.toUpperCase());
@@ -368,29 +381,50 @@ class TcRow extends React.Component<{ tc: TestCase; onRefresh: () => void; envAp
               {/* ── Request Headers ── */}
               <div>
                 <div style={{
-                  fontFamily: MONO, fontSize: 9, fontWeight: 700,
-                  color: "var(--cs-dim)", letterSpacing: 0.8,
-                  textTransform: "uppercase" as const, marginBottom: 5,
+                  display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 5,
                 }}>
-                  📋 Headers
+                  <div style={{
+                    fontFamily: MONO, fontSize: 9, fontWeight: 700, color: "var(--cs-dim)",
+                    letterSpacing: 0.8, textTransform: "uppercase" as const,
+                  }}>
+                    📋 Headers <span style={{ opacity: 0.5, fontWeight: 400 }}>JSON</span>
+                  </div>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    {headersError && (
+                      <span style={{
+                        fontSize: 9, color: "#f87171", background: "#f8717115",
+                        border: "1px solid #f8717133", borderRadius: 4, padding: "2px 8px",
+                      }}>
+                        ⚠ {headersError}
+                      </span>
+                    )}
+                    <button onClick={e => {
+                      e.stopPropagation();
+                      try {
+                        this.setState({ editHeaders: JSON.stringify(JSON.parse(editHeaders), null, 2), headersError: null });
+                      } catch { this.setState({ headersError: "Cannot format — invalid JSON" }); }
+                    }} style={{
+                      fontSize: 9, color: "#60a5fa", background: "transparent",
+                      border: "1px solid #60a5fa33", borderRadius: 4,
+                      padding: "1px 7px", cursor: "pointer", fontFamily: MONO,
+                    }}>{ } Format</button>
+                  </div>
                 </div>
-                <div style={{
-                  fontFamily: MONO, fontSize: 10, borderRadius: 7, padding: "8px 12px",
-                  background: "var(--cs-bg)", border: "1px solid var(--cs-border-sub)",
-                  color: "var(--cs-muted)", lineHeight: 1.7,
-                }}>
-                  <span style={{ color: "#60a5fa" }}>Content-Type</span>
-                  <span style={{ color: "var(--cs-dim)" }}>: </span>
-                  <span>application/json</span>
-                  <br />
-                  <span style={{ color: "#60a5fa" }}>Accept</span>
-                  <span style={{ color: "var(--cs-dim)" }}>: </span>
-                  <span>application/json</span>
-                  <br />
-                  <span style={{ color: "#60a5fa" }}>X-Source</span>
-                  <span style={{ color: "var(--cs-dim)" }}>: </span>
-                  <span style={{ color: "#34d399" }}>{tc.dataSource}</span>
-                </div>
+                <textarea
+                  value={editHeaders}
+                  onChange={e => this.setState({ editHeaders: e.target.value, dirty: true, headersError: null })}
+                  spellCheck={false}
+                  rows={Math.min(10, Math.max(3, editHeaders.split("\n").length + 1))}
+                  style={{
+                    width: "100%", padding: "10px 12px", fontFamily: MONO, fontSize: 11,
+                    background: "var(--cs-bg)", color: "var(--cs-text)",
+                    border: `1px solid ${headersError ? "#f87171" : dirty ? "#f59e0b66" : "var(--cs-border)"}`,
+                    borderRadius: 7, outline: "none", resize: "vertical" as const,
+                    lineHeight: 1.6, transition: "border-color .15s", boxSizing: "border-box" as const,
+                  }}
+                  onFocus={e => (e.target.style.borderColor = mc + "88")}
+                  onBlur={e => (e.target.style.borderColor = headersError ? "#f87171" : dirty ? "#f59e0b66" : "var(--cs-border)")}
+                />
               </div>
 
               {/* ── Request Body (POST / PATCH / PUT) ── */}
@@ -447,17 +481,17 @@ class TcRow extends React.Component<{ tc: TestCase; onRefresh: () => void; envAp
               {/* ── Run button ── */}
               <button
                 onClick={this.playOne}
-                disabled={running || !!bodyError}
+                disabled={running || !!bodyError || !!headersError}
                 style={{
                   alignSelf: "flex-start" as const,
                   padding: "8px 22px", borderRadius: 7,
-                  cursor: running || !!bodyError ? "not-allowed" : "pointer",
-                  background: running || !!bodyError ? "var(--cs-surface-2)" : `linear-gradient(135deg, ${mc}22, ${mc}44)`,
-                  border: `1.5px solid ${running || !!bodyError ? "var(--cs-border)" : mc + "88"}`,
-                  color: running || !!bodyError ? "var(--cs-dim)" : mc,
+                  cursor: running || !!bodyError || !!headersError ? "not-allowed" : "pointer",
+                  background: running || !!bodyError || !!headersError ? "var(--cs-surface-2)" : `linear-gradient(135deg, ${mc}22, ${mc}44)`,
+                  border: `1.5px solid ${running || !!bodyError || !!headersError ? "var(--cs-border)" : mc + "88"}`,
+                  color: running || !!bodyError || !!headersError ? "var(--cs-dim)" : mc,
                   fontFamily: MONO, fontSize: 12, fontWeight: 800,
                   display: "flex", alignItems: "center", gap: 8,
-                  opacity: running || !!bodyError ? 0.6 : 1,
+                  opacity: running || !!bodyError || !!headersError ? 0.6 : 1,
                   transition: "all .15s",
                 }}>
                 {running ? "⟳  Running…" : `▶  Run  ${tc.method}  ${tc.path}`}
