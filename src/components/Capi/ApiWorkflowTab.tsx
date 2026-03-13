@@ -2015,15 +2015,15 @@ export class DataGenTab extends React.Component<
               <button onClick={() => this.setState({ dgView: "setup" })}
                 style={{
                   flex: 1, padding: "11px", borderRadius: 8, cursor: "pointer",
-                  background: "transparent", border: "1px solid var(--cs-border-sub)",
-                  color: "var(--cs-muted)", fontFamily: MONO, fontSize: 12, fontWeight: 600
+                  background: "#34d39912", border: "1px solid #34d39933",
+                  color: "#34d399", fontFamily: MONO, fontSize: 12, fontWeight: 700
                 }}>
                 ← Configure more
               </button>
               <button onClick={() => { testStore.clear(); this.setState({ dgView: "setup", generatedN: 0 }); }}
                 style={{
                   flex: 1, padding: "11px", borderRadius: 8, cursor: "pointer",
-                  background: "transparent", border: "1px solid #f8717133",
+                  background: "#fb923c12", border: "1px solid #fb923c33",
                   color: "#f87171", fontFamily: MONO, fontSize: 12, fontWeight: 600
                 }}>
                 🗑 Clear queue
