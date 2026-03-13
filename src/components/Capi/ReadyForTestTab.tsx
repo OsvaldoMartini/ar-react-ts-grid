@@ -295,175 +295,276 @@ class TcRow extends React.Component<{ tc: TestCase; onRefresh: () => void; envAp
           </button>
         </div>
 
-        {/* ══ EXPANDED EDITOR PANEL ══ */}
+        {/* ══ EXPANDED PANEL ══ */}
         {open && (
           <div style={{
-            borderTop: `1px solid ${sc.border}`, padding: "12px 14px",
-            display: "flex", flexDirection: "column" as const, gap: 12
+            borderTop: `1px solid ${sc.border}`,
+            display: "flex", flexDirection: "column" as const,
           }}>
-            {/* ── URL editor ── */}
-            <div>
-              <div style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                marginBottom: 6
-              }}>
+
+            {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                REQUEST SECTION
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+            <div style={{
+              padding: "10px 14px 4px",
+              borderBottom: "1px solid var(--cs-border-sub)",
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              background: mc + "08",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span style={{
-                  fontSize: 9, fontWeight: 700, color: "var(--cs-dim)",
-                  textTransform: "uppercase" as const, letterSpacing: 0.8
+                  fontFamily: MONO, fontSize: 9, fontWeight: 800,
+                  color: mc, letterSpacing: 1, textTransform: "uppercase" as const,
                 }}>
-                  🌐 Request URL
+                  ▶ REQUEST
                 </span>
-                {dirty && (
-                  <button onClick={this.resetEdits} style={{
-                    fontSize: 9, color: "#f59e0b", background: "transparent",
-                    border: "1px solid #f59e0b33", borderRadius: 4, padding: "1px 7px",
-                    cursor: "pointer", fontFamily: MONO,
-                  }}>↺ Reset to original</button>
-                )}
+                <MChip method={tc.method} />
               </div>
-              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                <span style={{
-                  fontSize: 10, fontWeight: 800, color: mc,
-                  background: mc + "18", border: `1px solid ${mc}40`,
-                  borderRadius: 5, padding: "6px 10px", flexShrink: 0
-                }}>
-                  {tc.method}
-                </span>
-                <input
-                  value={editUrl}
-                  onChange={e => this.setState({ editUrl: e.target.value, dirty: true })}
-                  onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); this.playOne(e as any); } }}
-                  spellCheck={false}
-                  style={{
-                    flex: 1, padding: "7px 12px", fontFamily: MONO, fontSize: 11,
-                    background: "var(--cs-bg)", border: `1px solid ${dirty ? "#f59e0b66" : "var(--cs-border)"}`,
-                    borderRadius: 7, color: "var(--cs-text)", outline: "none",
-                    transition: "border-color .15s",
-                  }}
-                  onFocus={e => (e.target.style.borderColor = mc + "88")}
-                  onBlur={e => (e.target.style.borderColor = dirty ? "#f59e0b66" : "var(--cs-border)")}
-                />
-              </div>
+              {dirty && (
+                <button onClick={this.resetEdits} style={{
+                  fontSize: 9, color: "#f59e0b", background: "transparent",
+                  border: "1px solid #f59e0b33", borderRadius: 4, padding: "1px 7px",
+                  cursor: "pointer", fontFamily: MONO,
+                }}>↺ Reset edits</button>
+              )}
             </div>
 
-            {/* ── Body editor ── */}
-            {hasBody && (
+            <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column" as const, gap: 10 }}>
+
+              {/* ── Request URL ── */}
               <div>
                 <div style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  marginBottom: 6
+                  fontFamily: MONO, fontSize: 9, fontWeight: 700,
+                  color: "var(--cs-dim)", letterSpacing: 0.8,
+                  textTransform: "uppercase" as const, marginBottom: 5,
                 }}>
+                  🌐 Request URL
+                </div>
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                   <span style={{
-                    fontSize: 9, fontWeight: 700, color: "var(--cs-dim)",
-                    textTransform: "uppercase" as const, letterSpacing: 0.8
+                    fontSize: 10, fontWeight: 800, color: mc,
+                    background: mc + "18", border: `1px solid ${mc}40`,
+                    borderRadius: 5, padding: "6px 10px", flexShrink: 0,
                   }}>
-                    📦 Request Body <span style={{ opacity: 0.5, fontWeight: 400 }}>JSON</span>
+                    {tc.method}
                   </span>
-                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                    {bodyError && (
-                      <span style={{
-                        fontSize: 9, color: "#f87171",
-                        background: "#f8717115", border: "1px solid #f8717133",
-                        borderRadius: 4, padding: "2px 8px"
-                      }}>
-                        ⚠ {bodyError}
+                  <input
+                    value={editUrl}
+                    onChange={e => this.setState({ editUrl: e.target.value, dirty: true })}
+                    onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); this.playOne(e as any); } }}
+                    spellCheck={false}
+                    style={{
+                      flex: 1, padding: "7px 12px", fontFamily: MONO, fontSize: 11,
+                      background: "var(--cs-bg)", borderRadius: 7, color: "var(--cs-text)",
+                      border: `1px solid ${dirty ? "#f59e0b66" : "var(--cs-border)"}`,
+                      outline: "none", transition: "border-color .15s",
+                    }}
+                    onFocus={e => (e.target.style.borderColor = mc + "88")}
+                    onBlur={e => (e.target.style.borderColor = dirty ? "#f59e0b66" : "var(--cs-border)")}
+                  />
+                </div>
+              </div>
+
+              {/* ── Request Headers ── */}
+              <div>
+                <div style={{
+                  fontFamily: MONO, fontSize: 9, fontWeight: 700,
+                  color: "var(--cs-dim)", letterSpacing: 0.8,
+                  textTransform: "uppercase" as const, marginBottom: 5,
+                }}>
+                  📋 Headers
+                </div>
+                <div style={{
+                  fontFamily: MONO, fontSize: 10, borderRadius: 7, padding: "8px 12px",
+                  background: "var(--cs-bg)", border: "1px solid var(--cs-border-sub)",
+                  color: "var(--cs-muted)", lineHeight: 1.7,
+                }}>
+                  <span style={{ color: "#60a5fa" }}>Content-Type</span>
+                  <span style={{ color: "var(--cs-dim)" }}>: </span>
+                  <span>application/json</span>
+                  <br />
+                  <span style={{ color: "#60a5fa" }}>Accept</span>
+                  <span style={{ color: "var(--cs-dim)" }}>: </span>
+                  <span>application/json</span>
+                  <br />
+                  <span style={{ color: "#60a5fa" }}>X-Source</span>
+                  <span style={{ color: "var(--cs-dim)" }}>: </span>
+                  <span style={{ color: "#34d399" }}>{tc.dataSource}</span>
+                </div>
+              </div>
+
+              {/* ── Request Body (POST / PATCH / PUT) ── */}
+              {hasBody && (
+                <div>
+                  <div style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 5,
+                  }}>
+                    <div style={{
+                      fontFamily: MONO, fontSize: 9, fontWeight: 700, color: "var(--cs-dim)",
+                      letterSpacing: 0.8, textTransform: "uppercase" as const,
+                    }}>
+                      📦 Request Body <span style={{ opacity: 0.5, fontWeight: 400 }}>JSON</span>
+                    </div>
+                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                      {bodyError && (
+                        <span style={{
+                          fontSize: 9, color: "#f87171", background: "#f8717115",
+                          border: "1px solid #f8717133", borderRadius: 4, padding: "2px 8px",
+                        }}>
+                          ⚠ {bodyError}
+                        </span>
+                      )}
+                      <button onClick={e => {
+                        e.stopPropagation();
+                        try {
+                          this.setState({ editBody: JSON.stringify(JSON.parse(editBody), null, 2), bodyError: null });
+                        } catch { this.setState({ bodyError: "Cannot format — invalid JSON" }); }
+                      }} style={{
+                        fontSize: 9, color: "#60a5fa", background: "transparent",
+                        border: "1px solid #60a5fa33", borderRadius: 4,
+                        padding: "1px 7px", cursor: "pointer", fontFamily: MONO,
+                      }}>{ } Format</button>
+                    </div>
+                  </div>
+                  <textarea
+                    value={editBody}
+                    onChange={e => this.setState({ editBody: e.target.value, dirty: true, bodyError: null })}
+                    spellCheck={false}
+                    rows={Math.min(14, Math.max(4, editBody.split("\n").length + 1))}
+                    style={{
+                      width: "100%", padding: "10px 12px", fontFamily: MONO, fontSize: 11,
+                      background: "var(--cs-bg)", color: "var(--cs-text)",
+                      border: `1px solid ${bodyError ? "#f87171" : dirty ? "#f59e0b66" : "var(--cs-border)"}`,
+                      borderRadius: 7, outline: "none", resize: "vertical" as const,
+                      lineHeight: 1.6, transition: "border-color .15s", boxSizing: "border-box" as const,
+                    }}
+                    onFocus={e => (e.target.style.borderColor = mc + "88")}
+                    onBlur={e => (e.target.style.borderColor = bodyError ? "#f87171" : dirty ? "#f59e0b66" : "var(--cs-border)")}
+                  />
+                </div>
+              )}
+
+              {/* ── Run button ── */}
+              <button
+                onClick={this.playOne}
+                disabled={running || !!bodyError}
+                style={{
+                  alignSelf: "flex-start" as const,
+                  padding: "8px 22px", borderRadius: 7,
+                  cursor: running || !!bodyError ? "not-allowed" : "pointer",
+                  background: running || !!bodyError ? "var(--cs-surface-2)" : `linear-gradient(135deg, ${mc}22, ${mc}44)`,
+                  border: `1.5px solid ${running || !!bodyError ? "var(--cs-border)" : mc + "88"}`,
+                  color: running || !!bodyError ? "var(--cs-dim)" : mc,
+                  fontFamily: MONO, fontSize: 12, fontWeight: 800,
+                  display: "flex", alignItems: "center", gap: 8,
+                  opacity: running || !!bodyError ? 0.6 : 1,
+                  transition: "all .15s",
+                }}>
+                {running ? "⟳  Running…" : `▶  Run  ${tc.method}  ${tc.path}`}
+              </button>
+            </div>
+
+            {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                RESPONSE SECTION — only after execution
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+            {tc.result != null && (() => {
+              const resCol = isOk ? "#34d399" : isFail ? "#f87171" : "var(--cs-muted)";
+              const resBg = isOk ? "#34d39908" : isFail ? "#f8717108" : "var(--cs-bg)";
+              const resBrd = isOk ? "#34d39933" : isFail ? "#f8717133" : "var(--cs-border-sub)";
+              return (
+                <div style={{ borderTop: `1px solid ${resBrd}` }}>
+
+                  {/* Response section header */}
+                  <div style={{
+                    padding: "10px 14px 4px",
+                    borderBottom: `1px solid ${resBrd}`,
+                    background: resBg,
+                    display: "flex", alignItems: "center", gap: 10,
+                  }}>
+                    <span style={{
+                      fontFamily: MONO, fontSize: 9, fontWeight: 800,
+                      color: resCol, letterSpacing: 1, textTransform: "uppercase" as const,
+                    }}>
+                      ◀ RESPONSE
+                    </span>
+                    {tc.httpStatus != null && <StatusBadge status={tc.httpStatus} />}
+                    {tc.latency != null && (
+                      <span style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)" }}>
+                        {tc.latency}ms
                       </span>
                     )}
-                    <button onClick={e => {
-                      e.stopPropagation();
-                      try {
-                        const pretty = JSON.stringify(JSON.parse(editBody), null, 2);
-                        this.setState({ editBody: pretty, bodyError: null });
-                      } catch { this.setState({ bodyError: "Cannot format — invalid JSON" }); }
-                    }} style={{
-                      fontSize: 9, color: "#60a5fa", background: "transparent",
-                      border: "1px solid #60a5fa33", borderRadius: 4,
-                      padding: "1px 7px", cursor: "pointer", fontFamily: MONO,
-                    }}>{ } Format</button>
+                    {tc.resolvedUrl && (
+                      <span style={{
+                        fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)", opacity: 0.6,
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1,
+                      }}>
+                        → {tc.resolvedUrl}
+                      </span>
+                    )}
+                  </div>
+
+                  <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column" as const, gap: 10 }}>
+
+                    {/* ── Response Headers ── */}
+                    {tc.headers && Object.keys(tc.headers).length > 0 && (
+                      <div>
+                        <div style={{
+                          fontFamily: MONO, fontSize: 9, fontWeight: 700, color: "var(--cs-dim)",
+                          letterSpacing: 0.8, textTransform: "uppercase" as const, marginBottom: 5,
+                        }}>
+                          📋 Headers
+                        </div>
+                        <div style={{
+                          fontFamily: MONO, fontSize: 10, borderRadius: 7, padding: "8px 12px",
+                          background: "var(--cs-bg)", border: `1px solid ${resBrd}`,
+                          color: "var(--cs-muted)", lineHeight: 1.7,
+                        }}>
+                          {Object.entries(tc.headers).map(([k, v]) => (
+                            <div key={k}>
+                              <span style={{ color: "#60a5fa" }}>{k}</span>
+                              <span style={{ color: "var(--cs-dim)" }}>: </span>
+                              <span>{String(v)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ── Response Body ── */}
+                    <div>
+                      <div style={{
+                        fontFamily: MONO, fontSize: 9, fontWeight: 700, color: "var(--cs-dim)",
+                        letterSpacing: 0.8, textTransform: "uppercase" as const, marginBottom: 5,
+                      }}>
+                        📦 Body
+                      </div>
+                      <pre style={{
+                        fontFamily: MONO, fontSize: 10, margin: 0,
+                        background: resBg, border: `1px solid ${resBrd}`,
+                        borderRadius: 7, padding: "10px 12px", overflowX: "auto",
+                        maxHeight: 300, color: resCol, lineHeight: 1.55,
+                      }}>
+                        {JSON.stringify(tc.result, null, 2)}
+                      </pre>
+                    </div>
                   </div>
                 </div>
-                <textarea
-                  value={editBody}
-                  onChange={e => this.setState({ editBody: e.target.value, dirty: true, bodyError: null })}
-                  spellCheck={false}
-                  rows={Math.min(18, Math.max(4, editBody.split("\n").length + 1))}
-                  style={{
-                    width: "100%", padding: "10px 12px", fontFamily: MONO, fontSize: 11,
-                    background: "var(--cs-bg)", color: "var(--cs-text)",
-                    border: `1px solid ${bodyError ? "#f87171" : dirty ? "#f59e0b66" : "var(--cs-border)"}`,
-                    borderRadius: 7, outline: "none", resize: "vertical" as const,
-                    lineHeight: 1.6, transition: "border-color .15s", boxSizing: "border-box" as const,
-                  }}
-                  onFocus={e => (e.target.style.borderColor = mc + "88")}
-                  onBlur={e => (e.target.style.borderColor = bodyError ? "#f87171" : dirty ? "#f59e0b66" : "var(--cs-border)")}
-                />
-              </div>
-            )}
-
-            {/* ── Run button ── */}
-            <button
-              onClick={this.playOne}
-              disabled={running || !!bodyError}
-              style={{
-                alignSelf: "flex-start" as const,
-                padding: "8px 22px", borderRadius: 7, cursor: running || !!bodyError ? "not-allowed" : "pointer",
-                background: running || !!bodyError
-                  ? "var(--cs-surface-2)"
-                  : `linear-gradient(135deg, ${mc}22, ${mc}44)`,
-                border: `1.5px solid ${running || !!bodyError ? "var(--cs-border)" : mc + "88"}`,
-                color: running || !!bodyError ? "var(--cs-dim)" : mc,
-                fontFamily: MONO, fontSize: 12, fontWeight: 800,
-                display: "flex", alignItems: "center", gap: 8,
-                opacity: running || !!bodyError ? 0.6 : 1,
-                transition: "all .15s",
-              }}>
-              {running ? "⟳  Running…" : `▶  Run  ${tc.method}  ${tc.path}`}
-            </button>
-
-            {/* ── Response panel ── */}
-            {tc.result != null && (
-              <div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                  <span style={{
-                    fontSize: 9, fontWeight: 700, color: "var(--cs-dim)",
-                    textTransform: "uppercase" as const, letterSpacing: 0.8
-                  }}>Response</span>
-                  {tc.httpStatus != null && <StatusBadge status={tc.httpStatus} />}
-                  {tc.latency != null && (
-                    <span style={{ fontSize: 10, color: "var(--cs-dim)" }}>{tc.latency}ms</span>
-                  )}
-                  {tc.resolvedUrl && (
-                    <span style={{
-                      fontSize: 9, color: "var(--cs-dim)", opacity: 0.6,
-                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1
-                    }}>
-                      → {tc.resolvedUrl}
-                    </span>
-                  )}
-                </div>
-                <pre style={{
-                  fontFamily: MONO, fontSize: 10, margin: 0,
-                  background: isOk ? "#34d39908" : isFail ? "#f8717108" : "var(--cs-bg)",
-                  border: `1px solid ${isOk ? "#34d39933" : isFail ? "#f8717133" : "var(--cs-border-sub)"}`,
-                  borderRadius: 7, padding: "10px 12px", overflowX: "auto",
-                  maxHeight: 260, color: isOk ? "#34d399" : isFail ? "#f87171" : "var(--cs-muted)",
-                  lineHeight: 1.55,
-                }}>
-                  {JSON.stringify(tc.result, null, 2)}
-                </pre>
-              </div>
-            )}
+              );
+            })()}
 
             {/* ── Meta footer ── */}
             <div style={{
               display: "flex", gap: 14, fontSize: 9, color: "var(--cs-dim)",
-              flexWrap: "wrap" as const, paddingTop: 4, borderTop: "1px solid var(--cs-border-sub)"
+              flexWrap: "wrap" as const, padding: "8px 14px",
+              borderTop: "1px solid var(--cs-border-sub)",
+              background: "var(--cs-surface-2)",
             }}>
               <span>Created: {new Date(tc.createdAt).toLocaleTimeString()}</span>
               <span>Source: <strong style={{ color: "var(--cs-muted)" }}>{tc.dataSource}</strong></span>
               {tc.fileSource && <span>File: {tc.fileSource}</span>}
               {dirty && <span style={{ color: "#f59e0b" }}>⚠ Request has unsaved edits</span>}
             </div>
+
           </div>
         )}
       </div>
