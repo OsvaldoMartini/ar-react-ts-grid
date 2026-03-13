@@ -1463,6 +1463,8 @@ interface DataGenTabState {
   envTick: number;   // bumps when env selection changes
   specsPage: number;
   specsPageSize: number;
+  planPage: number;
+  planPageSize: number;
 }
 
 const DG_PRESETS = [1, 5, 10, 50, 100, 500, 1000, 2000];
@@ -1474,7 +1476,7 @@ export class DataGenTab extends React.Component<
   state: DataGenTabState = {
     selNames: [], testCount: 1, dgView: "setup",
     plan: [], generatedN: 0, envTick: 0,
-    specsPage: 0, specsPageSize: 20,
+    specsPage: 0, specsPageSize: 20, planPage: 0, planPageSize: 20,
   };
 
   private toggle = (fn: string) =>
@@ -1519,7 +1521,7 @@ export class DataGenTab extends React.Component<
 
   render() {
     const { loadedSpecs } = this.props;
-    const { selNames, testCount, dgView, plan, generatedN, specsPage, specsPageSize } = this.state;
+    const { selNames, testCount, dgView, plan, generatedN, specsPage, specsPageSize, planPage, planPageSize } = this.state;
     const SPEC_PAGE_SIZES = [10, 20, 50, 100];
     const specsTotalPages = Math.ceil(loadedSpecs.length / specsPageSize);
     const specsPageStart = specsPage * specsPageSize;
@@ -1969,11 +1971,64 @@ export class DataGenTab extends React.Component<
             {sel.length > 0 && (() => {
               const p = dgBuildPlan(sel);
               if (p.length === 0) return null;
+              const PLAN_PAGE_SIZES = [10, 20, 50, 100];
+              const planTotalPages = Math.ceil(p.length / planPageSize);
+              const planPageStart = planPage * planPageSize;
+              const pagedPlan = p.slice(planPageStart, planPageStart + planPageSize);
               return (
                 <div>
-                  <SLbl text={`Execution plan — ${p.length} step${p.length !== 1 ? "s" : ""} per run`} />
+                  {/* Header row with label + inline pagination */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <span style={{
+                      fontFamily: MONO, fontSize: 10, fontWeight: 700,
+                      color: "#34d399", letterSpacing: 1, textTransform: "uppercase" as const,
+                      background: "#34d39915", border: "1px solid #34d39933",
+                      borderRadius: 5, padding: "2px 9px", whiteSpace: "nowrap" as const, flexShrink: 0,
+                    }}>
+                      Execution plan — {p.length} step{p.length !== 1 ? "s" : ""} per run
+                    </span>
+
+                    {planTotalPages > 1 && (
+                      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
+                        <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)" }}>per page</span>
+                        {PLAN_PAGE_SIZES.map(n => (
+                          <button key={n} onClick={() => this.setState({ planPageSize: n, planPage: 0 })} style={{
+                            background: planPageSize === n ? "#34d39918" : "var(--cs-surface-2)",
+                            border: `1px solid ${planPageSize === n ? "#34d399" : "var(--cs-border)"}`,
+                            color: planPageSize === n ? "#34d399" : "var(--cs-muted)",
+                            borderRadius: 5, padding: "2px 7px", fontFamily: MONO, fontSize: 10,
+                            cursor: "pointer", fontWeight: planPageSize === n ? 700 : 400,
+                          }}>{n}</button>
+                        ))}
+                        <span style={{ width: 1, height: 14, background: "var(--cs-border)", margin: "0 2px" }} />
+                        <button onClick={() => this.setState({ planPage: planPage - 1 })} disabled={planPage === 0}
+                          style={{ background: "transparent", border: "1px solid var(--cs-border)", color: "var(--cs-muted)", borderRadius: 5, padding: "2px 7px", fontFamily: MONO, fontSize: 10, cursor: planPage === 0 ? "default" : "pointer", opacity: planPage === 0 ? 0.4 : 1 }}>‹</button>
+                        {Array.from({ length: planTotalPages }, (_, pi) => {
+                          const near = pi === 0 || pi === planTotalPages - 1 || Math.abs(pi - planPage) <= 1;
+                          if (!near) return (pi === 1 || pi === planTotalPages - 2)
+                            ? <span key={pi} style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)" }}>…</span> : null;
+                          return (
+                            <button key={pi} onClick={() => this.setState({ planPage: pi })} style={{
+                              background: pi === planPage ? "#34d399" : "var(--cs-surface-2)",
+                              border: `1px solid ${pi === planPage ? "#34d399" : "var(--cs-border)"}`,
+                              color: pi === planPage ? "#0a1f15" : "var(--cs-muted)",
+                              borderRadius: 5, padding: "2px 6px", fontFamily: MONO, fontSize: 10,
+                              cursor: "pointer", fontWeight: pi === planPage ? 700 : 400, minWidth: 24,
+                            }}>{pi + 1}</button>
+                          );
+                        })}
+                        <button onClick={() => this.setState({ planPage: planPage + 1 })} disabled={planPage === planTotalPages - 1}
+                          style={{ background: "transparent", border: "1px solid var(--cs-border)", color: "var(--cs-muted)", borderRadius: 5, padding: "2px 7px", fontFamily: MONO, fontSize: 10, cursor: planPage === planTotalPages - 1 ? "default" : "pointer", opacity: planPage === planTotalPages - 1 ? 0.4 : 1 }}>›</button>
+                        <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)", marginLeft: 2 }}>
+                          {planPageStart + 1}–{Math.min(planPageStart + planPageSize, p.length)} of {p.length}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
                   <div style={{ display: "flex", flexDirection: "column" as const, gap: 4 }}>
-                    {p.map((step, i) => {
+                    {pagedPlan.map((step, i) => {
+                      const globalIdx = planPageStart + i;
                       const col = DG_METHOD_COLORS[step.method] || "#8b949e";
                       return (
                         <div key={step.id} style={{
@@ -1981,23 +2036,16 @@ export class DataGenTab extends React.Component<
                           gap: 10, padding: "8px 12px", borderRadius: 7, background: "var(--cs-surface)",
                           border: `1px solid ${col}20`, borderLeft: `3px solid ${col}66`
                         }}>
-                          <span style={{
-                            fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)",
-                            width: 18, flexShrink: 0
-                          }}>{i + 1}</span>
+                          <span style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)", width: 18, flexShrink: 0 }}>{globalIdx + 1}</span>
                           <MChip m={step.method} />
                           <span style={{ fontFamily: MONO, fontSize: 12, color: "var(--cs-text)", flex: 1 }}>
                             {step.summary}
                           </span>
                           {step.producesId && (
-                            <span style={{ fontFamily: MONO, fontSize: 9, color: col, opacity: 0.7 }}>
-                              → {step.spec.resourceName}_id
-                            </span>
+                            <span style={{ fontFamily: MONO, fontSize: 9, color: col, opacity: 0.7 }}>→ {step.spec.resourceName}_id</span>
                           )}
                           {step.dependsOn.length > 0 && (
-                            <span style={{ fontFamily: MONO, fontSize: 9, color: "#60a5fa", opacity: 0.7 }}>
-                              ← uses prev id
-                            </span>
+                            <span style={{ fontFamily: MONO, fontSize: 9, color: "#60a5fa", opacity: 0.7 }}>← uses prev id</span>
                           )}
                         </div>
                       );
