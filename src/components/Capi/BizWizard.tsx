@@ -455,6 +455,9 @@ interface BizWizardState {
   flowPage: number;
   flowPageSize: number;
   chainExpanded: boolean;
+  chainPage: number;
+  apiSelectPage: number;
+  apiSelectPageSize: number;
 }
 
 export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
@@ -464,7 +467,8 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
     selStaticCase: null, staticParams: {},
     execLog: [], execResults: [], running: false,
     execMode: "flow", flowTimeout: 15,
-    selCat: "ALL", flowPage: 0, flowPageSize: 20, chainExpanded: false,
+    selCat: "ALL", flowPage: 0, flowPageSize: 20, chainExpanded: false, chainPage: 0,
+    apiSelectPage: 0, apiSelectPageSize: 20,
   };
   private logRef = createRef<HTMLDivElement>();
 
@@ -905,6 +909,50 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
                         {selSpecNames.length} selected
                       </span>
                     )}
+                    {/* ── Inline pagination ── */}
+                    {(() => {
+                      const { apiSelectPage, apiSelectPageSize } = this.state;
+                      const total = loadedSpecs.length;
+                      const totalPages = Math.ceil(total / apiSelectPageSize);
+                      if (totalPages <= 1) return null;
+                      const pageStart = apiSelectPage * apiSelectPageSize;
+                      return (
+                        <div style={{ display: "flex", alignItems: "center", gap: 5, marginLeft: 6 }}>
+                          <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)" }}>per page</span>
+                          {[10, 20, 50, 100].map(n => (
+                            <button key={n} onClick={() => this.setState({ apiSelectPageSize: n, apiSelectPage: 0 })} style={{
+                              background: apiSelectPageSize === n ? "#34d39918" : "var(--cs-surface-2)",
+                              border: `1px solid ${apiSelectPageSize === n ? "#34d399" : "var(--cs-border)"}`,
+                              color: apiSelectPageSize === n ? "#34d399" : "var(--cs-muted)",
+                              borderRadius: 4, padding: "1px 6px", fontFamily: MONO, fontSize: 9,
+                              cursor: "pointer", fontWeight: apiSelectPageSize === n ? 700 : 400,
+                            }}>{n}</button>
+                          ))}
+                          <button onClick={() => this.setState({ apiSelectPage: apiSelectPage - 1 })} disabled={apiSelectPage === 0}
+                            style={{ background: "var(--cs-surface-2)", border: "1px solid var(--cs-border)", color: "var(--cs-muted)", borderRadius: 4, padding: "1px 7px", fontFamily: MONO, fontSize: 11, cursor: apiSelectPage === 0 ? "default" : "pointer", opacity: apiSelectPage === 0 ? 0.4 : 1 }}>‹</button>
+                          {Array.from({ length: totalPages }, (_, pi) => {
+                            const near = pi === 0 || pi === totalPages - 1 || Math.abs(pi - apiSelectPage) <= 1;
+                            if (!near) return pi === 1 || pi === totalPages - 2
+                              ? <span key={pi} style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)" }}>…</span>
+                              : null;
+                            return (
+                              <button key={pi} onClick={() => this.setState({ apiSelectPage: pi })} style={{
+                                background: pi === apiSelectPage ? "#34d399" : "var(--cs-surface-2)",
+                                border: `1px solid ${pi === apiSelectPage ? "#34d399" : "var(--cs-border)"}`,
+                                color: pi === apiSelectPage ? "#0a1f15" : "var(--cs-muted)",
+                                borderRadius: 4, padding: "1px 6px", fontFamily: MONO, fontSize: 9,
+                                cursor: "pointer", fontWeight: pi === apiSelectPage ? 700 : 400, minWidth: 24,
+                              }}>{pi + 1}</button>
+                            );
+                          })}
+                          <button onClick={() => this.setState({ apiSelectPage: apiSelectPage + 1 })} disabled={apiSelectPage === totalPages - 1}
+                            style={{ background: "var(--cs-surface-2)", border: "1px solid var(--cs-border)", color: "var(--cs-muted)", borderRadius: 4, padding: "1px 7px", fontFamily: MONO, fontSize: 11, cursor: apiSelectPage === totalPages - 1 ? "default" : "pointer", opacity: apiSelectPage === totalPages - 1 ? 0.4 : 1 }}>›</button>
+                          <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)", whiteSpace: "nowrap" as const }}>
+                            {pageStart + 1}–{Math.min(pageStart + apiSelectPageSize, total)} of {total}
+                          </span>
+                        </div>
+                      );
+                    })()}
                     <div style={{ display: "flex", gap: 6, marginLeft: "auto" }}>
                       <button onClick={() => this.setState({ selSpecNames: loadedSpecs.map(s => s.fileName) })}
                         style={{
@@ -924,7 +972,10 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
                   </div>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    {loadedSpecs.map(spec => {
+                    {loadedSpecs.slice(
+                      this.state.apiSelectPage * this.state.apiSelectPageSize,
+                      (this.state.apiSelectPage + 1) * this.state.apiSelectPageSize
+                    ).map(spec => {
                       const sel = selSpecNames.includes(spec.fileName);
                       const inFields = spec.fields.filter(f => !f.readOnly && !f.isParam).length;
                       const outFields = spec.fields.filter(f => f.readOnly).length;
@@ -1486,7 +1537,7 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
                   );
                 })()}
 
-                {/* Dependency chain summary — collapsible */}
+                {/* Dependency chain summary — collapsible + paginated */}
                 {(() => {
                   const producers = dynPlan.filter(s => s.producesId);
                   const consumers = dynPlan.filter(s => s.dependsOnIds.length > 0);
@@ -1494,24 +1545,24 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
                   const rows = producers.map(p => {
                     const deps = dynPlan.filter(s => s.dependsOnIds.includes(p.id));
                     if (deps.length === 0) return null;
-                    const col = METHOD_COLORS[p.method];
-                    return { p, deps, col };
+                    return { p, deps, col: METHOD_COLORS[p.method] };
                   }).filter(Boolean) as { p: any; deps: any[]; col: string }[];
                   if (rows.length === 0) return null;
-                  const PREVIEW = 20;
-                  const { chainExpanded } = this.state;
-                  const visible = chainExpanded ? rows : rows.slice(0, PREVIEW);
-                  const hasMore = rows.length > PREVIEW;
+
+                  const PREVIEW = 5;
+                  const PAGE_SIZE = 20;
+                  const { chainExpanded, chainPage } = this.state;
+                  const totalChainPages = Math.ceil(rows.length / PAGE_SIZE);
+                  const pageStart = chainPage * PAGE_SIZE;
+                  const visible = chainExpanded
+                    ? rows.slice(pageStart, pageStart + PAGE_SIZE)
+                    : rows.slice(0, PREVIEW);
+
                   return (
-                    <div style={{
-                      borderRadius: 8, border: "1px solid var(--cs-border-sub)",
-                      background: "var(--cs-surface-2)", overflow: "hidden",
-                    }}>
+                    <div style={{ borderRadius: 8, border: "1px solid var(--cs-border-sub)", background: "var(--cs-surface-2)", overflow: "hidden" }}>
+
                       {/* Header */}
-                      <div style={{
-                        padding: "8px 14px", borderBottom: "1px solid var(--cs-border-sub)",
-                        display: "flex", alignItems: "center", justifyContent: "space-between",
-                      }}>
+                      <div style={{ padding: "8px 14px", borderBottom: "1px solid var(--cs-border-sub)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                         <SLabel style={{ marginBottom: 0 }}>ID chaining</SLabel>
                         <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)" }}>
                           {rows.length} chain{rows.length !== 1 ? "s" : ""}
@@ -1521,18 +1572,11 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
                       {/* Rows */}
                       <div style={{ padding: "10px 14px 4px" }}>
                         {visible.map(({ p, deps, col }) => (
-                          <div key={p.id} style={{
-                            display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap",
-                            fontFamily: MONO, fontSize: 11, color: "var(--cs-muted)", marginBottom: 6,
-                          }}>
+                          <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", fontFamily: MONO, fontSize: 11, color: "var(--cs-muted)", marginBottom: 6 }}>
                             <span style={{ color: col, fontWeight: 700 }}>{p.spec.resourceName}_id</span>
                             <span style={{ color: "var(--cs-dim)" }}>→</span>
                             {deps.map((d: any) => (
-                              <span key={d.id} style={{
-                                background: "var(--cs-bg)", border: "1px solid var(--cs-border-sub)",
-                                borderRadius: 4, padding: "1px 6px",
-                                color: "var(--cs-text)", fontWeight: 600,
-                              }}>
+                              <span key={d.id} style={{ background: "var(--cs-bg)", border: "1px solid var(--cs-border-sub)", borderRadius: 4, padding: "1px 6px", color: "var(--cs-text)", fontWeight: 600 }}>
                                 {d.spec.resourceName}
                                 <span style={{ color: METHOD_COLORS[d.method] || "#8b949e", marginLeft: 4 }}>{d.method}</span>
                               </span>
@@ -1541,27 +1585,33 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
                         ))}
                       </div>
 
+                      {/* Pagination — only when expanded */}
+                      {chainExpanded && totalChainPages > 1 && (
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, padding: "6px 14px", borderTop: "1px solid var(--cs-border-sub)" }}>
+                          <button onClick={() => this.setState({ chainPage: chainPage - 1 })} disabled={chainPage === 0}
+                            style={{ background: "transparent", border: "1px solid var(--cs-border)", color: "var(--cs-muted)", borderRadius: 5, padding: "2px 8px", fontFamily: MONO, fontSize: 10, cursor: chainPage === 0 ? "default" : "pointer", opacity: chainPage === 0 ? 0.4 : 1 }}>‹</button>
+                          {Array.from({ length: totalChainPages }, (_, pi) => {
+                            const near = pi === 0 || pi === totalChainPages - 1 || Math.abs(pi - chainPage) <= 1;
+                            if (!near) return (pi === 1 || pi === totalChainPages - 2) ? <span key={pi} style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)" }}>…</span> : null;
+                            return (
+                              <button key={pi} onClick={() => this.setState({ chainPage: pi })} style={{ background: pi === chainPage ? "#34d399" : "var(--cs-surface)", border: `1px solid ${pi === chainPage ? "#34d399" : "var(--cs-border)"}`, color: pi === chainPage ? "#0a1f15" : "var(--cs-muted)", borderRadius: 5, padding: "2px 7px", fontFamily: MONO, fontSize: 10, cursor: "pointer", fontWeight: pi === chainPage ? 700 : 400, minWidth: 26 }}>{pi + 1}</button>
+                            );
+                          })}
+                          <button onClick={() => this.setState({ chainPage: chainPage + 1 })} disabled={chainPage === totalChainPages - 1}
+                            style={{ background: "transparent", border: "1px solid var(--cs-border)", color: "var(--cs-muted)", borderRadius: 5, padding: "2px 8px", fontFamily: MONO, fontSize: 10, cursor: chainPage === totalChainPages - 1 ? "default" : "pointer", opacity: chainPage === totalChainPages - 1 ? 0.4 : 1 }}>›</button>
+                          <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)", marginLeft: 4 }}>
+                            {pageStart + 1}–{Math.min(pageStart + PAGE_SIZE, rows.length)} of {rows.length}
+                          </span>
+                        </div>
+                      )}
+
                       {/* Expand / collapse toggle */}
-                      {hasMore && (
+                      {rows.length > PREVIEW && (
                         <button
-                          onClick={() => this.setState({ chainExpanded: !chainExpanded })}
-                          style={{
-                            width: "100%", padding: "7px 14px",
-                            background: "var(--cs-surface)", border: "none",
-                            borderTop: "1px solid var(--cs-border-sub)",
-                            display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                            fontFamily: MONO, fontSize: 10, color: "#34d399",
-                            cursor: "pointer", fontWeight: 600,
-                          }}>
-                          <span style={{
-                            display: "inline-block",
-                            transform: chainExpanded ? "rotate(180deg)" : "rotate(0deg)",
-                            transition: "transform .2s",
-                            fontSize: 12, lineHeight: 1,
-                          }}>▼</span>
-                          {chainExpanded
-                            ? `Collapse — showing all ${rows.length}`
-                            : `Show ${rows.length - PREVIEW} more chains`}
+                          onClick={() => this.setState({ chainExpanded: !chainExpanded, chainPage: 0 })}
+                          style={{ width: "100%", padding: "7px 14px", background: "var(--cs-surface)", border: "none", borderTop: "1px solid var(--cs-border-sub)", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontFamily: MONO, fontSize: 10, color: "#34d399", cursor: "pointer", fontWeight: 600 }}>
+                          <span style={{ display: "inline-block", transform: chainExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform .2s", fontSize: 11, lineHeight: 1 }}>▼</span>
+                          {chainExpanded ? `Collapse` : `Show all ${rows.length} chains`}
                         </button>
                       )}
                     </div>
