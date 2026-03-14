@@ -172,26 +172,46 @@
 
 // ── API Search box ───────────────────────────────────────────────────────────
 
+// Light theme overrides
+[data-capi-theme="light"] .capi-api-search {
+  background:   #ffffff;
+  border-color: #93c5fd;                    // bright blue border — clearly visible
+  box-shadow:   0 1px 4px rgba(10,102,194,0.10);
+  &:focus-within {
+    border-color: #0a66c2;
+    box-shadow:   0 0 0 3px rgba(10,102,194,0.14);
+  }
+}
+[data-capi-theme="light"] .capi-api-search__icon  { color: #0a66c2; opacity: 1; }
+[data-capi-theme="light"] .capi-api-search__clear { color: #7a8aaa; &:hover { color: #0c0d14; } }
+
+// Dark theme overrides
+[data-capi-theme="dark"] .capi-api-search {
+  background:   #111424;
+  border-color: rgba(6, 182, 212, 0.45);    // cyan border — clearly visible
+  box-shadow:   0 1px 6px rgba(0,0,0,0.30);
+  &:focus-within {
+    border-color: #06b6d4;
+    box-shadow:   0 0 0 3px rgba(6,182,212,0.18);
+  }
+}
+[data-capi-theme="dark"] .capi-api-search__icon  { color: #06b6d4; opacity: 1; }
+[data-capi-theme="dark"] .capi-api-search__clear { color: #55607e; &:hover { color: #eef0f8; } }
+
+// Base (shared)
 .capi-api-search {
   display:       flex;
   align-items:   center;
-  gap:           6px;
-  background:    rgba(255,255,255,0.06);
-  border:        1px solid rgba(255,255,255,0.18);
-  border-radius: $r-sm;
-  padding:       6px 12px;
-  margin-bottom: 8px;
+  gap:           8px;
+  border:        2px solid transparent;
+  border-radius: $r-md;
+  padding:       8px 14px;
+  margin-bottom: 10px;
   transition:    border-color 0.15s, box-shadow 0.15s;
-
-  &:focus-within {
-    border-color: #06b6d4;
-    box-shadow:   0 0 0 2px rgba(6,182,212,0.20);
-  }
 }
 
 .capi-api-search__icon {
-  font-size:   13px;
-  opacity:     0.75;
+  font-size:   14px;
   flex-shrink: 0;
 }
 
@@ -202,21 +222,21 @@
   outline:     none;
   color:       var(--cs-text);
   font-family: $font-ui;
-  font-size:   12px;
+  font-size:   13px;
+  font-weight: 500;
 
-  &::placeholder { color: var(--cs-dim); }
+  &::placeholder { color: var(--cs-dim); font-weight: 400; }
 }
 
 .capi-api-search__clear {
   background:  transparent;
   border:      none;
-  color:       rgba(255,255,255,0.45);
-  font-size:   11px;
+  font-size:   12px;
   cursor:      pointer;
   padding:     0 2px;
   line-height: 1;
   flex-shrink: 0;
-  &:hover { color: rgba(255,255,255,0.90); }
+  transition:  color 0.15s;
 }
 
 
