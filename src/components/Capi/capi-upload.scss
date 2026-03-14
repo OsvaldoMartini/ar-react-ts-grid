@@ -176,22 +176,22 @@
   display:       flex;
   align-items:   center;
   gap:           6px;
-  background:    var(--cs-surface);
-  border:        1px solid var(--cs-border);
+  background:    rgba(255,255,255,0.06);
+  border:        1px solid rgba(255,255,255,0.18);
   border-radius: $r-sm;
-  padding:       5px 10px;
+  padding:       6px 12px;
   margin-bottom: 8px;
-  transition:    border-color 0.15s;
+  transition:    border-color 0.15s, box-shadow 0.15s;
 
   &:focus-within {
     border-color: #06b6d4;
-    box-shadow:   0 0 0 2px rgba(6,182,212,0.12);
+    box-shadow:   0 0 0 2px rgba(6,182,212,0.20);
   }
 }
 
 .capi-api-search__icon {
-  font-size:  13px;
-  opacity:    0.5;
+  font-size:   13px;
+  opacity:     0.75;
   flex-shrink: 0;
 }
 
@@ -210,13 +210,13 @@
 .capi-api-search__clear {
   background:  transparent;
   border:      none;
-  color:       var(--cs-dim);
+  color:       rgba(255,255,255,0.45);
   font-size:   11px;
   cursor:      pointer;
   padding:     0 2px;
   line-height: 1;
   flex-shrink: 0;
-  &:hover { color: var(--cs-text); }
+  &:hover { color: rgba(255,255,255,0.90); }
 }
 
 
@@ -239,18 +239,33 @@
 
 // ── API card — mirrors PersonalProfile .item hover-slide ──────────────────────
 
+// ── API card — light theme overrides ────────────────────────────────────────
+[data-capi-theme="light"] .capi-api-card {
+  background:   #f0fdf4;                          // very light green
+  border-color: #bbf7d0;                          // soft green border
+  &:hover { border-color: #4ade80; box-shadow: 0 0 10px rgba(34,197,94,0.12); }
+}
+[data-capi-theme="light"] .capi-api-card__name    { color: #0c0d14; }  // near-black — readable
+[data-capi-theme="light"] .capi-api-card__version { color: #0369a1; background: #e0f2fe; border-color: #7dd3fc; }
+[data-capi-theme="light"] .capi-api-card__ext     { color: #92400e; background: #fffbeb; border-color: #fde68a; }
+
+// ── API card — dark theme overrides ─────────────────────────────────────────
+[data-capi-theme="dark"] .capi-api-card {
+  background:   rgba(34, 197, 94, 0.05);          // dark green tint
+  border-color: rgba(34, 197, 94, 0.20);
+  &:hover { border-color: rgba(34, 197, 94, 0.50); box-shadow: 0 0 12px rgba(34,197,94,0.10); }
+}
+[data-capi-theme="dark"] .capi-api-card__name    { color: #eef0f8; }   // near-white — readable
+[data-capi-theme="dark"] .capi-api-card__version { color: #67e8f9; background: rgba(6,182,212,0.10); border-color: rgba(6,182,212,0.28); }
+[data-capi-theme="dark"] .capi-api-card__ext     { color: #fbbf24; background: rgba(251,191,36,0.10); border-color: rgba(251,191,36,0.28); }
+
+// ── API card — base (shared) ─────────────────────────────────────────────────
 .capi-api-card {
-  background:    var(--cs-card-bg);
-  border:        1px solid var(--cs-card-border);
   border-radius: $r-lg;
   margin-bottom: 5px;
   transition:    transform .2s ease, border-color .2s ease, box-shadow .2s ease;
-
-  &:hover {
-    transform:    translateX(3px);
-    border-color: var(--cs-accent-border);
-    box-shadow:   var(--cs-shadow-sm);
-  }
+  border:        1px solid transparent;
+  &:hover { transform: translateX(3px); }
 }
 
 .capi-api-card__header {
@@ -263,16 +278,28 @@
 
 .capi-api-card__name-row { display: flex; gap: 8px; align-items: center; }
 
-.capi-api-card__name    { font-family: $font-ui;   font-size: 13px; font-weight: 600; color: var(--cs-text); }
-.capi-api-card__version { font-family: $font-mono; font-size: 10px; color: var(--cs-dim); }
-.capi-api-card__ext     {
+// API name — color set per theme above
+.capi-api-card__name    { font-family: $font-ui; font-size: 13px; font-weight: 600; color: var(--cs-text); }
+
+// Version badge — monospace, color set per theme above
+.capi-api-card__version {
   font-family:   $font-mono;
-  font-size:     9px;
-  background:    var(--cs-surface);
-  border:        1px solid var(--cs-border-sub);
-  color:         var(--cs-dim);
+  font-size:     10px;
+  font-weight:   600;
   border-radius: $r-xs;
-  padding:       1px 5px;
+  padding:       1px 6px;
+  border:        1px solid transparent;
+}
+
+// Format badge (JSON / YAML etc) — color set per theme above
+.capi-api-card__ext {
+  font-family:    $font-mono;
+  font-size:      9px;
+  font-weight:    700;
+  letter-spacing: .4px;
+  border-radius:  $r-xs;
+  padding:        1px 5px;
+  border:         1px solid transparent;
 }
 .capi-api-card__warn    { font-size: 11px; color: var(--cs-red); }
 .capi-api-card__controls { display: flex; gap: 6px; align-items: center; }
