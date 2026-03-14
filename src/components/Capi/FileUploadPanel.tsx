@@ -22,6 +22,7 @@ interface FileUploadPanelState {
   apiPageSize: number;
   openSections: Set<string>; // keys like "3-fields", "3-deps"
   openUris: Set<string>;     // keys like "3-uri-1" per-endpoint URI toggles
+  apiSearch: string;         // filter text for API name / description
 }
 
 const ACCEPTED_EXTS = [".yaml", ".yml", ".json", ".schema", ".shape", ".proto", ".pdf"];
@@ -32,6 +33,7 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
     apiPage: 0, apiPageSize: 20,
     openSections: new Set<string>(),
     openUris: new Set<string>(),
+    apiSearch: "",
   };
 
   private folderRef = createRef<HTMLInputElement>();
@@ -94,13 +96,23 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
 
   render() {
     const { loadedSpecs, onDeleteAll } = this.props;
-    const { drag, parsing, results, expanded, showDeps, apiPage, apiPageSize, openSections, openUris } = this.state;
+    const { drag, parsing, results, expanded, showDeps, apiPage, apiPageSize, openSections, openUris, apiSearch } = this.state;
 
-    // Pagination slice — applied before grouping
+    // Search filter — applied before pagination
+    const searchTerm = apiSearch.trim().toLowerCase();
+    const filteredSpecs = searchTerm
+      ? loadedSpecs.filter(s =>
+        s.title?.toLowerCase().includes(searchTerm) ||
+        s.description?.toLowerCase().includes(searchTerm) ||
+        s.resourceName?.toLowerCase().includes(searchTerm)
+      )
+      : loadedSpecs;
+
+    // Pagination slice — applied after filtering
     const PAGE_SIZES = [10, 20, 50, 100];
-    const totalPages = Math.ceil(loadedSpecs.length / apiPageSize);
+    const totalPages = Math.ceil(filteredSpecs.length / apiPageSize);
     const pageStart = apiPage * apiPageSize;
-    const pagedSpecs = loadedSpecs.slice(pageStart, pageStart + apiPageSize);
+    const pagedSpecs = filteredSpecs.slice(pageStart, pageStart + apiPageSize);
 
     // Group specs by category
     const byCat: Record<string, ApiSpec[]> = {};
@@ -214,49 +226,30 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
           </div>
         )}
 
-        {/* Dependency graph */}
-        {loadedSpecs.length > 1 && (
-          <div className="capi-deps">
-            <button
-              className="capi-deps__toggle"
-              onClick={() => this.setState(s => ({ showDeps: !s.showDeps }))}
-            >
-              {showDeps ? "▲" : "▼"} Grafo Dipendenze API ({depEdges.length} link tra {Object.keys(depNodes).length} risorse)
-            </button>
-            {showDeps && (
-              <div className="capi-deps__body">
-                {Object.entries(depNodes).map(([id, node]) => {
-                  const deps = depEdges.filter(e => e.from === id).map(e => e.to);
-                  const usedBy = depEdges.filter(e => e.to === id).map(e => e.from);
-                  return (
-                    <div key={id} className="capi-deps__row">
-                      <div className="capi-deps__row-meta">
-                        <span className="capi-deps__path">/{id}</span>
-                        <span className="capi-deps__tag">{node.type}</span>
-                        <span className="capi-deps__meta">{node.endpoints} ep</span>
-                        {node.fields > 0 && <span className="capi-deps__meta">{node.fields} fields</span>}
-                      </div>
-                      {deps.length > 0 && (
-                        <div className="capi-deps__links">
-                          → dipende da: {deps.map(d => <code key={d} className="capi-deps__code-y">{d}</code>)}
-                        </div>
-                      )}
-                      {usedBy.length > 0 && (
-                        <div className="capi-deps__links">
-                          ← usato da: {usedBy.map(d => <code key={d} className="capi-deps__code-b">{d}</code>)}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+        {/* Search box */}
+        {loadedSpecs.length > 0 && (
+          <div className="capi-api-search">
+            <span className="capi-api-search__icon">🔍</span>
+            <input
+              className="capi-api-search__input"
+              type="text"
+              placeholder="Search APIs by name or description…"
+              value={apiSearch}
+              onChange={e => this.setState({ apiSearch: e.target.value, apiPage: 0 })}
+            />
+            {apiSearch && (
+              <button
+                className="capi-api-search__clear"
+                onClick={() => this.setState({ apiSearch: "", apiPage: 0 })}
+                title="Clear search"
+              >✕</button>
             )}
           </div>
         )}
 
-        {/* API list */}
+        {/* API list label */}
         <div className="capi-api-label" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span>API Caricate ({loadedSpecs.length}) · {Object.values(db.stores).reduce((a, s) => a + s.length, 0)} records</span>
+          <span>API Caricate ({filteredSpecs.length}{searchTerm ? ` / ${loadedSpecs.length}` : ""}) · {Object.values(db.stores).reduce((a, s) => a + s.length, 0)} records</span>
           {/* Page-size picker */}
           {loadedSpecs.length > 10 && (
             <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -461,8 +454,48 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
               style={{ background: "transparent", border: "1px solid var(--cs-border)", color: "var(--cs-muted)", borderRadius: 5, padding: "3px 9px", fontSize: 10, fontFamily: "monospace", cursor: apiPage === totalPages - 1 ? "default" : "pointer", opacity: apiPage === totalPages - 1 ? 0.4 : 1 }}>Next ›</button>
 
             <span style={{ fontSize: 9, color: "var(--cs-dim)", fontFamily: "monospace", marginLeft: 6 }}>
-              {pageStart + 1}–{Math.min(pageStart + apiPageSize, loadedSpecs.length)} of {loadedSpecs.length}
+              {pageStart + 1}–{Math.min(pageStart + apiPageSize, filteredSpecs.length)} of {filteredSpecs.length}
             </span>
+          </div>
+        )}
+
+        {/* Dependency graph — moved below API list */}
+        {loadedSpecs.length > 1 && (
+          <div className="capi-deps">
+            <button
+              className="capi-deps__toggle"
+              onClick={() => this.setState(s => ({ showDeps: !s.showDeps }))}
+            >
+              {showDeps ? "▲" : "▼"} Grafo Dipendenze API ({depEdges.length} link tra {Object.keys(depNodes).length} risorse)
+            </button>
+            {showDeps && (
+              <div className="capi-deps__body">
+                {Object.entries(depNodes).map(([id, node]) => {
+                  const deps = depEdges.filter(e => e.from === id).map(e => e.to);
+                  const usedBy = depEdges.filter(e => e.to === id).map(e => e.from);
+                  return (
+                    <div key={id} className="capi-deps__row">
+                      <div className="capi-deps__row-meta">
+                        <span className="capi-deps__path">/{id}</span>
+                        <span className="capi-deps__tag">{node.type}</span>
+                        <span className="capi-deps__meta">{node.endpoints} ep</span>
+                        {node.fields > 0 && <span className="capi-deps__meta">{node.fields} fields</span>}
+                      </div>
+                      {deps.length > 0 && (
+                        <div className="capi-deps__links">
+                          → dipende da: {deps.map(d => <code key={d} className="capi-deps__code-y">{d}</code>)}
+                        </div>
+                      )}
+                      {usedBy.length > 0 && (
+                        <div className="capi-deps__links">
+                          ← usato da: {usedBy.map(d => <code key={d} className="capi-deps__code-b">{d}</code>)}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -170,6 +170,56 @@
   margin-bottom:  10px;
 }
 
+// ── API Search box ───────────────────────────────────────────────────────────
+
+.capi-api-search {
+  display:       flex;
+  align-items:   center;
+  gap:           6px;
+  background:    var(--cs-surface);
+  border:        1px solid var(--cs-border);
+  border-radius: $r-sm;
+  padding:       5px 10px;
+  margin-bottom: 8px;
+  transition:    border-color 0.15s;
+
+  &:focus-within {
+    border-color: #06b6d4;
+    box-shadow:   0 0 0 2px rgba(6,182,212,0.12);
+  }
+}
+
+.capi-api-search__icon {
+  font-size:  13px;
+  opacity:    0.5;
+  flex-shrink: 0;
+}
+
+.capi-api-search__input {
+  flex:        1;
+  background:  transparent;
+  border:      none;
+  outline:     none;
+  color:       var(--cs-text);
+  font-family: $font-ui;
+  font-size:   12px;
+
+  &::placeholder { color: var(--cs-dim); }
+}
+
+.capi-api-search__clear {
+  background:  transparent;
+  border:      none;
+  color:       var(--cs-dim);
+  font-size:   11px;
+  cursor:      pointer;
+  padding:     0 2px;
+  line-height: 1;
+  flex-shrink: 0;
+  &:hover { color: var(--cs-text); }
+}
+
+
 // ── Category group ────────────────────────────────────────────────────────────
 
 .capi-api-group   { margin-bottom: 14px; }
