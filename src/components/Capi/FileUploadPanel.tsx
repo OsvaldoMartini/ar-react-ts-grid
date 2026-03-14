@@ -20,6 +20,8 @@ interface FileUploadPanelState {
   showDeps: boolean;
   apiPage: number;
   apiPageSize: number;
+  openSections: Set<string>; // keys like "3-fields", "3-deps"
+  openUris: Set<string>;     // keys like "3-uri-1" per-endpoint URI toggles
 }
 
 const ACCEPTED_EXTS = [".yaml", ".yml", ".json", ".schema", ".shape", ".proto", ".pdf"];
@@ -28,6 +30,8 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
   state: FileUploadPanelState = {
     drag: false, parsing: false, results: [], expanded: null, showDeps: false,
     apiPage: 0, apiPageSize: 20,
+    openSections: new Set<string>(),
+    openUris: new Set<string>(),
   };
 
   private folderRef = createRef<HTMLInputElement>();
@@ -90,7 +94,7 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
 
   render() {
     const { loadedSpecs, onDeleteAll } = this.props;
-    const { drag, parsing, results, expanded, showDeps, apiPage, apiPageSize } = this.state;
+    const { drag, parsing, results, expanded, showDeps, apiPage, apiPageSize, openSections, openUris } = this.state;
 
     // Pagination slice — applied before grouping
     const PAGE_SIZES = [10, 20, 50, 100];
@@ -329,55 +333,99 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
                           )}
                         </div>
 
-                        {spec.endpoints.map((ep, j) => (
-                          <div key={j} className="capi-api-card__ep">
-                            <MethodBadge method={ep.method} />
-                            <span>{ep.path}</span>
-                            {ep.summary && (
-                              <span className="capi-api-card__ep-sum">— {ep.summary.slice(0, 50)}</span>
-                            )}
-                          </div>
-                        ))}
-
-                        {spec.fields?.length > 0 && (
-                          <div className="capi-api-card__fields-wrap">
-                            <div className="capi-api-card__fields-label">
-                              Campi schema ({spec.fields.length}):
-                            </div>
-                            <div className="capi-api-card__fields">
-                              {spec.fields.slice(0, 20).map(f => (
-                                <span
-                                  key={f.name}
-                                  className="capi-api-card__field-chip"
-                                  title={`${f.name}: ${f.type}${f.required ? " (required)" : ""}`}
-                                >
-                                  {f.name}
-                                  {f.type !== "string" && f.type !== "integer" && (
-                                    <em style={{ opacity: 0.6, marginLeft: 3 }}>:{f.type}</em>
-                                  )}
-                                </span>
-                              ))}
-                              {spec.fields.length > 20 && (
-                                <span className="capi-api-card__more">+{spec.fields.length - 20} altri</span>
+                        {spec.endpoints.map((ep, j) => {
+                          const uriKey = `${gi}-uri-${j}`;
+                          const uriOpen = openUris.has(uriKey);
+                          return (
+                            <div key={j} className="capi-api-card__ep">
+                              <MethodBadge method={ep.method} />
+                              {/* URI hidden by default — click {URI} toggle to reveal */}
+                              <span
+                                className="capi-api-card__uri-toggle"
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  const next = new Set(openUris);
+                                  uriOpen ? next.delete(uriKey) : next.add(uriKey);
+                                  this.setState({ openUris: next });
+                                }}
+                                title={uriOpen ? "Hide URI" : "Show URI"}
+                              >
+                                {uriOpen ? ep.path : "{URI}"}
+                              </span>
+                              {ep.summary && (
+                                <span className="capi-api-card__ep-sum">— {ep.summary.slice(0, 50)}</span>
                               )}
                             </div>
-                          </div>
-                        )}
+                          );
+                        })}
 
-                        {spec.dependencies?.length > 0 && (
-                          <div className="capi-api-card__fields-wrap" style={{ marginTop: 8 }}>
-                            <div className="capi-api-card__fields-label">
-                              Dipendenze schema ({spec.dependencies.length}):
+                        {spec.fields?.length > 0 && (() => {
+                          const fKey = `${gi}-fields`;
+                          const fOpen = openSections.has(fKey);
+                          return (
+                            <div className="capi-api-card__fields-wrap">
+                              <div
+                                className="capi-api-card__fields-label capi-api-card__fields-label--toggle"
+                                onClick={() => {
+                                  const next = new Set(openSections);
+                                  fOpen ? next.delete(fKey) : next.add(fKey);
+                                  this.setState({ openSections: next });
+                                }}
+                              >
+                                <span className="capi-api-card__section-arrow">{fOpen ? "▾" : "▸"}</span>
+                                Schema fields ({spec.fields.length}):
+                              </div>
+                              {fOpen && (
+                                <div className="capi-api-card__fields">
+                                  {spec.fields.slice(0, 20).map(f => (
+                                    <span
+                                      key={f.name}
+                                      className="capi-api-card__field-chip"
+                                      title={`${f.name}: ${f.type}${f.required ? " (required)" : ""}`}
+                                    >
+                                      {f.name}
+                                      {f.type !== "string" && f.type !== "integer" && (
+                                        <em style={{ opacity: 0.6, marginLeft: 3 }}>:{f.type}</em>
+                                      )}
+                                    </span>
+                                  ))}
+                                  {spec.fields.length > 20 && (
+                                    <span className="capi-api-card__more">+{spec.fields.length - 20} altri</span>
+                                  )}
+                                </div>
+                              )}
                             </div>
-                            <div className="capi-api-card__fields">
-                              {spec.dependencies.map(d => (
-                                <code key={d} className="capi-deps__code-y" style={{ marginRight: 4 }}>
-                                  {d}
-                                </code>
-                              ))}
+                          );
+                        })()}
+
+                        {spec.dependencies?.length > 0 && (() => {
+                          const dKey = `${gi}-deps`;
+                          const dOpen = openSections.has(dKey);
+                          return (
+                            <div className="capi-api-card__fields-wrap" style={{ marginTop: 8 }}>
+                              <div
+                                className="capi-api-card__fields-label capi-api-card__fields-label--toggle"
+                                onClick={() => {
+                                  const next = new Set(openSections);
+                                  dOpen ? next.delete(dKey) : next.add(dKey);
+                                  this.setState({ openSections: next });
+                                }}
+                              >
+                                <span className="capi-api-card__section-arrow">{dOpen ? "▾" : "▸"}</span>
+                                Schema dependencies ({spec.dependencies.length}):
+                              </div>
+                              {dOpen && (
+                                <div className="capi-api-card__fields">
+                                  {spec.dependencies.map(d => (
+                                    <code key={d} className="capi-deps__code-y" style={{ marginRight: 4 }}>
+                                      {d}
+                                    </code>
+                                  ))}
+                                </div>
+                              )}
                             </div>
-                          </div>
-                        )}
+                          );
+                        })()}
                       </div>
                     )}
                   </div>

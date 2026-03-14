@@ -249,6 +249,34 @@
 .capi-api-card__ep-path { font-family: $font-mono; font-size: 11px; color: var(--cs-text2); }
 .capi-api-card__ep-sum  { font-family: $font-ui;   font-size: 11px; color: var(--cs-dim); }
 
+// URI toggle chip — cyan, hidden by default, click to expand
+.capi-api-card__uri-toggle {
+  font-family:    $font-mono;
+  font-size:      11px;
+  color:          #06b6d4;
+  background:     rgba(6, 182, 212, 0.08);
+  border:         1px solid rgba(6, 182, 212, 0.30);
+  border-radius:  $r-sm;
+  padding:        1px 6px;
+  cursor:         pointer;
+  user-select:    none;
+  transition:     background 0.15s, border-color 0.15s;
+  &:hover { background: rgba(6, 182, 212, 0.16); border-color: rgba(6, 182, 212, 0.55); }
+}
+
+// Collapsible section label for fields / deps
+.capi-api-card__fields-label--toggle {
+  cursor:      pointer;
+  user-select: none;
+  &:hover { color: var(--cs-text2); }
+}
+.capi-api-card__section-arrow {
+  display:      inline-block;
+  width:        12px;
+  margin-right: 3px;
+  font-size:    10px;
+}
+
 .capi-api-card__fields-wrap  { margin-top: 8px; }
 .capi-api-card__fields-label { font-family: $font-ui; font-size: 10px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--cs-dim); margin-bottom: 5px; }
 .capi-api-card__fields       { display: flex; flex-wrap: wrap; gap: 4px; }
