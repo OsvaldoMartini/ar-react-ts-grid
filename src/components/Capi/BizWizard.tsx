@@ -601,7 +601,7 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
 
     return (
       <div className="capi-wizard-overlay">
-        <div className="capi-wizard" style={{ width: "min(800px, 96vw)", maxHeight: "92vh" }}>
+        <div className="capi-wizard" style={{ width: "min(800px, 96vw)", height: "92vh" }}>
 
           {/* ── Header ── */}
           <div className="capi-wizard__header">
@@ -622,7 +622,9 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
           )}
 
           {/* ── Body ── */}
-          <div className="capi-wizard__body">
+          <div className="capi-wizard__body" style={{
+            overflowY: (wizStep === "running" || wizStep === "report") ? "hidden" : "auto",
+          }}>
 
             {/* ══════════════════════════════════════════
                 HOME  — launch DSG
@@ -953,17 +955,6 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
                   })()}
                 </div>
 
-                <div className="capi-wizard-actions">
-                  <button className="capi-wizard-btn capi-wizard-btn--back"
-                    onClick={() => this.setState({ wizStep: "home", wizMode: null })}>← Back</button>
-                  <button
-                    className="capi-wizard-btn capi-wizard-btn--run"
-                    disabled={selSpecNames.length === 0}
-                    onClick={this.goToData}
-                    style={{ opacity: selSpecNames.length === 0 ? 0.4 : 1 }}>
-                    Next: Synthetic Data → ({selSpecNames.length} selected)
-                  </button>
-                </div>
               </div>
             )}
 
@@ -1079,14 +1070,6 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
                   </div>
                 )}
 
-                <div className="capi-wizard-actions">
-                  <button className="capi-wizard-btn capi-wizard-btn--back"
-                    onClick={() => this.setState({ wizStep: "api-select" })}>← Back</button>
-                  <button className="capi-wizard-btn capi-wizard-btn--run"
-                    onClick={() => this.setState({ wizStep: "flow" })}>
-                    Next: Execution Flow →
-                  </button>
-                </div>
               </div>
             )}
 
@@ -1425,17 +1408,6 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
                   );
                 })()}
 
-                <div className="capi-wizard-actions">
-                  <button className="capi-wizard-btn capi-wizard-btn--back"
-                    onClick={() => this.setState({ wizStep: "data" })}>← Back</button>
-                  <button className="capi-wizard-btn capi-wizard-btn--run"
-                    onClick={this.execDynPlan}>
-                    {this.state.execMode === "flow"
-                      ? `▶ Execute Flow · ${dynPlan.length} steps × ${testCount} run${testCount > 1 ? "s" : ""}`
-                      : `⊞ Execute Independent · ${dynPlan.length} APIs × ${testCount} run${testCount > 1 ? "s" : ""}`
-                    }
-                  </button>
-                </div>
               </div>
             )}
 
@@ -1443,54 +1415,59 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
                 RUNNING  (DSG)
             ══════════════════════════════════════════ */}
             {wizStep === "running" && (
-              <div>
-                {/* ── LIVE strip + Stop ── */}
-                <div style={{
-                  display: "flex", alignItems: "center", gap: 10,
-                  padding: "9px 14px", borderRadius: 8, marginBottom: 12,
-                  background: "#f59e0b10", border: "1px solid #f59e0b33",
-                  position: "sticky", top: 0, zIndex: 10,
-                }}>
-                  <span style={{
-                    width: 8, height: 8, borderRadius: "50%",
-                    background: "#f59e0b", display: "inline-block",
-                    boxShadow: "0 0 6px #f59e0b",
-                  }} />
-                  <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: "#f59e0b", flex: 1 }}>
-                    LIVE — execution in progress
-                  </span>
-                  <button
-                    onClick={() => this.setState({ stopFlag: true })}
-                    disabled={stopFlag}
-                    style={{
-                      background: stopFlag ? "var(--cs-surface-2)" : "#f8717118",
-                      border: `1.5px solid ${stopFlag ? "var(--cs-border)" : "#f87171aa"}`,
-                      color: stopFlag ? "var(--cs-dim)" : "#f87171",
-                      borderRadius: 7, padding: "5px 16px",
-                      fontFamily: MONO, fontSize: 11, fontWeight: 700,
-                      cursor: stopFlag ? "not-allowed" : "pointer",
-                      display: "flex", alignItems: "center", gap: 6,
-                      transition: "all .15s",
-                    }}
-                    onMouseEnter={e => { if (!stopFlag) (e.currentTarget as HTMLButtonElement).style.background = "#f8717130"; }}
-                    onMouseLeave={e => { if (!stopFlag) (e.currentTarget as HTMLButtonElement).style.background = "#f8717118"; }}
-                  >
-                    {stopFlag ? "⏹ Stopping…" : "■ Stop"}
-                  </button>
+              <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, gap: 0, margin: "-18px -20px", overflow: "hidden" }}>
+
+                {/* ── Fixed top: LIVE strip + exec info ── */}
+                <div style={{ flexShrink: 0, padding: "10px 20px", borderBottom: "1px solid var(--cs-border-sub)", background: "var(--cs-bg)" }}>
+
+                  {/* LIVE strip */}
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 10,
+                    padding: "9px 14px", borderRadius: 8, marginBottom: 10,
+                    background: "#f59e0b10", border: "1px solid #f59e0b33",
+                  }}>
+                    <span style={{
+                      width: 8, height: 8, borderRadius: "50%",
+                      background: "#f59e0b", display: "inline-block",
+                      boxShadow: "0 0 6px #f59e0b",
+                    }} />
+                    <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: "#f59e0b", flex: 1 }}>
+                      LIVE — execution in progress
+                    </span>
+                    <button
+                      onClick={() => this.setState({ stopFlag: true })}
+                      disabled={stopFlag}
+                      style={{
+                        background: stopFlag ? "var(--cs-surface-2)" : "#f8717118",
+                        border: `1.5px solid ${stopFlag ? "var(--cs-border)" : "#f87171aa"}`,
+                        color: stopFlag ? "var(--cs-dim)" : "#f87171",
+                        borderRadius: 7, padding: "5px 16px",
+                        fontFamily: MONO, fontSize: 11, fontWeight: 700,
+                        cursor: stopFlag ? "not-allowed" : "pointer",
+                        display: "flex", alignItems: "center", gap: 6, transition: "all .15s",
+                      }}
+                      onMouseEnter={e => { if (!stopFlag) (e.currentTarget as HTMLButtonElement).style.background = "#f8717130"; }}
+                      onMouseLeave={e => { if (!stopFlag) (e.currentTarget as HTMLButtonElement).style.background = "#f8717118"; }}
+                    >
+                      {stopFlag ? "⏹ Stopping…" : "■ Stop"}
+                    </button>
+                  </div>
+
+                  {/* Exec info */}
+                  <div className="capi-wizard-running-header" style={{ marginBottom: 0 }}>
+                    <div className="capi-wizard-running-icon">⚙️</div>
+                    <div className="capi-wizard-running-title">
+                      {`Executing ${dynPlan.length} API steps…`}
+                    </div>
+                    {testCount > 1 && (
+                      <div style={{ fontFamily: MONO, fontSize: 11, color: "var(--cs-dim)", marginTop: 4 }}>
+                        {Math.min(testCount, 5)} of {testCount} runs — chaining IDs between POST → GET/PATCH/DELETE
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                <div className="capi-wizard-running-header">
-                  <div className="capi-wizard-running-icon">⚙️</div>
-                  <div className="capi-wizard-running-title">
-                    {`Executing ${dynPlan.length} API steps…`}
-                  </div>
-                  {testCount > 1 && (
-                    <div style={{ fontFamily: MONO, fontSize: 11, color: "var(--cs-dim)", marginTop: 4 }}>
-                      {Math.min(testCount, 5)} of {testCount} runs — chaining IDs between POST → GET/PATCH/DELETE
-                    </div>
-                  )}
-                </div>
-                {/* ── Exec log — paginated ── */}
+                {/* ── Paginated step list (scrollable middle) ── */}
                 {(() => {
                   const LOG_SIZES = [10, 20, 50, 100, 500];
                   const logTotal = execLog.length;
@@ -1501,7 +1478,6 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
                   const pageSlice = execLog.slice(logStart, logEnd);
 
                   const lastPage = logPages - 1;
-                  // Auto-advance to last page while running so new entries stay visible
                   if (this.state.running && safePage < lastPage) {
                     setTimeout(() => this.setState({ execLogPage: lastPage }), 0);
                   }
@@ -1513,7 +1489,7 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
                   };
                   const dis: React.CSSProperties = { opacity: 0.4, cursor: "not-allowed" };
 
-                  const PageBar = () => logPages <= 1 ? null : (
+                  const PaginationBar = () => logPages <= 1 ? null : (
                     <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" as const }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                         <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)" }}>per page</span>
@@ -1551,31 +1527,40 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
                           style={{ ...btnS, padding: "2px 7px", ...(safePage >= logPages - 1 ? dis : {}) }}>»</button>
                       </div>
                       <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)" }}>
-                        {logStart + 1}–{logEnd} of {logTotal}
+                        {logTotal > 0 ? `${logStart + 1}–${logEnd} of ${logTotal}` : "0 steps"}
                       </span>
                     </div>
                   );
 
                   return (
-                    <div>
-                      <PageBar />
-                      <div className="capi-wizard-steps" style={{ marginTop: logPages > 1 ? 8 : 0 }}>
-                        {pageSlice.map((e: ExecEntry, i: number) => {
-                          const isRun = e.status === "running";
-                          const cls = isRun ? "running" : e.ok ? "ok" : "fail";
-                          return (
-                            <div key={logStart + i} className={`capi-wizard-step capi-wizard-step--${cls}`}>
-                              <span className="capi-wizard-step__num">{e.step}</span>
-                              <span className="capi-wizard-step__icon">{isRun ? "⏳" : e.ok ? "✅" : "❌"}</span>
-                              <span className="capi-wizard-step__label">{e.label}</span>
-                              {!isRun && (<><StatusBadge status={e.status} /><span className="capi-wizard-step__lat">{e.latency}ms</span></>)}
-                            </div>
-                          );
-                        })}
-                        <div ref={this.logRef} />
+                    <>
+                      {/* Scrollable steps */}
+                      <div style={{ flex: 1, overflowY: "auto" as const, padding: "8px 20px" }}>
+                        {logPages > 1 && <div style={{ marginBottom: 8 }}><PaginationBar /></div>}
+                        <div className="capi-wizard-steps">
+                          {pageSlice.map((e: ExecEntry, i: number) => {
+                            const isRun = e.status === "running";
+                            const cls = isRun ? "running" : e.ok ? "ok" : "fail";
+                            return (
+                              <div key={logStart + i} className={`capi-wizard-step capi-wizard-step--${cls}`}>
+                                <span className="capi-wizard-step__num">{e.step}</span>
+                                <span className="capi-wizard-step__icon">{isRun ? "⏳" : e.ok ? "✅" : "❌"}</span>
+                                <span className="capi-wizard-step__label">{e.label}</span>
+                                {!isRun && (<><StatusBadge status={e.status} /><span className="capi-wizard-step__lat">{e.latency}ms</span></>)}
+                              </div>
+                            );
+                          })}
+                          <div ref={this.logRef} />
+                        </div>
                       </div>
-                      {logPages > 1 && <div style={{ marginTop: 8 }}><PageBar /></div>}
-                    </div>
+
+                      {/* Fixed bottom: bottom pagination only */}
+                      {logPages > 1 && (
+                        <div style={{ flexShrink: 0, padding: "8px 20px", borderTop: "1px solid var(--cs-border-sub)", background: "var(--cs-bg)" }}>
+                          <PaginationBar />
+                        </div>
+                      )}
+                    </>
                   );
                 })()}
               </div>
@@ -1585,73 +1570,60 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
                 REPORT  (shared)
             ══════════════════════════════════════════ */}
             {wizStep === "report" && (
-              <div className="capi-wizard-results">
+              <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, gap: 0, margin: "-18px -20px", overflow: "hidden" }}>
 
-                <div style={{
-                  padding: "11px 15px", borderRadius: 10, marginBottom: 4,
-                  background: "#a78bfa10", border: "1px solid #a78bfa33"
-                }}>
-                  <div style={{ fontFamily: MONO, fontSize: 12, fontWeight: 800, color: "#a78bfa", marginBottom: 4 }}>
-                    📊 Report Management
-                  </div>
-                  <div style={{ fontFamily: MONO, fontSize: 11, color: "var(--cs-muted)" }}>
-                    {`${selectedSpecs.length} API${selectedSpecs.length > 1 ? "s" : ""} · ${dynPlan.length} steps · ${testCount} configured run${testCount > 1 ? "s" : ""}`}
-                    {" · "}{execResults.length} calls executed · {pct}% success
-                  </div>
-                </div>
-
-                {/* Stats */}
-                <div className="capi-wizard-stats">
-                  {([
-                    { value: totalOk, label: "✓ PASS", mod: "ok" },
-                    { value: totalFail, label: "✗ FAIL", mod: "fail" },
-                    { value: execResults.length, label: "Total", mod: "total" },
-                    { value: avgLat + "ms", label: "Avg Lat", mod: "latency" },
-                  ] as const).map(({ value, label, mod }) => (
-                    <div key={label} className={`capi-wizard-stat capi-wizard-stat--${mod}`}>
-                      <div className="capi-wizard-stat__value">{value}</div>
-                      <div className="capi-wizard-stat__label">{label}</div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Success bar */}
-                <div>
+                {/* ── Fixed top: summary card + stats + bar + methods ── */}
+                <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", gap: 10, padding: "14px 20px 10px", borderBottom: "1px solid var(--cs-border-sub)", background: "var(--cs-bg)" }}>
                   <div style={{
-                    display: "flex", justifyContent: "space-between",
-                    fontFamily: MONO, fontSize: 11, color: "var(--cs-muted)", marginBottom: 5
+                    padding: "11px 15px", borderRadius: 10,
+                    background: "#a78bfa10", border: "1px solid #a78bfa33"
                   }}>
-                    <span>Success rate</span>
-                    <span style={{ fontWeight: 700, color: pctCol }}>{pct}%</span>
+                    <div style={{ fontFamily: MONO, fontSize: 12, fontWeight: 800, color: "#a78bfa", marginBottom: 4 }}>
+                      📊 Report Management
+                    </div>
+                    <div style={{ fontFamily: MONO, fontSize: 11, color: "var(--cs-muted)" }}>
+                      {`${selectedSpecs.length} API${selectedSpecs.length > 1 ? "s" : ""} · ${dynPlan.length} steps · ${testCount} configured run${testCount > 1 ? "s" : ""}`}
+                      {" · "}{execResults.length} calls executed · {pct}% success
+                    </div>
                   </div>
-                  <div style={{ height: 8, borderRadius: 4, background: "var(--cs-surface-2)", overflow: "hidden" }}>
-                    <div style={{
-                      height: "100%", borderRadius: 4, width: `${pct}%`,
-                      background: pctCol, transition: "width .6s ease"
-                    }} />
-                  </div>
-                </div>
 
-                {/* Method breakdown */}
-                <div>
-                  <SLabel>By HTTP method</SLabel>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    {(["POST", "GET", "PATCH", "PUT", "DELETE"] as const)
-                      .map(m => {
+                  <div className="capi-wizard-stats">
+                    {([
+                      { value: totalOk, label: "✓ PASS", mod: "ok" },
+                      { value: totalFail, label: "✗ FAIL", mod: "fail" },
+                      { value: execResults.length, label: "Total", mod: "total" },
+                      { value: avgLat + "ms", label: "Avg Lat", mod: "latency" },
+                    ] as const).map(({ value, label, mod }) => (
+                      <div key={label} className={`capi-wizard-stat capi-wizard-stat--${mod}`}>
+                        <div className="capi-wizard-stat__value">{value}</div>
+                        <div className="capi-wizard-stat__label">{label}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontFamily: MONO, fontSize: 11, color: "var(--cs-muted)", marginBottom: 5 }}>
+                      <span>Success rate</span>
+                      <span style={{ fontWeight: 700, color: pctCol }}>{pct}%</span>
+                    </div>
+                    <div style={{ height: 8, borderRadius: 4, background: "var(--cs-surface-2)", overflow: "hidden" }}>
+                      <div style={{ height: "100%", borderRadius: 4, width: `${pct}%`, background: pctCol, transition: "width .6s ease" }} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <SLabel>By HTTP method</SLabel>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {(["POST", "GET", "PATCH", "PUT", "DELETE"] as const).map(m => {
                         const mResults = execResults.filter(r => r.method === m);
                         if (mResults.length === 0) return null;
                         const ok = mResults.filter(r => r.ok).length;
                         const col = METHOD_COLORS[m];
                         return (
-                          <div key={m} style={{
-                            padding: "8px 13px", borderRadius: 8,
-                            background: col + "0a", border: `1px solid ${col}30`,
-                          }}>
+                          <div key={m} style={{ padding: "8px 13px", borderRadius: 8, background: col + "0a", border: `1px solid ${col}30` }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
                               <MethodChip method={m} size="xs" />
-                              <span style={{ fontFamily: MONO, fontSize: 10, color: col, fontWeight: 700 }}>
-                                {ok}/{mResults.length}
-                              </span>
+                              <span style={{ fontFamily: MONO, fontSize: 10, color: col, fontWeight: 700 }}>{ok}/{mResults.length}</span>
                             </div>
                             <div style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)" }}>
                               {mResults.length > 0 ? Math.round(mResults.reduce((a, r) => a + r.latency, 0) / mResults.length) : 0}ms avg
@@ -1659,31 +1631,132 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
                           </div>
                         );
                       })}
+                    </div>
                   </div>
                 </div>
 
-                {/* Step results */}
-                <div className="capi-wizard-result-list">
-                  <SLabel>Step results</SLabel>
-                  {execResults.map((r: ExecEntry, i: number) => <ResultRow key={i} r={r} i={i} />)}
-                </div>
+                {/* ── Scrollable paginated step results ── */}
+                {(() => {
+                  const RES_SIZES = [10, 20, 50, 100, 500];
+                  const resTotal = execResults.length;
+                  const resPages = Math.max(1, Math.ceil(resTotal / execLogPageSize));
+                  const safePage = Math.min(execLogPage, resPages - 1);
+                  const resStart = safePage * execLogPageSize;
+                  const resEnd = Math.min(resStart + execLogPageSize, resTotal);
+                  const pageSlice = execResults.slice(resStart, resEnd);
 
-                {/* Actions */}
-                <div className="capi-wizard-result-actions">
-                  <button className="capi-wizard-btn capi-wizard-btn--new" onClick={this.reset}>
-                    ← New Test
-                  </button>
-                  <button className="capi-wizard-btn capi-wizard-btn--back"
-                    onClick={() => this.setState({ wizStep: "flow" })}>← Change Flow</button>
-                  <button className="capi-wizard-btn capi-wizard-btn--rerun"
-                    onClick={this.execDynPlan}>
-                    ↻ Re-run
-                  </button>
-                </div>
+                  const btnS: React.CSSProperties = {
+                    background: "transparent", border: "1px solid var(--cs-border)",
+                    color: "var(--cs-muted)", borderRadius: 5, fontFamily: MONO,
+                    fontSize: 10, cursor: "pointer",
+                  };
+                  const dis: React.CSSProperties = { opacity: 0.4, cursor: "not-allowed" };
+
+                  const PaginationBar = () => resPages <= 1 ? null : (
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" as const, flexShrink: 0, padding: "4px 0" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                        <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)" }}>per page</span>
+                        {RES_SIZES.map(n => (
+                          <button key={n} onClick={() => this.setState({ execLogPageSize: n, execLogPage: 0 })} style={{
+                            background: execLogPageSize === n ? "#a78bfa18" : "var(--cs-surface-2)",
+                            border: `1px solid ${execLogPageSize === n ? "#a78bfa" : "var(--cs-border)"}`,
+                            color: execLogPageSize === n ? "#a78bfa" : "var(--cs-muted)",
+                            borderRadius: 5, padding: "2px 7px", fontFamily: MONO, fontSize: 10,
+                            cursor: "pointer", fontWeight: execLogPageSize === n ? 700 : 400,
+                          }}>{n}</button>
+                        ))}
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: "auto" }}>
+                        <button onClick={() => this.setState({ execLogPage: 0 })} disabled={safePage === 0}
+                          style={{ ...btnS, padding: "2px 7px", ...(safePage === 0 ? dis : {}) }}>«</button>
+                        <button onClick={() => this.setState({ execLogPage: safePage - 1 })} disabled={safePage === 0}
+                          style={{ ...btnS, padding: "2px 9px", ...(safePage === 0 ? dis : {}) }}>‹ Prev</button>
+                        {Array.from({ length: resPages }, (_, pi) => {
+                          const near = pi === 0 || pi === resPages - 1 || Math.abs(pi - safePage) <= 1;
+                          if (!near) return (pi === 1 || pi === resPages - 2) ? <span key={pi} style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)" }}>…</span> : null;
+                          return (
+                            <button key={pi} onClick={() => this.setState({ execLogPage: pi })} style={{
+                              background: pi === safePage ? "#a78bfa" : "var(--cs-surface-2)",
+                              border: `1px solid ${pi === safePage ? "#a78bfa" : "var(--cs-border)"}`,
+                              color: pi === safePage ? "#fff" : "var(--cs-muted)",
+                              borderRadius: 5, padding: "2px 7px", fontFamily: MONO, fontSize: 10,
+                              cursor: "pointer", fontWeight: pi === safePage ? 700 : 400, minWidth: 26,
+                            }}>{pi + 1}</button>
+                          );
+                        })}
+                        <button onClick={() => this.setState({ execLogPage: safePage + 1 })} disabled={safePage >= resPages - 1}
+                          style={{ ...btnS, padding: "2px 9px", ...(safePage >= resPages - 1 ? dis : {}) }}>Next ›</button>
+                        <button onClick={() => this.setState({ execLogPage: resPages - 1 })} disabled={safePage >= resPages - 1}
+                          style={{ ...btnS, padding: "2px 7px", ...(safePage >= resPages - 1 ? dis : {}) }}>»</button>
+                      </div>
+                      <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)" }}>
+                        {resTotal > 0 ? `${resStart + 1}–${resEnd} of ${resTotal}` : "0 results"}
+                      </span>
+                    </div>
+                  );
+
+                  return (
+                    <div style={{ flex: 1, display: "flex", flexDirection: "column" as const, minHeight: 0 }}>
+                      <div style={{ flexShrink: 0, padding: "8px 20px 0" }}>
+                        <SLabel>Step results</SLabel>
+                        <PaginationBar />
+                      </div>
+                      <div className="capi-wizard-result-list" style={{ flex: 1, overflowY: "auto" as const, padding: "8px 20px", marginTop: 0 }}>
+                        {pageSlice.map((r: ExecEntry, i: number) => <ResultRow key={resStart + i} r={r} i={resStart + i} />)}
+                      </div>
+                      <div style={{ flexShrink: 0, padding: "4px 20px 8px" }}><PaginationBar /></div>
+                    </div>
+                  );
+                })()}
+
               </div>
             )}
 
           </div>
+
+          {/* ══ FIXED FOOTER — buttons for all steps ══ */}
+          {wizStep !== "home" && wizStep !== "running" && (
+            <div style={{
+              flexShrink: 0, borderTop: "1px solid var(--cs-border-sub)",
+              padding: "12px 20px", background: "var(--cs-bg)", display: "flex", gap: 10,
+            }}>
+              {wizStep === "api-select" && (<>
+                <button className="capi-wizard-btn capi-wizard-btn--back"
+                  onClick={() => this.setState({ wizStep: "home", wizMode: null })}>← Back</button>
+                <button className="capi-wizard-btn capi-wizard-btn--run"
+                  disabled={selSpecNames.length === 0}
+                  onClick={this.goToData}
+                  style={{ opacity: selSpecNames.length === 0 ? 0.4 : 1 }}>
+                  Next: Synthetic Data → ({selSpecNames.length} selected)
+                </button>
+              </>)}
+              {wizStep === "data" && (<>
+                <button className="capi-wizard-btn capi-wizard-btn--back"
+                  onClick={() => this.setState({ wizStep: "api-select" })}>← Back</button>
+                <button className="capi-wizard-btn capi-wizard-btn--run"
+                  onClick={() => this.setState({ wizStep: "flow" })}>
+                  Next: Execution Flow →
+                </button>
+              </>)}
+              {wizStep === "flow" && (<>
+                <button className="capi-wizard-btn capi-wizard-btn--back"
+                  onClick={() => this.setState({ wizStep: "data" })}>← Back</button>
+                <button className="capi-wizard-btn capi-wizard-btn--run" onClick={this.execDynPlan}>
+                  {this.state.execMode === "flow"
+                    ? `▶ Execute Flow · ${dynPlan.length} steps × ${testCount} run${testCount > 1 ? "s" : ""}`
+                    : `⊞ Execute Independent · ${dynPlan.length} APIs × ${testCount} run${testCount > 1 ? "s" : ""}`}
+                </button>
+              </>)}
+              {wizStep === "report" && (<>
+                <button className="capi-wizard-btn capi-wizard-btn--new" onClick={this.reset}>← New Test</button>
+                <button className="capi-wizard-btn capi-wizard-btn--back"
+                  onClick={() => this.setState({ wizStep: "flow" })}>← Change Flow</button>
+                <button className="capi-wizard-btn capi-wizard-btn--rerun"
+                  onClick={this.execDynPlan}>↻ Re-run</button>
+              </>)}
+            </div>
+          )}
+
         </div>
       </div>
     );
