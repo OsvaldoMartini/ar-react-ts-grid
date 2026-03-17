@@ -2115,115 +2115,6 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void; 
           </div>
         )}
 
-        {/* ── Output mode row (above execute buttons) ── */}
-        {!running && (
-          <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
-
-            {/* LIVE LOADING REPORT */}
-            <button
-              onClick={() => {
-                executionHistory.outputMode = "live";
-                this.refresh();
-              }}
-              style={{
-                flex: 1, padding: "12px 16px", borderRadius: 8,
-                cursor: "pointer",
-                background: executionHistory.outputMode === "live"
-                  ? "linear-gradient(135deg, #0a2a1a, #34d399)"
-                  : "var(--cs-surface-2)",
-                border: `1.5px solid ${executionHistory.outputMode === "live" ? "#34d399" : "var(--cs-border)"}`,
-                color: executionHistory.outputMode === "live" ? "#fff" : "var(--cs-dim)",
-                fontFamily: MONO, fontSize: 12, fontWeight: 800,
-                display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                transition: "all .15s",
-              }}>
-              <span style={{
-                width: 9, height: 9, borderRadius: "50%",
-                background: executionHistory.outputMode === "live" ? "#fff" : "var(--cs-dim)",
-                display: "inline-block",
-                boxShadow: executionHistory.outputMode === "live" ? "0 0 6px #fff" : "none",
-              }} />
-              LIVE LOADING REPORT
-            </button>
-
-            {/* SAVE REPORT */}
-            <button
-              onClick={async () => {
-                if (executionHistory.outputMode !== "save") {
-                  executionHistory.outputMode = "save";
-                  this.refresh();
-                }
-                if (!executionHistory.dirHandle) {
-                  await this.pickFolder();
-                }
-              }}
-              style={{
-                flex: 1, padding: "12px 16px", borderRadius: 8,
-                cursor: "pointer",
-                background: executionHistory.outputMode === "save"
-                  ? "linear-gradient(135deg, #1a1a3a, #6366f1)"
-                  : "var(--cs-surface-2)",
-                border: `1.5px solid ${executionHistory.outputMode === "save" ? "#6366f1" : "var(--cs-border)"}`,
-                color: executionHistory.outputMode === "save" ? "#fff" : "var(--cs-dim)",
-                fontFamily: MONO, fontSize: 12, fontWeight: 800,
-                display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                transition: "all .15s",
-              }}>
-              💾 SAVE REPORT
-              {executionHistory.outputMode === "save" && executionHistory.dirHandle && (
-                <span style={{
-                  background: "#ffffff25", borderRadius: 5,
-                  padding: "2px 8px", fontSize: 10, fontWeight: 600,
-                  display: "flex", alignItems: "center", gap: 4,
-                }}>
-                  📁 {executionHistory.dirHandle.name}
-                </span>
-              )}
-              {executionHistory.outputMode === "save" && !executionHistory.dirHandle && (
-                <span style={{
-                  background: "#f8717130", borderRadius: 5,
-                  padding: "2px 8px", fontSize: 10, fontWeight: 700, color: "#fecaca",
-                }}>
-                  ⚠ Pick Folder
-                </span>
-              )}
-            </button>
-
-            {/* Folder picker + rows/file — only when save is active */}
-            {executionHistory.outputMode === "save" && (
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <button
-                  onClick={this.pickFolder}
-                  title="Change output folder"
-                  style={{
-                    height: "100%", padding: "0 12px", borderRadius: 8,
-                    background: "var(--cs-surface-2)", border: "1.5px solid var(--cs-border)",
-                    color: "var(--cs-muted)", fontFamily: MONO, fontSize: 11,
-                    cursor: "pointer", whiteSpace: "nowrap" as const,
-                  }}>
-                  📂 Change
-                </button>
-                <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "center", gap: 2 }}>
-                  <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)" }}>rows/file</span>
-                  <input
-                    type="number" min={10} max={10000} step={10}
-                    value={executionHistory.rowsPerFile}
-                    onChange={e => {
-                      executionHistory.rowsPerFile = Math.max(10, Math.min(10000, parseInt(e.target.value) || 100));
-                      this.refresh();
-                    }}
-                    style={{
-                      width: 58, padding: "4px 6px", fontFamily: MONO, fontSize: 11,
-                      background: "var(--cs-surface-2)", border: "1px solid var(--cs-border)",
-                      borderRadius: 5, color: "var(--cs-text)", textAlign: "center",
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
         {/* ── Run buttons / Completion panel ── */}
         {!running && pending === 0 && (passed + failed) > 0 ? (
           <div style={{
@@ -2386,7 +2277,81 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void; 
               );
             })}
           </div>
-          <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+          <div style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>
+
+            {/* ── LIVE / SAVE mode toggle ── */}
+            {/* LIVE LOADING REPORT */}
+            <button
+              onClick={() => { executionHistory.outputMode = "live"; this.refresh(); }}
+              style={{
+                background: executionHistory.outputMode === "live" ? "#f8717122" : "transparent",
+                border: `1px solid ${executionHistory.outputMode === "live" ? "#f87171aa" : "#8b949e44"}`,
+                color: executionHistory.outputMode === "live" ? "#f87171" : "var(--cs-dim)",
+                borderRadius: 6, padding: "4px 12px", fontFamily: MONO, fontSize: 11,
+                cursor: "pointer", display: "flex", alignItems: "center", gap: 5,
+                fontWeight: executionHistory.outputMode === "live" ? 700 : 400,
+                transition: "all .15s",
+              }}>
+              {executionHistory.outputMode === "live" && (
+                <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#f87171", display: "inline-block", boxShadow: "0 0 5px #f87171" }} />
+              )}
+              Live Loading Report
+            </button>
+
+            {/* SAVE REPORT */}
+            <button
+              onClick={async () => {
+                executionHistory.outputMode = "save";
+                this.refresh();
+                if (!executionHistory.dirHandle) await this.pickFolder();
+              }}
+              style={{
+                background: executionHistory.outputMode === "save" ? "#6366f122" : "transparent",
+                border: `1px solid ${executionHistory.outputMode === "save" ? "#6366f1aa" : "#8b949e44"}`,
+                color: executionHistory.outputMode === "save" ? "#6366f1" : "var(--cs-dim)",
+                borderRadius: 6, padding: "4px 12px", fontFamily: MONO, fontSize: 11,
+                cursor: "pointer", display: "flex", alignItems: "center", gap: 5,
+                fontWeight: executionHistory.outputMode === "save" ? 700 : 400,
+                transition: "all .15s",
+              }}>
+              💾 Save Report
+            </button>
+
+            {/* Folder name + Change + rows/file — only in save mode */}
+            {executionHistory.outputMode === "save" && (
+              <>
+                <button
+                  onClick={this.pickFolder}
+                  style={{
+                    background: executionHistory.dirHandle ? "#6366f112" : "#f8717112",
+                    border: `1px solid ${executionHistory.dirHandle ? "#6366f144" : "#f8717144"}`,
+                    color: executionHistory.dirHandle ? "#6366f1" : "#f87171",
+                    borderRadius: 6, padding: "4px 10px", fontFamily: MONO, fontSize: 11,
+                    cursor: "pointer", display: "flex", alignItems: "center", gap: 4,
+                    fontWeight: 600, transition: "all .15s",
+                  }}
+                  title="Select or change output folder">
+                  📁 {executionHistory.dirHandle?.name ?? "Pick folder"}
+                </button>
+                <input
+                  type="number" min={10} max={10000} step={10}
+                  value={executionHistory.rowsPerFile}
+                  title="Rows per CSV file"
+                  onChange={e => {
+                    executionHistory.rowsPerFile = Math.max(10, Math.min(10000, parseInt(e.target.value) || 100));
+                    this.refresh();
+                  }}
+                  style={{
+                    width: 58, padding: "4px 6px", fontFamily: MONO, fontSize: 11,
+                    background: "var(--cs-surface-2)", border: "1px solid var(--cs-border)",
+                    borderRadius: 5, color: "var(--cs-text)", textAlign: "center",
+                  }}
+                />
+              </>
+            )}
+
+            {/* divider */}
+            <span style={{ width: 1, height: 16, background: "var(--cs-border-sub)", display: "inline-block" }} />
             {(() => {
               const hasIds = testStore.cases.length > 0 && testStore.cases.some(tc => (tc.resolvedUrl ?? tc.path).includes("{id}"));
               const disabled = testStore.cases.length === 0;
