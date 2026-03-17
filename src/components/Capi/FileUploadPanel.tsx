@@ -30,7 +30,7 @@ const ACCEPTED_EXTS = [".yaml", ".yml", ".json", ".schema", ".shape", ".proto", 
 export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileUploadPanelState> {
   state: FileUploadPanelState = {
     drag: false, parsing: false, results: [], expanded: null, showDeps: false,
-    apiPage: 0, apiPageSize: 20,
+    apiPage: 0, apiPageSize: 10,
     openSections: new Set<string>(),
     openUris: new Set<string>(),
     apiSearch: "",

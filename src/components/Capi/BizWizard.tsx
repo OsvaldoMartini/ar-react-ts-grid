@@ -467,8 +467,8 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
     selStaticCase: null, staticParams: {},
     execLog: [], execResults: [], running: false,
     execMode: "flow", flowTimeout: 15,
-    selCat: "ALL", flowPage: 0, flowPageSize: 20, chainExpanded: false, chainPage: 0,
-    apiSelectPage: 0, apiSelectPageSize: 20,
+    selCat: "ALL", flowPage: 0, flowPageSize: 10, chainExpanded: false, chainPage: 0,
+    apiSelectPage: 0, apiSelectPageSize: 10,
   };
   private logRef = createRef<HTMLDivElement>();
 
@@ -1550,7 +1550,7 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
                   if (rows.length === 0) return null;
 
                   const PREVIEW = 5;
-                  const PAGE_SIZE = 20;
+                  const PAGE_SIZE = 10;
                   const { chainExpanded, chainPage } = this.state;
                   const totalChainPages = Math.ceil(rows.length / PAGE_SIZE);
                   const pageStart = chainPage * PAGE_SIZE;

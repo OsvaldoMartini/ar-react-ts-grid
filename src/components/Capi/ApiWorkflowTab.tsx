@@ -1479,7 +1479,7 @@ export class DataGenTab extends React.Component<
   state: DataGenTabState = {
     selNames: [], testCount: 1, dgView: "setup",
     plan: [], generatedN: 0, envTick: 0,
-    specsPage: 0, specsPageSize: 20, planPage: 0, planPageSize: 20, depOpenCard: null, depView: "cards", depGraphNode: null,
+    specsPage: 0, specsPageSize: 10, planPage: 0, planPageSize: 10, depOpenCard: null, depView: "cards", depGraphNode: null,
   };
 
   private toggle = (fn: string) =>
