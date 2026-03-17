@@ -2240,46 +2240,50 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void; 
           </div>
         )}
 
-        {/* ── Filters ── */}
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-          <div style={{ display: "flex", gap: 4 }}>
-            {(["all", "pending", "passed", "failed"] as const).map(f => {
-              const active = filter === f;
-              const cols = f === "passed" ? "#34d399" : f === "failed" ? "#f87171" : f === "pending" ? "#8b949e" : "var(--cs-accent)";
-              const cnt = f === "all" ? total : allCases.filter(c => c.status === f).length;
-              return (
-                <button key={f} onClick={() => this.setState({ filter: f, pageIndex: 0 })} style={{
-                  background: active ? cols + "20" : "transparent",
-                  border: `1px solid ${active ? cols : "var(--cs-border-sub)"}`,
-                  color: active ? cols : "var(--cs-muted)",
-                  borderRadius: 6, padding: "4px 11px", fontFamily: MONO, fontSize: 11,
-                  fontWeight: active ? 700 : 400, cursor: "pointer", transition: "all .12s",
-                }}>
-                  {f.charAt(0).toUpperCase() + f.slice(1)} ({cnt})
-                </button>
-              );
-            })}
-          </div>
-          <div style={{ display: "flex", gap: 4 }}>
-            {methods.map(m => {
-              const active = methodFilter === m;
-              const col = m === "ALL" ? "var(--cs-accent)" : (METHOD_COLORS[m] || "#8b949e");
-              return (
-                <button key={m} onClick={() => this.setState({ methodFilter: m, pageIndex: 0 })} style={{
-                  background: active ? col + "20" : "transparent",
-                  border: `1px solid ${active ? col : "var(--cs-border-sub)"}`,
-                  color: active ? col : "var(--cs-muted)",
-                  borderRadius: 6, padding: "4px 10px", fontFamily: MONO, fontSize: 10,
-                  fontWeight: active ? 700 : 400, cursor: "pointer", transition: "all .12s",
-                }}>
-                  {m}
-                </button>
-              );
-            })}
-          </div>
-          <div style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>
+        {/* ── Filters + mode toggle + action buttons ── */}
+        <div style={{ display: "flex", alignItems: "center", gap: 0, flexWrap: "wrap" as const }}>
 
-            {/* ── LIVE / SAVE mode toggle ── */}
+          {/* LEFT: status + method filters */}
+          <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" as const }}>
+            <div style={{ display: "flex", gap: 4 }}>
+              {(["all", "pending", "passed", "failed"] as const).map(f => {
+                const active = filter === f;
+                const cols = f === "passed" ? "#34d399" : f === "failed" ? "#f87171" : f === "pending" ? "#8b949e" : "var(--cs-accent)";
+                const cnt = f === "all" ? total : allCases.filter(c => c.status === f).length;
+                return (
+                  <button key={f} onClick={() => this.setState({ filter: f, pageIndex: 0 })} style={{
+                    background: active ? cols + "20" : "transparent",
+                    border: `1px solid ${active ? cols : "var(--cs-border-sub)"}`,
+                    color: active ? cols : "var(--cs-muted)",
+                    borderRadius: 6, padding: "4px 11px", fontFamily: MONO, fontSize: 11,
+                    fontWeight: active ? 700 : 400, cursor: "pointer", transition: "all .12s",
+                  }}>
+                    {f.charAt(0).toUpperCase() + f.slice(1)} ({cnt})
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ display: "flex", gap: 4 }}>
+              {methods.map(m => {
+                const active = methodFilter === m;
+                const col = m === "ALL" ? "var(--cs-accent)" : (METHOD_COLORS[m] || "#8b949e");
+                return (
+                  <button key={m} onClick={() => this.setState({ methodFilter: m, pageIndex: 0 })} style={{
+                    background: active ? col + "20" : "transparent",
+                    border: `1px solid ${active ? col : "var(--cs-border-sub)"}`,
+                    color: active ? col : "var(--cs-muted)",
+                    borderRadius: 6, padding: "4px 10px", fontFamily: MONO, fontSize: 10,
+                    fontWeight: active ? 700 : 400, cursor: "pointer", transition: "all .12s",
+                  }}>
+                    {m}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* CENTER: LIVE / SAVE mode toggle (absolutely centred in available space) */}
+          <div style={{ flex: 1, display: "flex", justifyContent: "center", alignItems: "center", gap: 6, flexWrap: "wrap" as const }}>
             {/* LIVE LOADING REPORT */}
             <button
               onClick={() => { executionHistory.outputMode = "live"; this.refresh(); }}
@@ -2289,8 +2293,7 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void; 
                 color: executionHistory.outputMode === "live" ? "#f87171" : "var(--cs-dim)",
                 borderRadius: 6, padding: "4px 12px", fontFamily: MONO, fontSize: 11,
                 cursor: "pointer", display: "flex", alignItems: "center", gap: 5,
-                fontWeight: executionHistory.outputMode === "live" ? 700 : 400,
-                transition: "all .15s",
+                fontWeight: executionHistory.outputMode === "live" ? 700 : 400, transition: "all .15s",
               }}>
               {executionHistory.outputMode === "live" && (
                 <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#f87171", display: "inline-block", boxShadow: "0 0 5px #f87171" }} />
@@ -2311,8 +2314,7 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void; 
                 color: executionHistory.outputMode === "save" ? "#6366f1" : "var(--cs-dim)",
                 borderRadius: 6, padding: "4px 12px", fontFamily: MONO, fontSize: 11,
                 cursor: "pointer", display: "flex", alignItems: "center", gap: 5,
-                fontWeight: executionHistory.outputMode === "save" ? 700 : 400,
-                transition: "all .15s",
+                fontWeight: executionHistory.outputMode === "save" ? 700 : 400, transition: "all .15s",
               }}>
               💾 Save Report
             </button>
@@ -2349,9 +2351,12 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void; 
                 />
               </>
             )}
+          </div>
 
+          {/* RIGHT: action buttons — left-aligned */}
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             {/* divider */}
-            <span style={{ width: 1, height: 16, background: "var(--cs-border-sub)", display: "inline-block" }} />
+            <span style={{ width: 1, height: 16, background: "var(--cs-border-sub)", display: "inline-block", marginRight: 2 }} />
             {(() => {
               const hasIds = testStore.cases.length > 0 && testStore.cases.some(tc => (tc.resolvedUrl ?? tc.path).includes("{id}"));
               const disabled = testStore.cases.length === 0;
@@ -2430,8 +2435,8 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void; 
             }}>
               🗑 Clear all
             </button>
-          </div>
-        </div>
+          </div>  {/* right */}
+        </div>  {/* toolbar outer */}
 
         {/* ── Pagination controls ── */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
