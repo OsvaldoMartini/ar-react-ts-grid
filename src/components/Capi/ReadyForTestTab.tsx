@@ -1,6 +1,7 @@
 import React from "react";
-import { testStore, TestCase, rest, envStore, Environment, EnvTag, mockServerStore } from "./utils";
+import { testStore, TestCase, rest, envStore, Environment, EnvTag, mockServerStore, executionHistory } from "./utils";
 import { StatusBadge } from "./AtomComponents";
+import { downloadExecution, ExecutionSummary } from "./reportGenerator";
 import { MockServerModal } from "./MockServerModal";
 import "./capi-readytest.scss";
 
@@ -1236,6 +1237,10 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void; 
     this.props.onExecutionStart?.();
 
     testStore.stopFlag = false;
+    // Record execution start
+    const execStart = new Date().toISOString();
+    executionHistory.currentStartedAt = execStart;
+
     this.setState({ running: true, runProgress: 0 });
     const ctx: Record<string, number> = {};
 
@@ -1303,6 +1308,29 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void; 
 
     this.setState({ running: false, currentExecUrl: null });
     testStore.stopFlag = false;
+
+    // Build and store execution summary
+    const execEnd = new Date().toISOString();
+    const ts = execStart.slice(0, 19).replace(/T/, "_").replace(/:/g, "-");
+    const sel = envStore.selected;
+    const summary: ExecutionSummary = {
+      id: ts,
+      startedAt: execStart,
+      finishedAt: execEnd,
+      mode: this.state.executionMode,
+      environment: sel.name,
+      baseUrl: sel.baseUrl,
+      cases: [...testStore.cases],
+    };
+    executionHistory.last = {
+      id: summary.id, startedAt: summary.startedAt, finishedAt: summary.finishedAt,
+      mode: summary.mode, environment: summary.environment, baseUrl: summary.baseUrl,
+    };
+    executionHistory.currentStartedAt = null;
+
+    if (executionHistory.outputMode === "save") {
+      downloadExecution(summary);
+    }
   };
 
   private saveCsv = () => {
@@ -2237,6 +2265,30 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void; 
                   {hasIds && <span style={{ fontSize: 10 }}>⚠</span>}
                   <span style={{ fontSize: 11 }}>$_</span>
                   Generate BASH
+                </button>
+              );
+            })()}
+            {/* ── Output mode toggle ── */}
+            {(() => {
+              const isLive = executionHistory.outputMode === "live";
+              return (
+                <button
+                  onClick={() => {
+                    executionHistory.outputMode = isLive ? "save" : "live";
+                    this.refresh();
+                  }}
+                  title={isLive
+                    ? "Live mode: results stream in Running tab. Click to switch to Save mode."
+                    : "Save mode: CSV + HTML report auto-downloaded after execution. Click to switch to Live mode."}
+                  style={{
+                    background: isLive ? "#34d39918" : "#f59e0b18",
+                    border: `1.5px solid ${isLive ? "#34d39966" : "#f59e0b66"}`,
+                    color: isLive ? "#34d399" : "#f59e0b",
+                    borderRadius: 6, padding: "4px 12px", fontFamily: MONO, fontSize: 11,
+                    cursor: "pointer", display: "flex", alignItems: "center", gap: 5,
+                    fontWeight: 700, transition: "all .15s",
+                  }}>
+                  {isLive ? "🔴 Live" : "💾 Save"}
                 </button>
               );
             })()}

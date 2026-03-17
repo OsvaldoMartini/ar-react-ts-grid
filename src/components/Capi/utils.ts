@@ -198,6 +198,30 @@ export class TestCaseStore {
 export const testStore = new TestCaseStore();
 
 // ═══════════════════════════════════════════════════════════════
+// EXECUTION HISTORY STORE
+// Tracks output mode + last completed execution for reporting
+// ═══════════════════════════════════════════════════════════════
+export interface StoredExecution {
+  id:          string;
+  startedAt:   string;
+  finishedAt:  string;
+  mode:        "flow" | "independent";
+  environment: string;
+  baseUrl:     string;
+}
+
+class ExecutionHistoryStore {
+  /** "live" = stream results in UI, "save" = download CSV+HTML on finish */
+  outputMode: "live" | "save" = "live";
+  /** Start time of the currently running execution */
+  currentStartedAt: string | null = null;
+  /** Last completed execution metadata (for download button) */
+  last: StoredExecution | null = null;
+}
+
+export const executionHistory = new ExecutionHistoryStore();
+
+// ═══════════════════════════════════════════════════════════════
 // ENVIRONMENT STORE
 // Shared singleton: selected base URL used during test execution
 // ═══════════════════════════════════════════════════════════════
