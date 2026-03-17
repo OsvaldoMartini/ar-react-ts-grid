@@ -1,7 +1,6 @@
 import React from "react";
 import { testStore, TestCase, rest, envStore, Environment, EnvTag, mockServerStore, executionHistory } from "./utils";
 import { StatusBadge } from "./AtomComponents";
-import { downloadExecution, ExecutionSummary } from "./reportGenerator";
 import { MockServerModal } from "./MockServerModal";
 import "./capi-readytest.scss";
 
@@ -1313,11 +1312,11 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void; 
     const execEnd = new Date().toISOString();
     const ts = execStart.slice(0, 19).replace(/T/, "_").replace(/:/g, "-");
     const sel = envStore.selected;
-    const summary: ExecutionSummary = {
+    const summary = {
       id: ts,
       startedAt: execStart,
       finishedAt: execEnd,
-      mode: this.state.executionMode,
+      mode: this.state.executionMode as "flow" | "independent",
       environment: sel.name,
       baseUrl: sel.baseUrl,
       cases: [...testStore.cases],
@@ -1329,7 +1328,18 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void; 
     executionHistory.currentStartedAt = null;
 
     if (executionHistory.outputMode === "save") {
-      downloadExecution(summary);
+      if (executionHistory.dirHandle) {
+        import("./reportGenerator").then(({ saveToFolder }) => {
+          saveToFolder(executionHistory.dirHandle!, summary, executionHistory.rowsPerFile)
+            .then(files => console.info("Saved execution files:", files))
+            .catch(err => console.error("Save error:", err));
+        });
+      } else {
+        // No folder selected — fall back to browser download
+        import("./reportGenerator").then(({ downloadExecution }) => {
+          downloadExecution(summary);
+        });
+      }
     }
   };
 
@@ -1689,7 +1699,29 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void; 
   };
 
 
+  private pickFolder = async (): Promise<boolean> => {
+    if (!("showDirectoryPicker" in window)) {
+      // Browser doesn't support File System Access API — fall back to download mode
+      executionHistory.outputMode = "live";
+      return true;
+    }
+    try {
+      const handle = await (window as any).showDirectoryPicker({ mode: "readwrite" });
+      executionHistory.dirHandle = handle;
+      if (executionHistory.outputMode === "live") executionHistory.outputMode = "save";
+      this.refresh();
+      return true;
+    } catch (err: any) {
+      if (err?.name !== "AbortError") console.error("Folder pick error:", err);
+      return false; // user cancelled
+    }
+  };
+
   private executeBlock = async () => {
+    if (executionHistory.outputMode === "save" && !executionHistory.dirHandle) {
+      const ok = await this.pickFolder();
+      if (!ok) return;
+    }
     const { pageSize, pageIndex } = this.state;
     const visible = this.getFiltered();
     const start = pageIndex * pageSize;
@@ -1698,6 +1730,10 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void; 
   };
 
   private executeAll = async () => {
+    if (executionHistory.outputMode === "save" && !executionHistory.dirHandle) {
+      const ok = await this.pickFolder();
+      if (!ok) return;
+    }
     const pending = testStore.cases.filter(c => c.status === "pending");
     await this.executeCases(pending);
   };
@@ -2268,28 +2304,73 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void; 
                 </button>
               );
             })()}
-            {/* ── Output mode toggle ── */}
+            {/* ── Output mode toggle + folder controls ── */}
             {(() => {
               const isLive = executionHistory.outputMode === "live";
+              const folderName = executionHistory.dirHandle?.name ?? null;
               return (
-                <button
-                  onClick={() => {
-                    executionHistory.outputMode = isLive ? "save" : "live";
-                    this.refresh();
-                  }}
-                  title={isLive
-                    ? "Live mode: results stream in Running tab. Click to switch to Save mode."
-                    : "Save mode: CSV + HTML report auto-downloaded after execution. Click to switch to Live mode."}
-                  style={{
-                    background: isLive ? "#34d39918" : "#f59e0b18",
-                    border: `1.5px solid ${isLive ? "#34d39966" : "#f59e0b66"}`,
-                    color: isLive ? "#34d399" : "#f59e0b",
-                    borderRadius: 6, padding: "4px 12px", fontFamily: MONO, fontSize: 11,
-                    cursor: "pointer", display: "flex", alignItems: "center", gap: 5,
-                    fontWeight: 700, transition: "all .15s",
-                  }}>
-                  {isLive ? "🔴 Live" : "💾 Save"}
-                </button>
+                <>
+                  {/* Mode toggle */}
+                  <button
+                    onClick={() => {
+                      executionHistory.outputMode = isLive ? "save" : "live";
+                      this.refresh();
+                    }}
+                    title={isLive
+                      ? "Live mode: results stream in Running tab. Click to switch to Save mode."
+                      : "Save mode: files saved to folder after execution. Click to switch to Live mode."}
+                    style={{
+                      background: isLive ? "#34d39918" : "#f59e0b18",
+                      border: `1.5px solid ${isLive ? "#34d39966" : "#f59e0b66"}`,
+                      color: isLive ? "#34d399" : "#f59e0b",
+                      borderRadius: 6, padding: "4px 12px", fontFamily: MONO, fontSize: 11,
+                      cursor: "pointer", display: "flex", alignItems: "center", gap: 5,
+                      fontWeight: 700, transition: "all .15s",
+                    }}>
+                    {isLive ? "🔴 Live" : "💾 Save"}
+                  </button>
+
+                  {/* Folder picker — shown when in Save mode */}
+                  {!isLive && (
+                    <>
+                      <button
+                        onClick={this.pickFolder}
+                        title="Select output folder for CSV + HTML report files"
+                        style={{
+                          background: folderName ? "#6366f118" : "#f8717118",
+                          border: `1.5px solid ${folderName ? "#6366f155" : "#f8717155"}`,
+                          color: folderName ? "#6366f1" : "#f87171",
+                          borderRadius: 6, padding: "4px 12px", fontFamily: MONO, fontSize: 11,
+                          cursor: "pointer", display: "flex", alignItems: "center", gap: 5,
+                          fontWeight: 700, transition: "all .15s",
+                        }}>
+                        📂 {folderName ? `📁 ${folderName}` : "Select Folder ⚠"}
+                      </button>
+
+                      {/* Rows per file */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                        <span style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)" }}>rows/file:</span>
+                        <input
+                          type="number"
+                          min={10}
+                          max={10000}
+                          step={10}
+                          value={executionHistory.rowsPerFile}
+                          onChange={e => {
+                            const v = Math.max(10, Math.min(10000, parseInt(e.target.value) || 100));
+                            executionHistory.rowsPerFile = v;
+                            this.refresh();
+                          }}
+                          style={{
+                            width: 64, padding: "3px 6px", fontFamily: MONO, fontSize: 11,
+                            background: "var(--cs-surface-2)", border: "1px solid var(--cs-border)",
+                            borderRadius: 5, color: "var(--cs-text)", textAlign: "center",
+                          }}
+                        />
+                      </div>
+                    </>
+                  )}
+                </>
               );
             })()}
             <button

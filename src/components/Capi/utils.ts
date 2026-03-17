@@ -211,12 +211,16 @@ export interface StoredExecution {
 }
 
 class ExecutionHistoryStore {
-  /** "live" = stream results in UI, "save" = download CSV+HTML on finish */
+  /** "live" = stream results in UI, "save" = write files to folder on finish */
   outputMode: "live" | "save" = "live";
   /** Start time of the currently running execution */
   currentStartedAt: string | null = null;
   /** Last completed execution metadata (for download button) */
   last: StoredExecution | null = null;
+  /** File System Access API directory handle — set before execution starts */
+  dirHandle: FileSystemDirectoryHandle | null = null;
+  /** Rows written per CSV chunk (default 100) */
+  rowsPerFile: number = 100;
 }
 
 export const executionHistory = new ExecutionHistoryStore();

@@ -538,3 +538,72 @@ export function parseCSVToSummary(csvText: string): ExecutionSummary | null {
     return null;
   }
 }
+
+// ─────────────────────────────────────────────────────────────
+// SAVE TO FOLDER  (File System Access API)
+// Creates a timestamped sub-folder and writes chunked CSV files
+// + a single HTML report into it.
+// Falls back to browser downloads if the API is unavailable.
+// ─────────────────────────────────────────────────────────────
+async function writeFile(
+  dir: FileSystemDirectoryHandle,
+  name: string,
+  content: string,
+): Promise<void> {
+  const fh = await dir.getFileHandle(name, { create: true });
+  const w  = await (fh as any).createWritable();
+  await w.write(content);
+  await w.close();
+}
+
+export async function saveToFolder(
+  dirHandle: FileSystemDirectoryHandle,
+  s: ExecutionSummary,
+  rowsPerFile: number = 100,
+): Promise<string[]> {
+  // Create a sub-folder named after the execution ID
+  const subDir = await dirHandle.getDirectoryHandle(s.id, { create: true });
+
+  const savedFiles: string[] = [];
+
+  // ── Chunked CSVs ──────────────────────────────────────────
+  const csvHeaders = [
+    "seq","runGroup","apiTitle","resourceName","method",
+    "path","resolvedUrl","body","dataSource",
+    "status","httpStatus","latency_ms","res_body","res_headers",
+    "startedAt","executionId","mode","environment",
+  ];
+
+  const esc = (v: any): string => {
+    const str = v == null ? "" : typeof v === "object" ? JSON.stringify(v) : String(v);
+    return `"${str.replace(/"/g, '""')}"`;
+  };
+
+  const totalChunks = Math.max(1, Math.ceil(s.cases.length / rowsPerFile));
+  const multiChunk  = totalChunks > 1;
+
+  for (let ci = 0; ci < totalChunks; ci++) {
+    const slice = s.cases.slice(ci * rowsPerFile, (ci + 1) * rowsPerFile);
+    const rows  = slice.map(tc => [
+      tc.seq, tc.runGroup, tc.apiTitle, tc.resourceName, tc.method,
+      tc.path, tc.resolvedUrl ?? "", tc.body ?? "", tc.dataSource,
+      tc.status, tc.httpStatus ?? "", tc.latency ?? "",
+      tc.result ?? "", tc.headers ?? "",
+      s.startedAt, s.id, s.mode, s.environment,
+    ].map(esc).join(","));
+
+    const csvContent = [csvHeaders.join(","), ...rows].join("\r\n");
+    const partTag    = multiChunk ? `_part${String(ci + 1).padStart(3, "0")}` : "";
+    const csvName    = `results${partTag}.csv`;
+
+    await writeFile(subDir, csvName, csvContent);
+    savedFiles.push(`${s.id}/${csvName}`);
+  }
+
+  // ── HTML report (single file, all cases) ─────────────────
+  const htmlName = "report.html";
+  await writeFile(subDir, htmlName, generateHTML(s));
+  savedFiles.push(`${s.id}/${htmlName}`);
+
+  return savedFiles;
+}
