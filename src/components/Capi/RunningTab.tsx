@@ -364,10 +364,15 @@ export class RunningTab extends React.Component<{}, RunningTabState> {
     const pageEnd = Math.min(pageStart + pageSize, total);
     const pageSlice = cases.slice(pageStart, pageEnd);
 
-    // While live (and not viewing a loaded file), jump to last page so the running row is visible
+    // While live, only auto-advance if the currently-running case is NOT on the visible page
     const lastPage = totalPages - 1;
-    if (!isViewingLoaded && isLive && safePage !== lastPage) {
-      setTimeout(() => this.setState({ pageIndex: lastPage }), 0);
+    if (!isViewingLoaded && isLive) {
+      const runningCase = cases.findIndex(c => c.status === "running");
+      const runningPage = runningCase >= 0 ? Math.floor(runningCase / pageSize) : -1;
+      // Only jump if the running case is on a page the user can't see right now
+      if (runningPage >= 0 && runningPage !== safePage && runningPage === lastPage) {
+        setTimeout(() => this.setState({ pageIndex: runningPage }), 0);
+      }
     }
 
     const btnBase: React.CSSProperties = {
@@ -517,12 +522,52 @@ export class RunningTab extends React.Component<{}, RunningTabState> {
             <div ref={this.bottomRef} />
           </div>
 
-          {/* ── Pagination bottom ── */}
+          {/* ── Pagination bottom (full mirror of top) ── */}
           {totalPages > 1 && (
-            <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
-              <button disabled={safePage === 0} onClick={() => this.setState({ pageIndex: safePage - 1 })} style={{ ...btnBase, padding: "5px 14px", fontSize: 12, ...(safePage === 0 ? dis : {}) }}>‹ Prev</button>
-              <span style={{ fontFamily: MONO, fontSize: 11, color: "var(--cs-dim)" }}>Page {safePage + 1} / {totalPages}</span>
-              <button disabled={safePage >= totalPages - 1} onClick={() => this.setState({ pageIndex: safePage + 1 })} style={{ ...btnBase, padding: "5px 14px", fontSize: 12, ...(safePage >= totalPages - 1 ? dis : {}) }}>Next ›</button>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" as const }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 11, color: "var(--cs-dim)" }}>Cases per page:</span>
+                <div style={{ display: "flex", gap: 4 }}>
+                  {PAGE_SIZES.map(n => {
+                    const active = pageSize === n;
+                    return (
+                      <button key={n} onClick={() => this.setState({ pageSize: n, pageIndex: 0 })} style={{
+                        background: active ? "var(--cs-accent)20" : "var(--cs-surface-2)",
+                        border: `1px solid ${active ? "var(--cs-accent)" : "var(--cs-border-sub)"}`,
+                        color: active ? "var(--cs-accent)" : "var(--cs-muted)",
+                        borderRadius: 6, padding: "3px 10px", fontFamily: MONO, fontSize: 11,
+                        fontWeight: active ? 700 : 400, cursor: "pointer",
+                      }}>{n}</button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
+                <button disabled={safePage === 0} onClick={() => this.setState({ pageIndex: 0 })} style={{ ...btnBase, ...(safePage === 0 ? dis : {}) }}>«</button>
+                <button disabled={safePage === 0} onClick={() => this.setState({ pageIndex: safePage - 1 })} style={{ ...btnBase, ...(safePage === 0 ? dis : {}) }}>‹ Prev</button>
+                {Array.from({ length: Math.min(totalPages, 9) }, (_, i) => {
+                  let start = Math.max(0, safePage - 4);
+                  const end = Math.min(totalPages, start + 9);
+                  start = Math.max(0, end - 9);
+                  const p = start + i;
+                  if (p >= totalPages) return null;
+                  const isCur = p === safePage;
+                  return (
+                    <button key={p} onClick={() => this.setState({ pageIndex: p })} style={{
+                      background: isCur ? "var(--cs-accent)" : "transparent",
+                      border: `1px solid ${isCur ? "var(--cs-accent)" : "var(--cs-border-sub)"}`,
+                      color: isCur ? "#0a0e1a" : "var(--cs-muted)",
+                      borderRadius: 6, padding: "3px 9px", fontFamily: MONO, fontSize: 11,
+                      fontWeight: isCur ? 800 : 400, cursor: "pointer", minWidth: 32,
+                    }}>{p + 1}</button>
+                  );
+                })}
+                <button disabled={safePage >= totalPages - 1} onClick={() => this.setState({ pageIndex: safePage + 1 })} style={{ ...btnBase, ...(safePage >= totalPages - 1 ? dis : {}) }}>Next ›</button>
+                <button disabled={safePage >= totalPages - 1} onClick={() => this.setState({ pageIndex: totalPages - 1 })} style={{ ...btnBase, ...(safePage >= totalPages - 1 ? dis : {}) }}>»</button>
+              </div>
+              <span style={{ fontSize: 11, color: "var(--cs-dim)" }}>
+                {total > 0 ? `${pageStart + 1}–${pageEnd} of ${total.toLocaleString()} case${total !== 1 ? "s" : ""}` : "0 cases"}
+              </span>
             </div>
           )}
 
