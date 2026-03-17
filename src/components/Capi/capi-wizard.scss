@@ -353,6 +353,7 @@
   gap:           10px;
   align-items:   center;
   padding:       9px 13px;
+  flex-shrink:   0;
   background:    var(--cs-card-bg);
   border:        1px solid var(--cs-border-sub);
   border-left:   3px solid transparent;
@@ -442,4 +443,5 @@
 }
 
 .capi-wizard-result-list    { display: flex; flex-direction: column; gap: 5px; }
+.capi-wizard-result-list > * { flex-shrink: 0; }
 .capi-wizard-result-actions { display: flex; gap: 10px; }

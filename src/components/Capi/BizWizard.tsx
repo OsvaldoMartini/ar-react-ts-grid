@@ -1535,18 +1535,20 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
                   return (
                     <>
                       {/* Scrollable steps */}
-                      <div style={{ flex: 1, overflowY: "auto" as const, padding: "8px 20px" }}>
+                      <div style={{ flex: 1, overflowY: "auto" as const, padding: "8px 20px", minHeight: 0 }}>
                         {logPages > 1 && <div style={{ marginBottom: 8 }}><PaginationBar /></div>}
                         <div className="capi-wizard-steps">
                           {pageSlice.map((e: ExecEntry, i: number) => {
                             const isRun = e.status === "running";
                             const cls = isRun ? "running" : e.ok ? "ok" : "fail";
                             return (
-                              <div key={logStart + i} className={`capi-wizard-step capi-wizard-step--${cls}`}>
-                                <span className="capi-wizard-step__num">{e.step}</span>
-                                <span className="capi-wizard-step__icon">{isRun ? "⏳" : e.ok ? "✅" : "❌"}</span>
-                                <span className="capi-wizard-step__label">{e.label}</span>
-                                {!isRun && (<><StatusBadge status={e.status} /><span className="capi-wizard-step__lat">{e.latency}ms</span></>)}
+                              <div key={logStart + i} style={{ flexShrink: 0 }}>
+                                <div className={`capi-wizard-step capi-wizard-step--${cls}`}>
+                                  <span className="capi-wizard-step__num">{e.step}</span>
+                                  <span className="capi-wizard-step__icon">{isRun ? "⏳" : e.ok ? "✅" : "❌"}</span>
+                                  <span className="capi-wizard-step__label">{e.label}</span>
+                                  {!isRun && (<><StatusBadge status={e.status} /><span className="capi-wizard-step__lat">{e.latency}ms</span></>)}
+                                </div>
                               </div>
                             );
                           })}
@@ -1701,8 +1703,16 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
                         <SLabel>Step results</SLabel>
                         <PaginationBar />
                       </div>
-                      <div className="capi-wizard-result-list" style={{ flex: 1, overflowY: "auto" as const, padding: "8px 20px", marginTop: 0 }}>
-                        {pageSlice.map((r: ExecEntry, i: number) => <ResultRow key={resStart + i} r={r} i={resStart + i} />)}
+                      <div className="capi-wizard-result-list" style={{
+                        flex: 1, overflowY: "auto" as const,
+                        padding: "8px 20px",
+                        minHeight: 0,
+                      }}>
+                        {pageSlice.map((r: ExecEntry, i: number) => (
+                          <div key={resStart + i} style={{ flexShrink: 0 }}>
+                            <ResultRow r={r} i={resStart + i} />
+                          </div>
+                        ))}
                       </div>
                       <div style={{ flexShrink: 0, padding: "4px 20px 8px" }}><PaginationBar /></div>
                     </div>
