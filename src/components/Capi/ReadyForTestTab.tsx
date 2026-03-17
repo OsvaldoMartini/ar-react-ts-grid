@@ -1382,94 +1382,9 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
     const safeTimeout = Math.max(1, Math.min(120, Math.round(Number(flowTimeoutSec) || 15)));
     const ts = new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-").replace(/--/g, "-");
     const modeTag = isFlow ? "flow_execution" : "independent_execution";
+    const MAX_PER_CHUNK = 200;
 
-    const lines: string[] = [];
-
-    // ── Header ──────────────────────────────────────────────
-    lines.push("#!/usr/bin/env bash");
-    lines.push("# =============================================================");
-    lines.push(`# Capi Test Runner — ${isFlow ? "FLOW" : "INDEPENDENT"} Execution`);
-    lines.push(`# Generated: ${new Date().toISOString()}`);
-    lines.push(`# Mode:      ${isFlow ? "Flow (sequential, ID chaining)" : "Independent (parallel-safe, no chaining)"}`);
-    if (isFlow) lines.push(`# Timeout:   ${safeTimeout}s per request`);
-    lines.push("# =============================================================");
-    lines.push("");
-
-    // ── Configurable variables (top, easy to edit) ──────────
-    lines.push("# ── CONFIGURE ────────────────────────────────────────────────");
-    lines.push(`BASE_URL="${baseUrl}"          # ${isMockRunning ? `Mock Server :${mockServerStore.port}` : `Env: ${envStore.selected.name}`} — change here if needed`);
-    if (isFlow) lines.push(`TIMEOUT=${safeTimeout}                      # Per-request timeout in seconds`);
-    lines.push("");
-
-    // ── Helpers ─────────────────────────────────────────────
-    lines.push("# ── HELPERS ──────────────────────────────────────────────────");
-    lines.push("GREEN='\\033[0;32m'; RED='\\033[0;31m'; CYAN='\\033[0;36m'; RESET='\\033[0m'");
-    lines.push("PASS=0; FAIL=0");
-    lines.push("");
-    lines.push("run_request() {");
-    lines.push("  local label=\"$1\" method=\"$2\" url=\"$3\" body=\"$4\"");
-    lines.push("  echo -e \"${CYAN}▶ ${label}${RESET}\"");
-    if (isFlow) {
-      lines.push("  local start_t=$(date +%s%3N)");
-      lines.push("  if [ -n \"$body\" ]; then");
-      lines.push(`    RESPONSE=$(curl -s -w "\\n%{http_code}" --max-time $TIMEOUT \\`);
-      lines.push("      -X \"$method\" \"$url\" \\");
-      lines.push("      -H 'Content-Type: application/json' -H 'Accept: application/json' \\");
-      lines.push("      -d \"$body\")");
-      lines.push("  else");
-      lines.push(`    RESPONSE=$(curl -s -w "\\n%{http_code}" --max-time $TIMEOUT \\`);
-      lines.push("      -X \"$method\" \"$url\" \\");
-      lines.push("      -H 'Accept: application/json')");
-      lines.push("  fi");
-      lines.push("  local end_t=$(date +%s%3N)");
-      lines.push("  HTTP_CODE=$(echo \"$RESPONSE\" | tail -1)");
-      lines.push("  BODY=$(echo \"$RESPONSE\" | sed '$d')");
-      lines.push("  local latency=$((end_t - start_t))");
-      lines.push("  if [[ \"$HTTP_CODE\" =~ ^2 ]]; then");
-      lines.push("    echo -e \"  ${GREEN}✓ $HTTP_CODE  ${latency}ms${RESET}\"");
-      lines.push("    PASS=$((PASS+1))");
-      lines.push("  else");
-      lines.push("    echo -e \"  ${RED}✗ $HTTP_CODE  ${latency}ms${RESET}\"");
-      lines.push("    FAIL=$((FAIL+1))");
-      lines.push("  fi");
-    } else {
-      lines.push("  if [ -n \"$body\" ]; then");
-      lines.push(`    RESPONSE=$(curl -s -w "\\n%{http_code}" \\`);
-      lines.push("      -X \"$method\" \"$url\" \\");
-      lines.push("      -H 'Content-Type: application/json' -H 'Accept: application/json' \\");
-      lines.push("      -d \"$body\")");
-      lines.push("  else");
-      lines.push(`    RESPONSE=$(curl -s -w "\\n%{http_code}" \\`);
-      lines.push("      -X \"$method\" \"$url\" \\");
-      lines.push("      -H 'Accept: application/json')");
-      lines.push("  fi");
-      lines.push("  HTTP_CODE=$(echo \"$RESPONSE\" | tail -1)");
-      lines.push("  BODY=$(echo \"$RESPONSE\" | sed '$d')");
-      lines.push("  if [[ \"$HTTP_CODE\" =~ ^2 ]]; then");
-      lines.push("    echo -e \"  ${GREEN}✓ $HTTP_CODE${RESET}\"");
-      lines.push("    PASS=$((PASS+1))");
-      lines.push("  else");
-      lines.push("    echo -e \"  ${RED}✗ $HTTP_CODE${RESET}\"");
-      lines.push("    FAIL=$((FAIL+1))");
-      lines.push("  fi");
-    }
-    lines.push("}");
-    lines.push("");
-
-    // ── Flow: ID chaining map ────────────────────────────────
-    if (isFlow) {
-      lines.push("# ── ID CHAIN MAP (auto-populated at runtime) ─────────────");
-      const resources = [...new Set(cases.map(c => c.resourceName).filter(Boolean))];
-      resources.forEach(r => lines.push(`ID_${r.toUpperCase().replace(/[^A-Z0-9]/g, "_")}=""`));
-      lines.push("");
-    }
-
-    // ── Test cases ──────────────────────────────────────────
-    lines.push("# ── TEST CASES ───────────────────────────────────────────────");
-    lines.push(`echo "Running ${cases.length} test case(s) in ${isFlow ? "FLOW" : "INDEPENDENT"} mode..."`);
-    lines.push("");
-
-    // Group by runGroup for flow, flat for independent
+    // ── Build resolved test case list ──────────────────────────
     const groups = isFlow
       ? cases.reduce((acc, tc) => {
         const g = tc.runGroup ?? 1;
@@ -1479,69 +1394,198 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
       }, {} as Record<number, TestCase[]>)
       : { 1: cases };
 
-    Object.entries(groups).forEach(([runNum, groupCases]) => {
-      if (isFlow && Object.keys(groups).length > 1) {
-        lines.push(`echo ""`);
-        lines.push(`echo "── Run ${runNum} ──────────────────────────────────────"`);
-      }
+    interface ResolvedCase {
+      tc: TestCase;
+      urlExpr: string;
+      bodyExpr: string;
+      label: string;
+      resVar: string | null;
+    }
 
-      groupCases.forEach((tc, idx) => {
+    const allResolved: ResolvedCase[] = [];
+    Object.entries(groups).forEach(([, groupCases]) => {
+      groupCases.forEach((tc) => {
         const resVar = isFlow
           ? `ID_${(tc.resourceName || "obj").toUpperCase().replace(/[^A-Z0-9]/g, "_")}`
           : null;
-
-        // Build URL — resolve {id} appropriately per mode
-        let urlExpr = tc.resolvedUrl
-          ? tc.resolvedUrl
-          : `${baseUrl}${tc.path}`;
-
+        let urlExpr = tc.resolvedUrl ? tc.resolvedUrl : `${baseUrl}${tc.path}`;
         if (tc.path.includes("{id}")) {
           if (isFlow && resVar) {
-            // Flow: substitute shell variable (populated at runtime via jq)
             urlExpr = urlExpr.replace(/\{id\}/g, `$${resVar}`);
           } else {
-            // Independent: pick a random seed ID (mock server seeds 50 records per resource)
-            const seedId = Math.floor(Math.random() * 50) + 1;
-            urlExpr = urlExpr.replace(/\{id\}/g, String(seedId));
+            urlExpr = urlExpr.replace(/\{id\}/g, String(Math.floor(Math.random() * 50) + 1));
           }
         }
-
-        // Body
-        const bodyExpr = tc.body
-          ? JSON.stringify(JSON.stringify(tc.body)) // double-encode for bash string
-          : "";
-
+        const bodyExpr = tc.body ? JSON.stringify(JSON.stringify(tc.body)) : "";
         const label = `[${tc.seq}] ${tc.method} ${tc.path} — ${tc.apiTitle}`;
-        lines.push(`# ${label}`);
-
-        if (isFlow) {
-          // For flow mode emit inline curl with ID chaining
-          lines.push(`run_request ${JSON.stringify(label)} ${tc.method} "${urlExpr}" ${bodyExpr || "''"}`);
-          // If POST and produces ID, capture it
-          if (tc.method === "POST" && resVar) {
-            lines.push(`if [[ "$HTTP_CODE" =~ ^2 ]] && command -v jq &>/dev/null; then`);
-            lines.push(`  ${resVar}=$(echo "$BODY" | jq -r '.id // empty' 2>/dev/null || echo "")`);
-            lines.push(`fi`);
-          }
-        } else {
-          lines.push(`run_request ${JSON.stringify(label)} ${tc.method} "${urlExpr}" ${bodyExpr || "''"}`);
-        }
-
-        lines.push("");
+        allResolved.push({ tc, urlExpr, bodyExpr, label, resVar });
       });
     });
 
-    // ── Summary ─────────────────────────────────────────────
-    lines.push("# ── SUMMARY ──────────────────────────────────────────────────");
-    lines.push("TOTAL=$((PASS+FAIL))");
-    lines.push("echo \"\"");
-    lines.push("echo -e \"Results: ${GREEN}${PASS} passed${RESET} / ${RED}${FAIL} failed${RESET} / ${TOTAL} total\"");
-    lines.push("[ $FAIL -eq 0 ] && exit 0 || exit 1");
+    // ── Split into chunks ──────────────────────────────────────
+    const chunks: ResolvedCase[][] = [];
+    for (let i = 0; i < allResolved.length; i += MAX_PER_CHUNK) {
+      chunks.push(allResolved.slice(i, i + MAX_PER_CHUNK));
+    }
+    const isMultiChunk = chunks.length > 1;
 
-    const fileName = `capi_${modeTag}_${ts}.sh`;
-    const csvFileName = `capi_${modeTag}_${ts}_data.csv`;
+    // ── Helper: build a single script content ─────────────────
+    const buildScript = (chunk: ResolvedCase[], chunkIdx: number, reportFile: string): string => {
+      const partSuffix = isMultiChunk ? `_part${chunkIdx + 1}` : "";
+      const lines: string[] = [];
 
-    // Build CSV content
+      lines.push("#!/usr/bin/env bash");
+      lines.push("# =============================================================");
+      lines.push(`# Capi Test Runner — ${isFlow ? "FLOW" : "INDEPENDENT"} Execution${isMultiChunk ? ` (Part ${chunkIdx + 1}/${chunks.length})` : ""}`);
+      lines.push(`# Generated: ${new Date().toISOString()}`);
+      lines.push(`# Cases:     ${chunk[0].tc.seq}–${chunk[chunk.length - 1].tc.seq} of ${cases.length}`);
+      if (isFlow) lines.push(`# Timeout:   ${safeTimeout}s per request`);
+      lines.push("# =============================================================");
+      lines.push("");
+      lines.push("# ── CONFIGURE ──────────────────────────────────────────────");
+      lines.push(`BASE_URL="${baseUrl}"   # ${isMockRunning ? `Mock Server :${mockServerStore.port}` : `Env: ${envStore.selected.name}`}`);
+      if (isFlow) lines.push(`TIMEOUT=${safeTimeout}             # Per-request timeout in seconds`);
+      lines.push(`REPORT_FILE="${reportFile}"`);
+      if (saveCsvToo) lines.push(`DATA_FILE="capi_${modeTag}_${ts}_data.csv"`);
+      lines.push("");
+
+      // ── Helpers ──
+      lines.push("GREEN='\\033[0;32m'; RED='\\033[0;31m'; CYAN='\\033[0;36m'; YELLOW='\\033[0;33m'; RESET='\\033[0m'");
+      lines.push("PASS=0; FAIL=0; TOTAL=0");
+      lines.push("REPORT_ROWS=\"\"");
+      lines.push("");
+      lines.push("run_request() {");
+      lines.push("  local label=\"$1\" method=\"$2\" url=\"$3\" body=\"$4\"");
+      lines.push("  local start_ms=$(date +%s%3N)");
+      lines.push("  echo -e \"${CYAN}▶ ${label}${RESET}\"");
+      if (isFlow) {
+        lines.push("  if [ -n \"$body\" ]; then");
+        lines.push(`    RESPONSE=$(curl -s -w "\\n%{http_code}" --max-time $TIMEOUT -X "$method" "$url" -H 'Content-Type: application/json' -H 'Accept: application/json' -d "$body")`);
+        lines.push("  else");
+        lines.push(`    RESPONSE=$(curl -s -w "\\n%{http_code}" --max-time $TIMEOUT -X "$method" "$url" -H 'Accept: application/json')`);
+        lines.push("  fi");
+      } else {
+        lines.push("  if [ -n \"$body\" ]; then");
+        lines.push(`    RESPONSE=$(curl -s -w "\\n%{http_code}" -X "$method" "$url" -H 'Content-Type: application/json' -H 'Accept: application/json' -d "$body")`);
+        lines.push("  else");
+        lines.push(`    RESPONSE=$(curl -s -w "\\n%{http_code}" -X "$method" "$url" -H 'Accept: application/json')`);
+        lines.push("  fi");
+      }
+      lines.push("  local end_ms=$(date +%s%3N)");
+      lines.push("  local latency=$((end_ms - start_ms))");
+      lines.push("  HTTP_CODE=$(echo \"$RESPONSE\" | tail -1)");
+      lines.push("  BODY=$(echo \"$RESPONSE\" | sed '$d')");
+      lines.push("  TOTAL=$((TOTAL+1))");
+      lines.push("  if [[ \"$HTTP_CODE\" =~ ^2 ]]; then");
+      lines.push("    echo -e \"  ${GREEN}✓ $HTTP_CODE  ${latency}ms${RESET}\"");
+      lines.push("    PASS=$((PASS+1))");
+      lines.push("    local status_class=\"pass\"; local status_icon=\"✓\"");
+      lines.push("  else");
+      lines.push("    echo -e \"  ${RED}✗ $HTTP_CODE  ${latency}ms${RESET}\"");
+      lines.push("    FAIL=$((FAIL+1))");
+      lines.push("    local status_class=\"fail\"; local status_icon=\"✗\"");
+      lines.push("  fi");
+      // escape body for HTML injection
+      lines.push("  local esc_body=$(echo \"$BODY\" | sed 's/&/\\&amp;/g; s/</\\&lt;/g; s/>/\\&gt;/g')");
+      lines.push("  local esc_url=$(echo \"$url\" | sed 's/&/\\&amp;/g; s/</\\&lt;/g; s/>/\\&gt;/g')");
+      lines.push("  local esc_body_in=$(echo \"$body\" | sed 's/&/\\&amp;/g; s/</\\&lt;/g; s/>/\\&gt;/g')");
+      lines.push("  REPORT_ROWS+=\"<tr class=\\\"$status_class\\\"><td class=\\\"icon\\\">$status_icon</td><td class=\\\"code\\\">$HTTP_CODE</td><td class=\\\"ms\\\">$(echo ${latency})ms</td><td class=\\\"lbl\\\">$label</td><td class=\\\"url\\\"><code>$method $esc_url</code></td><td class=\\\"body\\\"><pre>$esc_body</pre></td></tr>\\n\"");
+      lines.push("}");
+      lines.push("");
+
+      // ── ID chain vars ──
+      if (isFlow) {
+        const resources = [...new Set(chunk.map(r => r.tc.resourceName).filter(Boolean))];
+        if (resources.length) {
+          lines.push("# ── ID CHAIN MAP ──────────────────────────────────────────");
+          resources.forEach(r => lines.push(`ID_${r.toUpperCase().replace(/[^A-Z0-9]/g, "_")}=""`));
+          lines.push("");
+        }
+      }
+
+      // ── Init report file ──
+      lines.push("# ── INIT HTML REPORT ─────────────────────────────────────────");
+      lines.push(`echo "Starting ${chunk.length} test(s)..."`);
+      lines.push("");
+
+      // ── Test cases ──
+      lines.push("# ── TEST CASES ───────────────────────────────────────────────");
+      chunk.forEach(({ tc, urlExpr, bodyExpr, label, resVar }) => {
+        lines.push(`# ${label}`);
+        lines.push(`run_request ${JSON.stringify(label)} ${tc.method} "${urlExpr}" ${bodyExpr || "''"}`);
+        if (isFlow && tc.method === "POST" && resVar) {
+          lines.push(`if [[ "$HTTP_CODE" =~ ^2 ]] && command -v jq &>/dev/null; then`);
+          lines.push(`  ${resVar}=$(echo "$BODY" | jq -r '.id // empty' 2>/dev/null || echo "")`);
+          lines.push(`fi`);
+        }
+        lines.push("");
+      });
+
+      // ── Summary + write HTML ──
+      lines.push("# ── SUMMARY + HTML REPORT ────────────────────────────────────");
+      lines.push("TOTAL_CALC=$((PASS+FAIL))");
+      lines.push(`echo ""`);
+      lines.push("echo -e \"Results: ${GREEN}${PASS} passed${RESET} / ${RED}${FAIL} failed${RESET} / ${TOTAL_CALC} total\"");
+      lines.push("");
+      lines.push("PCT=0");
+      lines.push("[ $TOTAL_CALC -gt 0 ] && PCT=$(( PASS * 100 / TOTAL_CALC ))");
+      lines.push("");
+      lines.push("# ── Write HTML report ──────────────────────────────────────");
+      lines.push("cat > \"$REPORT_FILE\" << HTMLEOF");
+      lines.push("<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'>");
+      lines.push(`<title>Capi Test Report${isMultiChunk ? ` · Part ${chunkIdx + 1}` : ""}</title>`);
+      lines.push("<style>");
+      lines.push("*{box-sizing:border-box;margin:0;padding:0}");
+      lines.push("body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1117;color:#c9d1d9;min-height:100vh;padding:24px}");
+      lines.push(".shell{max-width:1100px;margin:0 auto}");
+      lines.push("h1{font-size:20px;font-weight:700;color:#e6edf3;margin-bottom:4px}");
+      lines.push(".meta{font-size:12px;color:#8b949e;margin-bottom:24px;font-family:monospace}");
+      lines.push(".stats{display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap}");
+      lines.push(".stat{padding:14px 22px;border-radius:10px;min-width:110px}");
+      lines.push(".stat .val{font-size:28px;font-weight:800;font-family:monospace}");
+      lines.push(".stat .lbl{font-size:11px;opacity:.7;margin-top:2px;text-transform:uppercase;letter-spacing:.6px}");
+      lines.push(".stat.pass{background:#1a3a2a;border:1px solid #2ea04326}.stat.pass .val{color:#3fb950}");
+      lines.push(".stat.fail{background:#3a1a1a;border:1px solid #f8514926}.stat.fail .val{color:#f85149}");
+      lines.push(".stat.total{background:#1c2128;border:1px solid #30363d}.stat.total .val{color:#8b949e}");
+      lines.push(".stat.pct{background:#1a2a3a;border:1px solid #388bfd26}.stat.pct .val{color:#58a6ff}");
+      lines.push(".bar-wrap{background:#21262d;border-radius:6px;height:8px;margin-bottom:24px;overflow:hidden}");
+      lines.push(".bar-fill{height:100%;border-radius:6px;background:linear-gradient(90deg,#3fb950,#58a6ff);transition:width .6s}");
+      lines.push("table{width:100%;border-collapse:collapse;font-size:13px}");
+      lines.push("thead th{background:#161b22;color:#8b949e;font-weight:600;padding:10px 12px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #30363d;position:sticky;top:0}");
+      lines.push("tr.pass{background:#0d1117}tr.pass:hover{background:#1a3a2a22}");
+      lines.push("tr.fail{background:#1a0a0a}tr.fail:hover{background:#3a1a1a33}");
+      lines.push("td{padding:9px 12px;border-bottom:1px solid #21262d;vertical-align:top}");
+      lines.push("td.icon{font-size:15px;width:32px;text-align:center}");
+      lines.push("tr.pass td.icon{color:#3fb950}tr.fail td.icon{color:#f85149}");
+      lines.push("td.code{font-family:monospace;font-weight:700;width:52px}");
+      lines.push("tr.pass td.code{color:#3fb950}tr.fail td.code{color:#f85149}");
+      lines.push("td.ms{font-family:monospace;font-size:11px;color:#8b949e;width:68px}");
+      lines.push("td.lbl{color:#8b949e;font-size:11px;width:200px}");
+      lines.push("td.url code{color:#79c0ff;font-family:monospace;font-size:12px;word-break:break-all}");
+      lines.push("td.body pre{font-family:monospace;font-size:11px;color:#adbac7;white-space:pre-wrap;word-break:break-all;max-height:120px;overflow-y:auto;background:#161b22;padding:6px 8px;border-radius:5px;border:1px solid #30363d}");
+      lines.push("</style></head><body><div class='shell'>");
+      lines.push(`<h1>🧪 Capi Test Report${isMultiChunk ? ` <span style='color:#8b949e;font-size:14px'>Part ${chunkIdx + 1} / ${chunks.length}</span>` : ""}</h1>`);
+      lines.push(`<div class='meta'>Mode: ${isFlow ? "FLOW" : "INDEPENDENT"} &nbsp;·&nbsp; Generated: $(date) &nbsp;·&nbsp; Base: ${baseUrl}</div>`);
+      lines.push("<div class='stats'>");
+      lines.push("<div class='stat pass'><div class='val'>$PASS</div><div class='lbl'>Passed</div></div>");
+      lines.push("<div class='stat fail'><div class='val'>$FAIL</div><div class='lbl'>Failed</div></div>");
+      lines.push("<div class='stat total'><div class='val'>$TOTAL_CALC</div><div class='lbl'>Total</div></div>");
+      lines.push("<div class='stat pct'><div class='val'>${PCT}%</div><div class='lbl'>Success</div></div>");
+      lines.push("</div>");
+      lines.push("<div class='bar-wrap'><div class='bar-fill' style='width:${PCT}%'></div></div>");
+      lines.push("<table><thead><tr><th></th><th>HTTP</th><th>Time</th><th>Test</th><th>Endpoint</th><th>Response</th></tr></thead><tbody>");
+      lines.push("HTMLEOF");
+      lines.push("printf '%b' \"$REPORT_ROWS\" >> \"$REPORT_FILE\"");
+      lines.push("cat >> \"$REPORT_FILE\" << HTMLEOF2");
+      lines.push("</tbody></table></div></body></html>");
+      lines.push("HTMLEOF2");
+      lines.push(`echo "📄 Report saved: $REPORT_FILE"`);
+      lines.push("[ $FAIL -eq 0 ] && exit 0 || exit 1");
+
+      return lines.join("\n");
+    };
+
+    // ── Build CSV ─────────────────────────────────────────────
     const escCsv = (v: any): string => {
       const s = v == null ? "" : typeof v === "object" ? JSON.stringify(v) : String(v);
       return `"${s.replace(/"/g, '""')}"`;
@@ -1554,42 +1598,40 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
       tc.result ?? "", tc.headers ?? "",
     ].map(escCsv).join(","));
     const csvContent = [csvHeaders.join(","), ...csvRows].join("\r\n");
+    const csvFileName = `capi_${modeTag}_${ts}_data.csv`;
 
-    // Embed CSV reference comment at top of script (after the header block)
-    if (saveCsvToo) {
-      const insertIdx = lines.findIndex(l => l.startsWith("BASE_URL="));
-      if (insertIdx >= 0) {
-        lines.splice(insertIdx, 0,
-          `DATA_FILE="${csvFileName}"        # Test data CSV saved alongside this script`,
-          ""
-        );
-      }
-    }
-
-    const script = lines.join("\n");
-
+    // ── Write all files ───────────────────────────────────────
     if ("showDirectoryPicker" in window) {
       try {
         const dirHandle = await (window as any).showDirectoryPicker({ mode: "readwrite" });
 
-        // Always write the .sh file
-        const shHandle = await dirHandle.getFileHandle(fileName, { create: true });
-        const shWritable = await shHandle.createWritable();
-        await shWritable.write(script);
-        await shWritable.close();
+        for (let i = 0; i < chunks.length; i++) {
+          const partSuffix = isMultiChunk ? `_part${i + 1}` : "";
+          const shName = `capi_${modeTag}_${ts}${partSuffix}.sh`;
+          const reportName = `capi_${modeTag}_${ts}${partSuffix}_report.html`;
+          const script = buildScript(chunks[i], i, reportName);
 
-        // Optionally write the .csv file alongside
+          const shHandle = await dirHandle.getFileHandle(shName, { create: true });
+          const shW = await shHandle.createWritable();
+          await shW.write(script); await shW.close();
+        }
+
         if (saveCsvToo) {
           const csvHandle = await dirHandle.getFileHandle(csvFileName, { create: true });
-          const csvWritable = await csvHandle.createWritable();
-          await csvWritable.write(csvContent);
-          await csvWritable.close();
+          const csvW = await csvHandle.createWritable();
+          await csvW.write(csvContent); await csvW.close();
         }
+
+        const fileList = chunks.map((_, i) => {
+          const partSuffix = isMultiChunk ? `_part${i + 1}` : "";
+          return `capi_${modeTag}_${ts}${partSuffix}.sh`;
+        }).join(", ");
+        console.info(`Saved: ${fileList}${saveCsvToo ? `, ${csvFileName}` : ""}`);
+
       } catch (err: any) {
         if (err?.name !== "AbortError") console.error("Bash save error:", err);
       }
     } else {
-      // Fallback: trigger separate downloads
       const dlBlob = (content: string, name: string, type: string) => {
         const blob = new Blob([content], { type });
         const url = URL.createObjectURL(blob);
@@ -1597,10 +1639,15 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
         a.href = url; a.download = name; a.click();
         URL.revokeObjectURL(url);
       };
-      dlBlob(script, fileName, "application/x-sh");
+      for (let i = 0; i < chunks.length; i++) {
+        const partSuffix = isMultiChunk ? `_part${i + 1}` : "";
+        const reportName = `capi_${modeTag}_${ts}${partSuffix}_report.html`;
+        dlBlob(buildScript(chunks[i], i, reportName), `capi_${modeTag}_${ts}${partSuffix}.sh`, "application/x-sh");
+      }
       if (saveCsvToo) dlBlob(csvContent, csvFileName, "text/csv;charset=utf-8;");
     }
   };
+
 
   private executeBlock = async () => {
     const { pageSize, pageIndex } = this.state;
