@@ -6,7 +6,13 @@ import { StoreTab } from "./StoreTab";
 import { BizWizard } from "./BizWizard";
 import { ApiWorkflowTab, DataGenTab } from "./ApiWorkflowTab";
 import { ReadyForTestTab } from "./ReadyForTestTab";
+import { AIAssistantTab } from "./AIAssistantTab";
+import { TestLibraryTab } from "./TestLibraryTab";
 import { testStore } from "./utils";
+
+// Import banking module (auto-registers built-in plugins on first import)
+import "./banking";
+
 import "./capi-app.scss";
 
 // ═══════════════════════════════════════════════════════════════
@@ -24,7 +30,7 @@ export interface CapiProps {
 }
 
 interface AppState {
-  tab: "apis" | "workflow" | "datagen" | "ready" | "running" | "report";
+  tab: "apis" | "workflow" | "datagen" | "ready" | "running" | "report" | "library" | "ai";
   specs: ApiSpec[];
   loading: boolean;
   showWizard: boolean;
@@ -95,10 +101,12 @@ export default class App extends React.Component<CapiProps, AppState> {
     const TABS = [
       { id: "apis", l: `📁 API Files (${specs.length})`, stepLabel: "API Files" },
       { id: "workflow", l: `⬡ Workflow`, stepLabel: "Workflow" },
-      { id: "datagen", l: `⚗ Data Generator`, stepLabel: "Data Generator" },
-      { id: "ready", l: `🧪 Ready for Test${queuedCount > 0 ? ` (${queuedCount.toLocaleString()})` : ""}`, stepLabel: "Ready for Test" },
+      { id: "datagen", l: `⚗ Data Generator`, stepLabel: "Data Gen" },
+      { id: "ready", l: `🧪 Ready for Test${queuedCount > 0 ? ` (${queuedCount.toLocaleString()})` : ""}`, stepLabel: "Ready" },
       { id: "running", l: `🔍 Running`, stepLabel: "Running" },
       { id: "report", l: `🗄️ Report (${tot})`, stepLabel: "Report" },
+      { id: "library", l: `📚 Test Library`, stepLabel: "Library" },
+      { id: "ai", l: `🤖 AI Assistant`, stepLabel: "AI" },
     ] as const;
     const activeTabIndex = TABS.findIndex(t => t.id === tab);
 
@@ -211,6 +219,12 @@ export default class App extends React.Component<CapiProps, AppState> {
               onOpenWizard={() => this.setState({ showWizard: true })}
               onOpenReport={() => { }}
             />
+          )}
+          {tab === "library" && (
+            <TestLibraryTab />
+          )}
+          {tab === "ai" && (
+            <AIAssistantTab loadedSpecs={specs} />
           )}
         </div>
       </div>

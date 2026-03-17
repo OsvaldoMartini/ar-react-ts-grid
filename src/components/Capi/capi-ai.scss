@@ -1,0 +1,401 @@
+// capi-ai.scss — AI Assistant Tab styles
+// Uses CSS custom properties from capi-tokens.scss
+
+@import './capi-tokens';
+
+// ─── CONTAINER ───────────────────────────────────────────────
+.ai-assistant {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  font-family: $font-ui;
+}
+
+// ─── CONTEXT BANNER ──────────────────────────────────────────
+.ai-ctx-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  background: var(--cs-surface);
+  border-bottom: 1px solid var(--cs-border);
+  gap: 12px;
+  flex-wrap: wrap;
+
+  &__left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  &__icon { font-size: 22px; }
+  &__title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--cs-text);
+  }
+  &__sub {
+    font-size: 10px;
+    color: var(--cs-muted);
+    margin-top: 1px;
+  }
+  &__badges {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+}
+
+.ai-provider-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: $r-full;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: $font-ui;
+
+  &--cloud {
+    background: var(--cs-accent-bg);
+    border: 1px solid var(--cs-accent-border);
+    color: var(--cs-accent);
+  }
+  &--local {
+    background: var(--cs-green-bg);
+    border: 1px solid var(--cs-green-border);
+    color: var(--cs-green);
+  }
+}
+
+.ai-btn-select-providers {
+  background: var(--cs-card-bg);
+  border: 1px solid var(--cs-border);
+  border-radius: $r-sm;
+  color: var(--cs-accent);
+  font-size: 10px;
+  font-family: $font-ui;
+  font-weight: 600;
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: $t-fast;
+
+  &:hover {
+    background: var(--cs-accent-bg);
+    border-color: var(--cs-accent);
+  }
+}
+
+// ─── PROVIDER PANEL ──────────────────────────────────────────
+.ai-provider-panel {
+  background: var(--cs-card-bg);
+  border-bottom: 1px solid var(--cs-border);
+  padding: 14px 20px;
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+
+  &__section { flex: 1; min-width: 280px; }
+  &__heading {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--cs-text2);
+    margin-bottom: 8px;
+    letter-spacing: 0.3px;
+  }
+}
+
+.ai-provider-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: $r-md;
+  cursor: pointer;
+  transition: $t-fast;
+  border: 1px solid transparent;
+  margin-bottom: 4px;
+
+  &:hover { background: var(--cs-surface); }
+  &.selected {
+    background: var(--cs-accent-bg);
+    border-color: var(--cs-accent-border);
+  }
+
+  input[type="checkbox"] {
+    margin-top: 3px;
+    accent-color: var(--cs-accent);
+  }
+
+  &__info { display: flex; flex-direction: column; gap: 2px; }
+  &__name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--cs-text);
+  }
+  &__desc {
+    font-size: 10px;
+    color: var(--cs-muted);
+  }
+  &__detail {
+    font-size: 9px;
+    font-family: $font-mono;
+    color: var(--cs-dim);
+  }
+}
+
+// ─── MAIN LAYOUT ─────────────────────────────────────────────
+.ai-main {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  gap: 0;
+}
+
+.ai-controls {
+  width: 340px;
+  min-width: 300px;
+  padding: 16px 18px;
+  overflow-y: auto;
+  border-right: 1px solid var(--cs-border);
+  background: var(--cs-bg);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ai-responses {
+  flex: 1;
+  padding: 16px 20px;
+  overflow-y: auto;
+  background: var(--cs-surface);
+}
+
+// ─── SECTION TITLE ───────────────────────────────────────────
+.ai-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--cs-dim);
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+// ─── MODE GRID ───────────────────────────────────────────────
+.ai-mode-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.ai-mode-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 10px 12px;
+  border-radius: $r-md;
+  border: 1px solid var(--cs-border);
+  background: var(--cs-card-bg);
+  cursor: pointer;
+  transition: $t-fast;
+  text-align: left;
+  font-family: $font-ui;
+
+  &:hover {
+    border-color: var(--cs-accent);
+    background: var(--cs-accent-bg);
+  }
+
+  &.active {
+    border-color: var(--cs-accent);
+    background: var(--cs-accent-bg);
+    box-shadow: var(--cs-shadow-glow);
+  }
+
+  &__icon { font-size: 16px; }
+  &__label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--cs-text);
+  }
+  &__desc {
+    font-size: 9px;
+    color: var(--cs-muted);
+    line-height: 1.4;
+  }
+}
+
+// ─── FIELD ───────────────────────────────────────────────────
+.ai-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  &__label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--cs-muted);
+  }
+  &__select, &__textarea {
+    font-family: $font-ui;
+    font-size: 12px;
+    padding: 8px 10px;
+    border-radius: $r-sm;
+    border: 1px solid var(--cs-border);
+    background: var(--cs-input-bg);
+    color: var(--cs-text);
+    outline: none;
+    transition: $t-fast;
+
+    &:focus {
+      border-color: var(--cs-accent);
+      box-shadow: var(--cs-shadow-glow);
+    }
+  }
+  &__textarea {
+    resize: vertical;
+    min-height: 80px;
+    line-height: 1.5;
+  }
+}
+
+// ─── CONTEXT SUMMARY ─────────────────────────────────────────
+.ai-context-summary {
+  background: var(--cs-surface);
+  border: 1px solid var(--cs-border);
+  border-radius: $r-md;
+  padding: 10px 12px;
+
+  &__title {
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--cs-dim);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  &__item {
+    font-size: 10px;
+    color: var(--cs-muted);
+    padding: 2px 0;
+  }
+}
+
+// ─── SEND BUTTON ─────────────────────────────────────────────
+.ai-btn-send {
+  padding: 10px 16px;
+  border: none;
+  border-radius: $r-md;
+  background: linear-gradient(135deg, $c-blue-600, $c-blue-400);
+  color: white;
+  font-family: $font-ui;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: $t-fast;
+  letter-spacing: 0.3px;
+
+  &:hover:not(:disabled) {
+    box-shadow: var(--cs-shadow-blue);
+    transform: translateY(-1px);
+  }
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+// ─── EMPTY STATE ─────────────────────────────────────────────
+.ai-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 30px;
+  text-align: center;
+
+  &__icon { font-size: 48px; margin-bottom: 12px; opacity: 0.6; }
+  &__title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--cs-text);
+    margin-bottom: 6px;
+  }
+  &__sub {
+    font-size: 11px;
+    color: var(--cs-muted);
+    max-width: 400px;
+    line-height: 1.6;
+  }
+}
+
+// ─── RESPONSE CARDS ──────────────────────────────────────────
+.ai-response-card {
+  background: var(--cs-card-bg);
+  border: 1px solid var(--cs-card-border);
+  border-radius: $r-lg;
+  margin-bottom: 12px;
+  overflow: hidden;
+
+  &--done { border-color: var(--cs-green-border); }
+  &--error { border-color: var(--cs-red-border); }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--cs-border-sub);
+    background: var(--cs-surface);
+  }
+  &__provider {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--cs-text);
+  }
+  &__time {
+    font-size: 9px;
+    font-family: $font-mono;
+    color: var(--cs-dim);
+  }
+  &__status {
+    margin-left: auto;
+    font-size: 10px;
+    font-weight: 600;
+    &--done { color: var(--cs-green); }
+    &--pending { color: var(--cs-yellow); }
+    &--error { color: var(--cs-red); }
+  }
+  &__body { padding: 14px; }
+  &__content {
+    font-family: $font-ui;
+    font-size: 11px;
+    color: var(--cs-text2);
+    line-height: 1.7;
+    white-space: pre-wrap;
+    margin: 0;
+  }
+  &__loading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--cs-muted);
+  }
+}
+
+// ─── PULSE ANIMATION ─────────────────────────────────────────
+.ai-pulse {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--cs-accent);
+  animation: ai-pulse-anim 1.2s ease-in-out infinite;
+}
+
+@keyframes ai-pulse-anim {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50%      { opacity: 1; transform: scale(1.2); }
+}
