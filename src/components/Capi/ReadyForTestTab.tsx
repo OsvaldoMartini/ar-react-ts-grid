@@ -1173,6 +1173,7 @@ interface RftState {
   expandReport: boolean;
   showModal: boolean;
   showMockModal: boolean;
+  showBashConfirm: boolean;
   envTick: number;
   lastAppliedEnvId: string;
   envAppliedKey: string;
@@ -1186,6 +1187,7 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
     tick: 0, pageSize: 10, pageIndex: 0, running: false,
     runProgress: 0, filter: "all", methodFilter: "ALL",
     expandReport: false, showModal: false, showMockModal: false,
+    showBashConfirm: false,
     envTick: 0,
     lastAppliedEnvId: envStore.selectedId,
     envAppliedKey: envStore.selectedId,
@@ -1291,7 +1293,82 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
     this.setState({ running: false, currentExecUrl: null });
   };
 
-  private generateBash = async () => {
+  private saveCsv = () => {
+    const cases = testStore.cases;
+    if (!cases.length) return;
+
+    const escape = (v: any): string => {
+      const s = v == null ? "" : typeof v === "object" ? JSON.stringify(v) : String(v);
+      return `"${s.replace(/"/g, '""')}"`;
+    };
+
+    const headers = [
+      "seq", "runGroup", "apiTitle", "resourceName", "method",
+      "path", "resolvedUrl", "body", "dataSource",
+      "status", "httpStatus", "latency_ms",
+      "res_body", "res_headers",
+    ];
+
+    const rows = cases.map((tc: TestCase) => [
+      tc.seq,
+      tc.runGroup,
+      tc.apiTitle,
+      tc.resourceName,
+      tc.method,
+      tc.path,
+      tc.resolvedUrl ?? "",
+      tc.body ?? "",
+      tc.dataSource,
+      tc.status,
+      tc.httpStatus ?? "",
+      tc.latency ?? "",
+      tc.result ?? "",
+      tc.headers ?? "",
+    ].map(escape).join(","));
+
+    const csv = [headers.join(","), ...rows].join("\r\n");
+    const ts = new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-").replace(/--/g, "-");
+    const hasResults = cases.some(c => c.status !== "pending");
+    const tag = hasResults ? "executed" : "pending";
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+
+    if ("showSaveFilePicker" in window) {
+      (window as any).showSaveFilePicker({
+        suggestedName: `capi_test_cases_${tag}_${ts}.csv`,
+        types: [{ description: "CSV file", accept: { "text/csv": [".csv"] } }],
+      }).then(async (fh: any) => {
+        const w = await fh.createWritable();
+        await w.write(csv);
+        await w.close();
+      }).catch((err: any) => {
+        if (err?.name !== "AbortError") console.error("CSV save error:", err);
+      });
+    } else {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `capi_test_cases_${tag}_${ts}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  };
+
+  private generateBash = () => {
+    const cases = testStore.cases;
+    if (!cases.length) return;
+    const hasUnresolved = cases.some(tc =>
+      (tc.resolvedUrl ?? tc.path).includes("{id}")
+    );
+    if (hasUnresolved) {
+      this.setState({ showBashConfirm: true });
+    } else {
+      this.doGenerateBash(false);
+    }
+  };
+
+  private doGenerateBash = async (saveCsvToo: boolean) => {
+    this.setState({ showBashConfirm: false });
     const { executionMode, flowTimeoutSec } = this.state;
     const cases = testStore.cases;
     if (!cases.length) return;
@@ -1413,14 +1490,20 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
           ? `ID_${(tc.resourceName || "obj").toUpperCase().replace(/[^A-Z0-9]/g, "_")}`
           : null;
 
-        // Build URL — replace {id} with shell variable in flow mode
+        // Build URL — resolve {id} appropriately per mode
         let urlExpr = tc.resolvedUrl
           ? tc.resolvedUrl
           : `${baseUrl}${tc.path}`;
 
-        if (isFlow && tc.path.includes("{id}") && resVar) {
-          urlExpr = urlExpr.replace(/\{id\}/g, `$${resVar}`);
-          // Use double-quotes for shell variable expansion
+        if (tc.path.includes("{id}")) {
+          if (isFlow && resVar) {
+            // Flow: substitute shell variable (populated at runtime via jq)
+            urlExpr = urlExpr.replace(/\{id\}/g, `$${resVar}`);
+          } else {
+            // Independent: pick a random seed ID (mock server seeds 50 records per resource)
+            const seedId = Math.floor(Math.random() * 50) + 1;
+            urlExpr = urlExpr.replace(/\{id\}/g, String(seedId));
+          }
         }
 
         // Body
@@ -1456,27 +1539,66 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
     lines.push("[ $FAIL -eq 0 ] && exit 0 || exit 1");
 
     const fileName = `capi_${modeTag}_${ts}.sh`;
+    const csvFileName = `capi_${modeTag}_${ts}_data.csv`;
+
+    // Build CSV content
+    const escCsv = (v: any): string => {
+      const s = v == null ? "" : typeof v === "object" ? JSON.stringify(v) : String(v);
+      return `"${s.replace(/"/g, '""')}"`;
+    };
+    const csvHeaders = ["seq", "runGroup", "apiTitle", "resourceName", "method", "path", "resolvedUrl", "body", "dataSource", "status", "httpStatus", "latency_ms", "res_body", "res_headers"];
+    const csvRows = cases.map((tc: TestCase) => [
+      tc.seq, tc.runGroup, tc.apiTitle, tc.resourceName, tc.method,
+      tc.path, tc.resolvedUrl ?? "", tc.body ?? "", tc.dataSource,
+      tc.status, tc.httpStatus ?? "", tc.latency ?? "",
+      tc.result ?? "", tc.headers ?? "",
+    ].map(escCsv).join(","));
+    const csvContent = [csvHeaders.join(","), ...csvRows].join("\r\n");
+
+    // Embed CSV reference comment at top of script (after the header block)
+    if (saveCsvToo) {
+      const insertIdx = lines.findIndex(l => l.startsWith("BASE_URL="));
+      if (insertIdx >= 0) {
+        lines.splice(insertIdx, 0,
+          `DATA_FILE="${csvFileName}"        # Test data CSV saved alongside this script`,
+          ""
+        );
+      }
+    }
+
     const script = lines.join("\n");
 
-    // Use File System Access API (folder picker) when available
     if ("showDirectoryPicker" in window) {
       try {
         const dirHandle = await (window as any).showDirectoryPicker({ mode: "readwrite" });
-        const fileHandle = await dirHandle.getFileHandle(fileName, { create: true });
-        const writable = await fileHandle.createWritable();
-        await writable.write(script);
-        await writable.close();
+
+        // Always write the .sh file
+        const shHandle = await dirHandle.getFileHandle(fileName, { create: true });
+        const shWritable = await shHandle.createWritable();
+        await shWritable.write(script);
+        await shWritable.close();
+
+        // Optionally write the .csv file alongside
+        if (saveCsvToo) {
+          const csvHandle = await dirHandle.getFileHandle(csvFileName, { create: true });
+          const csvWritable = await csvHandle.createWritable();
+          await csvWritable.write(csvContent);
+          await csvWritable.close();
+        }
       } catch (err: any) {
-        // User cancelled picker — silently ignore
         if (err?.name !== "AbortError") console.error("Bash save error:", err);
       }
     } else {
-      // Fallback: standard download for browsers without File System Access API
-      const blob = new Blob([script], { type: "application/x-sh" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url; a.download = fileName; a.click();
-      URL.revokeObjectURL(url);
+      // Fallback: trigger separate downloads
+      const dlBlob = (content: string, name: string, type: string) => {
+        const blob = new Blob([content], { type });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = name; a.click();
+        URL.revokeObjectURL(url);
+      };
+      dlBlob(script, fileName, "application/x-sh");
+      if (saveCsvToo) dlBlob(csvContent, csvFileName, "text/csv;charset=utf-8;");
     }
   };
 
@@ -1504,7 +1626,7 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
   render() {
     const {
       tick, pageSize, pageIndex, running, runProgress, filter, methodFilter,
-      expandReport, showModal, showMockModal, envTick, lastAppliedEnvId,
+      expandReport, showModal, showMockModal, showBashConfirm, envTick, lastAppliedEnvId,
       envAppliedKey, currentExecUrl, executionMode, flowTimeoutSec
     } = this.state;
 
@@ -1563,6 +1685,82 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
         )}
         {showModal && synthCases.length > 0 && (
           <SyntheticDataModal cases={synthCases} onClose={() => this.setState({ showModal: false })} />
+        )}
+
+        {/* ══ BASH CONFIRM MODAL ══ */}
+        {showBashConfirm && (
+          <div style={{
+            position: "fixed" as const, inset: 0, zIndex: 9999,
+            background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <div style={{
+              background: "var(--cs-surface)", border: "1.5px solid #f59e0b66",
+              borderRadius: 14, padding: "28px 32px", maxWidth: 480, width: "90%",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+            }}>
+              {/* Warning header */}
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 14, marginBottom: 18 }}>
+                <span style={{ fontSize: 28, lineHeight: 1 }}>⚠️</span>
+                <div>
+                  <div style={{ fontFamily: MONO, fontSize: 13, fontWeight: 800, color: "#f59e0b", marginBottom: 6 }}>
+                    Unresolved IDs detected
+                  </div>
+                  <div style={{ fontFamily: MONO, fontSize: 11, color: "var(--cs-muted)", lineHeight: 1.7 }}>
+                    Some test cases still contain <code style={{ color: "#f87171", background: "#f8717115", padding: "1px 5px", borderRadius: 3 }}>{"{id}"}</code> placeholders — real IDs are only available after a flow execution run.
+                  </div>
+                  <div style={{ fontFamily: MONO, fontSize: 11, color: "var(--cs-muted)", lineHeight: 1.7, marginTop: 8 }}>
+                    The script will use random seed IDs (1–50) for those calls.
+                  </div>
+                </div>
+              </div>
+
+              {/* CSV question */}
+              <div style={{
+                background: "#60a5fa0a", border: "1px solid #60a5fa33",
+                borderRadius: 8, padding: "12px 16px", marginBottom: 20,
+              }}>
+                <div style={{ fontFamily: MONO, fontSize: 12, fontWeight: 700, color: "#60a5fa", marginBottom: 4 }}>
+                  📄 Save test data CSV alongside the script?
+                </div>
+                <div style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)", lineHeight: 1.6 }}>
+                  A <strong>{`capi_..._data.csv`}</strong> file will be written to the same folder, containing all test case fields. The script will reference it via <code style={{ color: "#60a5fa" }}>$DATA_FILE</code>.
+                </div>
+              </div>
+
+              {/* YES / NO / Cancel */}
+              <div style={{ display: "flex", gap: 10 }}>
+                <button
+                  onClick={() => this.doGenerateBash(true)}
+                  style={{
+                    flex: 1, padding: "10px", borderRadius: 8, cursor: "pointer",
+                    background: "linear-gradient(135deg, #1a4a2a, #34d399)",
+                    border: "1.5px solid #34d399",
+                    color: "#0a1f15", fontFamily: MONO, fontSize: 12, fontWeight: 800,
+                  }}>
+                  ✓ YES — Save script + CSV
+                </button>
+                <button
+                  onClick={() => this.doGenerateBash(false)}
+                  style={{
+                    flex: 1, padding: "10px", borderRadius: 8, cursor: "pointer",
+                    background: "var(--cs-surface-2)", border: "1px solid var(--cs-border)",
+                    color: "var(--cs-muted)", fontFamily: MONO, fontSize: 12, fontWeight: 700,
+                  }}>
+                  ✗ NO — Script only
+                </button>
+                <button
+                  onClick={() => this.setState({ showBashConfirm: false })}
+                  style={{
+                    padding: "10px 14px", borderRadius: 8, cursor: "pointer",
+                    background: "transparent", border: "1px solid #f8717133",
+                    color: "#f87171", fontFamily: MONO, fontSize: 12, fontWeight: 700,
+                  }}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* ══ ENVIRONMENT ENDPOINT SELECTOR ══ */}
@@ -1957,23 +2155,53 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
             })}
           </div>
           <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+            {(() => {
+              const hasIds = testStore.cases.length > 0 && testStore.cases.some(tc => (tc.resolvedUrl ?? tc.path).includes("{id}"));
+              const disabled = testStore.cases.length === 0;
+              return (
+                <button
+                  onClick={this.generateBash}
+                  disabled={disabled}
+                  title={hasIds ? "⚠ Some test cases have unresolved {id} placeholders — click to review" : `Generate curl shell script for ${this.state.executionMode === "flow" ? "flow" : "independent"} execution`}
+                  style={{
+                    background: disabled ? "transparent" : hasIds ? "#f59e0b18" : "#a78bfa22",
+                    border: `1px solid ${disabled ? "#a78bfa22" : hasIds ? "#f59e0b66" : "#a78bfa44"}`,
+                    color: disabled ? "var(--cs-dim)" : hasIds ? "#f59e0b" : "var(--cs-muted)",
+                    borderRadius: 6, padding: "4px 12px", fontFamily: MONO, fontSize: 11,
+                    cursor: disabled ? "not-allowed" : "pointer",
+                    display: "flex", alignItems: "center", gap: 5, transition: "all .15s",
+                    opacity: disabled ? 0.45 : 1,
+                  }}
+                  onMouseEnter={e => { if (!disabled) { const b = e.currentTarget as HTMLButtonElement; b.style.background = hasIds ? "#f59e0b28" : "#a78bfa33"; b.style.color = hasIds ? "#f59e0b" : "#a78bfa"; } }}
+                  onMouseLeave={e => { if (!disabled) { const b = e.currentTarget as HTMLButtonElement; b.style.background = hasIds ? "#f59e0b18" : "#a78bfa22"; b.style.color = hasIds ? "#f59e0b" : "var(--cs-muted)"; } }}
+                >
+                  {hasIds && <span style={{ fontSize: 10 }}>⚠</span>}
+                  <span style={{ fontSize: 11 }}>$_</span>
+                  Generate BASH
+                </button>
+              );
+            })()}
             <button
-              onClick={this.generateBash}
+              onClick={this.saveCsv}
               disabled={testStore.cases.length === 0}
-              title={`Generate curl shell script for ${this.state.executionMode === "flow" ? "flow" : "independent"} execution`}
+              title={
+                testStore.cases.some(c => c.status !== "pending")
+                  ? "Save executed test cases with results (resolvedUrl, status, body, headers)"
+                  : "Save pending test cases as CSV"
+              }
               style={{
                 background: testStore.cases.length === 0 ? "transparent" : "#a78bfa22",
                 border: `1px solid ${testStore.cases.length === 0 ? "#a78bfa22" : "#a78bfa44"}`,
                 color: testStore.cases.length === 0 ? "var(--cs-dim)" : "var(--cs-muted)",
-                borderRadius: 6, padding: "4px 12px", fontFamily: MONO, fontSize: 11, cursor: testStore.cases.length === 0 ? "not-allowed" : "pointer",
+                borderRadius: 6, padding: "4px 12px", fontFamily: MONO, fontSize: 11,
+                cursor: testStore.cases.length === 0 ? "not-allowed" : "pointer",
                 display: "flex", alignItems: "center", gap: 5, transition: "all .15s",
                 opacity: testStore.cases.length === 0 ? 0.45 : 1,
               }}
-              onMouseEnter={e => { if (testStore.cases.length > 0) { (e.currentTarget as HTMLButtonElement).style.background = "#a78bfa33"; (e.currentTarget as HTMLButtonElement).style.color = "#a78bfa"; } }}
-              onMouseLeave={e => { if (testStore.cases.length > 0) { (e.currentTarget as HTMLButtonElement).style.background = "#a78bfa22"; (e.currentTarget as HTMLButtonElement).style.color = "var(--cs-muted)"; } }}
+              onMouseEnter={e => { if (testStore.cases.length > 0) { const b = e.currentTarget as HTMLButtonElement; b.style.background = "#a78bfa33"; b.style.color = "#a78bfa"; } }}
+              onMouseLeave={e => { if (testStore.cases.length > 0) { const b = e.currentTarget as HTMLButtonElement; b.style.background = "#a78bfa22"; b.style.color = "var(--cs-muted)"; } }}
             >
-              <span style={{ fontSize: 11 }}>$_</span>
-              Generate BASH
+              ⬇ Save CSV
             </button>
             <button
               onClick={() => this.setState(s => ({ showMockModal: !s.showMockModal }))}
@@ -2075,16 +2303,18 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
         </div>
 
         {/* ── Bottom pagination ── */}
-        {filtered.length > pageSize && (
-          <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
-            <button disabled={safePage === 0} onClick={() => this.setState({ pageIndex: safePage - 1 })} style={{ background: "transparent", border: "1px solid var(--cs-border-sub)", color: safePage === 0 ? "var(--cs-dim)" : "var(--cs-muted)", borderRadius: 6, padding: "5px 14px", fontFamily: MONO, fontSize: 12, cursor: safePage === 0 ? "not-allowed" : "pointer", opacity: safePage === 0 ? 0.4 : 1 }}>‹ Prev</button>
-            <span style={{ fontFamily: MONO, fontSize: 11, color: "var(--cs-dim)" }}>Page {safePage + 1} / {totalPages}</span>
-            <button disabled={safePage >= totalPages - 1} onClick={() => this.setState({ pageIndex: safePage + 1 })} style={{ background: "transparent", border: "1px solid var(--cs-border-sub)", color: safePage >= totalPages - 1 ? "var(--cs-dim)" : "var(--cs-muted)", borderRadius: 6, padding: "5px 14px", fontFamily: MONO, fontSize: 12, cursor: safePage >= totalPages - 1 ? "not-allowed" : "pointer", opacity: safePage >= totalPages - 1 ? 0.4 : 1 }}>Next ›</button>
-          </div>
-        )}
+        {
+          filtered.length > pageSize && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
+              <button disabled={safePage === 0} onClick={() => this.setState({ pageIndex: safePage - 1 })} style={{ background: "transparent", border: "1px solid var(--cs-border-sub)", color: safePage === 0 ? "var(--cs-dim)" : "var(--cs-muted)", borderRadius: 6, padding: "5px 14px", fontFamily: MONO, fontSize: 12, cursor: safePage === 0 ? "not-allowed" : "pointer", opacity: safePage === 0 ? 0.4 : 1 }}>‹ Prev</button>
+              <span style={{ fontFamily: MONO, fontSize: 11, color: "var(--cs-dim)" }}>Page {safePage + 1} / {totalPages}</span>
+              <button disabled={safePage >= totalPages - 1} onClick={() => this.setState({ pageIndex: safePage + 1 })} style={{ background: "transparent", border: "1px solid var(--cs-border-sub)", color: safePage >= totalPages - 1 ? "var(--cs-dim)" : "var(--cs-muted)", borderRadius: 6, padding: "5px 14px", fontFamily: MONO, fontSize: 12, cursor: safePage >= totalPages - 1 ? "not-allowed" : "pointer", opacity: safePage >= totalPages - 1 ? 0.4 : 1 }}>Next ›</button>
+            </div>
+          )
+        }
 
         <div ref={this.scrollRef} />
-      </div>
+      </div >
     );
   }
 }
