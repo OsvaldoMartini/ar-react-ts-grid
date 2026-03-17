@@ -176,6 +176,7 @@ export interface TestCase {
 export class TestCaseStore {
   private _seq = 0;
   cases: TestCase[] = [];
+  stopFlag = false;
 
   add(tc: Omit<TestCase, "id" | "seq" | "createdAt" | "status">): TestCase {
     const entry: TestCase = {
@@ -189,7 +190,7 @@ export class TestCaseStore {
     return entry;
   }
 
-  clear()   { this.cases = []; this._seq = 0; }
+  clear()   { this.cases = []; this._seq = 0; this.stopFlag = false; }
   pending() { return this.cases.filter(c => c.status === "pending"); }
   get total() { return this.cases.length; }
 }

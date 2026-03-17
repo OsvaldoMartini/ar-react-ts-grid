@@ -224,11 +224,25 @@ export class RunningTab extends React.Component<{}, RunningTabState> {
     return (
       <div style={{ display: "flex", flexDirection: "column" as const, gap: 16, padding: "20px 24px", fontFamily: MONO }}>
 
-        {/* ── Live indicator ── */}
+        {/* ── Live indicator + Stop button ── */}
         {isLive && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 8, background: "#f59e0b10", border: "1px solid #f59e0b33" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 14px", borderRadius: 8, background: "#f59e0b10", border: "1px solid #f59e0b33" }}>
             <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#f59e0b", display: "inline-block", boxShadow: "0 0 6px #f59e0b", animation: "spin 2s linear infinite" }} />
-            <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: "#f59e0b" }}>LIVE — execution in progress</span>
+            <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: "#f59e0b", flex: 1 }}>LIVE — execution in progress</span>
+            <button
+              onClick={() => { testStore.stopFlag = true; }}
+              style={{
+                background: "#f8717118", border: "1.5px solid #f87171aa",
+                color: "#f87171", borderRadius: 7, padding: "5px 16px",
+                fontFamily: MONO, fontSize: 11, fontWeight: 700,
+                cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+                transition: "all .15s",
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "#f8717130"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "#f8717118"; }}
+            >
+              ■ Stop
+            </button>
           </div>
         )}
 

@@ -1235,10 +1235,18 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void; 
     // Switch to Running tab immediately
     this.props.onExecutionStart?.();
 
+    testStore.stopFlag = false;
     this.setState({ running: true, runProgress: 0 });
     const ctx: Record<string, number> = {};
 
     for (let i = 0; i < cases.length; i++) {
+      // Honour stop request
+      if (testStore.stopFlag) {
+        // Mark remaining running cases back to pending
+        cases.slice(i).forEach(tc => { if (tc.status === "running" || tc.status === "pending") tc.status = "pending"; });
+        break;
+      }
+
       const tc = cases[i];
       tc.status = "running";
       this.setState({ currentExecUrl: tc.resolvedUrl || tc.path });
@@ -1294,6 +1302,7 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void; 
     }
 
     this.setState({ running: false, currentExecUrl: null });
+    testStore.stopFlag = false;
   };
 
   private saveCsv = () => {
