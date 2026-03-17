@@ -127,7 +127,7 @@ export default class App extends React.Component<CapiProps, AppState> {
               className="capi-btn-wizard"
               onClick={() => this.setState({ showWizard: true })}
             >
-              🧪 WIZARD
+              🧪 Generate Rapid Tests
             </button>
             <div className="capi-api-count">● {specs.length} API</div>
             {rightControls}

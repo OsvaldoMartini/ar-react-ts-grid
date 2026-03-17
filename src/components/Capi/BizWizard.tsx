@@ -413,6 +413,7 @@ interface BizWizardState {
   execLog: ExecEntry[];
   execResults: ExecEntry[];
   running: boolean;
+  stopFlag: boolean;
   // Execution mode
   execMode: "flow" | "independent";
   flowTimeout: number;          // seconds — only used in flow mode
@@ -429,7 +430,7 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
   state: BizWizardState = {
     wizMode: null, wizStep: "home",
     selSpecNames: [], dynPlan: [], testCount: 1, synthPreviews: [],
-    execLog: [], execResults: [], running: false,
+    execLog: [], execResults: [], running: false, stopFlag: false,
     execMode: "flow", flowTimeout: 15,
     flowPage: 0, flowPageSize: 10, chainExpanded: false, chainPage: 0,
     apiSelectPage: 0, apiSelectPageSize: 10,
@@ -479,7 +480,7 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
     const { selSpecNames } = this.state;
     const selected = loadedSpecs.filter(s => selSpecNames.includes(s.fileName));
 
-    this.setState({ wizStep: "running", running: true, execLog: [], execResults: [] });
+    this.setState({ wizStep: "running", running: true, execLog: [], execResults: [], stopFlag: false });
     const results: ExecEntry[] = [];
     // context is only populated/used in flow mode — in independent mode it stays empty
     const context: Record<string, number> = {};
@@ -487,8 +488,10 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
 
     const runCount = Math.min(testCount, 5);
 
+    outer:
     for (let run = 0; run < runCount; run++) {
       for (const step of dynPlan) {
+        if (this.state.stopFlag) break outer;
         stepNum++;
         const label = run > 0 ? `[Run ${run + 1}] ${step.summary}` : step.summary;
         this.setState(s => ({
@@ -564,13 +567,13 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
       }
     }
 
-    this.setState({ execResults: results, running: false, wizStep: "report" });
+    this.setState({ execResults: results, running: false, wizStep: "report", stopFlag: false });
   };
 
   private reset = () =>
     this.setState({
       wizMode: null, wizStep: "home", selSpecNames: [], dynPlan: [],
-      testCount: 1, execResults: [], execLog: [],
+      testCount: 1, execResults: [], execLog: [], stopFlag: false,
     });
 
   // ═══════════════════════════════════════════════════════════════
@@ -580,7 +583,7 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
     const { onClose, loadedSpecs } = this.props;
     const {
       wizMode, wizStep, selSpecNames, dynPlan, testCount, synthPreviews,
-      execLog, execResults,
+      execLog, execResults, stopFlag,
     } = this.state;
 
     const totalOk = execResults.filter(r => r.ok).length;
@@ -601,7 +604,7 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
           <div className="capi-wizard__header">
             <span className="capi-wizard__header-icon">🧪</span>
             <div className="capi-wizard__titles">
-              <div className="capi-wizard__title">Business Case Wizard</div>
+              <div className="capi-wizard__title">Generate Tests Wizard</div>
               <div className="capi-wizard__subtitle">
                 {wizStep === "home" ? "Select a test case"
                   : "Data Synthetic Generator"}
@@ -868,6 +871,51 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
                     })}
                   </div>
 
+                  {/* ── Bottom pagination mirror ── */}
+                  {(() => {
+                    const { apiSelectPage, apiSelectPageSize } = this.state;
+                    const total = loadedSpecs.length;
+                    const totalPages = Math.ceil(total / apiSelectPageSize);
+                    if (totalPages <= 1) return null;
+                    const pageStart = apiSelectPage * apiSelectPageSize;
+                    return (
+                      <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 8, flexWrap: "wrap" as const }}>
+                        <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)" }}>per page</span>
+                        {[10, 20, 50, 100].map(n => (
+                          <button key={n} onClick={() => this.setState({ apiSelectPageSize: n, apiSelectPage: 0 })} style={{
+                            background: apiSelectPageSize === n ? "#34d39918" : "var(--cs-surface-2)",
+                            border: `1px solid ${apiSelectPageSize === n ? "#34d399" : "var(--cs-border)"}`,
+                            color: apiSelectPageSize === n ? "#34d399" : "var(--cs-muted)",
+                            borderRadius: 4, padding: "1px 6px", fontFamily: MONO, fontSize: 9,
+                            cursor: "pointer", fontWeight: apiSelectPageSize === n ? 700 : 400,
+                          }}>{n}</button>
+                        ))}
+                        <button onClick={() => this.setState({ apiSelectPage: apiSelectPage - 1 })} disabled={apiSelectPage === 0}
+                          style={{ background: "var(--cs-surface-2)", border: "1px solid var(--cs-border)", color: "var(--cs-muted)", borderRadius: 4, padding: "1px 7px", fontFamily: MONO, fontSize: 11, cursor: apiSelectPage === 0 ? "default" : "pointer", opacity: apiSelectPage === 0 ? 0.4 : 1 }}>‹</button>
+                        {Array.from({ length: totalPages }, (_, pi) => {
+                          const near = pi === 0 || pi === totalPages - 1 || Math.abs(pi - apiSelectPage) <= 1;
+                          if (!near) return pi === 1 || pi === totalPages - 2
+                            ? <span key={pi} style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)" }}>…</span>
+                            : null;
+                          return (
+                            <button key={pi} onClick={() => this.setState({ apiSelectPage: pi })} style={{
+                              background: pi === apiSelectPage ? "#34d399" : "var(--cs-surface-2)",
+                              border: `1px solid ${pi === apiSelectPage ? "#34d399" : "var(--cs-border)"}`,
+                              color: pi === apiSelectPage ? "#0a1f15" : "var(--cs-muted)",
+                              borderRadius: 4, padding: "1px 6px", fontFamily: MONO, fontSize: 9,
+                              cursor: "pointer", fontWeight: pi === apiSelectPage ? 700 : 400, minWidth: 24,
+                            }}>{pi + 1}</button>
+                          );
+                        })}
+                        <button onClick={() => this.setState({ apiSelectPage: apiSelectPage + 1 })} disabled={apiSelectPage === totalPages - 1}
+                          style={{ background: "var(--cs-surface-2)", border: "1px solid var(--cs-border)", color: "var(--cs-muted)", borderRadius: 4, padding: "1px 7px", fontFamily: MONO, fontSize: 11, cursor: apiSelectPage === totalPages - 1 ? "default" : "pointer", opacity: apiSelectPage === totalPages - 1 ? 0.4 : 1 }}>›</button>
+                        <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)", whiteSpace: "nowrap" as const }}>
+                          {pageStart + 1}–{Math.min(pageStart + apiSelectPageSize, total)} of {total}
+                        </span>
+                      </div>
+                    );
+                  })()}
+
                   {/* Dependency preview */}
                   {selSpecNames.length > 1 && (() => {
                     const sel = loadedSpecs.filter(s => selSpecNames.includes(s.fileName));
@@ -973,48 +1021,6 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
                     </div>
                   </div>
                 </div>
-
-                {/* Per-spec field breakdown */}
-                {selectedSpecs.map(spec => {
-                  const pathParamSet = new Set(spec.pathParams || []);
-                  const inFields = spec.fields.filter(f =>
-                    !f.readOnly && !(pathParamSet.has(f.name)) && !f.isParam
-                  );
-                  const outFields = spec.fields.filter(f => f.readOnly);
-                  if (inFields.length === 0) return null;
-                  return (
-                    <div key={spec.fileName}>
-                      <SLabel>{spec.title} — {inFields.length} input fields</SLabel>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 8 }}>
-                        {inFields.slice(0, 12).map(f => (
-                          <span key={f.name} style={{
-                            background: f.writeOnly ? "#60a5fa15" : "#34d39912",
-                            border: `1px solid ${f.writeOnly ? "#60a5fa33" : "#34d39930"}`,
-                            color: f.writeOnly ? "#60a5fa" : "#34d399",
-                            borderRadius: 5, padding: "2px 8px",
-                            fontFamily: MONO, fontSize: 10, fontWeight: 600,
-                          }}>
-                            {f.name}
-                            <span style={{ opacity: 0.6, marginLeft: 4, fontSize: 9 }}>{f.type}</span>
-                          </span>
-                        ))}
-                        {inFields.length > 12 && (
-                          <span style={{
-                            fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)",
-                            padding: "2px 8px", alignSelf: "center"
-                          }}>
-                            +{inFields.length - 12} more
-                          </span>
-                        )}
-                      </div>
-                      {outFields.length > 0 && (
-                        <div style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)", opacity: 0.6 }}>
-                          {outFields.length} OUT fields skipped (readOnly — server-generated)
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
 
                 {/* Synth preview table */}
                 {synthPreviews.length > 0 && Object.keys(synthPreviews[0]).length > 0 && (
@@ -1296,69 +1302,37 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
                         })}
                       </div>
 
-                      {/* Pagination bar */}
+                      {/* Pagination bar — bottom (page-size + nav) */}
                       {totalPages > 1 && (
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, marginTop: 10 }}>
-                          <button
-                            onClick={() => this.setState({ flowPage: 0 })}
-                            disabled={flowPage === 0}
-                            style={{
-                              background: "transparent", border: "1px solid var(--cs-border)",
-                              color: flowPage === 0 ? "var(--cs-dim)" : "var(--cs-muted)",
-                              borderRadius: 5, padding: "3px 7px", fontFamily: MONO, fontSize: 10,
-                              cursor: flowPage === 0 ? "default" : "pointer", opacity: flowPage === 0 ? 0.4 : 1,
-                            }}>«</button>
-                          <button
-                            onClick={() => this.setState({ flowPage: flowPage - 1 })}
-                            disabled={flowPage === 0}
-                            style={{
-                              background: "transparent", border: "1px solid var(--cs-border)",
-                              color: flowPage === 0 ? "var(--cs-dim)" : "var(--cs-muted)",
-                              borderRadius: 5, padding: "3px 9px", fontFamily: MONO, fontSize: 10,
-                              cursor: flowPage === 0 ? "default" : "pointer", opacity: flowPage === 0 ? 0.4 : 1,
-                            }}>‹ Prev</button>
-
-                          {Array.from({ length: totalPages }, (_, pi) => {
-                            const near = pi === 0 || pi === totalPages - 1 || Math.abs(pi - flowPage) <= 1;
-                            if (!near) {
-                              if (pi === 1 || pi === totalPages - 2) return (
-                                <span key={pi} style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)", padding: "0 2px" }}>…</span>
-                              );
-                              return null;
-                            }
-                            return (
-                              <button key={pi} onClick={() => this.setState({ flowPage: pi })} style={{
-                                background: pi === flowPage ? "#34d399" : "var(--cs-surface-2)",
-                                border: `1px solid ${pi === flowPage ? "#34d399" : "var(--cs-border)"}`,
-                                color: pi === flowPage ? "#0a1f15" : "var(--cs-muted)",
-                                borderRadius: 5, padding: "3px 8px", fontFamily: MONO, fontSize: 10,
-                                cursor: "pointer", fontWeight: pi === flowPage ? 700 : 400, minWidth: 28,
-                              }}>{pi + 1}</button>
-                            );
-                          })}
-
-                          <button
-                            onClick={() => this.setState({ flowPage: flowPage + 1 })}
-                            disabled={flowPage === totalPages - 1}
-                            style={{
-                              background: "transparent", border: "1px solid var(--cs-border)",
-                              color: flowPage === totalPages - 1 ? "var(--cs-dim)" : "var(--cs-muted)",
-                              borderRadius: 5, padding: "3px 9px", fontFamily: MONO, fontSize: 10,
-                              cursor: flowPage === totalPages - 1 ? "default" : "pointer",
-                              opacity: flowPage === totalPages - 1 ? 0.4 : 1,
-                            }}>Next ›</button>
-                          <button
-                            onClick={() => this.setState({ flowPage: totalPages - 1 })}
-                            disabled={flowPage === totalPages - 1}
-                            style={{
-                              background: "transparent", border: "1px solid var(--cs-border)",
-                              color: flowPage === totalPages - 1 ? "var(--cs-dim)" : "var(--cs-muted)",
-                              borderRadius: 5, padding: "3px 7px", fontFamily: MONO, fontSize: 10,
-                              cursor: flowPage === totalPages - 1 ? "default" : "pointer",
-                              opacity: flowPage === totalPages - 1 ? 0.4 : 1,
-                            }}>»</button>
-
-                          <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)", marginLeft: 6 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 10, flexWrap: "wrap" as const }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                            <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)", marginRight: 2 }}>per page</span>
+                            {PAGE_SIZES.map(n => (
+                              <button key={n} onClick={() => this.setState({ flowPageSize: n, flowPage: 0 })} style={{
+                                background: flowPageSize === n ? "#34d39918" : "var(--cs-surface-2)",
+                                border: `1px solid ${flowPageSize === n ? "#34d399" : "var(--cs-border)"}`,
+                                color: flowPageSize === n ? "#34d399" : "var(--cs-muted)",
+                                borderRadius: 5, padding: "2px 7px", fontFamily: MONO, fontSize: 10,
+                                cursor: "pointer", fontWeight: flowPageSize === n ? 700 : 400,
+                              }}>{n}</button>
+                            ))}
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: "auto" }}>
+                            <button onClick={() => this.setState({ flowPage: 0 })} disabled={flowPage === 0}
+                              style={{ background: "transparent", border: "1px solid var(--cs-border)", color: flowPage === 0 ? "var(--cs-dim)" : "var(--cs-muted)", borderRadius: 5, padding: "3px 7px", fontFamily: MONO, fontSize: 10, cursor: flowPage === 0 ? "default" : "pointer", opacity: flowPage === 0 ? 0.4 : 1 }}>«</button>
+                            <button onClick={() => this.setState({ flowPage: flowPage - 1 })} disabled={flowPage === 0}
+                              style={{ background: "transparent", border: "1px solid var(--cs-border)", color: flowPage === 0 ? "var(--cs-dim)" : "var(--cs-muted)", borderRadius: 5, padding: "3px 9px", fontFamily: MONO, fontSize: 10, cursor: flowPage === 0 ? "default" : "pointer", opacity: flowPage === 0 ? 0.4 : 1 }}>‹ Prev</button>
+                            {Array.from({ length: totalPages }, (_, pi) => {
+                              const near = pi === 0 || pi === totalPages - 1 || Math.abs(pi - flowPage) <= 1;
+                              if (!near) return (pi === 1 || pi === totalPages - 2) ? <span key={pi} style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)" }}>…</span> : null;
+                              return <button key={pi} onClick={() => this.setState({ flowPage: pi })} style={{ background: pi === flowPage ? "#34d399" : "var(--cs-surface-2)", border: `1px solid ${pi === flowPage ? "#34d399" : "var(--cs-border)"}`, color: pi === flowPage ? "#0a1f15" : "var(--cs-muted)", borderRadius: 5, padding: "3px 8px", fontFamily: MONO, fontSize: 10, cursor: "pointer", fontWeight: pi === flowPage ? 700 : 400, minWidth: 28 }}>{pi + 1}</button>;
+                            })}
+                            <button onClick={() => this.setState({ flowPage: flowPage + 1 })} disabled={flowPage === totalPages - 1}
+                              style={{ background: "transparent", border: "1px solid var(--cs-border)", color: flowPage === totalPages - 1 ? "var(--cs-dim)" : "var(--cs-muted)", borderRadius: 5, padding: "3px 9px", fontFamily: MONO, fontSize: 10, cursor: flowPage === totalPages - 1 ? "default" : "pointer", opacity: flowPage === totalPages - 1 ? 0.4 : 1 }}>Next ›</button>
+                            <button onClick={() => this.setState({ flowPage: totalPages - 1 })} disabled={flowPage === totalPages - 1}
+                              style={{ background: "transparent", border: "1px solid var(--cs-border)", color: flowPage === totalPages - 1 ? "var(--cs-dim)" : "var(--cs-muted)", borderRadius: 5, padding: "3px 7px", fontFamily: MONO, fontSize: 10, cursor: flowPage === totalPages - 1 ? "default" : "pointer", opacity: flowPage === totalPages - 1 ? 0.4 : 1 }}>»</button>
+                          </div>
+                          <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)" }}>
                             {pageStart + 1}–{Math.min(pageStart + flowPageSize, dynPlan.length)} of {dynPlan.length}
                           </span>
                         </div>
@@ -1467,6 +1441,41 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
             ══════════════════════════════════════════ */}
             {wizStep === "running" && (
               <div>
+                {/* ── LIVE strip + Stop ── */}
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 10,
+                  padding: "9px 14px", borderRadius: 8, marginBottom: 12,
+                  background: "#f59e0b10", border: "1px solid #f59e0b33",
+                  position: "sticky", top: 0, zIndex: 10,
+                }}>
+                  <span style={{
+                    width: 8, height: 8, borderRadius: "50%",
+                    background: "#f59e0b", display: "inline-block",
+                    boxShadow: "0 0 6px #f59e0b",
+                  }} />
+                  <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: "#f59e0b", flex: 1 }}>
+                    LIVE — execution in progress
+                  </span>
+                  <button
+                    onClick={() => this.setState({ stopFlag: true })}
+                    disabled={stopFlag}
+                    style={{
+                      background: stopFlag ? "var(--cs-surface-2)" : "#f8717118",
+                      border: `1.5px solid ${stopFlag ? "var(--cs-border)" : "#f87171aa"}`,
+                      color: stopFlag ? "var(--cs-dim)" : "#f87171",
+                      borderRadius: 7, padding: "5px 16px",
+                      fontFamily: MONO, fontSize: 11, fontWeight: 700,
+                      cursor: stopFlag ? "not-allowed" : "pointer",
+                      display: "flex", alignItems: "center", gap: 6,
+                      transition: "all .15s",
+                    }}
+                    onMouseEnter={e => { if (!stopFlag) (e.currentTarget as HTMLButtonElement).style.background = "#f8717130"; }}
+                    onMouseLeave={e => { if (!stopFlag) (e.currentTarget as HTMLButtonElement).style.background = "#f8717118"; }}
+                  >
+                    {stopFlag ? "⏹ Stopping…" : "■ Stop"}
+                  </button>
+                </div>
+
                 <div className="capi-wizard-running-header">
                   <div className="capi-wizard-running-icon">⚙️</div>
                   <div className="capi-wizard-running-title">
