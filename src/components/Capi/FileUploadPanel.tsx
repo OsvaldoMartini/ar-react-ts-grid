@@ -18,6 +18,7 @@ interface FileUploadPanelState {
   results: { ok: boolean; spec: ApiSpec }[];
   expanded: number | null;
   showDeps: boolean;
+  showParseResults: boolean;
   apiPage: number;
   apiPageSize: number;
   openSections: Set<string>; // keys like "3-fields", "3-deps"
@@ -29,7 +30,7 @@ const ACCEPTED_EXTS = [".yaml", ".yml", ".json", ".schema", ".shape", ".proto", 
 
 export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileUploadPanelState> {
   state: FileUploadPanelState = {
-    drag: false, parsing: false, results: [], expanded: null, showDeps: false,
+    drag: false, parsing: false, results: [], expanded: null, showDeps: false, showParseResults: false,
     apiPage: 0, apiPageSize: 10,
     openSections: new Set<string>(),
     openUris: new Set<string>(),
@@ -96,7 +97,7 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
 
   render() {
     const { loadedSpecs, onDeleteAll } = this.props;
-    const { drag, parsing, results, expanded, showDeps, apiPage, apiPageSize, openSections, openUris, apiSearch } = this.state;
+    const { drag, parsing, results, expanded, showDeps, showParseResults, apiPage, apiPageSize, openSections, openUris, apiSearch } = this.state;
 
     // Search filter — applied before pagination
     const searchTerm = apiSearch.trim().toLowerCase();
@@ -432,36 +433,12 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
           </div>
         )}
 
-        {/* Parse status */}
+        {/* Parse status spinner */}
         {parsing && (
           <div className="capi-upload__parsing">⚙ Parsing in corso...</div>
         )}
-        {results.length > 0 && (
-          <div className="capi-upload__results">
-            {results.slice(-4).map((r, i) => (
-              <div
-                key={i}
-                className={`capi-upload__result capi-upload__result--${r.ok ? "ok" : "err"}`}
-              >
-                {r.ok ? (
-                  <>
-                    <b>{r.spec.title}</b>
-                    {" · "}{r.spec.ext.toUpperCase()}
-                    {" · "}{r.spec.endpoints.length} endpoints
-                    {r.spec.fields.length > 0 && ` · ${r.spec.fields.length} fields`}
-                    {r.spec.dependencies.length > 0 && ` · ${r.spec.dependencies.length} deps`}
-                    {db.get(r.spec.resourceName || "").length > 0 &&
-                      ` · ${db.get(r.spec.resourceName || "").length} records seeded`}
-                  </>
-                ) : (
-                  <>✗ {r.spec.fileName}: {r.spec.parseError}</>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
 
-        {/* Dependency graph — moved below API list */}
+        {/* Dependency graph — below API list */}
         {loadedSpecs.length > 1 && (
           <div className="capi-deps">
             <button
@@ -496,6 +473,43 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
                     </div>
                   );
                 })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Parse results log — collapsed by default, shown after Grafo */}
+        {results.length > 0 && (
+          <div className="capi-deps">
+            <button
+              className="capi-deps__toggle"
+              onClick={() => this.setState(s => ({ showParseResults: !s.showParseResults }))}
+            >
+              {showParseResults ? "▲" : "▼"} Log Caricamento API ({results.filter(r => r.ok).length} ok
+              {results.filter(r => !r.ok).length > 0 && `, ${results.filter(r => !r.ok).length} errori`})
+            </button>
+            {showParseResults && (
+              <div className="capi-upload__results">
+                {results.slice(-4).map((r, i) => (
+                  <div
+                    key={i}
+                    className={`capi-upload__result capi-upload__result--${r.ok ? "ok" : "err"}`}
+                  >
+                    {r.ok ? (
+                      <>
+                        <b>{r.spec.title}</b>
+                        {" · "}{r.spec.ext.toUpperCase()}
+                        {" · "}{r.spec.endpoints.length} endpoints
+                        {r.spec.fields.length > 0 && ` · ${r.spec.fields.length} fields`}
+                        {r.spec.dependencies.length > 0 && ` · ${r.spec.dependencies.length} deps`}
+                        {db.get(r.spec.resourceName || "").length > 0 &&
+                          ` · ${db.get(r.spec.resourceName || "").length} records seeded`}
+                      </>
+                    ) : (
+                      <>✗ {r.spec.fileName}: {r.spec.parseError}</>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </div>
