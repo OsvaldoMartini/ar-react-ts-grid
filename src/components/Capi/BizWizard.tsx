@@ -414,6 +414,8 @@ interface BizWizardState {
   execResults: ExecEntry[];
   running: boolean;
   stopFlag: boolean;
+  execLogPage: number;
+  execLogPageSize: number;
   // Execution mode
   execMode: "flow" | "independent";
   flowTimeout: number;          // seconds — only used in flow mode
@@ -431,6 +433,7 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
     wizMode: null, wizStep: "home",
     selSpecNames: [], dynPlan: [], testCount: 1, synthPreviews: [],
     execLog: [], execResults: [], running: false, stopFlag: false,
+    execLogPage: 0, execLogPageSize: 10,
     execMode: "flow", flowTimeout: 15,
     flowPage: 0, flowPageSize: 10, chainExpanded: false, chainPage: 0,
     apiSelectPage: 0, apiSelectPageSize: 10,
@@ -480,7 +483,7 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
     const { selSpecNames } = this.state;
     const selected = loadedSpecs.filter(s => selSpecNames.includes(s.fileName));
 
-    this.setState({ wizStep: "running", running: true, execLog: [], execResults: [], stopFlag: false });
+    this.setState({ wizStep: "running", running: true, execLog: [], execResults: [], stopFlag: false, execLogPage: 0 });
     const results: ExecEntry[] = [];
     // context is only populated/used in flow mode — in independent mode it stays empty
     const context: Record<string, number> = {};
@@ -583,7 +586,7 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
     const { onClose, loadedSpecs } = this.props;
     const {
       wizMode, wizStep, selSpecNames, dynPlan, testCount, synthPreviews,
-      execLog, execResults, stopFlag,
+      execLog, execResults, stopFlag, execLogPage, execLogPageSize,
     } = this.state;
 
     const totalOk = execResults.filter(r => r.ok).length;
@@ -1487,21 +1490,94 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
                     </div>
                   )}
                 </div>
-                <div className="capi-wizard-steps">
-                  {execLog.map((e: ExecEntry, i: number) => {
-                    const isRun = e.status === "running";
-                    const cls = isRun ? "running" : e.ok ? "ok" : "fail";
-                    return (
-                      <div key={i} className={`capi-wizard-step capi-wizard-step--${cls}`}>
-                        <span className="capi-wizard-step__num">{e.step}</span>
-                        <span className="capi-wizard-step__icon">{isRun ? "⏳" : e.ok ? "✅" : "❌"}</span>
-                        <span className="capi-wizard-step__label">{e.label}</span>
-                        {!isRun && (<><StatusBadge status={e.status} /><span className="capi-wizard-step__lat">{e.latency}ms</span></>)}
+                {/* ── Exec log — paginated ── */}
+                {(() => {
+                  const LOG_SIZES = [10, 20, 50, 100, 500];
+                  const logTotal = execLog.length;
+                  const logPages = Math.max(1, Math.ceil(logTotal / execLogPageSize));
+                  const safePage = Math.min(execLogPage, logPages - 1);
+                  const logStart = safePage * execLogPageSize;
+                  const logEnd = Math.min(logStart + execLogPageSize, logTotal);
+                  const pageSlice = execLog.slice(logStart, logEnd);
+
+                  const lastPage = logPages - 1;
+                  // Auto-advance to last page while running so new entries stay visible
+                  if (this.state.running && safePage < lastPage) {
+                    setTimeout(() => this.setState({ execLogPage: lastPage }), 0);
+                  }
+
+                  const btnS: React.CSSProperties = {
+                    background: "transparent", border: "1px solid var(--cs-border)",
+                    color: "var(--cs-muted)", borderRadius: 5, fontFamily: MONO,
+                    fontSize: 10, cursor: "pointer",
+                  };
+                  const dis: React.CSSProperties = { opacity: 0.4, cursor: "not-allowed" };
+
+                  const PageBar = () => logPages <= 1 ? null : (
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" as const }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                        <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)" }}>per page</span>
+                        {LOG_SIZES.map(n => (
+                          <button key={n} onClick={() => this.setState({ execLogPageSize: n, execLogPage: 0 })} style={{
+                            background: execLogPageSize === n ? "#34d39918" : "var(--cs-surface-2)",
+                            border: `1px solid ${execLogPageSize === n ? "#34d399" : "var(--cs-border)"}`,
+                            color: execLogPageSize === n ? "#34d399" : "var(--cs-muted)",
+                            borderRadius: 5, padding: "2px 7px", fontFamily: MONO, fontSize: 10,
+                            cursor: "pointer", fontWeight: execLogPageSize === n ? 700 : 400,
+                          }}>{n}</button>
+                        ))}
                       </div>
-                    );
-                  })}
-                  <div ref={this.logRef} />
-                </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: "auto" }}>
+                        <button onClick={() => this.setState({ execLogPage: 0 })} disabled={safePage === 0}
+                          style={{ ...btnS, padding: "2px 7px", ...(safePage === 0 ? dis : {}) }}>«</button>
+                        <button onClick={() => this.setState({ execLogPage: safePage - 1 })} disabled={safePage === 0}
+                          style={{ ...btnS, padding: "2px 9px", ...(safePage === 0 ? dis : {}) }}>‹ Prev</button>
+                        {Array.from({ length: logPages }, (_, pi) => {
+                          const near = pi === 0 || pi === logPages - 1 || Math.abs(pi - safePage) <= 1;
+                          if (!near) return (pi === 1 || pi === logPages - 2) ? <span key={pi} style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)" }}>…</span> : null;
+                          return (
+                            <button key={pi} onClick={() => this.setState({ execLogPage: pi })} style={{
+                              background: pi === safePage ? "#34d399" : "var(--cs-surface-2)",
+                              border: `1px solid ${pi === safePage ? "#34d399" : "var(--cs-border)"}`,
+                              color: pi === safePage ? "#0a1f15" : "var(--cs-muted)",
+                              borderRadius: 5, padding: "2px 7px", fontFamily: MONO, fontSize: 10,
+                              cursor: "pointer", fontWeight: pi === safePage ? 700 : 400, minWidth: 26,
+                            }}>{pi + 1}</button>
+                          );
+                        })}
+                        <button onClick={() => this.setState({ execLogPage: safePage + 1 })} disabled={safePage >= logPages - 1}
+                          style={{ ...btnS, padding: "2px 9px", ...(safePage >= logPages - 1 ? dis : {}) }}>Next ›</button>
+                        <button onClick={() => this.setState({ execLogPage: logPages - 1 })} disabled={safePage >= logPages - 1}
+                          style={{ ...btnS, padding: "2px 7px", ...(safePage >= logPages - 1 ? dis : {}) }}>»</button>
+                      </div>
+                      <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)" }}>
+                        {logStart + 1}–{logEnd} of {logTotal}
+                      </span>
+                    </div>
+                  );
+
+                  return (
+                    <div>
+                      <PageBar />
+                      <div className="capi-wizard-steps" style={{ marginTop: logPages > 1 ? 8 : 0 }}>
+                        {pageSlice.map((e: ExecEntry, i: number) => {
+                          const isRun = e.status === "running";
+                          const cls = isRun ? "running" : e.ok ? "ok" : "fail";
+                          return (
+                            <div key={logStart + i} className={`capi-wizard-step capi-wizard-step--${cls}`}>
+                              <span className="capi-wizard-step__num">{e.step}</span>
+                              <span className="capi-wizard-step__icon">{isRun ? "⏳" : e.ok ? "✅" : "❌"}</span>
+                              <span className="capi-wizard-step__label">{e.label}</span>
+                              {!isRun && (<><StatusBadge status={e.status} /><span className="capi-wizard-step__lat">{e.latency}ms</span></>)}
+                            </div>
+                          );
+                        })}
+                        <div ref={this.logRef} />
+                      </div>
+                      {logPages > 1 && <div style={{ marginTop: 8 }}><PageBar /></div>}
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
