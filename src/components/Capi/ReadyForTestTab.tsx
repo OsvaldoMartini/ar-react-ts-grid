@@ -2355,8 +2355,6 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void; 
 
           {/* RIGHT: action buttons — left-aligned */}
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            {/* divider */}
-            <span style={{ width: 1, height: 16, background: "var(--cs-border-sub)", display: "inline-block", marginRight: 2 }} />
             {(() => {
               const hasIds = testStore.cases.length > 0 && testStore.cases.some(tc => (tc.resolvedUrl ?? tc.path).includes("{id}"));
               const disabled = testStore.cases.length === 0;
