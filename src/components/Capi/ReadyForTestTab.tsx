@@ -1182,7 +1182,7 @@ interface RftState {
   flowTimeoutSec: number;
 }
 
-export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }, RftState> {
+export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void; onExecutionStart?: () => void }, RftState> {
   state: RftState = {
     tick: 0, pageSize: 10, pageIndex: 0, running: false,
     runProgress: 0, filter: "all", methodFilter: "ALL",
@@ -1231,6 +1231,9 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
     const { executionMode } = this.state;
     const isFlow = executionMode === "flow";
     const timeoutMs = this.getSafeFlowTimeoutSec() * 1000;
+
+    // Switch to Running tab immediately
+    this.props.onExecutionStart?.();
 
     this.setState({ running: true, runProgress: 0 });
     const ctx: Record<string, number> = {};

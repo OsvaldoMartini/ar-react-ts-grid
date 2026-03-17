@@ -1,7 +1,7 @@
 import React from "react";
 import { db, rest, SYNTH, ApiSpec } from "./utils";
 import { FileUploadPanel } from "./FileUploadPanel";
-import { DebugTab, LogEntry } from "./DebugTab";
+import { RunningTab } from "./RunningTab";
 import { StoreTab } from "./StoreTab";
 import { BizWizard } from "./BizWizard";
 import { ApiWorkflowTab, DataGenTab } from "./ApiWorkflowTab";
@@ -26,7 +26,6 @@ export interface CapiProps {
 interface AppState {
   tab: "apis" | "workflow" | "datagen" | "ready" | "running" | "report";
   specs: ApiSpec[];
-  log: LogEntry[];
   loading: boolean;
   showWizard: boolean;
   tick: number;
@@ -44,7 +43,6 @@ export default class App extends React.Component<CapiProps, AppState> {
     this.state = {
       tab: "apis",
       specs: [],
-      log: [],
       loading: false,
       showWizard: false,
       tick: 0,
@@ -76,10 +74,6 @@ export default class App extends React.Component<CapiProps, AppState> {
     }
   }
 
-  private addLog = (entry: Omit<LogEntry, "ts">) => {
-    this.setState(s => ({ log: [...s.log, { ...entry, ts: new Date().toISOString() }] }));
-  };
-
   private onSpecLoaded = (spec: ApiSpec) => {
     this.setState(prev => ({ specs: [...db.specs], tick: prev.tick + 1 }));
   };
@@ -87,12 +81,12 @@ export default class App extends React.Component<CapiProps, AppState> {
   private onDeleteAll = () => {
     db.specs = [];
     db.stores = {};
-    this.setState({ specs: [], log: [], tick: 0 });
+    this.setState({ specs: [], tick: 0 });
   };
 
   render() {
     const {
-      tab, specs, log, showWizard,
+      tab, specs, showWizard,
       homeBankingId, homeBankName, socketPortLive, botJobId, botJobName,
     } = this.state;
     const { rightControls } = this.props;
@@ -103,7 +97,7 @@ export default class App extends React.Component<CapiProps, AppState> {
       { id: "workflow", l: `⬡ Workflow`, stepLabel: "Workflow" },
       { id: "datagen", l: `⚗ Data Generator`, stepLabel: "Data Generator" },
       { id: "ready", l: `🧪 Ready for Test${queuedCount > 0 ? ` (${queuedCount.toLocaleString()})` : ""}`, stepLabel: "Ready for Test" },
-      { id: "running", l: `🔍 Running${log.length > 0 ? ` (${log.length})` : ""}`, stepLabel: "Running" },
+      { id: "running", l: `🔍 Running`, stepLabel: "Running" },
       { id: "report", l: `🗄️ Report (${tot})`, stepLabel: "Report" },
     ] as const;
     const activeTabIndex = TABS.findIndex(t => t.id === tab);
@@ -203,14 +197,14 @@ export default class App extends React.Component<CapiProps, AppState> {
             <div className="capi-scroll" style={{ padding: "24px 28px" }}>
               <ReadyForTestTab
                 onClearAll={() => this.setState(s => ({ tick: s.tick + 1 }))}
+                onExecutionStart={() => this.setState({ tab: "running" })}
               />
             </div>
           )}
           {tab === "running" && (
-            <DebugTab
-              log={log}
-              onClear={() => this.setState({ log: [] })}
-            />
+            <div className="capi-scroll">
+              <RunningTab />
+            </div>
           )}
           {tab === "report" && (
             <StoreTab
