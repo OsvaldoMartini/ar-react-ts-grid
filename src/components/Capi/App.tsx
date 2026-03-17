@@ -6,6 +6,7 @@ import { StoreTab } from "./StoreTab";
 import { BizWizard } from "./BizWizard";
 import { ApiWorkflowTab, DataGenTab } from "./ApiWorkflowTab";
 import { ReadyForTestTab } from "./ReadyForTestTab";
+import { AIAssistantTab } from "./AIAssistantTab";
 import { testStore } from "./utils";
 import "./capi-app.scss";
 
@@ -24,7 +25,7 @@ export interface CapiProps {
 }
 
 interface AppState {
-  tab: "apis" | "workflow" | "datagen" | "ready" | "running" | "report";
+  tab: "apis" | "workflow" | "datagen" | "ai" | "ready" | "running" | "report";
   specs: ApiSpec[];
   loading: boolean;
   showWizard: boolean;
@@ -96,6 +97,7 @@ export default class App extends React.Component<CapiProps, AppState> {
       { id: "apis", l: `📁 API Files (${specs.length})`, stepLabel: "API Files" },
       { id: "workflow", l: `⬡ Workflow`, stepLabel: "Workflow" },
       { id: "datagen", l: `⚗ Data Generator`, stepLabel: "Data Generator" },
+      { id: "ai", l: `🤖 AI Assistant`, stepLabel: "AI Assistant" },
       { id: "ready", l: `🧪 Ready for Test${queuedCount > 0 ? ` (${queuedCount.toLocaleString()})` : ""}`, stepLabel: "Ready for Test" },
       { id: "running", l: `🔍 Running`, stepLabel: "Running" },
       { id: "report", l: `🗄️ Report (${tot})`, stepLabel: "Report" },
@@ -191,6 +193,11 @@ export default class App extends React.Component<CapiProps, AppState> {
                 loadedSpecs={specs}
                 onGenerate={() => this.setState(s => ({ tick: s.tick + 1 }))}
               />
+            </div>
+          )}
+          {tab === "ai" && (
+            <div className="capi-scroll">
+              <AIAssistantTab loadedSpecs={specs} />
             </div>
           )}
           {tab === "ready" && (
