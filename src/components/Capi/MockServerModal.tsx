@@ -129,13 +129,29 @@ export class MockServerModal extends React.Component<Props, State> {
     this.setState({ tick: this.state.tick + 1 });
   };
 
-  private downloadScript = () => {
+  private downloadScript = async () => {
     const text = mockServerStore.generateNodeScript();
-    const blob = new Blob([text], { type: "text/javascript" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "mock-server.js";
-    a.click();
+    const fileName = "mock-server.js";
+
+    if ("showDirectoryPicker" in window) {
+      try {
+        const dirHandle = await (window as any).showDirectoryPicker({ mode: "readwrite" });
+        const fileHandle = await dirHandle.getFileHandle(fileName, { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(text);
+        await writable.close();
+      } catch (err: any) {
+        if (err?.name !== "AbortError") console.error("Mock server save error:", err);
+      }
+    } else {
+      // Fallback for Firefox / Safari
+      const blob = new Blob([text], { type: "text/javascript" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
   };
 
   private copyScript = () => {
