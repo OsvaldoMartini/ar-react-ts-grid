@@ -1291,6 +1291,195 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
     this.setState({ running: false, currentExecUrl: null });
   };
 
+  private generateBash = async () => {
+    const { executionMode, flowTimeoutSec } = this.state;
+    const cases = testStore.cases;
+    if (!cases.length) return;
+
+    const isMockRunning = mockServerStore.status === "running";
+    const baseUrl = (isMockRunning
+      ? `http://localhost:${mockServerStore.port}`
+      : envStore.selected.baseUrl
+    ).replace(/\/$/, "");
+    const isFlow = executionMode === "flow";
+    const safeTimeout = Math.max(1, Math.min(120, Math.round(Number(flowTimeoutSec) || 15)));
+    const ts = new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-").replace(/--/g, "-");
+    const modeTag = isFlow ? "flow_execution" : "independent_execution";
+
+    const lines: string[] = [];
+
+    // ── Header ──────────────────────────────────────────────
+    lines.push("#!/usr/bin/env bash");
+    lines.push("# =============================================================");
+    lines.push(`# Capi Test Runner — ${isFlow ? "FLOW" : "INDEPENDENT"} Execution`);
+    lines.push(`# Generated: ${new Date().toISOString()}`);
+    lines.push(`# Mode:      ${isFlow ? "Flow (sequential, ID chaining)" : "Independent (parallel-safe, no chaining)"}`);
+    if (isFlow) lines.push(`# Timeout:   ${safeTimeout}s per request`);
+    lines.push("# =============================================================");
+    lines.push("");
+
+    // ── Configurable variables (top, easy to edit) ──────────
+    lines.push("# ── CONFIGURE ────────────────────────────────────────────────");
+    lines.push(`BASE_URL="${baseUrl}"          # ${isMockRunning ? `Mock Server :${mockServerStore.port}` : `Env: ${envStore.selected.name}`} — change here if needed`);
+    if (isFlow) lines.push(`TIMEOUT=${safeTimeout}                      # Per-request timeout in seconds`);
+    lines.push("");
+
+    // ── Helpers ─────────────────────────────────────────────
+    lines.push("# ── HELPERS ──────────────────────────────────────────────────");
+    lines.push("GREEN='\\033[0;32m'; RED='\\033[0;31m'; CYAN='\\033[0;36m'; RESET='\\033[0m'");
+    lines.push("PASS=0; FAIL=0");
+    lines.push("");
+    lines.push("run_request() {");
+    lines.push("  local label=\"$1\" method=\"$2\" url=\"$3\" body=\"$4\"");
+    lines.push("  echo -e \"${CYAN}▶ ${label}${RESET}\"");
+    if (isFlow) {
+      lines.push("  local start_t=$(date +%s%3N)");
+      lines.push("  if [ -n \"$body\" ]; then");
+      lines.push(`    RESPONSE=$(curl -s -w "\\n%{http_code}" --max-time $TIMEOUT \\`);
+      lines.push("      -X \"$method\" \"$url\" \\");
+      lines.push("      -H 'Content-Type: application/json' -H 'Accept: application/json' \\");
+      lines.push("      -d \"$body\")");
+      lines.push("  else");
+      lines.push(`    RESPONSE=$(curl -s -w "\\n%{http_code}" --max-time $TIMEOUT \\`);
+      lines.push("      -X \"$method\" \"$url\" \\");
+      lines.push("      -H 'Accept: application/json')");
+      lines.push("  fi");
+      lines.push("  local end_t=$(date +%s%3N)");
+      lines.push("  HTTP_CODE=$(echo \"$RESPONSE\" | tail -1)");
+      lines.push("  BODY=$(echo \"$RESPONSE\" | sed '$d')");
+      lines.push("  local latency=$((end_t - start_t))");
+      lines.push("  if [[ \"$HTTP_CODE\" =~ ^2 ]]; then");
+      lines.push("    echo -e \"  ${GREEN}✓ $HTTP_CODE  ${latency}ms${RESET}\"");
+      lines.push("    PASS=$((PASS+1))");
+      lines.push("  else");
+      lines.push("    echo -e \"  ${RED}✗ $HTTP_CODE  ${latency}ms${RESET}\"");
+      lines.push("    FAIL=$((FAIL+1))");
+      lines.push("  fi");
+    } else {
+      lines.push("  if [ -n \"$body\" ]; then");
+      lines.push(`    RESPONSE=$(curl -s -w "\\n%{http_code}" \\`);
+      lines.push("      -X \"$method\" \"$url\" \\");
+      lines.push("      -H 'Content-Type: application/json' -H 'Accept: application/json' \\");
+      lines.push("      -d \"$body\")");
+      lines.push("  else");
+      lines.push(`    RESPONSE=$(curl -s -w "\\n%{http_code}" \\`);
+      lines.push("      -X \"$method\" \"$url\" \\");
+      lines.push("      -H 'Accept: application/json')");
+      lines.push("  fi");
+      lines.push("  HTTP_CODE=$(echo \"$RESPONSE\" | tail -1)");
+      lines.push("  BODY=$(echo \"$RESPONSE\" | sed '$d')");
+      lines.push("  if [[ \"$HTTP_CODE\" =~ ^2 ]]; then");
+      lines.push("    echo -e \"  ${GREEN}✓ $HTTP_CODE${RESET}\"");
+      lines.push("    PASS=$((PASS+1))");
+      lines.push("  else");
+      lines.push("    echo -e \"  ${RED}✗ $HTTP_CODE${RESET}\"");
+      lines.push("    FAIL=$((FAIL+1))");
+      lines.push("  fi");
+    }
+    lines.push("}");
+    lines.push("");
+
+    // ── Flow: ID chaining map ────────────────────────────────
+    if (isFlow) {
+      lines.push("# ── ID CHAIN MAP (auto-populated at runtime) ─────────────");
+      const resources = [...new Set(cases.map(c => c.resourceName).filter(Boolean))];
+      resources.forEach(r => lines.push(`ID_${r.toUpperCase().replace(/[^A-Z0-9]/g, "_")}=""`));
+      lines.push("");
+    }
+
+    // ── Test cases ──────────────────────────────────────────
+    lines.push("# ── TEST CASES ───────────────────────────────────────────────");
+    lines.push(`echo "Running ${cases.length} test case(s) in ${isFlow ? "FLOW" : "INDEPENDENT"} mode..."`);
+    lines.push("");
+
+    // Group by runGroup for flow, flat for independent
+    const groups = isFlow
+      ? cases.reduce((acc, tc) => {
+        const g = tc.runGroup ?? 1;
+        if (!acc[g]) acc[g] = [];
+        acc[g].push(tc);
+        return acc;
+      }, {} as Record<number, TestCase[]>)
+      : { 1: cases };
+
+    Object.entries(groups).forEach(([runNum, groupCases]) => {
+      if (isFlow && Object.keys(groups).length > 1) {
+        lines.push(`echo ""`);
+        lines.push(`echo "── Run ${runNum} ──────────────────────────────────────"`);
+      }
+
+      groupCases.forEach((tc, idx) => {
+        const resVar = isFlow
+          ? `ID_${(tc.resourceName || "obj").toUpperCase().replace(/[^A-Z0-9]/g, "_")}`
+          : null;
+
+        // Build URL — replace {id} with shell variable in flow mode
+        let urlExpr = tc.resolvedUrl
+          ? tc.resolvedUrl
+          : `${baseUrl}${tc.path}`;
+
+        if (isFlow && tc.path.includes("{id}") && resVar) {
+          urlExpr = urlExpr.replace(/\{id\}/g, `$${resVar}`);
+          // Use double-quotes for shell variable expansion
+        }
+
+        // Body
+        const bodyExpr = tc.body
+          ? JSON.stringify(JSON.stringify(tc.body)) // double-encode for bash string
+          : "";
+
+        const label = `[${tc.seq}] ${tc.method} ${tc.path} — ${tc.apiTitle}`;
+        lines.push(`# ${label}`);
+
+        if (isFlow) {
+          // For flow mode emit inline curl with ID chaining
+          lines.push(`run_request ${JSON.stringify(label)} ${tc.method} "${urlExpr}" ${bodyExpr || "''"}`);
+          // If POST and produces ID, capture it
+          if (tc.method === "POST" && resVar) {
+            lines.push(`if [[ "$HTTP_CODE" =~ ^2 ]] && command -v jq &>/dev/null; then`);
+            lines.push(`  ${resVar}=$(echo "$BODY" | jq -r '.id // empty' 2>/dev/null || echo "")`);
+            lines.push(`fi`);
+          }
+        } else {
+          lines.push(`run_request ${JSON.stringify(label)} ${tc.method} "${urlExpr}" ${bodyExpr || "''"}`);
+        }
+
+        lines.push("");
+      });
+    });
+
+    // ── Summary ─────────────────────────────────────────────
+    lines.push("# ── SUMMARY ──────────────────────────────────────────────────");
+    lines.push("TOTAL=$((PASS+FAIL))");
+    lines.push("echo \"\"");
+    lines.push("echo -e \"Results: ${GREEN}${PASS} passed${RESET} / ${RED}${FAIL} failed${RESET} / ${TOTAL} total\"");
+    lines.push("[ $FAIL -eq 0 ] && exit 0 || exit 1");
+
+    const fileName = `capi_${modeTag}_${ts}.sh`;
+    const script = lines.join("\n");
+
+    // Use File System Access API (folder picker) when available
+    if ("showDirectoryPicker" in window) {
+      try {
+        const dirHandle = await (window as any).showDirectoryPicker({ mode: "readwrite" });
+        const fileHandle = await dirHandle.getFileHandle(fileName, { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(script);
+        await writable.close();
+      } catch (err: any) {
+        // User cancelled picker — silently ignore
+        if (err?.name !== "AbortError") console.error("Bash save error:", err);
+      }
+    } else {
+      // Fallback: standard download for browsers without File System Access API
+      const blob = new Blob([script], { type: "application/x-sh" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = fileName; a.click();
+      URL.revokeObjectURL(url);
+    }
+  };
+
   private executeBlock = async () => {
     const { pageSize, pageIndex } = this.state;
     const visible = this.getFiltered();
@@ -1768,6 +1957,24 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void }
             })}
           </div>
           <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+            <button
+              onClick={this.generateBash}
+              disabled={testStore.cases.length === 0}
+              title={`Generate curl shell script for ${this.state.executionMode === "flow" ? "flow" : "independent"} execution`}
+              style={{
+                background: testStore.cases.length === 0 ? "transparent" : "#a78bfa22",
+                border: `1px solid ${testStore.cases.length === 0 ? "#a78bfa22" : "#a78bfa44"}`,
+                color: testStore.cases.length === 0 ? "var(--cs-dim)" : "var(--cs-muted)",
+                borderRadius: 6, padding: "4px 12px", fontFamily: MONO, fontSize: 11, cursor: testStore.cases.length === 0 ? "not-allowed" : "pointer",
+                display: "flex", alignItems: "center", gap: 5, transition: "all .15s",
+                opacity: testStore.cases.length === 0 ? 0.45 : 1,
+              }}
+              onMouseEnter={e => { if (testStore.cases.length > 0) { (e.currentTarget as HTMLButtonElement).style.background = "#a78bfa33"; (e.currentTarget as HTMLButtonElement).style.color = "#a78bfa"; } }}
+              onMouseLeave={e => { if (testStore.cases.length > 0) { (e.currentTarget as HTMLButtonElement).style.background = "#a78bfa22"; (e.currentTarget as HTMLButtonElement).style.color = "var(--cs-muted)"; } }}
+            >
+              <span style={{ fontSize: 11 }}>$_</span>
+              Generate BASH
+            </button>
             <button
               onClick={() => this.setState(s => ({ showMockModal: !s.showMockModal }))}
               style={{

@@ -1669,25 +1669,95 @@ export class DataGenTab extends React.Component<
                   );
                 })()}
 
-                {/* Generate button */}
-                <button
-                  disabled={selNames.length === 0}
-                  onClick={this.generate}
-                  style={{
-                    width: "100%", padding: "13px", borderRadius: 8,
-                    cursor: selNames.length === 0 ? "not-allowed" : "pointer",
-                    background: selNames.length === 0 ? "var(--cs-surface-2)"
-                      : "linear-gradient(135deg, #1a4a7a, #34d399)",
-                    border: `1.5px solid ${selNames.length === 0 ? "var(--cs-border)" : "#34d399"}`,
-                    color: selNames.length === 0 ? "var(--cs-dim)" : "#fff",
-                    fontFamily: MONO, fontSize: 13, fontWeight: 800, letterSpacing: 0.5,
-                    opacity: selNames.length === 0 ? 0.4 : 1, transition: "all .15s",
-                  }}>
-                  {selNames.length === 0
-                    ? "Select at least one API spec below"
-                    : `⬡ Generate Test Cases → Ready for Test`
-                  }
-                </button>
+                {/* Generate button row */}
+                <div style={{ display: "flex", gap: 10 }}>
+                  <label
+                    title="Load previously saved test cases from CSV"
+                    style={{
+                      flexShrink: 0, padding: "13px 18px", borderRadius: 8, cursor: "pointer",
+                      background: "linear-gradient(135deg, #1a3a5a, #60a5fa)",
+                      border: "1.5px solid #60a5fa",
+                      color: "#fff",
+                      fontFamily: MONO, fontSize: 13, fontWeight: 800,
+                      display: "flex", alignItems: "center", gap: 8,
+                      transition: "all .15s", userSelect: "none", whiteSpace: "nowrap" as const,
+                    }}>
+                    ⬆ Load Test Cases
+                    <input
+                      type="file"
+                      accept=".csv,text/csv"
+                      style={{ display: "none" }}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const reader = new FileReader();
+                        reader.onload = (ev) => {
+                          try {
+                            const text = ev.target?.result as string;
+                            const lines = text.split(/\r?\n/).filter(l => l.trim());
+                            if (lines.length < 2) return;
+                            const splitRow = (row: string): string[] => {
+                              const result: string[] = []; let cur = "", inQ = false;
+                              for (let i = 0; i < row.length; i++) {
+                                const ch = row[i];
+                                if (ch === '"') { if (inQ && row[i + 1] === '"') { cur += '"'; i++; } else inQ = !inQ; }
+                                else if (ch === ',' && !inQ) { result.push(cur); cur = ""; }
+                                else cur += ch;
+                              }
+                              result.push(cur); return result;
+                            };
+                            const parseCell = (s: string): any => {
+                              const t = s.trim().replace(/^"|"$/g, "").replace(/""/g, '"');
+                              try { return JSON.parse(t); } catch { return t; }
+                            };
+                            const [headerLine, ...dataLines] = lines;
+                            const keys = splitRow(headerLine);
+                            testStore.clear();
+                            dataLines.forEach(line => {
+                              const vals = splitRow(line);
+                              const obj: any = {};
+                              keys.forEach((k, i) => { obj[k] = parseCell(vals[i] ?? ""); });
+                              testStore.add({
+                                runGroup: Number(obj.runGroup) || 1,
+                                apiTitle: String(obj.apiTitle ?? ""),
+                                resourceName: String(obj.resourceName ?? ""),
+                                method: String(obj.method ?? "GET"),
+                                path: String(obj.path ?? "/"),
+                                body: obj.body || null,
+                                dataSource: "file",
+                                resolvedUrl: obj.resolvedUrl || undefined,
+                              });
+                            });
+                            const loaded = testStore.cases.length;
+                            this.setState({ generatedN: loaded, dgView: "generated" });
+                            this.props.onGenerate?.();
+                          } catch (err) { console.error("CSV load error:", err); }
+                        };
+                        reader.readAsText(file);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+
+                  <button
+                    disabled={selNames.length === 0}
+                    onClick={this.generate}
+                    style={{
+                      flex: 1, padding: "13px", borderRadius: 8,
+                      cursor: selNames.length === 0 ? "not-allowed" : "pointer",
+                      background: selNames.length === 0 ? "var(--cs-surface-2)"
+                        : "linear-gradient(135deg, #1a4a7a, #34d399)",
+                      border: `1.5px solid ${selNames.length === 0 ? "var(--cs-border)" : "#34d399"}`,
+                      color: selNames.length === 0 ? "var(--cs-dim)" : "#fff",
+                      fontFamily: MONO, fontSize: 13, fontWeight: 800, letterSpacing: 0.5,
+                      opacity: selNames.length === 0 ? 0.4 : 1, transition: "all .15s",
+                    }}>
+                    {selNames.length === 0
+                      ? "Select at least one API spec below"
+                      : `⬡ Generate Test Cases → Ready for Test`
+                    }
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -2511,6 +2581,37 @@ export class DataGenTab extends React.Component<
                   color: "#34d399", fontFamily: MONO, fontSize: 12, fontWeight: 700
                 }}>
                 ← Configure more
+              </button>
+              <button
+                onClick={() => {
+                  const cases = testStore.cases;
+                  if (!cases.length) return;
+                  const escape = (v: any) => {
+                    const s = v == null ? "" : typeof v === "object" ? JSON.stringify(v) : String(v);
+                    return `"${s.replace(/"/g, '""')}"`;
+                  };
+                  const headers = ["id", "seq", "runGroup", "apiTitle", "resourceName", "method", "path", "body", "dataSource", "resolvedUrl", "status", "httpStatus", "latency"];
+                  const rows = cases.map((tc: TestCase) => [
+                    tc.id, tc.seq, tc.runGroup, tc.apiTitle, tc.resourceName,
+                    tc.method, tc.path, tc.body, tc.dataSource, tc.resolvedUrl ?? "",
+                    tc.status, tc.httpStatus ?? "", tc.latency ?? "",
+                  ].map(escape).join(","));
+                  const csv = [headers.join(","), ...rows].join("\r\n");
+                  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `test-cases-${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.csv`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                style={{
+                  flex: 1, padding: "11px", borderRadius: 8, cursor: "pointer",
+                  background: "linear-gradient(135deg, #1a4a2a, #34d399)",
+                  border: "1.5px solid #34d399",
+                  color: "#0a1f15", fontFamily: MONO, fontSize: 12, fontWeight: 800
+                }}>
+                ⬇ Save Test Cases
               </button>
               <button onClick={() => { testStore.clear(); this.setState({ dgView: "setup", generatedN: 0 }); }}
                 style={{
