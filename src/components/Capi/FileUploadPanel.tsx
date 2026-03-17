@@ -197,34 +197,7 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
             </button>
           </div>
         )}
-        {/* Parse status */}
-        {parsing && (
-          <div className="capi-upload__parsing">⚙ Parsing in corso...</div>
-        )}
-        {results.length > 0 && (
-          <div className="capi-upload__results">
-            {results.slice(-4).map((r, i) => (
-              <div
-                key={i}
-                className={`capi-upload__result capi-upload__result--${r.ok ? "ok" : "err"}`}
-              >
-                {r.ok ? (
-                  <>
-                    <b>{r.spec.title}</b>
-                    {" · "}{r.spec.ext.toUpperCase()}
-                    {" · "}{r.spec.endpoints.length} endpoints
-                    {r.spec.fields.length > 0 && ` · ${r.spec.fields.length} fields`}
-                    {r.spec.dependencies.length > 0 && ` · ${r.spec.dependencies.length} deps`}
-                    {db.get(r.spec.resourceName || "").length > 0 &&
-                      ` · ${db.get(r.spec.resourceName || "").length} records seeded`}
-                  </>
-                ) : (
-                  <>✗ {r.spec.fileName}: {r.spec.parseError}</>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
+
 
         {/* Search box */}
         {loadedSpecs.length > 0 && (
@@ -456,6 +429,35 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
             <span style={{ fontSize: 9, color: "var(--cs-dim)", fontFamily: "monospace", marginLeft: 6 }}>
               {pageStart + 1}–{Math.min(pageStart + apiPageSize, filteredSpecs.length)} of {filteredSpecs.length}
             </span>
+          </div>
+        )}
+
+        {/* Parse status */}
+        {parsing && (
+          <div className="capi-upload__parsing">⚙ Parsing in corso...</div>
+        )}
+        {results.length > 0 && (
+          <div className="capi-upload__results">
+            {results.slice(-4).map((r, i) => (
+              <div
+                key={i}
+                className={`capi-upload__result capi-upload__result--${r.ok ? "ok" : "err"}`}
+              >
+                {r.ok ? (
+                  <>
+                    <b>{r.spec.title}</b>
+                    {" · "}{r.spec.ext.toUpperCase()}
+                    {" · "}{r.spec.endpoints.length} endpoints
+                    {r.spec.fields.length > 0 && ` · ${r.spec.fields.length} fields`}
+                    {r.spec.dependencies.length > 0 && ` · ${r.spec.dependencies.length} deps`}
+                    {db.get(r.spec.resourceName || "").length > 0 &&
+                      ` · ${db.get(r.spec.resourceName || "").length} records seeded`}
+                  </>
+                ) : (
+                  <>✗ {r.spec.fileName}: {r.spec.parseError}</>
+                )}
+              </div>
+            ))}
           </div>
         )}
 
