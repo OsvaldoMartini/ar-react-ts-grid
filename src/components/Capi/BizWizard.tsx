@@ -10,7 +10,7 @@ import "./capi-wizard.scss";
 // TYPES
 // ═══════════════════════════════════════════════════════════════
 type FieldDirection = "OUT" | "IN" | "IN_OUT" | "PARAM";
-type WizMode = "dsg" | "static";
+type WizMode = "dsg";
 type DsgStep = "api-select" | "data" | "flow" | "running" | "report";
 type StaticStep = "configure" | "running" | "report";
 type WizStep = "home" | DsgStep | StaticStep;
@@ -46,39 +46,8 @@ interface ExecEntry {
 // ═══════════════════════════════════════════════════════════════
 // STATIC CATALOG  (Load Test + Error Handling only, unchanged)
 // ═══════════════════════════════════════════════════════════════
-const STATIC_CASES = [
-  {
-    id: "load_test", cat: "Execution Management", icon: "⚡",
-    title: "Load Test Endpoint",
-    desc: "Test di carico su endpoint GET con N chiamate parallele.",
-    steps: [
-      { id: "s1", label: "GET ripetuto N volte", method: "GET", resource: "obj-addrs", params: { limit: 10 } },
-    ],
-    params: [
-      { key: "numRequests", label: "N. Richieste", type: "number", min: 10, max: 100, default: 20 },
-    ],
-    riskLevel: "HIGH", domains: ["Performance", "SRE"],
-  },
-  {
-    id: "error_handling", cat: "Report Management", icon: "⚠️",
-    title: "Test Error Handling",
-    desc: "Verifica corretta gestione errori: 404 not found, 400 bad request.",
-    steps: [
-      { id: "s1", label: "GET ID inesistente (404)", method: "GET", resource: "obj-addrs", path: "/999999999", expectStatus: 404 },
-      { id: "s2", label: "PATCH ID inesistente (404)", method: "PATCH", resource: "obj-addrs", path: "/999999999", expectStatus: 404 },
-      { id: "s3", label: "DELETE ID inesistente (404)", method: "DELETE", resource: "obj-addrs", path: "/999999999", expectStatus: 404 },
-    ],
-    params: [
-      { key: "includeEdgeCases", label: "Includi Edge Cases", type: "boolean", default: true },
-    ],
-    riskLevel: "LOW", domains: ["Resilience", "API Quality"],
-  },
-];
-
 const CAT_COLORS: Record<string, string> = {
   "API Data Management": "#34d399",
-  "Execution Management": "#fb923c",
-  "Report Management": "#a78bfa",
 };
 
 const MONO = "'JetBrains Mono','Fira Mono',monospace";
@@ -440,9 +409,6 @@ interface BizWizardState {
   dynPlan: DynStep[];
   testCount: number;
   synthPreviews: Record<string, any>[];
-  // Static case state
-  selStaticCase: typeof STATIC_CASES[0] | null;
-  staticParams: Record<string, any>;
   // Execution
   execLog: ExecEntry[];
   execResults: ExecEntry[];
@@ -451,7 +417,6 @@ interface BizWizardState {
   execMode: "flow" | "independent";
   flowTimeout: number;          // seconds — only used in flow mode
   // UI
-  selCat: string;
   flowPage: number;
   flowPageSize: number;
   chainExpanded: boolean;
@@ -464,10 +429,9 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
   state: BizWizardState = {
     wizMode: null, wizStep: "home",
     selSpecNames: [], dynPlan: [], testCount: 1, synthPreviews: [],
-    selStaticCase: null, staticParams: {},
     execLog: [], execResults: [], running: false,
     execMode: "flow", flowTimeout: 15,
-    selCat: "ALL", flowPage: 0, flowPageSize: 10, chainExpanded: false, chainPage: 0,
+    flowPage: 0, flowPageSize: 10, chainExpanded: false, chainPage: 0,
     apiSelectPage: 0, apiSelectPageSize: 10,
   };
   private logRef = createRef<HTMLDivElement>();
@@ -506,13 +470,6 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
         buildSynthBody(selected[0] || loadedSpecs[0], {}, selected)
       ),
     });
-  };
-
-  // ── Static case ───────────────────────────────────────────────
-  private selectStatic = (sc: typeof STATIC_CASES[0]) => {
-    const defaults: Record<string, any> = {};
-    sc.params.forEach(p => { defaults[p.key] = p.default; });
-    this.setState({ selStaticCase: sc, staticParams: defaults, wizMode: "static", wizStep: "configure" });
   };
 
   // ── Execution ─────────────────────────────────────────────────
@@ -610,75 +567,10 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
     this.setState({ execResults: results, running: false, wizStep: "report" });
   };
 
-  private execStaticPlan = async () => {
-    const { selStaticCase } = this.state;
-    if (!selStaticCase) return;
-    this.setState({ wizStep: "running", running: true, execLog: [], execResults: [] });
-    const results: ExecEntry[] = [];
-    let lastId: number | null = null;
-
-    for (let i = 0; i < selStaticCase.steps.length; i++) {
-      const step = selStaticCase.steps[i] as any;
-      this.setState(s => ({
-        execLog: [...s.execLog, {
-          step: i + 1, label: step.label, method: step.method,
-          status: "running", latency: 0, result: null, headers: null, ok: false,
-        }],
-      }));
-      const t0 = Date.now();
-      const staticReqHeaders = { "Content-Type": "application/json", "Accept": "application/json" };
-      try {
-        await new Promise(r => setTimeout(r, 40 + Math.random() * 80));
-        let r: any;
-        let staticCallPath: string;
-        let staticReqBody: any = undefined;
-        if (step.method === "POST" && step.synth === "address") {
-          staticCallPath = "/" + step.resource;
-          staticReqBody = SYNTH.address();
-          r = await rest.req("POST", staticCallPath, staticReqBody);
-          if (r.body?.id) lastId = r.body.id;
-        } else if (step.method === "GET") {
-          staticCallPath = step.dep && lastId ? `/${step.resource}/${lastId}` : `/${step.resource}`;
-          r = await rest.req("GET", staticCallPath, null, step.params || {});
-        } else if (step.method === "PATCH") {
-          staticCallPath = `/${step.resource}/${step.path?.replace("/", "") || lastId || 0}`;
-          staticReqBody = SYNTH.address();
-          r = await rest.req("PATCH", staticCallPath, staticReqBody);
-        } else if (step.method === "DELETE") {
-          staticCallPath = `/${step.resource}/${step.path?.replace("/", "") || lastId || 999999999}`;
-          r = await rest.req("DELETE", staticCallPath);
-        } else {
-          staticCallPath = "/" + (step.resource || "");
-          r = { status: step.expectStatus || 200, body: {}, headers: {} };
-        }
-        const latency = Date.now() - t0;
-        const expectOk = step.expectStatus ? r.status === step.expectStatus : r.status >= 200 && r.status < 300;
-        const entry: ExecEntry = {
-          step: i + 1, label: step.label, method: step.method, status: r.status, latency,
-          result: r.body, headers: r.headers, ok: expectOk,
-          reqUrl: envStore.resolve(staticCallPath),
-          reqHeaders: staticReqHeaders,
-          reqBody: staticReqBody,
-        };
-        results.push(entry);
-        this.setState(s => ({ execLog: s.execLog.map((x, xi) => xi === s.execLog.length - 1 ? entry : x) }));
-      } catch (e: any) {
-        const entry: ExecEntry = {
-          step: i + 1, label: step.label, method: step.method, status: "ERR",
-          latency: Date.now() - t0, result: { error: e.message }, headers: null, ok: false,
-          reqHeaders: staticReqHeaders,
-        };
-        results.push(entry);
-        this.setState(s => ({ execLog: s.execLog.map((x, xi) => xi === s.execLog.length - 1 ? entry : x) }));
-      }
-    }
-    this.setState({ execResults: results, running: false, wizStep: "report" });
-  };
-
   private reset = () =>
     this.setState({
       wizMode: null, wizStep: "home", selSpecNames: [], dynPlan: [],
-      testCount: 1, selStaticCase: null, execResults: [], execLog: [],
+      testCount: 1, execResults: [], execLog: [],
     });
 
   // ═══════════════════════════════════════════════════════════════
@@ -688,7 +580,7 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
     const { onClose, loadedSpecs } = this.props;
     const {
       wizMode, wizStep, selSpecNames, dynPlan, testCount, synthPreviews,
-      selStaticCase, staticParams, execLog, execResults, selCat,
+      execLog, execResults,
     } = this.state;
 
     const totalOk = execResults.filter(r => r.ok).length;
@@ -697,12 +589,6 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
       ? Math.round(execResults.reduce((a, r) => a + (r.latency || 0), 0) / execResults.length) : 0;
     const pct = execResults.length ? Math.round((totalOk / execResults.length) * 100) : 0;
     const pctCol = pct === 100 ? "#34d399" : pct >= 50 ? "#f59e0b" : "#f87171";
-
-    // Unique categories for filter bar
-    const cats = ["ALL", ...new Set(STATIC_CASES.map(c => c.cat))];
-    const filteredStatics = selCat === "ALL"
-      ? STATIC_CASES
-      : STATIC_CASES.filter(c => c.cat === selCat);
 
     // Selected specs for DSG
     const selectedSpecs = loadedSpecs.filter(s => selSpecNames.includes(s.fileName));
@@ -718,8 +604,7 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
               <div className="capi-wizard__title">Business Case Wizard</div>
               <div className="capi-wizard__subtitle">
                 {wizStep === "home" ? "Select a test case"
-                  : wizMode === "dsg" ? "Data Synthetic Generator"
-                    : selStaticCase?.title || "Configure"}
+                  : "Data Synthetic Generator"}
               </div>
             </div>
             <button className="capi-wizard__close" onClick={onClose}>✕</button>
@@ -734,7 +619,7 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
           <div className="capi-wizard__body">
 
             {/* ══════════════════════════════════════════
-                HOME  — choose DSG or static case
+                HOME  — launch DSG
             ══════════════════════════════════════════ */}
             {wizStep === "home" && (
               <div>
@@ -795,61 +680,6 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
                       ⚠ Upload API specs first to use this mode
                     </div>
                   )}
-                </div>
-
-                {/* Static cases */}
-                <div style={{
-                  fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)", fontWeight: 700,
-                  letterSpacing: 1, textTransform: "uppercase", marginBottom: 10
-                }}>
-                  Static test cases
-                </div>
-
-                <div className="capi-wizard-cats" style={{ marginBottom: 12 }}>
-                  {cats.map(c => {
-                    const active = selCat === c;
-                    const col = CAT_COLORS[c] || "#58a6ff";
-                    return (
-                      <button key={c} onClick={() => this.setState({ selCat: c })}
-                        className="capi-wizard-cat-btn"
-                        style={active ? { borderColor: col, color: col, background: col + "12" } : undefined}>
-                        {c}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div className="capi-wizard-cases">
-                  {filteredStatics.map(sc => {
-                    const col = CAT_COLORS[sc.cat] || "#58a6ff";
-                    return (
-                      <div key={sc.id} className="capi-wizard-case"
-                        onClick={() => this.selectStatic(sc)}
-                        onMouseEnter={e => (e.currentTarget.style.borderColor = col)}
-                        onMouseLeave={e => (e.currentTarget.style.borderColor = "")}>
-                        <div className="capi-wizard-case__row">
-                          <span className="capi-wizard-case__icon">{sc.icon}</span>
-                          <div className="capi-wizard-case__info">
-                            <div className="capi-wizard-case__title">{sc.title}</div>
-                            <div className="capi-wizard-case__desc">{sc.desc}</div>
-                            <div className="capi-wizard-case__tags">
-                              <span className="capi-wizard-case__tag"
-                                style={{ background: col + "22", borderColor: col + "44", color: col }}>
-                                {sc.cat}
-                              </span>
-                              <span className={`capi-wizard-case__tag capi-wizard-case__tag--risk-${sc.riskLevel === "HIGH" ? "high" : "low"}`}>
-                                ⚠ {sc.riskLevel}
-                              </span>
-                              {sc.domains.map(d => (
-                                <span key={d} className="capi-wizard-case__tag capi-wizard-case__tag--domain">{d}</span>
-                              ))}
-                            </div>
-                          </div>
-                          <div className="capi-wizard-case__step-count">{sc.steps.length} step</div>
-                        </div>
-                      </div>
-                    );
-                  })}
                 </div>
               </div>
             )}
@@ -1633,68 +1463,16 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
             )}
 
             {/* ══════════════════════════════════════════
-                STATIC — CONFIGURE
-            ══════════════════════════════════════════ */}
-            {wizStep === "configure" && selStaticCase && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                <div style={{
-                  padding: "12px 15px", borderRadius: 10, background: "var(--cs-surface-2)",
-                  border: "1px solid var(--cs-border-sub)"
-                }}>
-                  <div style={{
-                    fontFamily: MONO, fontSize: 14, fontWeight: 700,
-                    color: "var(--cs-text)", marginBottom: 5
-                  }}>
-                    {selStaticCase.icon} {selStaticCase.title}
-                  </div>
-                  <div style={{ fontFamily: MONO, fontSize: 12, color: "var(--cs-muted)", lineHeight: 1.55 }}>
-                    {selStaticCase.desc}
-                  </div>
-                </div>
-
-                {selStaticCase.params.map(p => (
-                  <div key={p.key} className="capi-wizard-field">
-                    <label className="capi-wizard-field__label">{p.label}</label>
-                    {p.type === "select" ? (
-                      <select className="capi-wizard-field__select"
-                        value={staticParams[p.key]}
-                        onChange={e => this.setState(s => ({ staticParams: { ...s.staticParams, [p.key]: e.target.value } }))}>
-                        {(p as any).options?.map((o: string) => <option key={o} value={o}>{o}</option>)}
-                      </select>
-                    ) : p.type === "number" ? (
-                      <input type="number" className="capi-wizard-field__input"
-                        value={staticParams[p.key]} min={(p as any).min} max={(p as any).max}
-                        onChange={e => this.setState(s => ({ staticParams: { ...s.staticParams, [p.key]: +e.target.value } }))} />
-                    ) : (
-                      <input type="text" className="capi-wizard-field__input"
-                        value={staticParams[p.key]}
-                        onChange={e => this.setState(s => ({ staticParams: { ...s.staticParams, [p.key]: e.target.value } }))} />
-                    )}
-                  </div>
-                ))}
-
-                <div className="capi-wizard-actions">
-                  <button className="capi-wizard-btn capi-wizard-btn--back"
-                    onClick={() => this.setState({ wizStep: "home", wizMode: null, selStaticCase: null })}>
-                    ← Back
-                  </button>
-                  <button className="capi-wizard-btn capi-wizard-btn--run"
-                    onClick={this.execStaticPlan}>▶ Execute</button>
-                </div>
-              </div>
-            )}
-
-            {/* ══════════════════════════════════════════
-                RUNNING  (shared DSG + static)
+                RUNNING  (DSG)
             ══════════════════════════════════════════ */}
             {wizStep === "running" && (
               <div>
                 <div className="capi-wizard-running-header">
                   <div className="capi-wizard-running-icon">⚙️</div>
                   <div className="capi-wizard-running-title">
-                    {wizMode === "dsg" ? `Executing ${dynPlan.length} API steps…` : "Executing…"}
+                    {`Executing ${dynPlan.length} API steps…`}
                   </div>
-                  {wizMode === "dsg" && testCount > 1 && (
+                  {testCount > 1 && (
                     <div style={{ fontFamily: MONO, fontSize: 11, color: "var(--cs-dim)", marginTop: 4 }}>
                       {Math.min(testCount, 5)} of {testCount} runs — chaining IDs between POST → GET/PATCH/DELETE
                     </div>
@@ -1732,9 +1510,7 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
                     📊 Report Management
                   </div>
                   <div style={{ fontFamily: MONO, fontSize: 11, color: "var(--cs-muted)" }}>
-                    {wizMode === "dsg"
-                      ? `${selectedSpecs.length} API${selectedSpecs.length > 1 ? "s" : ""} · ${dynPlan.length} steps · ${testCount} configured run${testCount > 1 ? "s" : ""}`
-                      : selStaticCase?.title}
+                    {`${selectedSpecs.length} API${selectedSpecs.length > 1 ? "s" : ""} · ${dynPlan.length} steps · ${testCount} configured run${testCount > 1 ? "s" : ""}`}
                     {" · "}{execResults.length} calls executed · {pct}% success
                   </div>
                 </div>
@@ -1771,37 +1547,35 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
                   </div>
                 </div>
 
-                {/* DSG: method breakdown */}
-                {wizMode === "dsg" && (
-                  <div>
-                    <SLabel>By HTTP method</SLabel>
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      {(["POST", "GET", "PATCH", "PUT", "DELETE"] as const)
-                        .map(m => {
-                          const mResults = execResults.filter(r => r.method === m);
-                          if (mResults.length === 0) return null;
-                          const ok = mResults.filter(r => r.ok).length;
-                          const col = METHOD_COLORS[m];
-                          return (
-                            <div key={m} style={{
-                              padding: "8px 13px", borderRadius: 8,
-                              background: col + "0a", border: `1px solid ${col}30`,
-                            }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
-                                <MethodChip method={m} size="xs" />
-                                <span style={{ fontFamily: MONO, fontSize: 10, color: col, fontWeight: 700 }}>
-                                  {ok}/{mResults.length}
-                                </span>
-                              </div>
-                              <div style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)" }}>
-                                {mResults.length > 0 ? Math.round(mResults.reduce((a, r) => a + r.latency, 0) / mResults.length) : 0}ms avg
-                              </div>
+                {/* Method breakdown */}
+                <div>
+                  <SLabel>By HTTP method</SLabel>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {(["POST", "GET", "PATCH", "PUT", "DELETE"] as const)
+                      .map(m => {
+                        const mResults = execResults.filter(r => r.method === m);
+                        if (mResults.length === 0) return null;
+                        const ok = mResults.filter(r => r.ok).length;
+                        const col = METHOD_COLORS[m];
+                        return (
+                          <div key={m} style={{
+                            padding: "8px 13px", borderRadius: 8,
+                            background: col + "0a", border: `1px solid ${col}30`,
+                          }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                              <MethodChip method={m} size="xs" />
+                              <span style={{ fontFamily: MONO, fontSize: 10, color: col, fontWeight: 700 }}>
+                                {ok}/{mResults.length}
+                              </span>
                             </div>
-                          );
-                        })}
-                    </div>
+                            <div style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)" }}>
+                              {mResults.length > 0 ? Math.round(mResults.reduce((a, r) => a + r.latency, 0) / mResults.length) : 0}ms avg
+                            </div>
+                          </div>
+                        );
+                      })}
                   </div>
-                )}
+                </div>
 
                 {/* Step results */}
                 <div className="capi-wizard-result-list">
@@ -1814,12 +1588,10 @@ export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
                   <button className="capi-wizard-btn capi-wizard-btn--new" onClick={this.reset}>
                     ← New Test
                   </button>
-                  {wizMode === "dsg" && (
-                    <button className="capi-wizard-btn capi-wizard-btn--back"
-                      onClick={() => this.setState({ wizStep: "flow" })}>← Change Flow</button>
-                  )}
+                  <button className="capi-wizard-btn capi-wizard-btn--back"
+                    onClick={() => this.setState({ wizStep: "flow" })}>← Change Flow</button>
                   <button className="capi-wizard-btn capi-wizard-btn--rerun"
-                    onClick={wizMode === "dsg" ? this.execDynPlan : this.execStaticPlan}>
+                    onClick={this.execDynPlan}>
                     ↻ Re-run
                   </button>
                 </div>

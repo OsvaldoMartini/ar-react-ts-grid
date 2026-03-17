@@ -24,7 +24,7 @@ export interface CapiProps {
 }
 
 interface AppState {
-  tab: "apis" | "workflow" | "datagen" | "ready" | "debug" | "store";
+  tab: "apis" | "workflow" | "datagen" | "ready" | "running" | "report";
   specs: ApiSpec[];
   log: LogEntry[];
   loading: boolean;
@@ -103,8 +103,8 @@ export default class App extends React.Component<CapiProps, AppState> {
       { id: "workflow", l: `⬡ Workflow`, stepLabel: "Workflow" },
       { id: "datagen", l: `⚗ Data Generator`, stepLabel: "Data Generator" },
       { id: "ready", l: `🧪 Ready for Test${queuedCount > 0 ? ` (${queuedCount.toLocaleString()})` : ""}`, stepLabel: "Ready for Test" },
-      { id: "debug", l: `🔍 Debug${log.length > 0 ? ` (${log.length})` : ""}`, stepLabel: "Debug" },
-      { id: "store", l: `🗄️ Store (${tot})`, stepLabel: "Store" },
+      { id: "running", l: `🔍 Running${log.length > 0 ? ` (${log.length})` : ""}`, stepLabel: "Running" },
+      { id: "report", l: `🗄️ Report (${tot})`, stepLabel: "Report" },
     ] as const;
     const activeTabIndex = TABS.findIndex(t => t.id === tab);
 
@@ -206,13 +206,13 @@ export default class App extends React.Component<CapiProps, AppState> {
               />
             </div>
           )}
-          {tab === "debug" && (
+          {tab === "running" && (
             <DebugTab
               log={log}
               onClear={() => this.setState({ log: [] })}
             />
           )}
-          {tab === "store" && (
+          {tab === "report" && (
             <StoreTab
               onOpenWizard={() => this.setState({ showWizard: true })}
               onOpenReport={() => { }}
