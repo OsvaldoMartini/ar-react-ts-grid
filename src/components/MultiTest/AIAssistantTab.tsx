@@ -67,10 +67,19 @@ interface AIResponse {
   timestamp:    string;
   status:       "pending" | "done" | "error";
   error?:       string;
-  /** Filename for the JSON artifact, set when content is saved */
   jsonFileName: string | null;
-  /** Whether the JSON has been written to disk (via download) */
   jsonSaved:    boolean;
+  /** Pre-parsed human summary — built from content on arrival */
+  summary:      AIResponseSummary | null;
+}
+
+interface AIResponseSummary {
+  mode:        "tests" | "text";
+  title:       string;
+  items:       { index: number; name: string; desc: string }[];
+  footer:      string[];
+  rawText:     string;
+  count:       number;
 }
 
 // ─── COMPONENT STATE ─────────────────────────────────────────
@@ -278,6 +287,50 @@ export class AIAssistantTab extends React.Component<AIAssistantProps, AIAssistan
     return `ai_tests_${safe}_${ts}.json`;
   }
 
+  // ─── BUILD HUMAN SUMMARY from raw AI content ─────────────────
+  private buildSummary(content: string, providerName: string, genMode: GenMode): AIResponseSummary {
+    // Try to extract JSON test cases array
+    let json: any[] | null = null;
+    const trimmed = content.trim();
+    if (trimmed.startsWith("[")) { try { json = JSON.parse(trimmed); } catch {} }
+    if (!json) {
+      const fence = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (fence) { try { json = JSON.parse(fence[1].trim()); } catch {} }
+    }
+    if (!json) {
+      const arr = content.match(/\[[\s\S]*\]/);
+      if (arr) { try { json = JSON.parse(arr[0]); } catch {} }
+    }
+
+    if (json && Array.isArray(json) && json.length > 0) {
+      // ── JSON test case array ──────────────────────────────────
+      const ctx = getActiveContext();
+      const runCount = aiPrefsStore.testRunCount;
+      const items = json.slice(0, 20).map((item: any, idx: number) => ({
+        index: idx + 1,
+        name: item.testName || item.name || item.title || `Test ${idx + 1}`,
+        desc: item.businessDescription || item.description || `${item.method || "?"} ${item.path || "/"}`,
+      }));
+      const title = `[${providerName}] Generated ${json.length} test case${json.length !== 1 ? "s" : ""} for ${this.state.selectedCategory || ctx.name} domain:`;
+      const footer = [
+        `💡 Banking context: ${ctx.name} · ${pluginRegistry.getEnabled().length} active plugins`,
+        `📋 Apply Ready — JSON file attached above`,
+      ];
+      return { mode: "tests", title, items, footer, rawText: content, count: json.length };
+    }
+
+    // ── Plain text response (analyze, explain, custom) ─────────
+    // Strip markdown fences, keep as-is
+    const cleaned = content
+      .replace(/```(?:json|text)?\n?/g, "")
+      .replace(/```/g, "")
+      .trim();
+    return {
+      mode: "text", title: `[${providerName}]`, items: [],
+      footer: [], rawText: cleaned, count: 0,
+    };
+  }
+
   // ─── REAL API CALLS ───────────────────────────────────────────
   private callProvider = async (provider: AIProvider, prompt: string): Promise<string> => {
     const key = this.state.apiKeys[provider.id] || "";
@@ -353,7 +406,7 @@ export class AIAssistantTab extends React.Component<AIAssistantProps, AIAssistan
     const responses: AIResponse[] = selected.map(p => ({
       providerId: p.id, providerName: p.name,
       content: "", timestamp: new Date().toISOString(),
-      status: "pending", jsonFileName: null, jsonSaved: false,
+      status: "pending", jsonFileName: null, jsonSaved: false, summary: null,
     }));
 
     this.setState({ sending: true, responses, applyStatus: null });
@@ -362,9 +415,10 @@ export class AIAssistantTab extends React.Component<AIAssistantProps, AIAssistan
       try {
         const content = await this.callProvider(p, prompt);
         const jsonFileName = this.makeFileName(p.name);
+        const summary = this.buildSummary(content, p.name, this.state.genMode);
         this.setState(prev => {
           const next = prev.responses.map(r =>
-            r.providerId === p.id ? { ...r, content, status: "done" as const, jsonFileName } : r
+            r.providerId === p.id ? { ...r, content, status: "done" as const, jsonFileName, summary } : r
           );
           this.persistResponses(next);
           return { responses: next };
@@ -372,7 +426,7 @@ export class AIAssistantTab extends React.Component<AIAssistantProps, AIAssistan
       } catch (err: any) {
         this.setState(prev => {
           const next = prev.responses.map(r =>
-            r.providerId === p.id ? { ...r, status: "error" as const, error: err.message, jsonFileName: null, jsonSaved: false } : r
+            r.providerId === p.id ? { ...r, status: "error" as const, error: err.message, jsonFileName: null, jsonSaved: false, summary: null } : r
           );
           this.persistResponses(next);
           return { responses: next };
@@ -849,7 +903,15 @@ export class AIAssistantTab extends React.Component<AIAssistantProps, AIAssistan
 
                 {/* ── CARD HEADER ── */}
                 <div className="ai-response-card__header" style={{ flexWrap: "wrap" as const, gap: 6 }}>
-                  <span className="ai-response-card__provider">{r.providerName}</span>
+                  {/* Provider name + model info */}
+                  <div style={{ display: "flex", flexDirection: "column" as const, gap: 1, minWidth: 0 }}>
+                    <span className="ai-response-card__provider">{r.providerName}</span>
+                    {r.status === "done" && r.summary && r.summary.mode === "tests" && (
+                      <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)", marginTop: 1 }}>
+                        {r.summary.count} test case{r.summary.count !== 1 ? "s" : ""} generated
+                      </span>
+                    )}
+                  </div>
                   <span className="ai-response-card__time">{new Date(r.timestamp).toLocaleTimeString()}</span>
                   <span className={`ai-response-card__status ai-response-card__status--${r.status}`}>
                     {r.status === "pending" ? "⏳ Processing..." : r.status === "done" ? "✓ Complete" : "✗ Error"}
@@ -908,10 +970,8 @@ export class AIAssistantTab extends React.Component<AIAssistantProps, AIAssistan
                 </div>
 
                 {/* ── BODY ── */}
-                {r.status === "done" && (
-                  <div className="ai-response-card__body">
-                    <pre className="ai-response-card__content">{r.content}</pre>
-                  </div>
+                {r.status === "done" && r.summary && (
+                  <AISummaryBody summary={r.summary} jsonFileName={r.jsonFileName} />
                 )}
                 {r.status === "pending" && (
                   <div className="ai-response-card__body">
@@ -939,6 +999,74 @@ export class AIAssistantTab extends React.Component<AIAssistantProps, AIAssistan
       </div>
     );
   }
+}
+
+// ─── AI SUMMARY BODY COMPONENT ──────────────────────────────
+
+function AISummaryBody({ summary, jsonFileName }: {
+  summary: AIResponseSummary;
+  jsonFileName: string | null;
+}) {
+  const MONO_F = "'JetBrains Mono','Fira Code',monospace";
+
+  if (summary.mode === "tests") {
+    return (
+      <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column" as const, gap: 10 }}>
+
+        {/* Title line */}
+        <div style={{ fontFamily: MONO_F, fontSize: 12, fontWeight: 700, color: "var(--cs-text)", lineHeight: 1.5 }}>
+          {summary.title}
+        </div>
+
+        {/* Numbered test list */}
+        <ol style={{ margin: 0, padding: "0 0 0 20px", display: "flex", flexDirection: "column" as const, gap: 6 }}>
+          {summary.items.map(item => (
+            <li key={item.index} style={{ fontFamily: MONO_F, fontSize: 11, color: "var(--cs-text)", lineHeight: 1.6 }}>
+              <span style={{ color: "#34d399", fontWeight: 700 }}>“{item.name}”</span>
+              {item.desc ? (
+                <span style={{ color: "var(--cs-muted)" }}> — {item.desc}</span>
+              ) : null}
+            </li>
+          ))}
+        </ol>
+
+        {/* Footer notes */}
+        <div style={{ display: "flex", flexDirection: "column" as const, gap: 4, marginTop: 4 }}>
+          {summary.footer.map((line, i) => (
+            <div key={i} style={{ fontFamily: MONO_F, fontSize: 10, color: "var(--cs-muted)", lineHeight: 1.5 }}>
+              {line}
+            </div>
+          ))}
+        </div>
+
+        {/* Apply Ready badge */}
+        {jsonFileName && (
+          <div style={{
+            display: "inline-flex", alignItems: "center", gap: 6,
+            padding: "6px 12px", borderRadius: 6, alignSelf: "flex-start" as const,
+            background: "#34d39915", border: "1px solid #34d39933",
+            fontFamily: MONO_F, fontSize: 10, color: "#34d399", fontWeight: 700,
+          }}>
+            ✅ Apply Ready: <span style={{ fontWeight: 400, opacity: 0.85 }}>{jsonFileName}</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Plain text mode (analyze-api, explain-rules, custom)
+  return (
+    <div style={{ padding: "14px 16px" }}>
+      <pre style={{
+        fontFamily: MONO_F, fontSize: 11, margin: 0,
+        color: "var(--cs-text)", lineHeight: 1.7,
+        whiteSpace: "pre-wrap" as const, wordBreak: "break-word" as const,
+        background: "transparent",
+      }}>
+        {summary.rawText}
+      </pre>
+    </div>
+  );
 }
 
 // ─── INLINE EDIT ──────────────────────────────────────────────
