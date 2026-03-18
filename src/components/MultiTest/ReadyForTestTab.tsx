@@ -1197,7 +1197,104 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void; 
   };
 
   private scrollRef = React.createRef<HTMLDivElement>();
+  private csvImportRef = React.createRef<HTMLInputElement>();
+  private jsonImportRef = React.createRef<HTMLInputElement>();
   private refresh = () => this.setState(s => ({ tick: s.tick + 1 }));
+
+  // ─── CSV / JSON IMPORT ───────────────────────────────────────
+  private parseCSVImportLine = (line: string): string[] => {
+    const out: string[] = [];
+    let cur = ""; let inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (inQ && line[i + 1] === '"') { cur += '"'; i++; } else inQ = !inQ;
+      } else if (ch === "," && !inQ) { out.push(cur); cur = ""; }
+      else cur += ch;
+    }
+    out.push(cur);
+    return out;
+  };
+
+  private doImportCSV = (content: string, fileName: string) => {
+    const lines = content.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (lines.length < 2) return;
+    const rawH = this.parseCSVImportLine(lines[0]);
+    const headers = rawH.map(h => h.replace(/^"|"$/g, "").trim().toLowerCase());
+    const col = (row: string[], name: string): string => {
+      const idx = headers.indexOf(name);
+      return idx >= 0 ? (row[idx] || "").replace(/^"|"$/g, "").trim() : "";
+    };
+    const runGroup = testStore.cases.length > 0
+      ? Math.max(...testStore.cases.map(c => c.runGroup)) + 1 : 1;
+    let added = 0;
+    for (let i = 1; i < lines.length; i++) {
+      const row = this.parseCSVImportLine(lines[i]);
+      const method = (col(row, "method") || "GET").toUpperCase();
+      const path   = col(row, "path");
+      if (!path) continue;
+      let body: Record<string, any> | null = null;
+      const rawBody = col(row, "body");
+      if (rawBody && rawBody !== "null" && rawBody !== '""') {
+        try { body = JSON.parse(rawBody); } catch {}
+      }
+      const rg = parseInt(col(row, "rungroup") || col(row, "run_group") || col(row, "run")) || runGroup;
+      testStore.add({
+        apiTitle:     col(row, "apititle") || col(row, "api") || col(row, "name") || "Imported",
+        resourceName: col(row, "resourcename") || col(row, "resource")
+          || path.replace(/^\//, "").split("/")[0].replace(/[{}]/g, "") || "resource",
+        method, path, body, dataSource: "file", fileSource: fileName, runGroup: rg,
+      });
+      added++;
+    }
+    for (const tc of testStore.cases) {
+      if (!tc.resolvedUrl) tc.resolvedUrl = envStore.resolve(tc.path);
+    }
+    this.refresh();
+    this.props.onClearAll?.();
+  };
+
+  private doImportJSON = (content: string, fileName: string) => {
+    let json: any;
+    try { json = JSON.parse(content); } catch { return; }
+    const arr: any[] = Array.isArray(json)
+      ? json : (json.testCases || json.cases || json.tests || [json]);
+    if (!arr.length) return;
+    const runGroup = testStore.cases.length > 0
+      ? Math.max(...testStore.cases.map(c => c.runGroup)) + 1 : 1;
+    for (const item of arr) {
+      if (!item || typeof item !== "object") continue;
+      const method = ((item.method as string) || "GET").toUpperCase();
+      const path   = (item.path as string) || "/";
+      if (!path) continue;
+      testStore.add({
+        apiTitle:     (item.testName || item.name || item.apiTitle || "Imported") as string,
+        resourceName: (item.resourceName || path.replace(/^\//, "").split("/")[0].replace(/[{}]/g, "") || "resource") as string,
+        method, path,
+        body:       (item.body || item.parameters || null) as Record<string, any> | null,
+        dataSource: "file", fileSource: fileName,
+        runGroup:   typeof item.runGroup === "number" ? item.runGroup : runGroup,
+      });
+    }
+    for (const tc of testStore.cases) {
+      if (!tc.resolvedUrl) tc.resolvedUrl = envStore.resolve(tc.path);
+    }
+    this.refresh();
+    this.props.onClearAll?.();
+  };
+
+  private handleImportFile = (e: React.ChangeEvent<HTMLInputElement>, type: "csv" | "json") => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const content = ev.target?.result as string;
+      if (type === "csv") this.doImportCSV(content, file.name);
+      else this.doImportJSON(content, file.name);
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
 
   private applyEnvToAll = () => {
     for (const tc of testStore.cases) {
@@ -2402,6 +2499,37 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void; 
               onMouseLeave={e => { if (testStore.cases.length > 0) { const b = e.currentTarget as HTMLButtonElement; b.style.background = "#a78bfa22"; b.style.color = "var(--cs-muted)"; } }}
             >
               ⬇ Save CSV
+            </button>
+            {/* ── Import CSV / JSON ── */}
+            <input
+              ref={this.csvImportRef} type="file" accept=".csv" style={{ display: "none" }}
+              onChange={e => this.handleImportFile(e, "csv")}
+            />
+            <input
+              ref={this.jsonImportRef} type="file" accept=".json" style={{ display: "none" }}
+              onChange={e => this.handleImportFile(e, "json")}
+            />
+            <button
+              onClick={() => this.csvImportRef.current?.click()}
+              title="Import test cases from CSV (app export format)"
+              style={{
+                background: "#60a5fa18", border: "1px solid #60a5fa44",
+                color: "#60a5fa", borderRadius: 6, padding: "4px 12px",
+                fontFamily: MONO, fontSize: 11, cursor: "pointer",
+                display: "flex", alignItems: "center", gap: 5,
+              }}>
+              📥 Import CSV
+            </button>
+            <button
+              onClick={() => this.jsonImportRef.current?.click()}
+              title="Import test cases from JSON"
+              style={{
+                background: "#f59e0b18", border: "1px solid #f59e0b44",
+                color: "#f59e0b", borderRadius: 6, padding: "4px 12px",
+                fontFamily: MONO, fontSize: 11, cursor: "pointer",
+                display: "flex", alignItems: "center", gap: 5,
+              }}>
+              {"{ }"} Import JSON
             </button>
             <button
               onClick={() => this.setState(s => ({ showMockModal: !s.showMockModal }))}
