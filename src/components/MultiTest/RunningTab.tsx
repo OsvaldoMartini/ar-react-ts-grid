@@ -1,5 +1,5 @@
 import React from "react";
-import { testStore, TestCase, executionHistory } from "./utils";
+import { testStore, TestCase, executionHistory, rest, envStore } from "./utils";
 import { StatusBadge } from "./AtomComponents";
 
 // ═══════════════════════════════════════════════════════════════
@@ -55,75 +55,432 @@ function StatCard({ value, label, color, icon }: {
 }
 
 // ── Case row ─────────────────────────────────────────────────────
-function CaseRow({ tc, idx }: { tc: TestCase; idx: number }) {
-  const isRunning = tc.status === "running";
-  const isPassed = tc.status === "passed";
-  const isFailed = tc.status === "failed";
-  const isPending = tc.status === "pending";
+// ── Expandable case row (same design as ReadyForTestTab TcRow) ────
 
-  const rowCol = isRunning ? "#f59e0b"
-    : isPassed ? "#34d399"
-      : isFailed ? "#f87171"
-        : "#8b949e";
+const STATUS_COLORS_RT = {
+  pending: { bg: "#8b949e15", border: "#8b949e30", dot: "#8b949e" },
+  running: { bg: "#f59e0b15", border: "#f59e0b44", dot: "#f59e0b" },
+  passed:  { bg: "#34d39915", border: "#34d39940", dot: "#34d399" },
+  failed:  { bg: "#f8717115", border: "#f8717140", dot: "#f87171" },
+};
 
-  const icon = isRunning ? "⏳"
-    : isPassed ? "✅"
-      : isFailed ? "❌"
-        : "○";
-
-  return (
-    <div style={{
-      display: "flex", alignItems: "center", gap: 10,
-      padding: "9px 14px",
-      background: rowCol + (isRunning ? "12" : isPassed ? "08" : isFailed ? "08" : "05"),
-      borderRadius: 8,
-      border: `1px solid ${rowCol}${isRunning ? "44" : "22"}`,
-      borderLeft: `3px solid ${rowCol}`,
-      transition: "all .2s",
-      opacity: isPending ? 0.45 : 1,
-    }}>
-      <span style={{ fontFamily: MONO, fontSize: 13, flexShrink: 0, width: 20, textAlign: "center" as const }}>
-        {icon}
-      </span>
-      <span style={{
-        fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)",
-        background: "var(--cs-surface-2)", border: "1px solid var(--cs-border-sub)",
-        borderRadius: 4, padding: "1px 6px", flexShrink: 0,
-      }}>
-        #{tc.seq}
-      </span>
-      <MChip method={tc.method} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{
-          fontFamily: MONO, fontSize: 11, fontWeight: 600,
-          color: "var(--cs-text)",
-          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const,
-        }}>
-          {tc.apiTitle}
-        </div>
-        <div style={{
-          fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)", marginTop: 1,
-          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const,
-        }}>
-          {tc.resolvedUrl ?? tc.path}
-        </div>
-      </div>
-      {tc.httpStatus != null && <StatusBadge status={tc.httpStatus} />}
-      {tc.latency != null && (
-        <span style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)", flexShrink: 0 }}>
-          {tc.latency}ms
-        </span>
-      )}
-      {isRunning && (
-        <span style={{
-          fontFamily: MONO, fontSize: 10, color: "#f59e0b",
-          animation: "spin 1s linear infinite",
-          display: "inline-block", flexShrink: 0,
-        }}>⟳</span>
-      )}
-    </div>
-  );
+interface RtRowState {
+  open:         boolean;
+  editUrl:      string;
+  editBody:     string;
+  editHeaders:  string;
+  bodyError:    string | null;
+  headersError: string | null;
+  running:      boolean;
+  dirty:        boolean;
 }
+
+class RtRow extends React.Component<{ tc: TestCase; onRefresh?: () => void }, RtRowState> {
+  constructor(props: { tc: TestCase; onRefresh?: () => void }) {
+    super(props);
+    const { tc } = props;
+    this.state = {
+      open:         false,
+      editUrl:      tc.resolvedUrl ?? tc.path,
+      editBody:     tc.body ? JSON.stringify(tc.body, null, 2) : "",
+      editHeaders:  JSON.stringify({ "Content-Type": "application/json", "Accept": "application/json" }, null, 2),
+      bodyError:    null,
+      headersError: null,
+      running:      false,
+      dirty:        false,
+    };
+  }
+
+  private playOne = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const { tc, onRefresh } = this.props;
+    const { editUrl, editBody, editHeaders } = this.state;
+
+    let parsedBody: Record<string, any> | null = null;
+    if (editBody.trim()) {
+      try { parsedBody = JSON.parse(editBody); }
+      catch { this.setState({ bodyError: "Invalid JSON — fix before running" }); return; }
+    }
+    let parsedHeaders: Record<string, string> = {};
+    if (editHeaders.trim()) {
+      try { parsedHeaders = JSON.parse(editHeaders); }
+      catch { this.setState({ headersError: "Invalid JSON — fix headers before running" }); return; }
+    }
+    this.setState({ headersError: null, running: true, bodyError: null });
+    tc.status = "running";
+    onRefresh?.();
+
+    const t0 = Date.now();
+    try {
+      await new Promise(r => setTimeout(r, 20 + Math.random() * 60));
+      let path = tc.path;
+      try { const u = new URL(editUrl); path = u.pathname + u.search; } catch { path = editUrl; }
+      const r = await rest.req(tc.method, path, parsedBody || undefined);
+      tc.status     = r.status >= 200 && r.status < 300 ? "passed" : "failed";
+      tc.httpStatus = r.status;
+      tc.latency    = Date.now() - t0;
+      tc.result     = r.body;
+      tc.headers    = r.headers;
+      tc.resolvedUrl = editUrl;
+      if (parsedBody) tc.body = parsedBody;
+    } catch (err: any) {
+      tc.status     = "failed";
+      tc.httpStatus = "ERR";
+      tc.latency    = Date.now() - t0;
+      tc.result     = { error: err.message };
+    }
+    this.setState({ running: false });
+    onRefresh?.();
+  };
+
+  private resetEdits = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const { tc } = this.props;
+    this.setState({
+      editUrl:     tc.resolvedUrl ?? tc.path,
+      editBody:    tc.body ? JSON.stringify(tc.body, null, 2) : "",
+      editHeaders: JSON.stringify({ "Content-Type": "application/json", "Accept": "application/json" }, null, 2),
+      bodyError: null, headersError: null, dirty: false,
+    });
+  };
+
+  render() {
+    const { tc } = this.props;
+    const { open, editUrl, editBody, editHeaders, bodyError, headersError, running, dirty } = this.state;
+
+    const liveStatus = running ? "running" : tc.status;
+    const sc   = STATUS_COLORS_RT[liveStatus];
+    const mc   = METHOD_COLORS[tc.method?.toUpperCase()] || "#8b949e";
+    const hasBody = ["POST", "PATCH", "PUT"].includes(tc.method?.toUpperCase());
+    const isOk    = tc.status === "passed";
+    const isFail  = tc.status === "failed";
+
+    return (
+      <div style={{
+        borderRadius: 8, border: `1px solid ${sc.border}`,
+        borderLeft: `3px solid ${sc.dot}`, background: sc.bg,
+        transition: "border .15s", fontFamily: MONO,
+        opacity: tc.status === "pending" ? 0.5 : 1,
+      }}>
+
+        {/* ══ HEADER ROW ══ */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 10px 9px 13px" }}>
+          {/* Status dot / spinner */}
+          <span style={{ fontFamily: MONO, fontSize: 13, color: sc.dot, flexShrink: 0, width: 16, textAlign: "center" as const, lineHeight: 1 }}>
+            {liveStatus === "running"
+              ? <span style={{ fontSize: 10, animation: "spin 1s linear infinite", display: "inline-block" }}>⟳</span>
+              : liveStatus === "passed" ? "✓" : liveStatus === "failed" ? "✗" : "○"}
+          </span>
+          <span style={{
+            fontSize: 10, color: "var(--cs-dim)",
+            background: "var(--cs-surface-2)", border: "1px solid var(--cs-border-sub)",
+            borderRadius: 4, padding: "1px 6px", flexShrink: 0,
+          }}>#{tc.seq}</span>
+          <span style={{ fontSize: 9, color: "var(--cs-dim)", flexShrink: 0, opacity: 0.7 }}>R{tc.runGroup}</span>
+          {/* Method chip */}
+          <span style={{
+            background: mc + "18", border: `1px solid ${mc}40`, color: mc,
+            borderRadius: 4, padding: "1px 6px", fontFamily: MONO, fontSize: 10,
+            fontWeight: 700, whiteSpace: "nowrap" as const, flexShrink: 0,
+          }}>{tc.method?.toUpperCase()}</span>
+          {/* Title + path — click to expand */}
+          <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }}
+            onClick={() => this.setState(s => ({ open: !s.open }))}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "var(--cs-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
+              {tc.apiTitle}
+            </div>
+            <div style={{ fontSize: 10, color: "var(--cs-dim)", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
+              {tc.path}
+            </div>
+          </div>
+          {tc.httpStatus != null && <StatusBadge status={tc.httpStatus} />}
+          {tc.latency != null && (
+            <span style={{ fontSize: 10, color: "var(--cs-dim)", flexShrink: 0 }}>{tc.latency}ms</span>
+          )}
+          {dirty && (
+            <span style={{
+              fontSize: 9, color: "#f59e0b", background: "#f59e0b15",
+              border: "1px solid #f59e0b33", borderRadius: 4, padding: "1px 6px",
+              flexShrink: 0, fontWeight: 700,
+            }}>EDITED</span>
+          )}
+          {/* Run button */}
+          <button onClick={this.playOne} disabled={running} title="Re-run this request"
+            style={{
+              flexShrink: 0, width: 30, height: 30, borderRadius: 6,
+              border: `1.5px solid ${running ? "var(--cs-border)" : mc + "88"}`,
+              background: running ? "var(--cs-surface-2)" : mc + "18",
+              color: running ? "var(--cs-dim)" : mc,
+              cursor: running ? "not-allowed" : "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 13, transition: "all .15s",
+            }}
+            onMouseEnter={e => { if (!running) (e.currentTarget as HTMLButtonElement).style.background = mc + "35"; }}
+            onMouseLeave={e => { if (!running) (e.currentTarget as HTMLButtonElement).style.background = mc + "18"; }}>
+            {running
+              ? <span style={{ fontSize: 10, animation: "spin 1s linear infinite", display: "inline-block" }}>⟳</span>
+              : "▶"}
+          </button>
+          {/* Expand ▼ / ▲ */}
+          <button onClick={() => this.setState(s => ({ open: !s.open }))}
+            style={{
+              flexShrink: 0, width: 26, height: 26, borderRadius: 5,
+              border: "1px solid var(--cs-border-sub)", background: "transparent",
+              color: "var(--cs-dim)", cursor: "pointer", fontSize: 9,
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+            {open ? "▲" : "▼"}
+          </button>
+        </div>
+
+        {/* ══ EXPANDED PANEL ══ */}
+        {open && (
+          <div style={{ borderTop: `1px solid ${sc.border}`, display: "flex", flexDirection: "column" as const }}>
+
+            {/* ── REQUEST header bar ── */}
+            <div style={{
+              padding: "10px 14px 4px",
+              borderBottom: "1px solid var(--cs-border-sub)",
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              background: mc + "08",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontFamily: MONO, fontSize: 9, fontWeight: 800, color: mc, letterSpacing: 1, textTransform: "uppercase" as const }}>
+                  ▶ REQUEST
+                </span>
+                <span style={{
+                  background: mc + "18", border: `1px solid ${mc}40`, color: mc,
+                  borderRadius: 4, padding: "1px 6px", fontFamily: MONO, fontSize: 10, fontWeight: 700,
+                }}>{tc.method?.toUpperCase()}</span>
+              </div>
+              {dirty && (
+                <button onClick={this.resetEdits} style={{
+                  fontSize: 9, color: "#f59e0b", background: "transparent",
+                  border: "1px solid #f59e0b33", borderRadius: 4, padding: "1px 7px",
+                  cursor: "pointer", fontFamily: MONO,
+                }}>↺ Reset edits</button>
+              )}
+            </div>
+
+            <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column" as const, gap: 10 }}>
+
+              {/* Request URL */}
+              <div>
+                <div style={{ fontFamily: MONO, fontSize: 9, fontWeight: 700, color: "var(--cs-dim)", letterSpacing: 0.8, textTransform: "uppercase" as const, marginBottom: 5 }}>
+                  🌐 Request URL
+                </div>
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <span style={{
+                    fontSize: 10, fontWeight: 800, color: mc, background: mc + "18",
+                    border: `1px solid ${mc}40`, borderRadius: 5, padding: "6px 10px", flexShrink: 0,
+                  }}>{tc.method?.toUpperCase()}</span>
+                  <input
+                    value={editUrl}
+                    onChange={e => this.setState({ editUrl: e.target.value, dirty: true })}
+                    onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); this.playOne(e as any); } }}
+                    spellCheck={false}
+                    style={{
+                      flex: 1, padding: "7px 12px", fontFamily: MONO, fontSize: 11,
+                      background: "var(--cs-bg)", borderRadius: 7, color: "var(--cs-text)",
+                      border: `1px solid ${dirty ? "#f59e0b66" : "var(--cs-border)"}`,
+                      outline: "none", transition: "border-color .15s",
+                    }}
+                    onFocus={e => (e.target.style.borderColor = mc + "88")}
+                    onBlur={e => (e.target.style.borderColor = dirty ? "#f59e0b66" : "var(--cs-border)")}
+                  />
+                </div>
+              </div>
+
+              {/* Request Headers */}
+              <div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 5 }}>
+                  <div style={{ fontFamily: MONO, fontSize: 9, fontWeight: 700, color: "var(--cs-dim)", letterSpacing: 0.8, textTransform: "uppercase" as const }}>
+                    📋 Headers <span style={{ opacity: 0.5, fontWeight: 400 }}>JSON</span>
+                  </div>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    {headersError && (
+                      <span style={{ fontSize: 9, color: "#f87171", background: "#f8717115", border: "1px solid #f8717133", borderRadius: 4, padding: "2px 8px" }}>
+                        ⚠ {headersError}
+                      </span>
+                    )}
+                    <button onClick={e => {
+                      e.stopPropagation();
+                      try { this.setState({ editHeaders: JSON.stringify(JSON.parse(editHeaders), null, 2), headersError: null }); }
+                      catch { this.setState({ headersError: "Cannot format — invalid JSON" }); }
+                    }} style={{
+                      fontSize: 9, color: "#60a5fa", background: "transparent",
+                      border: "1px solid #60a5fa33", borderRadius: 4, padding: "1px 7px",
+                      cursor: "pointer", fontFamily: MONO,
+                    }}>{ } Format</button>
+                  </div>
+                </div>
+                <textarea
+                  value={editHeaders}
+                  onChange={e => this.setState({ editHeaders: e.target.value, dirty: true, headersError: null })}
+                  spellCheck={false}
+                  rows={Math.min(10, Math.max(3, editHeaders.split("\n").length + 1))}
+                  style={{
+                    width: "100%", padding: "10px 12px", fontFamily: MONO, fontSize: 11,
+                    background: "var(--cs-bg)", color: "var(--cs-text)",
+                    border: `1px solid ${headersError ? "#f87171" : dirty ? "#f59e0b66" : "var(--cs-border)"}`,
+                    borderRadius: 7, outline: "none", resize: "vertical" as const,
+                    lineHeight: 1.6, transition: "border-color .15s", boxSizing: "border-box" as const,
+                  }}
+                  onFocus={e => (e.target.style.borderColor = mc + "88")}
+                  onBlur={e => (e.target.style.borderColor = headersError ? "#f87171" : dirty ? "#f59e0b66" : "var(--cs-border)")}
+                />
+              </div>
+
+              {/* Request Body — POST / PATCH / PUT only */}
+              {hasBody && (
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 5 }}>
+                    <div style={{ fontFamily: MONO, fontSize: 9, fontWeight: 700, color: "var(--cs-dim)", letterSpacing: 0.8, textTransform: "uppercase" as const }}>
+                      📦 Request Body <span style={{ opacity: 0.5, fontWeight: 400 }}>JSON</span>
+                    </div>
+                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                      {bodyError && (
+                        <span style={{ fontSize: 9, color: "#f87171", background: "#f8717115", border: "1px solid #f8717133", borderRadius: 4, padding: "2px 8px" }}>
+                          ⚠ {bodyError}
+                        </span>
+                      )}
+                      <button onClick={e => {
+                        e.stopPropagation();
+                        try { this.setState({ editBody: JSON.stringify(JSON.parse(editBody), null, 2), bodyError: null }); }
+                        catch { this.setState({ bodyError: "Cannot format — invalid JSON" }); }
+                      }} style={{
+                        fontSize: 9, color: "#60a5fa", background: "transparent",
+                        border: "1px solid #60a5fa33", borderRadius: 4, padding: "1px 7px",
+                        cursor: "pointer", fontFamily: MONO,
+                      }}>{ } Format</button>
+                    </div>
+                  </div>
+                  <textarea
+                    value={editBody}
+                    onChange={e => this.setState({ editBody: e.target.value, dirty: true, bodyError: null })}
+                    spellCheck={false}
+                    rows={Math.min(14, Math.max(4, editBody.split("\n").length + 1))}
+                    style={{
+                      width: "100%", padding: "10px 12px", fontFamily: MONO, fontSize: 11,
+                      background: "var(--cs-bg)", color: "var(--cs-text)",
+                      border: `1px solid ${bodyError ? "#f87171" : dirty ? "#f59e0b66" : "var(--cs-border)"}`,
+                      borderRadius: 7, outline: "none", resize: "vertical" as const,
+                      lineHeight: 1.6, transition: "border-color .15s", boxSizing: "border-box" as const,
+                    }}
+                    onFocus={e => (e.target.style.borderColor = mc + "88")}
+                    onBlur={e => (e.target.style.borderColor = bodyError ? "#f87171" : dirty ? "#f59e0b66" : "var(--cs-border)")}
+                  />
+                </div>
+              )}
+
+              {/* Run button */}
+              <button
+                onClick={this.playOne}
+                disabled={running || !!bodyError || !!headersError}
+                style={{
+                  alignSelf: "flex-start" as const,
+                  padding: "8px 22px", borderRadius: 7,
+                  cursor: running || !!bodyError || !!headersError ? "not-allowed" : "pointer",
+                  background: running || !!bodyError || !!headersError
+                    ? "var(--cs-surface-2)"
+                    : `linear-gradient(135deg, ${mc}22, ${mc}44)`,
+                  border: `1.5px solid ${running || !!bodyError || !!headersError ? "var(--cs-border)" : mc + "88"}`,
+                  color: running || !!bodyError || !!headersError ? "var(--cs-dim)" : mc,
+                  fontFamily: MONO, fontSize: 12, fontWeight: 800,
+                  display: "flex", alignItems: "center", gap: 8,
+                  opacity: running || !!bodyError || !!headersError ? 0.6 : 1,
+                  transition: "all .15s",
+                }}>
+                {running ? "⟳  Running…" : `▶  Run  ${tc.method?.toUpperCase()}  ${tc.path}`}
+              </button>
+            </div>
+
+            {/* ── RESPONSE SECTION — shown after any execution ── */}
+            {tc.result != null && (() => {
+              const resCol = isOk ? "#34d399" : isFail ? "#f87171" : "var(--cs-muted)";
+              const resBg  = isOk ? "#34d39908" : isFail ? "#f8717108" : "var(--cs-bg)";
+              const resBrd = isOk ? "#34d39933" : isFail ? "#f8717133" : "var(--cs-border-sub)";
+              return (
+                <div style={{ borderTop: `1px solid ${resBrd}` }}>
+                  {/* Response header bar */}
+                  <div style={{
+                    padding: "10px 14px 4px", borderBottom: `1px solid ${resBrd}`,
+                    background: resBg, display: "flex", alignItems: "center", gap: 10,
+                  }}>
+                    <span style={{ fontFamily: MONO, fontSize: 9, fontWeight: 800, color: resCol, letterSpacing: 1, textTransform: "uppercase" as const }}>
+                      ◀ RESPONSE
+                    </span>
+                    {tc.httpStatus != null && <StatusBadge status={tc.httpStatus} />}
+                    {tc.latency != null && (
+                      <span style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)" }}>{tc.latency}ms</span>
+                    )}
+                    {tc.resolvedUrl && (
+                      <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)", opacity: 0.6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const, flex: 1 }}>
+                        → {tc.resolvedUrl}
+                      </span>
+                    )}
+                  </div>
+
+                  <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column" as const, gap: 10 }}>
+                    {/* Response Headers */}
+                    {tc.headers && Object.keys(tc.headers).length > 0 && (
+                      <div>
+                        <div style={{ fontFamily: MONO, fontSize: 9, fontWeight: 700, color: "var(--cs-dim)", letterSpacing: 0.8, textTransform: "uppercase" as const, marginBottom: 5 }}>
+                          📋 Headers
+                        </div>
+                        <div style={{
+                          fontFamily: MONO, fontSize: 10, borderRadius: 7, padding: "8px 12px",
+                          background: "var(--cs-bg)", border: `1px solid ${resBrd}`,
+                          color: "var(--cs-muted)", lineHeight: 1.7,
+                        }}>
+                          {Object.entries(tc.headers).map(([k, v]) => (
+                            <div key={k}>
+                              <span style={{ color: "#60a5fa" }}>{k}</span>
+                              <span style={{ color: "var(--cs-dim)" }}>: </span>
+                              <span>{String(v)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {/* Response Body */}
+                    <div>
+                      <div style={{ fontFamily: MONO, fontSize: 9, fontWeight: 700, color: "var(--cs-dim)", letterSpacing: 0.8, textTransform: "uppercase" as const, marginBottom: 5 }}>
+                        📦 Body
+                      </div>
+                      <pre style={{
+                        fontFamily: MONO, fontSize: 10, margin: 0,
+                        background: resBg, border: `1px solid ${resBrd}`,
+                        borderRadius: 7, padding: "10px 12px", overflowX: "auto" as const,
+                        maxHeight: 300, color: resCol, lineHeight: 1.55,
+                      }}>
+                        {JSON.stringify(tc.result, null, 2)}
+                      </pre>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* ── Meta footer ── */}
+            <div style={{
+              display: "flex", gap: 14, fontSize: 9, color: "var(--cs-dim)",
+              flexWrap: "wrap" as const, padding: "8px 14px",
+              borderTop: "1px solid var(--cs-border-sub)",
+              background: "var(--cs-surface-2)",
+            }}>
+              <span>Created: {new Date(tc.createdAt).toLocaleTimeString()}</span>
+              <span>Source: <strong style={{ color: "var(--cs-muted)" }}>{tc.dataSource}</strong></span>
+              {tc.fileSource && <span>File: {tc.fileSource}</span>}
+              {dirty && <span style={{ color: "#f59e0b" }}>⚠ Request has unsaved edits</span>}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+}
+
 
 // ── Main component ────────────────────────────────────────────────
 const PAGE_SIZES = [10, 50, 100, 150] as const;
@@ -516,7 +873,7 @@ export class RunningTab extends React.Component<{}, RunningTabState> {
             </div>
             <div style={{ display: "flex", flexDirection: "column" as const, gap: 5 }}>
               {pageSlice.map((tc, i) => (
-                <CaseRow key={tc.id} tc={tc} idx={pageStart + i} />
+                <RtRow key={tc.id} tc={tc} onRefresh={() => this.setState(s => ({ tick: s.tick + 1 }))} />
               ))}
             </div>
             <div ref={this.bottomRef} />
