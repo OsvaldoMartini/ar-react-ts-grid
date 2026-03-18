@@ -13,8 +13,8 @@ i18n
     fallbackLng: 'en',
     load: 'languageOnly',   // strips region codes: "en-US" → "en"
 
-    defaultNS: 'capi',
-    ns: ['capi'],
+    defaultNS: 'mt',
+    ns: ['mt'],
 
     backend: {
       loadPath: '/locales/{{lng}}/{{ns}}.json',
@@ -23,7 +23,7 @@ i18n
     detection: {
       order: ['localStorage', 'navigator', 'htmlTag'],
       caches: ['localStorage'],
-      lookupLocalStorage: 'capi-lang',
+      lookupLocalStorage: 'mt-lang',
     },
 
     interpolation: {
@@ -31,7 +31,7 @@ i18n
     },
 
     react: {
-      useSuspense: false,   // CapiShell handles its own loading guard
+      useSuspense: false,
     },
   });
 
