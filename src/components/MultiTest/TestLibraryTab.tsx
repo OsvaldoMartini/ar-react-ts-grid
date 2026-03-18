@@ -12,6 +12,7 @@ import { pluginRegistry } from "./banking/PluginSystem";
 import { testLibraryStore } from "./banking/TestLibraryStore";
 import { schemaMatchingEngine, type MatchResult } from "./banking/SchemaMatchingEngine";
 import { db } from "./utils";
+import { aiPrefsStore } from "./AIPrefsStore";
 import "./mt-library.scss";
 
 // ─── COMPONENT STATE ─────────────────────────────────────────
@@ -30,6 +31,8 @@ interface LibraryState {
   generating:        boolean;
   lastMatchResults:  MatchResult[];
   generatedCount:    number;
+  aiSelectedCatIds:  Set<string>;
+  showAICategories:  boolean;
 }
 
 export class TestLibraryTab extends React.Component<{}, LibraryState> {
@@ -47,10 +50,13 @@ export class TestLibraryTab extends React.Component<{}, LibraryState> {
     generating:       false,
     lastMatchResults: [],
     generatedCount:   testLibraryStore.generated.length,
+    aiSelectedCatIds: new Set(aiPrefsStore.selectedCategoryIds),
+    showAICategories: false,
   };
 
   private unsubPlugin?: () => void;
   private unsubLib?: () => void;
+  private unsubPrefs?: () => void;
   private fileInput = React.createRef<HTMLInputElement>();
   private folderInput = React.createRef<HTMLInputElement>();
   private pluginFileInput = React.createRef<HTMLInputElement>();
@@ -58,10 +64,14 @@ export class TestLibraryTab extends React.Component<{}, LibraryState> {
   componentDidMount() {
     this.unsubPlugin = pluginRegistry.subscribe(() => this.refreshStats());
     this.unsubLib = testLibraryStore.subscribe(() => this.refreshStats());
+    this.unsubPrefs = aiPrefsStore.subscribe(() =>
+      this.setState({ aiSelectedCatIds: new Set(aiPrefsStore.selectedCategoryIds) })
+    );
   }
   componentWillUnmount() {
     this.unsubPlugin?.();
     this.unsubLib?.();
+    this.unsubPrefs?.();
   }
 
   private getPluginStates() {
@@ -241,7 +251,7 @@ export class TestLibraryTab extends React.Component<{}, LibraryState> {
 
   // ─── RENDER ─────────────────────────────────────────────────
   render() {
-    const { view, search, categoryStats, totalTests, selectedCategory, selectedSubcat, filteredTests, selectedTest, pluginStates, importing, generating, generatedCount } = this.state;
+    const { view, search, categoryStats, totalTests, selectedCategory, selectedSubcat, filteredTests, selectedTest, pluginStates, importing, generating, generatedCount, aiSelectedCatIds, showAICategories } = this.state;
     const stats = testLibraryStore.stats;
     const specsLoaded = db.specs.length;
 
@@ -308,6 +318,120 @@ export class TestLibraryTab extends React.Component<{}, LibraryState> {
         {/* ── DASHBOARD VIEW ── */}
         {view === "dashboard" && (
           <div className="lib-dashboard">
+
+            {/* ── AI CATEGORY SELECTOR ── */}
+            <div style={{
+              marginBottom: 18, borderRadius: 10,
+              border: "1px solid var(--cs-border)",
+              background: "var(--cs-surface-2)",
+              overflow: "hidden",
+            }}>
+              {/* Header / toggle */}
+              <button
+                onClick={() => this.setState(s => ({ showAICategories: !s.showAICategories }))}
+                style={{
+                  width: "100%", display: "flex", alignItems: "center", gap: 8,
+                  padding: "10px 14px", background: "transparent", border: "none",
+                  borderBottom: showAICategories ? "1px solid var(--cs-border)" : "none",
+                  cursor: "pointer", textAlign: "left" as const,
+                }}
+              >
+                <span style={{ fontSize: 14 }}>🤖</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontFamily: "'JetBrains Mono','Fira Code',monospace", fontSize: 11, fontWeight: 700, color: "var(--cs-text)" }}>
+                    AI Assistant Category Filter
+                  </div>
+                  <div style={{ fontFamily: "'JetBrains Mono','Fira Code',monospace", fontSize: 9, color: "var(--cs-dim)", marginTop: 1 }}>
+                    {aiSelectedCatIds.size === 0
+                      ? "No categories selected — AI will use all domains"
+                      : `${aiSelectedCatIds.size} categor${aiSelectedCatIds.size === 1 ? "y" : "ies"} selected — injected into AI prompts`}
+                  </div>
+                </div>
+                {aiSelectedCatIds.size > 0 && (
+                  <span style={{
+                    fontFamily: "'JetBrains Mono','Fira Code',monospace", fontSize: 9,
+                    padding: "2px 8px", borderRadius: 10,
+                    background: "#34d39920", border: "1px solid #34d39933", color: "#34d399",
+                  }}>
+                    {aiSelectedCatIds.size} active
+                  </span>
+                )}
+                <span style={{ fontFamily: "'JetBrains Mono','Fira Code',monospace", fontSize: 10, color: "var(--cs-dim)" }}>
+                  {showAICategories ? "▲" : "▼"}
+                </span>
+              </button>
+
+              {/* Expandable checkbox grid */}
+              {showAICategories && (
+                <div style={{ padding: "10px 14px 14px" }}>
+                  <div style={{
+                    display: "flex", gap: 6, flexWrap: "wrap" as const,
+                    marginBottom: 10,
+                  }}>
+                    <button onClick={() => { BANKING_CATEGORIES.forEach(c => { if (!aiPrefsStore.selectedCategoryIds.has(c.id)) aiPrefsStore.toggleCategory(c.id); }); }}
+                      style={{
+                        padding: "3px 10px", borderRadius: 6, cursor: "pointer",
+                        background: "var(--cs-accent)18", border: "1px solid var(--cs-accent)44",
+                        color: "var(--cs-accent)", fontFamily: "'JetBrains Mono','Fira Code',monospace", fontSize: 10, fontWeight: 700,
+                      }}>
+                      ✓ All
+                    </button>
+                    <button onClick={() => { [...aiPrefsStore.selectedCategoryIds].forEach(id => aiPrefsStore.toggleCategory(id)); }}
+                      style={{
+                        padding: "3px 10px", borderRadius: 6, cursor: "pointer",
+                        background: "transparent", border: "1px solid var(--cs-border-sub)",
+                        color: "var(--cs-dim)", fontFamily: "'JetBrains Mono','Fira Code',monospace", fontSize: 10,
+                      }}>
+                      ✕ None
+                    </button>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(210px,1fr))", gap: 6 }}>
+                    {BANKING_CATEGORIES.map(cat => {
+                      const checked = aiSelectedCatIds.has(cat.id);
+                      return (
+                        <label key={cat.id}
+                          onClick={() => aiPrefsStore.toggleCategory(cat.id)}
+                          style={{
+                            display: "flex", alignItems: "center", gap: 8,
+                            padding: "7px 10px", borderRadius: 8, cursor: "pointer",
+                            background: checked ? cat.color + "10" : "var(--cs-bg)",
+                            border: `1px solid ${checked ? cat.color + "44" : "var(--cs-border-sub)"}`,
+                            transition: "all .12s",
+                          }}
+                        >
+                          <input
+                            type="checkbox" checked={checked} readOnly
+                            style={{ accentColor: cat.color, width: 13, height: 13, flexShrink: 0 }}
+                          />
+                          <span style={{ fontSize: 14, flexShrink: 0 }}>{cat.icon}</span>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{
+                              fontFamily: "'JetBrains Mono','Fira Code',monospace", fontSize: 10,
+                              fontWeight: checked ? 700 : 400,
+                              color: checked ? cat.color : "var(--cs-muted)",
+                              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const,
+                            }}>
+                              {cat.name}
+                            </div>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  {aiSelectedCatIds.size > 0 && (
+                    <div style={{
+                      marginTop: 10, padding: "6px 10px", borderRadius: 6,
+                      background: "#34d39910", border: "1px solid #34d39922",
+                      fontFamily: "'JetBrains Mono','Fira Code',monospace", fontSize: 9, color: "#34d399",
+                      lineHeight: 1.5,
+                    }}>
+                      ✓ Selected: {[...aiSelectedCatIds].map(id => BANKING_CATEGORIES.find(c => c.id === id)?.name).filter(Boolean).join(" · ")}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             <div className="lib-cat-grid">
               {categoryStats.map(cs => {
                 const cat = BANKING_CATEGORIES.find(c => c.name === cs.category);
