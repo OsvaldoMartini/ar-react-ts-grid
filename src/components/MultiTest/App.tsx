@@ -1,4 +1,5 @@
 import React from "react";
+import { mtT as t } from "./useMtT";
 import { db, rest, SYNTH, ApiSpec } from "./utils";
 import { FileUploadPanel } from "./FileUploadPanel";
 import { RunningTab } from "./RunningTab";
@@ -99,14 +100,14 @@ export default class App extends React.Component<AppProps, AppState> {
     const tot = Object.values(db.stores).reduce((a, s) => a + s.length, 0);
     const queuedCount = testStore.total;
     const TABS = [
-      { id: "apis", l: `📁 API Files (${specs.length})`, stepLabel: "API Files" },
-      { id: "workflow", l: `⬡ Workflow`, stepLabel: "Workflow" },
-      { id: "datagen", l: `⚗ Data Generator`, stepLabel: "Data Gen" },
-      { id: "ready", l: `🧪 Ready for Test${queuedCount > 0 ? ` (${queuedCount.toLocaleString()})` : ""}`, stepLabel: "Ready" },
-      { id: "running", l: `🔍 Running`, stepLabel: "Running" },
-      { id: "report", l: `🗄️ Report (${tot})`, stepLabel: "Report" },
-      { id: "library", l: `📚 Test Library`, stepLabel: "Library" },
-      { id: "ai", l: `🤖 AI Assistant`, stepLabel: "AI" },
+      { id: "apis", l: `📁 ${t("nav.apiFiles")} (${specs.length})`, stepLabel: t("nav.apiFiles") },
+      { id: "workflow", l: `⬡ ${t("nav.workflow")}`, stepLabel: t("nav.workflow") },
+      { id: "datagen", l: `⚗ ${t("nav.dataGen")}`, stepLabel: t("nav.dataGen") },
+      { id: "ready", l: `🧪 ${t("nav.readyForTest")}${queuedCount > 0 ? ` (${queuedCount.toLocaleString()})` : ""}`, stepLabel: t("nav.readyForTest") },
+      { id: "running", l: `🔍 ${t("nav.running")}`, stepLabel: t("nav.running") },
+      { id: "report", l: `🗄️ ${t("nav.report")} (${tot})`, stepLabel: t("nav.report") },
+      { id: "library", l: `📚 ${t("nav.library")}`, stepLabel: t("nav.library") },
+      { id: "ai", l: `🤖 ${t("nav.ai")}`, stepLabel: t("nav.ai") },
     ] as const;
     const activeTabIndex = TABS.findIndex(t => t.id === tab);
 
@@ -135,7 +136,7 @@ export default class App extends React.Component<AppProps, AppState> {
               className="mt-btn-wizard"
               onClick={() => this.setState({ showWizard: true })}
             >
-              🧪 Generate Rapid Tests
+              {t("header.generateTests")}
             </button>
             <div className="mt-api-count">● {specs.length} API</div>
             {rightControls}
@@ -144,19 +145,19 @@ export default class App extends React.Component<AppProps, AppState> {
 
         {/* ── STEP INDICATOR + TABS ── */}
         <div className="mt-nav-shell">
-          <div className="mt-stepper" aria-label="Workflow progress">
-            {TABS.map((t, index) => {
+          <div className="mt-stepper" aria-label={t("nav.workflowProgress")}>
+            {TABS.map((tab, index) => {
               const stateClass = index < activeTabIndex ? "is-complete" : index === activeTabIndex ? "is-active" : "is-upcoming";
               return (
-                <React.Fragment key={t.id}>
+                <React.Fragment key={tab.id}>
                   <button
                     type="button"
-                    onClick={() => this.setState({ tab: t.id as any })}
+                    onClick={() => this.setState({ tab: tab.id as any })}
                     className={`mt-step ${stateClass}`}
                     aria-current={index === activeTabIndex ? "step" : undefined}
                   >
                     <span className="mt-step__circle">{index + 1}</span>
-                    <span className="mt-step__label">{t.stepLabel}</span>
+                    <span className="mt-step__label">{tab.stepLabel}</span>
                   </button>
                   {index < TABS.length - 1 && (
                     <div className={`mt-step__connector ${index < activeTabIndex ? "is-complete" : ""}`} aria-hidden="true" />
@@ -167,13 +168,13 @@ export default class App extends React.Component<AppProps, AppState> {
           </div>
 
           <div className="mt-tabs">
-            {TABS.map(t => (
+            {TABS.map(tab => (
               <button
-                key={t.id}
-                onClick={() => this.setState({ tab: t.id as any })}
-                className={`mt-tab-btn${tab === t.id ? " active" : ""}`}
+                key={tab.id}
+                onClick={() => this.setState({ tab: tab.id as any })}
+                className={`mt-tab-btn${this.state.tab === tab.id ? " active" : ""}`}
               >
-                {t.l}
+                {tab.l}
               </button>
             ))}
           </div>

@@ -19,6 +19,7 @@ import React from "react";
 import { ThemeProvider, useTheme } from "./ThemeContext";
 import { LanguagePicker } from "./LanguagePicker";
 import App, { type AppProps } from "./App";
+import { MtI18nBridge } from "./MtI18nBridge";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ThemeToggle — lives here so useTheme() is always inside <ThemeProvider>
@@ -98,7 +99,9 @@ function ThemedShell(props: AppProps) {
 export default function AppShell(props: AppProps) {
   return (
     <ThemeProvider>
-      <ThemedShell {...props} />
+      <MtI18nBridge>
+        <ThemedShell {...props} />
+      </MtI18nBridge>
     </ThemeProvider>
   );
 }
