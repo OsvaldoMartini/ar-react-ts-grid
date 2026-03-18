@@ -502,7 +502,6 @@ export class AIAssistantTab extends React.Component<AIAssistantProps, AIAssistan
     }
 
     if (["openai-cloud", "lmstudio-local", "custom-local"].includes(provider.id)) {
-      if (provider.id === "openai-cloud" && !key) throw new Error("OpenAI API key required — click Set Key to configure");
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (key) headers["Authorization"] = `Bearer ${key}`;
       const res = await fetch(provider.endpoint, {
@@ -733,7 +732,7 @@ export class AIAssistantTab extends React.Component<AIAssistantProps, AIAssistan
                 {p.icon} {p.name}
                 {apiKeys[p.id]
                   ? <span style={{ marginLeft: 4, color: "#34d399", fontSize: 9 }}>✓</span>
-                  : p.id === "claude-cloud" ? <span style={{ marginLeft: 4, color: "#34d399", fontSize: 9 }}>FREE</span>
+                  : (p.id === "claude-cloud" || p.id === "openai-cloud") ? <span style={{ marginLeft: 4, color: "#34d399", fontSize: 9 }}>FREE</span>
                   : p.type === "cloud" ? <span style={{ marginLeft: 4, color: "#f87171", fontSize: 9 }}>⚠ key</span>
                   : null}
               </span>
@@ -788,11 +787,11 @@ export class AIAssistantTab extends React.Component<AIAssistantProps, AIAssistan
                           <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, marginLeft: 8 }}>
                             <span style={{
                               fontFamily: MONO, fontSize: 9, padding: "2px 7px", borderRadius: 4,
-                              background: hasKey ? "#34d39915" : p.id === "claude-cloud" ? "#34d39910" : "#f8717115",
-                              border: `1px solid ${hasKey ? "#34d39933" : p.id === "claude-cloud" ? "#34d39922" : "#f8717133"}`,
-                              color: hasKey ? "#34d399" : p.id === "claude-cloud" ? "#34d399" : "#f87171",
+                              background: hasKey ? "#34d39915" : (p.id === "claude-cloud" || p.id === "openai-cloud") ? "#34d39910" : "#f8717115",
+                              border: `1px solid ${hasKey ? "#34d39933" : (p.id === "claude-cloud" || p.id === "openai-cloud") ? "#34d39922" : "#f8717133"}`,
+                              color: hasKey ? "#34d399" : (p.id === "claude-cloud" || p.id === "openai-cloud") ? "#34d399" : "#f87171",
                             }}>
-                              {hasKey ? "✓ Key set" : p.id === "claude-cloud" ? "FREE" : "⚠ No key"}
+                              {hasKey ? "✓ Key set" : (p.id === "claude-cloud" || p.id === "openai-cloud") ? "FREE" : "⚠ No key"}
                             </span>
                             <button onClick={e => { e.preventDefault(); this.setState(prev => ({ showKeyFor: prev.showKeyFor === p.id ? null : p.id })); }} style={IBTN_S}>
                               {isShowKey ? "▲" : "✎ Set Key"}
