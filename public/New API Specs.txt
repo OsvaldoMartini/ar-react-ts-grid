@@ -449,5 +449,3 @@ a visual enterprise UI layout for the tool
 so we can directly integrate it into the product.
 
  
-
-Andrea
