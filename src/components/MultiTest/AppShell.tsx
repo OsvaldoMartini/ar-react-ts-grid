@@ -15,11 +15,13 @@
 import "../../i18n";               // initialise i18next (src/i18n.ts)
 import "./mt-shell.scss";        // shell bar + toggle styles (uses mt-tokens)
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { ThemeProvider, useTheme } from "./ThemeContext";
 import { LanguagePicker } from "./LanguagePicker";
 import App, { type AppProps } from "./App";
 import { MtI18nBridge } from "./MtI18nBridge";
+import i18nInstance from "../../i18n";
+import { mtT as t } from "./useMtT";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ThemeToggle — lives here so useTheme() is always inside <ThemeProvider>
@@ -28,12 +30,15 @@ import { MtI18nBridge } from "./MtI18nBridge";
 
 function ThemeToggle() {
   const { isDark, toggle } = useTheme();
+  const lightLabel = t("shell.lightMode");
+  const darkLabel = t("shell.darkMode");
+  const label = isDark ? lightLabel : darkLabel;
   return (
     <button
       className="mt-toggle-btn"
       onClick={toggle}
-      aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
-      title={isDark ? "Switch to light mode" : "Switch to dark mode"}
+      aria-label={label}
+      title={label}
     >
       <div className={`mt-toggle-track${isDark ? " on" : ""}`}>
         <div className="mt-toggle-thumb" />
@@ -42,7 +47,7 @@ function ThemeToggle() {
         {isDark ? "☀️" : "🌙"}
       </span>
       <span className="mt-toggle-label">
-        {isDark ? "Light" : "Dark"}
+        {isDark ? t("shell.light") : t("shell.dark")}
       </span>
     </button>
   );
@@ -57,7 +62,7 @@ function ShellTopBar() {
     <div className="mt-shell-bar" role="banner">
       <div className="mt-shell-brand">
         <span className="mt-shell-dot" aria-hidden />
-        <span className="mt-shell-title">MultiTest Tools</span>
+        <span className="mt-shell-title">{t("shell.brand")}</span>
       </div>
       <div className="mt-shell-controls">
         <LanguagePicker />
@@ -70,10 +75,39 @@ function ShellTopBar() {
 // ─────────────────────────────────────────────────────────────────────────────
 // ThemedShell — child of ThemeProvider, applies [data-mt-theme] to root div
 // This attribute drives ALL CSS tokens in mt-tokens.scss
+//
+// i18nReady gate: HttpBackend loads translations async. We hold rendering
+// until i18next fires "initialized" so App.tsx never sees raw keys on first
+// paint. If i18n is already initialized (HMR / warm cache), we render immediately.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ThemedShell(props: AppProps) {
   const { theme } = useTheme();
+  const [i18nReady, setI18nReady] = useState<boolean>(i18nInstance.isInitialized);
+
+  useEffect(() => {
+    if (i18nInstance.isInitialized) {
+      setI18nReady(true);
+      return;
+    }
+    const handler = () => {
+      setI18nReady(true);
+      i18nInstance.off("initialized", handler); // self-unsubscribe after first fire
+    };
+    i18nInstance.on("initialized", handler);
+    return () => { i18nInstance.off("initialized", handler); };
+  }, []);
+
+  if (!i18nReady) {
+    // Transparent placeholder — same dimensions, no flash of raw keys
+    return (
+      <div
+        data-mt-theme={theme}
+        style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}
+      />
+    );
+  }
+
   return (
     <div
       data-mt-theme={theme}

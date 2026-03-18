@@ -122,7 +122,7 @@ export default class App extends React.Component<AppProps, AppState> {
         <div className="mt-header">
           <div className="mt-header__logo">A</div>
           <div>
-            <div className="mt-header__title">MULTITEST.AI — API TEST PLATFORM</div>
+            <div className="mt-header__title">{t("header.title")}</div>
             <div className="mt-header__badges">
               {botJobName && (
                 <span className="mt-badge mt-badge--job">🏢 Environment:({homeOrgId})-{homeOrgName}</span>

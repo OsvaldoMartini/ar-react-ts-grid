@@ -13,43 +13,44 @@ import { testLibraryStore } from "./banking/TestLibraryStore";
 import { schemaMatchingEngine, type MatchResult } from "./banking/SchemaMatchingEngine";
 import { db } from "./utils";
 import { aiPrefsStore } from "./AIPrefsStore";
+import { mtT as t } from "./useMtT";
 import "./mt-library.scss";
 
 // ─── COMPONENT STATE ─────────────────────────────────────────
 
 interface LibraryState {
-  view:              "dashboard" | "category" | "detail" | "plugins";
-  search:            string;
-  selectedCategory:  string;
-  selectedSubcat:    string;
-  selectedTest:      LibraryTestCase | null;
-  filteredTests:     LibraryTestCase[];
-  categoryStats:     { category: string; subcategories: number; tests: number; icon: string; color: string }[];
-  pluginStates:      { id: string; name: string; icon: string; enabled: boolean; rules: number; tests: number; category: string }[];
-  totalTests:        number;
-  importing:         boolean;
-  generating:        boolean;
-  lastMatchResults:  MatchResult[];
-  generatedCount:    number;
-  aiSelectedCatIds:  Set<string>;
-  showAICategories:  boolean;
+  view: "dashboard" | "category" | "detail" | "plugins";
+  search: string;
+  selectedCategory: string;
+  selectedSubcat: string;
+  selectedTest: LibraryTestCase | null;
+  filteredTests: LibraryTestCase[];
+  categoryStats: { category: string; subcategories: number; tests: number; icon: string; color: string }[];
+  pluginStates: { id: string; name: string; icon: string; enabled: boolean; rules: number; tests: number; category: string }[];
+  totalTests: number;
+  importing: boolean;
+  generating: boolean;
+  lastMatchResults: MatchResult[];
+  generatedCount: number;
+  aiSelectedCatIds: Set<string>;
+  showAICategories: boolean;
 }
 
 export class TestLibraryTab extends React.Component<{}, LibraryState> {
   state: LibraryState = {
-    view:             "dashboard",
-    search:           "",
+    view: "dashboard",
+    search: "",
     selectedCategory: "",
-    selectedSubcat:   "",
-    selectedTest:     null,
-    filteredTests:    [],
-    categoryStats:    testLibraryStore.getCategoryStats(),
-    pluginStates:     this.getPluginStates(),
-    totalTests:       testLibraryStore.stats.totalTests,
-    importing:        false,
-    generating:       false,
+    selectedSubcat: "",
+    selectedTest: null,
+    filteredTests: [],
+    categoryStats: testLibraryStore.getCategoryStats(),
+    pluginStates: this.getPluginStates(),
+    totalTests: testLibraryStore.stats.totalTests,
+    importing: false,
+    generating: false,
     lastMatchResults: [],
-    generatedCount:   testLibraryStore.generated.length,
+    generatedCount: testLibraryStore.generated.length,
     aiSelectedCatIds: new Set(aiPrefsStore.selectedCategoryIds),
     showAICategories: false,
   };
@@ -85,8 +86,8 @@ export class TestLibraryTab extends React.Component<{}, LibraryState> {
   private refreshStats() {
     this.setState({
       categoryStats: testLibraryStore.getCategoryStats(),
-      pluginStates:  this.getPluginStates(),
-      totalTests:    testLibraryStore.stats.totalTests,
+      pluginStates: this.getPluginStates(),
+      totalTests: testLibraryStore.stats.totalTests,
       generatedCount: testLibraryStore.generated.length,
     });
   }
@@ -95,7 +96,7 @@ export class TestLibraryTab extends React.Component<{}, LibraryState> {
   private handleGenerateFromSchemas = () => {
     const specs = db.specs;
     if (specs.length === 0) {
-      alert("No API schemas loaded. Please load API files in the API Files tab first.");
+      alert(t("library.noApisLoaded"));
       return;
     }
     this.setState({ generating: true });
@@ -114,7 +115,7 @@ export class TestLibraryTab extends React.Component<{}, LibraryState> {
         alert(`Generated ${count} test case${count !== 1 ? "s" : ""} from ${matches.length} banking context match${matches.length !== 1 ? "es" : ""} across ${specs.length} API spec${specs.length !== 1 ? "s" : ""}.`);
       } catch (err) {
         this.setState({ generating: false });
-        alert("Error generating tests from schemas. Check console for details.");
+        alert(t("library.generateError"));
         console.error("[SchemaMatchingEngine]", err);
       }
     }, 100);
@@ -180,7 +181,7 @@ export class TestLibraryTab extends React.Component<{}, LibraryState> {
         alert(`Imported ${count} test case${count !== 1 ? "s" : ""} successfully.`);
       } catch (err) {
         this.setState({ importing: false });
-        alert("Failed to parse JSON file. Please check the format.");
+        alert(t("errors.jsonParseFailed"));
       }
     };
     reader.readAsText(file);
@@ -241,10 +242,10 @@ export class TestLibraryTab extends React.Component<{}, LibraryState> {
       if (plugin) {
         alert(`Plugin "${plugin.metadata.name}" loaded successfully (${plugin.rules.length} rules, ${plugin.testCases.length} tests).`);
       } else {
-        alert("Failed to load plugin. Check the JSON format.");
+        alert(t("errors.pluginLoadFailed"));
       }
     } catch {
-      alert("Failed to parse plugin JSON file.");
+      alert(t("errors.pluginParseFailed"));
     }
     e.target.value = "";
   };

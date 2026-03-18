@@ -1,6 +1,7 @@
 import React from "react";
 import { testStore, TestCase, executionHistory, rest, envStore } from "./utils";
 import { StatusBadge } from "./AtomComponents";
+import { mtT as t } from "./useMtT";
 
 // ═══════════════════════════════════════════════════════════════
 // RUNNING TAB  — live execution view (BizWizard-style)
@@ -60,19 +61,19 @@ function StatCard({ value, label, color, icon }: {
 const STATUS_COLORS_RT = {
   pending: { bg: "#8b949e15", border: "#8b949e30", dot: "#8b949e" },
   running: { bg: "#f59e0b15", border: "#f59e0b44", dot: "#f59e0b" },
-  passed:  { bg: "#34d39915", border: "#34d39940", dot: "#34d399" },
-  failed:  { bg: "#f8717115", border: "#f8717140", dot: "#f87171" },
+  passed: { bg: "#34d39915", border: "#34d39940", dot: "#34d399" },
+  failed: { bg: "#f8717115", border: "#f8717140", dot: "#f87171" },
 };
 
 interface RtRowState {
-  open:         boolean;
-  editUrl:      string;
-  editBody:     string;
-  editHeaders:  string;
-  bodyError:    string | null;
+  open: boolean;
+  editUrl: string;
+  editBody: string;
+  editHeaders: string;
+  bodyError: string | null;
   headersError: string | null;
-  running:      boolean;
-  dirty:        boolean;
+  running: boolean;
+  dirty: boolean;
 }
 
 class RtRow extends React.Component<{ tc: TestCase; onRefresh?: () => void }, RtRowState> {
@@ -80,14 +81,14 @@ class RtRow extends React.Component<{ tc: TestCase; onRefresh?: () => void }, Rt
     super(props);
     const { tc } = props;
     this.state = {
-      open:         false,
-      editUrl:      tc.resolvedUrl ?? tc.path,
-      editBody:     tc.body ? JSON.stringify(tc.body, null, 2) : "",
-      editHeaders:  JSON.stringify({ "Content-Type": "application/json", "Accept": "application/json" }, null, 2),
-      bodyError:    null,
+      open: false,
+      editUrl: tc.resolvedUrl ?? tc.path,
+      editBody: tc.body ? JSON.stringify(tc.body, null, 2) : "",
+      editHeaders: JSON.stringify({ "Content-Type": "application/json", "Accept": "application/json" }, null, 2),
+      bodyError: null,
       headersError: null,
-      running:      false,
-      dirty:        false,
+      running: false,
+      dirty: false,
     };
   }
 
@@ -116,18 +117,18 @@ class RtRow extends React.Component<{ tc: TestCase; onRefresh?: () => void }, Rt
       let path = tc.path;
       try { const u = new URL(editUrl); path = u.pathname + u.search; } catch { path = editUrl; }
       const r = await rest.req(tc.method, path, parsedBody || undefined);
-      tc.status     = r.status >= 200 && r.status < 300 ? "passed" : "failed";
+      tc.status = r.status >= 200 && r.status < 300 ? "passed" : "failed";
       tc.httpStatus = r.status;
-      tc.latency    = Date.now() - t0;
-      tc.result     = r.body;
-      tc.headers    = r.headers;
+      tc.latency = Date.now() - t0;
+      tc.result = r.body;
+      tc.headers = r.headers;
       tc.resolvedUrl = editUrl;
       if (parsedBody) tc.body = parsedBody;
     } catch (err: any) {
-      tc.status     = "failed";
+      tc.status = "failed";
       tc.httpStatus = "ERR";
-      tc.latency    = Date.now() - t0;
-      tc.result     = { error: err.message };
+      tc.latency = Date.now() - t0;
+      tc.result = { error: err.message };
     }
     this.setState({ running: false });
     onRefresh?.();
@@ -137,8 +138,8 @@ class RtRow extends React.Component<{ tc: TestCase; onRefresh?: () => void }, Rt
     e.stopPropagation();
     const { tc } = this.props;
     this.setState({
-      editUrl:     tc.resolvedUrl ?? tc.path,
-      editBody:    tc.body ? JSON.stringify(tc.body, null, 2) : "",
+      editUrl: tc.resolvedUrl ?? tc.path,
+      editBody: tc.body ? JSON.stringify(tc.body, null, 2) : "",
       editHeaders: JSON.stringify({ "Content-Type": "application/json", "Accept": "application/json" }, null, 2),
       bodyError: null, headersError: null, dirty: false,
     });
@@ -149,11 +150,11 @@ class RtRow extends React.Component<{ tc: TestCase; onRefresh?: () => void }, Rt
     const { open, editUrl, editBody, editHeaders, bodyError, headersError, running, dirty } = this.state;
 
     const liveStatus = running ? "running" : tc.status;
-    const sc   = STATUS_COLORS_RT[liveStatus];
-    const mc   = METHOD_COLORS[tc.method?.toUpperCase()] || "#8b949e";
+    const sc = STATUS_COLORS_RT[liveStatus];
+    const mc = METHOD_COLORS[tc.method?.toUpperCase()] || "#8b949e";
     const hasBody = ["POST", "PATCH", "PUT"].includes(tc.method?.toUpperCase());
-    const isOk    = tc.status === "passed";
-    const isFail  = tc.status === "failed";
+    const isOk = tc.status === "passed";
+    const isFail = tc.status === "failed";
 
     return (
       <div style={{
@@ -398,7 +399,7 @@ class RtRow extends React.Component<{ tc: TestCase; onRefresh?: () => void }, Rt
             {/* ── RESPONSE SECTION — shown after any execution ── */}
             {tc.result != null && (() => {
               const resCol = isOk ? "#34d399" : isFail ? "#f87171" : "var(--cs-muted)";
-              const resBg  = isOk ? "#34d39908" : isFail ? "#f8717108" : "var(--cs-bg)";
+              const resBg = isOk ? "#34d39908" : isFail ? "#f8717108" : "var(--cs-bg)";
               const resBrd = isOk ? "#34d39933" : isFail ? "#f8717133" : "var(--cs-border-sub)";
               return (
                 <div style={{ borderTop: `1px solid ${resBrd}` }}>
@@ -539,7 +540,7 @@ export class RunningTab extends React.Component<{}, RunningTabState> {
         if (summary) {
           this.setState({ loadedExecution: summary as LoadedExecution, pageIndex: 0 });
         } else {
-          alert("Could not parse the CSV file. Make sure it was generated by MultiTest.");
+          alert(t("errors.csvParseFailed"));
         }
       });
     };
