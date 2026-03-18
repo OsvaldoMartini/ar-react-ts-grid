@@ -282,30 +282,54 @@ export class AIAssistantTab extends React.Component<AIAssistantProps, AIAssistan
   private callProvider = async (provider: AIProvider, prompt: string): Promise<string> => {
     const key = this.state.apiKeys[provider.id] || "";
 
+    // ── Anthropic Claude ──────────────────────────────────────────
+    // No key  → free platform call (no x-api-key header)
+    // Key set → user's own billing key
     if (provider.id === "claude-cloud") {
-      if (!key) throw new Error("API key required — click \u2756 Set Key in the provider panel");
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "anthropic-version": "2023-06-01",
+      };
+      if (key) headers["x-api-key"] = key;
+
       const res = await fetch(provider.endpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
-        body: JSON.stringify({ model: provider.model, max_tokens: 4096, messages: [{ role: "user", content: prompt }] }),
+        headers,
+        body: JSON.stringify({
+          model: provider.model,
+          max_tokens: 4096,
+          messages: [{ role: "user", content: prompt }],
+        }),
       });
-      if (!res.ok) { const e: any = await res.json().catch(() => ({})); throw new Error(`Anthropic ${res.status}: ${e?.error?.message || res.statusText}`); }
+      if (!res.ok) {
+        const e: any = await res.json().catch(() => ({}));
+        throw new Error(`Anthropic ${res.status}: ${e?.error?.message || res.statusText}`);
+      }
       const d: any = await res.json();
       return d.content?.[0]?.text || "(empty response)";
     }
 
+    // ── OpenAI / LM Studio / Custom (OpenAI-compatible) ──────────
+    // OpenAI cloud requires a key; local servers work without one.
     if (["openai-cloud", "lmstudio-local", "custom-local"].includes(provider.id)) {
+      if (provider.id === "openai-cloud" && !key) {
+        throw new Error("OpenAI API key required — click ✎ Set Key to configure");
+      }
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (key) headers["Authorization"] = `Bearer ${key}`;
       const res = await fetch(provider.endpoint, {
         method: "POST", headers,
         body: JSON.stringify({ model: provider.model, messages: [{ role: "user", content: prompt }], max_tokens: 4096 }),
       });
-      if (!res.ok) { const e: any = await res.json().catch(() => ({})); throw new Error(`${provider.name} ${res.status}: ${e?.error?.message || res.statusText}`); }
+      if (!res.ok) {
+        const e: any = await res.json().catch(() => ({}));
+        throw new Error(`${provider.name} ${res.status}: ${e?.error?.message || res.statusText}`);
+      }
       const d: any = await res.json();
       return d.choices?.[0]?.message?.content || "(empty response)";
     }
 
+    // ── Ollama (local, no key needed) ─────────────────────────────
     if (provider.id === "ollama-local") {
       const res = await fetch(provider.endpoint, {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -564,7 +588,11 @@ export class AIAssistantTab extends React.Component<AIAssistantProps, AIAssistan
               <span key={p.id} className={`ai-provider-chip ai-provider-chip--${p.type}`}>
                 {p.icon} {p.name}
                 {apiKeys[p.id] ? <span style={{ marginLeft: 4, color: "#34d399", fontSize: 9 }}>✓</span>
-                  : p.type === "cloud" ? <span style={{ marginLeft: 4, color: "#f87171", fontSize: 9 }}>⚠ key</span> : null}
+                  : p.type === "cloud"
+                    ? (p.id === "claude-cloud"
+                        ? <span style={{ marginLeft: 4, color: "#34d399", fontSize: 9 }}>FREE</span>
+                        : <span style={{ marginLeft: 4, color: "#f87171", fontSize: 9 }}>⚠ key</span>)
+                    : null}
               </span>
             ))}
             <button className="ai-btn-select-providers" onClick={() => this.setState(s => ({ showProviderPanel: !s.showProviderPanel }))}>
@@ -641,10 +669,10 @@ export class AIAssistantTab extends React.Component<AIAssistantProps, AIAssistan
                           <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, marginLeft: 8 }}>
                             <span style={{
                               fontFamily: MONO, fontSize: 9, padding: "2px 7px", borderRadius: 4,
-                              background: hasKey ? "#34d39915" : "#f8717115",
-                              border: `1px solid ${hasKey ? "#34d39933" : "#f8717133"}`,
-                              color: hasKey ? "#34d399" : "#f87171",
-                            }}>{hasKey ? "✓ Key set" : "⚠ No key"}</span>
+                              background: hasKey ? "#34d39915" : p.id === "claude-cloud" ? "#34d39910" : "#f8717115",
+                              border: `1px solid ${hasKey ? "#34d39933" : p.id === "claude-cloud" ? "#34d39922" : "#f8717133"}`,
+                              color: hasKey ? "#34d399" : p.id === "claude-cloud" ? "#34d399" : "#f87171",
+                            }}>{hasKey ? "✓ Key set" : p.id === "claude-cloud" ? "FREE" : "⚠ No key"}</span>
                             <button onClick={e => { e.preventDefault(); this.setState(prev => ({ showKeyFor: prev.showKeyFor === p.id ? null : p.id })); }}
                               style={IBTN_S}>
                               {isShowKey ? "▲" : "✎ Set Key"}
@@ -969,7 +997,7 @@ class ApiKeyInput extends React.Component<ApiKeyInputProps, { value: string; sho
           <button onClick={onCancel} style={{ ...IBTN_S, padding: "7px 12px", fontSize: 11 }}>✕</button>
         </div>
         <div style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)", marginTop: 6, lineHeight: 1.5 }}>
-          Session only — cleared on tab close. Sent only to {providerName}.
+          Optional for Anthropic Claude — leave empty to use free mode. Providing your own key removes rate limits.
         </div>
       </div>
     );
