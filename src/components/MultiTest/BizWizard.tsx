@@ -1,0 +1,1774 @@
+import React, { createRef } from "react";
+import {
+  SYNTH, rest, ApiSpec, envStore,
+  rndInt, rndFloat, rndPick, isoDate,
+} from "./utils";
+import { StatusBadge, ResultRow } from "./AtomComponents";
+import "./mt-wizard.scss";
+
+// ═══════════════════════════════════════════════════════════════
+// TYPES
+// ═══════════════════════════════════════════════════════════════
+type FieldDirection = "OUT" | "IN" | "IN_OUT" | "PARAM";
+type WizMode = "dsg";
+type DsgStep = "api-select" | "data" | "flow" | "running" | "report";
+type StaticStep = "configure" | "running" | "report";
+type WizStep = "home" | DsgStep | StaticStep;
+
+/** One step in the dynamic execution plan */
+interface DynStep {
+  id: string;
+  spec: ApiSpec;
+  method: string;
+  path: string;
+  summary: string;
+  /** Synthetic body (IN / IN_OUT fields, excluding OUTs and PARAMs) */
+  synthBody: Record<string, any>;
+  /** Which resourceNames this step needs an ID from (path params) */
+  needsIdFrom: string[];
+  /** Does this step produce a resource ID? (POST → true) */
+  producesId: boolean;
+  /** Steps that must complete before this one */
+  dependsOnIds: string[];
+}
+
+/** Live execution log entry */
+interface ExecEntry {
+  step: number; label: string; method: string;
+  status: number | string; latency: number;
+  result: any; headers: any; ok: boolean;
+  // Request snapshot (captured before the call)
+  reqUrl?: string;
+  reqHeaders?: Record<string, string>;
+  reqBody?: any;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STATIC CATALOG  (Load Test + Error Handling only, unchanged)
+// ═══════════════════════════════════════════════════════════════
+const CAT_COLORS: Record<string, string> = {
+  "API Data Management": "#34d399",
+};
+
+const MONO = "'JetBrains Mono','Fira Mono',monospace";
+
+const METHOD_ORDER: Record<string, number> = {
+  POST: 0, GET: 1, PATCH: 2, PUT: 3, DELETE: 4, RPC: 5,
+};
+
+const METHOD_COLORS: Record<string, string> = {
+  POST: "#34d399", GET: "#60a5fa", PATCH: "#fb923c",
+  PUT: "#f59e0b", DELETE: "#f87171", RPC: "#a78bfa",
+};
+
+// ═══════════════════════════════════════════════════════════════
+// SYNTH FIELD ENGINE
+// Maps field name + type → realistic banking-domain value
+// ═══════════════════════════════════════════════════════════════
+function synthValueForField(name: string, type: string): any {
+  const n = name.toLowerCase();
+  const t = type.toLowerCase().replace(/\[\]$/, "");
+
+  // ── Name-based heuristics (most specific first) ──
+  if (n.includes("eladdr") || n.includes("email")) return SYNTH.email(SYNTH.firstName(), SYNTH.lastName());
+  if (n === "firstname" || n.includes("firstname")) return SYNTH.firstName();
+  if (n === "name" || n === "lastname" || n === "surname") return SYNTH.lastName();
+  if (n === "firm" || n.includes("company")) return SYNTH.firm();
+  if (n.includes("street") && !n.includes("nr")) return SYNTH.street();
+  if (n === "streetnr" || n === "housenr") return String(rndInt(1, 200));
+  if (n === "zip" || n.includes("postal")) return String(rndInt(1000, 9999));
+  if (n === "city" || n.includes("city")) return SYNTH.city();
+  if (n.includes("iban")) return SYNTH.iban();
+  if (n.includes("bic") || n.includes("swift")) return SYNTH.bic();
+  if (n.includes("phone") || n.includes("tel")) return SYNTH.phone();
+  if (n === "currency" || n === "ccy") return SYNTH.currency();
+  if (n.includes("amount") || n.includes("amt") ||
+    n.includes("nominal") || n.includes("qty")) return rndFloat(1000, 1000000, 2);
+  if (n.includes("rate") || n.includes("yield")) return rndFloat(0.1, 8.5, 3);
+  if (n.includes("isin")) return SYNTH.isin();
+  if (n.includes("portfolio") || n === "portf") return SYNTH.portfolio();
+  if (n === "clientid" || n === "bpid") return rndInt(100000, 999999);
+  if (n.includes("date") && !n.includes("bde")) return isoDate(0);
+  if (n.includes("maturity") || n.includes("expiry")) return isoDate(rndInt(30, 1825));
+  if (n.includes("valdate") || n.includes("valuedate")) return isoDate(0);
+  if (n === "country" || n.includes("country")) return SYNTH.country();
+  if (n.includes("addrtype")) return SYNTH.addrType();
+  if (n.includes("addrkind")) return SYNTH.addrKind();
+  if (n.includes("riskclass") || n.includes("risk")) return SYNTH.riskClass();
+  if (n.includes("assetclass") || n.includes("assetcl")) return SYNTH.assetClass();
+  if (n.includes("txtype") || n.includes("transtype")) return SYNTH.txType();
+  if (n.includes("sign") || n.includes("longshort")) return SYNTH.posSign();
+  if (n === "description" || n === "desc" || n === "note") return `Test ${name} ${rndInt(100, 999)}`;
+  if (n.includes("nr") || n.includes("num") || n.includes("number"))
+    return String(rndInt(10000, 99999));
+  if (n === "id" || n.endsWith("id")) return null; // server assigns
+
+  // ── Type-based fallbacks ──
+  if (t === "integer" || t === "number" || t === "int32" || t === "int64") return rndInt(1, 9999);
+  if (t === "boolean") return true;
+  if (t === "string") return `${name}-${rndInt(100, 999)}`;
+  if (t === "object") return { id: rndInt(1, 100) };
+  return null;
+}
+
+/** Build a request body dict for IN and IN_OUT fields of a spec */
+function buildSynthBody(
+  spec: ApiSpec,
+  context: Record<string, number>,
+  allSpecs: ApiSpec[],
+): Record<string, any> {
+  const pathParamSet = new Set(spec.pathParams || []);
+  const body: Record<string, any> = {};
+
+  for (const f of spec.fields) {
+    // Skip server-output fields and path params
+    if (f.readOnly) continue;
+    if (pathParamSet.has(f.name) || f.isParam) continue;
+
+    const baseType = f.type.replace(/\[\]$/, "");
+    const isArr = f.type.endsWith("[]");
+
+    // Check if this type references another loaded spec
+    const depSpec = allSpecs.find(s =>
+      s.schemaName === baseType || s.resourceName === baseType
+    );
+    if (depSpec && depSpec.resourceName && context[depSpec.resourceName] != null) {
+      // Inject the ID produced by the dependency
+      body[f.name] = isArr
+        ? [{ id: context[depSpec.resourceName] }]
+        : { id: context[depSpec.resourceName] };
+      continue;
+    }
+
+    // Generate synthetic value
+    const val = synthValueForField(f.name, f.type);
+    if (val !== null) body[f.name] = val;
+  }
+
+  return body;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TOPOLOGICAL SORT
+// Specs whose dependencies come first in the result list.
+// ═══════════════════════════════════════════════════════════════
+function topoSortSpecs(specs: ApiSpec[]): ApiSpec[] {
+  const schemaToSpec: Record<string, ApiSpec> = {};
+  const resourceToSpec: Record<string, ApiSpec> = {};
+  for (const s of specs) {
+    if (s.schemaName) schemaToSpec[s.schemaName] = s;
+    if (s.resourceName) resourceToSpec[s.resourceName] = s;
+  }
+
+  const visited = new Set<string>();
+  const result: ApiSpec[] = [];
+
+  function visit(spec: ApiSpec) {
+    const key = spec.fileName;
+    if (visited.has(key)) return;
+    visited.add(key);
+    for (const dep of spec.dependencies || []) {
+      const depSpec = schemaToSpec[dep] || resourceToSpec[dep];
+      if (depSpec && depSpec.fileName !== key) visit(depSpec);
+    }
+    result.push(spec);
+  }
+
+  for (const s of specs) visit(s);
+  return result;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DYNAMIC EXECUTION PLAN BUILDER
+// Produces an ordered list of steps respecting:
+//   1. Dependency graph (specs whose deps run first)
+//   2. Method order within a spec (POST → GET → PATCH → DELETE)
+// ═══════════════════════════════════════════════════════════════
+function buildDynExecPlan(specs: ApiSpec[]): DynStep[] {
+  const sorted = topoSortSpecs(specs);
+  const steps: DynStep[] = [];
+
+  // Track which step IDs produce IDs per resource
+  const producerStepId: Record<string, string> = {};
+
+  for (const spec of sorted) {
+    if (!spec.resourceName) continue;
+    const res = spec.resourceName;
+
+    // Collect unique methods from endpoints, sorted by logical order
+    const methods = [...new Set(
+      spec.endpoints.map(e => e.method.toUpperCase())
+        .filter(m => ["POST", "GET", "PATCH", "PUT", "DELETE"].includes(m))
+    )].sort((a, b) => (METHOD_ORDER[a] ?? 9) - (METHOD_ORDER[b] ?? 9));
+
+    for (const method of methods) {
+      const ep = spec.endpoints.find(e => e.method.toUpperCase() === method)!;
+      const stepId = `${res}__${method}`;
+
+      // What steps does this depend on?
+      const dependsOnIds: string[] = [];
+      // Same resource POST must precede this if it's GET/PATCH/DELETE
+      if (method !== "POST") {
+        const postId = `${res}__POST`;
+        if (steps.find(s => s.id === postId)) dependsOnIds.push(postId);
+      }
+      // Cross-spec dependencies
+      for (const dep of spec.dependencies || []) {
+        const depSpec = sorted.find(s => s.schemaName === dep || s.resourceName === dep);
+        if (depSpec?.resourceName) {
+          const depPostId = `${depSpec.resourceName}__POST`;
+          if (!dependsOnIds.includes(depPostId) && steps.find(s => s.id === depPostId))
+            dependsOnIds.push(depPostId);
+        }
+      }
+
+      // What IDs from other resources does this need in its path?
+      const needsIdFrom: string[] = [];
+      if (["GET", "PATCH", "PUT", "DELETE"].includes(method) && spec.pathParams.length > 0) {
+        needsIdFrom.push(res);
+      }
+
+      // Build synth body (empty context here — will be populated at runtime)
+      const synthBody = method === "POST" || method === "PATCH" || method === "PUT"
+        ? buildSynthBody(spec, {}, sorted)
+        : {};
+
+      const producesId = method === "POST";
+      if (producesId) producerStepId[res] = stepId;
+
+      steps.push({
+        id: stepId, spec, method, path: ep.path,
+        summary: ep.summary || `${method} ${res}`,
+        synthBody, needsIdFrom, producesId, dependsOnIds,
+      });
+    }
+  }
+
+  return steps;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SHARED UI COMPONENTS
+// ═══════════════════════════════════════════════════════════════
+function SLabel({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
+  return (
+    <div style={{
+      fontFamily: MONO, fontSize: 10, fontWeight: 700, color: "var(--cs-dim)",
+      letterSpacing: 1, textTransform: "uppercase", marginBottom: 8, ...style,
+    }}>{children}</div>
+  );
+}
+
+function PhaseBanner({ color, icon, title, desc }: {
+  color: string; icon: string; title: string; desc: string;
+}) {
+  return (
+    <div style={{
+      padding: "11px 15px", borderRadius: 10, marginBottom: 2,
+      background: color + "10", border: `1px solid ${color}33`,
+    }}>
+      <div style={{ fontFamily: MONO, fontSize: 12, fontWeight: 800, color, marginBottom: 5 }}>
+        {icon} {title}
+      </div>
+      <div style={{ fontFamily: MONO, fontSize: 11, color: "var(--cs-muted)", lineHeight: 1.6 }}>
+        {desc}
+      </div>
+    </div>
+  );
+}
+
+function MethodChip({ method, size = "sm" }: { method: string; size?: "xs" | "sm" }) {
+  const col = METHOD_COLORS[method.toUpperCase()] || "#8b949e";
+  return (
+    <span style={{
+      background: col + "18", border: `1px solid ${col}44`, color: col,
+      borderRadius: 5, padding: size === "xs" ? "1px 5px" : "2px 8px",
+      fontFamily: MONO, fontSize: size === "xs" ? 9 : 10, fontWeight: 700,
+      whiteSpace: "nowrap", flexShrink: 0,
+    }}>{method}</span>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DSG PROGRESS STEPPER
+// ═══════════════════════════════════════════════════════════════
+const DSG_PHASES: { key: DsgStep; short: string }[] = [
+  { key: "api-select", short: "APIs" },
+  { key: "data", short: "Synth Data" },
+  { key: "flow", short: "Exec Flow" },
+  { key: "running", short: "Running" },
+  { key: "report", short: "Report" },
+];
+
+function DsgStepper({ current }: { current: DsgStep }) {
+  const idx = DSG_PHASES.findIndex(p => p.key === current);
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 0,
+      padding: "12px 20px 10px", borderBottom: "1px solid var(--cs-border-sub)",
+      background: "var(--cs-surface)", flexShrink: 0,
+    }}>
+      {DSG_PHASES.map((p, i) => {
+        const done = i < idx;
+        const active = i === idx;
+        const col = active ? "var(--cs-accent)" : done ? "#34d399" : "var(--cs-border)";
+        const txtCol = active ? "var(--cs-accent)" : done ? "#34d399" : "var(--cs-dim)";
+        return (
+          <React.Fragment key={p.key}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, flexShrink: 0 }}>
+              <div style={{
+                width: 26, height: 26, borderRadius: "50%", border: `2px solid ${col}`,
+                background: active ? "var(--cs-accent)" : done ? "#34d39920" : "transparent",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontFamily: MONO, fontSize: 10, fontWeight: 800,
+                color: active ? "#0a0e1a" : done ? "#34d399" : "var(--cs-dim)",
+                transition: "all .25s",
+              }}>
+                {done ? "✓" : i + 1}
+              </div>
+              <span style={{
+                fontFamily: MONO, fontSize: 9, fontWeight: active ? 700 : 400,
+                color: txtCol, letterSpacing: 0.4, whiteSpace: "nowrap",
+              }}>{p.short}</span>
+            </div>
+            {i < DSG_PHASES.length - 1 && (
+              <div style={{
+                flex: 1, height: 2, marginBottom: 14, minWidth: 8,
+                background: i < idx ? "#34d399" : "var(--cs-border-sub)",
+                transition: "background .3s",
+              }} />
+            )}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TEST COUNT SLIDER COMPONENT
+// ═══════════════════════════════════════════════════════════════
+function TestCountPicker({ value, onChange }: { value: number; onChange: (n: number) => void }) {
+  const presets = [1, 5, 10, 50, 100, 500, 1000, 2000];
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <SLabel style={{ marginBottom: 0 }}>Number of test runs</SLabel>
+        <input
+          type="number" min={1} max={2000} value={value}
+          onChange={e => onChange(Math.min(2000, Math.max(1, +e.target.value || 1)))}
+          style={{
+            width: 80, padding: "4px 8px", background: "var(--cs-input-bg)",
+            border: "1px solid var(--cs-border)", borderRadius: 6,
+            color: "var(--cs-text)", fontFamily: MONO, fontSize: 13,
+            textAlign: "right", outline: "none",
+          }}
+        />
+      </div>
+
+      {/* Slider */}
+      <input type="range" min={1} max={2000} value={value}
+        onChange={e => onChange(+e.target.value)}
+        style={{ width: "100%", accentColor: "var(--cs-accent)", marginBottom: 10 }}
+      />
+
+      {/* Preset chips */}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        {presets.map(n => (
+          <button key={n} onClick={() => onChange(n)}
+            style={{
+              background: value === n ? "var(--cs-accent)18" : "var(--cs-surface-2)",
+              border: `1px solid ${value === n ? "var(--cs-accent)" : "var(--cs-border)"}`,
+              color: value === n ? "var(--cs-accent)" : "var(--cs-muted)",
+              borderRadius: 6, padding: "3px 11px", fontFamily: MONO, fontSize: 11,
+              cursor: "pointer", fontWeight: value === n ? 700 : 400,
+              transition: "all .12s",
+            }}>
+            {n >= 1000 ? `${n / 1000}k` : n}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)", marginTop: 8, opacity: 0.7 }}>
+        {value === 1 ? "Single test run" : `${value} test runs — each run executes the full plan once`}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BIZ WIZARD  (main component)
+// ═══════════════════════════════════════════════════════════════
+interface BizWizardProps { onClose: () => void; loadedSpecs: ApiSpec[]; }
+
+interface BizWizardState {
+  wizMode: WizMode | null;
+  wizStep: WizStep;
+  // DSG state
+  selSpecNames: string[];
+  dynPlan: DynStep[];
+  testCount: number;
+  synthPreviews: Record<string, any>[];
+  // Execution
+  execLog: ExecEntry[];
+  execResults: ExecEntry[];
+  running: boolean;
+  stopFlag: boolean;
+  execLogPage: number;
+  execLogPageSize: number;
+  // Execution mode
+  execMode: "flow" | "independent";
+  flowTimeout: number;          // seconds — only used in flow mode
+  // UI
+  flowPage: number;
+  flowPageSize: number;
+  chainExpanded: boolean;
+  chainPage: number;
+  apiSelectPage: number;
+  apiSelectPageSize: number;
+}
+
+export class BizWizard extends React.Component<BizWizardProps, BizWizardState> {
+  state: BizWizardState = {
+    wizMode: null, wizStep: "home",
+    selSpecNames: [], dynPlan: [], testCount: 1, synthPreviews: [],
+    execLog: [], execResults: [], running: false, stopFlag: false,
+    execLogPage: 0, execLogPageSize: 10,
+    execMode: "flow", flowTimeout: 15,
+    flowPage: 0, flowPageSize: 10, chainExpanded: false, chainPage: 0,
+    apiSelectPage: 0, apiSelectPageSize: 10,
+  };
+  private logRef = createRef<HTMLDivElement>();
+
+  componentDidUpdate(_: BizWizardProps, prev: BizWizardState) {
+    if (prev.execLog !== this.state.execLog)
+      this.logRef.current?.scrollIntoView({ behavior: "smooth" });
+  }
+
+  // ── DSG ──────────────────────────────────────────────────────
+  private toggleSpec = (fileName: string) => {
+    this.setState(s => ({
+      selSpecNames: s.selSpecNames.includes(fileName)
+        ? s.selSpecNames.filter(n => n !== fileName)
+        : [...s.selSpecNames, fileName],
+    }));
+  };
+
+  private goToData = () => {
+    const { selSpecNames } = this.state;
+    const { loadedSpecs } = this.props;
+    const selected = loadedSpecs.filter(s => selSpecNames.includes(s.fileName));
+    const plan = buildDynExecPlan(selected);
+    const previews = Array.from({ length: 3 }, () =>
+      buildSynthBody(selected[0] || loadedSpecs[0], {}, selected)
+    );
+    this.setState({ dynPlan: plan, synthPreviews: previews, wizStep: "data" });
+  };
+
+  private refreshPreviews = () => {
+    const { loadedSpecs } = this.props;
+    const { selSpecNames } = this.state;
+    const selected = loadedSpecs.filter(s => selSpecNames.includes(s.fileName));
+    this.setState({
+      synthPreviews: Array.from({ length: 3 }, () =>
+        buildSynthBody(selected[0] || loadedSpecs[0], {}, selected)
+      ),
+    });
+  };
+
+  // ── Execution ─────────────────────────────────────────────────
+  private execDynPlan = async () => {
+    const { dynPlan, testCount, execMode, flowTimeout } = this.state;
+    const { loadedSpecs } = this.props;
+    const { selSpecNames } = this.state;
+    const selected = loadedSpecs.filter(s => selSpecNames.includes(s.fileName));
+
+    this.setState({ wizStep: "running", running: true, execLog: [], execResults: [], stopFlag: false, execLogPage: 0 });
+    const results: ExecEntry[] = [];
+    // context is only populated/used in flow mode — in independent mode it stays empty
+    const context: Record<string, number> = {};
+    let stepNum = 0;
+
+    const runCount = Math.min(testCount, 5);
+
+    outer:
+    for (let run = 0; run < runCount; run++) {
+      for (const step of dynPlan) {
+        if (this.state.stopFlag) break outer;
+        stepNum++;
+        const label = run > 0 ? `[Run ${run + 1}] ${step.summary}` : step.summary;
+        this.setState(s => ({
+          execLog: [...s.execLog, {
+            step: stepNum, label, method: step.method,
+            status: "running", latency: 0, result: null, headers: null, ok: false,
+          }],
+        }));
+
+        const t0 = Date.now();
+        // Hoist body + callPath so the catch block can reference them
+        const resource = step.spec.resourceName || "obj-addrs";
+        const pathId = execMode === "flow" ? (context[resource] || null) : null;
+        let callPath: string;
+        if (execMode === "flow" && ["GET", "PATCH", "PUT", "DELETE"].includes(step.method) && step.spec.pathParams.length > 0 && pathId) {
+          callPath = `/${resource}/${pathId}`;
+        } else {
+          callPath = `/${resource}`;
+        }
+        const body = (step.method === "POST" || step.method === "PATCH" || step.method === "PUT")
+          ? buildSynthBody(step.spec, execMode === "flow" ? context : {}, selected)
+          : null;
+
+        try {
+          // In flow mode: simulate real network latency + honour flowTimeout
+          // In independent mode: fast mock, no chaining, use pure synth data
+          const mockDelay = execMode === "flow"
+            ? 40 + Math.random() * 120
+            : 20 + Math.random() * 50;
+          await new Promise(r => setTimeout(r, mockDelay));
+
+          // Flow mode: apply per-step timeout guard
+          const timeoutMs = execMode === "flow" ? flowTimeout * 1000 : 10000;
+          const reqPromise = rest.req(step.method, callPath, body);
+          const timeoutPromise = new Promise<never>((_, rej) =>
+            setTimeout(() => rej(new Error(`Timeout after ${flowTimeout}s`)), timeoutMs)
+          );
+          const r = await Promise.race([reqPromise, timeoutPromise]) as Awaited<ReturnType<typeof rest.req>>;
+
+          // Only chain IDs in flow mode
+          if (execMode === "flow" && step.producesId && (r.body as any)?.id) {
+            context[resource] = (r.body as any).id;
+          }
+
+          const latency = Date.now() - t0;
+          const expectOk = r.status >= 200 && r.status < 300;
+          const entry: ExecEntry = {
+            step: stepNum, label, method: step.method,
+            status: r.status, latency, result: r.body,
+            headers: r.headers, ok: expectOk,
+            reqUrl: envStore.resolve(callPath),
+            reqHeaders: { "Content-Type": "application/json", "Accept": "application/json" },
+            reqBody: body ?? undefined,
+          };
+          results.push(entry);
+          this.setState(s => ({
+            execLog: s.execLog.map((x, xi) => xi === s.execLog.length - 1 ? entry : x),
+          }));
+        } catch (e: any) {
+          const entry: ExecEntry = {
+            step: stepNum, label, method: step.method,
+            status: "ERR", latency: Date.now() - t0,
+            result: { error: e.message }, headers: null, ok: false,
+            reqUrl: envStore.resolve(callPath),
+            reqHeaders: { "Content-Type": "application/json", "Accept": "application/json" },
+            reqBody: body ?? undefined,
+          };
+          results.push(entry);
+          this.setState(s => ({
+            execLog: s.execLog.map((x, xi) => xi === s.execLog.length - 1 ? entry : x),
+          }));
+        }
+      }
+    }
+
+    this.setState({ execResults: results, running: false, wizStep: "report", stopFlag: false });
+  };
+
+  private reset = () =>
+    this.setState({
+      wizMode: null, wizStep: "home", selSpecNames: [], dynPlan: [],
+      testCount: 1, execResults: [], execLog: [], stopFlag: false,
+    });
+
+  // ═══════════════════════════════════════════════════════════════
+  // RENDER
+  // ═══════════════════════════════════════════════════════════════
+  render() {
+    const { onClose, loadedSpecs } = this.props;
+    const {
+      wizMode, wizStep, selSpecNames, dynPlan, testCount, synthPreviews,
+      execLog, execResults, stopFlag, execLogPage, execLogPageSize,
+    } = this.state;
+
+    const totalOk = execResults.filter(r => r.ok).length;
+    const totalFail = execResults.filter(r => !r.ok).length;
+    const avgLat = execResults.length
+      ? Math.round(execResults.reduce((a, r) => a + (r.latency || 0), 0) / execResults.length) : 0;
+    const pct = execResults.length ? Math.round((totalOk / execResults.length) * 100) : 0;
+    const pctCol = pct === 100 ? "#34d399" : pct >= 50 ? "#f59e0b" : "#f87171";
+
+    // Selected specs for DSG
+    const selectedSpecs = loadedSpecs.filter(s => selSpecNames.includes(s.fileName));
+
+    return (
+      <div className="mt-wizard-overlay">
+        <div className="mt-wizard" style={{ width: "min(800px, 96vw)", height: "92vh" }}>
+
+          {/* ── Header ── */}
+          <div className="mt-wizard__header">
+            <span className="mt-wizard__header-icon">🧪</span>
+            <div className="mt-wizard__titles">
+              <div className="mt-wizard__title">Generate Tests Wizard</div>
+              <div className="mt-wizard__subtitle">
+                {wizStep === "home" ? "Select a test case"
+                  : "Data Synthetic Generator"}
+              </div>
+            </div>
+            <button className="mt-wizard__close" onClick={onClose}>✕</button>
+          </div>
+
+          {/* ── DSG Stepper ── */}
+          {wizMode === "dsg" && wizStep !== "home" && (
+            <DsgStepper current={wizStep as DsgStep} />
+          )}
+
+          {/* ── Body ── */}
+          <div className="mt-wizard__body" style={{
+            overflowY: (wizStep === "running" || wizStep === "report") ? "hidden" : "auto",
+          }}>
+
+            {/* ══════════════════════════════════════════
+                HOME  — launch DSG
+            ══════════════════════════════════════════ */}
+            {wizStep === "home" && (
+              <div>
+
+                {/* DSG entry card */}
+                <div
+                  onClick={() => this.setState({ wizMode: "dsg", wizStep: "api-select" })}
+                  style={{
+                    border: "2px solid #34d39944", borderRadius: 12,
+                    padding: "18px 20px", marginBottom: 16, cursor: "pointer",
+                    background: "#34d39908", transition: "all .15s",
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = "#34d399"; (e.currentTarget as HTMLDivElement).style.background = "#34d39914"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = "#34d39944"; (e.currentTarget as HTMLDivElement).style.background = "#34d39908"; }}
+                >
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+                    <span style={{ fontSize: 28 }}>⬡</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                        <span style={{ fontFamily: MONO, fontSize: 14, fontWeight: 800, color: "#34d399" }}>
+                          Data Synthetic Generator
+                        </span>
+                        <span style={{
+                          background: "#34d39920", border: "1px solid #34d39944",
+                          color: "#34d399", borderRadius: 5, padding: "2px 8px",
+                          fontFamily: MONO, fontSize: 10, fontWeight: 700,
+                        }}>DYNAMIC</span>
+                      </div>
+                      <div style={{ fontFamily: MONO, fontSize: 11, color: "var(--cs-muted)", lineHeight: 1.65, marginBottom: 10 }}>
+                        Select any combination of loaded APIs. The wizard automatically detects
+                        input fields, generates synthetic test data, resolves cross-API dependencies,
+                        and builds the correct execution sequence.
+                      </div>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        {["Auto field detection", "Dependency chaining", "IN/IN·OUT synth data", "Configurable test count"].map(f => (
+                          <span key={f} style={{
+                            background: "#34d39912", border: "1px solid #34d39930",
+                            color: "#34d399", borderRadius: 5, padding: "2px 9px",
+                            fontFamily: MONO, fontSize: 10,
+                          }}>{f}</span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  {loadedSpecs.length > 0 && (
+                    <div style={{
+                      marginTop: 12, paddingTop: 12, borderTop: "1px solid #34d39922",
+                      fontFamily: MONO, fontSize: 11, color: "var(--cs-muted)"
+                    }}>
+                      {loadedSpecs.length} API spec{loadedSpecs.length !== 1 ? "s" : ""} available for selection
+                    </div>
+                  )}
+                  {loadedSpecs.length === 0 && (
+                    <div style={{
+                      marginTop: 12, paddingTop: 12, borderTop: "1px solid #34d39922",
+                      fontFamily: MONO, fontSize: 11, color: "#fb923c"
+                    }}>
+                      ⚠ Upload API specs first to use this mode
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ══════════════════════════════════════════
+                DSG 1 — API SELECTION
+            ══════════════════════════════════════════ */}
+            {wizStep === "api-select" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <PhaseBanner
+                  color="#34d399" icon="⬡" title="Select APIs for Testing"
+                  desc="Choose which loaded API specs to include. The wizard will detect all input fields, cross-API dependencies, and build the execution sequence automatically."
+                />
+
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                    {/* Tri-state checkbox — select all / deselect all */}
+                    <div
+                      onClick={() => {
+                        const allSel = loadedSpecs.every(s => selSpecNames.includes(s.fileName));
+                        this.setState({ selSpecNames: allSel ? [] : loadedSpecs.map(s => s.fileName) });
+                      }}
+                      title={loadedSpecs.every(s => selSpecNames.includes(s.fileName)) ? "Deselect all" : "Select all"}
+                      style={{
+                        width: 16, height: 16, borderRadius: 4, flexShrink: 0,
+                        cursor: "pointer", display: "flex", alignItems: "center",
+                        justifyContent: "center", transition: "all .15s",
+                        border: selSpecNames.length === 0
+                          ? "1.5px solid var(--cs-border)"
+                          : "1.5px solid #34d399",
+                        background: loadedSpecs.length > 0 && selSpecNames.length === loadedSpecs.length
+                          ? "#34d399"
+                          : selSpecNames.length > 0
+                            ? "#34d39940"
+                            : "transparent",
+                      }}>
+                      {loadedSpecs.length > 0 && selSpecNames.length === loadedSpecs.length && (
+                        <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                          <path d="M1 4L3.5 6.5L9 1" stroke="#0a1f15" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                      {selSpecNames.length > 0 && selSpecNames.length < loadedSpecs.length && (
+                        <svg width="8" height="2" viewBox="0 0 8 2" fill="none">
+                          <path d="M1 1H7" stroke="#34d399" strokeWidth="1.8" strokeLinecap="round" />
+                        </svg>
+                      )}
+                    </div>
+                    <SLabel style={{ marginBottom: 0 }}>
+                      {loadedSpecs.length} loaded spec{loadedSpecs.length !== 1 ? "s" : ""}
+                    </SLabel>
+                    {selSpecNames.length > 0 && (
+                      <span style={{
+                        fontFamily: MONO, fontSize: 9, color: "#34d399",
+                        background: "#34d39915", border: "1px solid #34d39930",
+                        borderRadius: 4, padding: "1px 7px",
+                      }}>
+                        {selSpecNames.length} selected
+                      </span>
+                    )}
+                    {/* ── Inline pagination ── */}
+                    {(() => {
+                      const { apiSelectPage, apiSelectPageSize } = this.state;
+                      const total = loadedSpecs.length;
+                      const totalPages = Math.ceil(total / apiSelectPageSize);
+                      if (totalPages <= 1) return null;
+                      const pageStart = apiSelectPage * apiSelectPageSize;
+                      return (
+                        <div style={{ display: "flex", alignItems: "center", gap: 5, marginLeft: 6 }}>
+                          <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)" }}>per page</span>
+                          {[10, 20, 50, 100].map(n => (
+                            <button key={n} onClick={() => this.setState({ apiSelectPageSize: n, apiSelectPage: 0 })} style={{
+                              background: apiSelectPageSize === n ? "#34d39918" : "var(--cs-surface-2)",
+                              border: `1px solid ${apiSelectPageSize === n ? "#34d399" : "var(--cs-border)"}`,
+                              color: apiSelectPageSize === n ? "#34d399" : "var(--cs-muted)",
+                              borderRadius: 4, padding: "1px 6px", fontFamily: MONO, fontSize: 9,
+                              cursor: "pointer", fontWeight: apiSelectPageSize === n ? 700 : 400,
+                            }}>{n}</button>
+                          ))}
+                          <button onClick={() => this.setState({ apiSelectPage: apiSelectPage - 1 })} disabled={apiSelectPage === 0}
+                            style={{ background: "var(--cs-surface-2)", border: "1px solid var(--cs-border)", color: "var(--cs-muted)", borderRadius: 4, padding: "1px 7px", fontFamily: MONO, fontSize: 11, cursor: apiSelectPage === 0 ? "default" : "pointer", opacity: apiSelectPage === 0 ? 0.4 : 1 }}>‹</button>
+                          {Array.from({ length: totalPages }, (_, pi) => {
+                            const near = pi === 0 || pi === totalPages - 1 || Math.abs(pi - apiSelectPage) <= 1;
+                            if (!near) return pi === 1 || pi === totalPages - 2
+                              ? <span key={pi} style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)" }}>…</span>
+                              : null;
+                            return (
+                              <button key={pi} onClick={() => this.setState({ apiSelectPage: pi })} style={{
+                                background: pi === apiSelectPage ? "#34d399" : "var(--cs-surface-2)",
+                                border: `1px solid ${pi === apiSelectPage ? "#34d399" : "var(--cs-border)"}`,
+                                color: pi === apiSelectPage ? "#0a1f15" : "var(--cs-muted)",
+                                borderRadius: 4, padding: "1px 6px", fontFamily: MONO, fontSize: 9,
+                                cursor: "pointer", fontWeight: pi === apiSelectPage ? 700 : 400, minWidth: 24,
+                              }}>{pi + 1}</button>
+                            );
+                          })}
+                          <button onClick={() => this.setState({ apiSelectPage: apiSelectPage + 1 })} disabled={apiSelectPage === totalPages - 1}
+                            style={{ background: "var(--cs-surface-2)", border: "1px solid var(--cs-border)", color: "var(--cs-muted)", borderRadius: 4, padding: "1px 7px", fontFamily: MONO, fontSize: 11, cursor: apiSelectPage === totalPages - 1 ? "default" : "pointer", opacity: apiSelectPage === totalPages - 1 ? 0.4 : 1 }}>›</button>
+                          <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)", whiteSpace: "nowrap" as const }}>
+                            {pageStart + 1}–{Math.min(pageStart + apiSelectPageSize, total)} of {total}
+                          </span>
+                        </div>
+                      );
+                    })()}
+                    <div style={{ display: "flex", gap: 6, marginLeft: "auto" }}>
+                      <button onClick={() => this.setState({ selSpecNames: loadedSpecs.map(s => s.fileName) })}
+                        style={{
+                          background: "transparent", border: "1px solid var(--cs-border)", color: "#34d399",
+                          borderRadius: 6, padding: "3px 10px", fontFamily: MONO, fontSize: 11, cursor: "pointer"
+                        }}>
+                        All
+                      </button>
+                      <button onClick={() => this.setState({ selSpecNames: [] })}
+                        style={{
+                          background: "transparent", border: "1px solid var(--cs-border)", color: "var(--cs-muted)",
+                          borderRadius: 6, padding: "3px 10px", fontFamily: MONO, fontSize: 11, cursor: "pointer"
+                        }}>
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    {loadedSpecs.slice(
+                      this.state.apiSelectPage * this.state.apiSelectPageSize,
+                      (this.state.apiSelectPage + 1) * this.state.apiSelectPageSize
+                    ).map(spec => {
+                      const sel = selSpecNames.includes(spec.fileName);
+                      const inFields = spec.fields.filter(f => !f.readOnly && !f.isParam).length;
+                      const outFields = spec.fields.filter(f => f.readOnly).length;
+                      return (
+                        <div key={spec.fileName}
+                          onClick={() => this.toggleSpec(spec.fileName)}
+                          style={{
+                            display: "flex", alignItems: "center", gap: 12,
+                            padding: "10px 14px", borderRadius: 8, cursor: "pointer",
+                            background: sel ? "#34d39910" : "var(--cs-surface)",
+                            border: `1.5px solid ${sel ? "#34d39955" : "var(--cs-border-sub)"}`,
+                            transition: "all .12s",
+                          }}>
+                          {/* Checkbox */}
+                          <div style={{
+                            width: 18, height: 18, borderRadius: 4, flexShrink: 0,
+                            border: `2px solid ${sel ? "#34d399" : "var(--cs-border)"}`,
+                            background: sel ? "#34d399" : "transparent",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                          }}>
+                            {sel && <span style={{ color: "#0a0e1a", fontSize: 12, fontWeight: 900 }}>✓</span>}
+                          </div>
+
+                          {/* Name + meta */}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{
+                              fontFamily: MONO, fontSize: 12, fontWeight: 700,
+                              color: sel ? "var(--cs-text)" : "var(--cs-muted)",
+                              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"
+                            }}>
+                              {spec.title}
+                            </div>
+                            <div style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)", marginTop: 2 }}>
+                              {spec.resourceName} · {spec.fields.length} fields
+                            </div>
+                          </div>
+
+                          {/* Field badges */}
+                          <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
+                            <span style={{
+                              background: "#60a5fa15", border: "1px solid #60a5fa33",
+                              color: "#60a5fa", borderRadius: 5, padding: "2px 7px",
+                              fontFamily: MONO, fontSize: 9, fontWeight: 600,
+                            }}>IN {inFields}</span>
+                            <span style={{
+                              background: "#f8717115", border: "1px solid #f8717133",
+                              color: "#f87171", borderRadius: 5, padding: "2px 7px",
+                              fontFamily: MONO, fontSize: 9, fontWeight: 600,
+                            }}>OUT {outFields}</span>
+                          </div>
+
+                          {/* Method pills */}
+                          <div style={{ display: "flex", gap: 3, flexShrink: 0 }}>
+                            {[...new Set(spec.endpoints.map(e => e.method))].slice(0, 4).map(m => (
+                              <MethodChip key={m} method={m} size="xs" />
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* ── Bottom pagination mirror ── */}
+                  {(() => {
+                    const { apiSelectPage, apiSelectPageSize } = this.state;
+                    const total = loadedSpecs.length;
+                    const totalPages = Math.ceil(total / apiSelectPageSize);
+                    if (totalPages <= 1) return null;
+                    const pageStart = apiSelectPage * apiSelectPageSize;
+                    return (
+                      <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 8, flexWrap: "wrap" as const }}>
+                        <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)" }}>per page</span>
+                        {[10, 20, 50, 100].map(n => (
+                          <button key={n} onClick={() => this.setState({ apiSelectPageSize: n, apiSelectPage: 0 })} style={{
+                            background: apiSelectPageSize === n ? "#34d39918" : "var(--cs-surface-2)",
+                            border: `1px solid ${apiSelectPageSize === n ? "#34d399" : "var(--cs-border)"}`,
+                            color: apiSelectPageSize === n ? "#34d399" : "var(--cs-muted)",
+                            borderRadius: 4, padding: "1px 6px", fontFamily: MONO, fontSize: 9,
+                            cursor: "pointer", fontWeight: apiSelectPageSize === n ? 700 : 400,
+                          }}>{n}</button>
+                        ))}
+                        <button onClick={() => this.setState({ apiSelectPage: apiSelectPage - 1 })} disabled={apiSelectPage === 0}
+                          style={{ background: "var(--cs-surface-2)", border: "1px solid var(--cs-border)", color: "var(--cs-muted)", borderRadius: 4, padding: "1px 7px", fontFamily: MONO, fontSize: 11, cursor: apiSelectPage === 0 ? "default" : "pointer", opacity: apiSelectPage === 0 ? 0.4 : 1 }}>‹</button>
+                        {Array.from({ length: totalPages }, (_, pi) => {
+                          const near = pi === 0 || pi === totalPages - 1 || Math.abs(pi - apiSelectPage) <= 1;
+                          if (!near) return pi === 1 || pi === totalPages - 2
+                            ? <span key={pi} style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)" }}>…</span>
+                            : null;
+                          return (
+                            <button key={pi} onClick={() => this.setState({ apiSelectPage: pi })} style={{
+                              background: pi === apiSelectPage ? "#34d399" : "var(--cs-surface-2)",
+                              border: `1px solid ${pi === apiSelectPage ? "#34d399" : "var(--cs-border)"}`,
+                              color: pi === apiSelectPage ? "#0a1f15" : "var(--cs-muted)",
+                              borderRadius: 4, padding: "1px 6px", fontFamily: MONO, fontSize: 9,
+                              cursor: "pointer", fontWeight: pi === apiSelectPage ? 700 : 400, minWidth: 24,
+                            }}>{pi + 1}</button>
+                          );
+                        })}
+                        <button onClick={() => this.setState({ apiSelectPage: apiSelectPage + 1 })} disabled={apiSelectPage === totalPages - 1}
+                          style={{ background: "var(--cs-surface-2)", border: "1px solid var(--cs-border)", color: "var(--cs-muted)", borderRadius: 4, padding: "1px 7px", fontFamily: MONO, fontSize: 11, cursor: apiSelectPage === totalPages - 1 ? "default" : "pointer", opacity: apiSelectPage === totalPages - 1 ? 0.4 : 1 }}>›</button>
+                        <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)", whiteSpace: "nowrap" as const }}>
+                          {pageStart + 1}–{Math.min(pageStart + apiSelectPageSize, total)} of {total}
+                        </span>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Dependency preview */}
+                  {selSpecNames.length > 1 && (() => {
+                    const sel = loadedSpecs.filter(s => selSpecNames.includes(s.fileName));
+                    const depPairs: { from: string; to: string }[] = [];
+                    for (const s of sel) {
+                      for (const dep of s.dependencies || []) {
+                        const depSpec = sel.find(x => x.schemaName === dep || x.resourceName === dep);
+                        if (depSpec && depSpec.fileName !== s.fileName) {
+                          depPairs.push({ from: depSpec.title, to: s.title });
+                        }
+                      }
+                    }
+                    if (depPairs.length === 0) return null;
+                    return (
+                      <div style={{
+                        marginTop: 10, padding: "10px 14px", borderRadius: 8,
+                        background: "var(--cs-surface-2)", border: "1px solid var(--cs-border-sub)"
+                      }}>
+                        <SLabel>Detected dependencies</SLabel>
+                        {depPairs.map((p, i) => (
+                          <div key={i} style={{
+                            fontFamily: MONO, fontSize: 11, color: "var(--cs-muted)",
+                            display: "flex", alignItems: "center", gap: 6, marginBottom: 3
+                          }}>
+                            <span style={{ color: "#34d399", fontWeight: 700 }}>{p.from}</span>
+                            <span>→ ID injected into →</span>
+                            <span style={{ color: "#60a5fa", fontWeight: 700 }}>{p.to}</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+
+              </div>
+            )}
+
+            {/* ══════════════════════════════════════════
+                DSG 2 — SYNTHETIC DATA PREVIEW + TEST COUNT
+            ══════════════════════════════════════════ */}
+            {wizStep === "data" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <PhaseBanner
+                  color="#34d399" icon="⬡" title="API Data Management — Synthetic Generator"
+                  desc="IN and IN·OUT fields are auto-detected from the spec schemas. Values are generated using banking-domain heuristics. OUT (readOnly) fields are excluded — the server produces those."
+                />
+
+                {/* ── Number of Test Runs card — ApiWorkflowTab style ── */}
+                <div style={{ borderRadius: 10, border: "1px solid var(--cs-border)", overflow: "hidden" }}>
+                  {/* Header row */}
+                  <div style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    padding: "9px 14px", background: "var(--cs-surface-2)",
+                    borderBottom: "1px solid var(--cs-border-sub)",
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: 13 }}>⚡</span>
+                      <span style={{
+                        fontFamily: MONO, fontSize: 11, fontWeight: 800,
+                        color: "var(--cs-text)", letterSpacing: 0.3,
+                      }}>
+                        Number of Test Runs
+                      </span>
+                    </div>
+                    <input type="number" min={1} max={2000} value={testCount}
+                      onChange={e => this.setState({ testCount: Math.min(2000, Math.max(1, +e.target.value || 1)) })}
+                      style={{
+                        width: 72, padding: "3px 8px", background: "var(--cs-input-bg)",
+                        border: "1px solid var(--cs-border)", borderRadius: 6,
+                        color: "var(--cs-text)", fontFamily: MONO, fontSize: 13, fontWeight: 700,
+                        textAlign: "right" as const, outline: "none",
+                      }} />
+                  </div>
+                  {/* Slider + presets */}
+                  <div style={{ padding: "12px 14px 14px", background: "var(--cs-bg)" }}>
+                    <input type="range" min={1} max={2000} value={testCount}
+                      onChange={e => this.setState({ testCount: +e.target.value })}
+                      style={{ width: "100%", accentColor: "var(--cs-accent)", marginBottom: 10 }} />
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" as const, marginBottom: 6 }}>
+                      {[1, 5, 10, 50, 100, 500, 1000, 2000].map(n => (
+                        <button key={n} onClick={() => this.setState({ testCount: n })} style={{
+                          background: testCount === n ? "#34d39918" : "var(--cs-surface-2)",
+                          border: `1px solid ${testCount === n ? "#34d399" : "var(--cs-border)"}`,
+                          color: testCount === n ? "#34d399" : "var(--cs-muted)",
+                          borderRadius: 6, padding: "3px 11px", fontFamily: MONO, fontSize: 11,
+                          cursor: "pointer", fontWeight: testCount === n ? 700 : 400,
+                        }}>{n >= 1000 ? `${n / 1000}k` : n}</button>
+                      ))}
+                    </div>
+                    <div style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)", opacity: 0.7 }}>
+                      {testCount === 1 ? "Single test run" : `${testCount} test runs — each run executes the full plan once`}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Synth preview table */}
+                {synthPreviews.length > 0 && Object.keys(synthPreviews[0]).length > 0 && (
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                      <SLabel style={{ marginBottom: 0 }}>Sample generated payload ({selectedSpecs[0]?.title})</SLabel>
+                      <button onClick={this.refreshPreviews}
+                        style={{
+                          background: "transparent", border: "1px solid var(--cs-border)",
+                          color: "#34d399", borderRadius: 6, padding: "3px 10px",
+                          fontFamily: MONO, fontSize: 11, cursor: "pointer"
+                        }}>
+                        ↻ Regenerate
+                      </button>
+                    </div>
+                    <div style={{ overflowX: "auto", borderRadius: 8, border: "1px solid var(--cs-border-sub)" }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse", background: "var(--cs-bg)" }}>
+                        <thead>
+                          <tr>
+                            {Object.keys(synthPreviews[0]).slice(0, 6).map(k => (
+                              <th key={k} style={{
+                                padding: "7px 12px", background: "var(--cs-surface-2)",
+                                fontFamily: MONO, fontSize: 10, color: "var(--cs-muted)",
+                                textTransform: "uppercase", letterSpacing: 0.7,
+                                borderBottom: "1px solid var(--cs-border-sub)", textAlign: "left", whiteSpace: "nowrap",
+                              }}>{k}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {synthPreviews.map((row, ri) => (
+                            <tr key={ri} style={{ background: ri % 2 === 0 ? "var(--cs-bg)" : "var(--cs-surface)" }}>
+                              {Object.entries(row).slice(0, 6).map(([k, v]) => {
+                                const d = v == null ? "—"
+                                  : typeof v === "object" ? ((v as any).ident || (v as any).id || JSON.stringify(v))
+                                    : String(v);
+                                return (
+                                  <td key={k} title={d} style={{
+                                    padding: "7px 12px", fontFamily: MONO, fontSize: 11,
+                                    color: "var(--cs-text)", borderBottom: "1px solid var(--cs-border-sub)",
+                                    maxWidth: 130, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                                  }}>{d}</td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)", marginTop: 5, opacity: 0.6 }}>
+                      Fresh values generated per request at execution time
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            )}
+
+            {/* ══════════════════════════════════════════
+                DSG 3 — EXECUTION FLOW REVIEW
+            ══════════════════════════════════════════ */}
+            {wizStep === "flow" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <PhaseBanner
+                  color="#fb923c" icon="▶" title="Execution Flow"
+                  desc={`${dynPlan.length} API calls ordered by dependency graph and HTTP method logic (POST → GET → PATCH → DELETE). IDs produced by each POST are automatically chained into subsequent calls.`}
+                />
+
+                {/* ── Execution Mode Selector ── */}
+                {(() => {
+                  const { execMode, flowTimeout } = this.state;
+                  const isFlow = execMode === "flow";
+                  return (
+                    <div style={{
+                      borderRadius: 10, border: "1px solid var(--cs-border)",
+                      overflow: "hidden",
+                    }}>
+                      {/* Header */}
+                      <div style={{
+                        padding: "8px 14px",
+                        background: "var(--cs-surface-2)",
+                        borderBottom: "1px solid var(--cs-border-sub)",
+                        fontFamily: MONO, fontSize: 10, fontWeight: 700,
+                        color: "var(--cs-dim)", letterSpacing: 0.5,
+                      }}>
+                        EXECUTION MODE
+                      </div>
+
+                      {/* Two buttons row */}
+                      <div style={{ display: "flex", padding: "10px 12px", gap: 8, background: "var(--cs-bg)" }}>
+
+                        {/* ── Flow (default) ── */}
+                        <button
+                          onClick={() => this.setState({ execMode: "flow" })}
+                          style={{
+                            flex: 1, padding: "9px 12px", borderRadius: 7, cursor: "pointer",
+                            fontFamily: MONO, fontSize: 10, fontWeight: 800, textAlign: "left" as const,
+                            transition: "all .15s",
+                            background: isFlow
+                              ? "linear-gradient(135deg, #7a4a00, #f59e0b)"
+                              : "var(--cs-surface-2)",
+                            border: `1.5px solid ${isFlow ? "#f59e0b" : "var(--cs-border)"}`,
+                            color: isFlow ? "#0a0800" : "var(--cs-muted)",
+                            boxShadow: isFlow ? "0 0 12px #f59e0b44" : "none",
+                          }}
+                          onMouseEnter={e => {
+                            if (isFlow) (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 20px #f59e0b66";
+                          }}
+                          onMouseLeave={e => {
+                            (e.currentTarget as HTMLButtonElement).style.boxShadow = isFlow ? "0 0 12px #f59e0b44" : "none";
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                            {isFlow && <span style={{ fontSize: 9 }}>●</span>}
+                            <span>▶ Execution Flow</span>
+                            {isFlow && (
+                              <span style={{
+                                fontSize: 8, background: "#0a080044", borderRadius: 3,
+                                padding: "1px 5px", marginLeft: "auto",
+                              }}>DEFAULT</span>
+                            )}
+                          </div>
+                          <div style={{
+                            fontSize: 9, fontWeight: 400, lineHeight: 1.5,
+                            color: isFlow ? "#0a080099" : "var(--cs-dim)", marginTop: 2,
+                          }}>
+                            {dynPlan.length} calls · dependency graph · POST→GET→PATCH→DELETE.
+                            IDs from each POST auto-chained into next call.
+                            Each request waits for the previous response.
+                          </div>
+                        </button>
+
+                        {/* ── Independent ── */}
+                        <button
+                          onClick={() => this.setState({ execMode: "independent" })}
+                          style={{
+                            flex: 1, padding: "9px 12px", borderRadius: 7, cursor: "pointer",
+                            fontFamily: MONO, fontSize: 10, fontWeight: 800, textAlign: "left" as const,
+                            transition: "all .15s",
+                            background: !isFlow
+                              ? "#0d2e2b"
+                              : "var(--cs-surface-2)",
+                            border: `1.5px solid ${!isFlow ? "#95d7d1" : "var(--cs-border)"}`,
+                            color: !isFlow ? "#95d7d1" : "var(--cs-muted)",
+                            boxShadow: !isFlow ? "0 0 12px #95d7d133" : "none",
+                          }}
+                          onMouseEnter={e => {
+                            if (!isFlow) (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 20px #95d7d155";
+                          }}
+                          onMouseLeave={e => {
+                            (e.currentTarget as HTMLButtonElement).style.boxShadow = !isFlow ? "0 0 12px #95d7d133" : "none";
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                            {!isFlow && <span style={{ fontSize: 9 }}>●</span>}
+                            <span style={{ color: !isFlow ? "#95d7d1" : "var(--cs-muted)" }}>
+                              ⊞ Independent
+                            </span>
+                          </div>
+                          <div style={{
+                            fontSize: 9, fontWeight: 400, lineHeight: 1.5,
+                            color: !isFlow ? "#95d7d188" : "var(--cs-dim)", marginTop: 2,
+                          }}>
+                            Each API runs individually with synthetic data.
+                            No dependency chain — no waiting for other responses.
+                            Requests execute in parallel using generated payloads.
+                          </div>
+                        </button>
+                      </div>
+
+                      {/* Timeout field — only visible in flow mode */}
+                      {isFlow && (
+                        <div style={{
+                          display: "flex", alignItems: "center", gap: 10,
+                          padding: "8px 14px",
+                          background: "#f59e0b08",
+                          borderTop: "1px solid #f59e0b22",
+                        }}>
+                          <span style={{ fontFamily: MONO, fontSize: 9, color: "#f59e0b88", fontWeight: 700, letterSpacing: 0.5 }}>
+                            ⏱ STEP TIMEOUT
+                          </span>
+                          <input
+                            type="number" min={1} max={120} value={flowTimeout}
+                            onChange={e => this.setState({ flowTimeout: Math.min(120, Math.max(1, +e.target.value || 15)) })}
+                            style={{
+                              width: 52, padding: "3px 7px", borderRadius: 5,
+                              background: "var(--cs-bg)", border: "1px solid #f59e0b55",
+                              color: "#f59e0b", fontFamily: MONO, fontSize: 12, fontWeight: 700,
+                              textAlign: "center" as const, outline: "none",
+                            }}
+                          />
+                          <span style={{ fontFamily: MONO, fontSize: 9, color: "#f59e0b66" }}>seconds per request</span>
+                          <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)", marginLeft: "auto" }}>
+                            max {flowTimeout * dynPlan.length}s total
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Execution plan — paginated */}
+                {(() => {
+                  const { flowPage, flowPageSize } = this.state;
+                  const PAGE_SIZES = [10, 20, 50, 100, 500];
+                  const totalPages = Math.ceil(dynPlan.length / flowPageSize);
+                  const pageStart = flowPage * flowPageSize;
+                  const pageItems = dynPlan.slice(pageStart, pageStart + flowPageSize);
+                  return (
+                    <div>
+                      {/* Header row with label + page-size picker */}
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                        <SLabel style={{ marginBottom: 0 }}>
+                          Execution sequence — {dynPlan.length} steps · {testCount} run{testCount > 1 ? "s" : ""}
+                        </SLabel>
+                        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                          <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)", marginRight: 2 }}>per page</span>
+                          {PAGE_SIZES.map(n => (
+                            <button key={n} onClick={() => this.setState({ flowPageSize: n, flowPage: 0 })} style={{
+                              background: flowPageSize === n ? "#34d39918" : "var(--cs-surface-2)",
+                              border: `1px solid ${flowPageSize === n ? "#34d399" : "var(--cs-border)"}`,
+                              color: flowPageSize === n ? "#34d399" : "var(--cs-muted)",
+                              borderRadius: 5, padding: "2px 7px", fontFamily: MONO, fontSize: 10,
+                              cursor: "pointer", fontWeight: flowPageSize === n ? 700 : 400,
+                            }}>{n}</button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Step rows */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                        {pageItems.map((step, i) => {
+                          const globalIdx = pageStart + i;
+                          const col = METHOD_COLORS[step.method] || "#8b949e";
+                          const hasDeps = step.dependsOnIds.length > 0;
+                          const produces = step.producesId;
+                          const needsId = step.needsIdFrom.length > 0;
+                          const inFieldCount = Object.keys(step.synthBody).length;
+                          return (
+                            <div key={step.id} style={{
+                              display: "flex", alignItems: "flex-start", gap: 10,
+                              padding: "10px 13px", borderRadius: 8,
+                              background: "var(--cs-surface)", border: `1px solid ${col}20`,
+                              borderLeft: `3px solid ${col}80`,
+                            }}>
+                              <div style={{
+                                width: 24, height: 24, borderRadius: "50%", flexShrink: 0,
+                                background: col + "20", border: `1.5px solid ${col}44`,
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                fontFamily: MONO, fontSize: 10, fontWeight: 800, color: col
+                              }}>
+                                {globalIdx + 1}
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 4 }}>
+                                  <MethodChip method={step.method} />
+                                  <span style={{ fontFamily: MONO, fontSize: 12, color: "var(--cs-text)", fontWeight: 600 }}>
+                                    {step.summary}
+                                  </span>
+                                </div>
+                                <div style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)", display: "flex", gap: 10, flexWrap: "wrap" }}>
+                                  <span>{step.spec.resourceName}</span>
+                                  {inFieldCount > 0 && <span style={{ color: "#34d399" }}>⬡ {inFieldCount} synth fields</span>}
+                                  {hasDeps && <span style={{ color: "#60a5fa" }}>← needs ID from: {step.dependsOnIds.map(d => d.split("__")[0]).join(", ")}</span>}
+                                  {produces && <span style={{ color: col }}>→ produces {step.spec.resourceName}_id</span>}
+                                  {needsId && !produces && <span style={{ color: "#fb923c" }}>uses {step.needsIdFrom[0]}_id in path</span>}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Pagination bar — bottom (page-size + nav) */}
+                      {totalPages > 1 && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 10, flexWrap: "wrap" as const }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                            <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)", marginRight: 2 }}>per page</span>
+                            {PAGE_SIZES.map(n => (
+                              <button key={n} onClick={() => this.setState({ flowPageSize: n, flowPage: 0 })} style={{
+                                background: flowPageSize === n ? "#34d39918" : "var(--cs-surface-2)",
+                                border: `1px solid ${flowPageSize === n ? "#34d399" : "var(--cs-border)"}`,
+                                color: flowPageSize === n ? "#34d399" : "var(--cs-muted)",
+                                borderRadius: 5, padding: "2px 7px", fontFamily: MONO, fontSize: 10,
+                                cursor: "pointer", fontWeight: flowPageSize === n ? 700 : 400,
+                              }}>{n}</button>
+                            ))}
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: "auto" }}>
+                            <button onClick={() => this.setState({ flowPage: 0 })} disabled={flowPage === 0}
+                              style={{ background: "transparent", border: "1px solid var(--cs-border)", color: flowPage === 0 ? "var(--cs-dim)" : "var(--cs-muted)", borderRadius: 5, padding: "3px 7px", fontFamily: MONO, fontSize: 10, cursor: flowPage === 0 ? "default" : "pointer", opacity: flowPage === 0 ? 0.4 : 1 }}>«</button>
+                            <button onClick={() => this.setState({ flowPage: flowPage - 1 })} disabled={flowPage === 0}
+                              style={{ background: "transparent", border: "1px solid var(--cs-border)", color: flowPage === 0 ? "var(--cs-dim)" : "var(--cs-muted)", borderRadius: 5, padding: "3px 9px", fontFamily: MONO, fontSize: 10, cursor: flowPage === 0 ? "default" : "pointer", opacity: flowPage === 0 ? 0.4 : 1 }}>‹ Prev</button>
+                            {Array.from({ length: totalPages }, (_, pi) => {
+                              const near = pi === 0 || pi === totalPages - 1 || Math.abs(pi - flowPage) <= 1;
+                              if (!near) return (pi === 1 || pi === totalPages - 2) ? <span key={pi} style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)" }}>…</span> : null;
+                              return <button key={pi} onClick={() => this.setState({ flowPage: pi })} style={{ background: pi === flowPage ? "#34d399" : "var(--cs-surface-2)", border: `1px solid ${pi === flowPage ? "#34d399" : "var(--cs-border)"}`, color: pi === flowPage ? "#0a1f15" : "var(--cs-muted)", borderRadius: 5, padding: "3px 8px", fontFamily: MONO, fontSize: 10, cursor: "pointer", fontWeight: pi === flowPage ? 700 : 400, minWidth: 28 }}>{pi + 1}</button>;
+                            })}
+                            <button onClick={() => this.setState({ flowPage: flowPage + 1 })} disabled={flowPage === totalPages - 1}
+                              style={{ background: "transparent", border: "1px solid var(--cs-border)", color: flowPage === totalPages - 1 ? "var(--cs-dim)" : "var(--cs-muted)", borderRadius: 5, padding: "3px 9px", fontFamily: MONO, fontSize: 10, cursor: flowPage === totalPages - 1 ? "default" : "pointer", opacity: flowPage === totalPages - 1 ? 0.4 : 1 }}>Next ›</button>
+                            <button onClick={() => this.setState({ flowPage: totalPages - 1 })} disabled={flowPage === totalPages - 1}
+                              style={{ background: "transparent", border: "1px solid var(--cs-border)", color: flowPage === totalPages - 1 ? "var(--cs-dim)" : "var(--cs-muted)", borderRadius: 5, padding: "3px 7px", fontFamily: MONO, fontSize: 10, cursor: flowPage === totalPages - 1 ? "default" : "pointer", opacity: flowPage === totalPages - 1 ? 0.4 : 1 }}>»</button>
+                          </div>
+                          <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)" }}>
+                            {pageStart + 1}–{Math.min(pageStart + flowPageSize, dynPlan.length)} of {dynPlan.length}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Dependency chain summary — collapsible + paginated */}
+                {(() => {
+                  const producers = dynPlan.filter(s => s.producesId);
+                  const consumers = dynPlan.filter(s => s.dependsOnIds.length > 0);
+                  if (producers.length === 0 && consumers.length === 0) return null;
+                  const rows = producers.map(p => {
+                    const deps = dynPlan.filter(s => s.dependsOnIds.includes(p.id));
+                    if (deps.length === 0) return null;
+                    return { p, deps, col: METHOD_COLORS[p.method] };
+                  }).filter(Boolean) as { p: any; deps: any[]; col: string }[];
+                  if (rows.length === 0) return null;
+
+                  const PREVIEW = 5;
+                  const PAGE_SIZE = 10;
+                  const { chainExpanded, chainPage } = this.state;
+                  const totalChainPages = Math.ceil(rows.length / PAGE_SIZE);
+                  const pageStart = chainPage * PAGE_SIZE;
+                  const visible = chainExpanded
+                    ? rows.slice(pageStart, pageStart + PAGE_SIZE)
+                    : rows.slice(0, PREVIEW);
+
+                  return (
+                    <div style={{ borderRadius: 8, border: "1px solid var(--cs-border-sub)", background: "var(--cs-surface-2)", overflow: "hidden" }}>
+
+                      {/* Header */}
+                      <div style={{ padding: "8px 14px", borderBottom: "1px solid var(--cs-border-sub)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <SLabel style={{ marginBottom: 0 }}>ID chaining</SLabel>
+                        <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)" }}>
+                          {rows.length} chain{rows.length !== 1 ? "s" : ""}
+                        </span>
+                      </div>
+
+                      {/* Rows */}
+                      <div style={{ padding: "10px 14px 4px" }}>
+                        {visible.map(({ p, deps, col }) => (
+                          <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", fontFamily: MONO, fontSize: 11, color: "var(--cs-muted)", marginBottom: 6 }}>
+                            <span style={{ color: col, fontWeight: 700 }}>{p.spec.resourceName}_id</span>
+                            <span style={{ color: "var(--cs-dim)" }}>→</span>
+                            {deps.map((d: any) => (
+                              <span key={d.id} style={{ background: "var(--cs-bg)", border: "1px solid var(--cs-border-sub)", borderRadius: 4, padding: "1px 6px", color: "var(--cs-text)", fontWeight: 600 }}>
+                                {d.spec.resourceName}
+                                <span style={{ color: METHOD_COLORS[d.method] || "#8b949e", marginLeft: 4 }}>{d.method}</span>
+                              </span>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Pagination — only when expanded */}
+                      {chainExpanded && totalChainPages > 1 && (
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, padding: "6px 14px", borderTop: "1px solid var(--cs-border-sub)" }}>
+                          <button onClick={() => this.setState({ chainPage: chainPage - 1 })} disabled={chainPage === 0}
+                            style={{ background: "transparent", border: "1px solid var(--cs-border)", color: "var(--cs-muted)", borderRadius: 5, padding: "2px 8px", fontFamily: MONO, fontSize: 10, cursor: chainPage === 0 ? "default" : "pointer", opacity: chainPage === 0 ? 0.4 : 1 }}>‹</button>
+                          {Array.from({ length: totalChainPages }, (_, pi) => {
+                            const near = pi === 0 || pi === totalChainPages - 1 || Math.abs(pi - chainPage) <= 1;
+                            if (!near) return (pi === 1 || pi === totalChainPages - 2) ? <span key={pi} style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)" }}>…</span> : null;
+                            return (
+                              <button key={pi} onClick={() => this.setState({ chainPage: pi })} style={{ background: pi === chainPage ? "#34d399" : "var(--cs-surface)", border: `1px solid ${pi === chainPage ? "#34d399" : "var(--cs-border)"}`, color: pi === chainPage ? "#0a1f15" : "var(--cs-muted)", borderRadius: 5, padding: "2px 7px", fontFamily: MONO, fontSize: 10, cursor: "pointer", fontWeight: pi === chainPage ? 700 : 400, minWidth: 26 }}>{pi + 1}</button>
+                            );
+                          })}
+                          <button onClick={() => this.setState({ chainPage: chainPage + 1 })} disabled={chainPage === totalChainPages - 1}
+                            style={{ background: "transparent", border: "1px solid var(--cs-border)", color: "var(--cs-muted)", borderRadius: 5, padding: "2px 8px", fontFamily: MONO, fontSize: 10, cursor: chainPage === totalChainPages - 1 ? "default" : "pointer", opacity: chainPage === totalChainPages - 1 ? 0.4 : 1 }}>›</button>
+                          <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)", marginLeft: 4 }}>
+                            {pageStart + 1}–{Math.min(pageStart + PAGE_SIZE, rows.length)} of {rows.length}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Expand / collapse toggle */}
+                      {rows.length > PREVIEW && (
+                        <button
+                          onClick={() => this.setState({ chainExpanded: !chainExpanded, chainPage: 0 })}
+                          style={{ width: "100%", padding: "7px 14px", background: "var(--cs-surface)", border: "none", borderTop: "1px solid var(--cs-border-sub)", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontFamily: MONO, fontSize: 10, color: "#34d399", cursor: "pointer", fontWeight: 600 }}>
+                          <span style={{ display: "inline-block", transform: chainExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform .2s", fontSize: 11, lineHeight: 1 }}>▼</span>
+                          {chainExpanded ? `Collapse` : `Show all ${rows.length} chains`}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })()}
+
+              </div>
+            )}
+
+            {/* ══════════════════════════════════════════
+                RUNNING  (DSG)
+            ══════════════════════════════════════════ */}
+            {wizStep === "running" && (
+              <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, gap: 0, margin: "-18px -20px", overflow: "hidden" }}>
+
+                {/* ── Fixed top: LIVE strip + exec info ── */}
+                <div style={{ flexShrink: 0, padding: "10px 20px", borderBottom: "1px solid var(--cs-border-sub)", background: "var(--cs-bg)" }}>
+
+                  {/* LIVE strip */}
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 10,
+                    padding: "9px 14px", borderRadius: 8, marginBottom: 10,
+                    background: "#f59e0b10", border: "1px solid #f59e0b33",
+                  }}>
+                    <span style={{
+                      width: 8, height: 8, borderRadius: "50%",
+                      background: "#f59e0b", display: "inline-block",
+                      boxShadow: "0 0 6px #f59e0b",
+                    }} />
+                    <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: "#f59e0b", flex: 1 }}>
+                      LIVE — execution in progress
+                    </span>
+                    <button
+                      onClick={() => this.setState({ stopFlag: true })}
+                      disabled={stopFlag}
+                      style={{
+                        background: stopFlag ? "var(--cs-surface-2)" : "#f8717118",
+                        border: `1.5px solid ${stopFlag ? "var(--cs-border)" : "#f87171aa"}`,
+                        color: stopFlag ? "var(--cs-dim)" : "#f87171",
+                        borderRadius: 7, padding: "5px 16px",
+                        fontFamily: MONO, fontSize: 11, fontWeight: 700,
+                        cursor: stopFlag ? "not-allowed" : "pointer",
+                        display: "flex", alignItems: "center", gap: 6, transition: "all .15s",
+                      }}
+                      onMouseEnter={e => { if (!stopFlag) (e.currentTarget as HTMLButtonElement).style.background = "#f8717130"; }}
+                      onMouseLeave={e => { if (!stopFlag) (e.currentTarget as HTMLButtonElement).style.background = "#f8717118"; }}
+                    >
+                      {stopFlag ? "⏹ Stopping…" : "■ Stop"}
+                    </button>
+                  </div>
+
+                  {/* Exec info */}
+                  <div className="mt-wizard-running-header" style={{ marginBottom: 0 }}>
+                    <div className="mt-wizard-running-icon">⚙️</div>
+                    <div className="mt-wizard-running-title">
+                      {`Executing ${dynPlan.length} API steps…`}
+                    </div>
+                    {testCount > 1 && (
+                      <div style={{ fontFamily: MONO, fontSize: 11, color: "var(--cs-dim)", marginTop: 4 }}>
+                        {Math.min(testCount, 5)} of {testCount} runs — chaining IDs between POST → GET/PATCH/DELETE
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── Paginated step list (scrollable middle) ── */}
+                {(() => {
+                  const LOG_SIZES = [10, 20, 50, 100, 500];
+                  const logTotal = execLog.length;
+                  const logPages = Math.max(1, Math.ceil(logTotal / execLogPageSize));
+                  const safePage = Math.min(execLogPage, logPages - 1);
+                  const logStart = safePage * execLogPageSize;
+                  const logEnd = Math.min(logStart + execLogPageSize, logTotal);
+                  const pageSlice = execLog.slice(logStart, logEnd);
+
+                  const lastPage = logPages - 1;
+                  if (this.state.running && safePage < lastPage) {
+                    setTimeout(() => this.setState({ execLogPage: lastPage }), 0);
+                  }
+
+                  const btnS: React.CSSProperties = {
+                    background: "transparent", border: "1px solid var(--cs-border)",
+                    color: "var(--cs-muted)", borderRadius: 5, fontFamily: MONO,
+                    fontSize: 10, cursor: "pointer",
+                  };
+                  const dis: React.CSSProperties = { opacity: 0.4, cursor: "not-allowed" };
+
+                  const PaginationBar = () => logPages <= 1 ? null : (
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" as const }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                        <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)" }}>per page</span>
+                        {LOG_SIZES.map(n => (
+                          <button key={n} onClick={() => this.setState({ execLogPageSize: n, execLogPage: 0 })} style={{
+                            background: execLogPageSize === n ? "#34d39918" : "var(--cs-surface-2)",
+                            border: `1px solid ${execLogPageSize === n ? "#34d399" : "var(--cs-border)"}`,
+                            color: execLogPageSize === n ? "#34d399" : "var(--cs-muted)",
+                            borderRadius: 5, padding: "2px 7px", fontFamily: MONO, fontSize: 10,
+                            cursor: "pointer", fontWeight: execLogPageSize === n ? 700 : 400,
+                          }}>{n}</button>
+                        ))}
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: "auto" }}>
+                        <button onClick={() => this.setState({ execLogPage: 0 })} disabled={safePage === 0}
+                          style={{ ...btnS, padding: "2px 7px", ...(safePage === 0 ? dis : {}) }}>«</button>
+                        <button onClick={() => this.setState({ execLogPage: safePage - 1 })} disabled={safePage === 0}
+                          style={{ ...btnS, padding: "2px 9px", ...(safePage === 0 ? dis : {}) }}>‹ Prev</button>
+                        {Array.from({ length: logPages }, (_, pi) => {
+                          const near = pi === 0 || pi === logPages - 1 || Math.abs(pi - safePage) <= 1;
+                          if (!near) return (pi === 1 || pi === logPages - 2) ? <span key={pi} style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)" }}>…</span> : null;
+                          return (
+                            <button key={pi} onClick={() => this.setState({ execLogPage: pi })} style={{
+                              background: pi === safePage ? "#34d399" : "var(--cs-surface-2)",
+                              border: `1px solid ${pi === safePage ? "#34d399" : "var(--cs-border)"}`,
+                              color: pi === safePage ? "#0a1f15" : "var(--cs-muted)",
+                              borderRadius: 5, padding: "2px 7px", fontFamily: MONO, fontSize: 10,
+                              cursor: "pointer", fontWeight: pi === safePage ? 700 : 400, minWidth: 26,
+                            }}>{pi + 1}</button>
+                          );
+                        })}
+                        <button onClick={() => this.setState({ execLogPage: safePage + 1 })} disabled={safePage >= logPages - 1}
+                          style={{ ...btnS, padding: "2px 9px", ...(safePage >= logPages - 1 ? dis : {}) }}>Next ›</button>
+                        <button onClick={() => this.setState({ execLogPage: logPages - 1 })} disabled={safePage >= logPages - 1}
+                          style={{ ...btnS, padding: "2px 7px", ...(safePage >= logPages - 1 ? dis : {}) }}>»</button>
+                      </div>
+                      <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)" }}>
+                        {logTotal > 0 ? `${logStart + 1}–${logEnd} of ${logTotal}` : "0 steps"}
+                      </span>
+                    </div>
+                  );
+
+                  return (
+                    <>
+                      {/* Scrollable steps */}
+                      <div style={{ flex: 1, overflowY: "auto" as const, padding: "8px 20px", minHeight: 0 }}>
+                        {logPages > 1 && <div style={{ marginBottom: 8 }}><PaginationBar /></div>}
+                        <div className="mt-wizard-steps">
+                          {pageSlice.map((e: ExecEntry, i: number) => {
+                            const isRun = e.status === "running";
+                            const cls = isRun ? "running" : e.ok ? "ok" : "fail";
+                            return (
+                              <div key={logStart + i} style={{ flexShrink: 0 }}>
+                                <div className={`mt-wizard-step mt-wizard-step--${cls}`}>
+                                  <span className="mt-wizard-step__num">{e.step}</span>
+                                  <span className="mt-wizard-step__icon">{isRun ? "⏳" : e.ok ? "✅" : "❌"}</span>
+                                  <span className="mt-wizard-step__label">{e.label}</span>
+                                  {!isRun && (<><StatusBadge status={e.status} /><span className="mt-wizard-step__lat">{e.latency}ms</span></>)}
+                                </div>
+                              </div>
+                            );
+                          })}
+                          <div ref={this.logRef} />
+                        </div>
+                      </div>
+
+                      {/* Fixed bottom: bottom pagination only */}
+                      {logPages > 1 && (
+                        <div style={{ flexShrink: 0, padding: "8px 20px", borderTop: "1px solid var(--cs-border-sub)", background: "var(--cs-bg)" }}>
+                          <PaginationBar />
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+            )}
+
+            {/* ══════════════════════════════════════════
+                REPORT  (shared)
+            ══════════════════════════════════════════ */}
+            {wizStep === "report" && (
+              <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, gap: 0, margin: "-18px -20px", overflow: "hidden" }}>
+
+                {/* ── Fixed top: summary card + stats + bar + methods ── */}
+                <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", gap: 10, padding: "14px 20px 10px", borderBottom: "1px solid var(--cs-border-sub)", background: "var(--cs-bg)" }}>
+                  <div style={{
+                    padding: "11px 15px", borderRadius: 10,
+                    background: "#a78bfa10", border: "1px solid #a78bfa33"
+                  }}>
+                    <div style={{ fontFamily: MONO, fontSize: 12, fontWeight: 800, color: "#a78bfa", marginBottom: 4 }}>
+                      📊 Report Management
+                    </div>
+                    <div style={{ fontFamily: MONO, fontSize: 11, color: "var(--cs-muted)" }}>
+                      {`${selectedSpecs.length} API${selectedSpecs.length > 1 ? "s" : ""} · ${dynPlan.length} steps · ${testCount} configured run${testCount > 1 ? "s" : ""}`}
+                      {" · "}{execResults.length} calls executed · {pct}% success
+                    </div>
+                  </div>
+
+                  <div className="mt-wizard-stats">
+                    {([
+                      { value: totalOk, label: "✓ PASS", mod: "ok" },
+                      { value: totalFail, label: "✗ FAIL", mod: "fail" },
+                      { value: execResults.length, label: "Total", mod: "total" },
+                      { value: avgLat + "ms", label: "Avg Lat", mod: "latency" },
+                    ] as const).map(({ value, label, mod }) => (
+                      <div key={label} className={`mt-wizard-stat mt-wizard-stat--${mod}`}>
+                        <div className="mt-wizard-stat__value">{value}</div>
+                        <div className="mt-wizard-stat__label">{label}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontFamily: MONO, fontSize: 11, color: "var(--cs-muted)", marginBottom: 5 }}>
+                      <span>Success rate</span>
+                      <span style={{ fontWeight: 700, color: pctCol }}>{pct}%</span>
+                    </div>
+                    <div style={{ height: 8, borderRadius: 4, background: "var(--cs-surface-2)", overflow: "hidden" }}>
+                      <div style={{ height: "100%", borderRadius: 4, width: `${pct}%`, background: pctCol, transition: "width .6s ease" }} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <SLabel>By HTTP method</SLabel>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {(["POST", "GET", "PATCH", "PUT", "DELETE"] as const).map(m => {
+                        const mResults = execResults.filter(r => r.method === m);
+                        if (mResults.length === 0) return null;
+                        const ok = mResults.filter(r => r.ok).length;
+                        const col = METHOD_COLORS[m];
+                        return (
+                          <div key={m} style={{ padding: "8px 13px", borderRadius: 8, background: col + "0a", border: `1px solid ${col}30` }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                              <MethodChip method={m} size="xs" />
+                              <span style={{ fontFamily: MONO, fontSize: 10, color: col, fontWeight: 700 }}>{ok}/{mResults.length}</span>
+                            </div>
+                            <div style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)" }}>
+                              {mResults.length > 0 ? Math.round(mResults.reduce((a, r) => a + r.latency, 0) / mResults.length) : 0}ms avg
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Scrollable paginated step results ── */}
+                {(() => {
+                  const RES_SIZES = [10, 20, 50, 100, 500];
+                  const resTotal = execResults.length;
+                  const resPages = Math.max(1, Math.ceil(resTotal / execLogPageSize));
+                  const safePage = Math.min(execLogPage, resPages - 1);
+                  const resStart = safePage * execLogPageSize;
+                  const resEnd = Math.min(resStart + execLogPageSize, resTotal);
+                  const pageSlice = execResults.slice(resStart, resEnd);
+
+                  const btnS: React.CSSProperties = {
+                    background: "transparent", border: "1px solid var(--cs-border)",
+                    color: "var(--cs-muted)", borderRadius: 5, fontFamily: MONO,
+                    fontSize: 10, cursor: "pointer",
+                  };
+                  const dis: React.CSSProperties = { opacity: 0.4, cursor: "not-allowed" };
+
+                  const PaginationBar = () => resPages <= 1 ? null : (
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" as const, flexShrink: 0, padding: "4px 0" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                        <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)" }}>per page</span>
+                        {RES_SIZES.map(n => (
+                          <button key={n} onClick={() => this.setState({ execLogPageSize: n, execLogPage: 0 })} style={{
+                            background: execLogPageSize === n ? "#a78bfa18" : "var(--cs-surface-2)",
+                            border: `1px solid ${execLogPageSize === n ? "#a78bfa" : "var(--cs-border)"}`,
+                            color: execLogPageSize === n ? "#a78bfa" : "var(--cs-muted)",
+                            borderRadius: 5, padding: "2px 7px", fontFamily: MONO, fontSize: 10,
+                            cursor: "pointer", fontWeight: execLogPageSize === n ? 700 : 400,
+                          }}>{n}</button>
+                        ))}
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: "auto" }}>
+                        <button onClick={() => this.setState({ execLogPage: 0 })} disabled={safePage === 0}
+                          style={{ ...btnS, padding: "2px 7px", ...(safePage === 0 ? dis : {}) }}>«</button>
+                        <button onClick={() => this.setState({ execLogPage: safePage - 1 })} disabled={safePage === 0}
+                          style={{ ...btnS, padding: "2px 9px", ...(safePage === 0 ? dis : {}) }}>‹ Prev</button>
+                        {Array.from({ length: resPages }, (_, pi) => {
+                          const near = pi === 0 || pi === resPages - 1 || Math.abs(pi - safePage) <= 1;
+                          if (!near) return (pi === 1 || pi === resPages - 2) ? <span key={pi} style={{ fontFamily: MONO, fontSize: 10, color: "var(--cs-dim)" }}>…</span> : null;
+                          return (
+                            <button key={pi} onClick={() => this.setState({ execLogPage: pi })} style={{
+                              background: pi === safePage ? "#a78bfa" : "var(--cs-surface-2)",
+                              border: `1px solid ${pi === safePage ? "#a78bfa" : "var(--cs-border)"}`,
+                              color: pi === safePage ? "#fff" : "var(--cs-muted)",
+                              borderRadius: 5, padding: "2px 7px", fontFamily: MONO, fontSize: 10,
+                              cursor: "pointer", fontWeight: pi === safePage ? 700 : 400, minWidth: 26,
+                            }}>{pi + 1}</button>
+                          );
+                        })}
+                        <button onClick={() => this.setState({ execLogPage: safePage + 1 })} disabled={safePage >= resPages - 1}
+                          style={{ ...btnS, padding: "2px 9px", ...(safePage >= resPages - 1 ? dis : {}) }}>Next ›</button>
+                        <button onClick={() => this.setState({ execLogPage: resPages - 1 })} disabled={safePage >= resPages - 1}
+                          style={{ ...btnS, padding: "2px 7px", ...(safePage >= resPages - 1 ? dis : {}) }}>»</button>
+                      </div>
+                      <span style={{ fontFamily: MONO, fontSize: 9, color: "var(--cs-dim)" }}>
+                        {resTotal > 0 ? `${resStart + 1}–${resEnd} of ${resTotal}` : "0 results"}
+                      </span>
+                    </div>
+                  );
+
+                  return (
+                    <div style={{ flex: 1, display: "flex", flexDirection: "column" as const, minHeight: 0 }}>
+                      <div style={{ flexShrink: 0, padding: "8px 20px 0" }}>
+                        <SLabel>Step results</SLabel>
+                        <PaginationBar />
+                      </div>
+                      <div className="mt-wizard-result-list" style={{
+                        flex: 1, overflowY: "auto" as const,
+                        padding: "8px 20px",
+                        minHeight: 0,
+                      }}>
+                        {pageSlice.map((r: ExecEntry, i: number) => (
+                          <div key={resStart + i} style={{ flexShrink: 0 }}>
+                            <ResultRow r={r} i={resStart + i} />
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ flexShrink: 0, padding: "4px 20px 8px" }}><PaginationBar /></div>
+                    </div>
+                  );
+                })()}
+
+              </div>
+            )}
+
+          </div>
+
+          {/* ══ FIXED FOOTER — buttons for all steps ══ */}
+          {wizStep !== "home" && wizStep !== "running" && (
+            <div style={{
+              flexShrink: 0, borderTop: "1px solid var(--cs-border-sub)",
+              padding: "12px 20px", background: "var(--cs-bg)", display: "flex", gap: 10,
+            }}>
+              {wizStep === "api-select" && (<>
+                <button className="mt-wizard-btn mt-wizard-btn--back"
+                  onClick={() => this.setState({ wizStep: "home", wizMode: null })}>← Back</button>
+                <button className="mt-wizard-btn mt-wizard-btn--run"
+                  disabled={selSpecNames.length === 0}
+                  onClick={this.goToData}
+                  style={{ opacity: selSpecNames.length === 0 ? 0.4 : 1 }}>
+                  Next: Synthetic Data → ({selSpecNames.length} selected)
+                </button>
+              </>)}
+              {wizStep === "data" && (<>
+                <button className="mt-wizard-btn mt-wizard-btn--back"
+                  onClick={() => this.setState({ wizStep: "api-select" })}>← Back</button>
+                <button className="mt-wizard-btn mt-wizard-btn--run"
+                  onClick={() => this.setState({ wizStep: "flow" })}>
+                  Next: Execution Flow →
+                </button>
+              </>)}
+              {wizStep === "flow" && (<>
+                <button className="mt-wizard-btn mt-wizard-btn--back"
+                  onClick={() => this.setState({ wizStep: "data" })}>← Back</button>
+                <button className="mt-wizard-btn mt-wizard-btn--run" onClick={this.execDynPlan}>
+                  {this.state.execMode === "flow"
+                    ? `▶ Execute Flow · ${dynPlan.length} steps × ${testCount} run${testCount > 1 ? "s" : ""}`
+                    : `⊞ Execute Independent · ${dynPlan.length} APIs × ${testCount} run${testCount > 1 ? "s" : ""}`}
+                </button>
+              </>)}
+              {wizStep === "report" && (<>
+                <button className="mt-wizard-btn mt-wizard-btn--new" onClick={this.reset}>← New Test</button>
+                <button className="mt-wizard-btn mt-wizard-btn--back"
+                  onClick={() => this.setState({ wizStep: "flow" })}>← Change Flow</button>
+                <button className="mt-wizard-btn mt-wizard-btn--rerun"
+                  onClick={this.execDynPlan}>↻ Re-run</button>
+              </>)}
+            </div>
+          )}
+
+        </div>
+      </div>
+    );
+  }
+}

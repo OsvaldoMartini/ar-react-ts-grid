@@ -2,12 +2,12 @@
  * ApiTestToolAINew.tsx
  * Located at: src/components/ApiTestToolAINew.tsx
  *
- * Entry point for the Capi simulator.
+ * Entry point for the MultiTest platform.
  * index.tsx renders it as:
  *
  *   {sessionId && sessionId.includes("apiTestToolAINew") && (
  *     <ApiTestToolAINew
- *       homeBankingIdInitial={homeBanking}
+ *       homeOrgIdInitial={homeBanking}
  *       socketPort={socketPort}
  *       sessionId={sessionId}
  *       botJobIdInitial={botJobId}
@@ -15,10 +15,10 @@
  *     />
  *   )}
  *
- * Uses CapiShell (not App directly) so ThemeProvider + i18n are always mounted.
+ * Uses AppShell (not App directly) so ThemeProvider + i18n are always mounted.
  */
 
-import CapiShell from "./Capi/CapiShell";
-export type { CapiProps } from "./Capi/App";
+import AppShell from "./MultiTest/AppShell";
+export type { AppProps } from "./MultiTest/App";
 
-export default CapiShell;
+export default AppShell;

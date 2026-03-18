@@ -21,13 +21,13 @@ const App: React.FC = () => {
   const [componentsData, setComponentsData] = useState<ComponentsInstructionsDTO[]>([]);
   const [elementDTO, setElementDTO] = useState<ElementDTO[]>(elementsDTOMockData);
   const [botJobData, setBotJobData] = useState<BotJobData>(botJobMockData);
-  const [socketPort, setSocketPort] = useState<number>(58295);
+  const [socketPort, setSocketPort] = useState<number>(49370);
   const [botJobId, setBotJobId] = useState<number>(76);
-  const [botJobName, setBotJobName] = useState<string>("Capi Tests");
+  const [botJobName, setBotJobName] = useState<string>("Capi");
   const [homeBanking, setHomeBanking] = useState<number>(46);
-  const [homeBankName, setHomeBankName] = useState<string>("Banca Stato");
+  const [homeBankName, setHomeBankName] = useState<string>("Banca Statro");
   const [sessionId, setSessionId] = useState<string>("capiApiTestToolAI"); // (SENDER: scannerTool) -> scannerGrid-1  -> componentTasks-1 -> mobileScannerGrid 
-  const [errorFlag, setErrorFlag] = useState<boolean>(false)  //(SENDER: insertTool) -> botJobTasks-1 -> componentTasks  
+  const [errorFlag, setErrorFlag] = useState<boolean>(false)  //(SENDER: insertTool) -> botJobTasks-1 -> componentTasks  -> capiApiTestToolAI
   const [alertImage, setAlertImage] = useState(constructionImage);
   const [alertClass, setAlertClass] = useState('construction-image')
   const [alertMessageHeader, setAlertMessageHeader] = useState<string | null>(null);
@@ -49,6 +49,7 @@ const App: React.FC = () => {
       socketPort: number,
       sessionIdFromJava: string,
       homeBanking: number,
+      homeBankName: string,
       botJobId: number,
       botJobName: string
     ) => {
@@ -145,8 +146,8 @@ const App: React.FC = () => {
       {/* ── Avaloq API Test Simulator ── */}
       {sessionId && sessionId.includes("capiApiTestToolAI") && (
         <ApiTestToolAINew
-          homeBankingIdInitial={homeBanking}
-          homeBankNameInitial={homeBankName}
+          homeOrgIdInitial={homeBanking}
+          homeOrgNameInitial={homeBankName}
           socketPort={socketPort}
           sessionId={sessionId}
           botJobIdInitial={botJobId}

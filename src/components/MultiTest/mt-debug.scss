@@ -1,0 +1,173 @@
+// mt-debug.scss — DebugTab
+@import 'mt-tokens';
+
+.mt-debug {
+  flex:           1;
+  display:        flex;
+  flex-direction: column;
+  overflow:       hidden;
+  background:     var(--cs-body-bg);
+  font-family:    $font-ui;
+}
+
+// ── Toolbar ───────────────────────────────────────────────────────────────────
+
+.mt-debug__toolbar {
+  padding:       8px 24px;
+  border-bottom: 1px solid var(--cs-border-sub);
+  display:       flex;
+  gap:           12px;
+  align-items:   center;
+  background:    var(--cs-surface);
+  flex-shrink:   0;
+  transition:    $t-theme;
+}
+
+.mt-debug__count {
+  font-family: $font-ui;
+  font-size:   12px;
+  font-weight: 500;
+  color:       var(--cs-muted);
+}
+
+.mt-debug__clear {
+  background:     transparent;
+  border:         1px solid var(--cs-border-sub);
+  border-radius:  $r-sm;
+  color:          var(--cs-muted);
+  padding:        4px 12px;
+  cursor:         pointer;
+  font-family:    $font-ui;
+  font-size:      11px;
+  font-weight:    600;
+  letter-spacing: .02em;
+  transition:     $t-fast;
+
+  &:hover {
+    border-color: var(--cs-red-border);
+    color:        var(--cs-red);
+    background:   var(--cs-red-bg);
+  }
+}
+
+// ── Body ──────────────────────────────────────────────────────────────────────
+
+.mt-debug__body {
+  flex:       1;
+  overflow-y: auto;
+  padding:    14px 24px;
+}
+
+.mt-debug__empty {
+  font-family: $font-ui;
+  font-size:   14px;
+  color:       var(--cs-dim);
+  text-align:  center;
+  padding:     56px 0;
+  line-height: 1.6;
+}
+
+// ── Log entry card ────────────────────────────────────────────────────────────
+
+.mt-debug__entry {
+  margin-bottom:  8px;
+  padding:        10px 14px;
+  border-left:    3px solid transparent; // color set inline per type
+  border-radius:  0 $r-md $r-md 0;
+  background:     var(--cs-surface);
+  border-top:     1px solid var(--cs-border-sub);
+  border-right:   1px solid var(--cs-border-sub);
+  border-bottom:  1px solid var(--cs-border-sub);
+  transition:     background .2s;
+
+  &:hover { background: var(--cs-surface-2); }
+}
+
+.mt-debug__entry-meta {
+  display:       flex;
+  gap:           8px;
+  align-items:   center;
+  margin-bottom: 5px;
+  flex-wrap:     wrap;
+}
+
+.mt-debug__entry-ts {
+  font-family: $font-mono;
+  font-size:   10px;
+  color:       var(--cs-dim);
+  flex-shrink: 0;
+}
+
+.mt-debug__entry-type {
+  font-family:    $font-ui;
+  font-size:      10px;
+  font-weight:    700;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+  // color set inline (dynamic per entry type)
+}
+
+.mt-debug__entry-path {
+  font-family: $font-mono;
+  font-size:   11px;
+  color:       var(--cs-text2);
+}
+
+.mt-debug__entry-content {
+  font-family:   $font-ui;
+  font-size:     13px;
+  color:         var(--cs-text);
+  margin-bottom: 5px;
+  line-height:   1.55;
+}
+
+.mt-debug__entry-desc {
+  font-family:   $font-ui;
+  font-size:     12px;
+  color:         var(--cs-muted);
+  font-style:    italic;
+  margin-bottom: 5px;
+  line-height:   1.5;
+}
+
+// ── Section labels ────────────────────────────────────────────────────────────
+
+.mt-debug__section       { margin-bottom: 6px; }
+.mt-debug__section-label {
+  font-family:    $font-ui;
+  font-size:      10px;
+  font-weight:    700;
+  letter-spacing: .6px;
+  text-transform: uppercase;
+  color:          var(--cs-dim);
+  margin-bottom:  4px;
+}
+
+// ── Planned actions ───────────────────────────────────────────────────────────
+
+.mt-debug__planned-label {
+  font-family:    $font-ui;
+  font-size:      10px;
+  font-weight:    700;
+  letter-spacing: .6px;
+  text-transform: uppercase;
+  color:          var(--cs-dim);
+  margin-bottom:  6px;
+}
+
+.mt-debug__action-row {
+  display:     flex;
+  gap:         8px;
+  align-items: center;
+  padding:     3px 0;
+}
+
+.mt-debug__action-num  {
+  font-family: $font-mono;
+  font-size:   10px;
+  color:       var(--cs-dim);
+  width:       18px;
+  flex-shrink: 0;
+}
+.mt-debug__action-path { font-family: $font-mono; font-size: 11px; color: var(--cs-text2); }
+.mt-debug__action-desc { font-family: $font-ui;   font-size: 11px; color: var(--cs-dim); }
