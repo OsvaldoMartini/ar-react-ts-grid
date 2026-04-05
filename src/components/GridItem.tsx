@@ -147,6 +147,8 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
   const [alertMessageBody, setAlertMessageBody] = useState<string | ComplexMessage[]>([]);
   const [alertMessageFooter, setAlertMessageFooter] = useState<string | null>(null);
   const [alertDismissed, setAlertDismissed] = useState(false);
+  const [pendingDeleteBlockId, setPendingDeleteBlockId] = useState<number | null>(null);
+  const [alertOnConfirm, setAlertOnConfirm] = useState<(() => void) | undefined>(undefined);
 
   const [executionId, setExecutionId] = useState<number>(0);
   const [executionState, setExecutionState] = useState<string>();
@@ -862,6 +864,8 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     setErrorFlag(false); // Reset error flag
     setAlertMessageHeader('');
     setAlertMessageBody('');
+    setPendingDeleteBlockId(null);
+    setAlertOnConfirm(undefined);
   };
 
   const handleSaveBlockName = (blockId: number) => {
@@ -2375,6 +2379,24 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
     // Find the botJobId and blockOrderNumber associated with the blockId
     const blockInstruction = instructionsData.find(instruction => instruction.blockId === blockId);
+    const blockDisplayName = blockInstruction?.blockName || `Block ${blockId}`;
+
+    // Show confirmation dialog using AlertModal
+    setAlertImage(warningRedImage);
+    setAlertClass('construction-image');
+    setAlertMessageHeader('Delete Block');
+    setAlertMessageBody(`Are you sure you want to delete "${blockDisplayName}"?`);
+    setAlertMessageFooter('This action cannot be undone.');
+    setErrorFlag(true);
+    setAlertOnConfirm(() => () => executeRemoveBlock(blockId));
+    return;
+  };
+
+  const executeRemoveBlock = (blockId: number) => {
+    // Clear the confirmation dialog
+    handleClose();
+
+    const blockInstruction = instructionsData.find(instruction => instruction.blockId === blockId);
     const botJobId = blockInstruction ? blockInstruction.botJobId : null;
     const removedBlockOrderNumber = blockInstruction ? blockInstruction.blockOrderNumber : null;
 
@@ -3168,6 +3190,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
           body={alertMessageBody || ''}
           extraMsg={alertMessageFooter || ''}
           onClose={handleClose}
+          onConfirm={alertOnConfirm}
           imageSrc={alertImage}
           imageClass={alertClass}
           error={errorFlag}

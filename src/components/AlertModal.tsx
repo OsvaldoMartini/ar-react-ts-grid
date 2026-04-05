@@ -7,12 +7,13 @@ interface AlertModalProps {
   body: string | ComplexMessage[];    // Body message, can be string or array of ComplexMessage
   extraMsg: string;             // Footer message
   onClose: () => void;        // Close function
+  onConfirm?: () => void;     // Optional: confirm function (shows Confirm + Cancel buttons)
   imageSrc: string;           // Pass the image source from outside
   imageClass?: string;        // Optional: pass a CSS class for the image
   error: boolean;             // Determines if the footer is red (error) or blue (success)
 }
 
-const AlertModal: React.FC<AlertModalProps> = ({ header, body, extraMsg, onClose, imageSrc, imageClass, error }) => {
+const AlertModal: React.FC<AlertModalProps> = ({ header, body, extraMsg, onClose, onConfirm, imageSrc, imageClass, error }) => {
   const renderBody = () => {
     if (Array.isArray(body)) {
       return (
@@ -51,8 +52,15 @@ const AlertModal: React.FC<AlertModalProps> = ({ header, body, extraMsg, onClose
           <p>{extraMsg}</p>
         </div>
 
-        {/* Close button */}
-        <button onClick={onClose} className="close-btn">Close</button>
+        {/* Buttons */}
+        {onConfirm ? (
+          <div className="alert-buttons">
+            <button onClick={onConfirm} className="confirm-btn">Confirm</button>
+            <button onClick={onClose} className="cancel-btn">Cancel</button>
+          </div>
+        ) : (
+          <button onClick={onClose} className="close-btn">Close</button>
+        )}
       </div>
     </div>
   );
