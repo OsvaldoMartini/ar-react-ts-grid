@@ -40,25 +40,28 @@ const DomReviewModal: React.FC<DomReviewModalProps> = ({ data, onAction }) => {
 
         <div className="dom-review-body">
           <div className="dom-review-details">
-            <div className="dom-review-row">
-              <span className="dom-review-label">PC</span>
-              <span className="dom-review-value">{data.pcName}</span>
-            </div>
-            <div className="dom-review-row">
-              <span className="dom-review-label">Email</span>
-              <span className="dom-review-value">{data.email}</span>
-            </div>
-            <div className="dom-review-row">
-              <span className="dom-review-label">URL</span>
-              <span className="dom-review-value">{data.url}</span>
-            </div>
-            <div className="dom-review-row">
-              <span className="dom-review-label">Title</span>
-              <span className="dom-review-value">{data.title || '-'}</span>
-            </div>
-            <div className="dom-review-row">
-              <span className="dom-review-label">Size</span>
-              <span className="dom-review-value">{data.htmlSizeKb} KB</span>
+            <div className="dom-review-stripe" />
+            <div className="dom-review-details-body">
+              <div className="dom-review-row">
+                <span className="dom-review-label">PC</span>
+                <span className="dom-review-value">{data.pcName}</span>
+              </div>
+              <div className="dom-review-row">
+                <span className="dom-review-label">Email</span>
+                <span className="dom-review-value">{data.email}</span>
+              </div>
+              <div className="dom-review-row">
+                <span className="dom-review-label">URL</span>
+                <span className="dom-review-value">{data.url}</span>
+              </div>
+              <div className="dom-review-row">
+                <span className="dom-review-label">Title</span>
+                <span className="dom-review-value">{data.title || '-'}</span>
+              </div>
+              <div className="dom-review-row">
+                <span className="dom-review-label">Size</span>
+                <span className="dom-review-value">{data.htmlSizeKb} KB</span>
+              </div>
             </div>
           </div>
 
