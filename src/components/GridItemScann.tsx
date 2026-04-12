@@ -13,6 +13,7 @@ import testInputImage from "../assets/testInput.png";
 import clickTestImage from "../assets/clickTest2.png";
 import warningRedImage from '../assets/warning_red.png';
 import AlertModal from './AlertModal';
+import DomReviewModal, { type DomReviewData, type DomReviewAction } from './DomReviewModal';
 import { useWebSocket } from './useWebSocket';
 import AttributeDropdown from './AttributeDropdown';
 import './griditem.scss';
@@ -75,6 +76,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   // Inside your component:
   const [hoveredRow, setHoveredRow] = useState<ElementDTO | null>(null);
   const [hoveredRowsList, setHoveredRowsList] = useState<ElementDTO[]>([]);
+  const [domReviewData, setDomReviewData] = useState<DomReviewData | null>(null);
 
   const handleNextBlockPage = (typeElement: string) => {
     setBlockCurrentPages((prev) => ({
@@ -226,6 +228,18 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
 
           case "activate-update-all": {
             setIsUpdatingAll(false);
+            break;
+          }
+
+          case "SEND_DOM_REVIEW": {
+            const reviewData: DomReviewData = {
+              url: bodyData?.url || '',
+              title: bodyData?.title || '',
+              pcName: bodyData?.pcName || '',
+              email: bodyData?.email || '',
+              htmlSizeKb: bodyData?.htmlSizeKb || 0,
+            };
+            setDomReviewData(reviewData);
             break;
           }
 
@@ -610,8 +624,28 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   };
 
 
+  const handleDomReviewAction = (action: DomReviewAction) => {
+    setDomReviewData(null);
+    if (action === 'cancel') return;
+
+    if (webSocket && connected && webSocket.readyState === WebSocket.OPEN) {
+      const message = {
+        type: 'DOM_REVIEW_RESPONSE',
+        sessionId,
+        homeBankingId,
+        action,
+      };
+      webSocket.send(JSON.stringify(message));
+    }
+  };
+
   return (
     <div className="grid-container">
+      {/* DOM Review Modal */}
+      {domReviewData && (
+        <DomReviewModal data={domReviewData} onAction={handleDomReviewAction} />
+      )}
+
       {/* Alert Modal (as before) */}
       {alertMessageBody && alertMessageBody.length > 0 && (
         <AlertModal
