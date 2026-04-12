@@ -14,6 +14,7 @@ import clickTestImage from "../assets/clickTest2.png";
 import warningRedImage from '../assets/warning_red.png';
 import AlertModal from './AlertModal';
 import DomReviewModal, { type DomReviewData, type DomReviewAction } from './DomReviewModal';
+import SupportRequestModal, { type SupportRequestData, type SupportRequestAction } from './SupportRequestModal';
 import { useWebSocket } from './useWebSocket';
 import AttributeDropdown from './AttributeDropdown';
 import './griditem.scss';
@@ -77,6 +78,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   const [hoveredRow, setHoveredRow] = useState<ElementDTO | null>(null);
   const [hoveredRowsList, setHoveredRowsList] = useState<ElementDTO[]>([]);
   const [domReviewData, setDomReviewData] = useState<DomReviewData | null>(null);
+  const [supportReqData, setSupportReqData] = useState<SupportRequestData | null>(null);
 
   const handleNextBlockPage = (typeElement: string) => {
     setBlockCurrentPages((prev) => ({
@@ -240,6 +242,16 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
               htmlSizeKb: bodyData?.htmlSizeKb || 0,
             };
             setDomReviewData(reviewData);
+            break;
+          }
+
+          case "REQUEST_SUPPORT": {
+            const reqData: SupportRequestData = {
+              url: bodyData?.url || '',
+              pcName: bodyData?.pcName || '',
+              email: bodyData?.email || '',
+            };
+            setSupportReqData(reqData);
             break;
           }
 
@@ -624,6 +636,21 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   };
 
 
+  const handleSupportRequestAction = (action: SupportRequestAction, message: string) => {
+    setSupportReqData(null);
+    if (action === 'cancel') return;
+
+    if (webSocket && connected && webSocket.readyState === WebSocket.OPEN) {
+      webSocket.send(JSON.stringify({
+        type: 'SUPPORT_REQUEST_RESPONSE',
+        sessionId,
+        homeBankingId,
+        action,
+        message,
+      }));
+    }
+  };
+
   const handleDomReviewAction = (action: DomReviewAction) => {
     setDomReviewData(null);
     if (action === 'cancel') return;
@@ -644,6 +671,11 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
       {/* DOM Review Modal */}
       {domReviewData && (
         <DomReviewModal data={domReviewData} onAction={handleDomReviewAction} />
+      )}
+
+      {/* Support Request Modal */}
+      {supportReqData && (
+        <SupportRequestModal data={supportReqData} onAction={handleSupportRequestAction} />
       )}
 
       {/* Alert Modal (as before) */}
