@@ -77,7 +77,7 @@ const DomReviewModal: React.FC<DomReviewModalProps> = ({ data, onAction }) => {
           <div className="dom-review-divider" />
 
           <div className="dom-review-options">
-            <div className="dom-review-option" onClick={() => onAction('send')}>
+            <div className="dom-review-option dom-review-option-send" onClick={() => onAction('send')}>
               <div className="dom-review-option-icon dom-review-option-icon-send">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
                   stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -93,7 +93,7 @@ const DomReviewModal: React.FC<DomReviewModalProps> = ({ data, onAction }) => {
               </div>
             </div>
 
-            <div className="dom-review-option" onClick={() => onAction('save')}>
+            <div className="dom-review-option dom-review-option-save" onClick={() => onAction('save')}>
               <div className="dom-review-option-icon dom-review-option-icon-save">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
                   stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

@@ -184,13 +184,41 @@
     }
 
     .dom-review-option-icon-send {
-      background: rgba(33, 150, 243, 0.1);
-      svg { color: #1976d2; }
+      background: rgba(245, 158, 11, 0.12);
+      svg { color: #d97706; }
     }
 
     .dom-review-option-icon-save {
-      background: rgba(76, 175, 80, 0.1);
-      svg { color: #388e3c; }
+      background: rgba(33, 150, 243, 0.12);
+      svg { color: #1565c0; }
+    }
+
+    // ── Send To Support: orange theme ──
+    &.dom-review-option-send {
+      border-color: rgba(245, 158, 11, 0.25);
+      background: linear-gradient(135deg, rgba(245, 158, 11, 0.04), rgba(245, 158, 11, 0.01));
+      border-left: 4px solid #f59e0b;
+
+      &:hover {
+        border-color: #f59e0b;
+        background: linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(245, 158, 11, 0.03));
+      }
+
+      .dom-review-option-title { color: #92400e; }
+    }
+
+    // ── Create Local File: blue theme ──
+    &.dom-review-option-save {
+      border-color: rgba(33, 150, 243, 0.25);
+      background: linear-gradient(135deg, rgba(33, 150, 243, 0.04), rgba(33, 150, 243, 0.01));
+      border-left: 4px solid #1976d2;
+
+      &:hover {
+        border-color: #1976d2;
+        background: linear-gradient(135deg, rgba(33, 150, 243, 0.08), rgba(33, 150, 243, 0.03));
+      }
+
+      .dom-review-option-title { color: #0d47a1; }
     }
 
     .dom-review-option-body {
