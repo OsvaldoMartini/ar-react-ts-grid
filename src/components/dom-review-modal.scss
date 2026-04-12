@@ -154,18 +154,24 @@
 
   .dom-review-option {
     display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    padding: 12px 14px;
+    align-items: stretch;
+    gap: 0;
     border-radius: 10px;
-    border: 1.5px solid #e4e8ed;
-    background: #fff;
+    overflow: hidden;
     cursor: pointer;
     transition: all 0.15s ease;
 
-    &:hover {
-      border-color: #1976d2;
-      background: rgba(33, 150, 243, 0.03);
+    .dom-review-option-stripe {
+      width: 4px;
+      flex-shrink: 0;
+    }
+
+    .dom-review-option-content {
+      flex: 1;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 12px 14px;
     }
 
     .dom-review-option-icon {
@@ -183,23 +189,12 @@
       }
     }
 
-    .dom-review-option-icon-send {
-      background: rgba(33, 150, 243, 0.1);
-      svg { color: #1976d2; }
-    }
-
-    .dom-review-option-icon-save {
-      background: rgba(76, 175, 80, 0.1);
-      svg { color: #388e3c; }
-    }
-
     .dom-review-option-body {
       flex: 1;
 
       .dom-review-option-title {
         font-size: 0.85rem;
         font-weight: 700;
-        color: #1a1a1a;
         margin: 0 0 3px;
       }
 
@@ -211,6 +206,34 @@
       }
     }
   }
+}
+
+.dom-review-option-send {
+  border: 1.5px solid rgba(245, 158, 11, 0.25);
+  background: rgba(245, 158, 11, 0.02);
+
+  &:hover {
+    border-color: #f59e0b;
+    background: rgba(245, 158, 11, 0.06);
+  }
+
+  .dom-review-option-stripe { background: #f59e0b; }
+  .dom-review-option-icon { background: rgba(245, 158, 11, 0.12); svg { color: #d97706; } }
+  .dom-review-option-title { color: #92400e; }
+}
+
+.dom-review-option-save {
+  border: 1.5px solid rgba(33, 150, 243, 0.25);
+  background: rgba(33, 150, 243, 0.02);
+
+  &:hover {
+    border-color: #1976d2;
+    background: rgba(33, 150, 243, 0.06);
+  }
+
+  .dom-review-option-stripe { background: #1976d2; }
+  .dom-review-option-icon { background: rgba(33, 150, 243, 0.12); svg { color: #1565c0; } }
+  .dom-review-option-title { color: #0d47a1; }
 }
 
 .dom-review-footer {
