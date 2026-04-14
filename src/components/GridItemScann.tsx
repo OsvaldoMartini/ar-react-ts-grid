@@ -833,7 +833,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
                   <div className="block-header-left">
                     <button
                       type="button"
-                      className="block-collapse-badge"
+                      className={`block-collapse-badge ${collapsedBlocks.has(typeElement) ? 'is-collapsed' : ''}`}
                       title={collapsedBlocks.has(typeElement) ? "Expand block" : "Collapse block"}
                       onClick={() => toggleBlockCollapsed(typeElement)}
                     >

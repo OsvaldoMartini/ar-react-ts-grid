@@ -3340,7 +3340,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                         )}
                         <button
                           type="button"
-                          className="block-collapse-badge"
+                          className={`block-collapse-badge ${collapsedBlocks.has(Number(blockData.instructions[0].blockId)) ? 'is-collapsed' : ''}`}
                           title={collapsedBlocks.has(Number(blockData.instructions[0].blockId)) ? "Expand block" : "Collapse block"}
                           onClick={() => toggleBlockCollapsed(Number(blockData.instructions[0].blockId))}
                         >
