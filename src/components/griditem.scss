@@ -39,6 +39,32 @@
   white-space: nowrap;
 }
 
+.block-collapse-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin: 0 6px 0 4px;
+  padding: 0;
+  background: #ffffff;
+  color: #0b5394;
+  border: 1px solid #0b5394;
+  border-radius: 50%;
+  cursor: pointer;
+  line-height: 0;
+  transition: background-color 0.15s ease, color 0.15s ease;
+
+  &:hover {
+    background: #0b5394;
+    color: #ffffff;
+  }
+
+  svg {
+    display: block;
+  }
+}
+
 .grid-find-input {
   @extend .toolbar-input;
   flex: 1;          // ✅ takes all remaining free space

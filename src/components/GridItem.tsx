@@ -153,6 +153,33 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
   const [executionId, setExecutionId] = useState<number>(0);
   const [executionState, setExecutionState] = useState<string>();
   const [findText, setFindText] = useState<string>('');
+  const [collapsedBlocks, setCollapsedBlocks] = useState<Set<number>>(new Set());
+
+  const toggleBlockCollapsed = (blockId: number) => {
+    setCollapsedBlocks((prev) => {
+      const next = new Set(prev);
+      if (next.has(blockId)) next.delete(blockId);
+      else next.add(blockId);
+      return next;
+    });
+  };
+
+  const CollapseToggleIcon: React.FC<{ collapsed: boolean }> = ({ collapsed }) => (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="10"
+      height="10"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M5 12h14" />
+      {collapsed && <path d="M12 5v14" />}
+    </svg>
+  );
 
   type ActionFlag = "E" | "S";
 
@@ -3311,6 +3338,14 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                               handleBlockStatus(blockData.instructions[0].blockId)
                             } />
                         )}
+                        <button
+                          type="button"
+                          className="block-collapse-badge"
+                          title={collapsedBlocks.has(Number(blockData.instructions[0].blockId)) ? "Expand block" : "Collapse block"}
+                          onClick={() => toggleBlockCollapsed(Number(blockData.instructions[0].blockId))}
+                        >
+                          <CollapseToggleIcon collapsed={collapsedBlocks.has(Number(blockData.instructions[0].blockId))} />
+                        </button>
                         <span className="block-order-number">
                           #{blockData.instructions[0].blockOrderNumber}
                         </span>
@@ -3437,6 +3472,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
                         </div>
                       </div>
+                      {!collapsedBlocks.has(Number(blockData.instructions[0].blockId)) && (
                       <Droppable droppableId={blockGroupIndex} key={blockData.instructions[0].blockId}>
                         {(provided) => (
                           <div
@@ -3667,6 +3703,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                           </div>
                         )}
                       </Droppable>
+                      )}
                     </div >
                   ))
               )}

@@ -61,6 +61,33 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   const [alertDismissed, setAlertDismissed] = useState(false);
   const [showAttributes, setShowAttributes] = useState(false);
   const [findText, setFindText] = useState<string>('');
+  const [collapsedBlocks, setCollapsedBlocks] = useState<Set<string>>(new Set());
+
+  const toggleBlockCollapsed = (key: string) => {
+    setCollapsedBlocks((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const CollapseToggleIcon: React.FC<{ collapsed: boolean }> = ({ collapsed }) => (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="10"
+      height="10"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M5 12h14" />
+      {collapsed && <path d="M12 5v14" />}
+    </svg>
+  );
 
   // const totalPages = Math.max(1, Math.ceil(Object.entries(elementGrouped).length / rowsPerPage));
   // const paginatedData = Object.entries(elementGrouped).slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
@@ -804,6 +831,14 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
               <div key={typeElement} className="block">
                 <div className="block-header color-component1">
                   <div className="block-header-left">
+                    <button
+                      type="button"
+                      className="block-collapse-badge"
+                      title={collapsedBlocks.has(typeElement) ? "Expand block" : "Collapse block"}
+                      onClick={() => toggleBlockCollapsed(typeElement)}
+                    >
+                      <CollapseToggleIcon collapsed={collapsedBlocks.has(typeElement)} />
+                    </button>
                     <span className="block-order-number">#{index + 1}</span>
                     <span className="block-name">{getInstructionTypeElement(typeElement)}</span>
                     <span className="block-count">({elementData.elements.length})</span>
@@ -829,6 +864,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
                   />
 
                 </div>
+                {!collapsedBlocks.has(typeElement) && (
                 <div className="instructions-list">
                   {paginatedElements.map((elementDTO, i) => (
                     <div key={i}
@@ -887,6 +923,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
                     </div>
                   ))}
                 </div>
+                )}
               </div>
             );
           });
