@@ -60,6 +60,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   const [alertMessageFooter, setAlertMessageFooter] = useState<string | null>(null);
   const [alertDismissed, setAlertDismissed] = useState(false);
   const [showAttributes, setShowAttributes] = useState(false);
+  const [findText, setFindText] = useState<string>('');
 
   // const totalPages = Math.max(1, Math.ceil(Object.entries(elementGrouped).length / rowsPerPage));
   // const paginatedData = Object.entries(elementGrouped).slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
@@ -165,7 +166,13 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
             setIsSendingAll(false);
             setIsUpdatingAll(false);
 
-            const detailsData = Array.isArray(bodyData?.details) ? bodyData.details : [];
+           const detailsData = Array.isArray(bodyData?.elementDetails)
+            ? bodyData.elementDetails
+            : Array.isArray(bodyData?.details)
+              ? bodyData.details
+              : [];
+
+
             if (detailsData.length === 0) {
               setElementDTO([]);
               setElementGrouped({});
@@ -174,6 +181,8 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
             } else {
               setElementDTO(detailsData);
             }
+
+            setIsElementGrouped(false); 
             break;
           }
 
@@ -666,8 +675,33 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     }
   };
 
+  const matchesFind = (el: ElementDTO, q: string): boolean => {
+    if (!q) return true;
+    const fields = [
+      el.tagName,
+      (el as any).nameLabel,
+      (el as any).nameField,
+      (el as any).definedName,
+      (el as any).someText,
+      (el as any).attribId,
+      (el as any).attribName,
+      el.xPath,
+    ];
+    return fields.some((v) => typeof v === 'string' && v.toLowerCase().includes(q));
+  };
+
   return (
     <div className="grid-container">
+      <div className="grid-find-row">
+        <span className="grid-find-label">Find:</span>
+        <input
+          className="grid-find-input"
+          type="text"
+          value={findText}
+          onChange={(e) => setFindText(e.target.value)}
+          placeholder="Type to find…"
+        />
+      </div>
       {/* DOM Review Modal */}
       {domReviewData && (
         <DomReviewModal data={domReviewData} onAction={handleDomReviewAction} />
@@ -737,7 +771,28 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
             </div>
           </div>
 
-          {Object.entries(elementGrouped).map(([typeElement, elementData], index) => {
+          {(() => {
+            const q = findText.trim().toLowerCase();
+            const filteredEntries = Object.entries(elementGrouped)
+              .map(([typeElement, elementData]) => {
+                if (!q) return [typeElement, elementData] as const;
+                const groupMatches = typeElement.toLowerCase().includes(q);
+                const filteredElements = groupMatches
+                  ? elementData.elements
+                  : elementData.elements.filter((el) => matchesFind(el, q));
+                return [typeElement, { ...elementData, elements: filteredElements }] as const;
+              })
+              .filter(([, elementData]) => elementData.elements.length > 0);
+
+            if (q && filteredEntries.length === 0) {
+              return (
+                <div className="block">
+                  <div className="no-data-message">No matches for “{findText}”</div>
+                </div>
+              );
+            }
+
+            return filteredEntries.map(([typeElement, elementData], index) => {
             const currentPage = blockCurrentPages[typeElement] || 1;
             const totalPages = blockPages[typeElement] || 1;
             const paginatedElements = elementData.elements.slice(
@@ -834,7 +889,8 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
                 </div>
               </div>
             );
-          })}
+          });
+          })()}
         </>
       )}
     </div>
