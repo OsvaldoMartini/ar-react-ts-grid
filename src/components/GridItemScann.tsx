@@ -108,6 +108,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   const [domReviewData, setDomReviewData] = useState<DomReviewData | null>(null);
   const [supportReqData, setSupportReqData] = useState<SupportRequestData | null>(null);
   const [elementsSupportReqData, setElementsSupportReqData] = useState<SupportRequestData | null>(null);
+  const clickedSupportElementRef = useRef<ElementDTO | null>(null);
 
   const handleNextBlockPage = (typeElement: string) => {
     setBlockCurrentPages((prev) => ({
@@ -720,7 +721,8 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     }
   };
 
-  const requestElementsSupport = () => {
+  const requestElementsSupport = (clicked: ElementDTO) => {
+    clickedSupportElementRef.current = clicked;
     // Ask backend for context (pc/email/url) — reuses the same pattern as REQUEST_SUPPORT.
     if (webSocket && connected && webSocket.readyState === WebSocket.OPEN) {
       webSocket.send(JSON.stringify({
@@ -735,7 +737,9 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   };
 
   const handleElementsSupportRequestAction = (action: SupportRequestAction, message: string) => {
+    const clicked = clickedSupportElementRef.current;
     setElementsSupportReqData(null);
+    clickedSupportElementRef.current = null;
     if (action === 'cancel') return;
 
     if (webSocket && connected && webSocket.readyState === WebSocket.OPEN) {
@@ -745,7 +749,8 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
         homeBankingId,
         action,
         message,
-        elementDetails: elementDTO,
+        // Only the clicked element — backend will pull its live outerHTML.
+        elementDetails: clicked ? [clicked] : [],
       }));
     }
   };
@@ -979,10 +984,10 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
                       <div className="options-column">
                         <img
                           src={warningRedImage}
-                          alt="Report elements to support"
-                          title="Report all scanned elements to support"
+                          alt="Report this element to support"
+                          title="Report this element to support"
                           className="warning-button"
-                          onClick={requestElementsSupport}
+                          onClick={() => requestElementsSupport(elementDTO)}
                         />
                         <img src={pickItemImage} alt="" className="pick-button" onClick={(event) => handleRowSelectedClick(event, elementDTO, "DETAILS_ELEMENT_DTO")} />
                         {renderEditButton(
