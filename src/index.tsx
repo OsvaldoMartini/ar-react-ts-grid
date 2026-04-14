@@ -21,12 +21,12 @@ const App: React.FC = () => {
   const [componentsData, setComponentsData] = useState<ComponentsInstructionsDTO[]>([]);
   const [elementDTO, setElementDTO] = useState<ElementDTO[]>(elementsDTOMockData);
   const [botJobData, setBotJobData] = useState<BotJobData>(botJobMockData);
-  const [socketPort, setSocketPort] = useState<number>(55687);
+  const [socketPort, setSocketPort] = useState<number>(62408);
   const [botJobId, setBotJobId] = useState<number>(1);
   const [botJobName, setBotJobName] = useState<string>("CAPI API Test");
   const [homeBanking, setHomeBanking] = useState<number>(75);
   const [homeBankName, setHomeBankName] = useState<string>("CAPI - Avaloq");
-  const [sessionId, setSessionId] = useState<string>("capiApiTestToolAI"); // (SENDER: scannerTool) -> scannerGrid-1  -> componentTasks-1 -> mobileScannerGrid
+  const [sessionId, setSessionId] = useState<string>("scannerGrid"); // (SENDER: scannerTool) -> scannerGrid-1  -> componentTasks-1 -> mobileScannerGrid
   const [errorFlag, setErrorFlag] = useState<boolean>(false)  //(SENDER: insertTool) -> botJobTasks-1 -> componentTasks  -> capiApiTestToolAI
   const [alertImage, setAlertImage] = useState(constructionImage);
   const [alertClass, setAlertClass] = useState('construction-image')
