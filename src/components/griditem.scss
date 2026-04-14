@@ -182,6 +182,7 @@
 .cross-button,
 .save-button,
 .pick-button,
+.warning-button,
 .test-button,
 .active-button,
 .inactive-button,
@@ -300,6 +301,10 @@
 }
 
 .pick-button{
+  padding: 0 2px 0 6px;
+}
+
+.warning-button{
   padding: 0 2px 0 6px;
 }
 

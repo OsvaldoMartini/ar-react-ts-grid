@@ -107,6 +107,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   const [hoveredRowsList, setHoveredRowsList] = useState<ElementDTO[]>([]);
   const [domReviewData, setDomReviewData] = useState<DomReviewData | null>(null);
   const [supportReqData, setSupportReqData] = useState<SupportRequestData | null>(null);
+  const [elementsSupportReqData, setElementsSupportReqData] = useState<SupportRequestData | null>(null);
 
   const handleNextBlockPage = (typeElement: string) => {
     setBlockCurrentPages((prev) => ({
@@ -201,15 +202,37 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
 
 
             if (detailsData.length === 0) {
+              // Clear (explicit empty payload from Java - e.g. Clean List button)
               setElementDTO([]);
               setElementGrouped({});
               setBotJobId(bodyData?.botJobId);
               setBotJobName(bodyData?.botJobName);
             } else {
-              setElementDTO(detailsData);
+              // Accumulate chunks — each scan arrives as N messages of ~25 elements.
+              // Dedup by (xPath + tagName); Clean List button empties the grid.
+              setElementDTO((prev) => {
+                const seen = new Set(
+                  prev.map((el: any) => `${el.xPath}||${el.tagName}`)
+                );
+                const merged = [...prev];
+                let nextId = prev.reduce(
+                  (max: number, el: any) => Math.max(max, el.id || 0),
+                  0
+                );
+                for (const el of detailsData) {
+                  const key = `${el.xPath}||${el.tagName}`;
+                  if (!seen.has(key)) {
+                    seen.add(key);
+                    merged.push({ ...el, id: ++nextId });
+                  }
+                }
+                return merged;
+              });
+              if (typeof bodyData?.botJobId !== "undefined") setBotJobId(bodyData?.botJobId);
+              if (typeof bodyData?.botJobName !== "undefined") setBotJobName(bodyData?.botJobName);
             }
 
-            setIsElementGrouped(false); 
+            setIsElementGrouped(false);
             break;
           }
 
@@ -288,6 +311,16 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
               email: bodyData?.email || '',
             };
             setSupportReqData(reqData);
+            break;
+          }
+
+          case "REQUEST_SUPPORT_ELEMENTS": {
+            const reqData: SupportRequestData = {
+              url: bodyData?.url || '',
+              pcName: bodyData?.pcName || '',
+              email: bodyData?.email || '',
+            };
+            setElementsSupportReqData(reqData);
             break;
           }
 
@@ -687,6 +720,36 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     }
   };
 
+  const requestElementsSupport = () => {
+    // Ask backend for context (pc/email/url) — reuses the same pattern as REQUEST_SUPPORT.
+    if (webSocket && connected && webSocket.readyState === WebSocket.OPEN) {
+      webSocket.send(JSON.stringify({
+        type: 'REQUEST_SUPPORT_ELEMENTS',
+        sessionId,
+        homeBankingId,
+      }));
+    } else {
+      // Fallback: open modal immediately with blank context.
+      setElementsSupportReqData({ url: '', pcName: '', email: '' });
+    }
+  };
+
+  const handleElementsSupportRequestAction = (action: SupportRequestAction, message: string) => {
+    setElementsSupportReqData(null);
+    if (action === 'cancel') return;
+
+    if (webSocket && connected && webSocket.readyState === WebSocket.OPEN) {
+      webSocket.send(JSON.stringify({
+        type: 'SUPPORT_REQUEST_ELEMENTS_RESPONSE',
+        sessionId,
+        homeBankingId,
+        action,
+        message,
+        elementDetails: elementDTO,
+      }));
+    }
+  };
+
   const handleDomReviewAction = (action: DomReviewAction) => {
     setDomReviewData(null);
     if (action === 'cancel') return;
@@ -737,6 +800,10 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
       {/* Support Request Modal */}
       {supportReqData && (
         <SupportRequestModal data={supportReqData} onAction={handleSupportRequestAction} />
+      )}
+
+      {elementsSupportReqData && (
+        <SupportRequestModal data={elementsSupportReqData} onAction={handleElementsSupportRequestAction} />
       )}
 
       {/* Alert Modal (as before) */}
@@ -910,6 +977,13 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
                         <span>{"\u00A0".repeat(20)}</span>
                       )}
                       <div className="options-column">
+                        <img
+                          src={warningRedImage}
+                          alt="Report elements to support"
+                          title="Report all scanned elements to support"
+                          className="warning-button"
+                          onClick={requestElementsSupport}
+                        />
                         <img src={pickItemImage} alt="" className="pick-button" onClick={(event) => handleRowSelectedClick(event, elementDTO, "DETAILS_ELEMENT_DTO")} />
                         {renderEditButton(
                           elementDTO,
