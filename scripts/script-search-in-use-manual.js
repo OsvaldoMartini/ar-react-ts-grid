@@ -1,6 +1,4 @@
-// SEARCH IN USE (SENDER: scannerTool) -> UPDATE_LIST_ELEMENTS_ASYNC
-const __done = arguments[arguments.length - 1];
-
+// SEARCH IN USE (SENDER: scannerTool) -> scannerGrid
 (function (
   searchTerms,
   hiddenFields,
@@ -11,19 +9,17 @@ const __done = arguments[arguments.length - 1];
   homeBankingId,
   botJobId,
 ) {
-  // --- NEW: Selenium async callback handling ---
-  let __doneCalled = false;
-  function doneOnce(payload) {
-    if (__doneCalled) return;
-    __doneCalled = true;
-    __done(JSON.stringify(payload));
-  }
-
-  // Safety timeout so Java never waits forever (adjust seconds as you want)
-  setTimeout(
-    () => doneOnce({ ok: false, error: "timeout waiting for JS completion" }),
-    20000,
-  );
+  let pingIntervalId = null;
+  let attempts = 0;
+  let maxAttempts = 100;
+  let wSocket = null;
+  let alreadySent = false;
+  let previousXPath = null;
+  // Temporary storage for original styles
+  const originalStyles = new Map();
+  const hoveredXPathMap = new Set(); // Changed from Map to Set
+  let previousHighlightedElement = null;
+  let pageFullyLoaded = false;
 
   // --- NEW: stop any previous injected instance ---
   try {
@@ -32,13 +28,8 @@ const __done = arguments[arguments.length - 1];
     }
   } catch (e) {}
 
-  // keep reference to *this* run cleanup (assigned later)
+  // reset before registering this run
   window.__scannerToolCleanup = null;
-
-  // Minimal cleanup for non-WS version
-  const cleanup = () => {};
-  window.__scannerToolCleanup = cleanup;
-  window.addEventListener("beforeunload", cleanup, { once: true });
 
   window.elementInfoMap = new Map();
   // window.searchTerms = ["button", "input", "a", "select"];
@@ -51,35 +42,220 @@ const __done = arguments[arguments.length - 1];
   window.sessionId = `${sessionId}`; // -${homeBankingId}`;
   // var elementInfoSubmit = new Map();
 
-  let started = false;
-
-  function init(eventName) {
-    if (started) return;
-
-    const ready =
-      [
-        "DOMContentLoaded",
-        "onreadystatechange",
-        "load",
-        "onload",
-        "Direct Execution",
-      ].includes(eventName) ||
-      ["complete", "interactive"].includes(document.readyState);
-
-    if (!ready) return;
-
-    started = true;
+  function connectWebSocket() {
+    if (attempts >= maxAttempts) {
+      //console.error("Reached maximum reconnection attempts. Stopping.");
+      return;
+    }
 
     try {
-      startCollectingElements(window.searchTerms);
-    } catch (e) {
-      doneOnce({
-        ok: false,
-        error: "startCollectingElements failed",
-        message: String(e?.message || e),
-        stack: String(e?.stack || ""),
-      });
+      //console.log(`Attempt ${attempts + 1} to connect to WebSocket...`);
+      wSocket = new WebSocket(
+        `ws://localhost:${socketPort}/websocket?sessionId=${window.sessionId}`,
+      );
+
+      wSocket.onopen = () => {
+        //console.log(`WebSocket connected for session: ${window.sessionId}`);
+        attempts = 0; // Reset attempts on successful connection
+
+        try {
+          const subscriptionMessage = {
+            type: "echo",
+            sessionId: window.sessionId,
+            operationId: "test echo",
+            body: "subscribe",
+          };
+          // Convert the JSON message to a buffer
+          const base64Message = btoa(
+            unescape(encodeURIComponent(JSON.stringify(subscriptionMessage))),
+          );
+          // Convert the buffer to a Base64 string
+          wSocket.send(base64Message);
+          // wSocket.send(JSON.stringify(message));
+          //console.log("Sent SEARCH_TOOL:", subscriptionMessage);
+          //console.log("Sent ENCODED Length:", base64Message.length);
+          //console.log("Sent ENCODED:", base64Message);
+        } catch (sendError) {
+          //console.error("Failed to send subscription message:", sendError);
+        }
+
+        // Call startCollectingElements AFTER WebSocket is open
+        startCollectingElements(window.searchTerms);
+        startPing();
+      };
+
+      wSocket.onmessage = (event) => {
+        let receivedMessage = event.data;
+
+        if (receivedMessage.endsWith("\u0000")) {
+          receivedMessage = receivedMessage.slice(0, -1);
+        }
+
+        if (receivedMessage) {
+          try {
+            const parsedMessage = JSON.parse(receivedMessage);
+            // console.log("WebSocket message received:", parsedMessage);
+
+            const bodyData =
+              typeof parsedMessage.body === "string"
+                ? JSON.parse(parsedMessage.body)
+                : parsedMessage.body;
+
+            if (window.sessionId === bodyData.sessionId) {
+              if (bodyData.operationId === "highlight") {
+                const detailsData = Array.isArray(bodyData.elementDetails)
+                  ? bodyData.elementDetails
+                  : [];
+
+                //console.log("detailsData", detailsData[0]);
+
+                var hoveredElement = findElementByXPath(detailsData[0].xPath);
+
+                if (!hoveredElement) {
+                  hoveredElement = document.querySelector(
+                    detailsData[0].cssSelector,
+                  );
+                }
+
+                if (!hoveredElement) {
+                  var hoveredElement = getElementByCoordinates(
+                    detailsData[0].coordinates,
+                  );
+                }
+
+                if (hoveredElement) {
+                  // console.log("hoveredElement", hoveredElement);
+
+                  // NEW: keep the element used for highlight as "raw clicked" context
+                  window.__scannerRawClickedElement = hoveredElement;
+
+                  const currentXPath = detailsData[0].xPath;
+
+                  // Restore style of previous element (if XPath is different)
+                  if (previousXPath && previousXPath !== currentXPath) {
+                    const originalOutline = originalStyles.get(previousXPath);
+                    previousHighlightedElement.style.outline =
+                      originalOutline || "";
+                  }
+
+                  // Save original style using XPath as key
+                  if (!originalStyles.has(currentXPath)) {
+                    originalStyles.set(
+                      currentXPath,
+                      hoveredElement.style.outline,
+                    );
+                    hoveredXPathMap.add(currentXPath);
+                  }
+
+                  const originalOutline =
+                    originalStyles.get(currentXPath) || "";
+
+                  // Check if original style already had red
+                  if (originalOutline.includes("#2323FF")) {
+                    hoveredElement.style.outline = "3px solid #FF3131";
+                  } else if (originalOutline.includes("#FF3131")) {
+                    hoveredElement.style.outline = "3px solid #2323FF";
+                  } else {
+                    hoveredElement.style.outline = "3px solid #FF3131";
+                  }
+
+                  previousHighlightedElement = hoveredElement;
+                  previousXPath = currentXPath;
+                } else {
+                  restoreOriginalStyles();
+                }
+              }
+
+              if (
+                parsedMessage.body.includes("cannot be processed") ||
+                (parsedMessage.footer &&
+                  parsedMessage.footer.includes("cannot be processed"))
+              ) {
+                //Handle cannot be processed
+              }
+            }
+          } catch (parseError) {
+            // console.log("Non-JSON message received:", receivedMessage);
+          }
+        }
+      };
+
+      wSocket.onerror = (error) => {
+        //console.error("WebSocket error:", error);
+        // connectWebSocket(); // Retry connection
+      };
+
+      wSocket.onclose = () => {
+        //console.log("WebSocket connection closed");
+
+        if (attempts < maxAttempts) {
+          attempts++;
+          //console.log(`Reconnecting attempt ${attempts}...`);
+          if (!alreadySent) {
+            connectWebSocket(); // Retry connection
+          }
+        } else {
+          //console.log(`${maxAttempts} Attempts to Reconnect with the WebSocket.`);
+        }
+      };
+    } catch (initError) {
+      //console.error("Failed to initialize WebSocket:", initError);
     }
+  }
+
+  // Optionally, expose a cleanup function
+  const cleanup = () => {
+    try {
+      alreadySent = true; // IMPORTANT: prevents reconnect loop in onclose
+
+      // stop restore timer
+      if (typeof restoreIntervalId !== "undefined") {
+        clearInterval(restoreIntervalId);
+      }
+
+      // stop ping timer
+      if (pingIntervalId) {
+        clearInterval(pingIntervalId);
+        pingIntervalId = null;
+      }
+
+      // close ws even if CONNECTING
+      if (
+        wSocket &&
+        (wSocket.readyState === WebSocket.OPEN ||
+          wSocket.readyState === WebSocket.CONNECTING)
+      ) {
+        try {
+          wSocket.onclose = null; // avoid triggering reconnect logic
+        } catch (e) {}
+        wSocket.close(1000, "cleanup");
+      }
+    } catch (cleanupError) {}
+  };
+
+  window.cleanupWebSocket = cleanup;
+  window.__scannerToolCleanup = cleanup; // NEW: so next injection can stop this one
+  window.addEventListener("beforeunload", cleanup, { once: true });
+
+  function init(eventName) {
+    if (pageFullyLoaded) {
+      //console.log("Event Name", eventName);
+      if (
+        [
+          "DOMContentLoaded",
+          "onreadystatechange",
+          "load",
+          "onload",
+          "Direct Execution",
+        ].includes(eventName) ||
+        ["complete", "interactive"].includes(document.readyState)
+      ) {
+        //console.log("searchTerms", window.searchTerms);
+        connectWebSocket();
+        // startCollectingElements(window.searchTerms);
+      }
+    }
+    pageFullyLoaded = true;
   }
 
   // Function to collect general elements based on search terms
@@ -154,6 +330,7 @@ const __done = arguments[arguments.length - 1];
         !searchTerms.includes("with text") &&
         !searchTerms.includes("with test-id"))
     ) {
+      // Check if the clicked element has a shadow root
       // Check if the clicked element has a shadow root
       let shadowHost = null;
 
@@ -289,24 +466,37 @@ const __done = arguments[arguments.length - 1];
   }
 
   function fetchAndParseIframeContent(iframe) {
+    if (!iframe.src) return null;
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("GET", iframe.src, false); // 'false' makes the request synchronous
+
     try {
-      if (!iframe.src) return null;
-      // optionally: only same-origin
-      const url = new URL(iframe.src, window.location.href);
-      if (url.origin !== window.location.origin) return null;
-
-      const xhr = new XMLHttpRequest();
-      xhr.open("GET", iframe.src, false);
       xhr.send();
-      if (xhr.status !== 200) return null;
 
+      if (xhr.status !== 200) {
+        //console.error("Error fetching the iframe content:", xhr.status);
+        return null;
+      }
+
+      const htmlContent = xhr.responseText;
+
+      // Parse the HTML content
       const parser = new DOMParser();
-      const parsedDocument = parser.parseFromString(
-        xhr.responseText,
-        "text/html",
-      );
-      return parsedDocument.querySelectorAll("*");
-    } catch (e) {
+      const parsedDocument = parser.parseFromString(htmlContent, "text/html");
+
+      // Get all elements inside the parsed document
+      const srcElements = parsedDocument.querySelectorAll("*");
+      //console.log(`srcElements Total: <${srcElements.length}>`);
+
+      // srcElements.forEach((element) => {
+      //   console.log(`Element: <${element.tagName}>`);
+      //   console.log("Text Content:", element.textContent.trim());
+      // });
+
+      return srcElements; // Return the NodeList
+    } catch (error) {
+      //console.error("Error fetching the iframe content:", error);
       return null;
     }
   }
@@ -386,9 +576,6 @@ const __done = arguments[arguments.length - 1];
       try {
         let iframeDocument =
           iframe.contentDocument || iframe.contentWindow.document;
-
-        // NEW: collect Shadow DOM elements inside iframe (same-origin only)
-        collectShadowElements(iframeDocument, searchTerms);
 
         try {
           //console.log("Iframe origin:",new URL(iframe.src, window.location.origin).origin);
@@ -609,12 +796,57 @@ const __done = arguments[arguments.length - 1];
     // console.log("All element info stored in Map:", window.allElementInfo);
     window.elementInfoMap.clear();
 
-    // Return full list to Java once (no websocket, no chunks)
-    doneOnce({
-      ok: true,
-      elements: window.allElementInfo,
-      totalElements: window.allElementInfo.length,
-    });
+    if (wSocket && wSocket.readyState) {
+      //console.log("WebSocket readyState:", wSocket.readyState);
+    }
+
+    // Send elementDetails in chunks of 25
+    // helper sleep function
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    // Send elementDetails in chunks of 25 with 300ms delay
+    async function sendChunksWithDelay() {
+      if (wSocket && wSocket.readyState === WebSocket.OPEN) {
+        const CHUNK_SIZE = 25;
+
+        // snapshot so later clears don't affect what we send
+        const all = Array.isArray(window.allElementInfo)
+          ? window.allElementInfo
+          : [];
+
+        for (let i = 0; i < all.length; i += CHUNK_SIZE) {
+          const chunk = all.slice(i, i + CHUNK_SIZE);
+
+          const message = {
+            type: "SEARCH_TOOL",
+            sessionId: window.destination,
+            operationId: window.operationId,
+            homeBankingId: window.homeBankingId,
+            botJobId: window.botJobId,
+
+            elementDetails: chunk,
+
+            chunkIndex: Math.floor(i / CHUNK_SIZE),
+            totalChunks: Math.ceil(all.length / CHUNK_SIZE),
+            chunkSize: CHUNK_SIZE,
+            totalElements: all.length,
+          };
+
+          const base64Message = btoa(
+            unescape(encodeURIComponent(JSON.stringify(message))),
+          );
+
+          wSocket.send(base64Message);
+          console.log(`Sent chunk #${i / CHUNK_SIZE}`, chunk);
+
+          // ⏱ wait 300ms before next chunk
+          await sleep(300);
+        }
+      }
+    }
+
+    // call it
+    sendChunksWithDelay();
   };
 
   function pushElement(
@@ -689,6 +921,12 @@ const __done = arguments[arguments.length - 1];
 
     // Store tagName and other details in the Map
     if (elementIdentity) {
+      if (!originalStyles.has(element)) {
+        // Store the original outline before changing it
+        originalStyles.set(element, element.style.outline);
+      }
+      element.style.outline = "3px solid red";
+
       window.elementInfoMap.set(
         referXPath, // Keep Distinction iFrameXPath / child / etc...
         elementDTO(typeDTO, elementIdentity, names),
@@ -743,6 +981,65 @@ const __done = arguments[arguments.length - 1];
       someText,
     };
   };
+
+  function normalizeSomeTextForTables(sortedList) {
+    const raw = window.__scannerRawClickedElement;
+    if (!raw || !Array.isArray(sortedList) || sortedList.length === 0) return;
+
+    // Only apply inside instrument tables (or any mat-table)
+    const inInstrumentTable =
+      raw.closest?.("avq-instrument-table") ||
+      raw.closest?.("avq-trades-table") ||
+      raw.closest?.("table[mat-table]") ||
+      raw.closest?.("table.mat-mdc-table");
+
+    if (!inInstrumentTable) return;
+
+    // If it is inside a table, tagName must be "button"
+    sortedList.forEach((item) => {
+      if (!item) return;
+      item.tagName = "button";
+    });
+
+    // Get the clicked cell's text (this is what you want as someText)
+    const cell = raw.closest?.('td[role="gridcell"], td, th');
+    if (!cell) return;
+
+    const cellText = (cell.innerText || cell.textContent || "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (!cellText) return;
+
+    sortedList.forEach((item) => {
+      if (!item) return;
+
+      if (item.tagName === "input") {
+        const ariaLabel =
+          item.attributeData
+            ?.find((a) => a.name === "aria-label")
+            ?.value?.trim() || "";
+
+        const existingSomeTextAttr =
+          item.attributeData
+            ?.find((a) => a.name === "someText")
+            ?.value?.trim() || "";
+
+        if (!existingSomeTextAttr || existingSomeTextAttr === ariaLabel) {
+          item.someText = cellText;
+        }
+      } else {
+        item.someText = cellText;
+      }
+
+      if (Array.isArray(item.attributeData)) {
+        const idx = item.attributeData.findIndex((a) => a.name === "someText");
+        if (idx >= 0) item.attributeData[idx].value = item.someText;
+        else
+          item.attributeData.push({ name: "someText", value: item.someText });
+      }
+    });
+  }
 
   // Function to check if an element is hidden (using computed styles and attributes)
   const isHidden = (el) => {
@@ -1480,65 +1777,6 @@ const __done = arguments[arguments.length - 1];
     });
   }
 
-  function getElementByXPath(xpath) {
-    try {
-      // your xPaths are like /html/body/.../div[1]
-      const result = document.evaluate(
-        xpath,
-        document,
-        null,
-        XPathResult.FIRST_ORDERED_NODE_TYPE,
-        null,
-      );
-      return result.singleNodeValue || null;
-    } catch (e) {
-      return null;
-    }
-  }
-
-  function normalizeSomeTextForTables(sortedList) {
-    if (!Array.isArray(sortedList) || sortedList.length === 0) return;
-
-    // For list-scans (no click), normalize each entry based on its own DOM position
-    sortedList.forEach((item) => {
-      if (!item || !item.xPath) return;
-
-      const raw = getElementByXPath(item.xPath);
-      if (!raw) return;
-
-      const inInstrumentTable =
-        raw.closest?.("avq-instrument-table") ||
-        raw.closest?.("avq-trades-table") ||
-        raw.closest?.("table[mat-table]") ||
-        raw.closest?.("table.mat-mdc-table");
-
-      if (!inInstrumentTable) return;
-
-      // If it is inside a table, tagName must be "button"
-      item.tagName = "button";
-
-      const cell = raw.closest?.('td[role="gridcell"], td, th');
-      if (!cell) return;
-
-      const cellText = (cell.innerText || cell.textContent || "")
-        .replace(/\s+/g, " ")
-        .trim();
-
-      if (!cellText) return;
-
-      // Override someText with cell text (this fixes ISIN cell/div cases)
-      item.someText = cellText;
-
-      // Keep attributeData.someText aligned
-      if (Array.isArray(item.attributeData)) {
-        const idx = item.attributeData.findIndex((a) => a.name === "someText");
-        if (idx >= 0) item.attributeData[idx].value = item.someText;
-        else
-          item.attributeData.push({ name: "someText", value: item.someText });
-      }
-    });
-  }
-
   // Event listener to handle incoming messages from iframes
   window.addEventListener("message", function (event) {
     if (event.origin !== window.trustedOriginURL) {
@@ -1578,6 +1816,128 @@ const __done = arguments[arguments.length - 1];
     });
     window.attachEvent?.("onload", () => init("onload"));
   }
+
+  connectWebSocket();
+
+  function startPing() {
+    // Send a ping every 30 seconds (adjust if needed)
+    pingIntervalId = setInterval(() => {
+      if (wSocket && wSocket.readyState === WebSocket.OPEN) {
+        const pingMessage = {
+          type: "ping-search",
+          sessionId: window.sessionId,
+          timestamp: new Date().toISOString(),
+        };
+
+        try {
+          const encodedPing = btoa(
+            unescape(encodeURIComponent(JSON.stringify(pingMessage))),
+          );
+          wSocket.send(encodedPing);
+          //console.log("Ping sent:", pingMessage);
+        } catch (pingError) {
+          //console.error("Ping error:", pingError);
+        }
+      }
+    }, 15000); // 15 seconds
+  }
+
+  function findElementByXPath(xpath) {
+    try {
+      const result = document.evaluate(
+        xpath,
+        document,
+        null,
+        XPathResult.FIRST_ORDERED_NODE_TYPE,
+        null,
+      );
+      return result.singleNodeValue;
+    } catch (error) {
+      console.error("Error finding element by XPath:", error);
+      return null; // Return null in case of error
+    }
+  }
+
+  function getElementByCoordinates(coordString) {
+    const [xStr, yStr] = coordString.split(",");
+    const x = parseFloat(xStr.trim());
+    const y = parseFloat(yStr.trim());
+
+    if (isNaN(x) || isNaN(y)) {
+      //console.error("Invalid coordinates:", coordString);
+      return null;
+    }
+
+    const element = document.elementFromPoint(x, y);
+    //console.log("Element found at", x, y, "=>", element);
+    return element;
+  }
+
+  window.revertSearchInjections = function () {
+    // Remove the tooltip from the page and delete the reference after 5 seconds
+    setTimeout(() => {
+      restoreOriginalStyles();
+      window.allElementInfo = [];
+    }, 3000);
+  };
+
+  // Function to restore the original outline
+  function restoreOriginalStyles() {
+    // console.log("restoreOriginalStyles", originalStyles);
+    if (originalStyles && originalStyles.size > 0) {
+      originalStyles.forEach((originalStyle, element) => {
+        if (element && element.style) {
+          element.style.outline = originalStyle; // Restore original outline
+        }
+      });
+
+      // Paranoic
+      if (hoveredXPathMap && hoveredXPathMap.size > 0) {
+        // console.log("hoveredXPathMap");
+        hoveredXPathMap.forEach((xPath) => {
+          const originalOutline = originalStyles.get(xPath);
+          var element = findElementByXPath(xPath);
+          if (element && element.style) {
+            element.style.outline = originalOutline; // Restore original outline
+          }
+        });
+      }
+
+      // originalStyles.clear(); // Clear the stored styles
+    }
+  }
+
+  // Set up the interval to call the function every 5 seconds (5000 milliseconds)
+  const restoreIntervalId = setInterval(restoreOriginalStyles, 5000);
+
+  // window.addEventListener("beforeunload", function (event) {
+  //   // event.preventDefault();
+  //   // event.returnValue =
+  //   //   "⚠️ Warning: Closing this tab will terminate an active WebDriver session!";
+
+  //   if (wSocket && wSocket.readyState === WebSocket.OPEN) {
+  //     const message = {
+  //       type: "CLOSE_BROWSER",
+  //       sessionId: `scanner-element-pane`, //-${window.homeBankingId}`,
+  //       operationId: "closeBrowser",
+  //       homeBankingId: window.homeBankingId,
+  //       botJobId: window.botJobId,
+  //       elementDetails: window.allElementInfo, // Send allElementInfo
+  //     };
+
+  //     // Convert the JSON message to a buffer
+  //     const base64Message = btoa(
+  //       unescape(encodeURIComponent(JSON.stringify(message)))
+  //     );
+  //     // Convert the buffer to a Base64 string
+  //     wSocket.send(base64Message);
+
+  //     alreadySent = true;
+  //     window.allElementInfo = [];
+  //     window.elementInfoMap.clear();
+  //     window.revertSearchInjections();
+  //   }
+  // });
 
   // startCollectingElements(window.searchTerms);
   // init("Initiate");
@@ -1737,23 +2097,23 @@ const __done = arguments[arguments.length - 1];
       definedName,
     };
   }
-})(
-  arguments[0],
-  arguments[1],
-  arguments[2],
-  arguments[3],
-  arguments[4],
-  arguments[5],
-  arguments[6],
-  arguments[7],
-);
 // })(
-//   ["button", "textarea", "input", "label", "a", "select"],
-//   false,
-//   50869,
-//   "UPDATE_LIST_ELEMENTS",
-//   "perform-list-data",
-//   "searchTerms",
-//   184,
-//   310,
+//   arguments[0],
+//   arguments[1],
+//   arguments[2],
+//   arguments[3],
+//   arguments[4],
+//   arguments[5],
+//   arguments[6],
+//   arguments[7],
 // );
+})(
+  ["button", "textarea", "input", "label", "a", "select"],
+  false,
+  55687,
+  "scannerTool",
+  "scannerGrid",
+  "searchTerms",
+  184,
+  310,
+);

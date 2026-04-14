@@ -17,7 +17,7 @@ i18n
     ns: ['mt'],
 
     backend: {
-      loadPath: '/locales/{{lng}}/{{ns}}.json',
+      loadPath: './locales/{{lng}}/{{ns}}.json',
     },
 
     detection: {
