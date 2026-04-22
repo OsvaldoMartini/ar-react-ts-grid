@@ -2981,7 +2981,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
         .split(":")
         .map((part) => part.trim());
 
-      if (middle === "=" || middle === ">" || middle === "<" || middle === "!=") {
+      if (middle === "=" || middle === ">" || middle === "<" || middle === "!=" || middle === "contains") {
 
         const rightLabel =
           instruction.actions === "CSV CHECK"
@@ -2990,13 +2990,17 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
               ? "PDF VALUES"
               : right;
 
+        const rightDisplay = middle === "contains" ? `( ${rightLabel} )` : rightLabel;
+
         return (
           <span className="instruction-details">
             <span style={{ color: "#FFA500" }}>
               ({instruction.variableId}){left}
             </span>
+            {" "}
             <span style={{ color: "#0b5394" }}>{middle}</span>
-            <span style={{ color: "#FFA500" }}>{rightLabel}</span>
+            {" "}
+            <span style={{ color: "#FFA500" }}>{rightDisplay}</span>
           </span>
         );
       }
