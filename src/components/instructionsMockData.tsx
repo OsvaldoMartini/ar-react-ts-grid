@@ -23,7 +23,8 @@ export interface BlockLoopInstructionLoadDTO {
   loopOnly?: boolean;
   variableId?: number;
   parentBlockId?: number;
-  defaultValue?: string
+  defaultValue?: string;
+  forceCoordinates?: string | null; // F/E/T/N combinable, e.g. "FE"
 }
 
 
@@ -51,6 +52,7 @@ export interface ComponentsInstructionsDTO {
   loopOnly?: boolean;
   variableId?: number;
   parentBlockId?: number;
+  forceCoordinates?: string | null; // F/E/T/N combinable, e.g. "FE"
 }
 
 export interface ElementDTO {
@@ -138,7 +140,7 @@ export interface InstructionLoad {
   name: string;
   xpath: string;
   coordinates: string;
-  forceCoordinates: boolean | null;
+  forceCoordinates: string | null; // F/E/T/N combinable, e.g. "FE"
   iFrameXPath: string;
   tagName: string;
   shadowHost: string;

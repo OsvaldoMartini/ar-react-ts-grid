@@ -2804,6 +2804,48 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     );
   };
 
+  // ── force_coordinates flag toggles (F / E / T / N) ──────────────────────────
+  // Stored as a string in the instruction.forceCoordinates column, e.g. "FE", "N".
+  // Order is normalised to F → E → T → N on every update.
+  type ForceCoordFlag = "F" | "E" | "T" | "N";
+  const FORCE_COORD_ORDER: ForceCoordFlag[] = ["F", "E", "T", "N"];
+
+  const hasForceCoordFlag = (raw: string | null | undefined, flag: ForceCoordFlag) =>
+    (raw ?? "").toUpperCase().includes(flag);
+
+  const toggleForceCoordFlag = (raw: string | null | undefined, flag: ForceCoordFlag): string => {
+    const current = (raw ?? "").toUpperCase();
+    const has = current.includes(flag);
+    const next = has ? current.replace(flag, "") : current + flag;
+    return FORCE_COORD_ORDER.filter(c => next.includes(c)).join("");
+  };
+
+  const updateInstructionForceCoord = (instructionId: number, flag: ForceCoordFlag) => {
+    const instruction = instructionsData.find(x => x.id === instructionId);
+    if (!instruction) return;
+
+    const newForceCoordinates = toggleForceCoordFlag(instruction.forceCoordinates, flag);
+
+    if (webSocket && connected) {
+      const message = {
+        type: "FORCE_COORDINATES_UPDATE",
+        botJobId: instruction.botJobId,
+        blockId: instruction.blockId,
+        botJobName,
+        instructionId,
+        parentId: instruction.parentId,
+        forceCoordinates: newForceCoordinates,
+        homeBankingId,
+        sessionId: "botJobTasks",
+      };
+      webSocket.send(JSON.stringify(message));
+    }
+
+    setInstructionsData(prev =>
+      prev.map(x => (x.id === instructionId ? { ...x, forceCoordinates: newForceCoordinates } : x))
+    );
+  };
+
 
   const renderDeviceOptionsRow = (instruction: BlockLoopInstructionLoadDTO) => {
     if (allSpecialOperations(instruction.actions)) {
@@ -2811,11 +2853,14 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     }
 
     const isScroll = hasActionFlag(instruction.actions, "S");
-    const isEnter = hasActionFlag(instruction.actions, "E");
+    const isForce  = hasForceCoordFlag(instruction.forceCoordinates, "F");
+    const isEnter  = hasForceCoordFlag(instruction.forceCoordinates, "E");
+    const isTab    = hasForceCoordFlag(instruction.forceCoordinates, "T");
+    const isNext   = hasForceCoordFlag(instruction.forceCoordinates, "N");
 
     return (
       <div className="options-row">
-        {/* SCROLL */}
+        {/* SCROLL (stays on the action string) */}
         <div
           className={`options-toggle ${isScroll ? "active" : "inactive"}`}
           onClick={() => updateInstructionActions(instruction.id, "S")}
@@ -2830,17 +2875,62 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
           />
         </div>
 
-        {/* ENTER */}
+        {/* NEXT (mobile next-field; cascades N→T→E on failure when solo) */}
         <div
-          className={`options-toggle ${isEnter ? "active" : "inactive"}`}
-          onClick={() => updateInstructionActions(instruction.id, "E")}
+          className={`options-toggle ${isNext ? "active" : "inactive"}`}
+          onClick={() => updateInstructionForceCoord(instruction.id, "N")}
           role="button"
           tabIndex={0}
         >
-          <span className="options-toggle-label">Next / Enter</span>
+          <span className="options-toggle-label">Next</span>
+          <img
+            src={isNext ? activeImage : inactiveImage}
+            alt="next toggle"
+            className="options-toggle-icon"
+          />
+        </div>
+
+        {/* TAB */}
+        <div
+          className={`options-toggle ${isTab ? "active" : "inactive"}`}
+          onClick={() => updateInstructionForceCoord(instruction.id, "T")}
+          role="button"
+          tabIndex={0}
+        >
+          <span className="options-toggle-label">Tab</span>
+          <img
+            src={isTab ? activeImage : inactiveImage}
+            alt="tab toggle"
+            className="options-toggle-icon"
+          />
+        </div>
+
+        {/* ENTER (stronger Enter — JS KeyboardEvent dispatch + form.requestSubmit) */}
+        <div
+          className={`options-toggle ${isEnter ? "active" : "inactive"}`}
+          onClick={() => updateInstructionForceCoord(instruction.id, "E")}
+          role="button"
+          tabIndex={0}
+        >
+          <span className="options-toggle-label">Enter</span>
           <img
             src={isEnter ? activeImage : inactiveImage}
             alt="enter toggle"
+            className="options-toggle-icon"
+          />
+        </div>
+
+        {/* FORCE COORDINATES */}
+        <div
+          className={`options-toggle ${isForce ? "active" : "inactive"}`}
+          onClick={() => updateInstructionForceCoord(instruction.id, "F")}
+          role="button"
+          tabIndex={0}
+        >
+          <span className="options-toggle-label">Force C</span>
+          <img
+            src={isForce ? activeImage : inactiveImage}
+            alt="force coord toggle"
             className="options-toggle-icon"
           />
         </div>
