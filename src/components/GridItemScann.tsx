@@ -737,12 +737,13 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     const isNext = hasForceCoordFlag(elementDTO.forceCoordinates, "N");
 
     return (
-      <div className="options-row">
+      <div className="options-row options-row--inline">
         <div
           className={`options-toggle ${isScroll ? "active" : "inactive"}`}
           onClick={() => updateElementForceCoord(elementDTO.id, "S")}
           role="button"
           tabIndex={0}
+          title="Scroll into view before type/click"
         >
           <span className="options-toggle-label">Scroll</span>
           <img
@@ -757,8 +758,9 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
           onClick={() => updateElementForceCoord(elementDTO.id, "N")}
           role="button"
           tabIndex={0}
+          title="Next field (mobile)"
         >
-          <span className="options-toggle-label">Next</span>
+          <span className="options-toggle-label">Next (mobile)</span>
           <img
             src={isNext ? activeImage : inactiveImage}
             alt="next toggle"
@@ -771,6 +773,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
           onClick={() => updateElementForceCoord(elementDTO.id, "T")}
           role="button"
           tabIndex={0}
+          title="Tab after input"
         >
           <span className="options-toggle-label">Tab</span>
           <img
@@ -785,6 +788,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
           onClick={() => updateElementForceCoord(elementDTO.id, "E")}
           role="button"
           tabIndex={0}
+          title="Enter after input"
         >
           <span className="options-toggle-label">Enter</span>
           <img
@@ -799,8 +803,9 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
           onClick={() => updateElementForceCoord(elementDTO.id, "F")}
           role="button"
           tabIndex={0}
+          title="Force coordinates"
         >
-          <span className="options-toggle-label">Force Coords</span>
+          <span className="options-toggle-label">Force Coordinates</span>
           <img
             src={isForce ? activeImage : inactiveImage}
             alt="force coord toggle"
@@ -1066,8 +1071,8 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
                 {!collapsedBlocks.has(typeElement) && (
                 <div className="instructions-list">
                   {paginatedElements.map((elementDTO, i) => (
-                    <React.Fragment key={i}>
                     <div
+                      key={i}
                       className="instruction-item"
                       onMouseEnter={() => handleRowHover(elementDTO)}
                       onMouseLeave={handleRowLeave}
@@ -1109,6 +1114,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
                       ) : (
                         <span>{"\u00A0".repeat(20)}</span>
                       )}
+                      {renderForceCoordRow(elementDTO)}
                       <div className="options-column">
                         <img
                           src={warningRedImage}
@@ -1123,13 +1129,20 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
                           editImage
                         )}
                         <img src={saveImage} alt="" className="save-button" onClick={(event) => handleRowSelectedClick(event, elementDTO, "NEW_ELEMENT_DTO")} />
-                        <img src={testInputImage} alt="" className="test-button" onClick={(event) => handleRowSelectedClick(event, elementDTO, "TEST_INPUT_DTO")} />
-                        <img src={clickTestImage} alt="" className="test-button" onClick={(event) => handleRowSelectedClick(event, elementDTO, "TEST_CLICK_DTO")} />
+                        {(() => {
+                          // Test Input only makes sense on typeable elements (inputs, selects,
+                          // textareas). For links / buttons / anchors the element can't accept
+                          // text, so we hide that button and keep Test Click only.
+                          const tag = (elementDTO.tagName || "").toLowerCase();
+                          const isTypeable = tag === "input" || tag === "select" || tag === "textarea";
+                          return isTypeable ? (
+                            <img src={testInputImage} alt="Test Input" title="Test Input" className="test-button" onClick={(event) => handleRowSelectedClick(event, elementDTO, "TEST_INPUT_DTO")} />
+                          ) : null;
+                        })()}
+                        <img src={clickTestImage} alt="Test Click" title="Test Click" className="test-button" onClick={(event) => handleRowSelectedClick(event, elementDTO, "TEST_CLICK_DTO")} />
                         <img src={crossImage} alt="" className="cross-button" onClick={() => handleRemoveElementDTO(elementDTO)} />
                       </div>
                     </div>
-                    {renderForceCoordRow(elementDTO)}
-                    </React.Fragment>
                   ))}
                 </div>
                 )}
