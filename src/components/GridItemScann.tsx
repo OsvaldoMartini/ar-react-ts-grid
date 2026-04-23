@@ -12,6 +12,8 @@ import outPutImage from "../assets/output1.png";
 import testInputImage from "../assets/testInput.png";
 import clickTestImage from "../assets/clickTest2.png";
 import warningRedImage from '../assets/warning_red.png';
+import activeImage from '../assets/active3.png';
+import inactiveImage from '../assets/inactive2.png';
 import AlertModal from './AlertModal';
 import DomReviewModal, { type DomReviewData, type DomReviewAction } from './DomReviewModal';
 import SupportRequestModal, { type SupportRequestData, type SupportRequestAction } from './SupportRequestModal';
@@ -684,6 +686,131 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     );
   };
 
+  // ── force_coordinates flag toggles (F / E / T / N / S) ─────────────────────
+  // Same model as GridItem.tsx: a string of flags stored on the ElementDTO,
+  // normalised to F → E → T → N → S on every update. Toggling here mutates
+  // only local state — the flags ride out on the NEW_ELEMENT_DTO / UPDATE_*
+  // websocket message when the user clicks the save button for an element.
+  type ForceCoordFlag = "F" | "E" | "T" | "N" | "S";
+  const FORCE_COORD_ORDER: ForceCoordFlag[] = ["F", "E", "T", "N", "S"];
+
+  const hasForceCoordFlag = (raw: string | null | undefined, flag: ForceCoordFlag) =>
+    (raw ?? "").toUpperCase().includes(flag);
+
+  const toggleForceCoordFlag = (raw: string | null | undefined, flag: ForceCoordFlag): string => {
+    const current = (raw ?? "").toUpperCase();
+    const has = current.includes(flag);
+    const next = has ? current.replace(flag, "") : current + flag;
+    return FORCE_COORD_ORDER.filter(c => next.includes(c)).join("");
+  };
+
+  const updateElementForceCoord = (elementId: number, flag: ForceCoordFlag) => {
+    setElementDTO(prev =>
+      prev.map(el =>
+        el.id === elementId
+          ? { ...el, forceCoordinates: toggleForceCoordFlag(el.forceCoordinates, flag) }
+          : el
+      )
+    );
+    // Keep elementGrouped in sync so the UI re-renders with the new flag.
+    setElementGrouped(prevGrouped => {
+      const updated = { ...prevGrouped };
+      for (const tagName in updated) {
+        updated[tagName] = {
+          ...updated[tagName],
+          elements: updated[tagName].elements.map(el =>
+            el.id === elementId
+              ? { ...el, forceCoordinates: toggleForceCoordFlag(el.forceCoordinates, flag) }
+              : el
+          ),
+        };
+      }
+      return updated;
+    });
+  };
+
+  const renderForceCoordRow = (elementDTO: ElementDTO) => {
+    const isScroll = hasForceCoordFlag(elementDTO.forceCoordinates, "S");
+    const isForce = hasForceCoordFlag(elementDTO.forceCoordinates, "F");
+    const isEnter = hasForceCoordFlag(elementDTO.forceCoordinates, "E");
+    const isTab = hasForceCoordFlag(elementDTO.forceCoordinates, "T");
+    const isNext = hasForceCoordFlag(elementDTO.forceCoordinates, "N");
+
+    return (
+      <div className="options-row">
+        <div
+          className={`options-toggle ${isScroll ? "active" : "inactive"}`}
+          onClick={() => updateElementForceCoord(elementDTO.id, "S")}
+          role="button"
+          tabIndex={0}
+        >
+          <span className="options-toggle-label">Scroll</span>
+          <img
+            src={isScroll ? activeImage : inactiveImage}
+            alt="scroll toggle"
+            className="options-toggle-icon"
+          />
+        </div>
+
+        <div
+          className={`options-toggle ${isNext ? "active" : "inactive"}`}
+          onClick={() => updateElementForceCoord(elementDTO.id, "N")}
+          role="button"
+          tabIndex={0}
+        >
+          <span className="options-toggle-label">Next</span>
+          <img
+            src={isNext ? activeImage : inactiveImage}
+            alt="next toggle"
+            className="options-toggle-icon"
+          />
+        </div>
+
+        <div
+          className={`options-toggle ${isTab ? "active" : "inactive"}`}
+          onClick={() => updateElementForceCoord(elementDTO.id, "T")}
+          role="button"
+          tabIndex={0}
+        >
+          <span className="options-toggle-label">Tab</span>
+          <img
+            src={isTab ? activeImage : inactiveImage}
+            alt="tab toggle"
+            className="options-toggle-icon"
+          />
+        </div>
+
+        <div
+          className={`options-toggle ${isEnter ? "active" : "inactive"}`}
+          onClick={() => updateElementForceCoord(elementDTO.id, "E")}
+          role="button"
+          tabIndex={0}
+        >
+          <span className="options-toggle-label">Enter</span>
+          <img
+            src={isEnter ? activeImage : inactiveImage}
+            alt="enter toggle"
+            className="options-toggle-icon"
+          />
+        </div>
+
+        <div
+          className={`options-toggle ${isForce ? "active" : "inactive"}`}
+          onClick={() => updateElementForceCoord(elementDTO.id, "F")}
+          role="button"
+          tabIndex={0}
+        >
+          <span className="options-toggle-label">Force Coords</span>
+          <img
+            src={isForce ? activeImage : inactiveImage}
+            alt="force coord toggle"
+            className="options-toggle-icon"
+          />
+        </div>
+      </div>
+    );
+  };
+
 
   const handleRowHover = (elementDTO: ElementDTO) => {
     console.clear(); // Clear previous logs to only show the current hovered row
@@ -939,7 +1066,8 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
                 {!collapsedBlocks.has(typeElement) && (
                 <div className="instructions-list">
                   {paginatedElements.map((elementDTO, i) => (
-                    <div key={i}
+                    <React.Fragment key={i}>
+                    <div
                       className="instruction-item"
                       onMouseEnter={() => handleRowHover(elementDTO)}
                       onMouseLeave={handleRowLeave}
@@ -1000,6 +1128,8 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
                         <img src={crossImage} alt="" className="cross-button" onClick={() => handleRemoveElementDTO(elementDTO)} />
                       </div>
                     </div>
+                    {renderForceCoordRow(elementDTO)}
+                    </React.Fragment>
                   ))}
                 </div>
                 )}

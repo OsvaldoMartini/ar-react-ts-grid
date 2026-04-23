@@ -71,6 +71,10 @@ export interface ElementDTO {
   attributeType: string;
   autoScroll: string;
   autoEnter: string;
+  // Bitstring of F/E/T/N/S toggled in GridItemScann before the element is
+  // promoted to an instruction. Flows through to instruction.force_coordinates
+  // on save (NEW_ELEMENT_DTO message).
+  forceCoordinates?: string | null;
   blockId?: number;
 }
 
