@@ -2,8 +2,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Client, IMessage } from "@stomp/stompjs";
 import { BlockLoopInstructionLoadDTO, BotJobData, UpdatedBlock } from './instructionsMockData';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd'; // Import from react-beautiful-dnd
-import './griditem.scss';
-
 import setValueImage from '../assets/setValueBtn3.png';
 import getValueImage from '../assets/getValueBtn3.png';
 import checkImage from '../assets/check4.png';
@@ -39,6 +37,8 @@ import inactiveImage from '../assets/inactive2.png';
 
 
 import AlertModal from './AlertModal';
+import styles from './Griditem.module.scss';
+
 
 
 interface GridItemProps {
@@ -1807,12 +1807,12 @@ const GridDrag: React.FC<GridItemProps> = ({ data, botJobData }) => {
     // Return a combined image and text element if imageSrc exists, otherwise return just the text
     // Return a combined image and text element if imageSrc exists, otherwise return just the text
     return (
-      <div className="instruction-type">
+      <div className={styles.instructionType}>
         {imageSrc && (
           <>
             <img src={imageSrc} alt="" className={imageClass} />
             {hiddenField && (
-              <img src={hiddenImage} alt="hidden" className="hidden-image" />
+              <img src={hiddenImage} alt="hidden" className={styles.hiddenImage} />
             )}
             <span>{text}</span>
           </>
@@ -1837,7 +1837,7 @@ const GridDrag: React.FC<GridItemProps> = ({ data, botJobData }) => {
       <img
         src={editImage}
         alt="edit"
-        className="edit-button"
+        className={styles.editButton}
         onClick={() => handleEditInstruction(instruction)}  // Trigger edit mode
       />
     );
@@ -1854,13 +1854,13 @@ const GridDrag: React.FC<GridItemProps> = ({ data, botJobData }) => {
         <img
           src={upImage}
           alt="Move Up"
-          className="move-button"
+          className={styles.moveButton}
           onClick={() => handleMoveRowUp(instructionId)}
         />
         <img
           src={downImage}
           alt="Move Down"
-          className="move-button"
+          className={styles.moveButton}
           onClick={() => handleMoveRowDown(instructionId)}
         />
       </>
@@ -1957,7 +1957,7 @@ const GridDrag: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
       if (middle === "=" || middle === ">" || middle === "!=") {
         return (
-          <span className="instruction-details">
+          <span className={styles.instructionDetails}>
             <span style={{ color: "#0b5394" }}>({instruction.parentId}){left}</span>
             <span style={{ color: "#0b5394" }}>{middle}</span>
             <span style={{ color: "#FFA500" }}>{right}</span>
@@ -1969,7 +1969,7 @@ const GridDrag: React.FC<GridItemProps> = ({ data, botJobData }) => {
     // Special case for "GOTO" action - render only the operation without parentId or colon
     if (instruction.actions === "GOTO" && instruction.operation) {
       return (
-        <span className="instruction-details">
+        <span className={styles.instructionDetails}>
           <span style={{ color: "#b163ff" }}>{instruction.operation}</span>
         </span>
       );
@@ -1999,7 +1999,7 @@ const GridDrag: React.FC<GridItemProps> = ({ data, botJobData }) => {
       const parentValue = parentInstruction?.name || "Unknown";
 
       return (
-        <span className="instruction-details">
+        <span className={styles.instructionDetails}>
           <span style={{ color: "#0b5394" }}>Refresh</span>{" "}
           <span style={{ color: "#FFA500" }}>{refreshValue}s</span> :{" "}
           <span style={{ color: "#0b5394" }}>Loop</span>{" "}
@@ -2031,7 +2031,7 @@ const GridDrag: React.FC<GridItemProps> = ({ data, botJobData }) => {
       const parentValue = parentInstruction?.name || "Unknown";
 
       return (
-        <span className="instruction-details">
+        <span className={styles.instructionDetails}>
           <span style={{ color: "#0b5394" }}>Loop</span>{" "}
           <span style={{ color: "#FFA500" }}>{instruction.operation} times</span> :{" "}
           <span style={{ color: "#0b5394" }}>Jump To Parent</span>{" "}
@@ -2045,7 +2045,7 @@ const GridDrag: React.FC<GridItemProps> = ({ data, botJobData }) => {
       const [left, right] = instruction.operation.split(":");
 
       return (
-        <span className="instruction-details">
+        <span className={styles.instructionDetails}>
           <span style={{ color: "#0b5394" }}>({instruction.parentId}){left}</span>:
           <span style={{ color: "#FFA500" }}>{right}</span>
         </span>
@@ -2054,15 +2054,15 @@ const GridDrag: React.FC<GridItemProps> = ({ data, botJobData }) => {
 
     // Render the action if it is valid but has no operation
     if (validActions.includes(instruction.actions)) {
-      return <span className="instruction-details">{instruction.actions}</span>;
+      return <span className={styles.instructionDetails}>{instruction.actions}</span>;
     }
 
     // Return a blank span with a non-breaking space to maintain alignment
-    return <span className="instruction-details">&nbsp;</span>;
+    return <span className={styles.instructionDetails}>&nbsp;</span>;
   };
 
   return (
-    <div className="grid-container">
+    <div className={styles.gridContainer}>
       {alertMessageBody && (
         <AlertModal
           header={alertMessageHeader || ''}
@@ -2084,19 +2084,19 @@ const GridDrag: React.FC<GridItemProps> = ({ data, botJobData }) => {
               className="droppable-container"
             >
               {Object.keys(groupedData).length === 0 ? (
-                <div className="block">
-                  <div className="block-header">
-                    <span className="block-order-number">#1</span>
-                    <span className="block-name">Default Block</span>
+                <div className={styles.block}>
+                  <div className={styles.blockHeader}>
+                    <span className={styles.blockOrderNumber}>#1</span>
+                    <span className={styles.blockName}>Default Block</span>
                     {botJob && botJob.id > 0 && (
-                      <span className="block-name">BotJob : {botJob.name}</span>
+                      <span className={styles.blockName}>BotJob : {botJob.name}</span>
                     )}
                   </div>
-                  <div className="instructions-list">
-                    <div id={`dropdown-${1}`} ref={dropdownRef} className={`dropdown-menu ${dropdownPosition === 'above' ? 'dropdown-above' : ''}`}>
+                  <div className={styles.instructionsList}>
+                    <div id={`dropdown-${1}`} ref={dropdownRef} className={`${styles.dropdownMenu} ${dropdownPosition === 'above' ? styles.dropdownAbove : ''}`}>
                       <div onClick={() => handleNewStepAfter(1)}>Insert New Step</div>
                     </div>
-                    <div className="instruction-item"> </div>
+                    <div className={styles.instructionItem}> </div>
                   </div>
                 </div>
               ) : (
@@ -2108,27 +2108,27 @@ const GridDrag: React.FC<GridItemProps> = ({ data, botJobData }) => {
                     <Draggable key={blockGroupIndex} draggableId={blockGroupIndex} index={index}>
                       {(provided) => (
                         <div
-                          className="block"
+                          className={styles.block}
                           ref={provided.innerRef}
                           {...provided.draggableProps}
                           {...provided.dragHandleProps}
                         >
-                          <div className="block-header" {...provided.dragHandleProps}>
+                          <div className={styles.blockHeader} {...provided.dragHandleProps}>
                             {blockData.instructions[0].blockActive ? (
-                              <img src={activeImage} alt="Active" className="active-button" onClick={() => handleBlockStatus(blockData.instructions[0].blockId)} />
+                              <img src={activeImage} alt="Active" className={styles.activeButton} onClick={() => handleBlockStatus(blockData.instructions[0].blockId)} />
                             ) : (
-                              <img src={inactiveImage} alt="Inactive" className="inactive-button" onClick={() => handleBlockStatus(blockData.instructions[0].blockId)} />
+                              <img src={inactiveImage} alt="Inactive" className={styles.inactiveButton} onClick={() => handleBlockStatus(blockData.instructions[0].blockId)} />
                             )}
-                            <span className="block-order-number">#{blockData.instructions[0].blockOrderNumber}</span>
-                            <span className="block-name">{blockData.blockName}</span>
-                            <span className="block-count">({blockData.instructions.length})</span>
+                            <span className={styles.blockOrderNumber}>#{blockData.instructions[0].blockOrderNumber}</span>
+                            <span className={styles.blockName}>{blockData.blockName}</span>
+                            <span className={styles.blockCount}>({blockData.instructions.length})</span>
                           </div>
 
                           {/* Instructions (Droppable for instructions) */}
                           <Droppable droppableId={`block-${blockGroupIndex}-instructions`} direction="vertical">
                             {(provided) => (
                               <div
-                                className="instructions-list"
+                                className={styles.instructionsList}
                                 ref={provided.innerRef}
                                 {...provided.droppableProps}
                               >
@@ -2139,7 +2139,7 @@ const GridDrag: React.FC<GridItemProps> = ({ data, botJobData }) => {
                                         ref={provided.innerRef}
                                         {...provided.draggableProps}
                                         {...provided.dragHandleProps}
-                                        className="instruction-item"
+                                        className={styles.instructionItem}
                                       >
                                         {/* Instruction Content */}
                                         {instruction.name}

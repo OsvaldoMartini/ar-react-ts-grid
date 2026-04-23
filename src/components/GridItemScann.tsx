@@ -18,8 +18,9 @@ import DomReviewModal, { type DomReviewData, type DomReviewAction } from './DomR
 import SupportRequestModal, { type SupportRequestData, type SupportRequestAction } from './SupportRequestModal';
 import { useWebSocket } from './useWebSocket';
 import AttributeDropdown from './AttributeDropdown';
-import './gridItemScann.scss';
 import NameDropdown from './NameDropdown';
+import styles from './GridItemScann.module.scss';
+
 
 interface GridItemScannProps {
   homeBankingIdInitial: number;
@@ -648,7 +649,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     const displayText = dataNames?.length === 1 ? dataNames[0].name : text;
 
     return (
-      <div className="instruction-type">
+      <div className={styles.instructionType}>
         {imageSrc && <img src={imageSrc} alt="" className={imageClass} />}
 
         {dataNames?.length > 1 ? (
@@ -690,7 +691,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
 
     // Return a combined image and text element if imageSrc exists, otherwise return just the text
     return (
-      <div className="instruction-type">
+      <div className={styles.instructionType}>
         {imageSrc && (
           <>
             <img src={imageSrc} alt="" className={imageClass} />
@@ -758,7 +759,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
       <img
         src={editImage}
         alt="edit"
-        className="edit-button"
+        className={styles.editButton}
         onClick={() => handleEditInstruction(elementDTO)}  // Trigger edit mode
       />
     );
@@ -890,11 +891,11 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   };
 
   return (
-    <div className="grid-container">
-      <div className="grid-find-row">
-        <span className="grid-find-label">Find:</span>
+    <div className={styles.gridContainer}>
+      <div className={styles.gridFindRow}>
+        <span className={styles.gridFindLabel}>Find:</span>
         <input
-          className="grid-find-input"
+          className={styles.gridFindInput}
           type="text"
           value={findText}
           onChange={(e) => setFindText(e.target.value)}
@@ -945,36 +946,36 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
 
       {elementDTO.length === 0 ? (
         // No data message (as before)
-        <div className="block">
-          <div className="block-header color-component2">Scanned Web Elements</div>
-          <div className="instruction-item"> </div>
-          <div className="block">
-            <div className="no-data-message">No data found</div>
+        <div className={styles.block}>
+          <div className={`${styles.blockHeader} ${styles.colorComponent2}`}>Scanned Web Elements</div>
+          <div className={styles.instructionItem}> </div>
+          <div className={styles.block}>
+            <div className={styles.noDataMessage}>No data found</div>
           </div>
         </div>
       ) : (
         <>
           {/* Toggle Button and Pagination Controls on the same row */}
-          <div className="controls-row">
+          <div className={styles.controlsRow}>
             <button
-              className={`send-all-button ${isSendingAll ? 'sending' : ''}`}
+              className={`${styles.sendAllButton} ${isSendingAll ? styles.sending : ''}`}
               onClick={handlesSendAllClick}
               disabled={isSendingAll}
             >
               {isSendingAll ? 'Sending...' : 'Insert All Elements'}
             </button>
             <button
-              className={`update-all-button ${isUpdatingAll ? 'updating' : ''}`}
+              className={`${styles.updateAllButton} ${isUpdatingAll ? styles.updating : ''}`}
               onClick={handlesUpdateAllClick}
               disabled={isUpdatingAll}
             >
               {isUpdatingAll ? 'Updating...' : 'Update All Elements'}
             </button>
-            <button className="attributes-button" onClick={() => setShowAttributes(!showAttributes)}>
+            <button className={styles.attributesButton} onClick={() => setShowAttributes(!showAttributes)}>
               {showAttributes ? 'Hide Attributes' : 'Show Attributes'}
             </button>
             <button
-              className="attributes-button"
+              className={styles.attributesButton}
               onClick={keepAll}
               title="Mark every element as Keep"
               disabled={keepSelectedIds.size === elementDTO.length && elementDTO.length > 0}
@@ -982,7 +983,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
               Keep All
             </button>
             <button
-              className="attributes-button"
+              className={styles.attributesButton}
               onClick={clearKeeps}
               title="Clear the Keep checkboxes"
               disabled={keepSelectedIds.size === 0}
@@ -990,7 +991,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
               Clear Keeps
             </button>
             <button
-              className="attributes-button"
+              className={styles.attributesButton}
               onClick={requestDeleteUnchecked}
               disabled={uncheckedCount() === 0}
               style={{
@@ -1002,7 +1003,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
             >
               Delete Unchecked ({uncheckedCount()})
             </button>
-            <div className="pagination-controls">
+            <div className={styles.paginationControls}>
               <label>Rows per page: </label>
               <select
                 value={blockRowsPerPage}
@@ -1033,8 +1034,8 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
 
             if (q && filteredEntries.length === 0) {
               return (
-                <div className="block">
-                  <div className="no-data-message">No matches for “{findText}”</div>
+                <div className={styles.block}>
+                  <div className={styles.noDataMessage}>No matches for “{findText}”</div>
                 </div>
               );
             }
@@ -1048,23 +1049,23 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
             );
 
             return (
-              <div key={typeElement} className="block">
-                <div className="block-header color-component1">
-                  <div className="block-header-left">
+              <div key={typeElement} className={styles.block}>
+                <div className={`${styles.blockHeader} ${styles.colorComponent1}`}>
+                  <div className={styles.blockHeaderLeft}>
                     <button
                       type="button"
-                      className={`block-collapse-badge ${collapsedBlocks.has(typeElement) ? 'is-collapsed' : ''}`}
+                      className={`${styles.blockCollapseBadge} ${collapsedBlocks.has(typeElement) ? 'is-collapsed' : ''}`}
                       title={collapsedBlocks.has(typeElement) ? "Expand block" : "Collapse block"}
                       onClick={() => toggleBlockCollapsed(typeElement)}
                     >
                       <CollapseToggleIcon collapsed={collapsedBlocks.has(typeElement)} />
                     </button>
-                    <span className="block-order-number">#{index + 1}</span>
-                    <span className="block-name">{getInstructionTypeElement(typeElement)}</span>
-                    <span className="block-count">({elementData.elements.length})</span>
+                    <span className={styles.blockOrderNumber}>#{index + 1}</span>
+                    <span className={styles.blockName}>{getInstructionTypeElement(typeElement)}</span>
+                    <span className={styles.blockCount}>({elementData.elements.length})</span>
                   </div>
                   {elementData.elements.length > blockRowsPerPage && (
-                    <div className="bottom-pagination-controls">
+                    <div className={styles.bottomPaginationControls}>
                       <button disabled={currentPage === 1} onClick={() => handlePrevBlockPage(typeElement)}>
                         Prev
                       </button>
@@ -1079,17 +1080,17 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
                   <img
                     src={crossImage}
                     alt="Remove Block"
-                    className="cross-button"
+                    className={styles.crossButton}
                     onClick={() => handleRemoveRowsBlock(typeElement)}
                   />
 
                 </div>
                 {!collapsedBlocks.has(typeElement) && (
-                <div className="instructions-list">
+                <div className={styles.instructionsList}>
                   {paginatedElements.map((elementDTO, i) => (
                     <div
                       key={i}
-                      className="instruction-item"
+                      className={styles.instructionItem}
                       onMouseEnter={() => handleRowHover(elementDTO)}
                       onMouseLeave={handleRowLeave}
                     // onDoubleClick={(event) => handleRowSelectedClick(event, elementDTO, "NEW_ELEMENT_DTO")}
@@ -1099,14 +1100,14 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
                           so it survives when the user clicks "Delete Unchecked" in the header. */}
                       <input
                         type="checkbox"
-                        className="keep-checkbox"
+                        className={styles.keepCheckbox}
                         checked={keepSelectedIds.has(elementDTO.id)}
                         onChange={() => toggleKeep(elementDTO.id)}
                         title="Keep this element (survives 'Delete Unchecked')"
                         onClick={(e) => e.stopPropagation()}
                       />
                       {editingElementId === elementDTO.xPath && editingElementTagName === elementDTO.tagName ? (
-                        <div className="edit-container">
+                        <div className={styles.editContainer}>
                           <input
                             type="text"
                             value={elementName}
@@ -1120,19 +1121,19 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
                               setElementName(e.target.value);
                             }}
                             ref={elementDTORef} // Associate the ref with the input element
-                            className="edit-textbox"
+                            className={styles.editTextbox}
                           />
                           <img
                             src={saveImage}
                             alt="save"
-                            className="save-button"
+                            className={styles.saveButton}
                             onClick={() =>
                               handleSaveInstruction(elementDTO)
                             } // Save instruction logic
                           />
                         </div>
                       ) : (
-                        <span className="instruction-line">{getInstructionElement(elementDTO)}</span>)}
+                        <span className={styles.instructionLine}>{getInstructionElement(elementDTO)}</span>)}
                       {showAttributes ? (
                         <div className="attr-slot">
                           <AttributeDropdown dataArray={elementDTO.attributeData} onChange={handleAttributeChange} />
@@ -1140,21 +1141,21 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
                       ) : (
                         <span className="attr-slot">{"\u00A0".repeat(20)}</span>
                       )}
-                      <div className="options-column">
+                      <div className={styles.optionsColumn}>
                         <CompForce item={elementDTO} onChange={handleElementForceChange} />
                         <img
                           src={warningRedImage}
                           alt="Report this element to support"
                           title="Report this element to support"
-                          className="warning-button"
+                          className={styles.warningButton}
                           onClick={() => requestElementsSupport(elementDTO)}
                         />
-                        <img src={pickItemImage} alt="" className="pick-button" onClick={(event) => handleRowSelectedClick(event, elementDTO, "DETAILS_ELEMENT_DTO")} />
+                        <img src={pickItemImage} alt="" className={styles.pickButton} onClick={(event) => handleRowSelectedClick(event, elementDTO, "DETAILS_ELEMENT_DTO")} />
                         {renderEditButton(
                           elementDTO,
                           editImage
                         )}
-                        <img src={saveImage} alt="" className="save-button" onClick={(event) => handleRowSelectedClick(event, elementDTO, "NEW_ELEMENT_DTO")} />
+                        <img src={saveImage} alt="" className={styles.saveButton} onClick={(event) => handleRowSelectedClick(event, elementDTO, "NEW_ELEMENT_DTO")} />
                         {(() => {
                           // Test Input only makes sense on typeable elements (inputs, selects,
                           // textareas). For links / buttons / anchors the element can't accept
@@ -1162,11 +1163,11 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
                           const tag = (elementDTO.tagName || "").toLowerCase();
                           const isTypeable = tag === "input" || tag === "select" || tag === "textarea";
                           return isTypeable ? (
-                            <img src={testInputImage} alt="Test Input" title="Test Input" className="test-button" onClick={(event) => handleRowSelectedClick(event, elementDTO, "TEST_INPUT_DTO")} />
+                            <img src={testInputImage} alt="Test Input" title="Test Input" className={styles.testButton} onClick={(event) => handleRowSelectedClick(event, elementDTO, "TEST_INPUT_DTO")} />
                           ) : null;
                         })()}
-                        <img src={clickTestImage} alt="Test Click" title="Test Click" className="test-button" onClick={(event) => handleRowSelectedClick(event, elementDTO, "TEST_CLICK_DTO")} />
-                        <img src={crossImage} alt="" className="cross-button" onClick={() => handleRemoveElementDTO(elementDTO)} />
+                        <img src={clickTestImage} alt="Test Click" title="Test Click" className={styles.testButton} onClick={(event) => handleRowSelectedClick(event, elementDTO, "TEST_CLICK_DTO")} />
+                        <img src={crossImage} alt="" className={styles.crossButton} onClick={() => handleRemoveElementDTO(elementDTO)} />
                       </div>
                     </div>
                   ))}

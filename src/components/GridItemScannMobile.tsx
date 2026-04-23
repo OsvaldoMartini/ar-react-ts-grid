@@ -18,8 +18,9 @@ import inactiveImage from '../assets/inactive2.png';
 import AlertModal from './AlertModal';
 import { useWebSocket } from './useWebSocket';
 import AttributeDropdown from './AttributeDropdown';
-import './Griditem.module.scss';
 import NameDropdown from './NameDropdown';
+import styles from './Griditem.module.scss';
+
 
 interface GridItemScannMobileProps {
   homeBankingIdInitial: number;
@@ -1049,7 +1050,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
     const displayText = dataNames?.length === 1 ? dataNames[0].name : text;
 
     return (
-      <div className="instruction-type">
+      <div className={styles.instructionType}>
         {imageSrc && <img src={imageSrc} alt="" className={imageClass} />}
 
         {dataNames?.length > 1 ? (
@@ -1091,7 +1092,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
 
     // Return a combined image and text element if imageSrc exists, otherwise return just the text
     return (
-      <div className="instruction-type">
+      <div className={styles.instructionType}>
         {imageSrc && (
           <>
             <img src={imageSrc} alt="" className={imageClass} />
@@ -1160,7 +1161,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       <img
         src={editImage}
         alt="edit"
-        className="edit-button"
+        className={styles.editButton}
         onClick={() => handleEditInstruction(elementDTO)}  // Trigger edit mode
       />
     );
@@ -1213,7 +1214,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
   }, [elementGrouped, findText]);
 
   return (
-    <div className="grid-container">
+    <div className={styles.gridContainer}>
       {/* Alert Modal (as before) */}
       {alertMessageBody && alertMessageBody.length > 0 && (
         <AlertModal
@@ -1228,12 +1229,12 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       )}
 
       {/* Top toolbar — always visible */}
-      <div className="controls-toolbar">
+      <div className={styles.controlsToolbar}>
 
         {/* ================= ROW 1 ================= */}
-        <div className="toolbar-row toolbar-row-top">
+        <div className={`${styles.toolbarRow} ${styles.toolbarRowTop}`}>
           <button
-            className={`buttons-toolbar ${isSendingDevice ? 'sending' : ''}`}
+            className={`${styles.buttonsToolbar} ${isSendingDevice ? styles.sending : ''}`}
             onClick={handleConnectDeviceClick}
             disabled={isSendingDevice || isPackageSelectionRequired}
           >
@@ -1242,7 +1243,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
 
           <input
             type="text"
-            className="toolbar-input input-app-name"
+            className={`${styles.toolbarInput} ${styles.inputAppName}`}
             placeholder="eBanking"
             value={appQueryApp}
             onChange={(e) => setappQueryApp(e.target.value)}
@@ -1250,7 +1251,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
 
           {packagesFound.length > 0 ? (
             <select
-              className="toolbar-input select-package-name"
+              className={`${styles.toolbarInput} ${styles.selectPackageName}`}
               value={appQueryPackage}
               onChange={(e) => setappQueryPackage(e.target.value)}
             >
@@ -1262,7 +1263,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
           ) : (
             <input
               type="text"
-              className="toolbar-input input-package-name"
+              className={`${styles.toolbarInput} ${styles.inputPackageName}`}
               placeholder="ch.bsct.ebanking.mobile"
               value={appQueryPackage}
               onChange={(e) => setappQueryPackage(e.target.value)}
@@ -1270,7 +1271,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
           )}
 
           <button
-            className={`buttons-toolbar ${isSendingDiscovery ? 'sending' : ''}`}
+            className={`${styles.buttonsToolbar} ${isSendingDiscovery ? styles.sending : ''}`}
             onClick={handleDiscoveryAppClick}
             disabled={isSendingDiscovery}
           >
@@ -1278,7 +1279,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
           </button>
 
           <button
-            className={`buttons-toolbar ${isSendingScanner ? 'sending' : ''}`}
+            className={`${styles.buttonsToolbar} ${isSendingScanner ? styles.sending : ''}`}
             onClick={handleScannAppClick}
             disabled={isSendingScanner || isPackageSelectionRequired}
           >
@@ -1286,7 +1287,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
           </button>
 
           <select
-            className="scroll-select"
+            className={styles.scrollSelect}
             value={scannerType}
             onChange={(e) => setScannerType(e.target.value)}
             disabled={isSendingScanner || isPackageSelectionRequired}
@@ -1297,7 +1298,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
           </select>
 
           <button
-            className="buttons-toolbar danger"
+            className={`${styles.buttonsToolbar} danger`}
             onClick={handleClearDataClick}
             disabled={elementDTO.length === 0}
             title={elementDTO.length === 0 ? "No data to clear" : "Clear all scanned elements"}
@@ -1307,34 +1308,34 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
         </div>
 
         {/* ================= ROW 2 ================= */}
-        <div className="toolbar-row toolbar-row-bottom">
+        <div className={`${styles.toolbarRow} ${styles.toolbarRowBottom}`}>
 
           {/* ---- LEFT: Navigation + Scrolling ---- */}
-          <div className="toolbar-left">
-            <div className="scroll-select-group">
-              <span className="scroll-label">Navigation</span>
+          <div className={styles.toolbarLeft}>
+            <div className={styles.scrollSelectGroup}>
+              <span className={styles.scrollLabel}>Navigation</span>
 
-              <div className="scroll-buttons inline nav-buttons">
-                <button type="button" className="buttons-toolbar nav-btn recents" onClick={sendMobileRecents}>(≡)</button>
-                <button type="button" className="buttons-toolbar nav-btn home" onClick={sendMobileHome}>(○)</button>
-                <button type="button" className="buttons-toolbar nav-btn back" onClick={sendMobileBack}>(←)</button>
-                <button type="button" className="buttons-toolbar nav-btn close-all" onClick={sendMobileCloseAll}>(✕)</button>
+              <div className={`${styles.scrollButtons} ${styles.inline} ${styles.navButtons}`}>
+                <button type="button" className={`${styles.buttonsToolbar} ${styles.navBtn} ${styles.recents}`} onClick={sendMobileRecents}>(≡)</button>
+                <button type="button" className={`${styles.buttonsToolbar} ${styles.navBtn} ${styles.home}`} onClick={sendMobileHome}>(○)</button>
+                <button type="button" className={`${styles.buttonsToolbar} ${styles.navBtn} ${styles.back}`} onClick={sendMobileBack}>(←)</button>
+                <button type="button" className={`${styles.buttonsToolbar} ${styles.navBtn} ${styles.closeAll}`} onClick={sendMobileCloseAll}>(✕)</button>
               </div>
 
-              <span className="scroll-label">Scrolling</span>
+              <span className={styles.scrollLabel}>Scrolling</span>
 
-              <div className="scroll-buttons inline">
-                <button type="button" className="buttons-toolbar scroll-btn scroll-up" onClick={scrollDeviceUp}>▲</button>
-                <button type="button" className="buttons-toolbar scroll-btn scroll-down" onClick={scrollDeviceDown}>▼</button>
+              <div className={`${styles.scrollButtons} ${styles.inline}`}>
+                <button type="button" className={`${styles.buttonsToolbar} ${styles.scrollBtn} ${styles.scrollUp}`} onClick={scrollDeviceUp}>▲</button>
+                <button type="button" className={`${styles.buttonsToolbar} ${styles.scrollBtn} ${styles.scrollDown}`} onClick={scrollDeviceDown}>▼</button>
               </div>
 
               {/* NEXT / DONE button */}
-              <div className="scroll-buttons inline">
-                <span className="scroll-label">NEXT/DONE</span>
+              <div className={`${styles.scrollButtons} ${styles.inline}`}>
+                <span className={styles.scrollLabel}>NEXT/DONE</span>
 
                 <button
                   type="button"
-                  className="buttons-toolbar nav-btn next-done"
+                  className={`${styles.buttonsToolbar} ${styles.navBtn} ${styles.nextDone}`}
                   onClick={sendDoneCmd}
                 >
                   →|
@@ -1343,12 +1344,12 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
 
 
               {/* Close Keyboard button */}
-              <div className="scroll-buttons inline">
-                <span className="scroll-label">Close Keyboard</span>
+              <div className={`${styles.scrollButtons} ${styles.inline}`}>
+                <span className={styles.scrollLabel}>Close Keyboard</span>
 
                 <button
                   type="button"
-                  className="buttons-toolbar nav-btn close-keyboard"
+                  className={`${styles.buttonsToolbar} ${styles.navBtn} close-keyboard`}
                   onClick={sendCloseKeyboardCmd}
                 >
                   X
@@ -1358,16 +1359,16 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
           </div>
 
           {/* ---- RIGHT: Validate + Bot Job + Launch ---- */}
-          <div className="toolbar-right">
-            {/* <span className="toolbar-separator" aria-hidden="true" /> */}
+          <div className={styles.toolbarRight}>
+            {/* <span className={styles.toolbarSeparator} aria-hidden="true" /> */}
 
-            <div className="toolbar-inline validate-inline">
-              <span className="toolbar-label">Validate (CSV/PDF):</span>
+            <div className={`${styles.toolbarInline} ${styles.validateInline}`}>
+              <span className={styles.toolbarLabel}>Validate (CSV/PDF):</span>
 
-              <div className="validate-dropdown">
+              <div className={styles.validateDropdown}>
                 <button
                   type="button"
-                  className="buttons-toolbar validate-trigger"
+                  className={`${styles.buttonsToolbar} ${styles.validateTrigger}`}
                   onClick={() => setValidateOpen((v) => !v)}
                   disabled={!validatePayload?.fields}
                 >
@@ -1375,17 +1376,17 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
                 </button>
 
                 {validateOpen && (
-                  <div className="validate-menu">
+                  <div className={styles.validateMenu}>
                     {Object.entries(validatePayload?.fields ?? {}).map(([key, field]) => (
-                      <label key={key} className="validate-item">
+                      <label key={key} className={styles.validateItem}>
                         <input
                           type="checkbox"
                           checked={!!validateChecked[key]}
                           onChange={() => toggleValidate(key)}
                         />
-                        <span className="validate-item-text">
+                        <span className={styles.validateItemText}>
                           <strong>{key}</strong>
-                          <span className="validate-item-value"> {field?.value}</span>
+                          <span className={styles.validateItemValue}> {field?.value}</span>
                         </span>
                       </label>
                     ))}
@@ -1394,10 +1395,10 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
               </div>
             </div>
 
-            <div className="toolbar-inline">
+            <div className={styles.toolbarInline}>
 
               <select
-                className="toolbar-select"
+                className={styles.toolbarSelect}
                 value={selectedBlock?.id ?? ""}
                 onChange={handleBlockChange}
                 aria-label="Blocks"
@@ -1417,7 +1418,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
               </select>
 
               <select
-                className="toolbar-select"
+                className={styles.toolbarSelect}
                 value={selectedJob ? String(selectedJob.botJobId ?? selectedJob.id ?? selectedJob.name) : ""}
                 onChange={(e) => {
                   const key = e.target.value;
@@ -1445,7 +1446,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
 
               <button
                 type="button"
-                className={`buttons-toolbar ${isRefreshing ? "sending" : ""}`}
+                className={`${styles.buttonsToolbar} ${isRefreshing ? styles.sending : ""}`}
                 onClick={refreshBotJobs}
               >
                 ↻
@@ -1453,7 +1454,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
             </div>
 
             <button
-              className={`buttons-toolbar ${isBotJobRunning ? 'sending' : ''}`}
+              className={`${styles.buttonsToolbar} ${isBotJobRunning ? styles.sending : ''}`}
               onClick={handleLaunchBotJobClick}
               disabled={isBotJobRunning || !selectedJob}
             >
@@ -1462,10 +1463,10 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
           </div>
         </div>
         {/* FIND ROW (same as GridItem) */}
-        <div className="grid-find-row">
-          <span className="grid-find-label">Find:</span>
+        <div className={styles.gridFindRow}>
+          <span className={styles.gridFindLabel}>Find:</span>
           <input
-            className="grid-find-input"
+            className={styles.gridFindInput}
             type="text"
             value={findText}
             onChange={(e) => setFindText(e.target.value)}
@@ -1477,21 +1478,21 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       {/* === BELOW TOOLBAR === */}
       {elementDTO.length === 0 ? (
         // Empty state uses the scrollable area too
-        <div className="grid-content">
-          <div className="block">
-            <div className="block-header color-component2">Scanned Web Elements</div>
-            <div className="instruction-item"> </div>
-            <div className="block">
-              <div className="no-data-message">No data found</div>
+        <div className={styles.gridContent}>
+          <div className={styles.block}>
+            <div className={`${styles.blockHeader} ${styles.colorComponent2}`}>Scanned Web Elements</div>
+            <div className={styles.instructionItem}> </div>
+            <div className={styles.block}>
+              <div className={styles.noDataMessage}>No data found</div>
             </div>
           </div>
         </div>
       ) : (
         <>
           {/* SECOND FIXED ROW: Insert All / Attributes / Pagination */}
-          <div className="controls-row fixed-controls-row">
+          <div className={`${styles.controlsRow} ${styles.fixedControlsRow}`}>
             <button
-              className={`send-all-button ${isSendingAll ? 'sending' : ''}`}
+              className={`${styles.sendAllButton} ${isSendingAll ? styles.sending : ''}`}
               onClick={handlesSendAllClick}
               disabled={isSendingAll || !selectedJob}
             >
@@ -1499,13 +1500,13 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
             </button>
 
             <button
-              className="attributes-button"
+              className={styles.attributesButton}
               onClick={() => setShowAttributes(!showAttributes)}
             >
               {showAttributes ? 'Hide Attributes' : 'Show Attributes'}
             </button>
 
-            <div className="pagination-controls">
+            <div className={styles.paginationControls}>
               <label>Rows per page: </label>
               <select
                 value={blockRowsPerPage}
@@ -1521,8 +1522,8 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
 
 
           {/* SCROLLABLE GRID ONLY */}
-          <div className="grid-scroll">
-            <div className="grid-content">
+          <div className={styles.gridScroll}>
+            <div className={styles.gridContent}>
               {filteredGroupedEntries.map(([typeElement, elementData], index) => {
                 const q = findText.trim().toLowerCase();
 
@@ -1541,16 +1542,16 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
                 );
 
                 return (
-                  <div key={typeElement} className="block">
-                    <div className="block-header color-component1">
-                      <div className="block-header-left">
-                        <span className="block-order-number">#{index + 1}</span>
-                        <span className="block-name">{getInstructionTypeElement(typeElement)}</span>
-                        <span className="block-count">({filteredElements.length})</span>
+                  <div key={typeElement} className={styles.block}>
+                    <div className={`${styles.blockHeader} ${styles.colorComponent1}`}>
+                      <div className={styles.blockHeaderLeft}>
+                        <span className={styles.blockOrderNumber}>#{index + 1}</span>
+                        <span className={styles.blockName}>{getInstructionTypeElement(typeElement)}</span>
+                        <span className={styles.blockCount}>({filteredElements.length})</span>
                       </div>
 
                       {filteredElements.length > blockRowsPerPage && (
-                        <div className="bottom-pagination-controls">
+                        <div className={styles.bottomPaginationControls}>
                           <button
                             disabled={currentPage === 1}
                             onClick={() => handlePrevBlockPage(typeElement)}
@@ -1572,25 +1573,25 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
                       <img
                         src={crossImage}
                         alt="Remove Block"
-                        className="cross-button"
+                        className={styles.crossButton}
                         onClick={() => handleRemoveRowsBlock(typeElement)}
                       />
                     </div>
 
-                    <div className="instructions-list">
+                    <div className={styles.instructionsList}>
                       {paginatedElements.map((elementDTO, i) => {
                         const scrollOn = elementDTO.autoScroll === "active";
                         const enterOn = elementDTO.autoEnter === "active";
                         return (
                           <div
                             key={i}
-                            className="instruction-item"
+                            className={styles.instructionItem}
                             onMouseEnter={() => handleRowHover(elementDTO)}
                             onMouseLeave={handleRowLeave}
                           >
                             {editingElementId === elementDTO.xPath &&
                               editingElementTagName === elementDTO.tagName ? (
-                              <div className="edit-container">
+                              <div className={styles.editContainer}>
                                 <input
                                   type="text"
                                   value={elementName}
@@ -1601,17 +1602,17 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
                                   }}
                                   onChange={(e) => setElementName(e.target.value)}
                                   ref={elementDTORef}
-                                  className="edit-textbox"
+                                  className={styles.editTextbox}
                                 />
                                 <img
                                   src={saveImage}
                                   alt="save"
-                                  className="save-button"
+                                  className={styles.saveButton}
                                   onClick={() => handleSaveInstruction(elementDTO)}
                                 />
                               </div>
                             ) : (
-                              <span className="instruction-line">
+                              <span className={styles.instructionLine}>
                                 {getInstructionElement(elementDTO)}
                               </span>
                             )}
@@ -1627,31 +1628,31 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
                               <span>{"\u00A0".repeat(20)}</span>
                             )}
 
-                            <div className="options-column">
-                              <div className="options-row">
+                            <div className={styles.optionsColumn}>
+                              <div className={styles.optionsRow}>
                                 {/* AUTO SCROLL */}
                                 <div
-                                  className={`options-toggle ${scrollOn ? "active" : "inactive"}`}
+                                  className={`${styles.optionsToggle} ${scrollOn ? styles.active : styles.inactive}`}
                                   onClick={(e) => handleActiveDeviceScroll(e, elementDTO)}
                                 >
-                                  <span className="options-toggle-label">scroll</span>
+                                  <span className={styles.optionsToggleLabel}>scroll</span>
                                   <img
                                     src={scrollOn ? activeImage : inactiveImage}
                                     alt="auto scroll toggle"
-                                    className="options-toggle-icon"
+                                    className={styles.optionsToggleIcon}
                                   />
                                 </div>
 
                                 {/* NEXT/ENTER */}
                                 <div
-                                  className={`options-toggle ${enterOn ? "active" : "inactive"}`}
+                                  className={`${styles.optionsToggle} ${enterOn ? styles.active : styles.inactive}`}
                                   onClick={(e) => handleActiveDeviceEnter(e, elementDTO)}
                                 >
-                                  <span className="options-toggle-label">next/enter</span>
+                                  <span className={styles.optionsToggleLabel}>next/enter</span>
                                   <img
                                     src={enterOn ? activeImage : inactiveImage}
                                     alt="next/enter toggle"
-                                    className="options-toggle-icon"
+                                    className={styles.optionsToggleIcon}
                                   />
                                 </div>
                               </div>
@@ -1660,7 +1661,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
                               <img
                                 src={saveImage}
                                 alt=""
-                                className="save-button"
+                                className={styles.saveButton}
                                 onClick={(event) =>
                                   handleRowSelectedClick(event, elementDTO, "NEW_ELEMENT_DTO")
                                 }
@@ -1668,7 +1669,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
                               <img
                                 src={testInputImage}
                                 alt=""
-                                className="test-button"
+                                className={styles.testButton}
                                 onClick={(event) =>
                                   handleRowSelectedClick(event, elementDTO, "TEST_INPUT_DTO")
                                 }
@@ -1676,7 +1677,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
                               <img
                                 src={clickTestImage}
                                 alt=""
-                                className="test-button"
+                                className={styles.testButton}
                                 onClick={(event) =>
                                   handleRowSelectedClick(event, elementDTO, "TEST_CLICK_DTO")
                                 }
@@ -1684,7 +1685,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
                               <img
                                 src={crossImage}
                                 alt=""
-                                className="cross-button"
+                                className={styles.crossButton}
                                 onClick={() => handleRemoveElementDTO(elementDTO)}
                               />
                             </div>

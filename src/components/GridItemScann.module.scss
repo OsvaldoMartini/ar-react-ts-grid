@@ -1,12 +1,12 @@
 // Scoped stylesheet for GridItemScann only. The content is a copy of
-// griditem.scss with one intentional difference: .instruction-item uses a
+// griditem.scss with one intentional difference: .instructionItem uses a
 // 5-column grid (26px 240px auto minmax(60px, 1fr) auto) to reserve the first
-// 26px for the per-row "Keep" checkbox. Also includes the .keep-checkbox rule.
+// 26px for the per-row "Keep" checkbox. Also includes the .keepCheckbox rule.
 // GridItem / GridItemComp / GridDrag2 / GridItemScannMobile still use the
 // shared 4-column griditem.scss — unchanged.
 
 /* Grid Container */
-.grid-container {
+.gridContainer {
   padding: 0 12px 0 2px; /* Decreased padding */
   margin: 0;
   display: flex;
@@ -19,7 +19,7 @@
 }
 
 /* Fixed Find row (matches existing toolbar/button design) */
-.grid-find-row {
+.gridFindRow {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -33,20 +33,20 @@
   background: #fff;
 }
 
-.grid-scroll {
+.gridScroll {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;   // ✅ scroll happens here
 }
 
-.grid-find-label {
+.gridFindLabel {
   font-size: 12px;
   font-weight: bold;
   color: #0b5394;
   white-space: nowrap;
 }
 
-.block-collapse-badge {
+.blockCollapseBadge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -74,21 +74,21 @@
   }
 }
 
-.grid-find-input {
-  @extend .toolbar-input;
+.gridFindInput {
+  @extend .toolbarInput;
   flex: 1;          // ✅ takes all remaining free space
   min-width: 0;     // ✅ prevents flex overflow issues
 }
 
 
 /* NEW: scrollable area for the grid/list */
-.grid-content {
+.gridContent {
   flex: 1;
   overflow-y: auto;   /* only this part scrolls */
   padding-top: 4px;   /* small spacing below toolbar */
 }
 
-.find-highlight {
+.findHighlight {
   padding: 0;              /* ✅ no extra spacing inside words */
   margin: 0;
   border-radius: 2px;
@@ -100,7 +100,7 @@
   line-height: inherit;
 }
 
-.instruction-name {
+.instructionName {
   margin-left: 6px;
 }
 
@@ -113,7 +113,7 @@
 }
 
 /* Block Header */
-.block-header {
+.blockHeader {
   display: flex;
   align-items: center;
   gap: 8px; /* Decreased gap */
@@ -128,19 +128,19 @@
   height: 20px; /* Set a fixed height */
   justify-content: space-between;
 
-  &.color-component1 {
+  &.colorComponent1 {
     background-color: #c3d3d9   !important;
     color: #0b5394; 
   }
 
-  &.color-component2 {
+  &.colorComponent2 {
     background-color: #add8e6   !important;
     color: #0b5394; 
   }
   
 }
 
-.block-header-left {
+.blockHeaderLeft {
   display: flex;
   align-items: center;
   gap: 5px; /* Adjust gap as needed */
@@ -148,7 +148,7 @@
 
 
 /* Block Name Span */
-.block-header .block-name  {
+.blockHeader .blockName  {
   font-size: 14px; // Decrease font size
   width: 200px; /* Set width of block name to 100px */
   white-space: nowrap; /* Prevent text wrapping */
@@ -157,14 +157,14 @@
 }
 
 /* Block Name Span */
-.block-header .block-count {
+.blockHeader .blockCount {
   width: 50px; /* Set width of block name to 100px */
   white-space: nowrap; /* Prevent text wrapping */
   overflow: hidden; /* Hide overflow */
   text-overflow: ellipsis; /* Add ellipsis if text is too long */
 }
 
-.block-order-number{
+.blockOrderNumber{
   font-size: 14px; // Decrease font size
   // width: 200px; /* Set width of block name to 100px */
   white-space: nowrap; /* Prevent text wrapping */
@@ -173,7 +173,7 @@
 }
 
 /* Move Buttons Container */
-.block-header .move-buttons {
+.blockHeader .moveButtons {
   margin-left: auto;
   display: flex;
   gap: 4px; /* Smaller gap between buttons */
@@ -181,20 +181,20 @@
 
 
 /* Button Styling */
-.move-button,
-.rollback-button,
-.garbage-button,
-.edit-button,
-.excel-button,
-.cross-button,
-.save-button,
-.pick-button,
-.warning-button,
-.test-button,
-.active-button,
-.inactive-button,
-.arrow-left-button,
-.brick-button {
+.moveButton,
+.rollbackButton,
+.garbageButton,
+.editButton,
+.excelButton,
+.crossButton,
+.saveButton,
+.pickButton,
+.warningButton,
+.testButton,
+.activeButton,
+.inactiveButton,
+.arrowLeftButton,
+.brickButton {
   width: 15px; /* Decreased button size */
   height: 15px;
   background-color: transparent;
@@ -208,20 +208,20 @@
   
 }
 
-.options-row {
+.optionsRow {
   display: flex;
   flex-direction: row;
   gap: 12px; // ← horizontal spacing between toggles (adjust 8px / 12px / 16px)
   align-items: center;
 }
 
-// NOTE: the compact inline variant that used to live here (.options-row--inline)
+// NOTE: the compact inline variant that used to live here (.optionsRowInline)
 // is now a self-contained component — see CompForce.tsx + CompForce.module.scss.
 // GridItem / GridItemComp / GridItemScann all render CompForce inside their
-// .options-column instead of using this variant. Kept the base .options-row
+// .optionsColumn instead of using this variant. Kept the base .optionsRow
 // rules above for any remaining non-inline usage.
 
-.options-toggle {
+.optionsToggle {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -238,26 +238,26 @@
 }
 
 /* ACTIVE */
-.options-toggle.active {
+.optionsToggle.active {
   background: #e6f4ea;
   border-color: transparent;        // (optional, but explicit)
 }
 
-.options-toggle.active .options-toggle-label {
+.optionsToggle.active .optionsToggleLabel {
   color: #0f9d58;
 }
 
 /* INACTIVE */
-.options-toggle.inactive {
+.optionsToggle.inactive {
   background: transparent;
   border-color: #e0e0e0;            // <-- instead of adding/removing border
 }
 
-.options-toggle.inactive .options-toggle-label {
+.optionsToggle.inactive .optionsToggleLabel {
   color: #d93025;
 }
 
-.options-toggle-icon {
+.optionsToggleIcon {
   width: 14px;
   height: 14px;
   display: block;
@@ -265,23 +265,23 @@
 }
 
 
-// .active-button{
+// .activeButton{
 //   width: 20px;
 //   height: 20px;
 // }
 
-.edit-container {
+.editContainer {
   display: inline-flex;  /* Make input and image inline */
   align-items: center;   /* Vertically center the items */
   gap: 5px;              /* Add space between the text box and save button */
 }
 
-.edit-textbox {
+.editTextbox {
   flex: 1; /* Make the input take the available space */
   width: 10%;
 }
 
-.socket-port {
+.socketPort {
   font-size: 7px;
   display: inline-block;
   color: white;
@@ -290,42 +290,42 @@
 }
 
 
-.garbage-button {
+.garbageButton {
   margin-right: 2px; /* Reduced space from the up button */
 }
 
-.edit-button,
-.excel-button {
+.editButton,
+.excelButton {
   margin-left: 2px; /* Reduced margins */
 }
 
 /* Individual Button Padding */
-.edit-button {
+.editButton {
   padding: 0 0 0 6px;
 }
 
 /* Individual Button Padding */
-.excel-button {
+.excelButton {
   padding: 0 6px 0 0;
 }
 
-.save-button {
+.saveButton {
   padding: 0 2px 0 6px;
 }
 
-.pick-button{
+.pickButton{
   padding: 0 2px 0 6px;
 }
 
-.warning-button{
+.warningButton{
   padding: 0 2px 0 6px;
 }
 
-.test-button {
+.testButton {
   padding: 0 2px 0 6px;
 }
 
-.cross-button {
+.crossButton {
   padding: 0 2px 0 6px;
 }
 
@@ -341,90 +341,96 @@
 }
 
 /* New class for waitImage with same styles but different height */
-.wait-image {
+.waitImage {
   @extend .operations; /* Inherit styles from .operations */
   height: 20px; /* Override height */
 }
 
-.input-image {
+.inputImage {
   @extend .operations; /* Inherit styles from .operations */
   height: 20px; /* Override height */
 }
 
-.output-image {
+.outputImage {
   @extend .operations; /* Inherit styles from .operations */
   height: 20px; /* Override height */
 }
 
-.click-image {
+.clickImage {
   @extend .operations; /* Inherit styles from .operations */
   height: 20px; /* Override height */
 }
 
-.close-image {
+.closeImage {
   @extend .operations; /* Inherit styles from .operations */
   height: 20px; /* Override height */
 }
 
-.screen-image {
+.screenImage {
   @extend .operations; /* Inherit styles from .operations */
   height: 20px; /* Override height */
 }
 
-.link-image{
+.linkImage{
   @extend .operations; /* Inherit styles from .operations */
   height: 20px; /* Override height */
 }
 
-.ifelse-image {
+.ifelseImage {
   @extend .operations; /* Inherit styles from .operations */
   height: 20px; /* Override height */
 }
 
-.instruction-line {
-  display: inline-flex; /* Ensures the elements inside are in a single line */
-  align-items: center; /* Vertically aligns text and image */
+.instructionLine {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.refresh-image {
+.refreshImage {
   @extend .operations; /* Inherit styles from .operations */
   height: 20px; /* Override height */
 }
 
-.hidden-image {
+.hiddenImage {
   @extend .operations; /* Inherit styles from .operations */
   height: 20px; /* Override height */
 }
 
-.else-image {
+.elseImage {
   @extend .operations; /* Inherit styles from .operations */
   height: 20px; /* Override height */
 }
 
-.endif-image {
+.endifImage {
   @extend .operations; /* Inherit styles from .operations */
   height: 20px; /* Override height */
 }
 
 
-.pause-image {
+.pauseImage {
   @extend .operations; /* Inherit styles from .operations */
   height: 20px; /* Override height */
 }
 
-.goto-image {
+.gotoImage {
   @extend .operations; /* Inherit styles from .operations */
   height: 20px; /* Override height */
 }
 
-// .excelgoto-image {
+// .excelgotoImage {
 //   @extend .operations; /* Inherit styles from .operations */
 //   height: 20px; /* Override height */
 //   width: 30px; /* Override height */
 // }
 
-.excel-goto-container {
-  @extend .move-buttons; /* Inherit styles from .move-buttons */
+.excelGotoContainer {
+  @extend .moveButtons; /* Inherit styles from .moveButtons */
   background-color: transparent; /* Transparent background */
   background-color: #c3d3d9; /* Light gray background */
   // padding: 10px;
@@ -439,50 +445,52 @@
   cursor: pointer; /* Indicates it's interactive */
 }
 
-.excel-goto-container:hover {
+.excelGotoContainer:hover {
   background-color: #a7bed3;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); 
 }
 
-.excelgoto-image {
+.excelgotoImage {
   height: 16px;
   width: 16px;
   margin-right: 5px; 
 }
 
-.excelgoto-text {
+.excelgotoText {
   font-size: 0.8em; 
   margin-right: 5px;
   color: #b163ff;
   white-space: nowrap; 
 }
 
-.cross-image {
+.crossImage {
   height: 16px;
   width: 16px;
 }
 
 
 /* Instructions List */
-.instructions-list {
+.instructionsList {
   display: flex;
   flex-direction: column;
   gap: 3px; /* Decreased gap */
 }
 
 // Per-row "Keep this element" checkbox (GridItemScann only). Lives in the
-// first 26px column of .instruction-item. Clicking it toggles membership in
+// first 26px column of .instructionItem. Clicking it toggles membership in
 // keepSelectedIds; the header's "Delete Unchecked (N)" button prunes every
 // element whose id is NOT in the set.
-.keep-checkbox {
+.keepCheckbox {
+  grid-column: 1;
   justify-self: center;
   width: 16px;
   height: 16px;
   cursor: pointer;
+  margin: 0;
 }
 
 /* Instruction Item */
-.instruction-item {
+.instructionItem {
   display: grid;
   // grid-template-columns: 250px auto minmax(120px, 1fr) auto;
   // First 26px column holds the Keep checkbox in GridItemScann; panes that
@@ -499,12 +507,29 @@
   position: relative; // Required for background positioning
   z-index: 1;
 
+
+  > .instructionLine,
+  > .editContainer {
+    grid-column: 2;
+    justify-self: start;
+    padding-left: 6px;
+    min-width: 0;
+  }
+
+  > .optionsColumn {
+    grid-column: 5;
+  }
+
+  > .attrSlot {
+    grid-column: 3;
+    justify-self: start;
+  }
   &:hover {
     background-color: #b2ebf2; /* Slightly darker for hover effect */
     box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2); /* Stronger shadow on hover */
   }
 
-  .execution-background {
+  .executionBackground {
     position: absolute;
     inset: 0;
     z-index: 0;
@@ -514,22 +539,22 @@
   }
 
   // Color variants
-  .execution-background.green {
+  .executionBackground.green {
     background-color: #4caf50;
     box-shadow: 0 0 10px #4caf50;
   }
 
-  .execution-background.red {
+  .executionBackground.red {
     background-color: #f44336;
     box-shadow: 0 0 10px #f44336;
   }
 
-  .execution-background.yellow {
+  .executionBackground.yellow {
     background-color: #ffeb3b;
     box-shadow: 0 0 10px #ffeb3b;
   }
     // Everything else above background
-    > *:not(.execution-background) {
+    > *:not(.executionBackground) {
       position: relative;
       z-index: 100;
     }
@@ -537,19 +562,19 @@
 }
 
 /* Change background to white when dropdown is open */
-.instruction-item.dropdown-open {
+.instructionItem.dropdownOpen {
   background-color: #9ee6ef; /* Change background to white */
   position: relative;
   z-index: 999;
 }
 
 /* Margin for the first span element with instruction type */
-.instruction-item span:first-child {
+.instructionItem span:first-child {
   margin-left: 3px; /* Add left margin of 3px */
 }
 
 /* Options column styling */
-.instruction-item .options-column {
+.instructionItem .optionsColumn {
   display: flex;
   justify-content: flex-end; /* Align content to the right */
   margin-right: 8px; /* Add right margin of 3px */
@@ -559,28 +584,28 @@
 
 
 /* Instruction Item Span */
-.instruction-item span {
+.instructionItem span {
   font-size: 0.85em; /* Smaller font size for span text */
 }
 
 /* For instruction-type: uses flex */
-.instruction-type {
+.instructionType {
   display: flex;
   align-items: center; /* Align content vertically */
   gap: 3px; /* Add a 3px gap between elements */
 }
 
-.instruction-type span {
+.instructionType span {
   font-weight: bold; /* Make the text bold */
 }
 
-.instruction-details {
+.instructionDetails {
   font-weight: bold; /* Make the text bold */
   margin-right: 3px; /* Add a 3px gap after the span */
   display: inline-block; /* Ensure the span behaves as a block but allows space for the next element */
 }
 
-.toolbar-main-button {
+.toolbarMainButton {
   background-color: #c3d3d9 !important;
   color: #0b5394;
   border: none;
@@ -593,37 +618,37 @@
   white-space: nowrap;
 }
 
-.attributes-button {
-  @extend .toolbar-main-button;
+.attributesButton {
+  @extend .toolbarMainButton;
 }
 
-.send-all-button {
-  @extend .toolbar-main-button;
+.sendAllButton {
+  @extend .toolbarMainButton;
 }
 
-.update-all-button {
-  @extend .toolbar-main-button;
+.updateAllButton {
+  @extend .toolbarMainButton;
 }
 
-.attributes-button:hover,
-.send-all-button:hover,
-.update-all-button:hover {
+.attributesButton:hover,
+.sendAllButton:hover,
+.updateAllButton:hover {
   background-color: #a9bec7 !important;
   transform: scale(1.05);
 }
 
-.send-all-button.sending,
-.update-all-button.updating,
-.attributes-button.sending {
+.sendAllButton.sending,
+.updateAllButton.updating,
+.attributesButton.sending {
   background-color: #4caf50 !important;
   color: #0b5394 !important;
   animation: pulseBg 2s infinite;
   box-shadow: 0 0 10px #4caf50;
 }
 
-.send-all-button:disabled,
-.update-all-button:disabled,
-.attributes-button:disabled {
+.sendAllButton:disabled,
+.updateAllButton:disabled,
+.attributesButton:disabled {
   background-color: #cccccc;
   color: #7a7a7a;
   cursor: not-allowed;
@@ -631,7 +656,7 @@
 }
 
 /* === Toolbar above all sections === */
-.controls-toolbar {
+.controlsToolbar {
   position: sticky;
   top: 0;
   z-index: 1000;
@@ -652,7 +677,7 @@
 }
 
 /* ===== NEW: two-row toolbar layout (used by toolbar-row wrappers) ===== */
-.toolbar-row {
+.toolbarRow {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -660,28 +685,28 @@
   flex-wrap: nowrap;
 }
 
-.toolbar-row-top {
+.toolbarRowTop {
   justify-content: flex-start;
 }
 
-.toolbar-row-bottom {
+.toolbarRowBottom {
   justify-content: space-between; /* left group on left, right group on right */
 }
 
-.toolbar-left,
-.toolbar-right {
+.toolbarLeft,
+.toolbarRight {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-.toolbar-right {
+.toolbarRight {
   margin-left: auto; /* keeps right cluster aligned right */
 }
 
 
 /* === Buttons inside top toolbar === */
-.buttons-toolbar {
+.buttonsToolbar {
   // width: 110px;
   background-color: #c3d3d9 !important;
   color: #0b5394;
@@ -695,13 +720,13 @@
   white-space: nowrap;
 }
 
-.buttons-toolbar:hover {
+.buttonsToolbar:hover {
   background-color: #a9bec7 !important;
   transform: scale(1.05);
 }
 
 /* When isSending = true */
-.buttons-toolbar.sending {
+.buttonsToolbar.sending {
   background-color: #4caf50 !important; /* yellow */
   color: #0b5394 !important; /* dark blue text */
   animation: pulseBg 2s infinite;
@@ -709,7 +734,7 @@
 }
 
 /* Disabled state for toolbar buttons */
-.buttons-toolbar:disabled {
+.buttonsToolbar:disabled {
   background-color: #cccccc;
   color: #7a7a7a;
   cursor: not-allowed;
@@ -720,17 +745,17 @@
 
 
 /* Insert All Elements row directly after toolbar */
-.controls-toolbar + .controls-row {
+.controlsToolbar + .controlsRow {
   margin-top: -2px;
 }
 
 /* No-data header block directly after toolbar */
-.controls-toolbar + .block {
+.controlsToolbar + .block {
   margin-top: -2px;
 }
 
 /* === Toolbar text fields === */
-.toolbar-input {
+.toolbarInput {
   width: 250px;
   padding: 6px 10px;
   border: 1px solid #c0c0c0;
@@ -743,16 +768,16 @@
 }
 
 /* Add subtle extra space after input fields */
-.toolbar-input + .buttons-toolbar {
+.toolbarInput + .buttonsToolbar {
   margin-left: 1px;
 }
 
-.toolbar-input:focus {
+.toolbarInput:focus {
   border-color: #0b5394;
 }
 
 /* vertical separator in the toolbar */
-.toolbar-separator {
+.toolbarSeparator {
   width: 1px;
   height: 24px;              /* matches your 12px font & button height nicely */
   background-color: #c0c0c0; /* same tone as your border */
@@ -760,7 +785,7 @@
   margin: 0 3px;
 }
 
-.toolbar-select {
+.toolbarSelect {
   width: 130px;          /* narrower */
   padding: 3px 6px;      /* minimal height */
   border: 1px solid #c0c0c0;
@@ -778,20 +803,20 @@
 
 
 /* disabled look for the newBotJobName input when preset is not "Create New Bot jOb" */
-.toolbar-input:disabled {
+.toolbarInput:disabled {
   background-color: #eeeeee;
   color: #7a7a7a;
   cursor: not-allowed;
   opacity: 0.8;
 }
 
-.toolbar-inline {
+.toolbarInline {
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
 
-.toolbar-refresh-btn {
+.toolbarRefreshBtn {
   padding: 4px 7px;
   border: 1px solid #ccc;
   border-radius: 6px;
@@ -800,24 +825,24 @@
   font-size: 16px;
 }
 
-.toolbar-refresh-btn:hover {
+.toolbarRefreshBtn:hover {
   background: #eef;
 }
 
 /* Custom widths for new input fields */
-.input-app-name {
+.inputAppName {
   width: 80px !important;
 }
 
-.select-package-name {
+.selectPackageName {
   width: 150px !important;
 }
 
-.input-package-name {
+.inputPackageName {
   width: 150px !important;
 }
 
-.selected-attribute {
+.selectedAttribute {
   margin-top: 10px;
   font-weight: bold;
   padding: 5px;
@@ -826,13 +851,13 @@
   color: white;
 }
 
-.light-yellow-background {
+.lightYellowBackground {
   background-color: #ffffe0; /* Light yellow color */
 }
 
 
 /* Horizontal group for Scanner + Scanner AI + Scrolling select */
-.scanner-group {
+.scannerGroup {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -845,14 +870,14 @@
 }
 
 /* Optional hover effect */
-.scanner-group:hover {
+.scannerGroup:hover {
   background-color: #b2ebf2;      /* Slightly darker cyan */
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12);
 }
 
 /* Scanner type dropdown – styled like main toolbar buttons */
-.scanner-type-select {
-  @extend .buttons-toolbar;      /* reuse your button sizing & base style */
+.scannerTypeSelect {
+  @extend .buttonsToolbar;      /* reuse your button sizing & base style */
   padding-right: 28px;           /* space for the dropdown arrow */
   text-align: left;
   appearance: none;              /* remove native select look */
@@ -874,7 +899,7 @@
 
 
 /* Thin vertical separator between items */
-.group-divider {
+.groupDivider {
   width: 1px;
   height: 16px;
   background-color: #8fcbd4;     /* darker cyan line */
@@ -883,13 +908,13 @@
 }
 
 /* Scrolling selector container */
-.scroll-select-group {
+.scrollSelectGroup {
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
 
-.scroll-label {
+.scrollLabel {
   font-size: 11px;
   font-weight: bold;
   color: #0b5394;
@@ -897,8 +922,8 @@
    margin-right: 2px;          /* very tight */
 }
 
-.scroll-select {
-  @extend .toolbar-select;
+.scrollSelect {
+  @extend .toolbarSelect;
   width: 90px;
    padding: 3px 6px;           /* ↓ reduced height */
   font-weight: bold;
@@ -907,25 +932,25 @@
 
 /* ===== Scroll buttons (toolbar) ===== */
 
-.scroll-buttons-group {
+.scrollButtonsGroup {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-.scroll-buttons {
+.scrollButtons {
   display: flex;
   flex-direction: center;
   gap: 2px;
 }
 
-.scroll-buttons.inline {
+.scrollButtons.inline {
   display: flex;
   align-items: center;
   gap: 4px;
 }
 
-.scroll-btn {
+.scrollBtn {
  width: 26px;          /* same visual footprint as ↻ */
   height: 22px;
   padding: 0;
@@ -938,37 +963,37 @@
 }
 
 /* UP */
-.scroll-btn.scroll-up {
+.scrollBtn.scrollUp {
   background: linear-gradient(180deg, #4caf50, #2e7d32);
   color: #ffffff;
 }
 
 /* DOWN */
-.scroll-btn.scroll-down {
+.scrollBtn.scrollDown {
   background: linear-gradient(180deg, #ff9800, #ef6c00);
   color: #ffffff;
 }
 
 /* Hover / Active */
-.scroll-btn:hover {
+.scrollBtn:hover {
   filter: brightness(1.15);
 }
 
-.scroll-btn:active {
+.scrollBtn:active {
   transform: translateY(1px);
 }
 
 /* Disabled state (inherits toolbar behavior) */
-.scroll-btn:disabled {
+.scrollBtn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
 
-.nav-buttons {
+.navButtons {
   margin-bottom: 2px;
 }
 
-.nav-btn {
+.navBtn {
   width: 28px;          // smaller hitbox
   height: 24px;
   padding: 0;
@@ -978,28 +1003,28 @@
   text-align: center;
 }
 
-.nav-btn.back {
+.navBtn.back {
   font-size: 13px;
   font-weight: 900;     // strongest for arrow
 }
 
-.nav-btn.home {
+.navBtn.home {
   font-size: 14px;      // circle needs a touch more size
   font-weight: 900;
 }
 
-.nav-btn.recents {
+.navBtn.recents {
   font-size: 13px;
   font-weight: 900;
   letter-spacing: -1px; // tighter "≡"
 }
 
- .nav-btn.next-done {
+ .navBtn.nextDone {
     // minimal, optional overrides
     font-weight: 600;
   }
 
-.nav-btn.close-all {
+.navBtn.closeAll {
   color: #d32f2f;
   font-weight: bold;
 
@@ -1009,12 +1034,12 @@
 }
 
 /* Dropdown arrow styling */
-.dropdown-column {
+.dropdownColumn {
   position: relative;
   margin-right: 8px;
 }
 
-.dropdown-arrow {
+.dropdownArrow {
   cursor: pointer;
   width: 15px;
   height: 15px;
@@ -1026,7 +1051,7 @@
 }
 
 /* Dropdown menu styling */
-.dropdown-menu {
+.dropdownMenu {
   position: absolute;
   z-index: 999;
   top: 25px; /* Default: Adjust based on layout */
@@ -1041,7 +1066,7 @@
   width: 150px;
 }
 
-.dropdown-above {
+.dropdownAbove {
   top: auto;    /* Reset top */
   bottom: 25px; /* Position the dropdown above the clicked element */
 }
@@ -1049,20 +1074,20 @@
 
 
 /* Individual menu items */
-.dropdown-menu div {
+.dropdownMenu div {
   padding: 8px 12px;
   cursor: pointer;
   white-space: nowrap; /* Ensure the text stays on a single line */
 }
 
 /* Hover effect for menu items */
-.dropdown-menu div:hover {
+.dropdownMenu div:hover {
   background-color: #b2ebf2; /* Light blue background on hover */
   color: #00796b; /* Darker text color on hover */
 }
 
 
-.block-export-file {
+.blockExportFile {
   font-size: 12px; // Decrease font size
   color: #888;
   margin-left: 10px;
@@ -1073,7 +1098,7 @@
 }
 
 
-.w3-card {
+.w3Card {
   display: inline-block;
   background-color: white;
   border: 2px solid black;
@@ -1082,11 +1107,11 @@
   height: 80%;
 }
 
-.w3-gray {
+.w3Gray {
   text-align: center;
 }
 
-.controls-row {
+.controlsRow {
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -1095,8 +1120,8 @@
   font-size: 12px;
 }
 
-/* Keep the controls row visible while .grid-scroll scrolls */
-.fixed-controls-row {
+/* Keep the controls row visible while .gridScroll scrolls */
+.fixedControlsRow {
   position: sticky;
   top: 0;
   z-index: 20;
@@ -1104,7 +1129,7 @@
 }
 
 
-.pagination-controls {
+.paginationControls {
   display: flex;
   align-items: center;
   gap: 15px;
@@ -1113,12 +1138,12 @@
   white-space: nowrap;
 }
 
-.pagination-controls label {
+.paginationControls label {
   font-weight: bold;
   color: #333;
 }
 
-.pagination-controls select {
+.paginationControls select {
   padding: 8px 12px;
   border-radius: 5px;
   border: 1px solid #ccc;
@@ -1129,17 +1154,17 @@
   width: 80px;
 }
 
-.pagination-controls select:hover {
+.paginationControls select:hover {
   border-color: #007bff;
 }
 
-.pagination-controls select:focus {
+.paginationControls select:focus {
   outline: none;
   border-color: #007bff;
   box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
 }
 
-.pagination-controls button {
+.paginationControls button {
   background-color: #007bff;
   color: white;
   border: none;
@@ -1151,45 +1176,45 @@
   font-weight: bold;
 }
 
-.pagination-controls button:hover {
+.paginationControls button:hover {
   background-color: #0056b3;
   transform: scale(1.05);
 }
 
-.pagination-controls button:disabled {
+.paginationControls button:disabled {
   background-color: #ccc;
   cursor: not-allowed;
   transform: none;
 }
 
-.pagination-controls span {
+.paginationControls span {
   font-weight: bold;
   color: #555;
 }
 
-.bottom-pagination-controls {
+.bottomPaginationControls {
   display: flex;
   align-items: center;
   gap: 15px;
   font-size: 12px;
 }
 
-.bottom-pagination-controls span {
+.bottomPaginationControls span {
   white-space: nowrap; /* Prevent line breaks */
 }
 
-.no-data-message {
+.noDataMessage {
   font-size: 16px;
   color: #888;
   text-align: center;
   margin-top: 20px;
 }
 
-.toggle-section {
+.toggleSection {
   margin-bottom: 20px;
 }
 
-.toggle-button {
+.toggleButton {
   padding: 5px 10px;
   cursor: pointer;
   border: 1px solid #ccc;
@@ -1210,14 +1235,14 @@
 
 /* ===== Validate selector (toolbar-aligned) ===== */
 
-.validate-inline {
+.validateInline {
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
 
 /* Label: "Validate:" */
-.validate-inline .toolbar-label {
+.validateInline .toolbarLabel {
   font-size: 11px;
   font-weight: bold;
   color: #0b5394;
@@ -1226,14 +1251,14 @@
 }
 
 /* Dropdown wrapper */
-.validate-dropdown {
+.validateDropdown {
   position: relative;
   display: inline-flex;
   align-items: center;
 }
 
 /* Trigger button (same footprint as toolbar buttons) */
-.validate-trigger {
+.validateTrigger {
   width: auto;
   min-width: 70px;
   height: 22px;
@@ -1247,13 +1272,13 @@
 }
 
 /* Disabled state */
-.validate-trigger:disabled {
+.validateTrigger:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
 
 /* Dropdown panel */
-.validate-menu {
+.validateMenu {
   position: absolute;
   top: calc(100% + 4px);
   left: 0;
@@ -1270,7 +1295,7 @@
 }
 
 /* Single checkbox row */
-.validate-item {
+.validateItem {
   display: flex;
   align-items: flex-start;
   gap: 6px;
@@ -1284,31 +1309,31 @@
 }
 
 /* Checkbox alignment */
-.validate-item input[type="checkbox"] {
+.validateItem input[type="checkbox"] {
   margin-top: 2px;
 }
 
 /* Text container */
-.validate-item-text {
+.validateItemText {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
 }
 
 /* Field value */
-.validate-item-value {
+.validateItemValue {
   font-weight: 700;
   opacity: 0.85;
 }
 
 /* Confidence */
-.validate-item-conf {
+.validateItemConf {
   font-weight: 700;
   opacity: 0.65;
 }
 
 
-// .instruction-item[data-executing='true'] {
+// .instructionItem[data-executing='true'] {
 //   background-color: var(--execution-state-color); // optional if using a CSS var
 //   // animation: pulseBg 2s infinite;
 //   box-shadow: 0 0 10px var(--execution-state-color);

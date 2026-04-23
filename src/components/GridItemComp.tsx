@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { BotJobData, ComplexMessage, ComponentsInstructionsDTO, ElementDTO, UpdatedBlock } from './instructionsMockData';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd'; // Import from react-beautiful-dnd
-import './griditem.scss';
-
 import setValueImage from '../assets/setValueBtn3.png';
 import getValueImage from '../assets/getValueBtn3.png';
 import checkImage from '../assets/check4.png';
@@ -47,6 +45,8 @@ import ArrowLeft from '../assets/ArrowLeft.png';
 import AlertModal from './AlertModal';
 import CompForce from './CompForce';
 import { useWebSocket } from './useWebSocket';
+import styles from './Griditem.module.scss';
+
 
 interface GridItemCompProps {
   homeBankingIdInitial: number;
@@ -2637,12 +2637,12 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     // Return a combined image and text element if imageSrc exists, otherwise return just the text
     // Return a combined image and text element if imageSrc exists, otherwise return just the text
     return (
-      <div className="instruction-type">
+      <div className={styles.instructionType}>
         {imageSrc && (
           <>
             <img src={imageSrc} alt="" className={imageClass} />
             {hiddenField && (
-              <img src={hiddenImage} alt="hidden" className="hidden-image" />
+              <img src={hiddenImage} alt="hidden" className={styles.hiddenImage} />
             )}
             <span>{text ? renderHighlighted(text, findText) : null}</span>
           </>
@@ -2686,7 +2686,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       <img
         src={editImage}
         alt="edit"
-        className="edit-button"
+        className={styles.editButton}
         onClick={() => handleEditInstruction(instruction)}  // Trigger edit mode
       />
     );
@@ -2768,13 +2768,13 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
         <img
           src={upImage}
           alt="Move Up"
-          className="move-button"
+          className={styles.moveButton}
           onClick={() => handleMoveRowUp(instructionId)}
         />
         <img
           src={downImage}
           alt="Move Down"
-          className="move-button"
+          className={styles.moveButton}
           onClick={() => handleMoveRowDown(instructionId)}
         />
       </>
@@ -2791,7 +2791,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       <>
         <img src={clickTestImage}
           alt=""
-          className="test-button"
+          className={styles.testButton}
           onClick={(event) => handleRowSelectedClick(event, instruction, "TEST_CLICK_DTO")} />
       </>
     );
@@ -2918,7 +2918,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
         const rightDisplay = middle === "contains" ? `( ${rightLabel} )` : rightLabel;
 
         return (
-          <span className="instruction-details">
+          <span className={styles.instructionDetails}>
             <span style={{ color: "#FFA500" }}>
               ({instruction.variableId}){left}
             </span>
@@ -2941,7 +2941,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
         : ["N/A", "Unknown"]; // Fallback values if parentId is null
 
       return (
-        <span className="instruction-details">
+        <span className={styles.instructionDetails}>
           <span style={{ color: "#0b5394" }}>Block:</span>{" "}
           <span style={{ color: "#b163ff" }}>#{blockOrderNumber} {blockName}</span>{" "}
           <span style={{ color: "blue" }}>Limit:</span>{" "}
@@ -2977,7 +2977,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       const parentValue = parentInstruction?.name || "Unknown";
 
       return (
-        <span className="instruction-details">
+        <span className={styles.instructionDetails}>
           <span style={{ color: "#0b5394" }}>Refresh</span>{" "}
           <span style={{ color: "#FFA500" }}>{refreshValue}s</span> {" "}
           <span style={{ color: "#0b5394" }}>Loop</span>{" "}
@@ -3012,7 +3012,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       const parentValue = parentInstruction?.name || "Unknown";
 
       return (
-        <span className="instruction-details">
+        <span className={styles.instructionDetails}>
           <span style={{ color: "#0b5394" }}>Time</span>{" "}
           <span style={{ color: "#FFA500" }}>{refreshValue}s</span> {" "}
           <span style={{ color: "#0b5394" }}>Loop</span>{" "}
@@ -3046,7 +3046,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       const parentValue = parentInstruction?.name || "Unknown";
 
       return (
-        <span className="instruction-details">
+        <span className={styles.instructionDetails}>
           <span style={{ color: "#0b5394" }}>({instruction.parentId}){parentValue}</span>:
           <span style={{ color: "#FFA500" }}>{right}</span>
         </span>
@@ -3056,7 +3056,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     // Handle operation for other actions (E - Excel Write)
     if (instruction.actions === "E" && instruction.operation) {
       return (
-        <span className="instruction-details">
+        <span className={styles.instructionDetails}>
           <span style={{ color: "#FFA500" }}>({instruction.variableId}){instruction.operation}</span>
         </span>
       );
@@ -3064,11 +3064,11 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
 
     // Render the action if it is valid but has no operation
     if (validActions.includes(instruction.actions)) {
-      return <span className="instruction-details">{instruction.actions}</span>;
+      return <span className={styles.instructionDetails}>{instruction.actions}</span>;
     }
 
     // Return a blank span with a non-breaking space to maintain alignment
-    return <span className="instruction-details">&nbsp;</span>;
+    return <span className={styles.instructionDetails}>&nbsp;</span>;
   };
 
   const renderHighlighted = (text: string, query: string) => {
@@ -3088,7 +3088,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     return (
       <>
         {before}
-        <mark className="find-highlight">{match}</mark>
+        <mark className={styles.findHighlight}>{match}</mark>
         {after}
       </>
     );
@@ -3101,7 +3101,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     // If path is "No Excel Export File", render only the path
     if (path.includes("No Excel Export")) {
       return (
-        <span className="instruction-details">
+        <span className={styles.instructionDetails}>
           <span style={{ color: "#FFA500" }}>No Excel Export File</span>
         </span>
       );
@@ -3120,7 +3120,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     }
 
     return (
-      <span className="instruction-details">
+      <span className={styles.instructionDetails}>
         <span style={{ color: "#FFA500" }}>{path}</span>{'  '}
         <span style={{ color: "#FFA500" }}>({delimiterName})</span>
       </span>
@@ -3128,7 +3128,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
   };
 
   return (
-    <div className="grid-container">
+    <div className={styles.gridContainer}>
       {alertMessageBody && alertMessageBody.length > 0 && (
         <AlertModal
           header={alertMessageHeader || ''}
@@ -3142,33 +3142,33 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
         />
       )}
 
-      <div className="grid-find-row">
-        <span className="grid-find-label">Find:</span>
+      <div className={styles.gridFindRow}>
+        <span className={styles.gridFindLabel}>Find:</span>
         <input
-          className="grid-find-input"
+          className={styles.gridFindInput}
           type="text"
           value={findText}
           onChange={(e) => setFindText(e.target.value)}
           placeholder="Type to find…"
         />
       </div>
-      <div className="grid-scroll">
-        <div className="grid-content">
+      <div className={styles.gridScroll}>
+        <div className={styles.gridContent}>
           <DragDropContext onDragEnd={onDragEnd} // Define the onDragEnd handler to update the state when the dragging stops
           >
             {
               Object.keys(groupedData).length === 0 ? (
                 // Render default block if groupedData is empty
-                <div className="block">
-                  <div className={`block-header color-component2`}>
-                    <span className="block-name">{botJobName}</span>
-                    <span className="block-order-number">(AR Web) No components were created yet</span>
+                <div className={styles.block}>
+                  <div className={`${styles.blockHeader} ${styles.colorComponent2}`}>
+                    <span className={styles.blockName}>{botJobName}</span>
+                    <span className={styles.blockOrderNumber}>(AR Web) No components were created yet</span>
                   </div>
-                  <div className="instructions-list">
+                  <div className={styles.instructionsList}>
                     {/* Add an empty line */}
-                    <div className="instruction-item"> </div>
-                    <div className="block">
-                      <div className="no-data-message">No data found</div>
+                    <div className={styles.instructionItem}> </div>
+                    <div className={styles.block}>
+                      <div className={styles.noDataMessage}>No data found</div>
                     </div>
                   </div>
                 </div>
@@ -3193,20 +3193,20 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                       bBlockData.instructions[0].blockOrderNumber
                   )
                   .map(([blockGroupIndex, blockData], index) => (
-                    <div key={blockGroupIndex} className="block">
+                    <div key={blockGroupIndex} className={styles.block}>
                       {/* Block header with garbage, up, and down buttons */}
-                      <div className={`block-header ${componentsData && componentsData.length > 0 ? "color-component1" : "color-component2"}`}>
+                      <div className={`${styles.blockHeader} ${componentsData && componentsData.length > 0 ? styles.colorComponent1 : styles.colorComponent2}`}>
                         {blockData.instructions[0].blockActive ? (
                           <img src={activeImage}
                             alt="Active"
-                            className="active-button"
+                            className={styles.activeButton}
                             onClick={() =>
                               handleBlockStatus(blockData.instructions[0].blockId)
                             } />
                         ) : (
                           <img src={inactiveImage}
                             alt="Inactive"
-                            className="inactive-button"
+                            className={styles.inactiveButton}
                             onClick={() =>
                               handleBlockStatus(blockData.instructions[0].blockId)
                             } />
@@ -3214,16 +3214,16 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
 
                         <img src={ArrowLeft}
                           alt="ArrowLeft"
-                          className="arrow-left-button"
+                          className={styles.arrowLeftButton}
                           onClick={() =>
                             handleComponentInjection(Number(blockData.instructions[0].blockId))}
                         />
 
-                        <span className="block-order-number">
+                        <span className={styles.blockOrderNumber}>
                           #{blockData.instructions[0].blockOrderNumber}
                         </span>
                         {editingBlockId === Number(blockGroupIndex) ? (
-                          <div className="edit-container">
+                          <div className={styles.editContainer}>
                             <input
                               type="text"
                               value={blockName}
@@ -3237,15 +3237,15 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                                 setBlockName(e.target.value);
                               }}
                               ref={blockRef} // Associate the ref with the input element
-                              className="edit-textbox"
+                              className={styles.editTextbox}
                             />
-                            {/* <span className="block-order-number">
+                            {/* <span className={styles.blockOrderNumber}>
                           (Id:   {blockData.instructions[0].blockId})
                         </span> */}
                             <img
                               src={saveImage}
                               alt="save"
-                              className="save-button"
+                              className={styles.saveButton}
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter') {
                                   handleSaveBlockName(Number(blockData.instructions[0].blockId));
@@ -3255,49 +3255,49 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                             />
                           </div>
                         ) : (
-                          <span className="block-name">
+                          <span className={styles.blockName}>
                             {renderHighlighted(blockData.blockName ?? "", findText)}
                           </span>
-                          //<span className="block-name">{blockData.blockName} (Id:   {blockData.instructions[0].blockId})</span>
+                          //<span className={styles.blockName}>{blockData.blockName} (Id:   {blockData.instructions[0].blockId})</span>
                         )}
 
-                        <span className="block-count">
+                        <span className={styles.blockCount}>
                           ({blockData.instructions.length})
                           {/* {mockData ? "-Moock Data" : ""} */}
                         </span>
                         {/* Show the export file or "No Export File" */}
-                        <span className="block-export-file">
+                        <span className={styles.blockExportFile}>
                           {renderExportFile(String(blockData.exportFile))}
                         </span>
-                        <div className="move-buttons">
+                        <div className={styles.moveButtons}>
                           {index === 0 && (
                             <img
                               src={rollBackImage}
                               alt=""
-                              className="rollback-button"
+                              className={styles.rollbackButton}
                               onClick={() => handleRollbackBlock(Number(blockData.instructions[0].blockId))}
                             />
                           )}
                           {excelGotoInstruction &&
                             blockData.instructions[0].blockOrderNumber === excelGotoInstruction.blockOrderNumber && (
-                              <div className="excel-goto-container">
+                              <div className={styles.excelGotoContainer}>
                                 <img
                                   src={excelGotoImage}
                                   alt=""
-                                  className="excelgoto-image"
+                                  className={styles.excelgotoImage}
                                   title="This block contains the Excel GOTO instruction"
                                 />
-                                <span className="excelgoto-text">Row to Return</span>
+                                <span className={styles.excelgotoText}>Row to Return</span>
                                 <img
                                   src={edit2Image}
                                   alt=""
-                                  className="edit-button"
+                                  className={styles.editButton}
                                   onClick={() => handleEditSpecialOper(Number(excelGotoInstruction.id), componentsData)}
                                 />
                                 <img
                                   src={crossImage}
                                   alt=""
-                                  className="cross-button"
+                                  className={styles.crossButton}
                                   onClick={() => handleRemoveInstruction(Number(excelGotoInstruction.id))}
                                 />
                               </div>
@@ -3305,33 +3305,33 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                           <img
                             src={upImage}
                             alt=""
-                            className="move-button"
+                            className={styles.moveButton}
                             onClick={() => handleMoveBlockUp(Number(blockData.instructions[0].blockId))}
                           />
                           <img
                             src={downImage}
                             alt=""
-                            className="move-button"
+                            className={styles.moveButton}
                             onClick={() => handleMoveBlockDown(Number(blockData.instructions[0].blockId))}
                           />
                           {/* Edit Block Name Button */}
                           <img
                             src={editImage}
                             alt="edit"
-                            className="edit-button"
+                            className={styles.editButton}
                             onClick={() => handleEditBlock(Number(blockData.instructions[0].blockId), blockData.blockName)} // Edit block logic
                           />
                           {/* Edit Block Name Button */}
                           <img
                             src={excelImage}
                             alt="excel"
-                            className="excel-button"
+                            className={styles.excelButton}
                             onClick={() => handleExcelFileBlockName(Number(blockData.instructions[0].blockId), blockData.blockName, Number(blockData.instructions[0].blockOrderNumber), blockData.exportFile)} // Edit block logic
                           />
                           <img
                             src={crossImage}
                             alt=""
-                            className="cross-button"
+                            className={styles.crossButton}
                             onClick={() => handleRemoveBlock(Number(blockData.instructions[0].blockId))}
                           />
 
@@ -3341,7 +3341,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                       <Droppable droppableId={blockGroupIndex} key={blockData.instructions[0].blockId}>
                         {(provided) => (
                           <div
-                            className="instructions-list"
+                            className={styles.instructionsList}
                             ref={provided.innerRef}
                             {...provided.droppableProps}
                           >
@@ -3365,15 +3365,15 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                                       ref={provided.innerRef}
                                       {...provided.draggableProps}
                                       {...provided.dragHandleProps}
-                                      className={`instruction-item ${openDropdown === instruction.id ? 'dropdown-open' : ''
+                                      className={`${styles.instructionItem} ${openDropdown === instruction.id ? styles.dropdownOpen : ''
                                         } ${instruction.actions === 'IF' || instruction.actions === 'ELSEIF' || instruction.actions === 'ELSE' || instruction.actions === 'ENDIF'
-                                          ? 'light-yellow-background'
+                                          ? styles.lightYellowBackground
                                           : ''
                                         }`}
                                     // data-executing={instruction.id === executionId}
                                     >
                                       {editingInstructionId === instruction.id ? (
-                                        <div className="edit-container">
+                                        <div className={styles.editContainer}>
                                           <input
                                             type="text"
                                             value={instructionName}
@@ -3387,31 +3387,31 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                                               setInstructionName(e.target.value);
                                             }}
                                             ref={instructionRef} // Associate the ref with the input element
-                                            className="edit-textbox"
+                                            className={styles.editTextbox}
                                           />
                                           <img
                                             src={saveImage}
                                             alt="save"
-                                            className="save-button"
+                                            className={styles.saveButton}
                                             onClick={() =>
                                               handleSaveInstruction(instruction.id)
                                             } // Save instruction logic
                                           />
                                         </div>
                                       ) : (
-                                        <span className="instruction-line">
+                                        <span className={styles.instructionLine}>
                                           {/* <span>({instruction.id})</span> */}
                                           {instruction.instructionActive ? (
                                             <img src={activeImage}
                                               alt="Active"
-                                              className="active-button"
+                                              className={styles.activeButton}
                                               onClick={() =>
                                                 handleInstructionStatus(instruction.id, blockData.instructions)
                                               } />
                                           ) : (
                                             <img src={inactiveImage}
                                               alt="Inactive"
-                                              className="inactive-button"
+                                              className={styles.inactiveButton}
                                               onClick={() =>
                                                 handleInstructionStatus(instruction.id, blockData.instructions)
                                               } />
@@ -3421,14 +3421,14 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                                             <img
                                               src={refreshLoopImage}
                                               alt="refresh"
-                                              className="refresh-image"
+                                              className={styles.refreshImage}
                                             />
                                           )}
                                           {instruction.loopOnly && (
                                             <img
                                               src={refreshOnlyImage}
                                               alt="refresh"
-                                              className="refresh-image"
+                                              className={styles.refreshImage}
                                             />
                                           )}
 
@@ -3437,11 +3437,11 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
 
                                       )}
                                       {renderOperations(instruction, componentsData)}
-                                      <div className="options-column">
+                                      <div className={styles.optionsColumn}>
                                         {renderDeviceOptionsRow(
                                           instruction
                                         )}
-                                        <div className="move-buttons">
+                                        <div className={styles.moveButtons}>
                                           {renderEditButton(
                                             instruction.actions,
                                             editImage,
@@ -3452,7 +3452,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                                           <img
                                             src={crossImage}
                                             alt=""
-                                            className="cross-button"
+                                            className={styles.crossButton}
                                             onClick={() =>
                                               handleRemoveInstruction(instruction.id)
                                             }
@@ -3460,10 +3460,10 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                                         </div>
                                       </div>
                                       {/* New column for dropdown menu */}
-                                      <div className="dropdown-column">
+                                      <div className={styles.dropdownColumn}>
                                         <img
                                           src={menuDownImage}
-                                          className="dropdown-arrow"
+                                          className={styles.dropdownArrow}
                                           alt=""
                                           onClick={() =>
                                             handleToggleDropdown(instruction.id)
@@ -3474,8 +3474,8 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                                           <div
                                             id={`dropdown-${instruction.id}`} // Use unique ID for each dropdown
                                             ref={dropdownRef}
-                                            className={`dropdown-menu ${dropdownPosition === 'above'
-                                              ? 'dropdown-above'
+                                            className={`${styles.dropdownMenu} ${dropdownPosition === 'above'
+                                              ? styles.dropdownAbove
                                               : ''
                                               }`}
                                           >
