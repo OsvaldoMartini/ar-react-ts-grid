@@ -18,7 +18,7 @@ import inactiveImage from '../assets/inactive2.png';
 import AlertModal from './AlertModal';
 import { useWebSocket } from './useWebSocket';
 import AttributeDropdown from './AttributeDropdown';
-import './griditem.scss';
+import './Griditem.module.scss';
 import NameDropdown from './NameDropdown';
 
 interface GridItemScannMobileProps {

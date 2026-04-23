@@ -18,7 +18,7 @@ import DomReviewModal, { type DomReviewData, type DomReviewAction } from './DomR
 import SupportRequestModal, { type SupportRequestData, type SupportRequestAction } from './SupportRequestModal';
 import { useWebSocket } from './useWebSocket';
 import AttributeDropdown from './AttributeDropdown';
-import './griditem.scss';
+import './gridItemScann.scss';
 import NameDropdown from './NameDropdown';
 
 interface GridItemScannProps {
@@ -1134,11 +1134,11 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
                       ) : (
                         <span className="instruction-line">{getInstructionElement(elementDTO)}</span>)}
                       {showAttributes ? (
-                        <div>
+                        <div className="attr-slot">
                           <AttributeDropdown dataArray={elementDTO.attributeData} onChange={handleAttributeChange} />
                         </div>
                       ) : (
-                        <span>{"\u00A0".repeat(20)}</span>
+                        <span className="attr-slot">{"\u00A0".repeat(20)}</span>
                       )}
                       <div className="options-column">
                         <CompForce item={elementDTO} onChange={handleElementForceChange} />

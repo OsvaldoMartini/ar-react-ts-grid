@@ -1,0 +1,1318 @@
+// Scoped stylesheet for GridItemScann only. The content is a copy of
+// griditem.scss with one intentional difference: .instruction-item uses a
+// 5-column grid (26px 240px auto minmax(60px, 1fr) auto) to reserve the first
+// 26px for the per-row "Keep" checkbox. Also includes the .keep-checkbox rule.
+// GridItem / GridItemComp / GridDrag2 / GridItemScannMobile still use the
+// shared 4-column griditem.scss — unchanged.
+
+/* Grid Container */
+.grid-container {
+  padding: 0 12px 0 2px; /* Decreased padding */
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px; /* Decreased gap */
+  // height: 100vh;          /* NEW: take full viewport height */
+   height: 100%;      // use container height, not viewport
+  min-height: 0;     // important
+  box-sizing: border-box; /* make padding play nice with height */
+}
+
+/* Fixed Find row (matches existing toolbar/button design) */
+.grid-find-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  margin-top: 4px;
+  margin-bottom: 2px;
+  padding-bottom: 4px;
+
+  width: 100%;
+  /* remove these: position: sticky; top: 0; z-index */
+  background: #fff;
+}
+
+.grid-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;   // ✅ scroll happens here
+}
+
+.grid-find-label {
+  font-size: 12px;
+  font-weight: bold;
+  color: #0b5394;
+  white-space: nowrap;
+}
+
+.block-collapse-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0 6px 0 4px;
+  padding: 0;
+  flex-shrink: 0;
+  border-radius: 0.5rem;
+  background: #ffedd5;
+  color: #f59e0b;
+  border: 1.5px solid #fdba74;
+  cursor: pointer;
+  line-height: 0;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: #fed7aa;
+    border-color: #f59e0b;
+  }
+
+  svg {
+    display: block;
+    flex-shrink: 0;
+  }
+}
+
+.grid-find-input {
+  @extend .toolbar-input;
+  flex: 1;          // ✅ takes all remaining free space
+  min-width: 0;     // ✅ prevents flex overflow issues
+}
+
+
+/* NEW: scrollable area for the grid/list */
+.grid-content {
+  flex: 1;
+  overflow-y: auto;   /* only this part scrolls */
+  padding-top: 4px;   /* small spacing below toolbar */
+}
+
+.find-highlight {
+  padding: 0;              /* ✅ no extra spacing inside words */
+  margin: 0;
+  border-radius: 2px;
+
+  background: transparent; /* ✅ avoid background box that needs padding */
+  box-shadow: inset 0 1.45em 0 #fff2a8; /* ✅ highlight behind text */
+
+  display: inline;
+  line-height: inherit;
+}
+
+.instruction-name {
+  margin-left: 6px;
+}
+
+/* Block Styling */
+.block {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px; /* Decreased gap */
+}
+
+/* Block Header */
+.block-header {
+  display: flex;
+  align-items: center;
+  gap: 8px; /* Decreased gap */
+  padding: 8px; /* Reduced padding */
+  background-color: #0b5394; /* Dark blue background */
+  color: white; /* White text */
+  font-size: 1em; /* Decreased font size */
+  font-weight: bold; /* Bold text */
+  border-radius: 8px; /* Smaller rounded corners */
+  margin: 0;
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.4); /* Slightly smaller shadow */
+  height: 20px; /* Set a fixed height */
+  justify-content: space-between;
+
+  &.color-component1 {
+    background-color: #c3d3d9   !important;
+    color: #0b5394; 
+  }
+
+  &.color-component2 {
+    background-color: #add8e6   !important;
+    color: #0b5394; 
+  }
+  
+}
+
+.block-header-left {
+  display: flex;
+  align-items: center;
+  gap: 5px; /* Adjust gap as needed */
+}
+
+
+/* Block Name Span */
+.block-header .block-name  {
+  font-size: 14px; // Decrease font size
+  width: 200px; /* Set width of block name to 100px */
+  white-space: nowrap; /* Prevent text wrapping */
+  overflow: hidden; /* Hide overflow */
+  text-overflow: ellipsis; /* Add ellipsis if text is too long */
+}
+
+/* Block Name Span */
+.block-header .block-count {
+  width: 50px; /* Set width of block name to 100px */
+  white-space: nowrap; /* Prevent text wrapping */
+  overflow: hidden; /* Hide overflow */
+  text-overflow: ellipsis; /* Add ellipsis if text is too long */
+}
+
+.block-order-number{
+  font-size: 14px; // Decrease font size
+  // width: 200px; /* Set width of block name to 100px */
+  white-space: nowrap; /* Prevent text wrapping */
+  overflow: hidden; /* Hide overflow */
+  text-overflow: ellipsis; /* Add ellipsis if text is too long */
+}
+
+/* Move Buttons Container */
+.block-header .move-buttons {
+  margin-left: auto;
+  display: flex;
+  gap: 4px; /* Smaller gap between buttons */
+}
+
+
+/* Button Styling */
+.move-button,
+.rollback-button,
+.garbage-button,
+.edit-button,
+.excel-button,
+.cross-button,
+.save-button,
+.pick-button,
+.warning-button,
+.test-button,
+.active-button,
+.inactive-button,
+.arrow-left-button,
+.brick-button {
+  width: 15px; /* Decreased button size */
+  height: 15px;
+  background-color: transparent;
+  padding: 0;
+  cursor: pointer;
+  transition: transform 0.3s ease; /* Smooth scaling on hover */
+
+  &:hover {
+    transform: scale(1.4); /* Slightly increase size on hover */
+  }
+  
+}
+
+.options-row {
+  display: flex;
+  flex-direction: row;
+  gap: 12px; // ← horizontal spacing between toggles (adjust 8px / 12px / 16px)
+  align-items: center;
+}
+
+// NOTE: the compact inline variant that used to live here (.options-row--inline)
+// is now a self-contained component — see CompForce.tsx + CompForce.module.scss.
+// GridItem / GridItemComp / GridItemScann all render CompForce inside their
+// .options-column instead of using this variant. Kept the base .options-row
+// rules above for any remaining non-inline usage.
+
+.options-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+
+  box-sizing: border-box;
+  border: 1px solid transparent;   // <-- reserve space always
+
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  white-space: nowrap; 
+}
+
+/* ACTIVE */
+.options-toggle.active {
+  background: #e6f4ea;
+  border-color: transparent;        // (optional, but explicit)
+}
+
+.options-toggle.active .options-toggle-label {
+  color: #0f9d58;
+}
+
+/* INACTIVE */
+.options-toggle.inactive {
+  background: transparent;
+  border-color: #e0e0e0;            // <-- instead of adding/removing border
+}
+
+.options-toggle.inactive .options-toggle-label {
+  color: #d93025;
+}
+
+.options-toggle-icon {
+  width: 14px;
+  height: 14px;
+  display: block;
+  flex: 0 0 14px;
+}
+
+
+// .active-button{
+//   width: 20px;
+//   height: 20px;
+// }
+
+.edit-container {
+  display: inline-flex;  /* Make input and image inline */
+  align-items: center;   /* Vertically center the items */
+  gap: 5px;              /* Add space between the text box and save button */
+}
+
+.edit-textbox {
+  flex: 1; /* Make the input take the available space */
+  width: 10%;
+}
+
+.socket-port {
+  font-size: 7px;
+  display: inline-block;
+  color: white;
+  padding: 5px 12px 0px 0px;
+  vertical-align: text-top;
+}
+
+
+.garbage-button {
+  margin-right: 2px; /* Reduced space from the up button */
+}
+
+.edit-button,
+.excel-button {
+  margin-left: 2px; /* Reduced margins */
+}
+
+/* Individual Button Padding */
+.edit-button {
+  padding: 0 0 0 6px;
+}
+
+/* Individual Button Padding */
+.excel-button {
+  padding: 0 6px 0 0;
+}
+
+.save-button {
+  padding: 0 2px 0 6px;
+}
+
+.pick-button{
+  padding: 0 2px 0 6px;
+}
+
+.warning-button{
+  padding: 0 2px 0 6px;
+}
+
+.test-button {
+  padding: 0 2px 0 6px;
+}
+
+.cross-button {
+  padding: 0 2px 0 6px;
+}
+
+/* Operations Button */
+.operations {
+  width: 20px;
+  height: 17px;
+  background-color: transparent;
+  margin-left: 2px;
+  padding: 0;
+  cursor: pointer;
+  pointer-events: none; 
+}
+
+/* New class for waitImage with same styles but different height */
+.wait-image {
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
+
+.input-image {
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
+
+.output-image {
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
+
+.click-image {
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
+
+.close-image {
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
+
+.screen-image {
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
+
+.link-image{
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
+
+.ifelse-image {
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
+
+.instruction-line {
+  display: inline-flex; /* Ensures the elements inside are in a single line */
+  align-items: center; /* Vertically aligns text and image */
+}
+
+.refresh-image {
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
+
+.hidden-image {
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
+
+.else-image {
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
+
+.endif-image {
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
+
+
+.pause-image {
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
+
+.goto-image {
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
+
+// .excelgoto-image {
+//   @extend .operations; /* Inherit styles from .operations */
+//   height: 20px; /* Override height */
+//   width: 30px; /* Override height */
+// }
+
+.excel-goto-container {
+  @extend .move-buttons; /* Inherit styles from .move-buttons */
+  background-color: transparent; /* Transparent background */
+  background-color: #c3d3d9; /* Light gray background */
+  // padding: 10px;
+  border-radius: 5px;
+  display: flex; /* Use flexbox for layout */
+  align-items: center; /* Vertically center items */
+  // margin-bottom: 10px; /* Add some space below the container */
+
+
+  /* Add transition for smooth effect */
+  transition: background-color 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+  cursor: pointer; /* Indicates it's interactive */
+}
+
+.excel-goto-container:hover {
+  background-color: #a7bed3;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); 
+}
+
+.excelgoto-image {
+  height: 16px;
+  width: 16px;
+  margin-right: 5px; 
+}
+
+.excelgoto-text {
+  font-size: 0.8em; 
+  margin-right: 5px;
+  color: #b163ff;
+  white-space: nowrap; 
+}
+
+.cross-image {
+  height: 16px;
+  width: 16px;
+}
+
+
+/* Instructions List */
+.instructions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px; /* Decreased gap */
+}
+
+// Per-row "Keep this element" checkbox (GridItemScann only). Lives in the
+// first 26px column of .instruction-item. Clicking it toggles membership in
+// keepSelectedIds; the header's "Delete Unchecked (N)" button prunes every
+// element whose id is NOT in the set.
+.keep-checkbox {
+  justify-self: center;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+/* Instruction Item */
+.instruction-item {
+  display: grid;
+  // grid-template-columns: 250px auto minmax(120px, 1fr) auto;
+  // First 26px column holds the Keep checkbox in GridItemScann; panes that
+  // don't render a checkbox just get a small empty gutter.
+  grid-template-columns: 26px 240px auto minmax(60px, 1fr) auto;
+  // gap: 8px; /* Decreased gap */
+  // padding: 8px; /* Decreased padding */
+  background-color: #e0f7fa;
+  box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1); /* Reduced shadow size */
+  border-radius: 6px; /* Smaller border-radius */
+  border: 1px solid #ddd;
+  align-items: center; /* Center content vertically */
+  
+  position: relative; // Required for background positioning
+  z-index: 1;
+
+  &:hover {
+    background-color: #b2ebf2; /* Slightly darker for hover effect */
+    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2); /* Stronger shadow on hover */
+  }
+
+  .execution-background {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    border-radius: 6px;
+    pointer-events: none;
+    animation: pulseBg 2s infinite;
+  }
+
+  // Color variants
+  .execution-background.green {
+    background-color: #4caf50;
+    box-shadow: 0 0 10px #4caf50;
+  }
+
+  .execution-background.red {
+    background-color: #f44336;
+    box-shadow: 0 0 10px #f44336;
+  }
+
+  .execution-background.yellow {
+    background-color: #ffeb3b;
+    box-shadow: 0 0 10px #ffeb3b;
+  }
+    // Everything else above background
+    > *:not(.execution-background) {
+      position: relative;
+      z-index: 100;
+    }
+
+}
+
+/* Change background to white when dropdown is open */
+.instruction-item.dropdown-open {
+  background-color: #9ee6ef; /* Change background to white */
+  position: relative;
+  z-index: 999;
+}
+
+/* Margin for the first span element with instruction type */
+.instruction-item span:first-child {
+  margin-left: 3px; /* Add left margin of 3px */
+}
+
+/* Options column styling */
+.instruction-item .options-column {
+  display: flex;
+  justify-content: flex-end; /* Align content to the right */
+  margin-right: 8px; /* Add right margin of 3px */
+    white-space: nowrap; 
+}
+
+
+
+/* Instruction Item Span */
+.instruction-item span {
+  font-size: 0.85em; /* Smaller font size for span text */
+}
+
+/* For instruction-type: uses flex */
+.instruction-type {
+  display: flex;
+  align-items: center; /* Align content vertically */
+  gap: 3px; /* Add a 3px gap between elements */
+}
+
+.instruction-type span {
+  font-weight: bold; /* Make the text bold */
+}
+
+.instruction-details {
+  font-weight: bold; /* Make the text bold */
+  margin-right: 3px; /* Add a 3px gap after the span */
+  display: inline-block; /* Ensure the span behaves as a block but allows space for the next element */
+}
+
+.toolbar-main-button {
+  background-color: #c3d3d9 !important;
+  color: #0b5394;
+  border: none;
+  padding: 5px 13px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+  font-size: 11px;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.attributes-button {
+  @extend .toolbar-main-button;
+}
+
+.send-all-button {
+  @extend .toolbar-main-button;
+}
+
+.update-all-button {
+  @extend .toolbar-main-button;
+}
+
+.attributes-button:hover,
+.send-all-button:hover,
+.update-all-button:hover {
+  background-color: #a9bec7 !important;
+  transform: scale(1.05);
+}
+
+.send-all-button.sending,
+.update-all-button.updating,
+.attributes-button.sending {
+  background-color: #4caf50 !important;
+  color: #0b5394 !important;
+  animation: pulseBg 2s infinite;
+  box-shadow: 0 0 10px #4caf50;
+}
+
+.send-all-button:disabled,
+.update-all-button:disabled,
+.attributes-button:disabled {
+  background-color: #cccccc;
+  color: #7a7a7a;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* === Toolbar above all sections === */
+.controls-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: #fff;
+
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 6px;
+
+  margin-top: 4px;
+  margin-bottom: 2px;
+  font-size: 12px;
+  border-bottom: 1px solid #c0c0c0;
+  padding-bottom: 4px;
+  width: 100%;
+}
+
+/* ===== NEW: two-row toolbar layout (used by toolbar-row wrappers) ===== */
+.toolbar-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  flex-wrap: nowrap;
+}
+
+.toolbar-row-top {
+  justify-content: flex-start;
+}
+
+.toolbar-row-bottom {
+  justify-content: space-between; /* left group on left, right group on right */
+}
+
+.toolbar-left,
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.toolbar-right {
+  margin-left: auto; /* keeps right cluster aligned right */
+}
+
+
+/* === Buttons inside top toolbar === */
+.buttons-toolbar {
+  // width: 110px;
+  background-color: #c3d3d9 !important;
+  color: #0b5394;
+  border: none;
+  padding: 5px 12px; /* slightly wider button */
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+  font-size: 11px;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.buttons-toolbar:hover {
+  background-color: #a9bec7 !important;
+  transform: scale(1.05);
+}
+
+/* When isSending = true */
+.buttons-toolbar.sending {
+  background-color: #4caf50 !important; /* yellow */
+  color: #0b5394 !important; /* dark blue text */
+  animation: pulseBg 2s infinite;
+  box-shadow: 0 0 10px #4caf50;
+}
+
+/* Disabled state for toolbar buttons */
+.buttons-toolbar:disabled {
+  background-color: #cccccc;
+  color: #7a7a7a;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+  opacity: 0.7;
+}
+
+
+/* Insert All Elements row directly after toolbar */
+.controls-toolbar + .controls-row {
+  margin-top: -2px;
+}
+
+/* No-data header block directly after toolbar */
+.controls-toolbar + .block {
+  margin-top: -2px;
+}
+
+/* === Toolbar text fields === */
+.toolbar-input {
+  width: 250px;
+  padding: 6px 10px;
+  border: 1px solid #c0c0c0;
+  border-radius: 5px;
+  font-size: 12px;
+  color: #0b5394;
+  background-color: #f5f8fa;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+/* Add subtle extra space after input fields */
+.toolbar-input + .buttons-toolbar {
+  margin-left: 1px;
+}
+
+.toolbar-input:focus {
+  border-color: #0b5394;
+}
+
+/* vertical separator in the toolbar */
+.toolbar-separator {
+  width: 1px;
+  height: 24px;              /* matches your 12px font & button height nicely */
+  background-color: #c0c0c0; /* same tone as your border */
+  display: inline-block;
+  margin: 0 3px;
+}
+
+.toolbar-select {
+  width: 130px;          /* narrower */
+  padding: 3px 6px;      /* minimal height */
+  border: 1px solid #c0c0c0;
+  border-radius: 4px;
+  font-size: 11px;       /* slightly smaller font */
+  color: #0b5394;
+  background-color: #f5f8fa;
+  cursor: pointer;
+  white-space: nowrap;
+
+  &:focus {
+    border-color: #0b5394;
+  }
+}
+
+
+/* disabled look for the newBotJobName input when preset is not "Create New Bot jOb" */
+.toolbar-input:disabled {
+  background-color: #eeeeee;
+  color: #7a7a7a;
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+.toolbar-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.toolbar-refresh-btn {
+  padding: 4px 7px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: #f9f9f9;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.toolbar-refresh-btn:hover {
+  background: #eef;
+}
+
+/* Custom widths for new input fields */
+.input-app-name {
+  width: 80px !important;
+}
+
+.select-package-name {
+  width: 150px !important;
+}
+
+.input-package-name {
+  width: 150px !important;
+}
+
+.selected-attribute {
+  margin-top: 10px;
+  font-weight: bold;
+  padding: 5px;
+  background-color: #b163ff;
+  border-radius: 5px;
+  color: white;
+}
+
+.light-yellow-background {
+  background-color: #ffffe0; /* Light yellow color */
+}
+
+
+/* Horizontal group for Scanner + Scanner AI + Scrolling select */
+.scanner-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 4px;
+  border-radius: 6px;
+  background-color: #e0f7fa;      /* Light cyan */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  border: 1px solid #c2e9ef;      /* subtle border */
+  transition: background-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+/* Optional hover effect */
+.scanner-group:hover {
+  background-color: #b2ebf2;      /* Slightly darker cyan */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12);
+}
+
+/* Scanner type dropdown – styled like main toolbar buttons */
+.scanner-type-select {
+  @extend .buttons-toolbar;      /* reuse your button sizing & base style */
+  padding-right: 28px;           /* space for the dropdown arrow */
+  text-align: left;
+  appearance: none;              /* remove native select look */
+  background-color: #ffffff;
+  color: #0b5394;
+  font-weight: bold;
+
+  /* custom arrow */
+  background-image: url("data:image/svg+xml;utf8,<svg fill='gray' height='20' width='20' xmlns='http://www.w3.org/2000/svg'><path d='M6 8l4 4 4-4z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 12px;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+
+/* Thin vertical separator between items */
+.group-divider {
+  width: 1px;
+  height: 16px;
+  background-color: #8fcbd4;     /* darker cyan line */
+  margin: 0 3px;
+  display: inline-block;
+}
+
+/* Scrolling selector container */
+.scroll-select-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.scroll-label {
+  font-size: 11px;
+  font-weight: bold;
+  color: #0b5394;
+  white-space: nowrap;
+   margin-right: 2px;          /* very tight */
+}
+
+.scroll-select {
+  @extend .toolbar-select;
+  width: 90px;
+   padding: 3px 6px;           /* ↓ reduced height */
+  font-weight: bold;
+  color: #0b5394;
+}
+
+/* ===== Scroll buttons (toolbar) ===== */
+
+.scroll-buttons-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.scroll-buttons {
+  display: flex;
+  flex-direction: center;
+  gap: 2px;
+}
+
+.scroll-buttons.inline {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.scroll-btn {
+ width: 26px;          /* same visual footprint as ↻ */
+  height: 22px;
+  padding: 0;
+  font-size: 11px;
+  // font-weight: bold;
+   font-weight: 700;
+  line-height: 1;
+  border-radius: 4px;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+/* UP */
+.scroll-btn.scroll-up {
+  background: linear-gradient(180deg, #4caf50, #2e7d32);
+  color: #ffffff;
+}
+
+/* DOWN */
+.scroll-btn.scroll-down {
+  background: linear-gradient(180deg, #ff9800, #ef6c00);
+  color: #ffffff;
+}
+
+/* Hover / Active */
+.scroll-btn:hover {
+  filter: brightness(1.15);
+}
+
+.scroll-btn:active {
+  transform: translateY(1px);
+}
+
+/* Disabled state (inherits toolbar behavior) */
+.scroll-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.nav-buttons {
+  margin-bottom: 2px;
+}
+
+.nav-btn {
+  width: 28px;          // smaller hitbox
+  height: 24px;
+  padding: 0;
+  line-height: 1;
+  font-size: 13px;      // ↓ smaller font
+  font-weight: 800;     // ↑ bold
+  text-align: center;
+}
+
+.nav-btn.back {
+  font-size: 13px;
+  font-weight: 900;     // strongest for arrow
+}
+
+.nav-btn.home {
+  font-size: 14px;      // circle needs a touch more size
+  font-weight: 900;
+}
+
+.nav-btn.recents {
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: -1px; // tighter "≡"
+}
+
+ .nav-btn.next-done {
+    // minimal, optional overrides
+    font-weight: 600;
+  }
+
+.nav-btn.close-all {
+  color: #d32f2f;
+  font-weight: bold;
+
+  &:hover {
+    background-color: rgba(211, 47, 47, 0.15);
+  }
+}
+
+/* Dropdown arrow styling */
+.dropdown-column {
+  position: relative;
+  margin-right: 8px;
+}
+
+.dropdown-arrow {
+  cursor: pointer;
+  width: 15px;
+  height: 15px;
+  transition: transform 0.3s ease; /* Smooth scaling on hover */
+
+  &:hover {
+    transform: scale(1.4); /* Slightly increase size on hover */
+  }
+}
+
+/* Dropdown menu styling */
+.dropdown-menu {
+  position: absolute;
+  z-index: 999;
+  top: 25px; /* Default: Adjust based on layout */
+  right: 0;
+  background-color: #e0f7fa;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+  padding: 4px 0;
+  font-size: 0.85em;
+ 
+  width: 150px;
+}
+
+.dropdown-above {
+  top: auto;    /* Reset top */
+  bottom: 25px; /* Position the dropdown above the clicked element */
+}
+
+
+
+/* Individual menu items */
+.dropdown-menu div {
+  padding: 8px 12px;
+  cursor: pointer;
+  white-space: nowrap; /* Ensure the text stays on a single line */
+}
+
+/* Hover effect for menu items */
+.dropdown-menu div:hover {
+  background-color: #b2ebf2; /* Light blue background on hover */
+  color: #00796b; /* Darker text color on hover */
+}
+
+
+.block-export-file {
+  font-size: 12px; // Decrease font size
+  color: #888;
+  margin-left: 10px;
+  font-style: italic;
+  white-space: nowrap; // Prevent text from wrapping
+  overflow: hidden;
+  text-overflow: ellipsis; // Add "..." if the text is too long
+}
+
+
+.w3-card {
+  display: inline-block;
+  background-color: white;
+  border: 2px solid black;
+  min-width: 200px;
+  width: 35%;
+  height: 80%;
+}
+
+.w3-gray {
+  text-align: center;
+}
+
+.controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 15px;
+  margin-top: -2px;
+  font-size: 12px;
+}
+
+/* Keep the controls row visible while .grid-scroll scrolls */
+.fixed-controls-row {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: #fff; /* use your page bg */
+}
+
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  font-size: 12px;
+  width: 100px;
+  white-space: nowrap;
+}
+
+.pagination-controls label {
+  font-weight: bold;
+  color: #333;
+}
+
+.pagination-controls select {
+  padding: 8px 12px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+  font-size: 12px;
+  background-color: white;
+  cursor: pointer;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  width: 80px;
+}
+
+.pagination-controls select:hover {
+  border-color: #007bff;
+}
+
+.pagination-controls select:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+}
+
+.pagination-controls button {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.pagination-controls button:hover {
+  background-color: #0056b3;
+  transform: scale(1.05);
+}
+
+.pagination-controls button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.pagination-controls span {
+  font-weight: bold;
+  color: #555;
+}
+
+.bottom-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  font-size: 12px;
+}
+
+.bottom-pagination-controls span {
+  white-space: nowrap; /* Prevent line breaks */
+}
+
+.no-data-message {
+  font-size: 16px;
+  color: #888;
+  text-align: center;
+  margin-top: 20px;
+}
+
+.toggle-section {
+  margin-bottom: 20px;
+}
+
+.toggle-button {
+  padding: 5px 10px;
+  cursor: pointer;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+}
+
+@keyframes pulseBg {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* ===== Validate selector (toolbar-aligned) ===== */
+
+.validate-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Label: "Validate:" */
+.validate-inline .toolbar-label {
+  font-size: 11px;
+  font-weight: bold;
+  color: #0b5394;
+  white-space: nowrap;
+  margin-right: 2px; /* very tight */
+}
+
+/* Dropdown wrapper */
+.validate-dropdown {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Trigger button (same footprint as toolbar buttons) */
+.validate-trigger {
+  width: auto;
+  min-width: 70px;
+  height: 22px;
+  padding: 3px 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #0b5394;
+  line-height: 1;
+  border-radius: 4px;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+/* Disabled state */
+.validate-trigger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Dropdown panel */
+.validate-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 60;
+
+  min-width: 300px;
+  padding: 6px;
+
+  background: #ffffff;
+  border: 1px solid rgba(11, 83, 148, 0.25);
+  border-radius: 6px;
+
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+}
+
+/* Single checkbox row */
+.validate-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+
+  padding: 4px 4px;
+  cursor: pointer;
+
+  font-size: 11px;
+  font-weight: 700;
+  color: #0b5394;
+}
+
+/* Checkbox alignment */
+.validate-item input[type="checkbox"] {
+  margin-top: 2px;
+}
+
+/* Text container */
+.validate-item-text {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* Field value */
+.validate-item-value {
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+/* Confidence */
+.validate-item-conf {
+  font-weight: 700;
+  opacity: 0.65;
+}
+
+
+// .instruction-item[data-executing='true'] {
+//   background-color: var(--execution-state-color); // optional if using a CSS var
+//   // animation: pulseBg 2s infinite;
+//   box-shadow: 0 0 10px var(--execution-state-color);
+//   z-index: 0; // or -1 if needed
+//   position: relative; // required for z-index to work
+// }
+
