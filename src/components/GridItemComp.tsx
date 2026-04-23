@@ -2501,7 +2501,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     let imageSrc: string | null = null;
     let text: string | null = null;
     let isActionBold = false;
-    let imageClass = "operations"; // Default class for images
+    let imageClass : string = styles.operations; // Default class for images
     let hiddenField: boolean = false;
 
 
@@ -2510,7 +2510,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       const actionParts: string[] = instruction.actions.split(":");
       imageSrc = inputImage;
       text = `(${instruction.id})${instruction.name}`;
-      imageClass = "input-image";
+      imageClass = styles.inputImage;
 
       // Check if the third part is 'hidden'
       if (actionParts.length === 3 && actionParts[2] === "hidden") {
@@ -2519,11 +2519,11 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     } else if (instruction.tagName == "a") {
       imageSrc = linkImage;
       text = `(${instruction.id})${instruction.name}`;
-      imageClass = "link-image";
+      imageClass = styles.linkImage;
     } else if (instruction.actions.startsWith("O:")) {
       imageSrc = outPutImage;
       text = `(${instruction.id})${instruction.name}`;
-      imageClass = "output-image";
+      imageClass = styles.outputImage;
     } else {
       switch (instruction.actions) {
         case "SET":
@@ -2541,12 +2541,12 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
         case "CSV CHECK":
           imageSrc = excelGotoImage;
           text = instruction.name;
-          // imageClass = "excelgoto-image";
+          // imageClass = styles.excelgotoImage;
           break;
         case "PDF CHECK":
           imageSrc = excelGotoImage;
           text = instruction.name;
-          // imageClass = "excelgoto-image";
+          // imageClass = styles.excelgotoImage;
           break;
         case "E":
           imageSrc = excelImage;
@@ -2555,77 +2555,77 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
         case "P":
           imageSrc = screenImage;
           text = instruction.name;
-          imageClass = "screen-image";
+          imageClass = styles.screenImage;
           break;
         case "Q":
           imageSrc = closeBrowserImage;
           text = instruction.name;
-          imageClass = "close-image";
+          imageClass = styles.closeImage;
           break;
         case "C":
           imageSrc = clickImage;
           text = `(${instruction.id})${instruction.name}`;
-          imageClass = "click-image";
+          imageClass = styles.clickImage;
           break;
         case "H":
           imageSrc = waitImage;
           text = instruction.name;
-          imageClass = "wait-image";
+          imageClass = styles.waitImage;
           break;
         case "IF":
           imageSrc = ifElseImage;
           text = instruction.name;
-          imageClass = "ifelse-image";
+          imageClass = styles.ifelseImage;
           break;
         case "REFRESH":
           imageSrc = refreshOnlyImage;
           text = instruction.name;
-          imageClass = "refresh-image";
+          imageClass = styles.refreshImage;
           break;
         case "LOOP":
           imageSrc = refreshOnlyImage;
           text = instruction.name;
-          imageClass = "refresh-image";
+          imageClass = styles.refreshImage;
           break;
         case "REFRESH_LOOP":
           imageSrc = refreshLoopImage;
           text = instruction.name;
-          imageClass = "refresh-image";
+          imageClass = styles.refreshImage;
           break;
         case "GOTO":
           imageSrc = gotoImage;
           text = instruction.name;
-          imageClass = "goto-image";
+          imageClass = styles.gotoImage;
           break;
         case "EXCEL GOTO":
           imageSrc = excelGotoImage;
           text = instruction.name;
-          // imageClass = "excelgoto-image";
+          // imageClass = styles.excelgotoImage;
           break;
         case "NEXT ROW":
           imageSrc = nextRowImage;
           text = "Excel Data Next Row"; //instruction.name;
-          // imageClass = "excelgoto-image";
+          // imageClass = styles.excelgotoImage;
           break;
         case "ELSEIF":
           imageSrc = ifElseImage;
           text = instruction.name;
-          imageClass = "ifelse-image";
+          imageClass = styles.ifelseImage;
           break;
         case "ELSE":
           imageSrc = elseImage;
           text = instruction.name;
-          imageClass = "else-image";
+          imageClass = styles.elseImage;
           break;
         case "ENDIF":
           imageSrc = endIfImage;
           text = instruction.name;
-          imageClass = "endif-image";
+          imageClass = styles.endifImage;
           break;
         case "PAUSE":
           imageSrc = pauseImage;
           text = instruction.name;
-          imageClass = "pause-image";
+          imageClass = styles.pauseImage;
           break;
         default:
           imageSrc = null; // No image for other types

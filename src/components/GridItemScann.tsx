@@ -612,23 +612,23 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   const getInstructionElement = (instruction: ElementDTO): JSX.Element | string | null => {
     let imageSrc: string | null = null;
     let text: string | null = null;
-    let imageClass = "operations"; // Default class for images
+    let imageClass : string = styles.operations; // Default class for images
 
     // Normalize to lowercase once
     const tag = instruction.tagName?.toLowerCase() || "";
 
     if (tag === "input") {
       imageSrc = inputImage;
-      imageClass = "input-image";
+      imageClass = styles.inputImage;
     } else if (tag === "button") {
       imageSrc = clickImage;
-      imageClass = "click-image";
+      imageClass = styles.clickImage;
     } else if (tag === "a" || tag === "link") {
       imageSrc = linkImage;
-      imageClass = "link-image";
+      imageClass = styles.linkImage;
     } else {
       imageSrc = outPutImage;
-      imageClass = "output-image";
+      imageClass = styles.outputImage;
     }
 
     // Set the text based on the instruction properties
@@ -669,21 +669,21 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   const getInstructionTypeElement = (typeElement: string): JSX.Element | string | null => {
     let imageSrc: string | null = null;
     let text: string | null = null;
-    let imageClass = "operations"; // Default class for images
+    let imageClass : string = styles.operations; // Default class for images
 
     // Set the image source based on the tag name
     if (typeElement === "input") {
       imageSrc = inputImage;
-      imageClass = "input-image";
+      imageClass = styles.inputImage;
     } else if (typeElement === "button") {
       imageSrc = clickImage;
-      imageClass = "click-image";
+      imageClass = styles.clickImage;
     } else if (typeElement === "a" || typeElement === "link") {
       imageSrc = linkImage;
-      imageClass = "click-image";
+      imageClass = styles.clickImage;
     } else {
       imageSrc = outPutImage;
-      imageClass = "output-image";
+      imageClass = styles.outputImage;
     }
 
     // Set the text based on the instruction properties
