@@ -33,6 +33,15 @@
       margin-bottom: 12px;  // Reduced bottom margin for the image
     }
 
+    // Red warning icon used by destructive-confirm modals (e.g. GridItemScann's
+    // "Delete Unchecked" confirmation). Without this explicit rule the image
+    // falls back to its natural resolution and renders huge.
+    img.warning-image {
+      width: 72px;
+      height: auto;
+      margin-bottom: 12px;
+    }
+
     h3.alert-header {
       font-size: 1.4rem;  // Reduced font size for header
       font-weight: 600;

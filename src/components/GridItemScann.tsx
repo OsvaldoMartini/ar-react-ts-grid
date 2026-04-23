@@ -100,6 +100,14 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   const [editingElementTagName, setEditingElementTagName] = useState<string | null>(null);
   const [elementName, setElementName] = useState<string>('');
   const [isSendingAll, setIsSendingAll] = useState(false);
+
+  // Keep-selection state for the "Delete Unchecked" workflow. Each entry is the
+  // id of an element the user marked "Keep" via the per-row checkbox. Clicking
+  // "Delete Unchecked" prunes every element NOT in this set. State is purely
+  // local — no WebSocket push; the backend sees the remaining elements on the
+  // next Insert All / Save.
+  const [keepSelectedIds, setKeepSelectedIds] = useState<Set<number>>(new Set());
+  const [pendingDeleteCount, setPendingDeleteCount] = useState<number | null>(null);
   const [isUpdatingAll, setIsUpdatingAll] = useState(false);
   const lastProcessedIndexRef = useRef(0);
 
@@ -461,6 +469,60 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     } catch (error) {
       console.error("❌ Error sending WebSocket message:", error);
     }
+  };
+
+  // ── Keep-selection handlers (used by the per-row checkbox + header buttons) ──
+  const toggleKeep = (id: number) => {
+    setKeepSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const keepAll = () => {
+    setKeepSelectedIds(new Set(elementDTO.map(el => el.id)));
+  };
+
+  const clearKeeps = () => {
+    setKeepSelectedIds(new Set());
+  };
+
+  /** How many currently-visible elements are NOT marked Keep and would be removed. */
+  const uncheckedCount = (): number => {
+    let n = 0;
+    for (const el of elementDTO) if (!keepSelectedIds.has(el.id)) n++;
+    return n;
+  };
+
+  /** Opens the confirmation. Commit happens in {@link confirmDeleteUnchecked}. */
+  const requestDeleteUnchecked = () => {
+    const toDelete = uncheckedCount();
+    if (toDelete === 0) return;
+    setPendingDeleteCount(toDelete);
+  };
+
+  const confirmDeleteUnchecked = () => {
+    const keep = keepSelectedIds;
+    setElementDTO(prev => prev.filter(el => keep.has(el.id)));
+    setElementGrouped(prevGrouped => {
+      const updated = { ...prevGrouped };
+      for (const tagName of Object.keys(updated)) {
+        const filteredElements = updated[tagName].elements.filter(el => keep.has(el.id));
+        if (filteredElements.length === 0) {
+          delete updated[tagName];
+        } else {
+          updated[tagName] = { ...updated[tagName], elements: filteredElements };
+        }
+      }
+      return updated;
+    });
+    setPendingDeleteCount(null);
+  };
+
+  const cancelDeleteUnchecked = () => {
+    setPendingDeleteCount(null);
   };
 
   const handleRemoveElementDTO = (elementToRemove: ElementDTO) => {
@@ -849,6 +911,21 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
         />
       )}
 
+      {/* Delete-Unchecked confirmation. The AlertModal renders Confirm/Cancel
+          buttons when onConfirm is provided. */}
+      {pendingDeleteCount !== null && (
+        <AlertModal
+          header="Delete Unchecked Elements?"
+          body={`You are about to delete ${pendingDeleteCount} element${pendingDeleteCount === 1 ? '' : 's'} that are NOT marked Keep.`}
+          extraMsg={`${keepSelectedIds.size} element${keepSelectedIds.size === 1 ? '' : 's'} will be kept. This only affects the list in this pane — it does not touch the database.`}
+          onClose={cancelDeleteUnchecked}
+          onConfirm={confirmDeleteUnchecked}
+          imageSrc={warningRedImage}
+          imageClass="warning-image"
+          error={true}
+        />
+      )}
+
       {elementDTO.length === 0 ? (
         // No data message (as before)
         <div className="block">
@@ -878,6 +955,35 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
             </button>
             <button className="attributes-button" onClick={() => setShowAttributes(!showAttributes)}>
               {showAttributes ? 'Hide Attributes' : 'Show Attributes'}
+            </button>
+            <button
+              className="attributes-button"
+              onClick={keepAll}
+              title="Mark every element as Keep"
+              disabled={keepSelectedIds.size === elementDTO.length && elementDTO.length > 0}
+            >
+              Keep All
+            </button>
+            <button
+              className="attributes-button"
+              onClick={clearKeeps}
+              title="Clear the Keep checkboxes"
+              disabled={keepSelectedIds.size === 0}
+            >
+              Clear Keeps
+            </button>
+            <button
+              className="attributes-button"
+              onClick={requestDeleteUnchecked}
+              disabled={uncheckedCount() === 0}
+              style={{
+                backgroundColor: uncheckedCount() === 0 ? undefined : '#D32F2F',
+                color: uncheckedCount() === 0 ? undefined : '#fff',
+                fontWeight: 600,
+              }}
+              title="Delete every element that is NOT marked Keep"
+            >
+              Delete Unchecked ({uncheckedCount()})
             </button>
             <div className="pagination-controls">
               <label>Rows per page: </label>
@@ -972,6 +1078,16 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
                     // onDoubleClick={(event) => handleRowSelectedClick(event, elementDTO, "NEW_ELEMENT_DTO")}
                     // onClick={(event) => handleRowSelectedClick(event, elementDTO, "DETAILS_ELEMENT_DTO")}
                     >
+                      {/* Keep-this-one selector. Checking it marks the element as a keeper,
+                          so it survives when the user clicks "Delete Unchecked" in the header. */}
+                      <input
+                        type="checkbox"
+                        className="keep-checkbox"
+                        checked={keepSelectedIds.has(elementDTO.id)}
+                        onChange={() => toggleKeep(elementDTO.id)}
+                        title="Keep this element (survives 'Delete Unchecked')"
+                        onClick={(e) => e.stopPropagation()}
+                      />
                       {editingElementId === elementDTO.xPath && editingElementTagName === elementDTO.tagName ? (
                         <div className="edit-container">
                           <input
