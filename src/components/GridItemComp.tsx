@@ -2842,7 +2842,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
           role="button"
           tabIndex={0}
         >
-          <span className="options-toggle-label">Force C</span>
+          <span className="options-toggle-label">Force Coords</span>
           <img
             src={isForce ? activeImage : inactiveImage}
             alt="force coord toggle"
