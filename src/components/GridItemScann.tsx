@@ -61,7 +61,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   const [alertMessageBody, setAlertMessageBody] = useState<string | ComplexMessage[]>([]);
   const [alertMessageFooter, setAlertMessageFooter] = useState<string | null>(null);
   const [alertDismissed, setAlertDismissed] = useState(false);
-  const [showAttributes, setShowAttributes] = useState(false);
+  // const [showAttributes, setShowAttributes] = useState(false);
   const [findText, setFindText] = useState<string>('');
   const [collapsedBlocks, setCollapsedBlocks] = useState<Set<string>>(new Set());
 
@@ -971,9 +971,9 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
             >
               {isUpdatingAll ? 'Updating...' : 'Update All Elements'}
             </button>
-            <button className={styles.attributesButton} onClick={() => setShowAttributes(!showAttributes)}>
+            {/* <button className={styles.attributesButton} onClick={() => setShowAttributes(!showAttributes)}>
               {showAttributes ? 'Hide Attributes' : 'Show Attributes'}
-            </button>
+            </button> */}
             <button
               className={styles.attributesButton}
               onClick={keepAll}
@@ -1134,13 +1134,13 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
                         </div>
                       ) : (
                         <span className={styles.instructionLine}>{getInstructionElement(elementDTO)}</span>)}
-                      {showAttributes ? (
+                      {/* {showAttributes ? (
                         <div className="attr-slot">
                           <AttributeDropdown dataArray={elementDTO.attributeData} onChange={handleAttributeChange} />
                         </div>
                       ) : (
                         <span className="attr-slot">{"\u00A0".repeat(20)}</span>
-                      )}
+                      )} */}
                       <div className={styles.optionsColumn}>
                         <CompForce item={elementDTO} onChange={handleElementForceChange} />
                         <img
