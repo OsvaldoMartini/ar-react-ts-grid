@@ -45,6 +45,7 @@ import ArrowLeft from '../assets/ArrowLeft.png';
 
 
 import AlertModal from './AlertModal';
+import CompForce from './CompForce';
 import { useWebSocket } from './useWebSocket';
 
 interface GridItemCompProps {
@@ -2721,27 +2722,12 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
   };
 
   // ── force_coordinates flag toggles (F / E / T / N / S) ─────────────────────
-  // Stored in instruction.forceCoordinates as a canonical-ordered string (F→E→T→N→S).
-  // "S" is the scroll-before-type flag, migrated out of the "I:S:" actions-string
-  // token by backend migration 2026-04-26.
-  type ForceCoordFlag = "F" | "E" | "T" | "N" | "S";
-  const FORCE_COORD_ORDER: ForceCoordFlag[] = ["F", "E", "T", "N", "S"];
-
-  const hasForceCoordFlag = (raw: string | null | undefined, flag: ForceCoordFlag) =>
-    (raw ?? "").toUpperCase().includes(flag);
-
-  const toggleForceCoordFlag = (raw: string | null | undefined, flag: ForceCoordFlag): string => {
-    const current = (raw ?? "").toUpperCase();
-    const has = current.includes(flag);
-    const next = has ? current.replace(flag, "") : current + flag;
-    return FORCE_COORD_ORDER.filter(c => next.includes(c)).join("");
-  };
-
-  const updateInstructionForceCoord = (instructionId: number, flag: ForceCoordFlag) => {
+  // UI lives in CompForce. This handler persists the change: WebSocket push to
+  // the backend (FORCE_COORDINATES_UPDATE on componentTasks session) + local
+  // state update so the badge flips immediately.
+  const handleInstructionForceChange = (instructionId: number, nextForceCoordinates: string) => {
     const instruction = componentsData.find(x => x.id === instructionId);
     if (!instruction) return;
-
-    const newForceCoordinates = toggleForceCoordFlag(instruction.forceCoordinates, flag);
 
     if (webSocket && connected) {
       const message = {
@@ -2751,7 +2737,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
         botJobName,
         instructionId,
         parentId: instruction.parentId,
-        forceCoordinates: newForceCoordinates,
+        forceCoordinates: nextForceCoordinates,
         homeBankingId,
         sessionId: "componentTasks",
       };
@@ -2759,100 +2745,15 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     }
 
     setComponentsData(prev =>
-      prev.map(x => (x.id === instructionId ? { ...x, forceCoordinates: newForceCoordinates } : x))
+      prev.map(x => (x.id === instructionId ? { ...x, forceCoordinates: nextForceCoordinates } : x))
     );
   };
-
 
   const renderDeviceOptionsRow = (instruction: ComponentsInstructionsDTO) => {
     if (allSpecialOperations(instruction.actions)) {
       return <span className="edit-button-space">&nbsp;</span>;
     }
-
-    const isScroll = hasForceCoordFlag(instruction.forceCoordinates, "S");
-    const isForce  = hasForceCoordFlag(instruction.forceCoordinates, "F");
-    const isEnter  = hasForceCoordFlag(instruction.forceCoordinates, "E");
-    const isTab    = hasForceCoordFlag(instruction.forceCoordinates, "T");
-    const isNext   = hasForceCoordFlag(instruction.forceCoordinates, "N");
-
-    return (
-      <div className="options-row">
-        {/* SCROLL (force_coordinates bit; was "I:S:" in actions before migration 2026-04-26) */}
-        <div
-          className={`options-toggle ${isScroll ? "active" : "inactive"}`}
-          onClick={() => updateInstructionForceCoord(instruction.id, "S")}
-          role="button"
-          tabIndex={0}
-        >
-          <span className="options-toggle-label">Scroll</span>
-          <img
-            src={isScroll ? activeImage : inactiveImage}
-            alt="scroll toggle"
-            className="options-toggle-icon"
-          />
-        </div>
-
-        {/* NEXT (mobile next-field; cascades N→T→E on failure when solo) */}
-        <div
-          className={`options-toggle ${isNext ? "active" : "inactive"}`}
-          onClick={() => updateInstructionForceCoord(instruction.id, "N")}
-          role="button"
-          tabIndex={0}
-        >
-          <span className="options-toggle-label">Next</span>
-          <img
-            src={isNext ? activeImage : inactiveImage}
-            alt="next toggle"
-            className="options-toggle-icon"
-          />
-        </div>
-
-        {/* TAB */}
-        <div
-          className={`options-toggle ${isTab ? "active" : "inactive"}`}
-          onClick={() => updateInstructionForceCoord(instruction.id, "T")}
-          role="button"
-          tabIndex={0}
-        >
-          <span className="options-toggle-label">Tab</span>
-          <img
-            src={isTab ? activeImage : inactiveImage}
-            alt="tab toggle"
-            className="options-toggle-icon"
-          />
-        </div>
-
-        {/* ENTER */}
-        <div
-          className={`options-toggle ${isEnter ? "active" : "inactive"}`}
-          onClick={() => updateInstructionForceCoord(instruction.id, "E")}
-          role="button"
-          tabIndex={0}
-        >
-          <span className="options-toggle-label">Enter</span>
-          <img
-            src={isEnter ? activeImage : inactiveImage}
-            alt="enter toggle"
-            className="options-toggle-icon"
-          />
-        </div>
-
-        {/* FORCE COORDINATES */}
-        <div
-          className={`options-toggle ${isForce ? "active" : "inactive"}`}
-          onClick={() => updateInstructionForceCoord(instruction.id, "F")}
-          role="button"
-          tabIndex={0}
-        >
-          <span className="options-toggle-label">Force Coords</span>
-          <img
-            src={isForce ? activeImage : inactiveImage}
-            alt="force coord toggle"
-            className="options-toggle-icon"
-          />
-        </div>
-      </div>
-    );
+    return <CompForce item={instruction} onChange={handleInstructionForceChange} />;
   };
 
 

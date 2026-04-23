@@ -208,30 +208,11 @@
   align-items: center;
 }
 
-// Compact variant used inline inside an .instruction-item row (GridItemScann)
-// so the Scroll / Next / Tab / Enter / Force Coordinates badges sit between the
-// attributes block and the right-hand options-column instead of wrapping to a
-// second row. Labels are full words now — we trade some horizontal space for
-// readability but keep the padding / icon sizes tight.
-.options-row--inline {
-  gap: 4px;
-  flex: 0 0 auto;
-  margin: 0 8px;
-
-  .options-toggle {
-    padding: 1px 6px;
-    border-radius: 4px;
-    font-size: 10px;
-    font-weight: 600;
-    gap: 4px;
-  }
-
-  .options-toggle-icon {
-    width: 10px;
-    height: 10px;
-    flex: 0 0 10px;
-  }
-}
+// NOTE: the compact inline variant that used to live here (.options-row--inline)
+// is now a self-contained component — see CompForce.tsx + CompForce.module.scss.
+// GridItem / GridItemComp / GridItemScann all render CompForce inside their
+// .options-column instead of using this variant. Kept the base .options-row
+// rules above for any remaining non-inline usage.
 
 .options-toggle {
   display: flex;

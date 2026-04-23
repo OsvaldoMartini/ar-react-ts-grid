@@ -1,0 +1,57 @@
+// Compact horizontal strip of five force_coordinates badges. Designed to
+// sit INSIDE .options-column so it renders alongside the other row controls
+// rather than on its own line. Ported from GridItemScann's inline variant
+// (griditem.scss: .options-row--inline) and isolated here as a CSS module so
+// the scope stays local to the component.
+
+.compForceRow {
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+  flex: 0 0 auto;
+  margin: 0 8px;
+  align-items: center;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+// ACTIVE
+.active {
+  background: #e6f4ea;
+  border-color: transparent;
+}
+
+.active .label {
+  color: #0f9d58;
+}
+
+// INACTIVE
+.inactive {
+  background: transparent;
+  border-color: #e0e0e0;
+}
+
+.inactive .label {
+  color: #d93025;
+}
+
+.icon {
+  width: 10px;
+  height: 10px;
+  display: block;
+  flex: 0 0 10px;
+}
