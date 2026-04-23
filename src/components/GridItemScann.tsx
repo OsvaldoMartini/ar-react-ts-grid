@@ -155,7 +155,24 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
       newBlockPages[typeElement] = Math.max(1, Math.ceil(elementData.elements.length / blockRowsPerPage));
     });
     setBlockPages(newBlockPages);
-    setBlockCurrentPages(Object.keys(elementGrouped).reduce((acc, key) => ({ ...acc, [key]: 1 }), {}));
+
+    // Preserve the page the user was viewing in each block. Previously this
+    // effect unconditionally reset every block to page 1 on EVERY elementGrouped
+    // change — so toggling a force_coords badge, renaming a row, or deleting
+    // one snapped all blocks back to page 1. Now:
+    //   - existing blocks keep their current page (clamped to the new max in
+    //     case the element count shrank and the page no longer exists),
+    //   - newly-appeared blocks start at page 1,
+    //   - blocks that disappeared are dropped.
+    setBlockCurrentPages(prev => {
+      const next: Record<string, number> = {};
+      for (const key of Object.keys(elementGrouped)) {
+        const maxPage = newBlockPages[key] || 1;
+        const prevPage = prev[key];
+        next[key] = prevPage == null ? 1 : Math.min(Math.max(prevPage, 1), maxPage);
+      }
+      return next;
+    });
   }, [elementGrouped, blockRowsPerPage]);
 
   useEffect(() => {
