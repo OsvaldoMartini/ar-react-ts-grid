@@ -2804,11 +2804,13 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     );
   };
 
-  // ── force_coordinates flag toggles (F / E / T / N) ──────────────────────────
-  // Stored as a string in the instruction.forceCoordinates column, e.g. "FE", "N".
-  // Order is normalised to F → E → T → N on every update.
-  type ForceCoordFlag = "F" | "E" | "T" | "N";
-  const FORCE_COORD_ORDER: ForceCoordFlag[] = ["F", "E", "T", "N"];
+  // ── force_coordinates flag toggles (F / E / T / N / S) ─────────────────────
+  // Stored as a string in the instruction.forceCoordinates column, e.g. "FE", "SN".
+  // Order is normalised to F → E → T → N → S on every update. "S" is the
+  // scroll-before-type flag, migrated out of the "I:S:" action-string token
+  // (see backend migration 2026-04-26).
+  type ForceCoordFlag = "F" | "E" | "T" | "N" | "S";
+  const FORCE_COORD_ORDER: ForceCoordFlag[] = ["F", "E", "T", "N", "S"];
 
   const hasForceCoordFlag = (raw: string | null | undefined, flag: ForceCoordFlag) =>
     (raw ?? "").toUpperCase().includes(flag);
@@ -2852,7 +2854,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
       return <span className="edit-button-space">&nbsp;</span>;
     }
 
-    const isScroll = hasActionFlag(instruction.actions, "S");
+    const isScroll = hasForceCoordFlag(instruction.forceCoordinates, "S");
     const isForce  = hasForceCoordFlag(instruction.forceCoordinates, "F");
     const isEnter  = hasForceCoordFlag(instruction.forceCoordinates, "E");
     const isTab    = hasForceCoordFlag(instruction.forceCoordinates, "T");
@@ -2860,10 +2862,10 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
     return (
       <div className="options-row">
-        {/* SCROLL (stays on the action string) */}
+        {/* SCROLL (force_coordinates bit; was "I:S:" in actions before migration 2026-04-26) */}
         <div
           className={`options-toggle ${isScroll ? "active" : "inactive"}`}
-          onClick={() => updateInstructionActions(instruction.id, "S")}
+          onClick={() => updateInstructionForceCoord(instruction.id, "S")}
           role="button"
           tabIndex={0}
         >

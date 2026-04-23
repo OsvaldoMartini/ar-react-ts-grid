@@ -2720,10 +2720,12 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     );
   };
 
-  // ── force_coordinates flag toggles (F / E / T / N) ──────────────────────────
-  // Stored in instruction.forceCoordinates as a canonical-ordered string (F→E→T→N).
-  type ForceCoordFlag = "F" | "E" | "T" | "N";
-  const FORCE_COORD_ORDER: ForceCoordFlag[] = ["F", "E", "T", "N"];
+  // ── force_coordinates flag toggles (F / E / T / N / S) ─────────────────────
+  // Stored in instruction.forceCoordinates as a canonical-ordered string (F→E→T→N→S).
+  // "S" is the scroll-before-type flag, migrated out of the "I:S:" actions-string
+  // token by backend migration 2026-04-26.
+  type ForceCoordFlag = "F" | "E" | "T" | "N" | "S";
+  const FORCE_COORD_ORDER: ForceCoordFlag[] = ["F", "E", "T", "N", "S"];
 
   const hasForceCoordFlag = (raw: string | null | undefined, flag: ForceCoordFlag) =>
     (raw ?? "").toUpperCase().includes(flag);
@@ -2767,7 +2769,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       return <span className="edit-button-space">&nbsp;</span>;
     }
 
-    const isScroll = hasActionFlag(instruction.actions, "S");
+    const isScroll = hasForceCoordFlag(instruction.forceCoordinates, "S");
     const isForce  = hasForceCoordFlag(instruction.forceCoordinates, "F");
     const isEnter  = hasForceCoordFlag(instruction.forceCoordinates, "E");
     const isTab    = hasForceCoordFlag(instruction.forceCoordinates, "T");
@@ -2775,10 +2777,10 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
 
     return (
       <div className="options-row">
-        {/* SCROLL (stays on the action string) */}
+        {/* SCROLL (force_coordinates bit; was "I:S:" in actions before migration 2026-04-26) */}
         <div
           className={`options-toggle ${isScroll ? "active" : "inactive"}`}
-          onClick={() => updateInstructionActions(instruction.id, "S")}
+          onClick={() => updateInstructionForceCoord(instruction.id, "S")}
           role="button"
           tabIndex={0}
         >
