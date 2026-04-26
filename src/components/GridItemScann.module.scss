@@ -553,8 +553,10 @@
     background-color: #ffeb3b;
     box-shadow: 0 0 10px #ffeb3b;
   }
-    // Everything else above background
-    > *:not(.executionBackground) {
+    // Everything else above background EXCEPT the right-hand action column,
+    // which gets z-index: 0 below so it slides behind the row label when the
+    // viewport narrows (Roadmap 3 Phase 3d follow-up).
+    > *:not(.executionBackground):not(.optionsColumn) {
       position: relative;
       z-index: 100;
     }
