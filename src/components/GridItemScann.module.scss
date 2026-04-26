@@ -274,11 +274,17 @@
   display: inline-flex;  /* Make input and image inline */
   align-items: center;   /* Vertically center the items */
   gap: 5px;              /* Add space between the text box and save button */
+  /* Make the edit container actually visible — without a sensible min width
+     the inline-flex shrinks to content + flex:1 zero-basis input collapses
+     to a barely-visible sliver inside the 30px grid track. */
+  min-width: 220px;
 }
 
 .editTextbox {
   flex: 1; /* Make the input take the available space */
-  width: 10%;
+  min-width: 160px; /* Ensure the seeded label is visible + editable */
+  padding: 2px 6px;
+  font-size: 12px;
 }
 
 .socketPort {
@@ -508,10 +514,19 @@
   z-index: 1;
 
 
-  > .instructionLine,
-  > .editContainer {
+  > .instructionLine {
     grid-column: 2;
     justify-self: start;
+    padding-left: 6px;
+    min-width: 0;
+  }
+
+  /* In edit mode the input + save icon need real horizontal room; let the
+     editContainer span columns 2 through 4 so the seeded text is actually
+     visible and editable. */
+  > .editContainer {
+    grid-column: 2 / span 3;
+    justify-self: stretch;
     padding-left: 6px;
     min-width: 0;
   }
