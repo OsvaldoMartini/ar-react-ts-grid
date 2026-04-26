@@ -578,7 +578,23 @@
   display: flex;
   justify-content: flex-end; /* Align content to the right */
   margin-right: 8px; /* Add right margin of 3px */
-    white-space: nowrap; 
+    white-space: nowrap;
+  /* When the viewport narrows, the action buttons (CompForce S/N/T/E/F badges,
+     edit, save, test, cross-X) overflow their grid track and visually collide
+     with the picked-element label on the left. Drop them behind the left
+     content so the row text always reads cleanly. */
+  position: relative;
+  z-index: 0;
+}
+
+/* Roadmap 3 Phase 3d follow-up: keep the picked-element label readable when
+   the row shrinks and optionsColumn overflows behind it. Inherit the row's
+   background color so hover/active states still match. */
+.instructionItem .instructionLine,
+.instructionItem .instructionDetails {
+  position: relative;
+  z-index: 2;
+  background-color: inherit;
 }
 
 
