@@ -109,6 +109,11 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   // next Insert All / Save.
   const [keepSelectedIds, setKeepSelectedIds] = useState<Set<number>>(new Set());
   const [pendingDeleteCount, setPendingDeleteCount] = useState<number | null>(null);
+  // When checked, "Clear Grid All" also tells the backend to truncate
+  // <PATH_DB>/page_diagnostics/elementDTO-HP.json + AI-ElementDTO-HP.json.
+  // Backend hover-pick saves are CUMULATIVE (append-deduped by xPath) so this
+  // is the only way to reset the running list.
+  const [hoverPickMode, setHoverPickMode] = useState<boolean>(false);
   const [isUpdatingAll, setIsUpdatingAll] = useState(false);
   const lastProcessedIndexRef = useRef(0);
 
@@ -594,6 +599,32 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
 
   const cancelDeleteUnchecked = () => {
     setPendingDeleteCount(null);
+  };
+
+  /**
+   * Wipe the picker grid entirely. When the Hover Pick checkbox is on, also
+   * tell the backend to delete elementDTO-HP.json + AI-ElementDTO-HP.json so
+   * the next pick starts a fresh cumulative run. Backend hover-pick saves
+   * append by xPath; without this clear the file just keeps growing.
+   */
+  const handleClearGridAll = () => {
+    setElementDTO([]);
+    setElementGrouped({});
+    setKeepSelectedIds(new Set());
+    setIsElementGrouped(false);
+    if (hoverPickMode && webSocket && webSocket.readyState === WebSocket.OPEN) {
+      try {
+        webSocket.send(JSON.stringify({
+          type: 'CLEAR_HOVER_PICK_FILE',
+          homeBankingId,
+          botJobId,
+          sessionId: 'scanner-element-pane',
+        }));
+        console.log('Sent CLEAR_HOVER_PICK_FILE to backend.');
+      } catch (e) {
+        console.warn('CLEAR_HOVER_PICK_FILE send failed:', e);
+      }
+    }
   };
 
   const handleRemoveElementDTO = (elementToRemove: ElementDTO) => {
@@ -1095,6 +1126,34 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
             >
               Delete Unchecked ({uncheckedCount()})
             </button>
+            <button
+              className={styles.attributesButton}
+              onClick={handleClearGridAll}
+              disabled={elementDTO.length === 0 && !hoverPickMode}
+              style={{
+                backgroundColor: elementDTO.length === 0 && !hoverPickMode ? undefined : '#37474F',
+                color: elementDTO.length === 0 && !hoverPickMode ? undefined : '#fff',
+                fontWeight: 600,
+              }}
+              title={
+                hoverPickMode
+                  ? 'Clear the entire grid AND truncate elementDTO-HP.json on the backend'
+                  : 'Clear the entire grid (frontend only)'
+              }
+            >
+              Clear Grid All
+            </button>
+            <label
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginLeft: 8 }}
+              title="When checked, Clear Grid All also tells the backend to delete the cumulative elementDTO-HP.json file."
+            >
+              <input
+                type="checkbox"
+                checked={hoverPickMode}
+                onChange={(e) => setHoverPickMode(e.target.checked)}
+              />
+              <span style={{ fontSize: 12 }}>Hover Pick</span>
+            </label>
             <div className={styles.paginationControls}>
               <label>Rows per page: </label>
               <select
