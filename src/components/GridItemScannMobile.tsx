@@ -1138,13 +1138,17 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
     setEditingElementId(elementEdit.xPath);
     setEditingElementTagName(elementEdit.tagName);
     // Roadmap 3 Phase 3d: edit field operates on the user's "easy name" (clientNamed).
-    // Seed it with the current display value so the user starts from what they see;
-    // someText + definedName themselves stay immutable on the ElementDTO.
+    // Seed it with the EXACT value the display chain renders so the user always sees
+    // their current label and can edit it — clientNamed > definedName > someText > tagName.
+    // someText + definedName themselves stay immutable on the ElementDTO; only clientNamed
+    // changes when the user types and saves.
     const cn = (elementEdit as any).clientNamed;
     const dn = (elementEdit as any).definedName;
+    const st = elementEdit.someText;
     const seed = (cn && cn.length > 0) ? cn
                : (dn && dn.length > 0) ? dn
-               : (elementEdit.someText ?? "");
+               : (st && st.trim().length > 0) ? st
+               : (elementEdit.tagName ?? "");
     setElementName(seed);
   };
 
@@ -1169,12 +1173,17 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
     // and must NEVER be overwritten — they're what the backend writes to instruction.name.
     // The renamed value the user typed lives in clientNamed (the easy display label),
     // which the backend persists into instruction.client_named on save.
+    // If the user typed nothing OR typed back exactly what the display chain would have
+    // produced from immutable fields (definedName / someText / tagName), clear the
+    // override (null) so the row reverts to the canonical name.
     const typed = (elementName ?? "").trim();
     const updatedElements = elementDTO.map((element) => {
       if (element.id !== id) return element;
       const dn = (element as any).definedName as string | null | undefined;
       const st = element.someText ?? "";
-      const noOverride = typed.length === 0 || typed === dn || typed === st;
+      const tn = element.tagName ?? "";
+      const noOverride =
+        typed.length === 0 || typed === dn || typed === st || typed === tn;
       return { ...element, clientNamed: noOverride ? null : typed };
     });
 
