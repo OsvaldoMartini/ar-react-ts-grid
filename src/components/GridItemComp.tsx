@@ -2504,12 +2504,18 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     let imageClass : string = styles.operations; // Default class for images
     let hiddenField: boolean = false;
 
+    // Roadmap 3 Phase 3d: prefer the user-set display label when present.
+    // `instruction.name` is the canonical key the backend uses for matching/recovery
+    // and must never be mutated by the FE.
+    const displayName = (instruction.clientNamed && instruction.clientNamed.length > 0)
+      ? instruction.clientNamed
+      : instruction.name;
 
     // Determine the image source and text based on instruction type
     if (instruction.actions.startsWith("I:")) {
       const actionParts: string[] = instruction.actions.split(":");
       imageSrc = inputImage;
-      text = `(${instruction.id})${instruction.name}`;
+      text = `(${instruction.id})${displayName}`;
       imageClass = styles.inputImage;
 
       // Check if the third part is 'hidden'
@@ -2518,88 +2524,88 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       }
     } else if (instruction.tagName == "a") {
       imageSrc = linkImage;
-      text = `(${instruction.id})${instruction.name}`;
+      text = `(${instruction.id})${displayName}`;
       imageClass = styles.linkImage;
     } else if (instruction.actions.startsWith("O:")) {
       imageSrc = outPutImage;
-      text = `(${instruction.id})${instruction.name}`;
+      text = `(${instruction.id})${displayName}`;
       imageClass = styles.outputImage;
     } else {
       switch (instruction.actions) {
         case "SET":
           imageSrc = setValueImage;
-          text = instruction.name;
+          text = displayName;
           break;
         case "GET":
           imageSrc = getValueImage;
-          text = instruction.name;
+          text = displayName;
           break;
         case "CK":
           imageSrc = checkImage;
-          text = instruction.name;
+          text = displayName;
           break;
         case "CSV CHECK":
           imageSrc = excelGotoImage;
-          text = instruction.name;
+          text = displayName;
           // imageClass = styles.excelgotoImage;
           break;
         case "PDF CHECK":
           imageSrc = excelGotoImage;
-          text = instruction.name;
+          text = displayName;
           // imageClass = styles.excelgotoImage;
           break;
         case "E":
           imageSrc = excelImage;
-          text = instruction.name;
+          text = displayName;
           break;
         case "P":
           imageSrc = screenImage;
-          text = instruction.name;
+          text = displayName;
           imageClass = styles.screenImage;
           break;
         case "Q":
           imageSrc = closeBrowserImage;
-          text = instruction.name;
+          text = displayName;
           imageClass = styles.closeImage;
           break;
         case "C":
           imageSrc = clickImage;
-          text = `(${instruction.id})${instruction.name}`;
+          text = `(${instruction.id})${displayName}`;
           imageClass = styles.clickImage;
           break;
         case "H":
           imageSrc = waitImage;
-          text = instruction.name;
+          text = displayName;
           imageClass = styles.waitImage;
           break;
         case "IF":
           imageSrc = ifElseImage;
-          text = instruction.name;
+          text = displayName;
           imageClass = styles.ifelseImage;
           break;
         case "REFRESH":
           imageSrc = refreshOnlyImage;
-          text = instruction.name;
+          text = displayName;
           imageClass = styles.refreshImage;
           break;
         case "LOOP":
           imageSrc = refreshOnlyImage;
-          text = instruction.name;
+          text = displayName;
           imageClass = styles.refreshImage;
           break;
         case "REFRESH_LOOP":
           imageSrc = refreshLoopImage;
-          text = instruction.name;
+          text = displayName;
           imageClass = styles.refreshImage;
           break;
         case "GOTO":
           imageSrc = gotoImage;
-          text = instruction.name;
+          text = displayName;
           imageClass = styles.gotoImage;
           break;
         case "EXCEL GOTO":
           imageSrc = excelGotoImage;
-          text = instruction.name;
+          text = displayName;
           // imageClass = styles.excelgotoImage;
           break;
         case "NEXT ROW":
@@ -2609,27 +2615,27 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
           break;
         case "ELSEIF":
           imageSrc = ifElseImage;
-          text = instruction.name;
+          text = displayName;
           imageClass = styles.ifelseImage;
           break;
         case "ELSE":
           imageSrc = elseImage;
-          text = instruction.name;
+          text = displayName;
           imageClass = styles.elseImage;
           break;
         case "ENDIF":
           imageSrc = endIfImage;
-          text = instruction.name;
+          text = displayName;
           imageClass = styles.endifImage;
           break;
         case "PAUSE":
           imageSrc = pauseImage;
-          text = instruction.name;
+          text = displayName;
           imageClass = styles.pauseImage;
           break;
         default:
           imageSrc = null; // No image for other types
-          text = `(${instruction.id})${instruction.name}` || null;
+          text = `(${instruction.id})${displayName}` || null;
           isActionBold = true; // Set bold for actions
       }
     }
@@ -2800,7 +2806,12 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
 
   const handleEditInstruction = (instruction: ComponentsInstructionsDTO) => {
     setEditingInstructionId(instruction.id);
-    setInstructionName(instruction.name);
+    // Roadmap 3 Phase 3d: edit field rebinds to clientNamed (display-only override).
+    setInstructionName(
+      (instruction.clientNamed && instruction.clientNamed.length > 0)
+        ? instruction.clientNamed
+        : instruction.name
+    );
   };
 
   const handleSaveInstruction = (instructionId: number) => {
@@ -2820,29 +2831,13 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
 
     const { blockId, blockName, blockOrderNumber, botJobId, instructionOrderNumber } = instructionToUpdate;
 
-    // Update the instruction's name and actions
+    // Roadmap 3 Phase 3d: write the user's edit to clientNamed only; never mutate `name`
+    // or the I:<name> action token (the backend keys recovery on the canonical name).
     const updatedInstructions = componentsData.map((instruction) => {
       if (instruction.id === instructionId) {
-        // Update the name
-        const updatedName = instructionName;
-
-        // Update actions in the format "I:instructionName"
-        let updatedActions = instruction.actions;
-
-        if (instruction.actions.includes(":")) {
-          const actionParts = instruction.actions.split(":"); // Split into parts
-          if (actionParts.length > 2) {
-            actionParts[2] = updatedName; // Replace the name part
-            updatedActions = actionParts.join(":"); // Reassemble the updated actions
-          } else {
-            if (actionParts.length == 2) {
-              actionParts[1] = updatedName; // Replace the name part
-              updatedActions = actionParts.join(":"); // Reassemble the updated actions
-            }
-          }
-        }
-
-        return { ...instruction, name: updatedName, actions: updatedActions };
+        const typed = (instructionName ?? "").trim();
+        const nextClientNamed = (typed.length === 0 || typed === instruction.name) ? null : typed;
+        return { ...instruction, clientNamed: nextClientNamed };
       }
       return instruction;
     });
@@ -2865,8 +2860,11 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
         instructionId,
         instructionOrderNumber,
         blockOrderNumber,
-        instructionName, // The updated name
-        actions: updatedInstruction.actions, // Include the updated actions
+        // Roadmap 3 Phase 3d: instructionName always carries the canonical (immutable) name;
+        // clientNamed carries the display-only override (null = clear).
+        instructionName: instructionToUpdate.name,
+        clientNamed: updatedInstruction.clientNamed ?? null,
+        actions: updatedInstruction.actions,
       };
 
       try {

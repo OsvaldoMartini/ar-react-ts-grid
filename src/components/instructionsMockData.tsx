@@ -53,6 +53,9 @@ export interface ComponentsInstructionsDTO {
   variableId?: number;
   parentBlockId?: number;
   forceCoordinates?: string | null; // F/E/T/N combinable, e.g. "FE"
+  // Roadmap 3 Phase 3d. Display-only override of `name`. Null = no override; UI shows `name`.
+  // Non-null = UI shows clientNamed; backend always uses `name` for matchers/locator/recovery.
+  clientNamed?: string | null;
 }
 
 export interface ElementDTO {
