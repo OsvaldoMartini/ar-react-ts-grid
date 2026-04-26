@@ -631,8 +631,18 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
       imageClass = styles.outputImage;
     }
 
-    // Set the text based on the instruction properties
-    text = instruction.someText?.trim() ? instruction.someText : instruction.tagName;
+    // Roadmap 3 Phase 3d display chain:
+    //   clientNamed (user override) > definedName (resolver slug) > someText (visible label) > tagName
+    // someText + definedName come from the JS-injection ElementDTO and must stay frozen.
+    const overrideName =
+      ((instruction as any).clientNamed && (instruction as any).clientNamed.length > 0)
+        ? (instruction as any).clientNamed
+        : ((instruction as any).definedName && (instruction as any).definedName.length > 0)
+          ? (instruction as any).definedName
+          : null;
+    text = overrideName
+      ? overrideName
+      : (instruction.someText?.trim() ? instruction.someText : instruction.tagName);
 
     // If someText exists and contains commas or semicolons, split it into an array and format it correctly
     const dataNames = instruction.someText
@@ -645,8 +655,11 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
         return { name, value: name };
       }); // Convert to { name, value }
 
-    // If the array has only one element, display the text directly
-    const displayText = dataNames?.length === 1 ? dataNames[0].name : text;
+    // When clientNamed/definedName is set, surface that as the single display value rather than
+    // falling back to the someText comma-split list.
+    const displayText = overrideName
+      ? overrideName
+      : (dataNames?.length === 1 ? dataNames[0].name : text);
 
     return (
       <div className={styles.instructionType}>
@@ -718,7 +731,15 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   const handleEditInstruction = (elementEdit: ElementDTO) => {
     setEditingElementId(elementEdit.xPath);
     setEditingElementTagName(elementEdit.tagName);
-    setElementName(elementEdit.someText);
+    // Roadmap 3 Phase 3d: edit field operates on the user's "easy name" (clientNamed).
+    // Seed it with the current display value so the user starts from what they see;
+    // someText + definedName themselves stay immutable on the ElementDTO.
+    const cn = (elementEdit as any).clientNamed;
+    const dn = (elementEdit as any).definedName;
+    const seed = (cn && cn.length > 0) ? cn
+               : (dn && dn.length > 0) ? dn
+               : (elementEdit.someText ?? "");
+    setElementName(seed);
   };
   const handleSaveInstruction = (selectedElement: ElementDTO) => {
     // Find the instruction to get blockId and botJobId
@@ -737,14 +758,17 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     }
 
     const { id } = selectedElement;
-    const updatedName = elementName; // The new value for someText
-
-    // Update the instruction's someText
+    // Roadmap 3 Phase 3d: someText and definedName are frozen at JS-injection time
+    // and must NEVER be overwritten — they're what the backend writes to instruction.name.
+    // The renamed value the user typed lives in clientNamed (the easy display label),
+    // which the backend persists into instruction.client_named on save.
+    const typed = (elementName ?? "").trim();
     const updatedElements = elementDTO.map((element) => {
-      if (element.id === id) {
-        return { ...element, someText: updatedName }; // Update the someText property
-      }
-      return element; // Return the original element if it's not the one to update
+      if (element.id !== id) return element;
+      const dn = (element as any).definedName as string | null | undefined;
+      const st = element.someText ?? "";
+      const noOverride = typed.length === 0 || typed === dn || typed === st;
+      return { ...element, clientNamed: noOverride ? null : typed };
     });
 
     setElementDTO(updatedElements);
@@ -881,6 +905,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
       el.tagName,
       (el as any).nameLabel,
       (el as any).nameField,
+      (el as any).clientNamed,
       (el as any).definedName,
       (el as any).someText,
       (el as any).attribId,
