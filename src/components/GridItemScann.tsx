@@ -371,6 +371,32 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     }
   }, [editingElementId]);
 
+  // Roadmap 3 Phase 3d safety net: when entering edit mode, re-seed elementName
+  // from the EXACT row in elementDTO state (clientNamed > definedName > someText > tagName).
+  // The setState chain in handleEditInstruction normally seeds it correctly, but if the
+  // input ever appears empty, this effect keeps the controlled value in sync with the
+  // actual data and selects the text so the user can type to overwrite or cursor-edit.
+  useEffect(() => {
+    if (!editingElementId || !editingElementTagName) return;
+    const row = elementDTO.find(
+      (el) => el.xPath === editingElementId && el.tagName === editingElementTagName
+    );
+    if (!row) return;
+    const cn = (row as any).clientNamed;
+    const dn = (row as any).definedName;
+    const st = row.someText;
+    const seed = (cn && cn.length > 0) ? cn
+               : (dn && dn.length > 0) ? dn
+               : (st && st.trim().length > 0) ? st
+               : (row.tagName ?? "");
+    setElementName(seed);
+    console.log("[GridItemScann edit-mode seed] row:", row, " seed:", seed);
+    // Select the seeded text so the user can either type to replace or arrow to edit.
+    requestAnimationFrame(() => {
+      if (elementDTORef.current) elementDTORef.current.select();
+    });
+  }, [editingElementId, editingElementTagName, elementDTO]);
+
   useEffect(() => {
     if (!isElementGrouped && elementDTO && elementDTO.length > 0) {
       setElementGrouped(groupByTagName(elementDTO));
