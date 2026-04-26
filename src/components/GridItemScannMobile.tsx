@@ -1066,7 +1066,12 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       <div className={styles.instructionType}>
         {imageSrc && <img src={imageSrc} alt="" className={imageClass} />}
 
-        {dataNames?.length > 1 ? (
+        {/* Roadmap 3 Phase 3d: when the user has set a display label (clientNamed) or the
+            resolver produced a definedName, ALWAYS surface that as a single span — the
+            comma-split NameDropdown only kicks in for raw multi-token someText with no
+            override. Without this gate, picking a value from the dropdown would visually
+            replace the user's chosen label every render. */}
+        {(!overrideName && dataNames?.length > 1) ? (
           <div className="attribute-name">
             <NameDropdown dataArray={dataNames} onChange={handleNameChange} />
           </div>
