@@ -543,7 +543,24 @@
   display: flex;
   justify-content: flex-end; /* Align content to the right */
   margin-right: 8px; /* Add right margin of 3px */
-    white-space: nowrap; 
+    white-space: nowrap;
+  /* When the viewport narrows, the action buttons (CompForce S/N/T/E/F badges,
+     edit, move arrows, test, X) overflow their grid track and visually collide
+     with the instruction name on the left. Drop them behind the left content
+     so the row text always reads cleanly. The left side claims a higher
+     z-index + an inherited background to actually mask the buttons. */
+  position: relative;
+  z-index: 0;
+}
+
+/* Roadmap 3 Phase 3d follow-up: keep the instruction label readable when the
+   row shrinks and optionsColumn overflows behind it. Inherit the row's
+   background color so hover/active states still match. */
+.instructionItem .instructionLine,
+.instructionItem .instructionDetails {
+  position: relative;
+  z-index: 2;
+  background-color: inherit;
 }
 
 
