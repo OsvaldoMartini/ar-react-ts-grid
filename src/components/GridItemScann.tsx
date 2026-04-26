@@ -315,6 +315,33 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
             break;
           }
 
+          // Roadmap 2 follow-on: AROcrTestResultsPane "Accept OCR Name" button delivers a list of
+          // {xPath, clientNamed} pairs derived from approved EXACT_CONTAIN rows. Apply each suggestion
+          // to the matching ElementDTO so the picker shows the OCR-derived label and the next big save
+          // (NEW_ELEMENT_DTO) carries it as instruction.client_named on the backend INSERT.
+          case "applyOcrSuggestions": {
+            const suggestions: Array<{ xPath: string; clientNamed: string }> = Array.isArray(bodyData?.suggestions)
+              ? bodyData.suggestions
+              : [];
+            if (suggestions.length === 0) break;
+            const byXPath = new Map<string, string>();
+            for (const s of suggestions) {
+              if (s && typeof s.xPath === 'string' && typeof s.clientNamed === 'string') {
+                byXPath.set(s.xPath, s.clientNamed);
+              }
+            }
+            setElementDTO((prev) =>
+              prev.map((el) => {
+                const proposed = byXPath.get(el.xPath);
+                return proposed && proposed.length > 0 ? { ...el, clientNamed: proposed } : el;
+              })
+            );
+            // Trigger a re-grouping so the row labels refresh from the new clientNamed values.
+            setIsElementGrouped(false);
+            console.log(`[applyOcrSuggestions] applied ${byXPath.size} OCR-derived clientNamed value(s).`);
+            break;
+          }
+
           case "activate-update-all": {
             setIsUpdatingAll(false);
             break;
