@@ -76,6 +76,14 @@ export interface ElementDTO {
   // on save (NEW_ELEMENT_DTO message).
   forceCoordinates?: string | null;
   blockId?: number;
+  // Roadmap 3 Phase 3d.
+  // definedName is the resolver-generated slug — the canonical identifier the
+  // backend writes to instruction.name. Treat it as immutable.
+  // clientNamed is the user's display-only override; if set and !== definedName,
+  // GridItemScann sends it as instruction.client_named on save (NEW_ELEMENT_DTO).
+  // The backend never uses clientNamed for matching/recovery — it's a UI label.
+  definedName?: string | null;
+  clientNamed?: string | null;
 }
 
 export interface BlockData {
@@ -142,6 +150,9 @@ export interface InstructionLoad {
   instructionOrderNumber: number | null;
   actions: string;
   name: string;
+  // Roadmap 3 Phase 3d. Display-only override of `name`. Null = no override; UI shows `name`.
+  // Non-null = UI shows clientNamed; backend always uses `name` for matchers/locator/recovery.
+  clientNamed?: string | null;
   xpath: string;
   coordinates: string;
   forceCoordinates: string | null; // F/E/T/N combinable, e.g. "FE"
