@@ -1294,6 +1294,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
                       )} */}
                       <div className={styles.optionsColumn}>
                         <CompForce item={elementDTO} onChange={handleElementForceChange} />
+                        {/* Hidden — MultiPlugins support disabled
                         <img
                           src={warningRedImage}
                           alt="Report this element to support"
@@ -1301,6 +1302,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
                           className={styles.warningButton}
                           onClick={() => requestElementsSupport(elementDTO)}
                         />
+                        */}
                         <img src={pickItemImage} alt="" className={styles.pickButton} onClick={(event) => handleRowSelectedClick(event, elementDTO, "DETAILS_ELEMENT_DTO")} />
                         {renderEditButton(
                           elementDTO,
