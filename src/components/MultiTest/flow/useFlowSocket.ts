@@ -20,6 +20,43 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Flow, FlowStep } from "./types";
 
+/** Bot-job block row for the UI step picker (mirrors the Java handler shape). */
+export interface BotJobBlock {
+  id: number;
+  blockOrderNumber: number;
+  name: string;
+  description: string | null;
+  active: number;
+}
+
+/** Use case row from useCase.list — same shape as funcTest/types.UseCase. */
+export interface FlowUseCase {
+  id: number;
+  botJobId: number;
+  name: string;
+  description: string | null;
+}
+
+/** Mapping row from funcTest.loadMappings — used as substitution autocomplete source. */
+export interface FlowMapping {
+  id?: number;
+  useCaseId?: number | null;
+  apiKey: string;
+  apiSpecFile: string | null;
+  apiFieldName: string | null;
+  botInstructionId: number;
+}
+
+/** INPUT instruction for label-display lookups in the UI step inspector. */
+export interface BotJobInputInstruction {
+  id: number;
+  name: string | null;
+  clientNamed: string | null;
+  actions: string;
+  blockId: number;
+  blockName: string | null;
+}
+
 interface Options {
   socketPort: number;
   sessionId: string;
@@ -40,6 +77,12 @@ interface State {
   lastFlowDeletedId: number | null;
   lastStepsSaveOk: boolean | null;
   lastStepsSaveAt: string | null;
+  // Phase 2c — autocomplete sources for the inspector
+  blocks: BotJobBlock[];
+  useCases: FlowUseCase[];
+  inputInstructions: BotJobInputInstruction[];
+  /** Loaded use-case → mappings cache; populated lazily when a UI step picks a use case. */
+  mappingsByUseCase: Record<number, FlowMapping[]>;
 }
 
 const INITIAL: State = {
@@ -57,11 +100,19 @@ const INITIAL: State = {
   lastFlowDeletedId: null,
   lastStepsSaveOk: null,
   lastStepsSaveAt: null,
+  blocks: [],
+  useCases: [],
+  inputInstructions: [],
+  mappingsByUseCase: {},
 };
 
 export function useFlowSocket({ socketPort, sessionId }: Options) {
   const wsRef = useRef<WebSocket | null>(null);
   const [state, setState] = useState<State>(INITIAL);
+  // Tracks which use_case_id we asked for last via funcTest.loadMappings,
+  // so the response handler knows where to file the result. Plain ref —
+  // the server echoes the list without the use-case id.
+  const pendingMappingsUseCaseRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!socketPort || !sessionId) return;
@@ -120,6 +171,27 @@ export function useFlowSocket({ socketPort, sessionId }: Options) {
             lastStepsSaveAt: new Date().toISOString(),
             error: parsed.ok ? null : parsed.error || "Steps save failed",
           }));
+        } else if (verb === "botJob.blocks") {
+          const parsed = parseBody<BotJobBlock[]>() ?? [];
+          setState(s => ({ ...s, blocks: parsed }));
+        } else if (verb === "botJob.inputInstructions") {
+          const parsed = parseBody<BotJobInputInstruction[]>() ?? [];
+          setState(s => ({ ...s, inputInstructions: parsed }));
+        } else if (verb === "useCase.listResponse") {
+          const parsed = parseBody<FlowUseCase[]>() ?? [];
+          setState(s => ({ ...s, useCases: parsed }));
+        } else if (verb === "funcTest.mappingsLoaded") {
+          // The Flow tab requests this with a useCaseId in body — server echoes
+          // the full list back, but doesn't tell us WHICH use case it was for.
+          // We track the in-flight request so we can stash by use-case id.
+          const parsed = parseBody<FlowMapping[]>() ?? [];
+          const ucId = pendingMappingsUseCaseRef.current;
+          if (ucId) {
+            setState(s => ({
+              ...s,
+              mappingsByUseCase: { ...s.mappingsByUseCase, [ucId]: parsed },
+            }));
+          }
         }
       } catch (e) {
         setState(s => ({
@@ -199,5 +271,53 @@ export function useFlowSocket({ socketPort, sessionId }: Options) {
     })) setState(s => ({ ...s, savingSteps: false, error: "Socket not connected." }));
   }, [send, sessionId]);
 
-  return { ...state, loadFlows, saveFlow, deleteFlow, loadSteps, saveSteps };
+  // ── Phase 2c: autocomplete sources for the inspector ──────────────────
+  const loadBlocks = useCallback((botJobId: number) => {
+    if (!botJobId || botJobId <= 0) {
+      setState(s => ({ ...s, blocks: [] }));
+      return;
+    }
+    if (!send({
+      type: "botJob.getBlocks",
+      sessionId, botJobId, body: JSON.stringify({ botJobId }),
+    })) setState(s => ({ ...s, error: "Socket not connected." }));
+  }, [send, sessionId]);
+
+  const loadInputInstructions = useCallback((botJobId: number) => {
+    if (!botJobId || botJobId <= 0) {
+      setState(s => ({ ...s, inputInstructions: [] }));
+      return;
+    }
+    if (!send({
+      type: "botJob.getInputInstructions",
+      sessionId, botJobId, body: JSON.stringify({ botJobId }),
+    })) setState(s => ({ ...s, error: "Socket not connected." }));
+  }, [send, sessionId]);
+
+  const loadUseCasesForFlow = useCallback((botJobId: number) => {
+    if (!botJobId || botJobId <= 0) {
+      setState(s => ({ ...s, useCases: [] }));
+      return;
+    }
+    if (!send({
+      type: "useCase.list",
+      sessionId, botJobId, body: JSON.stringify({ botJobId }),
+    })) setState(s => ({ ...s, error: "Socket not connected." }));
+  }, [send, sessionId]);
+
+  const loadMappingsForUseCase = useCallback((useCaseId: number) => {
+    if (!useCaseId || useCaseId <= 0) return;
+    if (state.mappingsByUseCase[useCaseId]) return; // already cached
+    pendingMappingsUseCaseRef.current = useCaseId;
+    if (!send({
+      type: "funcTest.loadMappings",
+      sessionId, body: JSON.stringify({ useCaseId }),
+    })) setState(s => ({ ...s, error: "Socket not connected." }));
+  }, [send, sessionId, state.mappingsByUseCase]);
+
+  return {
+    ...state,
+    loadFlows, saveFlow, deleteFlow, loadSteps, saveSteps,
+    loadBlocks, loadInputInstructions, loadUseCasesForFlow, loadMappingsForUseCase,
+  };
 }

@@ -15,6 +15,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { mtT as t } from "./useMtT";
 import { useFlowSocket } from "./flow/useFlowSocket";
 import type { Flow, FlowStep, FlowStepType } from "./flow/types";
+import StepInspector from "./flow/StepInspector";
 
 interface FlowTabProps {
   socketPort: number;
@@ -115,7 +116,9 @@ export default function FlowTab({ socketPort, botJobId, botJobName }: FlowTabPro
     flows, loadingFlows,
     savingFlow, lastFlowSaveAt, lastFlowSaved, lastFlowDeletedId,
     steps: serverSteps, loadingSteps, savingSteps, lastStepsSaveAt, lastStepsSaveOk,
+    blocks, useCases, inputInstructions, mappingsByUseCase,
     loadFlows, saveFlow, deleteFlow, loadSteps, saveSteps,
+    loadBlocks, loadInputInstructions, loadUseCasesForFlow, loadMappingsForUseCase,
   } = useFlowSocket({ socketPort, sessionId });
 
   const [currentFlowId, setCurrentFlowId] = useState<number | null>(null);
@@ -123,11 +126,16 @@ export default function FlowTab({ socketPort, botJobId, botJobName }: FlowTabPro
   const [stepsBaseline, setStepsBaseline] = useState<FlowStep[]>([]);
   const [selectedStepIdx, setSelectedStepIdx] = useState<number | null>(null);
 
-  // Bot job change → load flows + reset
+  // Bot job change → load flows + autocomplete sources for the inspector + reset
   useEffect(() => {
     setCurrentFlowId(null);
-    if (botJobId > 0 && connected) loadFlows(botJobId);
-  }, [botJobId, connected, loadFlows]);
+    if (botJobId > 0 && connected) {
+      loadFlows(botJobId);
+      loadBlocks(botJobId);
+      loadInputInstructions(botJobId);
+      loadUseCasesForFlow(botJobId);
+    }
+  }, [botJobId, connected, loadFlows, loadBlocks, loadInputInstructions, loadUseCasesForFlow]);
 
   // Flows arrived → pick remembered or first
   useEffect(() => {
@@ -239,6 +247,21 @@ export default function FlowTab({ socketPort, botJobId, botJobName }: FlowTabPro
     setSelectedStepIdx(null);
     if (currentFlowId) clearStepsDraft(currentFlowId);
   };
+
+  // ── Inspector wiring ────────────────────────────────────────────────────
+  const onInspectorChange = (next: FlowStep) => {
+    if (selectedStepIdx === null) return;
+    setSteps(prev => prev.map((s, i) => (i === selectedStepIdx ? next : s)));
+  };
+
+  const instructionLabel = (instructionId: number): string => {
+    const inst = inputInstructions.find(i => i.id === instructionId);
+    if (!inst) return `id ${instructionId}`;
+    const label = inst.actions ? inst.actions.replace(/^I:/, "") : (inst.name || `id ${instructionId}`);
+    return inst.blockName ? `${inst.blockName} · ${label}` : label;
+  };
+
+  const mappingsForUseCase = (ucId: number) => mappingsByUseCase[ucId] ?? [];
 
   // ── handlers ────────────────────────────────────────────────────────────
   const onCreate = () => {
@@ -547,19 +570,38 @@ export default function FlowTab({ socketPort, botJobId, botJobName }: FlowTabPro
           )}
         </section>
 
-        {/* ── RIGHT (inspector placeholder) ──────────────────────── */}
+        {/* ── RIGHT (inspector) ──────────────────────────────────── */}
         <section style={panelStyle()}>
           <header style={panelHeader()}>
             <span>{t("flow.inspector")}</span>
+            {selectedStepIdx !== null && steps[selectedStepIdx] && (
+              <span style={{ fontSize: 11, color: "var(--cs-dim, #666)", fontWeight: 400 }}>
+                {t("flow.inspector.stepN").replace("{n}", String(selectedStepIdx + 1))}
+              </span>
+            )}
           </header>
-          <div style={{
-            padding: 24, flex: 1, display: "flex", flexDirection: "column",
-            alignItems: "center", justifyContent: "center", gap: 12,
-            color: "var(--cs-dim, #666)", textAlign: "center",
-          }}>
-            <div style={{ fontSize: 32, opacity: 0.3 }}>🔍</div>
-            <div style={{ fontSize: 11, maxWidth: 240 }}>{t("flow.inspectorPhase2cHint")}</div>
-          </div>
+          {selectedStepIdx === null || !steps[selectedStepIdx] ? (
+            <div style={{
+              padding: 24, flex: 1, display: "flex", flexDirection: "column",
+              alignItems: "center", justifyContent: "center", gap: 12,
+              color: "var(--cs-dim, #666)", textAlign: "center",
+            }}>
+              <div style={{ fontSize: 32, opacity: 0.3 }}>🔍</div>
+              <div style={{ fontSize: 11, maxWidth: 240 }}>
+                {steps.length === 0 ? t("flow.inspector.noSteps") : t("flow.inspector.pickStep")}
+              </div>
+            </div>
+          ) : (
+            <StepInspector
+              step={steps[selectedStepIdx]}
+              onChange={onInspectorChange}
+              blocks={blocks}
+              useCases={useCases}
+              mappingsForUseCase={mappingsForUseCase}
+              loadMappingsForUseCase={loadMappingsForUseCase}
+              instructionLabel={instructionLabel}
+            />
+          )}
         </section>
       </div>
     </div>
