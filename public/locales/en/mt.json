@@ -85,7 +85,27 @@
     "editorComingSoon":    "Step editor coming next",
     "editorPhase2bHint":   "Phase 2b adds the step cards (Add API / UI / Wait / Assert, reorder, delete). Schema is ready.",
     "inspector":           "Inspector",
-    "inspectorPhase2cHint":"Phase 2c puts the per-step payload editor + captures + substitutions tables here when a step card is selected."
+    "inspectorPhase2cHint":"Phase 2c puts the per-step payload editor + captures + substitutions tables here when a step card is selected.",
+    "loadingSteps":        "Loading steps…",
+    "noStepsHint":         "No steps yet. Add one below to get started.",
+    "unnamedStep":         "(unnamed)",
+    "addStep":             "Add step",
+    "addStep_API":         "Add an API step (HTTP call against a loaded spec)",
+    "addStep_UI":          "Add a UI step (bot-job block execution)",
+    "addStep_WAIT":        "Add a Wait step (fixed delay)",
+    "addStep_ASSERT":      "Add an Assert step (variable expression check)",
+    "moveUp":              "Move up",
+    "moveDown":            "Move down",
+    "deleteStep":          "Delete step",
+    "save":                "💾 Save",
+    "saving":              "Saving…",
+    "saveStepsTitle":      "Persist current step list to the scanner database",
+    "saveDisabledNoConn":     "Disconnected — wait for the green connection dot.",
+    "saveDisabledNoFlow":     "No flow selected — pick or create one.",
+    "saveDisabledNoChanges":  "Nothing to save — make a step change first.",
+    "discard":             "Discard",
+    "discardStepsTitle":   "Revert step list to the last saved state — your unsaved edits will be lost.",
+    "unsavedSteps":        "You have unsaved step changes"
   },
 
   "header": {

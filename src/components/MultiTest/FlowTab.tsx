@@ -14,7 +14,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { mtT as t } from "./useMtT";
 import { useFlowSocket } from "./flow/useFlowSocket";
-import type { Flow } from "./flow/types";
+import type { Flow, FlowStep, FlowStepType } from "./flow/types";
 
 interface FlowTabProps {
   socketPort: number;
@@ -39,6 +39,71 @@ function rememberFlowId(botJobId: number, flowId: number) {
   try { localStorage.setItem(activeFlowKey(botJobId), String(flowId)); } catch {}
 }
 
+// ── Draft cache for flow steps per (flowId) — survives refresh ─────────
+function stepsDraftKey(flowId: number) { return `flow.stepsDraft.${flowId}`; }
+function readStepsDraft(flowId: number): FlowStep[] | null {
+  if (!flowId) return null;
+  try {
+    const raw = localStorage.getItem(stepsDraftKey(flowId));
+    return raw ? (JSON.parse(raw) as FlowStep[]) : null;
+  } catch { return null; }
+}
+function writeStepsDraft(flowId: number, steps: FlowStep[]) {
+  if (!flowId) return;
+  try { localStorage.setItem(stepsDraftKey(flowId), JSON.stringify(steps)); } catch {}
+}
+function clearStepsDraft(flowId: number) {
+  if (!flowId) return;
+  try { localStorage.removeItem(stepsDraftKey(flowId)); } catch {}
+}
+
+// ── Default empty payload per step type — gives Phase 2c something to edit ──
+function defaultPayload(type: FlowStepType): string {
+  switch (type) {
+    case "API":    return JSON.stringify({ method: "GET", path: "/", headers: {}, captures: [], substitutes: [] });
+    case "UI":     return JSON.stringify({ refBlockId: 0, useCaseId: null, substitutes: [], captures: [] });
+    case "WAIT":   return JSON.stringify({ seconds: 1 });
+    case "ASSERT": return JSON.stringify({ expr: "", expected: "" });
+  }
+}
+
+// ── One-line summary of a step's payload, for the card ──
+function stepSummary(step: FlowStep): string {
+  try {
+    const p = step.payloadJson ? JSON.parse(step.payloadJson) : {};
+    switch (step.stepType) {
+      case "API":    return `${p.method ?? "GET"} ${p.path ?? "/"}`;
+      case "UI":     return p.refBlockId ? `block #${p.refBlockId}` : "(no block selected)";
+      case "WAIT":   return `${p.seconds ?? 0}s`;
+      case "ASSERT": return p.expr ? String(p.expr) : "(no expression)";
+    }
+  } catch {
+    return "(invalid payload)";
+  }
+  return "";
+}
+
+// ── Order-insensitive (by id+order) compare to drive dirty detection ──
+function sameSteps(a: FlowStep[], b: FlowStep[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i], y = b[i];
+    if (x.stepType !== y.stepType) return false;
+    if ((x.name ?? "") !== (y.name ?? "")) return false;
+    if ((x.payloadJson ?? "") !== (y.payloadJson ?? "")) return false;
+    if (x.stepOrder !== y.stepOrder) return false;
+  }
+  return true;
+}
+
+// ── Type-specific badge palette ──
+const STEP_BADGE: Record<FlowStepType, { bg: string; fg: string; icon: string; label: string }> = {
+  API:    { bg: "#1565C020", fg: "#1565C0", icon: "▶", label: "API"    },
+  UI:     { bg: "#2E7D3220", fg: "#2E7D32", icon: "▶", label: "UI"     },
+  WAIT:   { bg: "#E6510020", fg: "#E65100", icon: "⏱", label: "WAIT"   },
+  ASSERT: { bg: "#9C27B020", fg: "#9C27B0", icon: "✓", label: "ASSERT" },
+};
+
 export default function FlowTab({ socketPort, botJobId, botJobName }: FlowTabProps) {
   const sessionId = useMemo(
     () => `flow-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
@@ -49,10 +114,14 @@ export default function FlowTab({ socketPort, botJobId, botJobName }: FlowTabPro
     connected, error,
     flows, loadingFlows,
     savingFlow, lastFlowSaveAt, lastFlowSaved, lastFlowDeletedId,
-    loadFlows, saveFlow, deleteFlow,
+    steps: serverSteps, loadingSteps, savingSteps, lastStepsSaveAt, lastStepsSaveOk,
+    loadFlows, saveFlow, deleteFlow, loadSteps, saveSteps,
   } = useFlowSocket({ socketPort, sessionId });
 
   const [currentFlowId, setCurrentFlowId] = useState<number | null>(null);
+  const [steps, setSteps] = useState<FlowStep[]>([]);
+  const [stepsBaseline, setStepsBaseline] = useState<FlowStep[]>([]);
+  const [selectedStepIdx, setSelectedStepIdx] = useState<number | null>(null);
 
   // Bot job change → load flows + reset
   useEffect(() => {
@@ -96,6 +165,80 @@ export default function FlowTab({ socketPort, botJobId, botJobName }: FlowTabPro
     () => flows.find(f => f.id === currentFlowId),
     [flows, currentFlowId],
   );
+
+  // ── current flow change → load steps + reset ────────────────────────────
+  useEffect(() => {
+    setSteps([]);
+    setStepsBaseline([]);
+    setSelectedStepIdx(null);
+    if (currentFlowId && connected) loadSteps(currentFlowId);
+  }, [currentFlowId, connected, loadSteps]);
+
+  // ── server steps arrived → reconcile with draft ─────────────────────────
+  useEffect(() => {
+    if (serverSteps === null || !currentFlowId) return;
+    setStepsBaseline(serverSteps);
+    const draft = readStepsDraft(currentFlowId);
+    setSteps(draft ?? serverSteps);
+  }, [serverSteps, currentFlowId]);
+
+  // ── persist current state to draft on every change ──────────────────────
+  useEffect(() => {
+    if (currentFlowId) writeStepsDraft(currentFlowId, steps);
+  }, [currentFlowId, steps]);
+
+  // ── after a successful steps save → baseline := current, drop draft ────
+  useEffect(() => {
+    if (lastStepsSaveOk === true && lastStepsSaveAt && currentFlowId) {
+      // Reload from server so any newly inserted rows get their assigned ids
+      loadSteps(currentFlowId);
+      clearStepsDraft(currentFlowId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastStepsSaveAt]);
+
+  const stepsDirty = useMemo(() => !sameSteps(steps, stepsBaseline), [steps, stepsBaseline]);
+
+  // ── step list handlers ──────────────────────────────────────────────────
+  const onAddStep = (type: FlowStepType) => {
+    if (!currentFlowId) return;
+    setSteps(prev => [...prev, {
+      flowId: currentFlowId,
+      stepOrder: prev.length,
+      name: `${type} step ${prev.length + 1}`,
+      stepType: type,
+      payloadJson: defaultPayload(type),
+    }]);
+  };
+
+  const onDeleteStep = (idx: number) => {
+    setSteps(prev => prev.filter((_, i) => i !== idx).map((s, i) => ({ ...s, stepOrder: i })));
+    setSelectedStepIdx(null);
+  };
+
+  const onMoveStep = (idx: number, dir: -1 | 1) => {
+    setSteps(prev => {
+      const j = idx + dir;
+      if (j < 0 || j >= prev.length) return prev;
+      const next = prev.slice();
+      [next[idx], next[j]] = [next[j], next[idx]];
+      return next.map((s, i) => ({ ...s, stepOrder: i }));
+    });
+    setSelectedStepIdx(prev => (prev === idx ? idx + dir : prev));
+  };
+
+  const onSaveSteps = () => {
+    if (!currentFlowId || !stepsDirty || savingSteps) return;
+    // Re-stamp orders before sending so server-side order matches what user sees.
+    const ordered = steps.map((s, i) => ({ ...s, stepOrder: i, flowId: currentFlowId }));
+    saveSteps(currentFlowId, ordered);
+  };
+
+  const onDiscardSteps = () => {
+    setSteps(stepsBaseline);
+    setSelectedStepIdx(null);
+    if (currentFlowId) clearStepsDraft(currentFlowId);
+  };
 
   // ── handlers ────────────────────────────────────────────────────────────
   const onCreate = () => {
@@ -240,34 +383,168 @@ export default function FlowTab({ socketPort, botJobId, botJobName }: FlowTabPro
           </div>
         </section>
 
-        {/* ── CENTER (steps placeholder) ─────────────────────────── */}
+        {/* ── CENTER (step list) ─────────────────────────────────── */}
         <section style={panelStyle()}>
           <header style={panelHeader()}>
-            <span>{t("flow.steps")}</span>
-            <span style={{ fontSize: 11, color: "var(--cs-dim, #666)" }}>
-              {currentFlow ? currentFlow.name : t("flow.noFlowSelected")}
+            <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              {t("flow.steps")}
+              {stepsDirty && (
+                <span title={t("flow.unsavedSteps")} style={{ color: "#E65100", fontSize: 10 }}>●</span>
+              )}
+              <span style={{ fontSize: 11, color: "var(--cs-dim, #666)", fontWeight: 400 }}>
+                {currentFlow ? `(${currentFlow.name})` : ""}
+              </span>
             </span>
+            {currentFlow && (
+              <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 11, color: "var(--cs-dim, #666)" }}>{steps.length}</span>
+                {stepsDirty && (
+                  <button
+                    onClick={onDiscardSteps}
+                    title={t("flow.discardStepsTitle")}
+                    style={{
+                      border: "1px solid var(--cs-border, #ddd)", background: "transparent",
+                      padding: "2px 8px", borderRadius: 3, fontSize: 11, cursor: "pointer",
+                    }}
+                  >{t("flow.discard")}</button>
+                )}
+                {(() => {
+                  const canSave = stepsDirty && !savingSteps && !!currentFlowId && connected;
+                  const reason = !connected
+                    ? t("flow.saveDisabledNoConn")
+                    : !currentFlowId
+                      ? t("flow.saveDisabledNoFlow")
+                      : !stepsDirty
+                        ? t("flow.saveDisabledNoChanges")
+                        : t("flow.saveStepsTitle");
+                  return (
+                    <button
+                      onClick={onSaveSteps}
+                      disabled={!canSave}
+                      title={reason}
+                      style={{
+                        border: "none",
+                        background: canSave ? "#2E7D32" : "#9e9e9e",
+                        color: "#fff", padding: "3px 10px", borderRadius: 3, fontSize: 11,
+                        fontWeight: 600, cursor: canSave ? "pointer" : "not-allowed",
+                      }}
+                    >{savingSteps ? t("flow.saving") : t("flow.save")}</button>
+                  );
+                })()}
+              </span>
+            )}
           </header>
 
-          <div style={{
-            padding: 24, flex: 1, display: "flex", flexDirection: "column",
-            alignItems: "center", justifyContent: "center", gap: 12,
-            color: "var(--cs-dim, #666)", textAlign: "center",
-          }}>
-            {!currentFlow ? (
-              <>
-                <div style={{ fontSize: 42, opacity: 0.3 }}>🔀</div>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>{t("flow.pickFlowToStart")}</div>
-                <div style={{ fontSize: 11, maxWidth: 360 }}>{t("flow.pickFlowHint")}</div>
-              </>
-            ) : (
-              <>
-                <div style={{ fontSize: 42, opacity: 0.3 }}>🚧</div>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>{t("flow.editorComingSoon")}</div>
-                <div style={{ fontSize: 11, maxWidth: 360 }}>{t("flow.editorPhase2bHint")}</div>
-              </>
-            )}
-          </div>
+          {!currentFlow ? (
+            <div style={{
+              padding: 24, flex: 1, display: "flex", flexDirection: "column",
+              alignItems: "center", justifyContent: "center", gap: 12,
+              color: "var(--cs-dim, #666)", textAlign: "center",
+            }}>
+              <div style={{ fontSize: 42, opacity: 0.3 }}>🔀</div>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>{t("flow.pickFlowToStart")}</div>
+              <div style={{ fontSize: 11, maxWidth: 360 }}>{t("flow.pickFlowHint")}</div>
+            </div>
+          ) : (
+            <div style={{
+              padding: 10, flex: 1, overflow: "auto",
+              display: "flex", flexDirection: "column", gap: 6,
+            }}>
+              {loadingSteps && (
+                <div style={{ fontSize: 11, color: "var(--cs-dim, #666)", padding: 8, textAlign: "center" }}>
+                  {t("flow.loadingSteps")}
+                </div>
+              )}
+
+              {!loadingSteps && steps.length === 0 && (
+                <EmptyHint text={t("flow.noStepsHint")} />
+              )}
+
+              {steps.map((step, idx) => {
+                const badge = STEP_BADGE[step.stepType];
+                const selected = selectedStepIdx === idx;
+                const canUp = idx > 0;
+                const canDown = idx < steps.length - 1;
+                return (
+                  <div
+                    key={step.id ?? `new-${idx}`}
+                    onClick={() => setSelectedStepIdx(idx)}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 8,
+                      padding: "8px 10px",
+                      background: selected ? "#1565C015" : "var(--cs-card-bg, #fff)",
+                      border: `2px solid ${selected ? "#1565C0" : "var(--cs-border, #ddd)"}`,
+                      borderRadius: 6, cursor: "pointer",
+                    }}
+                  >
+                    <span style={{
+                      fontSize: 11, fontWeight: 700, color: "var(--cs-dim, #666)",
+                      minWidth: 20, textAlign: "right", fontFamily: MONO,
+                    }}>{idx + 1}.</span>
+                    <span style={{
+                      background: badge.bg, color: badge.fg,
+                      padding: "2px 8px", borderRadius: 3,
+                      fontSize: 10, fontWeight: 700, fontFamily: MONO,
+                    }}>{badge.icon} {badge.label}</span>
+                    <span style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {step.name || t("flow.unnamedStep")}
+                      </span>
+                      <span style={{ fontSize: 11, color: "var(--cs-dim, #666)", fontFamily: MONO, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {stepSummary(step)}
+                      </span>
+                    </span>
+                    <button
+                      onClick={e => { e.stopPropagation(); onMoveStep(idx, -1); }}
+                      disabled={!canUp}
+                      title={t("flow.moveUp")}
+                      style={iconBtn(canUp)}
+                    >▲</button>
+                    <button
+                      onClick={e => { e.stopPropagation(); onMoveStep(idx, +1); }}
+                      disabled={!canDown}
+                      title={t("flow.moveDown")}
+                      style={iconBtn(canDown)}
+                    >▼</button>
+                    <button
+                      onClick={e => { e.stopPropagation(); onDeleteStep(idx); }}
+                      title={t("flow.deleteStep")}
+                      style={{ ...iconBtn(true), color: "#C62828" }}
+                    >✕</button>
+                  </div>
+                );
+              })}
+
+              {/* + Add step row */}
+              <div style={{
+                marginTop: 8, padding: 8,
+                background: "var(--cs-soft-bg, #f5f5f5)",
+                border: "1px dashed var(--cs-border, #ccc)",
+                borderRadius: 6,
+                display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap",
+              }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: "var(--cs-dim, #666)" }}>
+                  {t("flow.addStep")}:
+                </span>
+                {(["API", "UI", "WAIT", "ASSERT"] as FlowStepType[]).map(type => {
+                  const b = STEP_BADGE[type];
+                  return (
+                    <button
+                      key={type}
+                      onClick={() => onAddStep(type)}
+                      title={t(`flow.addStep_${type}`)}
+                      style={{
+                        border: "none", background: b.fg, color: "#fff",
+                        padding: "4px 10px", borderRadius: 4,
+                        fontSize: 11, fontWeight: 700, fontFamily: MONO,
+                        cursor: "pointer",
+                      }}
+                    >+ {b.label}</button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </section>
 
         {/* ── RIGHT (inspector placeholder) ──────────────────────── */}
@@ -329,5 +606,17 @@ function btn(color: string, enabled: boolean, extra: React.CSSProperties): React
     cursor: enabled ? "pointer" : "not-allowed",
     opacity: enabled ? 1 : 0.7,
     ...extra,
+  };
+}
+
+function iconBtn(enabled: boolean): React.CSSProperties {
+  return {
+    border: "1px solid var(--cs-border, #ddd)",
+    background: "transparent",
+    padding: "2px 6px", borderRadius: 3,
+    fontSize: 10, cursor: enabled ? "pointer" : "not-allowed",
+    opacity: enabled ? 1 : 0.4,
+    color: "var(--cs-dim, #666)",
+    minWidth: 26, fontFamily: MONO,
   };
 }
