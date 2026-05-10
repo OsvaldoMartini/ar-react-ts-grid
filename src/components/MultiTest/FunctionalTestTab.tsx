@@ -16,6 +16,7 @@ import type {
   ApiFieldRow,
   BotJobInputField,
   FieldMapping,
+  UseCase,
 } from "./funcTest/types";
 
 interface FunctionalTestTabProps {
@@ -68,32 +69,48 @@ function stripActionPrefix(actions: string): string {
 // is just a crash-safety net so unsaved work isn't lost on reload.
 // ─────────────────────────────────────────────────────────────
 
-function draftKey(botJobId: number) {
-  return `funcTest.draft.botJob.${botJobId}`;
+function draftKey(botJobId: number, useCaseId: number) {
+  return `funcTest.draft.botJob.${botJobId}.uc.${useCaseId}`;
 }
 
-function readDraft(botJobId: number): FieldMapping[] | null {
-  if (!botJobId) return null;
+function readDraft(botJobId: number, useCaseId: number): FieldMapping[] | null {
+  if (!botJobId || !useCaseId) return null;
   try {
-    const raw = localStorage.getItem(draftKey(botJobId));
+    const raw = localStorage.getItem(draftKey(botJobId, useCaseId));
     return raw ? (JSON.parse(raw) as FieldMapping[]) : null;
   } catch {
     return null;
   }
 }
 
-function writeDraft(botJobId: number, mappings: FieldMapping[]) {
-  if (!botJobId) return;
+function writeDraft(botJobId: number, useCaseId: number, mappings: FieldMapping[]) {
+  if (!botJobId || !useCaseId) return;
   try {
-    localStorage.setItem(draftKey(botJobId), JSON.stringify(mappings));
+    localStorage.setItem(draftKey(botJobId, useCaseId), JSON.stringify(mappings));
   } catch {
     // quota or private mode — silent
   }
 }
 
-function clearDraft(botJobId: number) {
-  if (!botJobId) return;
-  try { localStorage.removeItem(draftKey(botJobId)); } catch {}
+function clearDraft(botJobId: number, useCaseId: number) {
+  if (!botJobId || !useCaseId) return;
+  try { localStorage.removeItem(draftKey(botJobId, useCaseId)); } catch {}
+}
+
+// ── Remembered active use case per bot job — so reopening the tab returns
+//    the user to the same use case they were on. ─────────────────────────
+function activeUcKey(botJobId: number) {
+  return `funcTest.activeUseCase.botJob.${botJobId}`;
+}
+function readRememberedUseCaseId(botJobId: number): number | null {
+  if (!botJobId) return null;
+  const raw = localStorage.getItem(activeUcKey(botJobId));
+  const n = raw ? parseInt(raw, 10) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+function rememberUseCaseId(botJobId: number, useCaseId: number) {
+  if (!botJobId || !useCaseId) return;
+  try { localStorage.setItem(activeUcKey(botJobId), String(useCaseId)); } catch {}
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -216,7 +233,10 @@ export default function FunctionalTestTab({
     connected, loading, saving, error,
     fields: botFields, persistedMappings,
     lastSaveOk, lastSaveAt,
-    loadInputInstructions, loadMappings, saveMappings,
+    useCases, lastUseCaseSaveAt, lastUseCaseSaved, lastUseCaseDeletedId,
+    loadInputInstructions,
+    loadUseCases, saveUseCase, deleteUseCase,
+    loadMappings, saveMappings,
   } = useFuncTestSocket({ socketPort, sessionId });
 
   const apiRows = useMemo(() => buildApiFieldRows(loadedSpecs), [loadedSpecs]);
@@ -235,50 +255,98 @@ export default function FunctionalTestTab({
   const [mappings, setMappings] = useState<FieldMapping[]>([]);
   const [savedBaseline, setSavedBaseline] = useState<FieldMapping[]>([]); // last DB-confirmed state
   const [armedApiKey, setArmedApiKey] = useState<string | null>(null);
+  const [currentUseCaseId, setCurrentUseCaseId] = useState<number | null>(null);
 
   // Lookup helpers for the centre column display + server conversion.
   const apiByKey = useMemo(() => new Map(apiRows.map(r => [r.key, r])), [apiRows]);
   const botById  = useMemo(() => new Map(botFields.map(f => [f.id, f])), [botFields]);
 
-  // ── Bot-job change: trigger DB load + reset armed state ─────────────────
+  // ── Bot-job change: load use cases for the new job + reset armed ────────
   useEffect(() => {
     setArmedApiKey(null);
+    setCurrentUseCaseId(null);
+    setMappings([]);
+    setSavedBaseline([]);
     if (botJobId > 0 && connected) {
-      loadMappings(botJobId);
+      loadUseCases(botJobId);
+    }
+  }, [botJobId, connected, loadUseCases]);
+
+  // ── Use cases arrived: pick the remembered one (if still present) or
+  //    fall back to the first ("Default" by id ordering). ─────────────────
+  useEffect(() => {
+    if (botJobId <= 0 || useCases.length === 0) return;
+    setCurrentUseCaseId(prev => {
+      if (prev && useCases.some(u => u.id === prev)) return prev;
+      const remembered = readRememberedUseCaseId(botJobId);
+      if (remembered && useCases.some(u => u.id === remembered)) return remembered;
+      return useCases[0].id;
+    });
+  }, [useCases, botJobId]);
+
+  // ── Current use case changed: persist choice + load its mappings ────────
+  useEffect(() => {
+    if (currentUseCaseId && botJobId > 0) {
+      rememberUseCaseId(botJobId, currentUseCaseId);
+      loadMappings(currentUseCaseId);
     } else {
       setMappings([]);
       setSavedBaseline([]);
     }
-  }, [botJobId, connected, loadMappings]);
+    setArmedApiKey(null);
+  }, [currentUseCaseId, botJobId, loadMappings]);
 
-  // ── DB load arrived: reconcile with any local draft ─────────────────────
-  // If a draft exists (user had unsaved work before refresh), prefer the
-  // draft; otherwise hydrate from the DB result. The savedBaseline is
-  // ALWAYS the DB result so dirty-detection is correct either way.
+  // ── DB mapping load arrived: reconcile with any local draft ─────────────
+  // Draft wins if present (user had unsaved work before refresh); otherwise
+  // hydrate from DB. savedBaseline is ALWAYS the DB state so dirty detection
+  // works correctly either way.
   useEffect(() => {
-    if (persistedMappings === null) return; // not loaded yet
+    if (persistedMappings === null || !currentUseCaseId) return;
     const fromDb = fromServer(persistedMappings);
     setSavedBaseline(fromDb);
-    const draft = readDraft(botJobId);
+    const draft = readDraft(botJobId, currentUseCaseId);
     setMappings(draft ?? fromDb);
-  }, [persistedMappings, botJobId]);
+  }, [persistedMappings, botJobId, currentUseCaseId]);
 
   // ── Persist current state to draft on every change ──────────────────────
   useEffect(() => {
-    if (botJobId > 0) writeDraft(botJobId, mappings);
-  }, [botJobId, mappings]);
+    if (botJobId > 0 && currentUseCaseId) writeDraft(botJobId, currentUseCaseId, mappings);
+  }, [botJobId, currentUseCaseId, mappings]);
 
   // ── After a successful save, refresh the baseline and drop the draft ───
   useEffect(() => {
-    if (lastSaveOk === true && lastSaveAt) {
+    if (lastSaveOk === true && lastSaveAt && currentUseCaseId) {
       setSavedBaseline(mappings);
-      clearDraft(botJobId);
+      clearDraft(botJobId, currentUseCaseId);
     }
     // intentionally only on lastSaveAt change — mappings is the user's current state
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastSaveAt]);
 
+  // ── After a successful use-case create/rename: refresh list + select it ─
+  useEffect(() => {
+    if (!lastUseCaseSaveAt || !lastUseCaseSaved || botJobId <= 0) return;
+    loadUseCases(botJobId);
+    if (lastUseCaseSaved.id) setCurrentUseCaseId(lastUseCaseSaved.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastUseCaseSaveAt]);
+
+  // ── After a successful use-case delete: refresh list + clear drafts ─────
+  useEffect(() => {
+    if (!lastUseCaseDeletedId || botJobId <= 0) return;
+    clearDraft(botJobId, lastUseCaseDeletedId);
+    if (currentUseCaseId === lastUseCaseDeletedId) setCurrentUseCaseId(null);
+    loadUseCases(botJobId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastUseCaseDeletedId]);
+
   const dirty = useMemo(() => !sameMappings(mappings, savedBaseline), [mappings, savedBaseline]);
+
+  const currentUseCase: UseCase | undefined = useMemo(
+    () => useCases.find(u => u.id === currentUseCaseId),
+    [useCases, currentUseCaseId],
+  );
+  const isDefaultUseCase = currentUseCase?.name === "Default";
 
   // ── interaction handlers ────────────────────────────────────
   const onClickApi = (key: string) => {
@@ -302,13 +370,44 @@ export default function FunctionalTestTab({
   };
 
   const onSave = () => {
-    if (!dirty || saving) return;
-    saveMappings(botJobId, toServer(mappings, apiByKey));
+    if (!dirty || saving || !currentUseCaseId) return;
+    saveMappings(botJobId, currentUseCaseId, toServer(mappings, apiByKey));
   };
 
   const onDiscardDraft = () => {
     setMappings(savedBaseline);
-    clearDraft(botJobId);
+    if (currentUseCaseId) clearDraft(botJobId, currentUseCaseId);
+  };
+
+  // ── Use case CRUD handlers ──────────────────────────────────────────────
+  const onCreateUseCase = () => {
+    if (botJobId <= 0) return;
+    const name = (window.prompt(t("funcTest.newUseCasePrompt"), "") || "").trim();
+    if (!name) return;
+    if (useCases.some(u => u.name.toLowerCase() === name.toLowerCase())) {
+      window.alert(t("funcTest.useCaseNameTaken"));
+      return;
+    }
+    saveUseCase({ botJobId, name, description: null });
+  };
+
+  const onRenameUseCase = () => {
+    if (!currentUseCase || isDefaultUseCase) return;
+    const next = (window.prompt(t("funcTest.renameUseCasePrompt"), currentUseCase.name) || "").trim();
+    if (!next || next === currentUseCase.name) return;
+    if (useCases.some(u => u.id !== currentUseCase.id && u.name.toLowerCase() === next.toLowerCase())) {
+      window.alert(t("funcTest.useCaseNameTaken"));
+      return;
+    }
+    saveUseCase({
+      id: currentUseCase.id, botJobId, name: next, description: currentUseCase.description,
+    });
+  };
+
+  const onDeleteUseCase = () => {
+    if (!currentUseCase || isDefaultUseCase) return;
+    if (!window.confirm(t("funcTest.deleteUseCaseConfirm").replace("{name}", currentUseCase.name))) return;
+    deleteUseCase(currentUseCase.id);
   };
 
   // ── derived sets for "is this card paired?" lookups ──────────
@@ -334,6 +433,61 @@ export default function FunctionalTestTab({
           }} />
           <span>{connected ? t("funcTest.connected") : t("funcTest.disconnected")}</span>
         </div>
+      </div>
+
+      {/* Use case selector */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
+        padding: "8px 10px",
+        background: "var(--cs-soft-bg, #f5f5f5)",
+        border: "1px solid var(--cs-border, #ddd)",
+        borderRadius: 6, fontSize: 12,
+      }}>
+        <span style={{ fontWeight: 600 }}>{t("funcTest.useCase")}:</span>
+        <select
+          value={currentUseCaseId ?? ""}
+          onChange={e => {
+            const v = parseInt(e.target.value, 10);
+            if (Number.isFinite(v) && v > 0) setCurrentUseCaseId(v);
+          }}
+          disabled={useCases.length === 0 || botJobId <= 0}
+          style={{
+            padding: "4px 8px", border: "1px solid var(--cs-border, #ddd)",
+            borderRadius: 4, fontSize: 12, minWidth: 180,
+          }}
+        >
+          {useCases.length === 0 && <option value="">{t("funcTest.noUseCases")}</option>}
+          {useCases.map(u => (
+            <option key={u.id} value={u.id}>{u.name}</option>
+          ))}
+        </select>
+
+        <button
+          onClick={onCreateUseCase}
+          disabled={botJobId <= 0 || !connected}
+          title={t("funcTest.newUseCaseTitle")}
+          style={btnStyle("#1565C0", botJobId > 0 && connected)}
+        >➕ {t("funcTest.newUseCase")}</button>
+
+        <button
+          onClick={onRenameUseCase}
+          disabled={!currentUseCase || isDefaultUseCase}
+          title={isDefaultUseCase ? t("funcTest.cannotRenameDefault") : t("funcTest.renameUseCaseTitle")}
+          style={btnStyle("#37474F", !!currentUseCase && !isDefaultUseCase)}
+        >✏️ {t("funcTest.renameUseCase")}</button>
+
+        <button
+          onClick={onDeleteUseCase}
+          disabled={!currentUseCase || isDefaultUseCase}
+          title={isDefaultUseCase ? t("funcTest.cannotDeleteDefault") : t("funcTest.deleteUseCaseTitle")}
+          style={btnStyle("#C62828", !!currentUseCase && !isDefaultUseCase)}
+        >🗑 {t("funcTest.deleteUseCase")}</button>
+
+        {currentUseCase && (
+          <span style={{ marginLeft: "auto", color: "var(--cs-dim, #666)", fontStyle: "italic" }}>
+            {currentUseCase.description || ""}
+          </span>
+        )}
       </div>
 
       {error && (
@@ -588,4 +742,15 @@ function panelHeader(): React.CSSProperties {
 
 function truncate(s: string, n: number): string {
   return s.length <= n ? s : s.slice(0, n - 1) + "…";
+}
+
+function btnStyle(color: string, enabled: boolean): React.CSSProperties {
+  return {
+    border: "none",
+    background: enabled ? color : "#9e9e9e",
+    color: "#fff", padding: "4px 10px", borderRadius: 4,
+    fontSize: 11, fontWeight: 600,
+    cursor: enabled ? "pointer" : "not-allowed",
+    opacity: enabled ? 1 : 0.7,
+  };
 }

@@ -38,7 +38,21 @@
     "saveTitle":     "Persist current mappings to the scanner database",
     "discard":       "Discard",
     "discardDraft":  "Revert to last saved state — your unsaved edits will be lost",
-    "unsavedHint":   "You have unsaved mapping changes"
+    "unsavedHint":   "You have unsaved mapping changes",
+    "useCase":              "Use case",
+    "noUseCases":           "(none — load a bot job first)",
+    "newUseCase":           "New",
+    "newUseCaseTitle":      "Create a new named use case under this bot job",
+    "newUseCasePrompt":     "Name for the new use case (e.g. \"Login\", \"Transfer\"):",
+    "renameUseCase":        "Rename",
+    "renameUseCaseTitle":   "Rename the current use case",
+    "renameUseCasePrompt":  "New name for this use case:",
+    "deleteUseCase":        "Delete",
+    "deleteUseCaseTitle":   "Delete this use case AND its mappings",
+    "deleteUseCaseConfirm": "Delete use case \"{name}\"? Its mappings will also be deleted. This cannot be undone.",
+    "useCaseNameTaken":     "A use case with that name already exists for this bot job.",
+    "cannotRenameDefault":  "The Default use case cannot be renamed.",
+    "cannotDeleteDefault":  "The Default use case cannot be deleted."
   },
 
   "header": {

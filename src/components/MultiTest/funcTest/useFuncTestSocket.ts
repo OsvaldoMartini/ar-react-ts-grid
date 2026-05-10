@@ -4,20 +4,32 @@
 //   send  { type: "botJob.getInputInstructions", sessionId, body: "{\"botJobId\":N}" }
 //   recv  { type: "botJob.inputInstructions",    body: "[ ...BotJobInputField... ]" }
 //
-//   send  { type: "funcTest.loadMappings", sessionId, body: "{\"botJobId\":N}" }
+//   send  { type: "funcTest.loadMappings", sessionId,
+//           body: "{\"useCaseId\":U}" | "{\"botJobId\":N}" }
 //   recv  { type: "funcTest.mappingsLoaded", body: "[ ...PersistedFieldMapping... ]" }
 //
 //   send  { type: "funcTest.saveMappings", sessionId,
-//           body: "{\"botJobId\":N, \"mappings\": [ ...PersistedFieldMapping... ]}" }
-//   recv  { type: "funcTest.mappingsSaved", body: "{\"ok\":bool,\"count\":N,\"botJobId\":N}" }
+//           body: "{\"botJobId\":N, \"useCaseId\":U, \"mappings\": [ ... ]}" }
+//   recv  { type: "funcTest.mappingsSaved", body: "{\"ok\":bool,\"count\":N,\"botJobId\":N,\"useCaseId\":U}" }
+//
+//   send  { type: "useCase.list", sessionId, body: "{\"botJobId\":N}" }
+//   recv  { type: "useCase.listResponse", body: "[ ...UseCase... ]" }
+//
+//   send  { type: "useCase.save", sessionId,
+//           body: "{\"useCase\": {...UseCase or partial...}}" }
+//   recv  { type: "useCase.saveResponse", body: "{\"ok\":bool,\"id\":N,\"useCase\":{...}}" }
+//
+//   send  { type: "useCase.delete", sessionId, body: "{\"useCaseId\":U}" }
+//   recv  { type: "useCase.deleteResponse", body: "{\"ok\":bool,\"useCaseId\":U}" }
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { BotJobInputField } from "./types";
+import type { BotJobInputField, UseCase } from "./types";
 
 /** Server-side mapping row. Matches Java FieldMappingDTO field-for-field. */
 export interface PersistedFieldMapping {
   id?: number;
   botJobId?: number;
+  useCaseId?: number | null;   // Phase 1a (ROADMAP_9)
   apiKey: string;
   apiSpecFile: string | null;
   apiFieldName: string | null;
@@ -35,24 +47,38 @@ interface State {
   connected: boolean;
   loading: boolean;          // for instructions
   loadingMappings: boolean;
+  loadingUseCases: boolean;
   saving: boolean;
+  savingUseCase: boolean;
   error: string | null;
   fields: BotJobInputField[];
   persistedMappings: PersistedFieldMapping[] | null;  // null = never loaded yet
   lastSaveOk: boolean | null;
   lastSaveAt: string | null;
+  useCases: UseCase[];
+  lastUseCaseSaveOk: boolean | null;
+  lastUseCaseSaveAt: string | null;
+  lastUseCaseSaved: UseCase | null;       // the freshly-created or renamed one
+  lastUseCaseDeletedId: number | null;
 }
 
 const INITIAL: State = {
   connected: false,
   loading: false,
   loadingMappings: false,
+  loadingUseCases: false,
   saving: false,
+  savingUseCase: false,
   error: null,
   fields: [],
   persistedMappings: null,
   lastSaveOk: null,
   lastSaveAt: null,
+  useCases: [],
+  lastUseCaseSaveOk: null,
+  lastUseCaseSaveAt: null,
+  lastUseCaseSaved: null,
+  lastUseCaseDeletedId: null,
 };
 
 export function useFuncTestSocket({ socketPort, sessionId }: Options) {
@@ -97,10 +123,32 @@ export function useFuncTestSocket({ socketPort, sessionId }: Options) {
             lastSaveAt: new Date().toISOString(),
             error: parsed.ok ? null : parsed.error || "Save failed",
           }));
+        } else if (verb === "useCase.listResponse") {
+          const parsed = parseBody<UseCase[]>() ?? [];
+          setState(s => ({ ...s, loadingUseCases: false, useCases: parsed, error: null }));
+        } else if (verb === "useCase.saveResponse") {
+          const parsed = parseBody<{ ok: boolean; id?: number; useCase?: UseCase; error?: string }>()
+            ?? { ok: false };
+          setState(s => ({
+            ...s,
+            savingUseCase: false,
+            lastUseCaseSaveOk: parsed.ok,
+            lastUseCaseSaveAt: new Date().toISOString(),
+            lastUseCaseSaved: parsed.useCase ?? null,
+            error: parsed.ok ? null : parsed.error || "Use case save failed",
+          }));
+        } else if (verb === "useCase.deleteResponse") {
+          const parsed = parseBody<{ ok: boolean; useCaseId?: number; error?: string }>() ?? { ok: false };
+          setState(s => ({
+            ...s,
+            lastUseCaseDeletedId: parsed.ok ? (parsed.useCaseId ?? null) : null,
+            error: parsed.ok ? null : parsed.error || "Use case delete failed",
+          }));
         }
       } catch (e) {
         setState(s => ({
           ...s, loading: false, loadingMappings: false, saving: false,
+          loadingUseCases: false, savingUseCase: false,
           error: `Failed to parse server response: ${(e as Error).message}`,
         }));
       }
@@ -123,6 +171,7 @@ export function useFuncTestSocket({ socketPort, sessionId }: Options) {
     return true;
   }, []);
 
+  // ── Bot job instructions ────────────────────────────────────────────────
   const loadInputInstructions = useCallback((botJobId: number) => {
     if (!botJobId || botJobId <= 0) {
       setState(s => ({ ...s, error: "No active bot job — open a bot job first.", fields: [] }));
@@ -135,30 +184,69 @@ export function useFuncTestSocket({ socketPort, sessionId }: Options) {
     })) setState(s => ({ ...s, loading: false, error: "Socket not connected." }));
   }, [send, sessionId]);
 
-  const loadMappings = useCallback((botJobId: number) => {
+  // ── Use case CRUD ───────────────────────────────────────────────────────
+  const loadUseCases = useCallback((botJobId: number) => {
     if (!botJobId || botJobId <= 0) {
+      setState(s => ({ ...s, useCases: [] }));
+      return;
+    }
+    setState(s => ({ ...s, loadingUseCases: true, error: null }));
+    if (!send({
+      type: "useCase.list",
+      sessionId, botJobId, body: JSON.stringify({ botJobId }),
+    })) setState(s => ({ ...s, loadingUseCases: false, error: "Socket not connected." }));
+  }, [send, sessionId]);
+
+  const saveUseCase = useCallback((useCase: Partial<UseCase> & { botJobId: number; name: string }) => {
+    setState(s => ({ ...s, savingUseCase: true, lastUseCaseSaved: null, error: null }));
+    if (!send({
+      type: "useCase.save",
+      sessionId, body: JSON.stringify({ useCase }),
+    })) setState(s => ({ ...s, savingUseCase: false, error: "Socket not connected." }));
+  }, [send, sessionId]);
+
+  const deleteUseCase = useCallback((useCaseId: number) => {
+    if (!useCaseId || useCaseId <= 0) return;
+    setState(s => ({ ...s, lastUseCaseDeletedId: null, error: null }));
+    if (!send({
+      type: "useCase.delete",
+      sessionId, body: JSON.stringify({ useCaseId }),
+    })) setState(s => ({ ...s, error: "Socket not connected." }));
+  }, [send, sessionId]);
+
+  // ── Mappings (now scoped to a use case) ─────────────────────────────────
+  const loadMappings = useCallback((useCaseId: number) => {
+    if (!useCaseId || useCaseId <= 0) {
       setState(s => ({ ...s, persistedMappings: [] }));
       return;
     }
-    setState(s => ({ ...s, loadingMappings: true, error: null }));
+    setState(s => ({ ...s, loadingMappings: true, persistedMappings: null, error: null }));
     if (!send({
       type: "funcTest.loadMappings",
-      sessionId, botJobId, body: JSON.stringify({ botJobId }),
+      sessionId, body: JSON.stringify({ useCaseId }),
     })) setState(s => ({ ...s, loadingMappings: false, error: "Socket not connected." }));
   }, [send, sessionId]);
 
-  const saveMappings = useCallback((botJobId: number, mappings: PersistedFieldMapping[]) => {
-    if (!botJobId || botJobId <= 0) {
-      setState(s => ({ ...s, error: "No active bot job — cannot save." }));
-      return;
-    }
-    setState(s => ({ ...s, saving: true, error: null }));
-    if (!send({
-      type: "funcTest.saveMappings",
-      sessionId, botJobId,
-      body: JSON.stringify({ botJobId, mappings }),
-    })) setState(s => ({ ...s, saving: false, error: "Socket not connected." }));
-  }, [send, sessionId]);
+  const saveMappings = useCallback(
+    (botJobId: number, useCaseId: number, mappings: PersistedFieldMapping[]) => {
+      if (!botJobId || botJobId <= 0 || !useCaseId || useCaseId <= 0) {
+        setState(s => ({ ...s, error: "Need an active bot job + use case to save." }));
+        return;
+      }
+      setState(s => ({ ...s, saving: true, error: null }));
+      if (!send({
+        type: "funcTest.saveMappings",
+        sessionId,
+        body: JSON.stringify({ botJobId, useCaseId, mappings }),
+      })) setState(s => ({ ...s, saving: false, error: "Socket not connected." }));
+    },
+    [send, sessionId],
+  );
 
-  return { ...state, loadInputInstructions, loadMappings, saveMappings };
+  return {
+    ...state,
+    loadInputInstructions,
+    loadUseCases, saveUseCase, deleteUseCase,
+    loadMappings, saveMappings,
+  };
 }

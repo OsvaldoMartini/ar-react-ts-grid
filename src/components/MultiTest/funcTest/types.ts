@@ -35,3 +35,13 @@ export interface FieldMapping {
   botFieldId: number;         // BotJobInputField.id
   createdAt: string;          // ISO timestamp
 }
+
+/** Phase 1a (ROADMAP_9) — named group of mappings within a bot job. */
+export interface UseCase {
+  id: number;
+  botJobId: number;
+  name: string;
+  description: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
