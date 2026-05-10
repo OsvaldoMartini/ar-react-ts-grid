@@ -9,6 +9,7 @@ import { ApiWorkflowTab, DataGenTab } from "./ApiWorkflowTab";
 import { ReadyForTestTab } from "./ReadyForTestTab";
 import { AIAssistantTab } from "./AIAssistantTab";
 import { TestLibraryTab } from "./TestLibraryTab";
+import FunctionalTestTab from "./FunctionalTestTab";
 import { testStore } from "./utils";
 
 // Import banking module (auto-registers built-in plugins on first import)
@@ -31,7 +32,7 @@ export interface AppProps {
 }
 
 interface AppState {
-  tab: "apis" | "workflow" | "datagen" | "ready" | "running" | "report" | "library" | "ai";
+  tab: "apis" | "workflow" | "datagen" | "functest" | "ready" | "running" | "report" | "library" | "ai";
   specs: ApiSpec[];
   loading: boolean;
   showWizard: boolean;
@@ -100,16 +101,18 @@ export default class App extends React.Component<AppProps, AppState> {
     const tot = Object.values(db.stores).reduce((a, s) => a + s.length, 0);
     const queuedCount = testStore.total;
     const TABS = [
-      { id: "apis", l: `📁 ${t("nav.apiFiles")} (${specs.length})`, stepLabel: t("nav.apiFiles") },
-      { id: "workflow", l: `⬡ ${t("nav.workflow")}`, stepLabel: t("nav.workflow") },
-      { id: "datagen", l: `⚗ ${t("nav.dataGen")}`, stepLabel: t("nav.dataGen") },
-      { id: "ready", l: `🧪 ${t("nav.readyForTest")}${queuedCount > 0 ? ` (${queuedCount.toLocaleString()})` : ""}`, stepLabel: t("nav.readyForTest") },
-      { id: "running", l: `🔍 ${t("nav.running")}`, stepLabel: t("nav.running") },
-      { id: "report", l: `🗄️ ${t("nav.report")} (${tot})`, stepLabel: t("nav.report") },
-      { id: "library", l: `📚 ${t("nav.library")}`, stepLabel: t("nav.library") },
-      { id: "ai", l: `🤖 ${t("nav.ai")}`, stepLabel: t("nav.ai") },
+      { id: "apis", l: `📁 ${t("nav.apiFiles")} (${specs.length})`, stepLabel: t("nav.apiFiles"), hidden: false },
+      { id: "workflow", l: `⬡ ${t("nav.workflow")}`, stepLabel: t("nav.workflow"), hidden: false },
+      { id: "datagen", l: `⚗ ${t("nav.dataGen")}`, stepLabel: t("nav.dataGen"), hidden: false },
+      { id: "functest", l: `🔗 ${t("nav.functionalTest")}`, stepLabel: t("nav.functionalTest"), hidden: false },
+      { id: "ready", l: `🧪 ${t("nav.readyForTest")}${queuedCount > 0 ? ` (${queuedCount.toLocaleString()})` : ""}`, stepLabel: t("nav.readyForTest"), hidden: false },
+      { id: "running", l: `🔍 ${t("nav.running")}`, stepLabel: t("nav.running"), hidden: false },
+      { id: "report", l: `🗄️ ${t("nav.report")} (${tot})`, stepLabel: t("nav.report"), hidden: false },
+      { id: "library", l: `📚 ${t("nav.library")}`, stepLabel: t("nav.library"), hidden: true },
+      { id: "ai", l: `🤖 ${t("nav.ai")}`, stepLabel: t("nav.ai"), hidden: true },
     ] as const;
-    const activeTabIndex = TABS.findIndex(t => t.id === tab);
+    const visibleTabs = TABS.filter(tb => !tb.hidden);
+    const activeTabIndex = visibleTabs.findIndex(tb => tb.id === tab);
 
     return (
       <div className="mt-app">
@@ -146,7 +149,7 @@ export default class App extends React.Component<AppProps, AppState> {
         {/* ── STEP INDICATOR + TABS ── */}
         <div className="mt-nav-shell">
           <div className="mt-stepper" aria-label={t("nav.workflowProgress")}>
-            {TABS.map((tab, index) => {
+            {visibleTabs.map((tab, index) => {
               const stateClass = index < activeTabIndex ? "is-complete" : index === activeTabIndex ? "is-active" : "is-upcoming";
               return (
                 <React.Fragment key={tab.id}>
@@ -159,7 +162,7 @@ export default class App extends React.Component<AppProps, AppState> {
                     <span className="mt-step__circle">{index + 1}</span>
                     <span className="mt-step__label">{tab.stepLabel}</span>
                   </button>
-                  {index < TABS.length - 1 && (
+                  {index < visibleTabs.length - 1 && (
                     <div className={`mt-step__connector ${index < activeTabIndex ? "is-complete" : ""}`} aria-hidden="true" />
                   )}
                 </React.Fragment>
@@ -168,7 +171,7 @@ export default class App extends React.Component<AppProps, AppState> {
           </div>
 
           <div className="mt-tabs">
-            {TABS.map(tab => (
+            {visibleTabs.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => this.setState({ tab: tab.id as any })}
@@ -201,6 +204,14 @@ export default class App extends React.Component<AppProps, AppState> {
                 onGenerate={() => this.setState(s => ({ tick: s.tick + 1 }))}
               />
             </div>
+          )}
+          {tab === "functest" && (
+            <FunctionalTestTab
+              loadedSpecs={specs}
+              socketPort={socketPortLive}
+              botJobId={botJobId}
+              botJobName={botJobName}
+            />
           )}
           {tab === "ready" && (
             <div className="mt-scroll" style={{ padding: "24px 28px" }}>

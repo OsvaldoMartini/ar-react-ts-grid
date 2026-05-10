@@ -23,6 +23,11 @@ import { MtI18nBridge } from "./MtI18nBridge";
 import i18nInstance from "../../i18n";
 import { mtT as t } from "./useMtT";
 
+// Toggle to re-enable the language dropdown in the top bar. Bundled English
+// fallback in MtI18nBridge keeps the UI readable, so the picker is currently
+// hidden — flip to true to expose it again without code edits.
+const SHOW_LANGUAGE_PICKER = false;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // ThemeToggle — lives here so useTheme() is always inside <ThemeProvider>
 // Styles come from mt-shell.scss (.mt-toggle-*)
@@ -65,7 +70,7 @@ function ShellTopBar() {
         <span className="mt-shell-title">{t("shell.brand")}</span>
       </div>
       <div className="mt-shell-controls">
-        <LanguagePicker />
+        {SHOW_LANGUAGE_PICKER && <LanguagePicker />}
         <ThemeToggle />
       </div>
     </div>
@@ -117,7 +122,7 @@ function ThemedShell(props: AppProps) {
         {...props}
         rightControls={
           <>
-            <LanguagePicker />
+            {SHOW_LANGUAGE_PICKER && <LanguagePicker />}
             <ThemeToggle />
           </>
         }

@@ -22,6 +22,20 @@
 
 import React from "react";
 import i18nInstance from "../../i18n";
+import enFallback from "./locales/en.mt.json";
+
+// Register bundled English as a fallback resource the moment this module loads.
+// overwrite=false → if HttpBackend later succeeds in fetching ./locales/en/mt.json,
+// the network copy wins. If the fetch fails (common in JAR / offline contexts),
+// these strings keep the UI readable instead of leaking raw keys like "nav.apiFiles".
+// Other languages still load over HTTP and fall through to "en" via fallbackLng.
+i18nInstance.addResourceBundle(
+  "en",
+  "mt",
+  enFallback as Record<string, unknown>,
+  /* deep */ true,
+  /* overwrite */ false,
+);
 
 interface MtI18nBridgeState {
   lang: string;
