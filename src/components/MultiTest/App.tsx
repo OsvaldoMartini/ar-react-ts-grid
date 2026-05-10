@@ -10,6 +10,7 @@ import { ReadyForTestTab } from "./ReadyForTestTab";
 import { AIAssistantTab } from "./AIAssistantTab";
 import { TestLibraryTab } from "./TestLibraryTab";
 import FunctionalTestTab from "./FunctionalTestTab";
+import FlowTab from "./FlowTab";
 import { testStore } from "./utils";
 
 // Import banking module (auto-registers built-in plugins on first import)
@@ -32,7 +33,7 @@ export interface AppProps {
 }
 
 interface AppState {
-  tab: "apis" | "workflow" | "datagen" | "functest" | "ready" | "running" | "report" | "library" | "ai";
+  tab: "apis" | "workflow" | "datagen" | "functest" | "flow" | "ready" | "running" | "report" | "library" | "ai";
   specs: ApiSpec[];
   loading: boolean;
   showWizard: boolean;
@@ -105,6 +106,7 @@ export default class App extends React.Component<AppProps, AppState> {
       { id: "workflow", l: `⬡ ${t("nav.workflow")}`, stepLabel: t("nav.workflow"), hidden: false },
       { id: "datagen", l: `⚗ ${t("nav.dataGen")}`, stepLabel: t("nav.dataGen"), hidden: false },
       { id: "functest", l: `🔗 ${t("nav.functionalTest")}`, stepLabel: t("nav.functionalTest"), hidden: false },
+      { id: "flow", l: `🔀 ${t("nav.flow")}`, stepLabel: t("nav.flow"), hidden: false },
       { id: "ready", l: `🧪 ${t("nav.readyForTest")}${queuedCount > 0 ? ` (${queuedCount.toLocaleString()})` : ""}`, stepLabel: t("nav.readyForTest"), hidden: false },
       { id: "running", l: `🔍 ${t("nav.running")}`, stepLabel: t("nav.running"), hidden: false },
       { id: "report", l: `🗄️ ${t("nav.report")} (${tot})`, stepLabel: t("nav.report"), hidden: false },
@@ -208,6 +210,13 @@ export default class App extends React.Component<AppProps, AppState> {
           {tab === "functest" && (
             <FunctionalTestTab
               loadedSpecs={specs}
+              socketPort={socketPortLive}
+              botJobId={botJobId}
+              botJobName={botJobName}
+            />
+          )}
+          {tab === "flow" && (
+            <FlowTab
               socketPort={socketPortLive}
               botJobId={botJobId}
               botJobName={botJobName}

@@ -4,6 +4,7 @@
     "workflow":      "Workflow",
     "dataGen":       "Data Generator",
     "functionalTest":"Functional Test",
+    "flow":          "Flow",
     "readyForTest":  "Ready for Test",
     "running":       "Running",
     "report":        "Report",
@@ -57,6 +58,34 @@
     "saveDisabledNoJob":       "No active bot job — open a bot job first.",
     "saveDisabledNoUseCase":   "No use case selected — pick or create one.",
     "saveDisabledNoChanges":   "Nothing to save — make a mapping change first."
+  },
+
+  "flow": {
+    "title":               "Flow Authoring",
+    "subtitle":            "Compose ordered API + UI steps with variable substitution.",
+    "connected":           "Connected",
+    "disconnected":        "Disconnected",
+    "flows":               "Flows",
+    "activeBotJob":        "Active bot job",
+    "noBotJob":            "(none — open a bot job first)",
+    "newFlow":             "New",
+    "newFlowTitle":        "Create a new flow under this bot job",
+    "newFlowPrompt":       "Name for the new flow (e.g. \"Transfer EUR 100\"):",
+    "renameFlowTitle":     "Rename the selected flow",
+    "renameFlowPrompt":    "New name for this flow:",
+    "deleteFlowTitle":     "Delete the selected flow AND its steps",
+    "deleteFlowConfirm":   "Delete flow \"{name}\"? Its steps will also be deleted. This cannot be undone.",
+    "flowNameTaken":       "A flow with that name already exists for this bot job.",
+    "loadingFlows":        "Loading flows…",
+    "noFlowsHint":         "No flows yet. Click ➕ New to create one.",
+    "steps":               "Steps",
+    "noFlowSelected":      "(no flow selected)",
+    "pickFlowToStart":     "Pick a flow on the left",
+    "pickFlowHint":        "Or click ➕ New to create your first flow under this bot job.",
+    "editorComingSoon":    "Step editor coming next",
+    "editorPhase2bHint":   "Phase 2b adds the step cards (Add API / UI / Wait / Assert, reorder, delete). Schema is ready.",
+    "inspector":           "Inspector",
+    "inspectorPhase2cHint":"Phase 2c puts the per-step payload editor + captures + substitutions tables here when a step card is selected."
   },
 
   "header": {
