@@ -554,18 +554,32 @@ export default function FunctionalTestTab({
                   }}
                 >{t("funcTest.discard")}</button>
               )}
-              <button
-                onClick={onSave}
-                disabled={!dirty || saving || botJobId <= 0 || !connected}
-                title={t("funcTest.saveTitle")}
-                style={{
-                  border: "none",
-                  background: dirty && !saving && botJobId > 0 && connected ? "#2E7D32" : "#9e9e9e",
-                  color: "#fff", padding: "3px 10px", borderRadius: 3, fontSize: 11,
-                  fontWeight: 600,
-                  cursor: dirty && !saving && botJobId > 0 && connected ? "pointer" : "not-allowed",
-                }}
-              >{saving ? t("funcTest.saving") : t("funcTest.save")}</button>
+              {(() => {
+                const canSave = dirty && !saving && botJobId > 0 && connected && !!currentUseCaseId;
+                const reason = !connected
+                  ? t("funcTest.saveDisabledNoConn")
+                  : botJobId <= 0
+                    ? t("funcTest.saveDisabledNoJob")
+                    : !currentUseCaseId
+                      ? t("funcTest.saveDisabledNoUseCase")
+                      : !dirty
+                        ? t("funcTest.saveDisabledNoChanges")
+                        : t("funcTest.saveTitle");
+                return (
+                  <button
+                    onClick={onSave}
+                    disabled={!canSave}
+                    title={reason}
+                    style={{
+                      border: "none",
+                      background: canSave ? "#2E7D32" : "#9e9e9e",
+                      color: "#fff", padding: "3px 10px", borderRadius: 3, fontSize: 11,
+                      fontWeight: 600,
+                      cursor: canSave ? "pointer" : "not-allowed",
+                    }}
+                  >{saving ? t("funcTest.saving") : t("funcTest.save")}</button>
+                );
+              })()}
             </span>
           </header>
 
