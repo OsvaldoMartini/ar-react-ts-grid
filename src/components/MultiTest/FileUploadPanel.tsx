@@ -158,16 +158,19 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
         {/* Upload zones */}
         <div className="mt-upload__zones">
 
-          {/* Folder zone */}
+          {/* Multi-file picker zone — webkitdirectory removed because it
+              triggers a Chromium "upload all files from <folder>" security
+              prompt that JCEF cannot suppress. To bulk-import a whole
+              folder, drag-drop it onto the zone on the right. */}
           <div className="mt-zone" onClick={() => this.folderRef.current?.click()}>
             <div className="mt-zone__icon">📁</div>
-            <div className="mt-zone__title">Carica Cartella</div>
-            <div className="mt-zone__subtitle">yaml yml json schema shape proto pdf</div>
+            <div className="mt-zone__title">Pick Files</div>
+            <div className="mt-zone__subtitle">yaml yml json schema shape proto pdf · multi-select</div>
             <input
               ref={this.folderRef}
               type="file"
-              {...({ webkitdirectory: "true" } as any)}
               multiple
+              accept={ACCEPTED_EXTS.join(",")}
               style={{ display: "none" }}
               onChange={e => this.processFiles(e.target.files)}
             />

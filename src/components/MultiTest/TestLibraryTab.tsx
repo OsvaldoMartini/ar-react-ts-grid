@@ -287,8 +287,10 @@ export class TestLibraryTab extends React.Component<{}, LibraryState> {
         {this.state.modal && <QuestionsCard {...this.state.modal} />}
         <input ref={this.fileInput} type="file" accept=".json" style={{ display: "none" }} onChange={this.onFileImport} />
         <input ref={this.pluginFileInput} type="file" accept=".json" style={{ display: "none" }} onChange={this.onPluginFileImport} />
+        {/* Plugin import — webkitdirectory removed (Chromium "upload all
+            files" security prompt cannot be suppressed in JCEF). User
+            now multi-selects the JSON files from a folder instead. */}
         <input ref={this.folderInput} type="file" accept=".json" multiple style={{ display: "none" }}
-          {...({ webkitdirectory: "", directory: "" } as any)}
           onChange={this.onPluginFolderSelect} />
 
         {/* ── TOP BAR ── */}
