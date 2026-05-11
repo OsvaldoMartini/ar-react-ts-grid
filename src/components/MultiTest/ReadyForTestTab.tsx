@@ -1480,25 +1480,15 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void; 
 
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
 
-    if ("showSaveFilePicker" in window) {
-      (window as any).showSaveFilePicker({
-        suggestedName: `capi_test_cases_${tag}_${ts}.csv`,
-        types: [{ description: "CSV file", accept: { "text/csv": [".csv"] } }],
-      }).then(async (fh: any) => {
-        const w = await fh.createWritable();
-        await w.write(csv);
-        await w.close();
-      }).catch((err: any) => {
-        if (err?.name !== "AbortError") console.error("CSV save error:", err);
-      });
-    } else {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `capi_test_cases_${tag}_${ts}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-    }
+    // Standard browser download — goes to Downloads folder. Avoiding
+    // showSaveFilePicker because it triggers a native dialog that JCEF
+    // cannot suppress.
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `capi_test_cases_${tag}_${ts}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   private generateBash = () => {
@@ -1748,70 +1738,34 @@ export class ReadyForTestTab extends React.Component<{ onClearAll?: () => void; 
     const csvFileName = `capi_${modeTag}_${ts}_data.csv`;
 
     // ── Write all files ───────────────────────────────────────
-    if ("showDirectoryPicker" in window) {
-      try {
-        const dirHandle = await (window as any).showDirectoryPicker({ mode: "readwrite" });
-
-        for (let i = 0; i < chunks.length; i++) {
-          const partSuffix = isMultiChunk ? `_part${i + 1}` : "";
-          const shName = `capi_${modeTag}_${ts}${partSuffix}.sh`;
-          const reportName = `capi_${modeTag}_${ts}${partSuffix}_report.html`;
-          const script = buildScript(chunks[i], i, reportName);
-
-          const shHandle = await dirHandle.getFileHandle(shName, { create: true });
-          const shW = await shHandle.createWritable();
-          await shW.write(script); await shW.close();
-        }
-
-        if (saveCsvToo) {
-          const csvHandle = await dirHandle.getFileHandle(csvFileName, { create: true });
-          const csvW = await csvHandle.createWritable();
-          await csvW.write(csvContent); await csvW.close();
-        }
-
-        const fileList = chunks.map((_, i) => {
-          const partSuffix = isMultiChunk ? `_part${i + 1}` : "";
-          return `capi_${modeTag}_${ts}${partSuffix}.sh`;
-        }).join(", ");
-        console.info(`Saved: ${fileList}${saveCsvToo ? `, ${csvFileName}` : ""}`);
-
-      } catch (err: any) {
-        if (err?.name !== "AbortError") console.error("Bash save error:", err);
-      }
-    } else {
-      const dlBlob = (content: string, name: string, type: string) => {
-        const blob = new Blob([content], { type });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url; a.download = name; a.click();
-        URL.revokeObjectURL(url);
-      };
-      for (let i = 0; i < chunks.length; i++) {
-        const partSuffix = isMultiChunk ? `_part${i + 1}` : "";
-        const reportName = `capi_${modeTag}_${ts}${partSuffix}_report.html`;
-        dlBlob(buildScript(chunks[i], i, reportName), `capi_${modeTag}_${ts}${partSuffix}.sh`, "application/x-sh");
-      }
-      if (saveCsvToo) dlBlob(csvContent, csvFileName, "text/csv;charset=utf-8;");
+    // Each file is downloaded individually to the browser's Downloads
+    // folder. Avoiding showDirectoryPicker because it triggers a native
+    // dialog that JCEF cannot suppress.
+    const dlBlob = (content: string, name: string, type: string) => {
+      const blob = new Blob([content], { type });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = name; a.click();
+      URL.revokeObjectURL(url);
+    };
+    for (let i = 0; i < chunks.length; i++) {
+      const partSuffix = isMultiChunk ? `_part${i + 1}` : "";
+      const reportName = `capi_${modeTag}_${ts}${partSuffix}_report.html`;
+      dlBlob(buildScript(chunks[i], i, reportName), `capi_${modeTag}_${ts}${partSuffix}.sh`, "application/x-sh");
     }
+    if (saveCsvToo) dlBlob(csvContent, csvFileName, "text/csv;charset=utf-8;");
   };
 
 
   private pickFolder = async (): Promise<boolean> => {
-    if (!("showDirectoryPicker" in window)) {
-      // Browser doesn't support File System Access API — fall back to download mode
-      executionHistory.outputMode = "live";
-      return true;
-    }
-    try {
-      const handle = await (window as any).showDirectoryPicker({ mode: "readwrite" });
-      executionHistory.dirHandle = handle;
-      if (executionHistory.outputMode === "live") executionHistory.outputMode = "save";
-      this.refresh();
-      return true;
-    } catch (err: any) {
-      if (err?.name !== "AbortError") console.error("Folder pick error:", err);
-      return false; // user cancelled
-    }
+    // showDirectoryPicker disabled — it triggers a native folder-pick
+    // dialog that JCEF cannot suppress. Save-mode auto-write to a
+    // chosen folder is therefore unavailable; execution always runs in
+    // "live" mode (in-memory). The Download Report button still works.
+    executionHistory.outputMode = "live";
+    executionHistory.dirHandle = null;
+    this.refresh();
+    return true;
   };
 
   private executeBlock = async () => {
