@@ -127,7 +127,7 @@ export class ChatTab extends React.Component<ChatTabProps, ChatTabState> {
                 padding: "9px 12px", fontSize: 11, lineHeight: 1.7, color: "#e6edf3",
               }}>
                 <div style={{ fontSize: 8, color: "#555", marginBottom: 3, letterSpacing: 1 }}>
-                  {m.role === "user" ? "YOU" : "MULTITEST AI"}
+                  {m.role === "user" ? "YOU" : "CAPI"}
                 </div>
                 <div style={{ whiteSpace: "pre-wrap" }}>{m.content}</div>
               </div>

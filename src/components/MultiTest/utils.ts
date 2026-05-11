@@ -666,7 +666,7 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, () => {
   console.log('\\n\\x1b[35m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\\x1b[0m');
-  console.log('\\x1b[35m  MultiTest MOCK SERVER  ·  API Services API Test Simulator\\x1b[0m');
+  console.log('\\x1b[35m  CAPI MOCK SERVER  ·  API Services API Test Simulator\\x1b[0m');
   console.log('\\x1b[35m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\\x1b[0m');
   console.log(\`  \\x1b[32m📡  http://localhost:\${PORT}\\x1b[0m\`);
   console.log(\`  📦  \${Object.keys(db).length} resources  ·  \${Object.values(db).reduce((s,a) => s+a.length,0)} seed records\\n\`);

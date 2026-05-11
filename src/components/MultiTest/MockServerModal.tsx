@@ -548,7 +548,7 @@ export class MockServerModal extends React.Component<Props, State> {
           fontSize: 9,
         }}>
           <span style={{ color: "var(--cs-dim)" }}>
-            MultiTest Mock Engine · in-browser + Node.js export
+            CAPI Mock Engine · in-browser + Node.js export
           </span>
           <span style={{ color: running ? "#34d399" : "var(--cs-dim)" }}>
             {running ? `● ${routes.length} routes active` : "○ inactive"}
