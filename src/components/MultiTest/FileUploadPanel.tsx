@@ -1,6 +1,7 @@
 import React, { createRef } from "react";
 import { db, ApiSpec, DEFAULT_SPEC, CAT_COLORS, parseApiSpec } from "./utils";
 import { MethodBadge } from "./AtomComponents";
+import QuestionsCard, { type QuestionsCardProps } from "../QuestionsCard";
 import "./mt-upload.scss";
 
 // ═══════════════════════════════════════════════════════════════
@@ -24,6 +25,7 @@ interface FileUploadPanelState {
   openSections: Set<string>; // keys like "3-fields", "3-deps"
   openUris: Set<string>;     // keys like "3-uri-1" per-endpoint URI toggles
   apiSearch: string;         // filter text for API name / description
+  modal: QuestionsCardProps | null;
 }
 
 const ACCEPTED_EXTS = [".yaml", ".yml", ".json", ".schema", ".shape", ".proto", ".pdf"];
@@ -35,7 +37,10 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
     openSections: new Set<string>(),
     openUris: new Set<string>(),
     apiSearch: "",
+    modal: null,
   };
+
+  private closeModal = () => this.setState({ modal: null });
 
   private folderRef = createRef<HTMLInputElement>();
   private fileRef = createRef<HTMLInputElement>();
@@ -148,6 +153,8 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
 
     return (
       <div className="mt-upload">
+        {this.state.modal && <QuestionsCard {...this.state.modal} />}
+
         {/* Upload zones */}
         <div className="mt-upload__zones">
 
@@ -192,7 +199,17 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
           <div className="mt-upload__delete-row">
             <button
               className="mt-btn-delete"
-              onClick={() => { if (window.confirm("Delete all loaded API files?")) onDeleteAll(); }}
+              onClick={() => this.setState({
+                modal: {
+                  mode: "confirm",
+                  header: "Delete all API files?",
+                  body: "This will remove every loaded API spec from this session. The spec files on disk are not affected — you can re-upload them anytime.",
+                  okLabel: "Delete all",
+                  destructive: true,
+                  onSubmit: () => { this.closeModal(); onDeleteAll(); },
+                  onCancel: this.closeModal,
+                },
+              })}
             >
               🗑 Delete All
             </button>

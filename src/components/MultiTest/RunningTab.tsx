@@ -2,6 +2,7 @@ import React from "react";
 import { testStore, TestCase, executionHistory, rest, envStore } from "./utils";
 import { StatusBadge } from "./AtomComponents";
 import { mtT as t } from "./useMtT";
+import QuestionsCard, { type QuestionsCardProps } from "../QuestionsCard";
 
 // ═══════════════════════════════════════════════════════════════
 // RUNNING TAB  — live execution view (BizWizard-style)
@@ -497,10 +498,12 @@ interface RunningTabState {
   pageIndex: number;
   pageSize: typeof PAGE_SIZES[number];
   loadedExecution: LoadedExecution | null;
+  modal: QuestionsCardProps | null;
 }
 
 export class RunningTab extends React.Component<{}, RunningTabState> {
-  state: RunningTabState = { tick: 0, pageIndex: 0, pageSize: 10, loadedExecution: null };
+  state: RunningTabState = { tick: 0, pageIndex: 0, pageSize: 10, loadedExecution: null, modal: null };
+  private closeModal = () => this.setState({ modal: null });
   private pollId: ReturnType<typeof setInterval> | null = null;
   private bottomRef = React.createRef<HTMLDivElement>();
   private fileRef = React.createRef<HTMLInputElement>();
@@ -540,7 +543,16 @@ export class RunningTab extends React.Component<{}, RunningTabState> {
         if (summary) {
           this.setState({ loadedExecution: summary as LoadedExecution, pageIndex: 0 });
         } else {
-          alert(t("errors.csvParseFailed"));
+          this.setState({
+            modal: {
+              mode: "alert",
+              header: t("running.csvParseHeader"),
+              body: t("errors.csvParseFailed"),
+              error: true,
+              onSubmit: this.closeModal,
+              onCancel: this.closeModal,
+            },
+          });
         }
       });
     };
@@ -681,6 +693,7 @@ export class RunningTab extends React.Component<{}, RunningTabState> {
     if (cases.length === 0) {
       return (
         <div style={{ display: "flex", flexDirection: "column" as const }}>
+          {this.state.modal && <QuestionsCard {...this.state.modal} />}
           {actionBar}
           <div style={{
             display: "flex", flexDirection: "column" as const,
@@ -742,6 +755,7 @@ export class RunningTab extends React.Component<{}, RunningTabState> {
 
     return (
       <div style={{ display: "flex", flexDirection: "column" as const }}>
+        {this.state.modal && <QuestionsCard {...this.state.modal} />}
         {actionBar}
         <div style={{ display: "flex", flexDirection: "column" as const, gap: 16, padding: "20px 24px", fontFamily: MONO }}>
 

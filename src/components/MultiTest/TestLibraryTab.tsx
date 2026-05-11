@@ -14,6 +14,7 @@ import { schemaMatchingEngine, type MatchResult } from "./banking/SchemaMatching
 import { db } from "./utils";
 import { aiPrefsStore } from "./AIPrefsStore";
 import { mtT as t } from "./useMtT";
+import QuestionsCard, { type QuestionsCardProps } from "../QuestionsCard";
 import "./mt-library.scss";
 
 // ─── COMPONENT STATE ─────────────────────────────────────────
@@ -34,6 +35,7 @@ interface LibraryState {
   generatedCount: number;
   aiSelectedCatIds: Set<string>;
   showAICategories: boolean;
+  modal: QuestionsCardProps | null;
 }
 
 export class TestLibraryTab extends React.Component<{}, LibraryState> {
@@ -53,6 +55,17 @@ export class TestLibraryTab extends React.Component<{}, LibraryState> {
     generatedCount: testLibraryStore.generated.length,
     aiSelectedCatIds: new Set(aiPrefsStore.selectedCategoryIds),
     showAICategories: false,
+    modal: null,
+  };
+
+  private closeModal = () => this.setState({ modal: null });
+  private showAlert = (header: string, body: string, error = false) => {
+    this.setState({
+      modal: {
+        mode: "alert", header, body, error,
+        onSubmit: this.closeModal, onCancel: this.closeModal,
+      },
+    });
   };
 
   private unsubPlugin?: () => void;
@@ -96,7 +109,7 @@ export class TestLibraryTab extends React.Component<{}, LibraryState> {
   private handleGenerateFromSchemas = () => {
     const specs = db.specs;
     if (specs.length === 0) {
-      alert(t("library.noApisLoaded"));
+      this.showAlert(t("library.noApisLoadedHeader"), t("library.noApisLoaded"), true);
       return;
     }
     this.setState({ generating: true });
@@ -112,10 +125,13 @@ export class TestLibraryTab extends React.Component<{}, LibraryState> {
           generating: false,
           lastMatchResults: matches,
         });
-        alert(`Generated ${count} test case${count !== 1 ? "s" : ""} from ${matches.length} banking context match${matches.length !== 1 ? "es" : ""} across ${specs.length} API spec${specs.length !== 1 ? "s" : ""}.`);
+        this.showAlert(
+          t("library.generateSuccessHeader"),
+          `Generated ${count} test case${count !== 1 ? "s" : ""} from ${matches.length} banking context match${matches.length !== 1 ? "es" : ""} across ${specs.length} API spec${specs.length !== 1 ? "s" : ""}.`,
+        );
       } catch (err) {
         this.setState({ generating: false });
-        alert(t("library.generateError"));
+        this.showAlert(t("library.generateErrorHeader"), t("library.generateError"), true);
         console.error("[SchemaMatchingEngine]", err);
       }
     }, 100);
@@ -178,10 +194,13 @@ export class TestLibraryTab extends React.Component<{}, LibraryState> {
         const count = testLibraryStore.importTests(arr);
         this.refreshStats();
         this.setState({ importing: false });
-        alert(`Imported ${count} test case${count !== 1 ? "s" : ""} successfully.`);
+        this.showAlert(
+          t("library.importSuccessHeader"),
+          `Imported ${count} test case${count !== 1 ? "s" : ""} successfully.`,
+        );
       } catch (err) {
         this.setState({ importing: false });
-        alert(t("errors.jsonParseFailed"));
+        this.showAlert(t("library.importErrorHeader"), t("errors.jsonParseFailed"), true);
       }
     };
     reader.readAsText(file);
@@ -227,7 +246,11 @@ export class TestLibraryTab extends React.Component<{}, LibraryState> {
       }
     }
     this.refreshStats();
-    alert(`Plugin folder loaded: ${loaded} plugin${loaded !== 1 ? "s" : ""} registered${failed > 0 ? `, ${failed} failed` : ""}.`);
+    this.showAlert(
+      t("library.pluginFolderHeader"),
+      `Plugin folder loaded: ${loaded} plugin${loaded !== 1 ? "s" : ""} registered${failed > 0 ? `, ${failed} failed` : ""}.`,
+      failed > 0,
+    );
     e.target.value = "";
   };
 
@@ -240,12 +263,15 @@ export class TestLibraryTab extends React.Component<{}, LibraryState> {
       const plugin = pluginRegistry.loadFromJSON(json);
       this.refreshStats();
       if (plugin) {
-        alert(`Plugin "${plugin.metadata.name}" loaded successfully (${plugin.rules.length} rules, ${plugin.testCases.length} tests).`);
+        this.showAlert(
+          t("library.pluginLoadedHeader"),
+          `Plugin "${plugin.metadata.name}" loaded successfully (${plugin.rules.length} rules, ${plugin.testCases.length} tests).`,
+        );
       } else {
-        alert(t("errors.pluginLoadFailed"));
+        this.showAlert(t("library.pluginLoadErrorHeader"), t("errors.pluginLoadFailed"), true);
       }
     } catch {
-      alert(t("errors.pluginParseFailed"));
+      this.showAlert(t("library.pluginParseErrorHeader"), t("errors.pluginParseFailed"), true);
     }
     e.target.value = "";
   };
@@ -258,6 +284,7 @@ export class TestLibraryTab extends React.Component<{}, LibraryState> {
 
     return (
       <div className="lib-root">
+        {this.state.modal && <QuestionsCard {...this.state.modal} />}
         <input ref={this.fileInput} type="file" accept=".json" style={{ display: "none" }} onChange={this.onFileImport} />
         <input ref={this.pluginFileInput} type="file" accept=".json" style={{ display: "none" }} onChange={this.onPluginFileImport} />
         <input ref={this.folderInput} type="file" accept=".json" multiple style={{ display: "none" }}
