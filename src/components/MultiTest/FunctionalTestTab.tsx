@@ -18,6 +18,7 @@ import type {
   FieldMapping,
   UseCase,
 } from "./funcTest/types";
+import QuestionsCard, { type QuestionsCardProps } from "../QuestionsCard";
 
 interface FunctionalTestTabProps {
   loadedSpecs: ApiSpec[];
@@ -256,6 +257,8 @@ export default function FunctionalTestTab({
   const [savedBaseline, setSavedBaseline] = useState<FieldMapping[]>([]); // last DB-confirmed state
   const [armedApiKey, setArmedApiKey] = useState<string | null>(null);
   const [currentUseCaseId, setCurrentUseCaseId] = useState<number | null>(null);
+  const [modal, setModal] = useState<QuestionsCardProps | null>(null);
+  const closeModal = () => setModal(null);
 
   // Lookup helpers for the centre column display + server conversion.
   const apiByKey = useMemo(() => new Map(apiRows.map(r => [r.key, r])), [apiRows]);
@@ -379,35 +382,78 @@ export default function FunctionalTestTab({
     if (currentUseCaseId) clearDraft(botJobId, currentUseCaseId);
   };
 
-  // ── Use case CRUD handlers ──────────────────────────────────────────────
+  // ── Use case CRUD handlers (use QuestionsCard — JCEF blocks window.*) ──
+  const showNameTakenAlert = () => {
+    setModal({
+      mode: "alert",
+      header: t("funcTest.useCaseNameTaken"),
+      body: t("funcTest.useCaseNameTakenBody"),
+      error: true,
+      onSubmit: closeModal,
+      onCancel: closeModal,
+    });
+  };
+
   const onCreateUseCase = () => {
     if (botJobId <= 0) return;
-    const name = (window.prompt(t("funcTest.newUseCasePrompt"), "") || "").trim();
-    if (!name) return;
-    if (useCases.some(u => u.name.toLowerCase() === name.toLowerCase())) {
-      window.alert(t("funcTest.useCaseNameTaken"));
-      return;
-    }
-    saveUseCase({ botJobId, name, description: null });
+    setModal({
+      mode: "prompt",
+      header: t("funcTest.newUseCaseHeader"),
+      body: t("funcTest.newUseCasePrompt"),
+      placeholder: t("funcTest.newUseCasePlaceholder"),
+      okLabel: t("funcTest.create"),
+      onSubmit: (raw) => {
+        const name = raw.trim();
+        if (!name) { closeModal(); return; }
+        if (useCases.some(u => u.name.toLowerCase() === name.toLowerCase())) {
+          showNameTakenAlert();
+          return;
+        }
+        closeModal();
+        saveUseCase({ botJobId, name, description: null });
+      },
+      onCancel: closeModal,
+    });
   };
 
   const onRenameUseCase = () => {
     if (!currentUseCase || isDefaultUseCase) return;
-    const next = (window.prompt(t("funcTest.renameUseCasePrompt"), currentUseCase.name) || "").trim();
-    if (!next || next === currentUseCase.name) return;
-    if (useCases.some(u => u.id !== currentUseCase.id && u.name.toLowerCase() === next.toLowerCase())) {
-      window.alert(t("funcTest.useCaseNameTaken"));
-      return;
-    }
-    saveUseCase({
-      id: currentUseCase.id, botJobId, name: next, description: currentUseCase.description,
+    setModal({
+      mode: "prompt",
+      header: t("funcTest.renameUseCaseHeader"),
+      body: t("funcTest.renameUseCasePrompt"),
+      defaultValue: currentUseCase.name,
+      okLabel: t("funcTest.rename"),
+      onSubmit: (raw) => {
+        const next = raw.trim();
+        if (!next || next === currentUseCase.name) { closeModal(); return; }
+        if (useCases.some(u => u.id !== currentUseCase.id && u.name.toLowerCase() === next.toLowerCase())) {
+          showNameTakenAlert();
+          return;
+        }
+        closeModal();
+        saveUseCase({
+          id: currentUseCase.id, botJobId, name: next, description: currentUseCase.description,
+        });
+      },
+      onCancel: closeModal,
     });
   };
 
   const onDeleteUseCase = () => {
     if (!currentUseCase || isDefaultUseCase) return;
-    if (!window.confirm(t("funcTest.deleteUseCaseConfirm").replace("{name}", currentUseCase.name))) return;
-    deleteUseCase(currentUseCase.id);
+    setModal({
+      mode: "confirm",
+      header: t("funcTest.deleteUseCaseHeader"),
+      body: t("funcTest.deleteUseCaseConfirm").replace("{name}", currentUseCase.name),
+      okLabel: t("funcTest.delete"),
+      destructive: true,
+      onSubmit: () => {
+        closeModal();
+        deleteUseCase(currentUseCase.id);
+      },
+      onCancel: closeModal,
+    });
   };
 
   // ── derived sets for "is this card paired?" lookups ──────────
@@ -420,6 +466,8 @@ export default function FunctionalTestTab({
   // ── render ──────────────────────────────────────────────────
   return (
     <div className="mt-scroll" style={{ padding: "16px 20px", height: "100%", display: "flex", flexDirection: "column", gap: 12 }}>
+      {modal && <QuestionsCard {...modal} />}
+
       {/* Header strip */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <h3 style={{ margin: 0, fontSize: 16 }}>{t("funcTest.title")}</h3>

@@ -16,6 +16,7 @@ import { mtT as t } from "./useMtT";
 import { useFlowSocket } from "./flow/useFlowSocket";
 import type { Flow, FlowStep, FlowStepType } from "./flow/types";
 import StepInspector from "./flow/StepInspector";
+import QuestionsCard, { type QuestionsCardProps } from "../QuestionsCard";
 
 interface FlowTabProps {
   socketPort: number;
@@ -125,6 +126,8 @@ export default function FlowTab({ socketPort, botJobId, botJobName }: FlowTabPro
   const [steps, setSteps] = useState<FlowStep[]>([]);
   const [stepsBaseline, setStepsBaseline] = useState<FlowStep[]>([]);
   const [selectedStepIdx, setSelectedStepIdx] = useState<number | null>(null);
+  const [modal, setModal] = useState<QuestionsCardProps | null>(null);
+  const closeModal = () => setModal(null);
 
   // Bot job change → load flows + autocomplete sources for the inspector + reset
   useEffect(() => {
@@ -263,40 +266,85 @@ export default function FlowTab({ socketPort, botJobId, botJobName }: FlowTabPro
 
   const mappingsForUseCase = (ucId: number) => mappingsByUseCase[ucId] ?? [];
 
-  // ── handlers ────────────────────────────────────────────────────────────
+  // ── handlers (use QuestionsCard — JCEF blocks window.*) ────────────────
+  const showFlowNameTakenAlert = () => {
+    setModal({
+      mode: "alert",
+      header: t("flow.flowNameTaken"),
+      body: t("flow.flowNameTakenBody"),
+      error: true,
+      onSubmit: closeModal,
+      onCancel: closeModal,
+    });
+  };
+
   const onCreate = () => {
     if (botJobId <= 0) return;
-    const name = (window.prompt(t("flow.newFlowPrompt"), "") || "").trim();
-    if (!name) return;
-    if (flows.some(f => f.name.toLowerCase() === name.toLowerCase())) {
-      window.alert(t("flow.flowNameTaken"));
-      return;
-    }
-    saveFlow({ botJobId, name, description: null });
+    setModal({
+      mode: "prompt",
+      header: t("flow.newFlowHeader"),
+      body: t("flow.newFlowPrompt"),
+      placeholder: t("flow.newFlowPlaceholder"),
+      okLabel: t("flow.create"),
+      onSubmit: (raw) => {
+        const name = raw.trim();
+        if (!name) { closeModal(); return; }
+        if (flows.some(f => f.name.toLowerCase() === name.toLowerCase())) {
+          showFlowNameTakenAlert();
+          return;
+        }
+        closeModal();
+        saveFlow({ botJobId, name, description: null });
+      },
+      onCancel: closeModal,
+    });
   };
 
   const onRename = () => {
     if (!currentFlow) return;
-    const next = (window.prompt(t("flow.renameFlowPrompt"), currentFlow.name) || "").trim();
-    if (!next || next === currentFlow.name) return;
-    if (flows.some(f => f.id !== currentFlow.id && f.name.toLowerCase() === next.toLowerCase())) {
-      window.alert(t("flow.flowNameTaken"));
-      return;
-    }
-    saveFlow({
-      id: currentFlow.id, botJobId, name: next, description: currentFlow.description,
+    setModal({
+      mode: "prompt",
+      header: t("flow.renameFlowHeader"),
+      body: t("flow.renameFlowPrompt"),
+      defaultValue: currentFlow.name,
+      okLabel: t("flow.rename"),
+      onSubmit: (raw) => {
+        const next = raw.trim();
+        if (!next || next === currentFlow.name) { closeModal(); return; }
+        if (flows.some(f => f.id !== currentFlow.id && f.name.toLowerCase() === next.toLowerCase())) {
+          showFlowNameTakenAlert();
+          return;
+        }
+        closeModal();
+        saveFlow({
+          id: currentFlow.id, botJobId, name: next, description: currentFlow.description,
+        });
+      },
+      onCancel: closeModal,
     });
   };
 
   const onDelete = () => {
     if (!currentFlow) return;
-    if (!window.confirm(t("flow.deleteFlowConfirm").replace("{name}", currentFlow.name))) return;
-    deleteFlow(currentFlow.id);
+    setModal({
+      mode: "confirm",
+      header: t("flow.deleteFlowHeader"),
+      body: t("flow.deleteFlowConfirm").replace("{name}", currentFlow.name),
+      okLabel: t("flow.delete"),
+      destructive: true,
+      onSubmit: () => {
+        closeModal();
+        deleteFlow(currentFlow.id);
+      },
+      onCancel: closeModal,
+    });
   };
 
   // ── render ──────────────────────────────────────────────────────────────
   return (
     <div className="mt-scroll" style={{ padding: "16px 20px", height: "100%", display: "flex", flexDirection: "column", gap: 12 }}>
+      {modal && <QuestionsCard {...modal} />}
+
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <h3 style={{ margin: 0, fontSize: 16 }}>{t("flow.title")}</h3>
