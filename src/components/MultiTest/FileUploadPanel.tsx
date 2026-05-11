@@ -30,6 +30,44 @@ interface FileUploadPanelState {
 
 const ACCEPTED_EXTS = [".yaml", ".yml", ".json", ".schema", ".shape", ".proto", ".pdf"];
 
+/**
+ * Recursively collect every File from a DataTransferItemList. Supports
+ * folder drops via the webkitGetAsEntry / createReader / readEntries
+ * pipeline. Falls back gracefully when items aren't entries (e.g.
+ * synthetic drag events from automation).
+ */
+async function collectFilesFromDataTransfer(items: DataTransferItemList): Promise<File[]> {
+  const out: File[] = [];
+  const fileFromEntry = (entry: any): Promise<File> =>
+    new Promise((resolve, reject) => entry.file(resolve, reject));
+  const readBatch = (reader: any): Promise<any[]> =>
+    new Promise((resolve, reject) => reader.readEntries(resolve, reject));
+
+  const walk = async (entry: any): Promise<void> => {
+    if (!entry) return;
+    if (entry.isFile) {
+      try { out.push(await fileFromEntry(entry)); } catch { /* unreadable */ }
+    } else if (entry.isDirectory) {
+      const reader = entry.createReader();
+      // readEntries returns in batches; loop until an empty batch.
+      while (true) {
+        let batch: any[] = [];
+        try { batch = await readBatch(reader); } catch { break; }
+        if (batch.length === 0) break;
+        for (const child of batch) await walk(child);
+      }
+    }
+  };
+
+  const entries: any[] = [];
+  for (let i = 0; i < items.length; i++) {
+    const e = (items[i] as any).webkitGetAsEntry?.();
+    if (e) entries.push(e);
+  }
+  await Promise.all(entries.map(walk));
+  return out;
+}
+
 export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileUploadPanelState> {
   state: FileUploadPanelState = {
     drag: false, parsing: false, results: [], expanded: null, showDeps: false, showParseResults: false,
@@ -46,13 +84,34 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
   private fileRef = createRef<HTMLInputElement>();
 
   // ── File processing ─────────────────────────────────────────
-  private processFiles = async (files: FileList | null) => {
+  // Accepts both FileList (from <input>) and File[] (from folder-walk drop).
+  private processFiles = async (files: FileList | File[] | null) => {
     if (!files) return;
     this.setState({ parsing: true });
 
-    const arr = Array.from(files).filter(f =>
+    const all = Array.from(files);
+    const arr = all.filter(f =>
       ACCEPTED_EXTS.includes("." + f.name.split(".").pop()!.toLowerCase())
     );
+
+    // Empty drop / nothing-recognized: surface via QuestionsCard so the
+    // user knows the gesture registered and what was filtered out.
+    if (arr.length === 0) {
+      this.setState({
+        parsing: false,
+        modal: {
+          mode: "alert",
+          header: all.length === 0 ? "Empty drop" : "No recognised files",
+          body: all.length === 0
+            ? "Nothing was dropped (or the items couldn't be read). Try again, or use the Pick Files button."
+            : `Dropped ${all.length} item${all.length === 1 ? "" : "s"} but none had a recognised extension. Accepted: ${ACCEPTED_EXTS.join(", ")}.`,
+          error: true,
+          onSubmit: this.closeModal,
+          onCancel: this.closeModal,
+        },
+      });
+      return;
+    }
 
     const newResults: { ok: boolean; spec: ApiSpec }[] = [];
 
@@ -176,12 +235,25 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
             />
           </div>
 
-          {/* Drop zone */}
+          {/* Drop zone — supports both individual file drops AND recursive
+              folder drops via collectFilesFromDataTransfer. */}
           <div
             className={`mt-zone${drag ? " mt-zone--dragging" : ""}`}
             onDragOver={e => { e.preventDefault(); this.setState({ drag: true }); }}
             onDragLeave={() => this.setState({ drag: false })}
-            onDrop={e => { e.preventDefault(); this.setState({ drag: false }); this.processFiles(e.dataTransfer.files); }}
+            onDrop={async e => {
+              e.preventDefault();
+              this.setState({ drag: false });
+              const items = e.dataTransfer.items;
+              if (items && items.length > 0 && (items[0] as any).webkitGetAsEntry) {
+                // Use the entry API so folder drops recurse.
+                const files = await collectFilesFromDataTransfer(items);
+                this.processFiles(files);
+              } else {
+                // Fallback: synthetic events / older paths
+                this.processFiles(e.dataTransfer.files);
+              }
+            }}
             onClick={() => this.fileRef.current?.click()}
           >
             <div className="mt-zone__icon">🗂️</div>
