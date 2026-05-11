@@ -235,39 +235,6 @@ export class FileUploadPanel extends React.Component<FileUploadPanelProps, FileU
             />
           </div>
 
-          {/* Drop zone — supports both individual file drops AND recursive
-              folder drops via collectFilesFromDataTransfer. */}
-          <div
-            className={`mt-zone${drag ? " mt-zone--dragging" : ""}`}
-            onDragOver={e => { e.preventDefault(); this.setState({ drag: true }); }}
-            onDragLeave={() => this.setState({ drag: false })}
-            onDrop={async e => {
-              e.preventDefault();
-              this.setState({ drag: false });
-              const items = e.dataTransfer.items;
-              if (items && items.length > 0 && (items[0] as any).webkitGetAsEntry) {
-                // Use the entry API so folder drops recurse.
-                const files = await collectFilesFromDataTransfer(items);
-                this.processFiles(files);
-              } else {
-                // Fallback: synthetic events / older paths
-                this.processFiles(e.dataTransfer.files);
-              }
-            }}
-            onClick={() => this.fileRef.current?.click()}
-          >
-            <div className="mt-zone__icon">🗂️</div>
-            <div className="mt-zone__title">Drag &amp; Drop / File</div>
-            <div className="mt-zone__subtitle">+ PDF per documentazione API</div>
-            <input
-              ref={this.fileRef}
-              type="file"
-              multiple
-              accept={ACCEPTED_EXTS.join(",")}
-              style={{ display: "none" }}
-              onChange={e => this.processFiles(e.target.files)}
-            />
-          </div>
         </div>
         {/* Delete All */}
         {loadedSpecs.length > 0 && (
