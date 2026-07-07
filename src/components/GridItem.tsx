@@ -47,7 +47,7 @@ import ArrowLeft from '../assets/ArrowLeft.png';
 
 import AlertModal from './AlertModal';
 import CompForce from './CompForce';
-import CreateNewBlock, { CreateBlockPosition } from './CreateNewBlock';
+import CreateNewBlock, { CreateBlockOption, CreateBlockPosition } from './CreateNewBlock';
 import { useWebSocket } from './useWebSocket';
 import styles from './Griditem.module.scss';
 
@@ -108,6 +108,28 @@ const reassignInstructionOrderNumbersByBlock = (instructions: BlockLoopInstructi
   return updatedInstructions;
 };
 
+const blockOptionsFromInstructions = (instructions: BlockLoopInstructionLoadDTO[]): CreateBlockOption[] => {
+  const byBlockId = new Map<number, CreateBlockOption>();
+  instructions.forEach((instruction) => {
+    if (!byBlockId.has(instruction.blockId)) {
+      byBlockId.set(instruction.blockId, {
+        blockId: instruction.blockId,
+        blockOrderNumber: instruction.blockOrderNumber,
+        blockName: instruction.blockName,
+      });
+    }
+  });
+  return Array.from(byBlockId.values()).sort((a, b) => a.blockOrderNumber - b.blockOrderNumber);
+};
+
+const normalizeBlockOptions = (blocks: CreateBlockOption[]): CreateBlockOption[] => {
+  const byBlockId = new Map<number, CreateBlockOption>();
+  blocks.forEach((block) => {
+    if (block.blockId > 0) byBlockId.set(block.blockId, block);
+  });
+  return Array.from(byBlockId.values()).sort((a, b) => a.blockOrderNumber - b.blockOrderNumber);
+};
+
 const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketPort, sessionId, botJobIdInitial, botJobNameInitial }) => {
   // Using the custom WebSocket hook
   const { webSocket, connected, reconnectAttempts, messages, error } = useWebSocket(socketPort, sessionId);
@@ -163,6 +185,9 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
   const [memoryPanelOpen, setMemoryPanelOpen] = useState<boolean>(false);
   const [memoryPanelPos, setMemoryPanelPos] = useState<{ x: number; y: number }>({ x: 80, y: 120 });
   const [memoryTargetBlockId, setMemoryTargetBlockId] = useState<number | null>(null);
+  const [memoryBlockOptions, setMemoryBlockOptions] = useState<CreateBlockOption[]>(
+    blockOptionsFromInstructions(data)
+  );
   const [createBlockOpen, setCreateBlockOpen] = useState<boolean>(false);
 
   const handleAddToMemory = (instruction: BlockLoopInstructionLoadDTO) => {
@@ -176,13 +201,20 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     setMemorySteps((prev) => prev.filter((step) => step.id !== id));
   };
 
+  useEffect(() => {
+    setMemoryBlockOptions((prev) => normalizeBlockOptions([
+      ...prev,
+      ...blockOptionsFromInstructions(instructionsData),
+    ]));
+  }, [instructionsData]);
+
   // Apply: move the memorized steps (in insertion order) to the end of the
   // selected block, then persist exactly like a drag & drop move (ROW_MOVE).
   const handleApplyMemory = () => {
     if (memoryTargetBlockId === null || memorySteps.length === 0) return;
 
-    const targetBlock = groupedData[memoryTargetBlockId];
-    if (!targetBlock || targetBlock.instructions.length === 0) return;
+    const targetBlockOption = memoryBlockOptions.find((block) => block.blockId === memoryTargetBlockId);
+    if (!targetBlockOption) return;
 
     // Same rules as drag & drop: structural and loop-attached steps can't change block.
     const isMovable = (step: BlockLoopInstructionLoadDTO) =>
@@ -211,14 +243,22 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     });
 
     // Append to the target block, in memory-list insertion order.
-    const { blockId, blockName, blockOrderNumber, botJobId } = targetBlock.instructions[0];
+    const blockId = targetBlockOption.blockId;
+    const blockName = targetBlockOption.blockName;
+    const blockOrderNumber = targetBlockOption.blockOrderNumber;
+    const targetBotJobId = botJobId ?? instructionsData[0]?.botJobId ?? -1;
     const appended = movable
       .map((step) => movedById.get(step.id))
       .filter((ins): ins is BlockLoopInstructionLoadDTO => Boolean(ins))
       .map((ins) => ({ ...ins, blockId, blockName, blockOrderNumber }));
+    const existingTargetBlock = updatedGroupedData[blockId] ?? {
+      blockName,
+      instructions: [],
+      exportFile: "No Excel Export File",
+    };
     updatedGroupedData[blockId] = {
-      ...updatedGroupedData[blockId],
-      instructions: [...updatedGroupedData[blockId].instructions, ...appended],
+      ...existingTargetBlock,
+      instructions: [...existingTargetBlock.instructions, ...appended],
     };
 
     // Renumber every block and drop the ones the move emptied.
@@ -253,7 +293,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
       const message = {
         type: 'ROW_MOVE',
-        botJobId,
+        botJobId: targetBotJobId,
         botJobName,
         deleteBlockId,
         homeBankingId: homeBankingId,
@@ -273,9 +313,8 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     setMemorySteps((prev) => prev.filter((step) => !movableIds.has(step.id)));
   };
 
-  // UI-only for now: the Java backend will own block creation (it must mint the
-  // new blockId). This builds the proposed BLOCK_CREATE contract and logs it;
-  // enable the send once the backend implements the message type.
+  // Java backend owns block creation and mints the new blockId. It refreshes the
+  // grid through the existing updateInstructions socket path after BLOCK_CREATE.
   const handleCreateNewBlock = (newBlockName: string, position: CreateBlockPosition) => {
     const botJobId = instructionsData[0]?.botJobId ?? -1;
 
@@ -291,13 +330,18 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
       beforeBlockOrderNumber: position.type === 'before' ? position.blockOrderNumber : -1,
     };
 
-    console.log('BLOCK_CREATE (UI only — backend pending):', message);
-    // TODO backend: when the Java side handles BLOCK_CREATE, activate:
-    // if (webSocket && connected) {
-    //   try { webSocket.send(JSON.stringify(message)); } catch (err) { console.log(err); }
-    // }
+    if (!webSocket || !connected) {
+      console.log('Cannot send BLOCK_CREATE: WebSocket is not connected', message);
+      return;
+    }
 
-    setCreateBlockOpen(false);
+    try {
+      webSocket.send(JSON.stringify(message));
+      console.log('Sent BLOCK_CREATE message:', message);
+    } catch (err) {
+      console.log('Error sending BLOCK_CREATE message:', err);
+      return;
+    }
   };
 
   const startMemoryPanelDrag = (e: React.MouseEvent) => {
@@ -900,7 +944,23 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
           // ... handle updateInstructions ...
           // Ensure detailsData is always an array if possible
-          const detailsData = Array.isArray(bodyData) ? bodyData : [];
+          const detailsData = Array.isArray(bodyData)
+            ? bodyData
+            : Array.isArray(bodyData.instructions)
+              ? bodyData.instructions
+              : [];
+          const backendBlocks = !Array.isArray(bodyData) && Array.isArray(bodyData.blocks)
+            ? bodyData.blocks
+            : [];
+          const createdBlockId = !Array.isArray(bodyData) ? Number(bodyData.createdBlockId) : -1;
+
+          if (backendBlocks.length > 0) {
+            setMemoryBlockOptions(normalizeBlockOptions(backendBlocks));
+          }
+          if (createdBlockId > 0) {
+            setMemoryTargetBlockId(createdBlockId);
+            setCreateBlockOpen(false);
+          }
 
           // Check if detailsData is empty
           if (detailsData.length === 0) {
@@ -908,9 +968,9 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
             setInstructionsData([]);
             setGroupedData({}); // Or set to your initial empty state
             setIsDataReordered(true); // Or false, depending on your logic
-            setBotJobId(bodyData.botJobId);
-            setBotJobName(bodyData.botJobName);
-            setBlockId(bodyData.blockId);
+            if (bodyData.botJobId !== undefined) setBotJobId(bodyData.botJobId);
+            if (bodyData.botJobName !== undefined) setBotJobName(bodyData.botJobName);
+            if (bodyData.blockId !== undefined) setBlockId(bodyData.blockId);
           } else {
             // Otherwise, set elementDTO to detailsData
 
@@ -922,6 +982,12 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
               setBotJobName(detailsData[0].botJobName);
             }
             setInstructionsData(detailsData);
+            if (backendBlocks.length === 0) {
+              setMemoryBlockOptions((prev) => normalizeBlockOptions([
+                ...prev,
+                ...blockOptionsFromInstructions(detailsData),
+              ]));
+            }
 
 
             setIsDataReordered(false); // To trigger reordering logic if needed
@@ -3471,15 +3537,10 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
             >
               <option value="">Select target block…</option>
               <option value="__create__">➕ Create new block…</option>
-              {Object.values(groupedData)
-                .filter((bd) => bd.instructions.length > 0)
-                .sort(
-                  (a, b) =>
-                    a.instructions[0].blockOrderNumber - b.instructions[0].blockOrderNumber
-                )
-                .map((bd) => (
-                  <option key={bd.instructions[0].blockId} value={bd.instructions[0].blockId}>
-                    #{bd.instructions[0].blockOrderNumber} {bd.blockName}
+              {memoryBlockOptions
+                .map((block) => (
+                  <option key={block.blockId} value={block.blockId}>
+                    #{block.blockOrderNumber} {block.blockName}
                   </option>
                 ))}
             </select>
@@ -3510,7 +3571,11 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
             <button
               type="button"
               className={styles.memoryApplyButton}
-              disabled={memoryTargetBlockId === null || memorySteps.length === 0}
+              disabled={
+                memoryTargetBlockId === null
+                || memorySteps.length === 0
+                || !memoryBlockOptions.some((block) => block.blockId === memoryTargetBlockId)
+              }
               onClick={handleApplyMemory}
             >
               Apply
@@ -3520,13 +3585,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
       )}
       {createBlockOpen && (
         <CreateNewBlock
-          blocks={Object.values(groupedData)
-            .filter((bd) => bd.instructions.length > 0)
-            .map((bd) => ({
-              blockId: bd.instructions[0].blockId,
-              blockOrderNumber: bd.instructions[0].blockOrderNumber,
-              blockName: bd.blockName,
-            }))}
+          blocks={memoryBlockOptions}
           onCreate={handleCreateNewBlock}
           onClose={() => setCreateBlockOpen(false)}
         />
