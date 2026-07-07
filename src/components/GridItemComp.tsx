@@ -3069,6 +3069,17 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     return <span className={styles.instructionDetails}>&nbsp;</span>;
   };
 
+  // Same rule everywhere: match the label the grid displays (clientNamed wins
+  // over the canonical backend name), but keep matching `name` too so searching
+  // by the backend key still works.
+  const instructionMatchesFind = (ins: ComponentsInstructionsDTO, q: string): boolean => {
+    const shownLabel = (ins.clientNamed && ins.clientNamed.length > 0)
+      ? ins.clientNamed
+      : ins.name;
+    return (shownLabel ?? "").toLowerCase().includes(q)
+      || (ins.name ?? "").toLowerCase().includes(q);
+  };
+
   const renderHighlighted = (text: string, query: string) => {
     const q = query.trim();
     if (!q) return text;
@@ -3179,8 +3190,8 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
 
                     const blockMatch = (blockData.blockName ?? "").toLowerCase().includes(q);
 
-                    const instructionMatch = (blockData.instructions ?? []).some((ins) =>
-                      (ins.name ?? "").toLowerCase().includes(q)
+                    const instructionMatch = (blockData.instructions ?? []).some(
+                      (ins) => instructionMatchesFind(ins, q)
                     );
 
                     return blockMatch || instructionMatch;
@@ -3346,6 +3357,18 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                             {blockData.instructions.map((instruction, index) => {
                               if (instruction.actions === "EXCEL GOTO") return null;
 
+                              // Row-level find: inside a kept block, hide rows that don't
+                              // match — unless the block itself matched by name (then the
+                              // whole block stays visible).
+                              const findQuery = findText.trim().toLowerCase();
+                              if (
+                                findQuery &&
+                                !(blockData.blockName ?? "").toLowerCase().includes(findQuery) &&
+                                !instructionMatchesFind(instruction, findQuery)
+                              ) {
+                                return null;
+                              }
+
                               const isLastInstruction =
                                 index === blockData.instructions.length - 1;
                               const isJustOne = blockData.instructions.length === 1;
@@ -3357,6 +3380,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                                   key={instruction.id}
                                   draggableId={instruction.id.toString()}
                                   index={index}
+                                  isDragDisabled={findText.trim().length > 0}
                                 >
                                   {(provided) => (
                                     <div

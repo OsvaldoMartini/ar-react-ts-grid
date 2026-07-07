@@ -47,6 +47,7 @@ import ArrowLeft from '../assets/ArrowLeft.png';
 
 import AlertModal from './AlertModal';
 import CompForce from './CompForce';
+import CreateNewBlock, { CreateBlockPosition } from './CreateNewBlock';
 import { useWebSocket } from './useWebSocket';
 import styles from './Griditem.module.scss';
 
@@ -155,6 +156,165 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
   const [executionState, setExecutionState] = useState<string>();
   const [findText, setFindText] = useState<string>('');
   const [collapsedBlocks, setCollapsedBlocks] = useState<Set<number>>(new Set());
+
+  // Memory list: steps hand-picked via the row "+" button, kept in insertion order,
+  // shown in a floating (non-modal, draggable) panel.
+  const [memorySteps, setMemorySteps] = useState<BlockLoopInstructionLoadDTO[]>([]);
+  const [memoryPanelOpen, setMemoryPanelOpen] = useState<boolean>(false);
+  const [memoryPanelPos, setMemoryPanelPos] = useState<{ x: number; y: number }>({ x: 80, y: 120 });
+  const [memoryTargetBlockId, setMemoryTargetBlockId] = useState<number | null>(null);
+  const [createBlockOpen, setCreateBlockOpen] = useState<boolean>(false);
+
+  const handleAddToMemory = (instruction: BlockLoopInstructionLoadDTO) => {
+    setMemorySteps((prev) =>
+      prev.some((step) => step.id === instruction.id) ? prev : [...prev, instruction]
+    );
+    setMemoryPanelOpen(true);
+  };
+
+  const handleRemoveFromMemory = (id: number) => {
+    setMemorySteps((prev) => prev.filter((step) => step.id !== id));
+  };
+
+  // Apply: move the memorized steps (in insertion order) to the end of the
+  // selected block, then persist exactly like a drag & drop move (ROW_MOVE).
+  const handleApplyMemory = () => {
+    if (memoryTargetBlockId === null || memorySteps.length === 0) return;
+
+    const targetBlock = groupedData[memoryTargetBlockId];
+    if (!targetBlock || targetBlock.instructions.length === 0) return;
+
+    // Same rules as drag & drop: structural and loop-attached steps can't change block.
+    const isMovable = (step: BlockLoopInstructionLoadDTO) =>
+      !["IF", "ELSEIF", "ELSE", "ENDIF"].includes(step.actions) &&
+      !step.refreshLoop &&
+      !step.loopOnly;
+
+    const movable = memorySteps.filter(isMovable);
+    if (movable.length === 0) return;
+    const movableIds = new Set(movable.map((step) => step.id));
+
+    // Pull the live rows out of every block (the memory list holds snapshots).
+    const movedById = new Map<number, BlockLoopInstructionLoadDTO>();
+    const updatedGroupedData: typeof groupedData = {};
+    Object.keys(groupedData).forEach((key) => {
+      const currentBlockId = Number(key);
+      const blockData = groupedData[currentBlockId];
+      const kept = blockData.instructions.filter((ins) => {
+        if (movableIds.has(ins.id)) {
+          movedById.set(ins.id, ins);
+          return false;
+        }
+        return true;
+      });
+      updatedGroupedData[currentBlockId] = { ...blockData, instructions: kept };
+    });
+
+    // Append to the target block, in memory-list insertion order.
+    const { blockId, blockName, blockOrderNumber, botJobId } = targetBlock.instructions[0];
+    const appended = movable
+      .map((step) => movedById.get(step.id))
+      .filter((ins): ins is BlockLoopInstructionLoadDTO => Boolean(ins))
+      .map((ins) => ({ ...ins, blockId, blockName, blockOrderNumber }));
+    updatedGroupedData[blockId] = {
+      ...updatedGroupedData[blockId],
+      instructions: [...updatedGroupedData[blockId].instructions, ...appended],
+    };
+
+    // Renumber every block and drop the ones the move emptied.
+    let deleteBlockId = -1;
+    Object.keys(updatedGroupedData).forEach((key) => {
+      const currentBlockId = Number(key);
+      const block = updatedGroupedData[currentBlockId];
+      if (block.instructions.length === 0) {
+        if (deleteBlockId === -1) deleteBlockId = currentBlockId;
+        delete updatedGroupedData[currentBlockId];
+        return;
+      }
+      block.instructions = block.instructions.map((ins, i) => ({
+        ...ins,
+        instructionOrderNumber: i + 1,
+      }));
+    });
+
+    setGroupedData(updatedGroupedData);
+    const updatedInstructionsData = Object.values(updatedGroupedData).flatMap(
+      (block) => block.instructions
+    );
+    setInstructionsData(updatedInstructionsData);
+    setIsDataReordered(false);
+
+    if (webSocket && connected) {
+      const updatedRows = updatedInstructionsData.map((ins) => ({
+        blockId: ins.blockId,
+        instructionId: ins.id,
+        instructionOrderNumber: ins.instructionOrderNumber,
+      }));
+
+      const message = {
+        type: 'ROW_MOVE',
+        botJobId,
+        botJobName,
+        deleteBlockId,
+        homeBankingId: homeBankingId,
+        sessionId: `botJobTasks`,
+        updatedRows,
+      };
+
+      try {
+        webSocket.send(JSON.stringify(message));
+        console.log('Sent memory apply (row move) message:', message);
+      } catch (error) {
+        console.log('Error sending WebSocket message:', error);
+      }
+    }
+
+    // Applied steps leave the list; non-movable ones (IF/ELSE/loop) stay visible.
+    setMemorySteps((prev) => prev.filter((step) => !movableIds.has(step.id)));
+  };
+
+  // UI-only for now: the Java backend will own block creation (it must mint the
+  // new blockId). This builds the proposed BLOCK_CREATE contract and logs it;
+  // enable the send once the backend implements the message type.
+  const handleCreateNewBlock = (newBlockName: string, position: CreateBlockPosition) => {
+    const botJobId = instructionsData[0]?.botJobId ?? -1;
+
+    const message = {
+      type: 'BLOCK_CREATE',
+      botJobId,
+      botJobName,
+      homeBankingId: homeBankingId,
+      sessionId: `botJobTasks`,
+      blockName: newBlockName,
+      insertPosition: position.type === 'end' ? 'END' : 'BEFORE',
+      beforeBlockId: position.type === 'before' ? position.blockId : -1,
+      beforeBlockOrderNumber: position.type === 'before' ? position.blockOrderNumber : -1,
+    };
+
+    console.log('BLOCK_CREATE (UI only — backend pending):', message);
+    // TODO backend: when the Java side handles BLOCK_CREATE, activate:
+    // if (webSocket && connected) {
+    //   try { webSocket.send(JSON.stringify(message)); } catch (err) { console.log(err); }
+    // }
+
+    setCreateBlockOpen(false);
+  };
+
+  const startMemoryPanelDrag = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const orig = memoryPanelPos;
+    const onMove = (ev: MouseEvent) => {
+      setMemoryPanelPos({ x: orig.x + (ev.clientX - startX), y: orig.y + (ev.clientY - startY) });
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
 
   const toggleBlockCollapsed = (blockId: number) => {
     setCollapsedBlocks((prev) => {
@@ -3166,6 +3326,17 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     return <span className={styles.instructionDetails}>&nbsp;</span>;
   };
 
+  // Same rule everywhere: match the label the grid displays (clientNamed wins
+  // over the canonical backend name), but keep matching `name` too so searching
+  // by the backend key still works.
+  const instructionMatchesFind = (ins: BlockLoopInstructionLoadDTO, q: string): boolean => {
+    const shownLabel = (ins.clientNamed && ins.clientNamed.length > 0)
+      ? ins.clientNamed
+      : ins.name;
+    return (shownLabel ?? "").toLowerCase().includes(q)
+      || (ins.name ?? "").toLowerCase().includes(q);
+  };
+
   const renderHighlighted = (text: string, query: string) => {
     const q = query.trim();
     if (!q) return text;
@@ -3245,7 +3416,121 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
           onChange={(e) => setFindText(e.target.value)}
           placeholder="Type to find…"
         />
+        {memorySteps.length > 0 && !memoryPanelOpen && (
+          <button
+            type="button"
+            className={styles.memoryToggleButton}
+            onClick={() => setMemoryPanelOpen(true)}
+          >
+            Memory ({memorySteps.length})
+          </button>
+        )}
       </div>
+      {memoryPanelOpen && (
+        <div
+          className={styles.memoryPanel}
+          style={{ left: memoryPanelPos.x, top: memoryPanelPos.y }}
+        >
+          <div className={styles.memoryPanelHeader} onMouseDown={startMemoryPanelDrag}>
+            <span className={styles.memoryPanelTitle}>
+              Memory List ({memorySteps.length})
+            </span>
+            <button
+              type="button"
+              className={styles.memoryPanelHeaderBtn}
+              title="Clear all"
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={() => setMemorySteps([])}
+            >
+              🗑
+            </button>
+            <button
+              type="button"
+              className={styles.memoryPanelHeaderBtn}
+              title="Close"
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={() => setMemoryPanelOpen(false)}
+            >
+              ✕
+            </button>
+          </div>
+          <div className={styles.memoryPanelSelectRow}>
+            <span className={styles.memoryPanelSelectLabel}>Block:</span>
+            <select
+              className={styles.memoryPanelSelect}
+              value={memoryTargetBlockId ?? ''}
+              onChange={(e) => {
+                if (e.target.value === '__create__') {
+                  // Not a target: opens the Create-new-block dialog. The controlled
+                  // value snaps the select back to the current selection.
+                  setCreateBlockOpen(true);
+                  return;
+                }
+                setMemoryTargetBlockId(e.target.value === '' ? null : Number(e.target.value));
+              }}
+            >
+              <option value="">Select target block…</option>
+              <option value="__create__">➕ Create new block…</option>
+              {Object.values(groupedData)
+                .filter((bd) => bd.instructions.length > 0)
+                .sort(
+                  (a, b) =>
+                    a.instructions[0].blockOrderNumber - b.instructions[0].blockOrderNumber
+                )
+                .map((bd) => (
+                  <option key={bd.instructions[0].blockId} value={bd.instructions[0].blockId}>
+                    #{bd.instructions[0].blockOrderNumber} {bd.blockName}
+                  </option>
+                ))}
+            </select>
+          </div>
+          <div className={styles.memoryPanelList}>
+            {memorySteps.length === 0 ? (
+              <div className={styles.memoryPanelEmpty}>
+                Click “+” on a step to add it here
+              </div>
+            ) : (
+              memorySteps.map((step, i) => (
+                <div key={step.id} className={styles.memoryPanelRow}>
+                  <span className={styles.memoryPanelOrder}>{i + 1}.</span>
+                  {getInstructionTypeElement(step)}
+                  <button
+                    type="button"
+                    className={styles.memoryPanelRemove}
+                    title="Remove from memory list"
+                    onClick={() => handleRemoveFromMemory(step.id)}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+          <div className={styles.memoryPanelFooter}>
+            <button
+              type="button"
+              className={styles.memoryApplyButton}
+              disabled={memoryTargetBlockId === null || memorySteps.length === 0}
+              onClick={handleApplyMemory}
+            >
+              Apply
+            </button>
+          </div>
+        </div>
+      )}
+      {createBlockOpen && (
+        <CreateNewBlock
+          blocks={Object.values(groupedData)
+            .filter((bd) => bd.instructions.length > 0)
+            .map((bd) => ({
+              blockId: bd.instructions[0].blockId,
+              blockOrderNumber: bd.instructions[0].blockOrderNumber,
+              blockName: bd.blockName,
+            }))}
+          onCreate={handleCreateNewBlock}
+          onClose={() => setCreateBlockOpen(false)}
+        />
+      )}
       <div className={styles.gridScroll}>
         <div className={styles.gridContent}>
           <DragDropContext onDragEnd={onDragEnd} // Define the onDragEnd handler to update the state when the dragging stops
@@ -3321,8 +3606,8 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
                     const blockMatch = (blockData.blockName ?? "").toLowerCase().includes(q);
 
-                    const instructionMatch = (blockData.instructions ?? []).some((ins) =>
-                      (ins.name ?? "").toLowerCase().includes(q)
+                    const instructionMatch = (blockData.instructions ?? []).some(
+                      (ins) => instructionMatchesFind(ins, q)
                     );
 
                     return blockMatch || instructionMatch;
@@ -3496,6 +3781,18 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                             {blockData.instructions.map((instruction, index) => {
                               if (instruction.actions === "EXCEL GOTO") return null;
 
+                              // Row-level find: inside a kept block, hide rows that don't
+                              // match — unless the block itself matched by name (then the
+                              // whole block stays visible).
+                              const findQuery = findText.trim().toLowerCase();
+                              if (
+                                findQuery &&
+                                !(blockData.blockName ?? "").toLowerCase().includes(findQuery) &&
+                                !instructionMatchesFind(instruction, findQuery)
+                              ) {
+                                return null;
+                              }
+
                               const isLastInstruction =
                                 index === blockData.instructions.length - 1;
                               const isJustOne = blockData.instructions.length === 1;
@@ -3507,6 +3804,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                                   key={instruction.id}
                                   draggableId={instruction.id.toString()}
                                   index={index}
+                                  isDragDisabled={findText.trim().length > 0}
                                 >
                                   {(provided) => (
                                     <div
@@ -3568,6 +3866,17 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                                               } />
                                           )}
                                           {getInstructionTypeElement(instruction)}
+                                          <button
+                                            type="button"
+                                            className={styles.memoryAddButton}
+                                            title="Add step to memory list"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleAddToMemory(instruction);
+                                            }}
+                                          >
+                                            +
+                                          </button>
                                           {instruction.refreshLoop && (
                                             <img
                                               src={refreshLoopImage}
