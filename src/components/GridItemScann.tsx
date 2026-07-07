@@ -19,6 +19,7 @@ import SupportRequestModal, { type SupportRequestData, type SupportRequestAction
 import { useWebSocket } from './useWebSocket';
 import AttributeDropdown from './AttributeDropdown';
 import NameDropdown from './NameDropdown';
+import CreateNewBlock, { CreateBlockOption, CreateBlockPosition } from './CreateNewBlock';
 import styles from './GridItemScann.module.scss';
 
 
@@ -40,6 +41,30 @@ const groupByTagName = (data: ElementDTO[]) => {
     result[tagName].elements.push(item);
     return result;
   }, {} as Record<string, { tagName: string; elements: ElementDTO[] }>);
+};
+
+const normalizeBlockOptions = (blocks: CreateBlockOption[]): CreateBlockOption[] => {
+  const byBlockId = new Map<number, CreateBlockOption>();
+  blocks.forEach((block) => {
+    if (block.blockId > 0) byBlockId.set(block.blockId, block);
+  });
+  return Array.from(byBlockId.values()).sort((a, b) => a.blockOrderNumber - b.blockOrderNumber);
+};
+
+const blockOptionsFromPayload = (payload: any): CreateBlockOption[] => {
+  const rawBlocks = Array.isArray(payload?.blocks) ? payload.blocks : [];
+  return rawBlocks
+    .map((block: any) => ({
+      blockId: Number(block.blockId),
+      blockOrderNumber: Number(block.blockOrderNumber),
+      blockName: String(block.blockName ?? ''),
+    }))
+    .filter((block: CreateBlockOption) =>
+      Number.isFinite(block.blockId)
+      && block.blockId > 0
+      && Number.isFinite(block.blockOrderNumber)
+      && block.blockName.length > 0
+    );
 };
 
 const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, botJobIdInitial, botJobNameInitial, dataDTO, socketPort, sessionId }) => {
@@ -124,6 +149,106 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   const [supportReqData, setSupportReqData] = useState<SupportRequestData | null>(null);
   const [elementsSupportReqData, setElementsSupportReqData] = useState<SupportRequestData | null>(null);
   const clickedSupportElementRef = useRef<ElementDTO | null>(null);
+  const [memoryElements, setMemoryElements] = useState<ElementDTO[]>([]);
+  const [memoryPanelOpen, setMemoryPanelOpen] = useState<boolean>(false);
+  const [memoryPanelPos, setMemoryPanelPos] = useState<{ x: number; y: number }>({ x: 80, y: 120 });
+  const [memoryTargetBlockId, setMemoryTargetBlockId] = useState<number | null>(null);
+  const [memoryBlockOptions, setMemoryBlockOptions] = useState<CreateBlockOption[]>([]);
+  const [createBlockOpen, setCreateBlockOpen] = useState<boolean>(false);
+
+  const memoryElementKey = (element: ElementDTO) =>
+    `${element.xPath || ''}||${element.tagName || ''}||${element.typeElement || ''}||${element.attributeType || ''}||${element.someText || ''}`;
+
+  const handleAddElementToMemory = (element: ElementDTO) => {
+    const key = memoryElementKey(element);
+    setMemoryElements((prev) =>
+      prev.some((item) => memoryElementKey(item) === key) ? prev : [...prev, element]
+    );
+    setMemoryPanelOpen(true);
+  };
+
+  const handleRemoveElementFromMemory = (element: ElementDTO) => {
+    const key = memoryElementKey(element);
+    setMemoryElements((prev) => prev.filter((item) => memoryElementKey(item) !== key));
+  };
+
+  const startMemoryPanelDrag = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startLeft = memoryPanelPos.x;
+    const startTop = memoryPanelPos.y;
+    const onMove = (moveEvent: MouseEvent) => {
+      setMemoryPanelPos({
+        x: Math.max(0, startLeft + moveEvent.clientX - startX),
+        y: Math.max(0, startTop + moveEvent.clientY - startY),
+      });
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  const handleApplyMemory = () => {
+    if (memoryTargetBlockId === null || memoryElements.length === 0) return;
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
+      console.warn('WebSocket is not connected. Cannot apply scanner memory list.');
+      return;
+    }
+
+    const targetBlock = memoryBlockOptions.find((block) => block.blockId === memoryTargetBlockId);
+    if (!targetBlock) return;
+
+    const message = {
+      type: 'SEND_ALL_ELEMENTS_DTO',
+      homeBankingId,
+      botJobId,
+      botJobName,
+      sessionId: 'scanner-element-pane',
+      blockId: targetBlock.blockId,
+      blockName: targetBlock.blockName,
+      blockOrderNumber: targetBlock.blockOrderNumber,
+      elementDetails: memoryElements,
+    };
+
+    try {
+      webSocket.send(JSON.stringify(message));
+      console.log('Sent scanner memory apply:', message);
+      setMemoryElements([]);
+    } catch (error) {
+      console.error('Error sending scanner memory apply:', error);
+    }
+  };
+
+  const handleCreateNewBlock = (newBlockName: string, position: CreateBlockPosition) => {
+    const message = {
+      type: 'BLOCK_CREATE',
+      botJobId,
+      botJobName,
+      homeBankingId,
+      sessionId: 'scanner-element-pane',
+      blockName: newBlockName,
+      insertPosition: position.type === 'end' ? 'END' : 'BEFORE',
+      beforeBlockId: position.type === 'before' ? position.blockId : -1,
+      beforeBlockOrderNumber: position.type === 'before' ? position.blockOrderNumber : -1,
+    };
+
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
+      console.log('Cannot send BLOCK_CREATE: WebSocket is not connected', message);
+      return;
+    }
+
+    try {
+      webSocket.send(JSON.stringify(message));
+      console.log('Sent BLOCK_CREATE from scanner memory:', message);
+      setCreateBlockOpen(false);
+    } catch (err) {
+      console.log('Error sending BLOCK_CREATE from scanner memory:', err);
+    }
+  };
 
   const handleNextBlockPage = (typeElement: string) => {
     setBlockCurrentPages((prev) => ({
@@ -265,6 +390,10 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
               if (typeof bodyData?.botJobName !== "undefined") setBotJobName(bodyData?.botJobName);
             }
 
+            setMemoryBlockOptions((prev) => normalizeBlockOptions([
+              ...prev,
+              ...blockOptionsFromPayload(bodyData),
+            ]));
             setIsElementGrouped(false);
             break;
           }
@@ -349,6 +478,19 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
 
           case "activate-update-all": {
             setIsUpdatingAll(false);
+            break;
+          }
+
+          case "blocksUpdate": {
+            setMemoryBlockOptions((prev) => normalizeBlockOptions([
+              ...prev,
+              ...blockOptionsFromPayload(bodyData),
+            ]));
+            const createdBlockId = Number(bodyData?.blockId ?? bodyData?.createdBlockId);
+            if (Number.isFinite(createdBlockId) && createdBlockId > 0) {
+              setMemoryTargetBlockId(createdBlockId);
+              setCreateBlockOpen(false);
+            }
             break;
           }
 
@@ -1067,6 +1209,103 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
         />
       )}
 
+      {memoryPanelOpen && (
+        <div
+          className={styles.memoryPanel}
+          style={{ left: memoryPanelPos.x, top: memoryPanelPos.y }}
+        >
+          <div className={styles.memoryPanelHeader} onMouseDown={startMemoryPanelDrag}>
+            <span className={styles.memoryPanelTitle}>
+              Memory List ({memoryElements.length})
+            </span>
+            <button
+              type="button"
+              className={styles.memoryPanelHeaderBtn}
+              title="Clear all"
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={() => setMemoryElements([])}
+            >
+              Del
+            </button>
+            <button
+              type="button"
+              className={styles.memoryPanelHeaderBtn}
+              title="Close"
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={() => setMemoryPanelOpen(false)}
+            >
+              x
+            </button>
+          </div>
+          <div className={styles.memoryPanelSelectRow}>
+            <span className={styles.memoryPanelSelectLabel}>Block:</span>
+            <select
+              className={styles.memoryPanelSelect}
+              value={memoryTargetBlockId ?? ''}
+              onChange={(e) => {
+                if (e.target.value === '__create__') {
+                  setCreateBlockOpen(true);
+                  return;
+                }
+                setMemoryTargetBlockId(e.target.value === '' ? null : Number(e.target.value));
+              }}
+            >
+              <option value="">Select target block...</option>
+              <option value="__create__">+ Create new block...</option>
+              {memoryBlockOptions.map((block) => (
+                <option key={block.blockId} value={block.blockId}>
+                  #{block.blockOrderNumber} {block.blockName}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className={styles.memoryPanelList}>
+            {memoryElements.length === 0 ? (
+              <div className={styles.memoryPanelEmpty}>
+                Click "+" on a web element to add it here
+              </div>
+            ) : (
+              memoryElements.map((element, i) => (
+                <div key={memoryElementKey(element)} className={styles.memoryPanelRow}>
+                  <span className={styles.memoryPanelOrder}>{i + 1}.</span>
+                  {getInstructionElement(element)}
+                  <button
+                    type="button"
+                    className={styles.memoryPanelRemove}
+                    title="Remove from memory list"
+                    onClick={() => handleRemoveElementFromMemory(element)}
+                  >
+                    x
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+          <div className={styles.memoryPanelFooter}>
+            <button
+              type="button"
+              className={styles.memoryApplyButton}
+              disabled={
+                memoryTargetBlockId === null
+                || memoryElements.length === 0
+                || !memoryBlockOptions.some((block) => block.blockId === memoryTargetBlockId)
+              }
+              onClick={handleApplyMemory}
+            >
+              Apply
+            </button>
+          </div>
+        </div>
+      )}
+
+      {createBlockOpen && (
+        <CreateNewBlock
+          blocks={memoryBlockOptions}
+          onCreate={handleCreateNewBlock}
+          onClose={() => setCreateBlockOpen(false)}
+        />
+      )}
+
       {elementDTO.length === 0 ? (
         // No data message (as before)
         <div className={styles.block}>
@@ -1154,6 +1393,15 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
               />
               <span style={{ fontSize: 12 }}>Hover Pick</span>
             </label>
+            {memoryElements.length > 0 && !memoryPanelOpen && (
+              <button
+                type="button"
+                className={styles.memoryToggleButton}
+                onClick={() => setMemoryPanelOpen(true)}
+              >
+                Memory ({memoryElements.length})
+              </button>
+            )}
             <div className={styles.paginationControls}>
               <label>Rows per page: </label>
               <select
@@ -1284,7 +1532,20 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
                           />
                         </div>
                       ) : (
-                        <span className={styles.instructionLine}>{getInstructionElement(elementDTO)}</span>)}
+                        <span className={styles.instructionLine}>
+                          {getInstructionElement(elementDTO)}
+                          <button
+                            type="button"
+                            className={styles.memoryAddButton}
+                            title="Add web element to memory list"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAddElementToMemory(elementDTO);
+                            }}
+                          >
+                            +
+                          </button>
+                        </span>)}
                       {/* {showAttributes ? (
                         <div className="attr-slot">
                           <AttributeDropdown dataArray={elementDTO.attributeData} onChange={handleAttributeChange} />
