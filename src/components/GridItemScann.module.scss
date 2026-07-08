@@ -224,6 +224,63 @@
   font-weight: 700;
 }
 
+.preScanStatus {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 24px;
+  padding: 3px 7px;
+  border: 1px solid #b9cdd6;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #455a64;
+  font-size: 12px;
+}
+
+.preScanStatusLabel {
+  flex: 0 0 auto;
+  min-width: 58px;
+  color: #0b5394;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.preScanStatusMessage {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preScanStatusCount {
+  margin-left: auto;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #0b5394;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.preScanStatus_running {
+  border-color: #1565c0;
+  background: #e3f2fd;
+}
+
+.preScanStatus_done {
+  border-color: #2e7d32;
+  background: #e8f5e9;
+}
+
+.preScanStatus_empty {
+  border-color: #f9a825;
+  background: #fffde7;
+}
+
+.preScanStatus_failed {
+  border-color: #c62828;
+  background: #ffebee;
+}
+
 .preScanHiddenControl {
   display: none;
 }

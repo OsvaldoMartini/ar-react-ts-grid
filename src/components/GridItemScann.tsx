@@ -69,7 +69,14 @@ const blockOptionsFromPayload = (payload: any): CreateBlockOption[] => {
 };
 
 const SCANNER_TEST_INPUT_VALUE = 'abc';
+type PreScanStatus = {
+  status: 'idle' | 'running' | 'done' | 'empty' | 'failed';
+  message: string;
+  elementCount: number;
+};
+
 const PRE_SCAN_FOCUS_PROFILES = [
+  { value: 'factory-default', label: 'All page scanner controls', searchText: '' },
   { value: 'all-interactive', label: 'All interactive controls', searchText: 'button, a, select, option, input, textarea, role, aria-haspopup, data-testid' },
   { value: 'select-options', label: 'Select options', searchText: 'select, option, combobox, listbox' },
   { value: 'inputs', label: 'Inputs and textareas', searchText: 'input, textarea, textbox, contenteditable' },
@@ -102,6 +109,11 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   const [dashboardSearchText, setDashboardSearchText] = useState<string>(PRE_SCAN_FOCUS_PROFILES[0].searchText);
   const [dashboardFocus, setDashboardFocus] = useState<string>(PRE_SCAN_FOCUS_PROFILES[0].value);
   const [dashboardSearchHidden, setDashboardSearchHidden] = useState<boolean>(false);
+  const [preScanStatus, setPreScanStatus] = useState<PreScanStatus>({
+    status: 'idle',
+    message: 'Ready',
+    elementCount: 0,
+  });
   const [collapsedBlocks, setCollapsedBlocks] = useState<Set<string>>(new Set());
   const isPreScanMode = mode === 'preScan' || sessionId.includes('preScannerGrid');
 
@@ -375,6 +387,16 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
         const bodyData = tryParse(parsedMessage.body);
 
         switch (parsedMessage.operationId) {
+          case "preScanStatus": {
+            const status = String(bodyData?.status ?? 'idle') as PreScanStatus['status'];
+            setPreScanStatus({
+              status: ['idle', 'running', 'done', 'empty', 'failed'].includes(status) ? status : 'idle',
+              message: String(bodyData?.message ?? ''),
+              elementCount: Number(bodyData?.elementCount ?? 0),
+            });
+            break;
+          }
+
           case "searchTerms": {
             setIsSendingAll(false);
             setIsUpdatingAll(false);
@@ -1235,12 +1257,22 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
               {connected ? 'Connected' : `Disconnected${reconnectAttempts > 0 ? ` (${reconnectAttempts})` : ''}`}
             </div>
           </div>
+          <div className={`${styles.preScanStatus} ${styles[`preScanStatus_${preScanStatus.status}`]}`}>
+            <span className={styles.preScanStatusLabel}>
+              {preScanStatus.status === 'running' ? 'Scanning' : preScanStatus.status}
+            </span>
+            <span className={styles.preScanStatusMessage}>{preScanStatus.message}</span>
+            {preScanStatus.elementCount > 0 && (
+              <span className={styles.preScanStatusCount}>{preScanStatus.elementCount}</span>
+            )}
+          </div>
 
           <div className={styles.preScanToolbar}>
             <button
               type="button"
               className={styles.preScanPrimaryButton}
               onClick={() => sendDashboardCommand('PRE_SCAN_PAGE')}
+              disabled={preScanStatus.status === 'running'}
               title="Run the Playwright page scanner for the selected URL"
             >
               Page Scanner
@@ -1257,6 +1289,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
               type="button"
               className={styles.preScanButton}
               onClick={() => sendDashboardCommand('PRE_SCAN_REFRESH_PAGE')}
+              disabled={preScanStatus.status === 'running'}
               title="Refresh the pre-scan browser page"
             >
               Refresh Web Page
@@ -1325,6 +1358,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
               type="button"
               className={styles.preScanPrimaryButton}
               onClick={() => sendDashboardCommand('PRE_SCAN_PAGE')}
+              disabled={preScanStatus.status === 'running'}
               title="Run scanner with current focus and search terms"
             >
               Search
