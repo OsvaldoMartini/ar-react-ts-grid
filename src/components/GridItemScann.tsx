@@ -67,6 +67,8 @@ const blockOptionsFromPayload = (payload: any): CreateBlockOption[] => {
     );
 };
 
+const SCANNER_TEST_INPUT_VALUE = 'abc';
+
 const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, botJobIdInitial, botJobNameInitial, dataDTO, socketPort, sessionId }) => {
   // Using the custom WebSocket hook
   const { webSocket, connected, reconnectAttempts, messages, error } = useWebSocket(socketPort, sessionId);
@@ -689,6 +691,24 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     }
   };
 
+  const isInputTextBlock = (typeElement: string) =>
+    ["input", "textarea"].includes(typeElement.toLowerCase());
+
+  const withScannerTestInputValue = (elementDTO: ElementDTO): ElementDTO => ({
+    ...elementDTO,
+    defaultValue: SCANNER_TEST_INPUT_VALUE,
+  });
+
+  const handleBlockTestInputClick = (
+    event: React.MouseEvent<HTMLImageElement, MouseEvent>,
+    elements: ElementDTO[]
+  ) => {
+    event.stopPropagation();
+    elements.forEach((element) => {
+      sendWebSocketMessage(withScannerTestInputValue(element), "TEST_INPUT_DTO");
+    });
+  };
+
   // ── Keep-selection handlers (used by the per-row checkbox + header buttons) ──
   const toggleKeep = (id: number) => {
     setKeepSelectedIds(prev => {
@@ -916,7 +936,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     let imageClass : string = styles.operations; // Default class for images
 
     // Set the image source based on the tag name
-    if (typeElement === "input") {
+    if (typeElement === "input" || typeElement === "textarea") {
       imageSrc = inputImage;
       imageClass = styles.inputImage;
     } else if (typeElement === "button") {
@@ -1462,6 +1482,15 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
                     <span className={styles.blockOrderNumber}>#{index + 1}</span>
                     <span className={styles.blockName}>{getInstructionTypeElement(typeElement)}</span>
                     <span className={styles.blockCount}>({elementData.elements.length})</span>
+                    {isInputTextBlock(typeElement) && (
+                      <img
+                        src={testInputImage}
+                        alt="Test Input"
+                        title={`Type "${SCANNER_TEST_INPUT_VALUE}" into each input in this block`}
+                        className={`${styles.testButton} ${styles.blockHeaderTestButton}`}
+                        onClick={(event) => handleBlockTestInputClick(event, elementData.elements)}
+                      />
+                    )}
                   </div>
                   {elementData.elements.length > blockRowsPerPage && (
                     <div className={styles.bottomPaginationControls}>

@@ -75,6 +75,7 @@ export interface ElementDTO {
   iFrameXPath: string;
   attributeValue: string;
   attributeType: string;
+  defaultValue?: string;
   autoScroll: string;
   autoEnter: string;
   // Bitstring of F/E/T/N/S toggled in GridItemScann before the element is
