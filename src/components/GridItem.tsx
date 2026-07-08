@@ -197,6 +197,21 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     setMemoryPanelOpen(true);
   };
 
+  const handleAddBlockToMemory = (instructions: BlockLoopInstructionLoadDTO[]) => {
+    setMemorySteps((prev) => {
+      const seen = new Set(prev.map((step) => step.id));
+      const next = [...prev];
+      instructions.forEach((instruction) => {
+        if (!seen.has(instruction.id)) {
+          seen.add(instruction.id);
+          next.push(instruction);
+        }
+      });
+      return next;
+    });
+    setMemoryPanelOpen(true);
+  };
+
   const handleRemoveFromMemory = (id: number) => {
     setMemorySteps((prev) => prev.filter((step) => step.id !== id));
   };
@@ -3749,6 +3764,17 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                           ({blockData.instructions.length})
                           {/* {mockData ? "-Moock Data" : ""} */}
                         </span>
+                        <button
+                          type="button"
+                          className={styles.memoryAddButton}
+                          title="Add all steps in this block to memory list"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAddBlockToMemory(blockData.instructions);
+                          }}
+                        >
+                          +
+                        </button>
                         {/* Show the export file or "No Export File" */}
                         <span className={styles.blockExportFile}>
                           {renderExportFile(String(blockData.exportFile))}

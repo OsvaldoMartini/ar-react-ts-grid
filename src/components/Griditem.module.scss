@@ -13,6 +13,10 @@
 
 /* Fixed Find row (matches existing toolbar/button design) */
 .gridFindRow {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -22,8 +26,8 @@
   padding-bottom: 4px;
 
   width: 100%;
-  /* remove these: position: sticky; top: 0; z-index */
   background: #fff;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.12);
 }
 
 .gridScroll {
