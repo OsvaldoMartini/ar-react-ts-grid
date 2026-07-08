@@ -78,6 +78,8 @@ const App: React.FC = () => {
           setInstructionsData(dataLoad as BlockLoopInstructionLoadDTO[]);
         } else if (Array.isArray(dataLoad) && dataLoad.length > 0 && sessionIdFromJava.includes("componentTasks")) {
           setComponentsData(dataLoad as BlockLoopInstructionLoadDTO[]);
+        } else if (Array.isArray(dataLoad) && dataLoad.length > 0 && sessionIdFromJava.includes("preScannerGrid")) {
+          setElementDTO(dataLoad as ElementDTO[]);
         } else if (Array.isArray(dataLoad) && dataLoad.length > 0 && sessionIdFromJava.includes("scannerGrid")) {
           // existing desktop scanner
           setElementDTO(dataLoad as ElementDTO[]);
@@ -126,6 +128,9 @@ const App: React.FC = () => {
       )}
       {sessionId && (sessionId.includes("scannerGrid")) && (
         <GridItemScann homeBankingIdInitial={homeBanking} dataDTO={elementDTO} socketPort={socketPort} sessionId={sessionId} botJobIdInitial={botJobId} botJobNameInitial={botJobName} />
+      )}
+      {sessionId && (sessionId.includes("preScannerGrid")) && (
+        <GridItemScann mode="preScan" homeBankingIdInitial={homeBanking} dataDTO={elementDTO} socketPort={socketPort} sessionId={sessionId} botJobIdInitial={botJobId} botJobNameInitial={botJobName} />
       )}
       {sessionId && (sessionId.includes("mobileScannerGrid")) && (
         <GridItemScannMobile homeBankingIdInitial={homeBanking} dataDTO={elementDTO} socketPort={socketPort} sessionId={sessionId} botJobIdInitial={botJobId} botJobNameInitial={botJobName} />

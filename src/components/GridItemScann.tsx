@@ -30,6 +30,7 @@ interface GridItemScannProps {
   dataDTO: ElementDTO[];
   socketPort: number;
   sessionId: string;
+  mode?: 'scanner' | 'preScan';
 }
 
 const groupByTagName = (data: ElementDTO[]) => {
@@ -68,8 +69,16 @@ const blockOptionsFromPayload = (payload: any): CreateBlockOption[] => {
 };
 
 const SCANNER_TEST_INPUT_VALUE = 'abc';
+const PRE_SCAN_FOCUS_PROFILES = [
+  { value: 'all-interactive', label: 'All interactive controls', searchText: 'button, a, select, option, input, textarea, role, aria-haspopup, data-testid' },
+  { value: 'select-options', label: 'Select options', searchText: 'select, option, combobox, listbox' },
+  { value: 'inputs', label: 'Inputs and textareas', searchText: 'input, textarea, textbox, contenteditable' },
+  { value: 'clickables', label: 'Buttons and clickables', searchText: 'button, link, menuitem, tab, treeitem, svg' },
+  { value: 'outputs', label: 'Labels and outputs', searchText: 'label, span, p, div, h1, h2, h3, output' },
+  { value: 'data-ids', label: 'Data/test id attributes', searchText: 'data-testid, data-test, data-cy, data-qa, id, name' },
+];
 
-const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, botJobIdInitial, botJobNameInitial, dataDTO, socketPort, sessionId }) => {
+const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, botJobIdInitial, botJobNameInitial, dataDTO, socketPort, sessionId, mode = 'scanner' }) => {
   // Using the custom WebSocket hook
   const { webSocket, connected, reconnectAttempts, messages, error } = useWebSocket(socketPort, sessionId);
 
@@ -90,7 +99,11 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   const [alertDismissed, setAlertDismissed] = useState(false);
   // const [showAttributes, setShowAttributes] = useState(false);
   const [findText, setFindText] = useState<string>('');
+  const [dashboardSearchText, setDashboardSearchText] = useState<string>(PRE_SCAN_FOCUS_PROFILES[0].searchText);
+  const [dashboardFocus, setDashboardFocus] = useState<string>(PRE_SCAN_FOCUS_PROFILES[0].value);
+  const [dashboardSearchHidden, setDashboardSearchHidden] = useState<boolean>(false);
   const [collapsedBlocks, setCollapsedBlocks] = useState<Set<string>>(new Set());
+  const isPreScanMode = mode === 'preScan' || sessionId.includes('preScannerGrid');
 
   const toggleBlockCollapsed = (key: string) => {
     setCollapsedBlocks((prev) => {
@@ -340,6 +353,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     const acceptedSessions = new Set([
       sessionId, // the one passed as prop
       "scannerGrid",
+      "preScannerGrid",
       "scannerTool",
       "scanner-element-pane",
     ]);
@@ -781,6 +795,45 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     setIsElementGrouped(false);
   };
 
+  const sendDashboardCommand = (type: string, extra: Record<string, unknown> = {}) => {
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
+      console.warn("WebSocket is not connected. Cannot send dashboard command.");
+      return;
+    }
+
+    const message = {
+      type,
+      homeBankingId,
+      botJobId,
+      botJobName,
+      sessionId: 'preScannerGrid',
+      focusProfile: dashboardFocus,
+      searchTerms: dashboardSearchText,
+      searchHiddenFields: dashboardSearchHidden,
+      ...extra,
+    };
+
+    try {
+      webSocket.send(JSON.stringify(message));
+      console.log("Sent pre-scan dashboard command:", message);
+    } catch (error) {
+      console.error("Error sending pre-scan dashboard command:", error);
+    }
+  };
+
+  const handleDashboardFocusChange = (value: string) => {
+    setDashboardFocus(value);
+    const profile = PRE_SCAN_FOCUS_PROFILES.find((item) => item.value === value);
+    if (profile) {
+      setDashboardSearchText(profile.searchText);
+    }
+  };
+
+  const handleDashboardClearGrid = () => {
+    handleClearGridAll();
+    sendDashboardCommand('PRE_SCAN_CLEAR_GRID');
+  };
+
   const handleRemoveElementDTO = (elementToRemove: ElementDTO) => {
     console.log("Removing elementDTO:", elementToRemove);
 
@@ -1169,6 +1222,116 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
 
   return (
     <div className={styles.gridContainer}>
+      {isPreScanMode && (
+        <div className={styles.preScanDashboard}>
+          <div className={styles.preScanHeader}>
+            <div>
+              <div className={styles.preScanTitle}>PRE SCAN Dashboard</div>
+              <div className={styles.preScanSubtitle}>
+                {botJobName || 'Bot Job'} - memory only until Apply
+              </div>
+            </div>
+            <div className={styles.preScanConnection}>
+              {connected ? 'Connected' : `Disconnected${reconnectAttempts > 0 ? ` (${reconnectAttempts})` : ''}`}
+            </div>
+          </div>
+
+          <div className={styles.preScanToolbar}>
+            <button
+              type="button"
+              className={styles.preScanPrimaryButton}
+              onClick={() => sendDashboardCommand('PRE_SCAN_PAGE')}
+              title="Run the Playwright page scanner for the selected URL"
+            >
+              Page Scanner
+            </button>
+            <button
+              type="button"
+              className={styles.preScanIconButton}
+              onClick={() => sendDashboardCommand('PRE_SCAN_OCR_CONFIG')}
+              title="OCR Configuration"
+            >
+              OCR Config
+            </button>
+            <button
+              type="button"
+              className={styles.preScanButton}
+              onClick={() => sendDashboardCommand('PRE_SCAN_REFRESH_PAGE')}
+              title="Refresh the pre-scan browser page"
+            >
+              Refresh Web Page
+            </button>
+            <button
+              type="button"
+              className={`${styles.preScanButton} ${styles.preScanHiddenControl}`}
+              onClick={() => sendDashboardCommand('PRE_SCAN_SEND_DOM_REVIEW')}
+              title="Send sanitized HTML for review"
+            >
+              Send Pure HTML Review
+            </button>
+            <button
+              type="button"
+              className={`${styles.preScanButton} ${styles.preScanHiddenControl}`}
+              onClick={() => sendDashboardCommand('PRE_SCAN_REQUEST_SUPPORT')}
+              title="Request support for the current page"
+            >
+              Request Support
+            </button>
+            <button
+              type="button"
+              className={styles.preScanDangerButton}
+              onClick={handleDashboardClearGrid}
+              disabled={elementDTO.length === 0}
+              title="Clear the dashboard grid"
+            >
+              Clear Grid
+            </button>
+          </div>
+
+          <div className={styles.preScanSearchRow}>
+            <label className={styles.preScanLabel}>
+              Focus:
+              <select
+                className={styles.preScanSelect}
+                value={dashboardFocus}
+                onChange={(event) => handleDashboardFocusChange(event.target.value)}
+              >
+                {PRE_SCAN_FOCUS_PROFILES.map((profile) => (
+                  <option key={profile.value} value={profile.value}>
+                    {profile.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className={styles.preScanLabel}>
+              Search by:
+              <input
+                className={styles.preScanSearchInput}
+                type="text"
+                value={dashboardSearchText}
+                onChange={(event) => setDashboardSearchText(event.target.value)}
+                placeholder="button, label, input, data-testid"
+              />
+            </label>
+            <label className={`${styles.preScanToggle} ${styles.preScanHiddenControl}`}>
+              <input
+                type="checkbox"
+                checked={dashboardSearchHidden}
+                onChange={(event) => setDashboardSearchHidden(event.target.checked)}
+              />
+              Search Hidden Fields
+            </label>
+            <button
+              type="button"
+              className={styles.preScanPrimaryButton}
+              onClick={() => sendDashboardCommand('PRE_SCAN_PAGE')}
+              title="Run scanner with current focus and search terms"
+            >
+              Search
+            </button>
+          </div>
+        </div>
+      )}
       <div className={styles.gridFindRow}>
         <span className={styles.gridFindLabel}>Find:</span>
         <div className={styles.gridFindInputWrap}>

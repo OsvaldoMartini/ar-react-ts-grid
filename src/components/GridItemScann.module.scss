@@ -189,6 +189,130 @@
   font-style: italic;
 }
 
+.preScanDashboard {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  background: #f5f8fa;
+  border-bottom: 1px solid #b9cdd6;
+}
+
+.preScanHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.preScanTitle {
+  color: #0b5394;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.preScanSubtitle {
+  color: #455a64;
+  font-size: 12px;
+}
+
+.preScanConnection {
+  flex: 0 0 auto;
+  color: #1b5e20;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.preScanHiddenControl {
+  display: none;
+}
+
+.preScanToolbar,
+.preScanSearchRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.preScanButton,
+.preScanPrimaryButton,
+.preScanIconButton,
+.preScanDangerButton {
+  min-height: 26px;
+  padding: 3px 9px;
+  border: 1px solid #9fb7c3;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #0b5394;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.preScanPrimaryButton {
+  border-color: #0b5394;
+  background: #0b5394;
+  color: #ffffff;
+}
+
+.preScanIconButton {
+  background: #eaf3de;
+  color: #244f13;
+}
+
+.preScanDangerButton {
+  border-color: #8d1d1d;
+  background: #ffffff;
+  color: #8d1d1d;
+}
+
+.preScanButton:hover,
+.preScanPrimaryButton:hover,
+.preScanIconButton:hover,
+.preScanDangerButton:hover {
+  filter: brightness(0.96);
+}
+
+.preScanButton:disabled,
+.preScanPrimaryButton:disabled,
+.preScanIconButton:disabled,
+.preScanDangerButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.preScanLabel,
+.preScanToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #0b5394;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.preScanSelect,
+.preScanSearchInput {
+  min-height: 26px;
+  border: 1px solid #b9cdd6;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #1f2933;
+  font-size: 12px;
+}
+
+.preScanSelect {
+  min-width: 210px;
+}
+
+.preScanSearchInput {
+  width: min(460px, 46vw);
+  padding: 3px 7px;
+}
+
 /* Fixed Find row (matches existing toolbar/button design) */
 .gridFindRow {
   position: sticky;
