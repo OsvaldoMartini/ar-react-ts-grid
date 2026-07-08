@@ -1171,13 +1171,26 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     <div className={styles.gridContainer}>
       <div className={styles.gridFindRow}>
         <span className={styles.gridFindLabel}>Find:</span>
-        <input
-          className={styles.gridFindInput}
-          type="text"
-          value={findText}
-          onChange={(e) => setFindText(e.target.value)}
-          placeholder="Type to find…"
-        />
+        <div className={styles.gridFindInputWrap}>
+          <input
+            className={styles.gridFindInput}
+            type="text"
+            value={findText}
+            onChange={(e) => setFindText(e.target.value)}
+            placeholder="Type to find…"
+          />
+          {findText.length > 0 && (
+            <button
+              type="button"
+              className={styles.gridFindClear}
+              aria-label="Clear find"
+              title="Clear find"
+              onClick={() => setFindText('')}
+            >
+              X
+            </button>
+          )}
+        </div>
       </div>
       {/* DOM Review Modal */}
       {domReviewData && (

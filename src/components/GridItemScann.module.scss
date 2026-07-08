@@ -257,6 +257,43 @@
 
 
 /* NEW: scrollable area for the grid/list */
+.gridFindInputWrap {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  display: flex;
+}
+
+.gridFindInput {
+  width: 100%;
+  padding-right: 26px;
+}
+
+.gridFindClear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid #9aa0a6;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #444444;
+  font-size: 11px;
+  font-weight: bold;
+  line-height: 16px;
+  cursor: pointer;
+}
+
+.gridFindClear:hover {
+  background: #e3f2fd;
+  border-color: #1976d2;
+  color: #0b5394;
+}
+
+/* NEW: scrollable area for the grid/list */
 .gridContent {
   flex: 1;
   overflow-y: auto;   /* only this part scrolls */
