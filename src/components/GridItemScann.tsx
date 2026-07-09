@@ -20,6 +20,7 @@ import { useWebSocket } from './useWebSocket';
 import AttributeDropdown from './AttributeDropdown';
 import NameDropdown from './NameDropdown';
 import CreateNewBlock, { CreateBlockOption, CreateBlockPosition } from './CreateNewBlock';
+import OCRPanel from './OCRPanel';
 import styles from './GridItemScann.module.scss';
 
 
@@ -282,32 +283,11 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     window.addEventListener('mouseup', onUp);
   };
 
-  // ── OCR review panel (preScan): per-block floating panel where the client agrees
+  // ── OCR review panel (preScan): per-block floating OCRPanel where the client agrees
   // with the OCR-resolved name or keeps the scanned DOM text, per element. The
   // backend stashes the pre-OCR text in attributeData['scanned-text'] whenever the
   // resolver changed it; rows without it are shown as "same".
   const [ocrReviewBlock, setOcrReviewBlock] = useState<string | null>(null);
-  const [ocrPanelPos, setOcrPanelPos] = useState<{ x: number; y: number }>({ x: 140, y: 150 });
-
-  const startOcrPanelDrag = (e: React.MouseEvent) => {
-    e.preventDefault();
-    const startX = e.clientX;
-    const startY = e.clientY;
-    const startLeft = ocrPanelPos.x;
-    const startTop = ocrPanelPos.y;
-    const onMove = (moveEvent: MouseEvent) => {
-      setOcrPanelPos({
-        x: Math.max(0, startLeft + moveEvent.clientX - startX),
-        y: Math.max(0, startTop + moveEvent.clientY - startY),
-      });
-    };
-    const onUp = () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-  };
 
   const scannedTextOf = (el: ElementDTO): string | null => {
     const attrs = (el as any).attributeData as Array<{ name: string; value: string }> | undefined;
@@ -1605,67 +1585,13 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
       )}
 
       {ocrReviewBlock && elementGrouped[ocrReviewBlock] && (
-        <div
-          className={`${styles.memoryPanel} ${styles.ocrPanel}`}
-          style={{ left: ocrPanelPos.x, top: ocrPanelPos.y }}
-        >
-          <div className={styles.memoryPanelHeader} onMouseDown={startOcrPanelDrag}>
-            <span className={styles.memoryPanelTitle}>
-              OCR Review — {getElementBlockText(ocrReviewBlock)} ({elementGrouped[ocrReviewBlock].elements.length})
-            </span>
-            <button
-              type="button"
-              className={styles.memoryPanelHeaderBtn}
-              title="Close"
-              onMouseDown={(e) => e.stopPropagation()}
-              onClick={() => setOcrReviewBlock(null)}
-            >
-              ✕
-            </button>
-          </div>
-          <div className={styles.ocrPanelColumns}>
-            <span>Scanned (DOM)</span>
-            <span></span>
-            <span>OCR resolved</span>
-            <span></span>
-          </div>
-          <div className={styles.ocrPanelList}>
-            {elementGrouped[ocrReviewBlock].elements.map((el) => {
-              const scanned = scannedTextOf(el);
-              return (
-                <div key={`${el.id}-${el.xPath}`} className={styles.ocrPanelRow}>
-                  <span className={styles.ocrScannedText} title={scanned ?? 'OCR did not change this element'}>
-                    {scanned ?? <span className={styles.dimmedDash}>—</span>}
-                  </span>
-                  <span className={styles.ocrArrow}>→</span>
-                  <span className={styles.ocrCurrentText} title={el.someText || ''}>{el.someText}</span>
-                  {scanned ? (
-                    <span className={styles.ocrRowActions}>
-                      <button
-                        type="button"
-                        className={styles.ocrAgreeBtn}
-                        title="Agree — keep the OCR-resolved name"
-                        onClick={() => applyOcrDecision(el, false)}
-                      >
-                        ✓
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.ocrDeferBtn}
-                        title="Defer — keep the scanned (DOM) text instead"
-                        onClick={() => applyOcrDecision(el, true)}
-                      >
-                        ✗
-                      </button>
-                    </span>
-                  ) : (
-                    <span className={styles.ocrSameBadge}>same</span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <OCRPanel
+          title={String(getElementBlockText(ocrReviewBlock))}
+          elements={elementGrouped[ocrReviewBlock].elements}
+          scannedTextOf={scannedTextOf}
+          onDecision={applyOcrDecision}
+          onClose={() => setOcrReviewBlock(null)}
+        />
       )}
 
       {memoryPanelOpen && (
