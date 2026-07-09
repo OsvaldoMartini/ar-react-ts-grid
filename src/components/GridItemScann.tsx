@@ -89,7 +89,8 @@ const blockOptionsFromPayload = (payload: any): CreateBlockOption[] => {
 
 const SCANNER_TEST_INPUT_VALUE = 'abc';
 type PreScanStatus = {
-  status: 'idle' | 'running' | 'done' | 'empty' | 'failed';
+  // 'waiting' = browser opening / page loading & settling; 'running' = actual scan.
+  status: 'idle' | 'waiting' | 'running' | 'done' | 'empty' | 'failed';
   message: string;
   elementCount: number;
 };
@@ -409,7 +410,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
           case "preScanStatus": {
             const status = String(bodyData?.status ?? 'idle') as PreScanStatus['status'];
             setPreScanStatus({
-              status: ['idle', 'running', 'done', 'empty', 'failed'].includes(status) ? status : 'idle',
+              status: ['idle', 'waiting', 'running', 'done', 'empty', 'failed'].includes(status) ? status : 'idle',
               message: String(bodyData?.message ?? ''),
               elementCount: Number(bodyData?.elementCount ?? 0),
             });
@@ -1280,7 +1281,11 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
           </div>
           <div className={`${styles.preScanStatus} ${styles[`preScanStatus_${preScanStatus.status}`]}`}>
             <span className={styles.preScanStatusLabel}>
-              {preScanStatus.status === 'running' ? 'Scanning' : preScanStatus.status}
+              {preScanStatus.status === 'running'
+                ? 'Scanning'
+                : preScanStatus.status === 'waiting'
+                  ? 'Waiting'
+                  : preScanStatus.status}
             </span>
             <span className={styles.preScanStatusMessage}>{preScanStatus.message}</span>
             {preScanStatus.elementCount > 0 && (
@@ -1293,7 +1298,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
               type="button"
               className={styles.preScanPrimaryButton}
               onClick={() => sendDashboardCommand('PRE_SCAN_PAGE')}
-              disabled={preScanStatus.status === 'running'}
+              disabled={preScanStatus.status === 'running' || preScanStatus.status === 'waiting'}
               title="Run the Playwright page scanner for the selected URL"
             >
               Page Scanner
@@ -1310,7 +1315,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
               type="button"
               className={styles.preScanButton}
               onClick={() => sendDashboardCommand('PRE_SCAN_REFRESH_PAGE')}
-              disabled={preScanStatus.status === 'running'}
+              disabled={preScanStatus.status === 'running' || preScanStatus.status === 'waiting'}
               title="Refresh the pre-scan browser page"
             >
               Refresh Web Page
@@ -1379,7 +1384,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
               type="button"
               className={styles.preScanPrimaryButton}
               onClick={() => sendDashboardCommand('PRE_SCAN_PAGE')}
-              disabled={preScanStatus.status === 'running'}
+              disabled={preScanStatus.status === 'running' || preScanStatus.status === 'waiting'}
               title="Run scanner with current focus and search terms"
             >
               Search
