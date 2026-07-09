@@ -137,6 +137,38 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   const [collapsedBlocks, setCollapsedBlocks] = useState<Set<string>>(new Set());
   const isPreScanMode = mode === 'preScan' || sessionId.includes('preScannerGrid');
 
+  // Per-block display mode (preScan dashboard): 'name' = normal display chain,
+  // 'id' = raw DOM id (locator planning), 'testid' = testing attribute
+  // (data-testid & friends) so test-automation-friendly elements are visible.
+  const [blockViewModes, setBlockViewModes] = useState<Record<string, 'name' | 'id' | 'testid'>>({});
+
+  const toggleBlockViewMode = (blockKey: string, nextMode: 'id' | 'testid') => {
+    setBlockViewModes((prev) => ({
+      ...prev,
+      [blockKey]: prev[blockKey] === nextMode ? 'name' : nextMode,
+    }));
+  };
+
+  // 'onetrust-accept-btn-handler' -> 'onetrust accept btn handler' (tooltip helper).
+  const humanizeId = (raw: string): string =>
+    raw
+      .replace(/[_-]+/g, ' ')
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+  // First testing attribute the scanner captured for this element, if any.
+  const testAttributeOf = (el: ElementDTO): { name: string; value: string } | null => {
+    const attrs = (el as any).attributeData as Array<{ name: string; value: string }> | undefined;
+    if (!Array.isArray(attrs)) return null;
+    const wanted = ['data-testid', 'data-test-id', 'test-id', 'data-cy', 'data-qa'];
+    for (const attrName of wanted) {
+      const hit = attrs.find((a) => a && a.name === attrName && a.value && a.value.length > 0);
+      if (hit) return { name: hit.name, value: hit.value };
+    }
+    return null;
+  };
+
   const toggleBlockCollapsed = (key: string) => {
     setCollapsedBlocks((prev) => {
       const next = new Set(prev);
@@ -960,7 +992,10 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
 
 
 
-  const getInstructionElement = (instruction: ElementDTO): JSX.Element | string | null => {
+  const getInstructionElement = (
+    instruction: ElementDTO,
+    viewMode: 'name' | 'id' | 'testid' = 'name'
+  ): JSX.Element | string | null => {
     let imageSrc: string | null = null;
     let text: string | null = null;
     let imageClass : string = styles.operations; // Default class for images
@@ -1012,6 +1047,32 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     const displayText = overrideName
       ? overrideName
       : (dataNames?.length === 1 ? dataNames[0].name : text);
+
+    // Block header "id" / "id-test" view modes (preScan dashboard): swap the label for
+    // the raw DOM id (locator planning) or the testing attribute. Dimmed dash marks
+    // elements without one — the client instantly sees what is automatable by id/test-id.
+    if (viewMode === 'id' || viewMode === 'testid') {
+      let value: string | null = null;
+      let tooltip = '';
+      if (viewMode === 'id') {
+        value = instruction.attribId && instruction.attribId.length > 0 ? instruction.attribId : null;
+        if (value) tooltip = `${humanizeId(value)}\n${displayText}`;
+      } else {
+        const testAttr = testAttributeOf(instruction);
+        value = testAttr ? testAttr.value : null;
+        if (value && testAttr) tooltip = `${testAttr.name}\n${displayText}`;
+      }
+      return (
+        <div className={styles.instructionType}>
+          {imageSrc && <img src={imageSrc} alt="" className={imageClass} />}
+          {value ? (
+            <span className={styles.idValueText} title={tooltip}>{value}</span>
+          ) : (
+            <span className={styles.dimmedDash} title={String(displayText ?? '')}>—</span>
+          )}
+        </div>
+      );
+    }
 
     return (
       <div className={styles.instructionType}>
@@ -1725,6 +1786,32 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
                     >
                       +
                     </button>
+                    {isPreScanMode && (
+                      <>
+                        <button
+                          type="button"
+                          className={`${styles.blockViewToggle} ${blockViewModes[typeElement] === 'id' ? styles.blockViewToggleActive : ''}`}
+                          title="Show the raw DOM id of each element (hover an id for its humanized form and visible text)"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            toggleBlockViewMode(typeElement, 'id');
+                          }}
+                        >
+                          id
+                        </button>
+                        <button
+                          type="button"
+                          className={`${styles.blockViewToggle} ${blockViewModes[typeElement] === 'testid' ? styles.blockViewToggleActive : ''}`}
+                          title="Show which elements carry a testing attribute (data-testid / data-cy / …)"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            toggleBlockViewMode(typeElement, 'testid');
+                          }}
+                        >
+                          id-test
+                        </button>
+                      </>
+                    )}
                     {isInputTextBlock(typeElement) && (
                       <img
                         src={testInputImage}
@@ -1805,7 +1892,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
                         </div>
                       ) : (
                         <span className={styles.instructionLine}>
-                          {getInstructionElement(elementDTO)}
+                          {getInstructionElement(elementDTO, blockViewModes[typeElement] ?? 'name')}
                           <button
                             type="button"
                             className={styles.memoryAddButton}

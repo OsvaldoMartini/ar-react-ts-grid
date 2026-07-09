@@ -1777,3 +1777,46 @@
 //   position: relative; // required for z-index to work
 // }
 
+
+/* ── Block header "id" / "id-test" view toggles (preScan dashboard) ── */
+
+.blockViewToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 16px;
+  margin-left: 4px;
+  padding: 0 7px;
+  border-radius: 8px;
+  border: 1px solid #ffffff;
+  background: transparent;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: bold;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.75;
+}
+
+.blockViewToggle:hover {
+  opacity: 1;
+}
+
+.blockViewToggleActive {
+  background: #ffffff;
+  color: #0b5394;
+  opacity: 1;
+}
+
+/* Raw id / test attribute shown in place of the element name */
+.idValueText {
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 0.85em;
+  color: #0b5394;
+}
+
+/* Element has no id / testing attribute */
+.dimmedDash {
+  opacity: 0.35;
+  font-weight: bold;
+}
