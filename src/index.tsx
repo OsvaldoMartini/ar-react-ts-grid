@@ -126,7 +126,9 @@ const App: React.FC = () => {
       {sessionId && (sessionId.includes("componentTasks")) && (
         <GridItemComp homeBankingIdInitial={homeBanking} dataComp={componentsData} socketPort={socketPort} sessionId={sessionId} botJobIdInitial={botJobId} botJobNameInitial={botJobName} />
       )}
-      {sessionId && (sessionId.includes("scannerGrid")) && (
+      {/* Guard against preScannerGrid double-mounting: only case ("S") separates
+          the two session ids, so exclude it explicitly. */}
+      {sessionId && sessionId.includes("scannerGrid") && !sessionId.includes("preScannerGrid") && (
         <GridItemScann homeBankingIdInitial={homeBanking} dataDTO={elementDTO} socketPort={socketPort} sessionId={sessionId} botJobIdInitial={botJobId} botJobNameInitial={botJobName} />
       )}
       {sessionId && (sessionId.includes("preScannerGrid")) && (

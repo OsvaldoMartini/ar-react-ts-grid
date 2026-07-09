@@ -33,13 +33,32 @@ interface GridItemScannProps {
   mode?: 'scanner' | 'preScan';
 }
 
+// Canonical group buckets. The scanner's DECIDED category (typeElement) wins over
+// the raw tag, so a <select> classified as clickable lands in the Button group and
+// nothing ever mints a one-off group like "Select Text" (mat-select, svg, option…).
+// Undecided elements render as Output — same convention as the AR Web Factory pane
+// (input → input, click → button, link → a, output → label).
+const groupTagFor = (item: ElementDTO): string => {
+  const tag = (item.tagName ?? '').toLowerCase();
+  if (tag === 'input' || tag === 'textarea') return 'input';
+  if (tag === 'button') return 'button';
+  if (tag === 'a' || tag === 'link') return 'a';
+  if (tag === 'label') return 'label';
+
+  const type = ((item as any).typeElement ?? '').toLowerCase();
+  if (type === 'input') return 'input';
+  if (type === 'button') return 'button';
+  if (type === 'a' || type === 'link') return 'a';
+  return 'label';
+};
+
 const groupByTagName = (data: ElementDTO[]) => {
   return data.reduce((result, item) => {
-    const { tagName } = item;
-    if (!result[tagName]) {
-      result[tagName] = { tagName, elements: [] };
+    const groupTag = groupTagFor(item);
+    if (!result[groupTag]) {
+      result[groupTag] = { tagName: groupTag, elements: [] };
     }
-    result[tagName].elements.push(item);
+    result[groupTag].elements.push(item);
     return result;
   }, {} as Record<string, { tagName: string; elements: ElementDTO[] }>);
 };
@@ -887,8 +906,10 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   const handleRemoveRowsBlock = (blockTagName: string) => {
     console.log("Removing block:", blockTagName);
 
+    // Groups are keyed by the decided category, so removal must match the same
+    // bucket, not the raw tagName.
     setElementDTO((prevElements) =>
-      prevElements.filter((element) => element.tagName !== blockTagName)
+      prevElements.filter((element) => groupTagFor(element) !== blockTagName)
     );
 
     setElementGrouped((prevGrouped) => {
@@ -904,9 +925,6 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     if (["input", "textarea"].includes(lowerTag)) {
       return "Input Text";
     }
-    if (lowerTag === "select") {
-      return "Select Text";
-    }
     if (lowerTag === "button") {
       return "Button";
     }
@@ -917,7 +935,9 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
       return "Output";
     }
 
-    return typeElement; //"Output Text"; // optional fallback
+    // Never mint a new group label from an unknown tag (was: "Select Text" for
+    // <select>). Groups are canonical buckets; anything else reads as Output.
+    return "Output";
   };
 
 
@@ -927,8 +947,9 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     let text: string | null = null;
     let imageClass : string = styles.operations; // Default class for images
 
-    // Normalize to lowercase once
-    const tag = instruction.tagName?.toLowerCase() || "";
+    // Icon follows the decided category (same bucket as the group), so e.g. a
+    // <select> classified clickable shows the click icon, not the output one.
+    const tag = groupTagFor(instruction);
 
     if (tag === "input") {
       imageSrc = inputImage;
