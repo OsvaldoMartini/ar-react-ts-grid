@@ -1841,7 +1841,11 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
                           elementDTO,
                           editImage
                         )}
-                        <img src={saveImage} alt="" className={styles.saveButton} onClick={(event) => handleRowSelectedClick(event, elementDTO, "NEW_ELEMENT_DTO")} />
+                        {/* Row save removed in preScan mode: the Memory List "+" → Apply is the
+                            single insert path for this version. */}
+                        {!isPreScanMode && (
+                          <img src={saveImage} alt="" className={styles.saveButton} onClick={(event) => handleRowSelectedClick(event, elementDTO, "NEW_ELEMENT_DTO")} />
+                        )}
                         {(() => {
                           // Test Input only makes sense on typeable elements (inputs, selects,
                           // textareas). For links / buttons / anchors the element can't accept
