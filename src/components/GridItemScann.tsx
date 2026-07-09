@@ -282,6 +282,75 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     window.addEventListener('mouseup', onUp);
   };
 
+  // ── OCR review panel (preScan): per-block floating panel where the client agrees
+  // with the OCR-resolved name or keeps the scanned DOM text, per element. The
+  // backend stashes the pre-OCR text in attributeData['scanned-text'] whenever the
+  // resolver changed it; rows without it are shown as "same".
+  const [ocrReviewBlock, setOcrReviewBlock] = useState<string | null>(null);
+  const [ocrPanelPos, setOcrPanelPos] = useState<{ x: number; y: number }>({ x: 140, y: 150 });
+
+  const startOcrPanelDrag = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startLeft = ocrPanelPos.x;
+    const startTop = ocrPanelPos.y;
+    const onMove = (moveEvent: MouseEvent) => {
+      setOcrPanelPos({
+        x: Math.max(0, startLeft + moveEvent.clientX - startX),
+        y: Math.max(0, startTop + moveEvent.clientY - startY),
+      });
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  const scannedTextOf = (el: ElementDTO): string | null => {
+    const attrs = (el as any).attributeData as Array<{ name: string; value: string }> | undefined;
+    if (!Array.isArray(attrs)) return null;
+    const hit = attrs.find((a) => a && a.name === 'scanned-text' && a.value && a.value.length > 0);
+    return hit ? hit.value : null;
+  };
+
+  // FE approximation of the backend TextSimilarity.slug used for definedName.
+  const slugifyName = (text: string): string =>
+    text
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 40);
+
+  // Agree (useScanned=false): keep the OCR-resolved name. Defer (useScanned=true):
+  // restore the scanned DOM text as someText + definedName. Either way the
+  // scanned-text marker is consumed so the row reads as settled.
+  const applyOcrDecision = (target: ElementDTO, useScanned: boolean) => {
+    const scanned = scannedTextOf(target);
+    const updateEl = (el: ElementDTO): ElementDTO => {
+      if (el.id !== target.id || el.xPath !== target.xPath) return el;
+      const attrs = (((el as any).attributeData || []) as Array<{ name: string; value: string }>)
+        .filter((a) => a && a.name !== 'scanned-text');
+      const next: any = { ...el, attributeData: attrs };
+      if (useScanned && scanned) {
+        next.someText = scanned;
+        next.definedName = slugifyName(scanned);
+      }
+      return next as ElementDTO;
+    };
+    setElementDTO((prev) => prev.map(updateEl));
+    setElementGrouped((prev) => {
+      const updated = { ...prev };
+      for (const key of Object.keys(updated)) {
+        updated[key] = { ...updated[key], elements: updated[key].elements.map(updateEl) };
+      }
+      return updated;
+    });
+  };
+
   const handleApplyMemory = () => {
     if (memoryTargetBlockId === null || memoryElements.length === 0) return;
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
@@ -1535,6 +1604,70 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
         />
       )}
 
+      {ocrReviewBlock && elementGrouped[ocrReviewBlock] && (
+        <div
+          className={`${styles.memoryPanel} ${styles.ocrPanel}`}
+          style={{ left: ocrPanelPos.x, top: ocrPanelPos.y }}
+        >
+          <div className={styles.memoryPanelHeader} onMouseDown={startOcrPanelDrag}>
+            <span className={styles.memoryPanelTitle}>
+              OCR Review — {getElementBlockText(ocrReviewBlock)} ({elementGrouped[ocrReviewBlock].elements.length})
+            </span>
+            <button
+              type="button"
+              className={styles.memoryPanelHeaderBtn}
+              title="Close"
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={() => setOcrReviewBlock(null)}
+            >
+              ✕
+            </button>
+          </div>
+          <div className={styles.ocrPanelColumns}>
+            <span>Scanned (DOM)</span>
+            <span></span>
+            <span>OCR resolved</span>
+            <span></span>
+          </div>
+          <div className={styles.ocrPanelList}>
+            {elementGrouped[ocrReviewBlock].elements.map((el) => {
+              const scanned = scannedTextOf(el);
+              return (
+                <div key={`${el.id}-${el.xPath}`} className={styles.ocrPanelRow}>
+                  <span className={styles.ocrScannedText} title={scanned ?? 'OCR did not change this element'}>
+                    {scanned ?? <span className={styles.dimmedDash}>—</span>}
+                  </span>
+                  <span className={styles.ocrArrow}>→</span>
+                  <span className={styles.ocrCurrentText} title={el.someText || ''}>{el.someText}</span>
+                  {scanned ? (
+                    <span className={styles.ocrRowActions}>
+                      <button
+                        type="button"
+                        className={styles.ocrAgreeBtn}
+                        title="Agree — keep the OCR-resolved name"
+                        onClick={() => applyOcrDecision(el, false)}
+                      >
+                        ✓
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.ocrDeferBtn}
+                        title="Defer — keep the scanned (DOM) text instead"
+                        onClick={() => applyOcrDecision(el, true)}
+                      >
+                        ✗
+                      </button>
+                    </span>
+                  ) : (
+                    <span className={styles.ocrSameBadge}>same</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {memoryPanelOpen && (
         <div
           className={styles.memoryPanel}
@@ -1809,6 +1942,17 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
                           }}
                         >
                           id-test
+                        </button>
+                        <button
+                          type="button"
+                          className={`${styles.blockViewToggle} ${ocrReviewBlock === typeElement ? styles.blockViewToggleActive : ''}`}
+                          title="Review OCR name suggestions for this block — agree with the OCR name or keep the scanned text, per element"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setOcrReviewBlock((prev) => (prev === typeElement ? null : typeElement));
+                          }}
+                        >
+                          OCR
                         </button>
                       </>
                     )}
