@@ -741,7 +741,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
       ? `scannerTool`
       : `scanner-element-pane`;
 
-    const message = {
+    const message: Record<string, unknown> = {
       type: action,
       homeBankingId: homeBankingId,
       botJobId: botJobId,
@@ -749,6 +749,23 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
       sessionId: sessionDestine,
       elementDetails: [elementDTO],
     };
+
+    // Pre-scan single-row save: there is no legacy pane to prompt for a block, so the
+    // save must carry the Memory List's selected target block. Without one the backend
+    // apply (correctly) rejects the insert — surface that here instead.
+    if (action === 'NEW_ELEMENT_DTO' && isPreScanMode) {
+      const targetBlock = memoryBlockOptions.find((block) => block.blockId === memoryTargetBlockId);
+      if (!targetBlock) {
+        setAlertMessageHeader('Select a target block first');
+        setAlertMessageBody(
+          'Open the Memory List and choose the block that should receive this element, then save again.'
+        );
+        return;
+      }
+      message.blockId = targetBlock.blockId;
+      message.blockName = targetBlock.blockName;
+      message.blockOrderNumber = targetBlock.blockOrderNumber;
+    }
 
     try {
       webSocket.send(JSON.stringify(message));
