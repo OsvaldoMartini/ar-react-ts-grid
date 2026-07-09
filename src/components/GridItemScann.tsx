@@ -1706,20 +1706,27 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
           <>
             {/* Toggle Button and Pagination Controls on the same row */}
             <div className={styles.controlsRow}>
-            <button
-              className={`${styles.sendAllButton} ${isSendingAll ? styles.sending : ''}`}
-              onClick={handlesSendAllClick}
-              disabled={isSendingAll}
-            >
-              {isSendingAll ? 'Sending...' : 'Insert All Elements'}
-            </button>
-            <button
-              className={`${styles.updateAllButton} ${isUpdatingAll ? styles.updating : ''}`}
-              onClick={handlesUpdateAllClick}
-              disabled={isUpdatingAll}
-            >
-              {isUpdatingAll ? 'Updating...' : 'Update All Elements'}
-            </button>
+            {/* Pane-dependent bulk actions, hidden in preScan mode: Insert All sends no
+                blockId (Memory List "+" → Apply is the single insert path) and Update All
+                is a scanner-element-pane-only path — both dead ends without AR Web Factory. */}
+            {!isPreScanMode && (
+              <>
+                <button
+                  className={`${styles.sendAllButton} ${isSendingAll ? styles.sending : ''}`}
+                  onClick={handlesSendAllClick}
+                  disabled={isSendingAll}
+                >
+                  {isSendingAll ? 'Sending...' : 'Insert All Elements'}
+                </button>
+                <button
+                  className={`${styles.updateAllButton} ${isUpdatingAll ? styles.updating : ''}`}
+                  onClick={handlesUpdateAllClick}
+                  disabled={isUpdatingAll}
+                >
+                  {isUpdatingAll ? 'Updating...' : 'Update All Elements'}
+                </button>
+              </>
+            )}
             {/* <button className={styles.attributesButton} onClick={() => setShowAttributes(!showAttributes)}>
               {showAttributes ? 'Hide Attributes' : 'Show Attributes'}
             </button> */}
@@ -1993,7 +2000,11 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
                           onClick={() => requestElementsSupport(elementDTO)}
                         />
                         */}
-                        <img src={pickItemImage} alt="" className={styles.pickButton} onClick={(event) => handleRowSelectedClick(event, elementDTO, "DETAILS_ELEMENT_DTO")} />
+                        {/* Details only fills the legacy pane's text fields — dead click
+                            in preScan mode where the pane isn't open. */}
+                        {!isPreScanMode && (
+                          <img src={pickItemImage} alt="" className={styles.pickButton} onClick={(event) => handleRowSelectedClick(event, elementDTO, "DETAILS_ELEMENT_DTO")} />
+                        )}
                         {renderEditButton(
                           elementDTO,
                           editImage
