@@ -1922,3 +1922,11 @@
   font-style: italic;
   text-align: right;
 }
+
+/* Scanner-generated search id (element has no DOM id) — distinct from real ids */
+.idGeneratedText {
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 0.85em;
+  color: #b45309;
+  font-style: italic;
+}

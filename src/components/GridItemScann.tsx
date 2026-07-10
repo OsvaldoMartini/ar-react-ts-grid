@@ -1103,9 +1103,24 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     if (viewMode === 'id' || viewMode === 'testid') {
       let value: string | null = null;
       let tooltip = '';
+      let isGenerated = false;
       if (viewMode === 'id') {
         value = instruction.attribId && instruction.attribId.length > 0 ? instruction.attribId : null;
-        if (value) tooltip = `${humanizeId(value)}\n${displayText}`;
+        if (value) {
+          tooltip = `${humanizeId(value)}\n${displayText}`;
+        } else {
+          // No DOM id: fall back to the scanner's deterministic generated-id
+          // (strongest attributes: name > aria-label > href segment > text > type).
+          const attrs = (instruction as any).attributeData as Array<{ name: string; value: string }> | undefined;
+          const generated = Array.isArray(attrs)
+            ? attrs.find((a) => a && a.name === 'generated-id' && a.value && a.value.length > 0)
+            : undefined;
+          if (generated) {
+            value = generated.value;
+            isGenerated = true;
+            tooltip = `generated id (element has no DOM id)\n${displayText}`;
+          }
+        }
       } else {
         const testAttr = testAttributeOf(instruction);
         value = testAttr ? testAttr.value : null;
@@ -1115,7 +1130,9 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
         <div className={styles.instructionType}>
           {imageSrc && <img src={imageSrc} alt="" className={imageClass} />}
           {value ? (
-            <span className={styles.idValueText} title={tooltip}>{value}</span>
+            <span className={isGenerated ? styles.idGeneratedText : styles.idValueText} title={tooltip}>
+              {value}
+            </span>
           ) : (
             <span className={styles.dimmedDash} title={String(displayText ?? '')}>—</span>
           )}
