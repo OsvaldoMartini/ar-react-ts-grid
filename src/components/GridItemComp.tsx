@@ -3527,7 +3527,25 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                                             allowSplit={false}
                                             allowElseIf={["IF", "ELSEIF"].includes(instruction.actions) || isBetweenIfAndElseExcluded(instruction.instructionOrderNumber, blockData.instructions)}
                                             onClose={() => setOpenDropdown(null)}
-                                            onInsertElseIf={() => handleInsertElseIf(instruction.id, blockData.instructions)}
+                                            onInsertElseIf={() => {
+                                              webSocket?.send(JSON.stringify({
+                                                type: 'commandEditor.insertElseIf',
+                                                sessionId,
+                                                homeBankingId,
+                                                body: JSON.stringify({
+                                                  requestId: `${Date.now()}-elseif-${instruction.id}`,
+                                                  targetSessionId: 'componentTasks',
+                                                  homeBankingId,
+                                                  botJobId,
+                                                  botJobName,
+                                                  blockId: instruction.blockId,
+                                                  blockName: instruction.blockName,
+                                                  blockOrderNumber: instruction.blockOrderNumber,
+                                                  instructionId: instruction.id,
+                                                }),
+                                              }));
+                                              setOpenDropdown(null);
+                                            }}
                                             onApplyCommand={(draft) => applyCommandFromPanel(instruction, draft)}
                                             messages={messages}
                                             context={{ sessionId, targetSessionId: 'componentTasks', homeBankingId, botJobId, botJobName }}
