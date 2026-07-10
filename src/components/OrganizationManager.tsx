@@ -16,6 +16,7 @@ interface OrganizationRow {
 
 interface HomeUrlRow {
   id: number;
+  name?: string;
   homeBankingId: number;
   orgName?: string;
   url: string;
@@ -41,6 +42,7 @@ const emptyOrg: OrganizationRow = {
 
 const emptyUrl: HomeUrlRow = {
   id: 0,
+  name: 'TEST',
   homeBankingId: 0,
   url: '',
 };
@@ -71,7 +73,7 @@ const OrganizationManager: React.FC<OrganizationManagerProps> = ({ socketPort, s
   );
 
   const selectedOrgLabel = orgDraft.id ? `${orgDraft.id} - ${orgDraft.name}` : 'New Organization';
-  const selectedEnvLabel = urlDraft.id ? `${urlDraft.id} - ${urlDraft.url}` : 'New Environment';
+  const selectedEnvLabel = urlDraft.id ? `${urlDraft.id} - ${urlDraft.name || 'TEST'}` : 'New Environment';
 
   const send = useCallback(
     (type: string, body: unknown = {}) => {
@@ -183,6 +185,7 @@ const OrganizationManager: React.FC<OrganizationManagerProps> = ({ socketPort, s
     send(mode === 'create' ? 'homeUrl.create' : 'homeUrl.update', {
       homeBankingId: orgDraft.id,
       homeUrlId: urlDraft.id,
+      name: urlDraft.name || 'TEST',
       url: urlDraft.url,
     });
   };
@@ -225,7 +228,7 @@ const OrganizationManager: React.FC<OrganizationManagerProps> = ({ socketPort, s
               <option value={NEW_ENV}>+ New Environment</option>
               {selectedOrgUrls.map(row => (
                 <option key={row.id} value={row.id}>
-                  {row.id} - {row.url}
+                  {row.id} - {row.name || 'TEST'}
                 </option>
               ))}
             </select>
@@ -291,6 +294,16 @@ const OrganizationManager: React.FC<OrganizationManagerProps> = ({ socketPort, s
                 <input className={styles.input} value={urlDraft.id || ''} readOnly />
               </label>
               <label className={styles.fieldLabel}>
+                Environment Name
+                <input
+                  className={styles.input}
+                  value={urlDraft.name ?? 'TEST'}
+                  placeholder="TEST, UAT, DEV, prod..."
+                  disabled={!orgDraft.id}
+                  onChange={e => setUrlDraft(prev => ({ ...prev, name: e.target.value, homeBankingId: orgDraft.id }))}
+                />
+              </label>
+              <label className={styles.fieldLabel}>
                 Environment URL
                 <input
                   className={styles.input}
@@ -349,8 +362,9 @@ const OrganizationManager: React.FC<OrganizationManagerProps> = ({ socketPort, s
                     className={`${styles.listRow} ${urlDraft.id === row.id ? styles.activeRow : ''}`}
                     onClick={() => selectUrl(row)}
                   >
-                    <span>{row.url}</span>
+                    <span>{row.name || 'TEST'}</span>
                     <small>#{row.id}</small>
+                    <em>{row.url}</em>
                   </button>
                 ))}
                 {selectedOrgUrls.length === 0 && <div className={styles.empty}>No environments for this organization.</div>}

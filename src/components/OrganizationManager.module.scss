@@ -298,6 +298,16 @@
   font-weight: bold;
 }
 
+.listRow em {
+  grid-column: 1 / -1;
+  color: #555555;
+  font-size: 11px;
+  font-style: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .listRow:hover {
   border-color: #0b5394;
 }
