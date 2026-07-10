@@ -433,6 +433,7 @@ const OrganizationManager: React.FC<OrganizationManagerProps> = ({ socketPort, s
                   >
                     <span>{row.name || 'TEST'}</span>
                     <small>#{row.id}</small>
+                    <em>{row.url}</em>
                     <button
                       type="button"
                       className={styles.rowDelete}
@@ -445,7 +446,6 @@ const OrganizationManager: React.FC<OrganizationManagerProps> = ({ socketPort, s
                     >
                       X
                     </button>
-                    <em>{row.url}</em>
                   </div>
                 ))}
                 {selectedOrgUrls.length === 0 && <div className={styles.empty}>No environments for this organization.</div>}

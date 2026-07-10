@@ -1,15 +1,18 @@
 .shell {
+  width: 100vw;
   min-height: 100vh;
   box-sizing: border-box;
-  padding: 14px;
+  padding: 10px;
   background: #eef3f8;
   color: #1f2933;
   font-family: Arial, Helvetica, sans-serif;
+  overflow: auto;
 }
 
 .window {
-  max-width: 1280px;
-  margin: 0 auto;
+  width: 100%;
+  min-height: calc(100vh - 20px);
+  margin: 0;
   background: #ffffff;
   border: 1px solid #0b5394;
   border-radius: 8px;
@@ -121,7 +124,7 @@
 
 .content {
   display: grid;
-  grid-template-columns: minmax(460px, 1fr) minmax(460px, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px;
   padding: 12px;
   align-items: start;
@@ -272,11 +275,11 @@
 }
 
 .listRow {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  display: flex;
   align-items: center;
   gap: 8px;
   width: 100%;
+  min-width: 0;
   border: 1px solid #ddd;
   border-radius: 4px;
   background: #e0f7fa;
@@ -288,17 +291,22 @@
 }
 
 .listRow span {
+  flex: 1 1 160px;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .listRow small {
+  flex: 0 0 auto;
   color: #0b5394;
   font-weight: bold;
+  white-space: nowrap;
 }
 
 .rowDelete {
+  flex: 0 0 22px;
   width: 20px;
   height: 20px;
   border: 1px solid #c62828;
@@ -317,7 +325,8 @@
 }
 
 .listRow em {
-  grid-column: 1 / -1;
+  flex: 1 1 220px;
+  min-width: 0;
   color: #555555;
   font-size: 11px;
   font-style: normal;
