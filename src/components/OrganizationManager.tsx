@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import styles from './OrganizationManager.module.scss';
 import { useWebSocket } from './useWebSocket';
 
@@ -62,6 +62,7 @@ const OrganizationManager: React.FC<OrganizationManagerProps> = ({ socketPort, s
   const [urlDraft, setUrlDraft] = useState<HomeUrlRow>(emptyUrl);
   const [orgSelect, setOrgSelect] = useState<string>(NEW_ORG);
   const [envSelect, setEnvSelect] = useState<string>(NEW_ENV);
+  const processedMessageCountRef = useRef(0);
   const [status, setStatus] = useState<{ level: StatusLevel; text: string }>({
     level: 'warn',
     text: 'Waiting for backend data',
@@ -74,6 +75,9 @@ const OrganizationManager: React.FC<OrganizationManagerProps> = ({ socketPort, s
 
   const selectedOrgLabel = orgDraft.id ? `${orgDraft.id} - ${orgDraft.name}` : 'New Organization';
   const selectedEnvLabel = urlDraft.id ? `${urlDraft.id} - ${urlDraft.name || 'TEST'}` : 'New Environment';
+  const selectedHomeBankingId = Number(
+    orgDraft.id || urlDraft.homeBankingId || (orgSelect !== NEW_ORG ? orgSelect : 0),
+  );
 
   const send = useCallback(
     (type: string, body: unknown = {}) => {
@@ -93,7 +97,9 @@ const OrganizationManager: React.FC<OrganizationManagerProps> = ({ socketPort, s
   }, [connected, send]);
 
   useEffect(() => {
-    for (const raw of messages) {
+    const nextMessages = messages.slice(processedMessageCountRef.current);
+    processedMessageCountRef.current = messages.length;
+    for (const raw of nextMessages) {
       try {
         const { operationId, body } = parseMessage(raw);
         if (operationId === 'organization.listResponse') {
@@ -182,8 +188,12 @@ const OrganizationManager: React.FC<OrganizationManagerProps> = ({ socketPort, s
   };
 
   const saveUrl = (mode: 'create' | 'update') => {
+    if (!selectedHomeBankingId) {
+      setStatus({ level: 'warn', text: 'Select an Organization before saving an Environment' });
+      return;
+    }
     send(mode === 'create' ? 'homeUrl.create' : 'homeUrl.update', {
-      homeBankingId: orgDraft.id,
+      homeBankingId: selectedHomeBankingId,
       homeUrlId: urlDraft.id,
       name: urlDraft.name || 'TEST',
       url: urlDraft.url,
@@ -270,7 +280,6 @@ const OrganizationManager: React.FC<OrganizationManagerProps> = ({ socketPort, s
             </div>
 
             <div className={styles.footer}>
-              <button className={styles.cancelBtn} onClick={selectNewOrganization}>New</button>
               <button className={styles.createBtn} onClick={() => saveOrg(orgDraft.id ? 'update' : 'create')}>
                 {orgDraft.id ? 'Update Organization' : 'Create Organization'}
               </button>
@@ -315,15 +324,12 @@ const OrganizationManager: React.FC<OrganizationManagerProps> = ({ socketPort, s
               </label>
             </div>
             <div className={styles.footer}>
-              <button className={styles.cancelBtn} disabled={!orgDraft.id} onClick={() => selectNewEnvironment(orgDraft.id)}>
-                New Environment
-              </button>
               <button
                 className={styles.createBtn}
-                disabled={!orgDraft.id}
+                disabled={!selectedHomeBankingId}
                 onClick={() => saveUrl(urlDraft.id ? 'update' : 'create')}
               >
-                {urlDraft.id ? 'Update URL' : 'Create URL'}
+                {urlDraft.id ? 'Update Environment' : 'Create Environment'}
               </button>
               <button
                 className={styles.dangerBtn}
