@@ -26,6 +26,9 @@ interface OrganizationManagerProps {
   sessionId: string;
 }
 
+const NEW_ORG = 'new';
+const NEW_ENV = 'new';
+
 const emptyOrg: OrganizationRow = {
   id: 0,
   name: '',
@@ -55,6 +58,8 @@ const OrganizationManager: React.FC<OrganizationManagerProps> = ({ socketPort, s
   const [homeUrls, setHomeUrls] = useState<HomeUrlRow[]>([]);
   const [orgDraft, setOrgDraft] = useState<OrganizationRow>(emptyOrg);
   const [urlDraft, setUrlDraft] = useState<HomeUrlRow>(emptyUrl);
+  const [orgSelect, setOrgSelect] = useState<string>(NEW_ORG);
+  const [envSelect, setEnvSelect] = useState<string>(NEW_ENV);
   const [status, setStatus] = useState<{ level: StatusLevel; text: string }>({
     level: 'warn',
     text: 'Waiting for backend data',
@@ -64,6 +69,9 @@ const OrganizationManager: React.FC<OrganizationManagerProps> = ({ socketPort, s
     () => homeUrls.filter(row => Number(row.homeBankingId) === Number(orgDraft.id)),
     [homeUrls, orgDraft.id],
   );
+
+  const selectedOrgLabel = orgDraft.id ? `${orgDraft.id} - ${orgDraft.name}` : 'New Organization';
+  const selectedEnvLabel = urlDraft.id ? `${urlDraft.id} - ${urlDraft.url}` : 'New Environment';
 
   const send = useCallback(
     (type: string, body: unknown = {}) => {
@@ -107,6 +115,12 @@ const OrganizationManager: React.FC<OrganizationManagerProps> = ({ socketPort, s
           if (body.organizations) setOrganizations(body.organizations);
           if (body.homeUrls) setHomeUrls(body.homeUrls);
           setStatus({ level: body.ok === false ? 'error' : 'ok', text: body.message || operationId });
+          if (body.ok !== false && operationId === 'organization.deleteResponse') {
+            selectNewOrganization();
+          }
+          if (body.ok !== false && operationId === 'homeUrl.deleteResponse') {
+            selectNewEnvironment(orgDraft.id);
+          }
         } else if (operationId === 'organization.status') {
           setStatus({
             level: body.level === 'error' ? 'error' : body.level === 'warning' ? 'warn' : 'ok',
@@ -117,15 +131,48 @@ const OrganizationManager: React.FC<OrganizationManagerProps> = ({ socketPort, s
         console.warn('OrganizationManager ignored socket message', err, raw);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages]);
 
+  const selectNewOrganization = () => {
+    setOrgSelect(NEW_ORG);
+    setEnvSelect(NEW_ENV);
+    setOrgDraft(emptyOrg);
+    setUrlDraft(emptyUrl);
+  };
+
+  const selectNewEnvironment = (homeBankingId: number) => {
+    setEnvSelect(NEW_ENV);
+    setUrlDraft({ ...emptyUrl, homeBankingId });
+  };
+
   const selectOrg = (org: OrganizationRow) => {
+    setOrgSelect(String(org.id));
     setOrgDraft({ ...emptyOrg, ...org });
-    setUrlDraft({ ...emptyUrl, homeBankingId: org.id });
+    selectNewEnvironment(org.id);
   };
 
   const selectUrl = (row: HomeUrlRow) => {
+    setEnvSelect(String(row.id));
     setUrlDraft({ ...row });
+  };
+
+  const onOrganizationSelect = (value: string) => {
+    if (value === NEW_ORG) {
+      selectNewOrganization();
+      return;
+    }
+    const org = organizations.find(row => String(row.id) === value);
+    if (org) selectOrg(org);
+  };
+
+  const onEnvironmentSelect = (value: string) => {
+    if (value === NEW_ENV) {
+      selectNewEnvironment(orgDraft.id);
+      return;
+    }
+    const env = selectedOrgUrls.find(row => String(row.id) === value);
+    if (env) selectUrl(env);
   };
 
   const saveOrg = (mode: 'create' | 'update') => {
@@ -145,144 +192,172 @@ const OrganizationManager: React.FC<OrganizationManagerProps> = ({ socketPort, s
 
   return (
     <main className={styles.shell}>
-      <header className={styles.header}>
-        <div>
-          <h1 className={styles.title}>Organizations</h1>
-          <p className={styles.subtitle}>Manage organization records and their environment URLs.</p>
-        </div>
-        <div className={`${styles.status} ${statusClass}`}>
-          {error ? error : status.text}
-        </div>
-      </header>
+      <section className={styles.window}>
+        <header className={styles.topBar}>
+          <div>
+            <h1 className={styles.title}>New Organization</h1>
+            <p className={styles.subtitle}>Organizations and child environments</p>
+          </div>
+          <div className={`${styles.status} ${statusClass}`}>{error ? error : status.text}</div>
+        </header>
 
-      <section className={styles.layout}>
-        <div className={styles.panel}>
-          <h2 className={styles.panelTitle}>Organization Details</h2>
-          <div className={styles.formGrid}>
-            <label className={styles.label}>
-              ID
-              <input className={styles.input} value={orgDraft.id || ''} readOnly />
-            </label>
-            <label className={styles.label}>
-              Organization
-              <input
-                className={styles.input}
-                value={orgDraft.name}
-                onChange={e => setOrgDraft(prev => ({ ...prev, name: e.target.value }))}
-              />
-            </label>
-            <label className={styles.label}>
-              Jobs
-              <input className={styles.input} value={orgDraft.jobs || 0} readOnly />
-            </label>
-            <label className={styles.label}>
-              URL Baseline
-              <input
-                className={styles.input}
-                value={orgDraft.url}
-                onChange={e => setOrgDraft(prev => ({ ...prev, url: e.target.value }))}
-              />
-            </label>
-            <label className={`${styles.label} ${styles.wide}`}>
-              Priority
-              <textarea
-                className={styles.textarea}
-                value={orgDraft.priority || ''}
-                onChange={e => setOrgDraft(prev => ({ ...prev, priority: e.target.value }))}
-              />
-            </label>
-            <label className={`${styles.label} ${styles.wide}`}>
-              Scan Config
-              <textarea
-                className={styles.textarea}
-                value={orgDraft.searchConfig || ''}
-                onChange={e => setOrgDraft(prev => ({ ...prev, searchConfig: e.target.value }))}
-              />
-            </label>
-            <label className={`${styles.label} ${styles.wide}`}>
-              WebDriver Options
-              <textarea
-                className={styles.textarea}
-                value={orgDraft.optionsConfig || ''}
-                onChange={e => setOrgDraft(prev => ({ ...prev, optionsConfig: e.target.value }))}
-              />
-            </label>
-          </div>
-          <div className={styles.actions}>
-            <button className={`${styles.button} ${styles.primary}`} onClick={() => saveOrg('create')}>Insert</button>
-            <button className={styles.button} disabled={!orgDraft.id} onClick={() => saveOrg('update')}>Update</button>
-            <button className={`${styles.button} ${styles.danger}`} disabled={!orgDraft.id || Number(orgDraft.jobs || 0) > 0} onClick={() => send('organization.delete', { id: orgDraft.id })}>Delete</button>
-            <button className={styles.button} onClick={() => send('organization.template')}>Template</button>
-            <button className={styles.button} onClick={() => setOrgDraft(emptyOrg)}>Clear</button>
-          </div>
+        <div className={styles.selectorBand}>
+          <label className={styles.selectorLabel}>
+            Organization
+            <select className={styles.select} value={orgSelect} onChange={e => onOrganizationSelect(e.target.value)}>
+              <option value={NEW_ORG}>+ New Organization</option>
+              {organizations.map(org => (
+                <option key={org.id} value={org.id}>
+                  {org.id} - {org.name}
+                </option>
+              ))}
+            </select>
+          </label>
 
-          <h2 className={styles.panelTitle}>Environment Details</h2>
-          <div className={styles.formGrid}>
-            <label className={styles.label}>
-              ID
-              <input className={styles.input} value={urlDraft.id || ''} readOnly />
-            </label>
-            <label className={`${styles.label} ${styles.wide}`}>
-              Environment URL
-              <input
-                className={styles.input}
-                value={urlDraft.url}
-                onChange={e => setUrlDraft(prev => ({ ...prev, url: e.target.value, homeBankingId: orgDraft.id }))}
-              />
-            </label>
-          </div>
-          <div className={styles.actions}>
-            <button className={`${styles.button} ${styles.primary}`} disabled={!orgDraft.id} onClick={() => saveUrl('create')}>Insert URL</button>
-            <button className={styles.button} disabled={!orgDraft.id || !urlDraft.id} onClick={() => saveUrl('update')}>Update URL</button>
-            <button className={`${styles.button} ${styles.danger}`} disabled={!orgDraft.id || !urlDraft.id || selectedOrgUrls.length <= 1} onClick={() => send('homeUrl.delete', { homeBankingId: orgDraft.id, homeUrlId: urlDraft.id })}>Delete URL</button>
-            <button className={styles.button} onClick={() => setUrlDraft({ ...emptyUrl, homeBankingId: orgDraft.id })}>Clear URL</button>
-          </div>
+          <label className={styles.selectorLabel}>
+            Environment
+            <select
+              className={styles.select}
+              value={envSelect}
+              disabled={!orgDraft.id}
+              onChange={e => onEnvironmentSelect(e.target.value)}
+            >
+              <option value={NEW_ENV}>+ New Environment</option>
+              {selectedOrgUrls.map(row => (
+                <option key={row.id} value={row.id}>
+                  {row.id} - {row.url}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
 
-        <div className={styles.tables}>
-          <div className={styles.panel}>
-            <h2 className={styles.panelTitle}>Organizations</h2>
-            <div className={styles.tableWrap}>
-              <table className={styles.table}>
-                <thead>
-                  <tr><th>ID</th><th>Jobs</th><th>Organization</th><th>URL Baseline</th></tr>
-                </thead>
-                <tbody>
-                  {organizations.map(org => (
-                    <tr key={org.id} className={`${styles.row} ${orgDraft.id === org.id ? styles.selected : ''}`} onClick={() => selectOrg(org)}>
-                      <td>{org.id}</td>
-                      <td>{org.jobs || 0}</td>
-                      <td>{org.name}</td>
-                      <td>{org.url}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {organizations.length === 0 && <div className={styles.empty}>No organizations loaded.</div>}
+        <section className={styles.content}>
+          <div className={styles.editorPanel}>
+            <div className={styles.panelHeader}>
+              <span className={styles.panelTitle}>{selectedOrgLabel}</span>
+              <span className={styles.badge}>{orgDraft.jobs || 0} active jobs</span>
+            </div>
+
+            <div className={styles.body}>
+              <div className={styles.formGrid}>
+                <label className={styles.fieldLabel}>
+                  ID
+                  <input className={styles.input} value={orgDraft.id || ''} readOnly />
+                </label>
+                <label className={styles.fieldLabel}>
+                  Organization Name
+                  <input
+                    className={styles.input}
+                    value={orgDraft.name}
+                    placeholder="Avaloq, BancaStato, Temenos..."
+                    onChange={e => setOrgDraft(prev => ({ ...prev, name: e.target.value }))}
+                  />
+                </label>
+                <label className={`${styles.fieldLabel} ${styles.full}`}>
+                  URL Baseline
+                  <input
+                    className={styles.input}
+                    value={orgDraft.url}
+                    placeholder="https://..."
+                    onChange={e => setOrgDraft(prev => ({ ...prev, url: e.target.value }))}
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className={styles.footer}>
+              <button className={styles.cancelBtn} onClick={selectNewOrganization}>New</button>
+              <button className={styles.createBtn} onClick={() => saveOrg(orgDraft.id ? 'update' : 'create')}>
+                {orgDraft.id ? 'Update Organization' : 'Create Organization'}
+              </button>
+              <button
+                className={styles.dangerBtn}
+                disabled={!orgDraft.id || Number(orgDraft.jobs || 0) > 0}
+                onClick={() => send('organization.delete', { id: orgDraft.id })}
+              >
+                Delete
+              </button>
             </div>
           </div>
 
-          <div className={styles.panel}>
-            <h2 className={styles.panelTitle}>Environments</h2>
-            <div className={styles.tableWrap}>
-              <table className={styles.table}>
-                <thead>
-                  <tr><th>ID</th><th>Organization</th><th>URL Environment</th></tr>
-                </thead>
-                <tbody>
-                  {selectedOrgUrls.map(row => (
-                    <tr key={row.id} className={`${styles.row} ${urlDraft.id === row.id ? styles.selected : ''}`} onClick={() => selectUrl(row)}>
-                      <td>{row.id}</td>
-                      <td>{row.orgName || orgDraft.name}</td>
-                      <td>{row.url}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {selectedOrgUrls.length === 0 && <div className={styles.empty}>Select an organization to see environments.</div>}
+          <aside className={styles.sidePanel}>
+            <div className={styles.panelHeader}>
+              <span className={styles.panelTitle}>{selectedEnvLabel}</span>
             </div>
-          </div>
-        </div>
+            <div className={styles.body}>
+              <label className={styles.fieldLabel}>
+                Environment ID
+                <input className={styles.input} value={urlDraft.id || ''} readOnly />
+              </label>
+              <label className={styles.fieldLabel}>
+                Environment URL
+                <input
+                  className={styles.input}
+                  value={urlDraft.url}
+                  placeholder="https://uat.example.com"
+                  disabled={!orgDraft.id}
+                  onChange={e => setUrlDraft(prev => ({ ...prev, url: e.target.value, homeBankingId: orgDraft.id }))}
+                />
+              </label>
+            </div>
+            <div className={styles.footer}>
+              <button className={styles.cancelBtn} disabled={!orgDraft.id} onClick={() => selectNewEnvironment(orgDraft.id)}>
+                New Environment
+              </button>
+              <button
+                className={styles.createBtn}
+                disabled={!orgDraft.id}
+                onClick={() => saveUrl(urlDraft.id ? 'update' : 'create')}
+              >
+                {urlDraft.id ? 'Update URL' : 'Create URL'}
+              </button>
+              <button
+                className={styles.dangerBtn}
+                disabled={!orgDraft.id || !urlDraft.id || selectedOrgUrls.length <= 1}
+                onClick={() => send('homeUrl.delete', { homeBankingId: orgDraft.id, homeUrlId: urlDraft.id })}
+              >
+                Delete URL
+              </button>
+            </div>
+
+            <div className={styles.listPanel}>
+              <div className={styles.listHeader}>Organization List</div>
+              <div className={styles.compactList}>
+                {organizations.map(org => (
+                  <button
+                    key={org.id}
+                    type="button"
+                    className={`${styles.listRow} ${orgDraft.id === org.id ? styles.activeRow : ''}`}
+                    onClick={() => selectOrg(org)}
+                  >
+                    <span>{org.name}</span>
+                    <small>{org.jobs || 0} jobs</small>
+                  </button>
+                ))}
+                {organizations.length === 0 && <div className={styles.empty}>No organizations loaded.</div>}
+              </div>
+            </div>
+
+            <div className={styles.listPanel}>
+              <div className={styles.listHeader}>Environment List</div>
+              <div className={styles.compactList}>
+                {selectedOrgUrls.map(row => (
+                  <button
+                    key={row.id}
+                    type="button"
+                    className={`${styles.listRow} ${urlDraft.id === row.id ? styles.activeRow : ''}`}
+                    onClick={() => selectUrl(row)}
+                  >
+                    <span>{row.url}</span>
+                    <small>#{row.id}</small>
+                  </button>
+                ))}
+                {selectedOrgUrls.length === 0 && <div className={styles.empty}>No environments for this organization.</div>}
+              </div>
+            </div>
+          </aside>
+        </section>
       </section>
     </main>
   );
