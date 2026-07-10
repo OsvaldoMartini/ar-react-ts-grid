@@ -15,6 +15,7 @@ import ApiTestToolAINew from './components/ApiTestToolAINew';
 import OrganizationManager from './components/OrganizationManager';
 import MainDashboard from './components/MainDashboard';
 import NewBotJobManager from './components/NewBotJobManager';
+import ConfigManager from './components/ConfigManager';
 
 // Initialize the root
 const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
@@ -151,6 +152,10 @@ const App: React.FC = () => {
 
       {sessionId && (sessionId.includes("newBotJobManager")) && (
         <NewBotJobManager socketPort={socketPort} sessionId={sessionId} />
+      )}
+
+      {sessionId && (sessionId.includes("configManager")) && (
+        <ConfigManager socketPort={socketPort} sessionId={sessionId} />
       )}
 
       {/* ── NEW: ApiTestTool – same props shape as GridItem / GridItemComp ── */}
