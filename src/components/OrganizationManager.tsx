@@ -344,6 +344,35 @@ const OrganizationManager: React.FC<OrganizationManagerProps> = ({ socketPort, s
                 Delete
               </button>
             </div>
+
+            <div className={styles.listPanel}>
+              <div className={styles.listHeader}>Organization List</div>
+              <div className={styles.compactList}>
+                {organizations.map(org => (
+                  <div
+                    key={org.id}
+                    className={`${styles.listRow} ${orgDraft.id === org.id ? styles.activeRow : ''}`}
+                    onClick={() => selectOrg(org)}
+                  >
+                    <span>{org.name}</span>
+                    <small>{org.jobs || 0} jobs</small>
+                    <button
+                      type="button"
+                      className={styles.rowDelete}
+                      aria-label={`Delete organization ${org.name}`}
+                      title="Delete Organization"
+                      onClick={e => {
+                        e.stopPropagation();
+                        requestDeleteOrganization(org);
+                      }}
+                    >
+                      X
+                    </button>
+                  </div>
+                ))}
+                {organizations.length === 0 && <div className={styles.empty}>No organizations loaded.</div>}
+              </div>
+            </div>
           </div>
 
           <aside className={styles.sidePanel}>
@@ -391,35 +420,6 @@ const OrganizationManager: React.FC<OrganizationManagerProps> = ({ socketPort, s
               >
                 Delete Environment
               </button>
-            </div>
-
-            <div className={styles.listPanel}>
-              <div className={styles.listHeader}>Organization List</div>
-              <div className={styles.compactList}>
-                {organizations.map(org => (
-                  <div
-                    key={org.id}
-                    className={`${styles.listRow} ${orgDraft.id === org.id ? styles.activeRow : ''}`}
-                    onClick={() => selectOrg(org)}
-                  >
-                    <span>{org.name}</span>
-                    <small>{org.jobs || 0} jobs</small>
-                    <button
-                      type="button"
-                      className={styles.rowDelete}
-                      aria-label={`Delete organization ${org.name}`}
-                      title="Delete Organization"
-                      onClick={e => {
-                        e.stopPropagation();
-                        requestDeleteOrganization(org);
-                      }}
-                    >
-                      X
-                    </button>
-                  </div>
-                ))}
-                {organizations.length === 0 && <div className={styles.empty}>No organizations loaded.</div>}
-              </div>
             </div>
 
             <div className={styles.listPanel}>

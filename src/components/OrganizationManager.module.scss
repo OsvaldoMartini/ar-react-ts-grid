@@ -121,7 +121,7 @@
 
 .content {
   display: grid;
-  grid-template-columns: minmax(520px, 1fr) minmax(360px, 420px);
+  grid-template-columns: minmax(460px, 1fr) minmax(460px, 1fr);
   gap: 12px;
   padding: 12px;
   align-items: start;
@@ -263,7 +263,7 @@
 }
 
 .compactList {
-  max-height: 162px;
+  max-height: 240px;
   overflow-y: auto;
   padding: 8px 10px;
   display: flex;
