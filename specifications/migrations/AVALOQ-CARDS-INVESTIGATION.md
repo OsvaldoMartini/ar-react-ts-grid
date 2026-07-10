@@ -56,3 +56,14 @@ DEFAULT_SELECTOR already know `[test-id]` — only the default PROFILE terms lac
    card matches what a human does.
 4. Generated-id synergy: these cards have no DOM ids but rich test-ids — the new
    generated-id feature plus recommendation 1 gives every card row a strong search id.
+
+## Implementation status (2026-07-10, ar-web-selenium 452da0c3)
+
+- Rec 1 (selector coverage): ALREADY IN PLACE — addCompanionSelectors injects
+  [test-id]/[data-testid]/[data-test-id]/[data-cy]/[data-qa] into every scan.
+- Rec 2 (classification): DONE — test-id carriers classify button (card hosts wrapping a
+  selection control / inside button-link) or output (value spans); Java safety net.
+- Rec 3 (click target): DONE — executor retries the nearest effective ancestor
+  (mat-radio-button / mat-checkbox / mat-slide-toggle / avq-state-layer-host) between
+  force-click and JS dispatch.
+- Rec 4 (generated-id synergy): DONE earlier (432830b9).
