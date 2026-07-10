@@ -48,6 +48,7 @@ import ArrowLeft from '../assets/ArrowLeft.png';
 import AlertModal from './AlertModal';
 import CompForce from './CompForce';
 import CreateNewBlock, { CreateBlockOption, CreateBlockPosition } from './CreateNewBlock';
+import InstructionCommandPanel, { CommandDraft } from './InstructionCommandPanel';
 import { useWebSocket } from './useWebSocket';
 import styles from './Griditem.module.scss';
 
@@ -3474,6 +3475,34 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     );
   };
 
+  const applyCommandFromPanel = (instruction: BlockLoopInstructionLoadDTO, draft: CommandDraft) => {
+    if (!webSocket || !connected) return;
+    const payload = {
+      ...draft,
+      requestId: `${Date.now()}-${instruction.id}`,
+      targetSessionId: 'botJobTasks',
+      homeBankingId,
+      botJobId,
+      botJobName,
+      blockId: instruction.blockId,
+      blockName: instruction.blockName,
+      blockOrderNumber: instruction.blockOrderNumber,
+      instructionId: instruction.id,
+      instructionName: instruction.name,
+      instructionOrderNumber: instruction.instructionOrderNumber,
+      variableId: instruction.variableId,
+      parentId: instruction.parentId,
+      parentBlockId: instruction.parentBlockId,
+    };
+    webSocket.send(JSON.stringify({
+      type: 'commandEditor.apply',
+      sessionId,
+      homeBankingId,
+      body: JSON.stringify(payload),
+    }));
+    setOpenDropdown(null);
+  };
+
   return (
     <div className={styles.gridContainer}>
       {alertMessageBody && alertMessageBody.length > 0 && (
@@ -4029,89 +4058,21 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                                         />
 
                                         {openDropdown === instruction.id && (
-                                          <div
-                                            id={`dropdown-${instruction.id}`} // Use unique ID for each dropdown
-                                            ref={dropdownRef}
-                                            className={`${styles.dropdownMenu} ${dropdownPosition === 'above'
-                                              ? styles.dropdownAbove
-                                              : ''
-                                              }`}
-                                          >
-                                            <div
-                                              onClick={() =>
-                                                handleInsertStepBefore("INSERT_BEFORE", "botJobTasks", instruction.id, blockData.instructions)
-                                              }
-                                            >
-                                              Insert Step Before
-                                            </div>
-                                            <div
-                                              onClick={() =>
-                                                handleInsertStepAfter(instruction.id, blockData.instructions)
-                                              }
-                                            >
-                                              Insert Step After
-                                            </div>
-
-
-                                            {!isJustOne &&
-                                              ((!["IF", "ELSEIF", "ELSE", "ENDIF"].includes(instruction.actions) &&
-                                                !isBetweenIfAndEndIf(instruction.instructionOrderNumber, blockData.instructions))) && (
-                                                <>
-                                                  <div
-                                                    onClick={() =>
-                                                      handleSplitComponent(
-                                                        instruction.id,
-                                                        groupedData,
-                                                        setGroupedData,
-                                                        instructionsData,
-                                                        isLastInstruction
-                                                      )
-                                                    }
-                                                  >
-                                                    Split Component
-                                                  </div>
-                                                </>
-                                              )
-                                            }
-
-
-                                            {
-                                              (editableSpecialOperations(instruction.actions)) && (
-                                                <>
-                                                  <div
-                                                    onClick={() =>
-                                                      handleEditSpecialOper(instruction.id, blockData.instructions)
-                                                    }
-                                                  >
-                                                    Edit Operation
-                                                  </div>
-                                                </>
-                                              )
-                                            }
-
-                                            {
-                                              ((["IF", "ELSEIF"].includes(instruction.actions) ||
-                                                isBetweenIfAndElseExcluded(instruction.instructionOrderNumber, blockData.instructions))) && (
-                                                <>
-                                                  <div
-                                                    onClick={() =>
-                                                      handleInsertElseIf(instruction.id, blockData.instructions)
-                                                    }
-                                                  >
-                                                    Insert ElseIf
-                                                  </div>
-                                                </>
-                                              )
-                                            }
-
-                                            <div
-                                              onClick={() =>
-                                                handleRemoveInstruction(instruction.id)
-                                              }
-                                            >
-                                              Delete
-                                            </div>
-                                          </div>
+                                          <InstructionCommandPanel
+                                            instruction={instruction}
+                                            allowSplit={!isJustOne && !["IF", "ELSEIF", "ELSE", "ENDIF"].includes(instruction.actions) && !isBetweenIfAndEndIf(instruction.instructionOrderNumber, blockData.instructions)}
+                                            allowElseIf={["IF", "ELSEIF"].includes(instruction.actions) || isBetweenIfAndElseExcluded(instruction.instructionOrderNumber, blockData.instructions)}
+                                            onClose={() => setOpenDropdown(null)}
+                                            onInsertBefore={() => handleInsertStepBefore("INSERT_BEFORE", "botJobTasks", instruction.id, blockData.instructions)}
+                                            onInsertAfter={() => handleInsertStepAfter(instruction.id, blockData.instructions)}
+                                            onSplit={() => handleSplitComponent(instruction.id, groupedData, setGroupedData, instructionsData, isLastInstruction)}
+                                            onInsertElseIf={() => handleInsertElseIf(instruction.id, blockData.instructions)}
+                                            onDelete={() => handleRemoveInstruction(instruction.id)}
+                                            onApplyCommand={(draft) => applyCommandFromPanel(instruction, draft)}
+                                            messages={messages}
+                                            context={{ sessionId, targetSessionId: 'botJobTasks', homeBankingId, botJobId, botJobName }}
+                                            onSocketCommand={(type, body) => webSocket?.send(JSON.stringify({ type, sessionId, homeBankingId, body: JSON.stringify(body) }))}
+                                          />
                                         )}
                                       </div>
                                     </div>
