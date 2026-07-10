@@ -112,7 +112,11 @@ function todayKey(): string {
   const now = new Date();
   const month = String(now.getMonth() + 1).padStart(2, '0');
   const day = String(now.getDate()).padStart(2, '0');
-  return `${now.getFullYear()}_${month}_${day}`;
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
+function backendDateKey(date: string): string {
+  return date.replace(/-/g, '_');
 }
 
 const ConfigManager: React.FC<ConfigManagerProps> = ({ socketPort, sessionId }) => {
@@ -127,6 +131,7 @@ const ConfigManager: React.FC<ConfigManagerProps> = ({ socketPort, sessionId }) 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [promptOpen, setPromptOpen] = useState(false);
   const [promptText, setPromptText] = useState('');
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [status, setStatus] = useState<{ level: StatusLevel; text: string }>({
     level: 'warn',
     text: 'Waiting for backend data',
@@ -256,11 +261,11 @@ const ConfigManager: React.FC<ConfigManagerProps> = ({ socketPort, sessionId }) 
     }
     if (!window.confirm(`Restore database from ${restoreDate}? This will replace current data.`)) return;
     setBusyAction('restore');
-    send('config.restore', { databaseType: config.databaseType, date: restoreDate.trim() });
+    send('config.restore', { databaseType: config.databaseType, date: backendDateKey(restoreDate.trim()) });
   };
 
   const deleteAll = () => {
-    if (!window.confirm('Delete ALL job details from the selected database?')) return;
+    setDeleteConfirmOpen(false);
     setBusyAction('delete');
     send('config.deleteAllJobs', { databaseType: config.databaseType });
   };
@@ -310,9 +315,9 @@ const ConfigManager: React.FC<ConfigManagerProps> = ({ socketPort, sessionId }) 
           <button type="button" onClick={restore} disabled={!!busyAction}>Restore DB</button>
           <label className={styles.toolbarField}>
             Date Restore
-            <input value={restoreDate} onChange={event => setRestoreDate(event.target.value)} placeholder="yyyy_MM_dd" />
+            <input type="date" value={restoreDate} onChange={event => setRestoreDate(event.target.value)} />
           </label>
-          <button type="button" className={styles.dangerBtn} onClick={deleteAll} disabled={!!busyAction}>Delete DB</button>
+          <button type="button" className={styles.dangerBtn} onClick={() => setDeleteConfirmOpen(true)} disabled={!!busyAction}>Delete DB</button>
           <button type="button" onClick={() => send('config.openOrganizations')} disabled={!!busyAction}>Organizations</button>
         </section>
 
@@ -404,6 +409,31 @@ const ConfigManager: React.FC<ConfigManagerProps> = ({ socketPort, sessionId }) 
             <footer>
               <button type="button" onClick={() => setPromptOpen(false)}>Cancel</button>
               <button type="button" onClick={savePrompt} disabled={busyAction === 'prompt'}>Save Prompt</button>
+            </footer>
+          </section>
+        </div>
+      )}
+
+      {deleteConfirmOpen && (
+        <div className={styles.modalShade} role="presentation" onMouseDown={() => setDeleteConfirmOpen(false)}>
+          <section
+            className={styles.confirmModal}
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-db-title"
+            onMouseDown={event => event.stopPropagation()}
+          >
+            <header>
+              <h2 id="delete-db-title">Confirm Database Deletion</h2>
+              <button type="button" title="Close" onClick={() => setDeleteConfirmOpen(false)}>X</button>
+            </header>
+            <div className={styles.confirmBody}>
+              <strong>Delete all Bot Job details?</strong>
+              <p>This removes all job details from the selected <b>{config.databaseType || 'current'}</b> database. This operation cannot be undone.</p>
+            </div>
+            <footer>
+              <button type="button" onClick={() => setDeleteConfirmOpen(false)}>Cancel</button>
+              <button type="button" className={styles.confirmDeleteBtn} onClick={deleteAll}>Delete DB</button>
             </footer>
           </section>
         </div>
