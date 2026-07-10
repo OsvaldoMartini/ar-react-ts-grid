@@ -131,6 +131,8 @@ const normalizeBlockOptions = (blocks: CreateBlockOption[]): CreateBlockOption[]
   return Array.from(byBlockId.values()).sort((a, b) => a.blockOrderNumber - b.blockOrderNumber);
 };
 
+const CONDITIONAL_BOUNDARY_ACTIONS = new Set(['IF', 'ELSEIF', 'ELSE', 'ENDIF']);
+
 const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketPort, sessionId, botJobIdInitial, botJobNameInitial }) => {
   // Using the custom WebSocket hook
   const { webSocket, connected, reconnectAttempts, messages, error } = useWebSocket(socketPort, sessionId);
@@ -192,6 +194,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
   const [createBlockOpen, setCreateBlockOpen] = useState<boolean>(false);
 
   const handleAddToMemory = (instruction: BlockLoopInstructionLoadDTO) => {
+    if (CONDITIONAL_BOUNDARY_ACTIONS.has(instruction.actions)) return;
     setMemorySteps((prev) =>
       prev.some((step) => step.id === instruction.id) ? prev : [...prev, instruction]
     );
@@ -3993,17 +3996,19 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                                               } />
                                           )}
                                           {getInstructionTypeElement(instruction)}
-                                          <button
-                                            type="button"
-                                            className={styles.memoryAddButton}
-                                            title="Add step to memory list"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleAddToMemory(instruction);
-                                            }}
-                                          >
-                                            +
-                                          </button>
+                                          {!CONDITIONAL_BOUNDARY_ACTIONS.has(instruction.actions) && (
+                                            <button
+                                              type="button"
+                                              className={styles.memoryAddButton}
+                                              title="Add step to memory list"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleAddToMemory(instruction);
+                                              }}
+                                            >
+                                              +
+                                            </button>
+                                          )}
                                           {instruction.refreshLoop && (
                                             <img
                                               src={refreshLoopImage}
