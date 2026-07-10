@@ -130,6 +130,12 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
     () => COMMANDS.find(([code]) => code === action)?.[1] || action,
     [action]
   );
+  const selectedWebField = webFields.find(row => row.id === selectedWebFieldId);
+  const selectedWebFieldTag = (selectedWebField?.tagName || '').toLowerCase();
+  const availableCommands = useMemo(
+    () => COMMANDS.filter(([code]) => code !== 'SET' || ['input', 'select', 'textarea'].includes(selectedWebFieldTag)),
+    [selectedWebFieldTag]
+  );
   const requiresWebField = ['SET', 'GET', 'CK', 'PDF CHECK', 'CSV CHECK', 'E', 'LOOP', 'REFRESH_LOOP'].includes(action);
   const requiresVariable = ['SET', 'GET', 'CK', 'PDF CHECK', 'CSV CHECK', 'E'].includes(action);
   const requiresBlock = ['GOTO', 'EXCEL GOTO'].includes(action);
@@ -142,8 +148,9 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
   const openCommand = (nextMode: 'before' | 'after' | 'edit') => {
     setMode(nextMode);
     if (nextMode !== 'edit') {
-      setAction('SET');
-      setName('Set Value');
+      const defaultAction = ['input', 'select', 'textarea'].includes(selectedWebFieldTag) ? 'SET' : 'GET';
+      setAction(defaultAction);
+      setName(defaultAction === 'SET' ? 'Set Value' : 'Get Value');
       setOperation('');
     }
     setView('command');
@@ -197,7 +204,7 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
           <div className={styles.form}>
             <label>Placement<select value={mode} onChange={(e) => setMode(e.target.value as typeof mode)}><option value="before">Before selected step</option><option value="after">After selected step</option><option value="edit">Update selected step</option></select></label>
             <label>Command<select value={action} onChange={(e) => { const value = e.target.value; setAction(value); setName(COMMANDS.find(([code]) => code === value)?.[1] || value); }}>
-              {COMMANDS.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+              {availableCommands.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
             </select></label>
             <label>Name<input value={name} onChange={(e) => setName(e.target.value)} /></label>
             <div className={styles.anchorSummary}>
