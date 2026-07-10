@@ -22,6 +22,7 @@ export type CommandDraft = {
   operation: string;
   hold: number;
   variableId?: number;
+  parentId?: number;
   parentBlockId?: number;
 };
 
@@ -30,18 +31,17 @@ type Props = {
   allowSplit: boolean;
   allowElseIf: boolean;
   onClose: () => void;
-  onInsertBefore: () => void;
-  onInsertAfter: () => void;
   onSplit?: () => void;
   onInsertElseIf?: () => void;
-  onDelete: () => void;
   onApplyCommand: (draft: CommandDraft) => void;
   messages: string[];
   context: { sessionId: string; targetSessionId: string; homeBankingId: number; botJobId: number | null; botJobName: string | null };
   onSocketCommand: (type: string, body: Record<string, unknown>) => void;
 };
 
-type VariableRow = { id?: number; type: string; name: string; value: string; localFormat?: string; delimiter?: string; usedVars?: string };
+type VariableRow = { id?: number; type: string; name: string; value: string; instructionId?: number; localFormat?: string; delimiter?: string; usedVars?: string };
+type WebFieldRow = { id: number; name: string; actions: string; tagName?: string; blockId: number; blockName?: string };
+type BlockRow = { id: number; name: string; blockOrderNumber?: number };
 
 const COMMANDS = [
   ['SET', 'Set Value'], ['GET', 'Get Value'], ['CK', 'Check Value'],
@@ -51,6 +51,7 @@ const COMMANDS = [
   ['NEXT_ENTER', 'Next / Enter'], ['SWIPE_UP', 'Swipe Up'], ['SWIPE_DOWN', 'Swipe Down'],
   ['HOLD', 'Wait'], ['PAUSE', 'Pause'], ['QUIT', 'Close Browser'], ['SCREEN', 'Screenshot'],
 ];
+const SPECIAL_ACTIONS = new Set(COMMANDS.map(([code]) => code).concat(['Q', 'P', 'H', 'ELSEIF', 'ELSE', 'ENDIF', 'NEXT ROW']));
 
 const InstructionCommandPanel: React.FC<Props> = (props) => {
   const { instruction } = props;
@@ -63,6 +64,11 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
   const [operation, setOperation] = useState(instruction.operation || '');
   const [hold, setHold] = useState(5);
   const [variables, setVariables] = useState<VariableRow[]>([]);
+  const [webFields, setWebFields] = useState<WebFieldRow[]>([]);
+  const [blocks, setBlocks] = useState<BlockRow[]>([]);
+  const [selectedWebFieldId, setSelectedWebFieldId] = useState<number | undefined>(instruction.parentId || instruction.id);
+  const [selectedVariableId, setSelectedVariableId] = useState<number | undefined>(instruction.variableId || undefined);
+  const [selectedBlockId, setSelectedBlockId] = useState<number | undefined>(instruction.parentBlockId || undefined);
   const [variable, setVariable] = useState<VariableRow>({ type: '$String', name: '', value: '$EMPTY' });
   const [variableStatus, setVariableStatus] = useState('');
 
@@ -82,6 +88,15 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
   }, []);
 
   useEffect(() => {
+    props.onSocketCommand('commandEditor.bootstrap', {
+      ...props.context,
+      instructionId: instruction.id,
+      instructionName: instruction.name,
+      blockId: instruction.blockId,
+    });
+  }, [instruction.id]);
+
+  useEffect(() => {
     if (view !== 'variables') return;
     props.onSocketCommand('variableEditor.bootstrap', {
       ...props.context,
@@ -94,10 +109,18 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
     if (!props.messages.length) return;
     try {
       const envelope = JSON.parse(props.messages[props.messages.length - 1]);
-      if (!String(envelope.operationId || '').startsWith('variableEditor.')) return;
+      const operationId = String(envelope.operationId || '');
       const body = typeof envelope.body === 'string' ? JSON.parse(envelope.body) : envelope.body;
-      if (Array.isArray(body?.variables)) setVariables(body.variables);
-      setVariableStatus(body?.ok ? (body.message || '') : (body?.error || 'Variable operation failed.'));
+      if (operationId === 'commandEditor.bootstrapResponse') {
+        if (Array.isArray(body?.variables)) setVariables(body.variables.filter((row: VariableRow & { error?: string }) => !row.error));
+        if (Array.isArray(body?.webFields)) setWebFields(body.webFields);
+        if (Array.isArray(body?.blocks)) setBlocks(body.blocks);
+        return;
+      }
+      if (operationId.startsWith('variableEditor.')) {
+        if (Array.isArray(body?.variables)) setVariables(body.variables);
+        setVariableStatus(body?.ok ? (body.message || '') : (body?.error || 'Variable operation failed.'));
+      }
     } catch (_) {
       // Other socket messages are handled by the owning grid.
     }
@@ -107,6 +130,14 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
     () => COMMANDS.find(([code]) => code === action)?.[1] || action,
     [action]
   );
+  const requiresWebField = ['SET', 'GET', 'CK', 'PDF CHECK', 'CSV CHECK', 'E', 'LOOP', 'REFRESH_LOOP'].includes(action);
+  const requiresVariable = ['SET', 'GET', 'CK', 'PDF CHECK', 'CSV CHECK', 'E'].includes(action);
+  const requiresBlock = ['GOTO', 'EXCEL GOTO'].includes(action);
+  const relatedVariables = useMemo(
+    () => variables.filter(row => !selectedWebFieldId || row.instructionId === selectedWebFieldId),
+    [variables, selectedWebFieldId]
+  );
+  const isCommandRow = SPECIAL_ACTIONS.has((instruction.actions || '').split(':', 1)[0].toUpperCase());
 
   const openCommand = (nextMode: 'before' | 'after' | 'edit') => {
     setMode(nextMode);
@@ -156,12 +187,9 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
           <div className={styles.actionGrid}>
             <button onClick={() => openCommand('before')}><b>Add command before</b><span>Create and insert a configured operation</span></button>
             <button onClick={() => openCommand('after')}><b>Add command after</b><span>Create and insert a configured operation</span></button>
-            <button onClick={() => openCommand('edit')}><b>Edit command</b><span>Update {instruction.actions || 'this instruction'}</span></button>
-            <button onClick={props.onInsertBefore}><b>Insert empty step before</b><span>Use the existing placeholder workflow</span></button>
-            <button onClick={props.onInsertAfter}><b>Insert empty step after</b><span>Use the existing placeholder workflow</span></button>
+            {isCommandRow && !['IF', 'ELSEIF', 'ELSE', 'ENDIF'].includes(instruction.actions) && <button onClick={() => openCommand('edit')}><b>Edit command</b><span>Update {instruction.actions || 'this instruction'}</span></button>}
             {props.allowSplit && props.onSplit && <button onClick={props.onSplit}><b>Split component</b><span>Move the selected sequence into a component</span></button>}
             {props.allowElseIf && props.onInsertElseIf && <button onClick={props.onInsertElseIf}><b>Insert ElseIf</b><span>Extend the current conditional structure</span></button>}
-            <button className={styles.dangerAction} onClick={props.onDelete}><b>Delete instruction</b><span>Confirmation is required</span></button>
           </div>
         )}
 
@@ -172,6 +200,23 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
               {COMMANDS.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
             </select></label>
             <label>Name<input value={name} onChange={(e) => setName(e.target.value)} /></label>
+            <div className={styles.anchorSummary}>
+              <span>Reference instruction</span>
+              <b>#{instruction.instructionOrderNumber} ({instruction.id}) {instruction.name}</b>
+              <small>{instruction.blockName}</small>
+            </div>
+            {requiresWebField && <label>Web Field<select value={selectedWebFieldId || ''} onChange={(e) => { setSelectedWebFieldId(Number(e.target.value) || undefined); setSelectedVariableId(undefined); }}>
+              <option value="">Select Web Field</option>
+              {webFields.filter(row => row.blockId === instruction.blockId).map(row => <option key={row.id} value={row.id}>#{row.id} {row.name} [{row.tagName || row.actions}]</option>)}
+            </select></label>}
+            {requiresVariable && <label>Variable<select value={selectedVariableId || ''} onChange={(e) => setSelectedVariableId(Number(e.target.value) || undefined)}>
+              <option value="">Select Variable</option>
+              {relatedVariables.map(row => <option key={row.id} value={row.id}>{row.type === '#Numeric' ? '#' : '$'}{row.name} = {row.value}</option>)}
+            </select></label>}
+            {requiresBlock && <label>Destination Block<select value={selectedBlockId || ''} onChange={(e) => setSelectedBlockId(Number(e.target.value) || undefined)}>
+              <option value="">Select Block</option>
+              {blocks.filter(row => row.id !== instruction.blockId).map(row => <option key={row.id} value={row.id}>#{row.blockOrderNumber || ''} {row.name}</option>)}
+            </select></label>}
             <label>Operation / value<input value={operation} onChange={(e) => setOperation(e.target.value)} placeholder="Variable, locator, comparison, count, or target" /></label>
             {action === 'HOLD' && <label>Wait seconds<input type="number" min={1} max={9999} value={hold} onChange={(e) => setHold(Number(e.target.value))} /></label>}
             <div className={styles.preview}><span>Preview</span><b>{selectedLabel}</b><code>{operation || 'No additional value'}</code></div>
@@ -204,7 +249,7 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
 
       {view === 'command' && <footer className={styles.footer}>
         <button type="button" onClick={() => setView('actions')}>Back</button>
-        <button type="button" className={styles.primary} disabled={!name.trim() || !action} onClick={() => props.onApplyCommand({ mode, action, name: name.trim(), operation: operation.trim(), hold })}>Apply</button>
+        <button type="button" className={styles.primary} disabled={!name.trim() || !action || (requiresWebField && !selectedWebFieldId) || (requiresVariable && !selectedVariableId) || (requiresBlock && !selectedBlockId)} onClick={() => props.onApplyCommand({ mode, action, name: name.trim(), operation: operation.trim(), hold, parentId: selectedWebFieldId, variableId: selectedVariableId, parentBlockId: selectedBlockId })}>Apply</button>
       </footer>}
     </div>
   );

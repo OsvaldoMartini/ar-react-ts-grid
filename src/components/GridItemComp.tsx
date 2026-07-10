@@ -3152,9 +3152,9 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       instructionId: instruction.id,
       instructionName: instruction.name,
       instructionOrderNumber: instruction.instructionOrderNumber,
-      variableId: instruction.variableId,
-      parentId: instruction.parentId,
-      parentBlockId: instruction.parentBlockId,
+      variableId: draft.variableId ?? instruction.variableId,
+      parentId: draft.parentId ?? instruction.parentId,
+      parentBlockId: draft.parentBlockId ?? instruction.parentBlockId,
     };
     webSocket.send(JSON.stringify({
       type: 'commandEditor.apply',
@@ -3527,10 +3527,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                                             allowSplit={false}
                                             allowElseIf={["IF", "ELSEIF"].includes(instruction.actions) || isBetweenIfAndElseExcluded(instruction.instructionOrderNumber, blockData.instructions)}
                                             onClose={() => setOpenDropdown(null)}
-                                            onInsertBefore={() => handleInsertStepBefore("INSERT_BEFORE", "componentTasks", instruction.id, blockData.instructions)}
-                                            onInsertAfter={() => handleInsertStepAfter(instruction.id, blockData.instructions)}
                                             onInsertElseIf={() => handleInsertElseIf(instruction.id, blockData.instructions)}
-                                            onDelete={() => handleRemoveInstruction(instruction.id)}
                                             onApplyCommand={(draft) => applyCommandFromPanel(instruction, draft)}
                                             messages={messages}
                                             context={{ sessionId, targetSessionId: 'componentTasks', homeBankingId, botJobId, botJobName }}
