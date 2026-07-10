@@ -1303,273 +1303,6 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
   };
 
 
-  const handleInsertStepBefore = (type: string, destination: string, instructionId: number, instructions: ComponentsInstructionsDTO[]) => {
-    // Find the instruction based on the instructionId
-    const instruction = instructions.find(instruction => instruction.id === instructionId);
-
-    if (instruction) {
-
-      const isBetween = isBetweenIfAndEndIf(instruction.instructionOrderNumber, instructions);
-
-      const botJobId = instruction.botJobId || -1;
-
-      const message = {
-        type: type,
-        botJobId: botJobId,
-        botJobName: botJobName,
-        blockId: instruction.blockId,
-        blockName: instruction.blockName,
-        isBetween: isBetween,
-        homeBankingId: homeBankingId,
-        sessionId: destination, // or `botJobTasks-${botJobId}`
-
-        // InstructionDTO fields (flattened)
-        instructionId: instruction.id,
-        blockOrderNumber: instruction.blockOrderNumber,
-        instructionOrderNumber: instruction.instructionOrderNumber,
-        instructionName: instruction.name,
-        operation: instruction.operation,
-        actions: instruction.actions,
-        parentId: instruction.parentId
-      };
-
-
-      // Send WebSocket message
-      if (webSocket && connected) {
-        try {
-          webSocket.send(JSON.stringify(message));
-
-          console.log('Sent insert before message:', message);
-        } catch (error) {
-          console.log('Error sending WebSocket message:', error);
-        }
-      }
-    } else {
-      setAlertImage(warningRedImage);
-      setAlertClass('construction-image');
-      setAlertMessageHeader(
-        `Error Instruction not found`
-      );
-      setErrorFlag(true);
-      setAlertMessageBody(`Instruction with ID ${instructionId} not found.`);
-    }
-    setOpenDropdown(null);
-  };
-
-  const handleNewStepAfter = (instructionId: number) => {
-    const message = {
-      type: 'INSERT_NEW',
-      homeBankingId: homeBankingId,
-      sessionId: `componentTasks`, // or `botJobTasks-${botJobId}`
-      botJobId: botJobId,
-      botJobName: botJobName,
-      blockId: blockId,
-      blockName: "Default Block",
-      blockOrderNumber: 1,
-
-      // InstructionDTO fields (flattened)
-      instructionId: instructionId,
-      instructionName: "New Instruction",
-      instructionOrderNumber: 1,
-
-      isBetween: null,
-
-      operation: null,
-      actions: null,
-      variableId: null,
-      parentId: null,
-      parentBlockId: null
-    };
-
-
-    // Send WebSocket message
-    if (webSocket && connected) {
-      try {
-        webSocket.send(JSON.stringify(message));
-
-        console.log('Sent insert after message:', message);
-      } catch (error) {
-        console.log('Error sending WebSocket message:', error);
-      }
-    }
-    setOpenDropdown(null);
-  };
-
-
-
-  const handleEditSpecialOper = (instructionId: number, instructions: ComponentsInstructionsDTO[]) => {
-    // Find the instruction based on the instructionId
-    const instruction = instructions.find(instruction => instruction.id === instructionId);
-
-    if (instruction) {
-
-      const isBetween = isBetweenIfAndEndIf(instruction.instructionOrderNumber, instructions);
-
-      const botJobId = instruction.botJobId || -1;
-
-      const message = {
-        type: 'EDIT_OPERATION',
-        homeBankingId: homeBankingId,
-        sessionId: `componentTasks`, // or `botJobTasks-${botJobId}`
-        botJobId: botJobId,
-        botJobName: botJobName,
-        blockId: instruction.blockId,
-        blockName: "Default Block",
-        blockOrderNumber: 1,
-
-        // InstructionDTO fields (flattened)
-        instructionId: instruction.id,
-        instructionName: instruction.name,
-        instructionOrderNumber: instruction.instructionOrderNumber,
-
-        isBetween: isBetween,
-
-        operation: instruction.operation,
-        actions: instruction.actions,
-        variableId: instruction.variableId,
-        parentId: instruction.parentId,
-        parentBlockId: instruction.parentBlockId
-      };
-
-
-      // Send WebSocket message
-      if (webSocket && connected) {
-        try {
-
-          webSocket.send(JSON.stringify(message));
-
-          console.log('Edit Operation message:', message);
-        } catch (error) {
-          console.log('Error sending WebSocket message:', error);
-        }
-      }
-    } else {
-      setAlertImage(warningRedImage);
-      setAlertClass('construction-image');
-      setAlertMessageHeader(
-        `Error Instruction not found`
-      );
-      setErrorFlag(true);
-      setAlertMessageBody(`Instruction with ID ${instructionId} not found.`);
-    }
-
-    setOpenDropdown(null);
-  };
-
-
-  const handleInsertElseIf = (instructionId: number, instructions: ComponentsInstructionsDTO[]) => {
-    // Find the instruction based on the instructionId
-    const instruction = instructions.find(instruction => instruction.id === instructionId);
-
-    if (instruction) {
-
-      const { isBetween, parentId } = isBetweenCondition(instruction.instructionOrderNumber, instructions);
-
-      const botJobId = instruction.botJobId || -1;
-
-      // If the instruction is found, use its name for the alert message
-      // setErrorFlag(true);
-      // setAlertMessageBody(`Inserting step before instruction: ${instruction.name}`);
-
-      const typeInsert = instruction.actions === "ELSE" ? "INSERT_BEFORE_ELSEIF" : "INSERT_AFTER_ELSEIF";
-
-      const message = {
-        type: typeInsert,
-        botJobId: botJobId,
-        botJobName: botJobName,
-        blockId: instruction.blockId,
-        blockName: instruction.blockName,
-        isBetween: isBetween,
-        homeBankingId: homeBankingId,
-        sessionId: `componentTasks`, // or `botJobTasks-${botJobId}`
-
-        // InstructionDTO fields (flattened)
-        instructionId: instruction.id,
-        blockOrderNumber: instruction.blockOrderNumber,
-        instructionOrderNumber: instruction.instructionOrderNumber,
-        instructionName: "ELSEIF",
-        operation: "ELSEIF",
-        actions: "ELSEIF",
-        parentId: instruction.parentId
-      };
-
-      // Send WebSocket message
-      if (webSocket && connected) {
-        try {
-          webSocket.send(JSON.stringify(message));
-
-          console.log('Sent insert after message:', message);
-        } catch (error) {
-          console.log('Error sending WebSocket message:', error);
-        }
-      }
-    } else {
-      setAlertImage(warningRedImage);
-      setAlertClass('construction-image');
-      setAlertMessageHeader(
-        `Error Instruction not found`
-      );
-      setErrorFlag(true);
-      setAlertMessageBody(`Instruction with ID ${instructionId} not found.`);
-    }
-
-    setOpenDropdown(null);
-  };
-
-
-  const handleInsertStepAfter = (instructionId: number, instructions: ComponentsInstructionsDTO[]) => {
-    // Find the instruction based on the instructionId
-    const instruction = instructions.find(instruction => instruction.id === instructionId);
-
-    if (instruction) {
-
-      const isBetween = isBetweenIfAndEndIf(instruction.instructionOrderNumber, instructions);
-
-      const botJobId = instruction.botJobId || -1;
-
-      const message = {
-        type: 'INSERT_AFTER',
-        sessionId: `componentTasks`, // or `botJobTasks-${botJobId}`
-        homeBankingId: homeBankingId,
-        botJobId: botJobId,
-        botJobName: botJobName,
-        blockId: instruction.blockId,
-        blockName: instruction.blockName,
-        isBetween: isBetween,
-
-        // InstructionDTO fields (flattened)
-        instructionId: instruction.id,
-        blockOrderNumber: instruction.blockOrderNumber,
-        instructionOrderNumber: instruction.instructionOrderNumber,
-        instructionName: instruction.name,
-        operation: instruction.operation,
-        actions: instruction.actions,
-        parentId: instruction.parentId
-      };
-
-      // Send WebSocket message
-      if (webSocket && connected) {
-        try {
-          webSocket.send(JSON.stringify(message));
-
-          console.log('Sent insert after message:', message);
-        } catch (error) {
-          console.log('Error sending WebSocket message:', error);
-        }
-      }
-    } else {
-      setAlertImage(warningRedImage);
-      setAlertClass('construction-image');
-      setAlertMessageHeader(
-        `Error Instruction not found`
-      );
-      setErrorFlag(true);
-      setAlertMessageBody(`Instruction with ID ${instructionId} not found.`);
-    }
-
-    setOpenDropdown(null);
-  };
-
   const closeAlert = () => {
     setAlertMessageHeader(null);
     setErrorFlag(false);
@@ -3330,7 +3063,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                                   src={edit2Image}
                                   alt=""
                                   className={styles.editButton}
-                                  onClick={() => handleEditSpecialOper(Number(excelGotoInstruction.id), componentsData)}
+                                  onClick={() => setOpenDropdown(Number(excelGotoInstruction.id))}
                                 />
                                 <img
                                   src={crossImage}
@@ -3338,6 +3071,18 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                                   className={styles.crossButton}
                                   onClick={() => handleRemoveInstruction(Number(excelGotoInstruction.id))}
                                 />
+                                {openDropdown === excelGotoInstruction.id && (
+                                  <InstructionCommandPanel
+                                    instruction={excelGotoInstruction}
+                                    allowSplit={false}
+                                    allowElseIf={false}
+                                    onClose={() => setOpenDropdown(null)}
+                                    onApplyCommand={(draft) => applyCommandFromPanel(excelGotoInstruction, draft)}
+                                    messages={messages}
+                                    context={{ sessionId, targetSessionId: 'componentTasks', homeBankingId, botJobId, botJobName }}
+                                    onSocketCommand={(type, body) => webSocket?.send(JSON.stringify({ type, sessionId, homeBankingId, body: JSON.stringify(body) }))}
+                                  />
+                                )}
                               </div>
                             )}
                           <img
