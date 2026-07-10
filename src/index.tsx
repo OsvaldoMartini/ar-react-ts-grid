@@ -12,6 +12,7 @@ import GridItemComp from './components/GridItemComp';
 import GridItemScannMobile from './components/GridItemScannMobile';
 import ApiTestToolAI from './components/ApiTestToolAI';
 import ApiTestToolAINew from './components/ApiTestToolAINew';
+import OrganizationManager from './components/OrganizationManager';
 
 // Initialize the root
 const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
@@ -136,6 +137,10 @@ const App: React.FC = () => {
       )}
       {sessionId && (sessionId.includes("mobileScannerGrid")) && (
         <GridItemScannMobile homeBankingIdInitial={homeBanking} dataDTO={elementDTO} socketPort={socketPort} sessionId={sessionId} botJobIdInitial={botJobId} botJobNameInitial={botJobName} />
+      )}
+
+      {sessionId && (sessionId.includes("organizationManager")) && (
+        <OrganizationManager socketPort={socketPort} sessionId={sessionId} />
       )}
 
       {/* ── NEW: ApiTestTool – same props shape as GridItem / GridItemComp ── */}
