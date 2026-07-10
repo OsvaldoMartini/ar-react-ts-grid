@@ -1,5 +1,5 @@
 .shell {
-  width: 100vw;
+  width: 100%;
   min-height: 100vh;
   box-sizing: border-box;
   padding: 10px;
@@ -7,6 +7,12 @@
   color: #1f2933;
   font-family: Arial, Helvetica, sans-serif;
   overflow: auto;
+}
+
+.shell *,
+.shell *::before,
+.shell *::after {
+  box-sizing: border-box;
 }
 
 .window {
@@ -132,6 +138,7 @@
 
 .editorPanel,
 .sidePanel {
+  min-width: 0;
   border: 1px solid #b9cdd6;
   border-radius: 8px;
   background: #ffffff;
@@ -268,7 +275,9 @@
 .compactList {
   max-height: 240px;
   overflow-y: auto;
-  padding: 8px 10px;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+  padding: 8px 14px 8px 10px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -280,6 +289,7 @@
   gap: 8px;
   width: 100%;
   min-width: 0;
+  max-width: 100%;
   border: 1px solid #ddd;
   border-radius: 4px;
   background: #e0f7fa;
@@ -307,8 +317,9 @@
 
 .rowDelete {
   flex: 0 0 22px;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
   border: 1px solid #c62828;
   border-radius: 50%;
   background: #ffffff;
