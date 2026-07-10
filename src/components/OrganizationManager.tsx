@@ -3,6 +3,9 @@ import styles from './OrganizationManager.module.scss';
 import { useWebSocket } from './useWebSocket';
 
 type StatusLevel = 'ok' | 'warn' | 'error';
+type ConfirmTarget =
+  | { kind: 'organization'; id: number; label: string; jobs: number }
+  | { kind: 'environment'; id: number; homeBankingId: number; label: string; total: number };
 
 interface OrganizationRow {
   id: number;
@@ -54,6 +57,16 @@ function parseMessage(raw: string): { operationId?: string; body: any } {
   return { operationId, body };
 }
 
+function responseMessage(body: any, fallback: string): string {
+  return (
+    body?.error?.errorMessage ||
+    body?.error?.errorHeader ||
+    body?.error?.errorTitle ||
+    body?.message ||
+    fallback
+  );
+}
+
 const OrganizationManager: React.FC<OrganizationManagerProps> = ({ socketPort, sessionId }) => {
   const { webSocket, connected, messages, error } = useWebSocket(socketPort, sessionId);
   const [organizations, setOrganizations] = useState<OrganizationRow[]>([]);
@@ -62,6 +75,7 @@ const OrganizationManager: React.FC<OrganizationManagerProps> = ({ socketPort, s
   const [urlDraft, setUrlDraft] = useState<HomeUrlRow>(emptyUrl);
   const [orgSelect, setOrgSelect] = useState<string>(NEW_ORG);
   const [envSelect, setEnvSelect] = useState<string>(NEW_ENV);
+  const [confirmTarget, setConfirmTarget] = useState<ConfirmTarget | null>(null);
   const processedMessageCountRef = useRef(0);
   const [status, setStatus] = useState<{ level: StatusLevel; text: string }>({
     level: 'warn',
@@ -122,7 +136,7 @@ const OrganizationManager: React.FC<OrganizationManagerProps> = ({ socketPort, s
         ) {
           if (body.organizations) setOrganizations(body.organizations);
           if (body.homeUrls) setHomeUrls(body.homeUrls);
-          setStatus({ level: body.ok === false ? 'error' : 'ok', text: body.message || operationId });
+          setStatus({ level: body.ok === false ? 'error' : 'ok', text: responseMessage(body, operationId || 'Status') });
           if (body.ok !== false && operationId === 'organization.deleteResponse') {
             selectNewOrganization();
           }
@@ -198,6 +212,45 @@ const OrganizationManager: React.FC<OrganizationManagerProps> = ({ socketPort, s
       name: urlDraft.name || 'TEST',
       url: urlDraft.url,
     });
+  };
+
+  const requestDeleteOrganization = (org: OrganizationRow) => {
+    const jobs = Number(org.jobs || 0);
+    if (jobs > 0) {
+      setStatus({
+        level: 'error',
+        text: `Cannot delete "${org.name}" because ${jobs} bot job${jobs === 1 ? '' : 's'} still use it.`,
+      });
+      return;
+    }
+    setConfirmTarget({ kind: 'organization', id: org.id, label: org.name, jobs });
+  };
+
+  const requestDeleteEnvironment = (env: HomeUrlRow) => {
+    if (selectedOrgUrls.length <= 1) {
+      setStatus({
+        level: 'error',
+        text: 'Cannot delete this Environment because the Organization must keep at least one Environment.',
+      });
+      return;
+    }
+    setConfirmTarget({
+      kind: 'environment',
+      id: env.id,
+      homeBankingId: env.homeBankingId,
+      label: env.name || env.url || `#${env.id}`,
+      total: selectedOrgUrls.length,
+    });
+  };
+
+  const confirmDelete = () => {
+    if (!confirmTarget) return;
+    if (confirmTarget.kind === 'organization') {
+      send('organization.delete', { id: confirmTarget.id });
+    } else {
+      send('homeUrl.delete', { homeBankingId: confirmTarget.homeBankingId, homeUrlId: confirmTarget.id });
+    }
+    setConfirmTarget(null);
   };
 
   const statusClass =
@@ -286,7 +339,7 @@ const OrganizationManager: React.FC<OrganizationManagerProps> = ({ socketPort, s
               <button
                 className={styles.dangerBtn}
                 disabled={!orgDraft.id || Number(orgDraft.jobs || 0) > 0}
-                onClick={() => send('organization.delete', { id: orgDraft.id })}
+                onClick={() => requestDeleteOrganization(orgDraft)}
               >
                 Delete
               </button>
@@ -334,9 +387,9 @@ const OrganizationManager: React.FC<OrganizationManagerProps> = ({ socketPort, s
               <button
                 className={styles.dangerBtn}
                 disabled={!orgDraft.id || !urlDraft.id || selectedOrgUrls.length <= 1}
-                onClick={() => send('homeUrl.delete', { homeBankingId: orgDraft.id, homeUrlId: urlDraft.id })}
+                onClick={() => requestDeleteEnvironment(urlDraft)}
               >
-                Delete URL
+                Delete Environment
               </button>
             </div>
 
@@ -344,15 +397,26 @@ const OrganizationManager: React.FC<OrganizationManagerProps> = ({ socketPort, s
               <div className={styles.listHeader}>Organization List</div>
               <div className={styles.compactList}>
                 {organizations.map(org => (
-                  <button
+                  <div
                     key={org.id}
-                    type="button"
                     className={`${styles.listRow} ${orgDraft.id === org.id ? styles.activeRow : ''}`}
                     onClick={() => selectOrg(org)}
                   >
                     <span>{org.name}</span>
                     <small>{org.jobs || 0} jobs</small>
-                  </button>
+                    <button
+                      type="button"
+                      className={styles.rowDelete}
+                      aria-label={`Delete organization ${org.name}`}
+                      title="Delete Organization"
+                      onClick={e => {
+                        e.stopPropagation();
+                        requestDeleteOrganization(org);
+                      }}
+                    >
+                      X
+                    </button>
+                  </div>
                 ))}
                 {organizations.length === 0 && <div className={styles.empty}>No organizations loaded.</div>}
               </div>
@@ -362,16 +426,27 @@ const OrganizationManager: React.FC<OrganizationManagerProps> = ({ socketPort, s
               <div className={styles.listHeader}>Environment List</div>
               <div className={styles.compactList}>
                 {selectedOrgUrls.map(row => (
-                  <button
+                  <div
                     key={row.id}
-                    type="button"
                     className={`${styles.listRow} ${urlDraft.id === row.id ? styles.activeRow : ''}`}
                     onClick={() => selectUrl(row)}
                   >
                     <span>{row.name || 'TEST'}</span>
                     <small>#{row.id}</small>
+                    <button
+                      type="button"
+                      className={styles.rowDelete}
+                      aria-label={`Delete environment ${row.name || row.url}`}
+                      title="Delete Environment"
+                      onClick={e => {
+                        e.stopPropagation();
+                        requestDeleteEnvironment(row);
+                      }}
+                    >
+                      X
+                    </button>
                     <em>{row.url}</em>
-                  </button>
+                  </div>
                 ))}
                 {selectedOrgUrls.length === 0 && <div className={styles.empty}>No environments for this organization.</div>}
               </div>
@@ -379,6 +454,32 @@ const OrganizationManager: React.FC<OrganizationManagerProps> = ({ socketPort, s
           </aside>
         </section>
       </section>
+      {confirmTarget && (
+        <div className={styles.confirmOverlay} role="presentation" onClick={() => setConfirmTarget(null)}>
+          <section className={styles.confirmDialog} role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}>
+            <div className={styles.confirmHeader}>Confirm deletion</div>
+            <div className={styles.confirmBody}>
+              <strong>{confirmTarget.label}</strong>
+              <p>
+                {confirmTarget.kind === 'organization'
+                  ? 'This will delete the Organization and its Environment records when no bot jobs are using it.'
+                  : 'This will delete the selected Environment when no bot jobs are using it.'}
+              </p>
+              <p className={styles.confirmHint}>
+                If this item is in use by bot jobs, the backend will refuse the delete and show the reason.
+              </p>
+            </div>
+            <div className={styles.confirmFooter}>
+              <button className={styles.cancelBtn} type="button" onClick={() => setConfirmTarget(null)}>
+                Cancel
+              </button>
+              <button className={styles.dangerBtn} type="button" onClick={confirmDelete}>
+                Delete
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </main>
   );
 };

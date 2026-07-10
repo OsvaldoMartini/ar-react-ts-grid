@@ -273,7 +273,7 @@
 
 .listRow {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 8px;
   width: 100%;
@@ -296,6 +296,24 @@
 .listRow small {
   color: #0b5394;
   font-weight: bold;
+}
+
+.rowDelete {
+  width: 20px;
+  height: 20px;
+  border: 1px solid #c62828;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #c62828;
+  font-size: 11px;
+  font-weight: bold;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.rowDelete:hover {
+  background: #c62828;
+  color: #ffffff;
 }
 
 .listRow em {
@@ -322,6 +340,58 @@
   color: #777777;
   font-size: 12px;
   font-style: italic;
+}
+
+.confirmOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.42);
+  padding: 18px;
+}
+
+.confirmDialog {
+  width: min(420px, 100%);
+  border: 1px solid #0b5394;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+  overflow: hidden;
+}
+
+.confirmHeader {
+  background: #0b5394;
+  color: #ffffff;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.confirmBody {
+  padding: 12px;
+  color: #1f2933;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.confirmBody p {
+  margin: 8px 0 0;
+}
+
+.confirmHint {
+  color: #8a4b00;
+}
+
+.confirmFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid #d9d9d9;
+  background: #ececec;
 }
 
 @media (max-width: 980px) {
