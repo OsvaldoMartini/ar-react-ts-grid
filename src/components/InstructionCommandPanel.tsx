@@ -19,8 +19,10 @@ export type CommandDraft = {
   mode: 'before' | 'after' | 'edit';
   action: string;
   name: string;
-  operation: string;
   hold: number;
+  operator: string;
+  interval: number;
+  count: number;
   variableId?: number;
   parentId?: number;
   parentBlockId?: number;
@@ -49,7 +51,7 @@ const COMMANDS = [
   ['IF', 'IF'], ['GOTO', 'GOTO'], ['EXCEL GOTO', 'Excel GOTO'],
   ['LOOP', 'Loop'], ['REFRESH_LOOP', 'Refresh Loop'], ['REFRESH', 'Refresh'],
   ['NEXT_ENTER', 'Next / Enter'], ['SWIPE_UP', 'Swipe Up'], ['SWIPE_DOWN', 'Swipe Down'],
-  ['HOLD', 'Wait'], ['PAUSE', 'Pause'], ['QUIT', 'Close Browser'], ['SCREEN', 'Screenshot'],
+  ['H', 'Wait'], ['PAUSE', 'Pause'], ['Q', 'Close Browser'], ['P', 'Screenshot'],
 ];
 const SPECIAL_ACTIONS = new Set(COMMANDS.map(([code]) => code).concat(['Q', 'P', 'H', 'ELSEIF', 'ELSE', 'ENDIF', 'NEXT ROW']));
 
@@ -61,8 +63,10 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
   const [mode, setMode] = useState<'before' | 'after' | 'edit'>('after');
   const [action, setAction] = useState(instruction.actions || 'SET');
   const [name, setName] = useState(instruction.name || 'New Command');
-  const [operation, setOperation] = useState(instruction.operation || '');
   const [hold, setHold] = useState(5);
+  const [operator, setOperator] = useState('=');
+  const [interval, setIntervalValue] = useState(1);
+  const [count, setCount] = useState(1);
   const [variables, setVariables] = useState<VariableRow[]>([]);
   const [webFields, setWebFields] = useState<WebFieldRow[]>([]);
   const [blocks, setBlocks] = useState<BlockRow[]>([]);
@@ -139,6 +143,9 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
   const requiresWebField = ['SET', 'GET', 'CK', 'PDF CHECK', 'CSV CHECK', 'E', 'LOOP', 'REFRESH_LOOP'].includes(action);
   const requiresVariable = ['SET', 'GET', 'CK', 'PDF CHECK', 'CSV CHECK', 'E'].includes(action);
   const requiresBlock = ['GOTO', 'EXCEL GOTO'].includes(action);
+  const requiresOperator = ['CK', 'PDF CHECK', 'CSV CHECK'].includes(action);
+  const requiresIntervalAndCount = ['LOOP', 'REFRESH_LOOP'].includes(action);
+  const requiresCount = ['GOTO', 'SWIPE_UP', 'SWIPE_DOWN'].includes(action);
   const relatedVariables = useMemo(
     () => variables.filter(row => !selectedWebFieldId || row.instructionId === selectedWebFieldId),
     [variables, selectedWebFieldId]
@@ -151,7 +158,6 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
       const defaultAction = ['input', 'select', 'textarea'].includes(selectedWebFieldTag) ? 'SET' : 'GET';
       setAction(defaultAction);
       setName(defaultAction === 'SET' ? 'Set Value' : 'Get Value');
-      setOperation('');
     }
     setView('command');
   };
@@ -224,9 +230,11 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
               <option value="">Select Block</option>
               {blocks.filter(row => row.id !== instruction.blockId).map(row => <option key={row.id} value={row.id}>#{row.blockOrderNumber || ''} {row.name}</option>)}
             </select></label>}
-            <label>Operation / value<input value={operation} onChange={(e) => setOperation(e.target.value)} placeholder="Variable, locator, comparison, count, or target" /></label>
-            {action === 'HOLD' && <label>Wait seconds<input type="number" min={1} max={9999} value={hold} onChange={(e) => setHold(Number(e.target.value))} /></label>}
-            <div className={styles.preview}><span>Preview</span><b>{selectedLabel}</b><code>{operation || 'No additional value'}</code></div>
+            {requiresOperator && <label>Operator<select value={operator} onChange={(e) => setOperator(e.target.value)}><option value="=">Equals</option><option value="!=">Not equal</option><option value=">">Greater than</option><option value="<">Less than</option><option value=">=">Greater or equal</option><option value="<=">Less or equal</option></select></label>}
+            {requiresIntervalAndCount && <><label>Interval seconds<input type="number" min={1} max={9999} value={interval} onChange={(e) => setIntervalValue(Number(e.target.value))} /></label><label>Iterations<input type="number" min={1} max={9999} value={count} onChange={(e) => setCount(Number(e.target.value))} /></label></>}
+            {requiresCount && <label>{action === 'GOTO' ? 'GOTO count' : 'Repetitions'}<input type="number" min={1} max={9999} value={count} onChange={(e) => setCount(Number(e.target.value))} /></label>}
+            {action === 'H' && <label>Wait seconds<input type="number" min={1} max={9999} value={hold} onChange={(e) => setHold(Number(e.target.value))} /></label>}
+            <div className={styles.preview}><span>Preview</span><b>{selectedLabel}</b><code>Operation is generated and validated by Java</code></div>
           </div>
         )}
 
@@ -247,7 +255,7 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
               <div className={styles.variableButtons}>
                 {variable.id != null && <button className={styles.deleteButton} onClick={() => { if (window.confirm(`Delete variable ${variable.name}?`)) props.onSocketCommand('variableEditor.delete', { ...props.context, instructionId: instruction.id, instructionName: instruction.name, variableId: variable.id }); }}>Delete</button>}
                 <button className={styles.primary} disabled={!variable.name.trim()} onClick={() => props.onSocketCommand('variableEditor.save', { ...props.context, instructionId: instruction.id, instructionName: instruction.name, variable })}>{variable.id == null ? 'Create' : 'Update'}</button>
-                <button onClick={() => { setOperation(`${variable.type === '#Numeric' ? '#' : '$'}${variable.name}`); setView('command'); }}>Use in command</button>
+                <button onClick={() => { setSelectedVariableId(variable.id); if (variable.instructionId) setSelectedWebFieldId(variable.instructionId); setView('command'); }}>Use in command</button>
               </div>
             </div>
           </div>
@@ -256,7 +264,7 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
 
       {view === 'command' && <footer className={styles.footer}>
         <button type="button" onClick={() => setView('actions')}>Back</button>
-        <button type="button" className={styles.primary} disabled={!name.trim() || !action || (requiresWebField && !selectedWebFieldId) || (requiresVariable && !selectedVariableId) || (requiresBlock && !selectedBlockId)} onClick={() => props.onApplyCommand({ mode, action, name: name.trim(), operation: operation.trim(), hold, parentId: selectedWebFieldId, variableId: selectedVariableId, parentBlockId: selectedBlockId })}>Apply</button>
+        <button type="button" className={styles.primary} disabled={!name.trim() || !action || (requiresWebField && !selectedWebFieldId) || (requiresVariable && !selectedVariableId) || (requiresBlock && !selectedBlockId)} onClick={() => props.onApplyCommand({ mode, action, name: name.trim(), hold, operator, interval, count, parentId: selectedWebFieldId, variableId: selectedVariableId, parentBlockId: selectedBlockId })}>Apply</button>
       </footer>}
     </div>
   );
