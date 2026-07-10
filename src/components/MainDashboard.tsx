@@ -45,6 +45,7 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId }) 
   const { webSocket, connected, messages, error } = useWebSocket(socketPort, sessionId);
   const processedMessageCountRef = useRef(0);
   const [botJobs, setBotJobs] = useState<BotJobRow[]>([]);
+  const [findText, setFindText] = useState('');
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<BotJobRow | null>(null);
   const [status, setStatus] = useState<{ level: StatusLevel; text: string }>({
@@ -56,6 +57,15 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId }) 
     () => botJobs.find(row => row.id === selectedId) || null,
     [botJobs, selectedId],
   );
+
+  const filteredBotJobs = useMemo(() => {
+    const query = findText.trim().toLowerCase();
+    if (!query) return botJobs;
+    return botJobs.filter(row =>
+      row.name.toLowerCase().includes(query) ||
+      (row.organizationName || '').toLowerCase().includes(query)
+    );
+  }, [botJobs, findText]);
 
   const send = useCallback(
     (type: string, body: unknown = {}) => {
@@ -186,12 +196,31 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId }) 
           <button type="button" className={styles.dangerBtn} onClick={() => send('mainDashboard.exit')}>
             Exit
           </button>
+          <div className={styles.findControl}>
+            <label htmlFor="main-dashboard-find">Find:</label>
+            <div className={styles.findInputWrap}>
+              <input
+                id="main-dashboard-find"
+                type="text"
+                value={findText}
+                placeholder="Bot Job or Organization"
+                onChange={event => setFindText(event.target.value)}
+              />
+              {findText && (
+                <button type="button" title="Clear Find" onClick={() => setFindText('')}>
+                  X
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
         <section className={styles.gridPanel}>
           <div className={styles.panelHeader}>
             <span className={styles.panelTitle}>Bot Jobs</span>
-            <span className={styles.badge}>{botJobs.length}</span>
+            <span className={styles.badge}>
+              {findText.trim() ? `${filteredBotJobs.length} / ${botJobs.length}` : botJobs.length}
+            </span>
           </div>
           <div className={styles.gridWrap}>
             <table className={styles.grid}>
@@ -209,12 +238,14 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId }) 
                 </tr>
               </thead>
               <tbody>
-                {botJobs.length === 0 ? (
+                {filteredBotJobs.length === 0 ? (
                   <tr>
-                    <td className={styles.emptyCell} colSpan={9}>No Bot Jobs loaded</td>
+                    <td className={styles.emptyCell} colSpan={9}>
+                      {botJobs.length === 0 ? 'No Bot Jobs loaded' : 'No Bot Jobs match Find'}
+                    </td>
                   </tr>
                 ) : (
-                  botJobs.map(row => (
+                  filteredBotJobs.map(row => (
                     <tr
                       key={row.id}
                       className={selectedId === row.id ? styles.selectedRow : undefined}
