@@ -44,14 +44,14 @@ type Props = {
 type VariableRow = { id?: number; type: string; name: string; value: string; instructionId?: number; localFormat?: string; delimiter?: string; usedVars?: string };
 type WebFieldRow = { id: number; name: string; actions: string; tagName?: string; blockId: number; blockName?: string };
 type BlockRow = { id: number; name: string; blockOrderNumber?: number };
-type CommandDefinition = { code: string; label: string; target: string };
+type CommandDefinition = { code: string; label: string; target: string; fields: string[] };
 
 const FALLBACK_COMMANDS: CommandDefinition[] = [
-  { code: 'SET', label: 'Set Value', target: 'variable' },
-  { code: 'GET', label: 'Get Value', target: 'variable' },
-  { code: 'CK', label: 'Check Value', target: 'variable' },
-  { code: 'GOTO', label: 'GOTO', target: 'block' },
-  { code: 'H', label: 'Wait', target: 'number' },
+  { code: 'SET', label: 'Set Value', target: 'variable', fields: ['webField', 'variable'] },
+  { code: 'GET', label: 'Get Value', target: 'variable', fields: ['webField', 'variable'] },
+  { code: 'CK', label: 'Check Value', target: 'variable', fields: ['webField', 'variable', 'operator'] },
+  { code: 'GOTO', label: 'GOTO', target: 'block', fields: ['block', 'count'] },
+  { code: 'H', label: 'Wait', target: 'number', fields: ['hold'] },
 ];
 const SPECIAL_ACTIONS = new Set(['SET', 'GET', 'CK', 'Q', 'P', 'H', 'E', 'GOTO', 'IF', 'ELSEIF', 'ELSE', 'ENDIF', 'PAUSE', 'REFRESH', 'LOOP', 'REFRESH_LOOP', 'NEXT_ENTER', 'SWIPE_UP', 'SWIPE_DOWN', 'EXCEL GOTO', 'NEXT ROW', 'CSV CHECK', 'PDF CHECK']);
 
@@ -142,12 +142,14 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
     () => commands.filter(command => command.code !== 'SET' || ['input', 'select', 'textarea'].includes(selectedWebFieldTag)),
     [commands, selectedWebFieldTag]
   );
-  const requiresWebField = ['SET', 'GET', 'CK', 'PDF CHECK', 'CSV CHECK', 'E', 'LOOP', 'REFRESH_LOOP'].includes(action);
-  const requiresVariable = ['SET', 'GET', 'CK', 'PDF CHECK', 'CSV CHECK', 'E'].includes(action);
-  const requiresBlock = ['GOTO', 'EXCEL GOTO'].includes(action);
-  const requiresOperator = ['CK', 'PDF CHECK', 'CSV CHECK'].includes(action);
-  const requiresIntervalAndCount = ['LOOP', 'REFRESH_LOOP'].includes(action);
-  const requiresCount = ['GOTO', 'SWIPE_UP', 'SWIPE_DOWN'].includes(action);
+  const selectedCommand = commands.find(command => command.code === action);
+  const commandFields = selectedCommand?.fields || [];
+  const requiresWebField = commandFields.includes('webField');
+  const requiresVariable = commandFields.includes('variable');
+  const requiresBlock = commandFields.includes('block');
+  const requiresOperator = commandFields.includes('operator');
+  const requiresIntervalAndCount = commandFields.includes('interval') && commandFields.includes('count');
+  const requiresCount = commandFields.includes('count') && !commandFields.includes('interval');
   const relatedVariables = useMemo(
     () => variables.filter(row => !selectedWebFieldId || row.instructionId === selectedWebFieldId),
     [variables, selectedWebFieldId]
@@ -235,7 +237,7 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
             {requiresOperator && <label>Operator<select value={operator} onChange={(e) => setOperator(e.target.value)}><option value="=">Equals</option><option value="!=">Not equal</option><option value=">">Greater than</option><option value="<">Less than</option><option value=">=">Greater or equal</option><option value="<=">Less or equal</option></select></label>}
             {requiresIntervalAndCount && <><label>Interval seconds<input type="number" min={1} max={9999} value={interval} onChange={(e) => setIntervalValue(Number(e.target.value))} /></label><label>Iterations<input type="number" min={1} max={9999} value={count} onChange={(e) => setCount(Number(e.target.value))} /></label></>}
             {requiresCount && <label>{action === 'GOTO' ? 'GOTO count' : 'Repetitions'}<input type="number" min={1} max={9999} value={count} onChange={(e) => setCount(Number(e.target.value))} /></label>}
-            {action === 'H' && <label>Wait seconds<input type="number" min={1} max={9999} value={hold} onChange={(e) => setHold(Number(e.target.value))} /></label>}
+            {commandFields.includes('hold') && <label>Wait seconds<input type="number" min={1} max={9999} value={hold} onChange={(e) => setHold(Number(e.target.value))} /></label>}
             <div className={styles.preview}><span>Preview</span><b>{selectedLabel}</b><code>Operation is generated and validated by Java</code></div>
           </div>
         )}
