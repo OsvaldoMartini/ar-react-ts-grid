@@ -18,6 +18,7 @@ import NewBotJobManager from './components/NewBotJobManager';
 import ConfigManager from './components/ConfigManager';
 import LicenseManager from './components/LicenseManager';
 import AboutPanel from './components/AboutPanel';
+import ActivationRequired from './components/ActivationRequired';
 
 // Initialize the root
 const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
@@ -164,6 +165,9 @@ const App: React.FC = () => {
       )}
       {sessionId && sessionId.includes("aboutPanel") && (
         <AboutPanel socketPort={socketPort} sessionId={sessionId} />
+      )}
+      {sessionId && sessionId.includes("activationRequired") && (
+        <ActivationRequired socketPort={socketPort} sessionId={sessionId} />
       )}
 
       {/* ── NEW: ApiTestTool – same props shape as GridItem / GridItemComp ── */}
