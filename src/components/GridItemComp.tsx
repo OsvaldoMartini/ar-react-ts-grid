@@ -1310,24 +1310,6 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     setAlertMessageFooter(null);
   };
 
-  const isBetweenIfAndEndIf = (currentOrderNumber: number, instructions: ComponentsInstructionsDTO[]) => {
-    let ifFound = false;
-
-    for (const instr of instructions) {
-      if (instr.actions === "IF") {
-        ifFound = true;
-      }
-      if (instr.instructionOrderNumber === currentOrderNumber && ifFound) {
-        return true; // The instruction is between IF and ENDIF
-      }
-      if (instr.actions === "ENDIF" && ifFound) {
-        ifFound = false; // Reset once ENDIF is encountered
-      }
-    }
-    return false;
-  }
-
-
   const isBetweenCondition = (
     currentOrderNumber: number,
     instructions: ComponentsInstructionsDTO[]
@@ -3051,7 +3033,6 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                                 {openDropdown === excelGotoInstruction.id && (
                                   <InstructionCommandPanel
                                     instruction={excelGotoInstruction}
-                                    allowSplit={false}
                                     onClose={() => setOpenDropdown(null)}
                                     onApplyCommand={(draft) => applyCommandFromPanel(excelGotoInstruction, draft)}
                                     messages={messages}
@@ -3121,7 +3102,6 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
 
                               const isLastInstruction =
                                 index === blockData.instructions.length - 1;
-                              const isJustOne = blockData.instructions.length === 1;
                               const isLastBlock =
                                 Number(blockGroupIndex) === Object.keys(groupedData).length; // Check if this is the last block
 
@@ -3245,7 +3225,6 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                                         {openDropdown === instruction.id && (
                                           <InstructionCommandPanel
                                             instruction={instruction}
-                                            allowSplit={false}
                                             onClose={() => setOpenDropdown(null)}
                                             onInsertElseIf={(graphRevision) => {
                                               webSocket?.send(JSON.stringify({
