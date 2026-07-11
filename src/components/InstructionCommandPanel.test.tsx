@@ -106,3 +106,25 @@ test('edits, selects, and deletes an unused bot-job variable', () => {
     targetSessionId: 'botJobTasks', variableId: 22,
   }));
 });
+
+test('submits typed command fields without constructing an operation string', () => {
+  const onApplyCommand = jest.fn();
+  render(<InstructionCommandPanel
+    instruction={instruction}
+    onClose={jest.fn()}
+    onApplyCommand={onApplyCommand}
+    messages={[bootstrapMessage]}
+    context={{ sessionId: 'botJobTasks', targetSessionId: 'botJobTasks', homeBankingId: 2, botJobId: 19, botJobName: 'Banca Stato' }}
+    onSocketCommand={jest.fn()}
+  />);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Command' }));
+  fireEvent.change(screen.getByLabelText('Variable'), { target: { value: '20' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+  expect(onApplyCommand).toHaveBeenCalledTimes(1);
+  const draft = onApplyCommand.mock.calls[0][0];
+  expect(draft).toEqual(expect.objectContaining({
+    action: 'SET', parentId: 10, variableId: 20, graphRevision: 'revision-1',
+  }));
+  expect(draft).not.toHaveProperty('operation');
+});
