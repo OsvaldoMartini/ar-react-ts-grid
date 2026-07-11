@@ -21,6 +21,7 @@ import AttributeDropdown from './AttributeDropdown';
 import NameDropdown from './NameDropdown';
 import CreateNewBlock, { CreateBlockOption, CreateBlockPosition } from './CreateNewBlock';
 import OCRPanel from './OCRPanel';
+import OCRConfigPanel, { OCRConfigData, OCRParameter } from './OCRConfigPanel';
 import styles from './GridItemScann.module.scss';
 
 
@@ -288,6 +289,9 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   // backend stashes the pre-OCR text in attributeData['scanned-text'] whenever the
   // resolver changed it; rows without it are shown as "same".
   const [ocrReviewBlock, setOcrReviewBlock] = useState<string | null>(null);
+  const [ocrConfig, setOcrConfig] = useState<OCRConfigData | null>(null);
+  const [ocrConfigBusy, setOcrConfigBusy] = useState(false);
+  const [ocrConfigError, setOcrConfigError] = useState('');
 
   const scannedTextOf = (el: ElementDTO): string | null => {
     const attrs = (el as any).attributeData as Array<{ name: string; value: string }> | undefined;
@@ -626,6 +630,27 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
             break;
           }
 
+          case "ocrConfig.bootstrapResponse":
+          case "ocrConfig.profileResponse": {
+            setOcrConfigBusy(false);
+            if (!bodyData?.ok) { setOcrConfigError(String(bodyData?.error || 'OCR configuration could not be loaded.')); break; }
+            setOcrConfig(previous => ({
+              profiles: bodyData.profiles || previous?.profiles || [],
+              activeProfileId: bodyData.profile?.id ?? bodyData.activeProfileId ?? previous?.activeProfileId,
+              categories: bodyData.categories || previous?.categories || [],
+              parameters: bodyData.parameters || [],
+            }));
+            setOcrConfigError('');
+            break;
+          }
+          case "ocrConfig.saveResponse":
+          case "ocrConfig.deleteResponse": {
+            setOcrConfigBusy(false);
+            if (!bodyData?.ok) { setOcrConfigError(String(bodyData?.error || 'OCR profile operation failed.')); break; }
+            sendOcrConfigCommand('ocrConfig.bootstrap', { homeBankingId });
+            break;
+          }
+
           case "activate-update-all": {
             setIsUpdatingAll(false);
             break;
@@ -960,6 +985,15 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
       console.error("Error sending pre-scan dashboard command:", error);
     }
   };
+
+  const sendOcrConfigCommand = (type:string, body:Record<string,unknown>) => {
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) { setOcrConfigError('WebSocket is not connected.'); return; }
+    setOcrConfigBusy(true);
+    webSocket.send(JSON.stringify({type,sessionId,homeBankingId,body:JSON.stringify(body)}));
+  };
+  const openOcrConfig = () => { setOcrConfigError(''); setOcrConfig({profiles:[],categories:[],parameters:[]}); sendOcrConfigCommand('ocrConfig.bootstrap',{homeBankingId}); };
+  const saveOcrConfig = (draft:{profileId?:number;name:string;description:string;parameters:OCRParameter[];asNew:boolean}) => sendOcrConfigCommand('ocrConfig.save',{...draft,homeBankingId});
+  const deleteOcrConfig = (profileId:number) => { if(window.confirm('Delete this OCR profile?')) sendOcrConfigCommand('ocrConfig.delete',{profileId,confirmed:true}); };
 
   const handleDashboardFocusChange = (value: string) => {
     setDashboardFocus(value);
@@ -1450,7 +1484,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
             <button
               type="button"
               className={styles.preScanIconButton}
-              onClick={() => sendDashboardCommand('PRE_SCAN_OCR_CONFIG')}
+              onClick={openOcrConfig}
               title="OCR Configuration"
             >
               OCR Config
@@ -1869,7 +1903,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
                     >
                       +
                     </button>
-                    {isPreScanMode && (
+      {isPreScanMode && (
                       <>
                         <button
                           type="button"
@@ -1905,7 +1939,8 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
                           OCR
                         </button>
                       </>
-                    )}
+      )}
+      {ocrConfig && <OCRConfigPanel key={ocrConfig.activeProfileId || 'new'} data={ocrConfig} busy={ocrConfigBusy} error={ocrConfigError} onSelect={profileId=>sendOcrConfigCommand('ocrConfig.profile',{profileId})} onSave={saveOcrConfig} onDelete={deleteOcrConfig} onClose={()=>setOcrConfig(null)}/>}
                     {isInputTextBlock(typeElement) && (
                       <img
                         src={testInputImage}
