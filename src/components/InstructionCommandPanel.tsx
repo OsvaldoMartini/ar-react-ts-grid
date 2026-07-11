@@ -44,16 +44,16 @@ type Props = {
 type VariableRow = { id?: number; type: string; name: string; value: string; instructionId?: number; localFormat?: string; delimiter?: string; usedVars?: string };
 type WebFieldRow = { id: number; name: string; actions: string; tagName?: string; blockId: number; blockName?: string };
 type BlockRow = { id: number; name: string; blockOrderNumber?: number };
+type CommandDefinition = { code: string; label: string; target: string };
 
-const COMMANDS = [
-  ['SET', 'Set Value'], ['GET', 'Get Value'], ['CK', 'Check Value'],
-  ['PDF CHECK', 'PDF Check'], ['CSV CHECK', 'CSV Check'], ['E', 'Extract Field'],
-  ['IF', 'IF'], ['GOTO', 'GOTO'], ['EXCEL GOTO', 'Excel GOTO'],
-  ['LOOP', 'Loop'], ['REFRESH_LOOP', 'Refresh Loop'], ['REFRESH', 'Refresh'],
-  ['NEXT_ENTER', 'Next / Enter'], ['SWIPE_UP', 'Swipe Up'], ['SWIPE_DOWN', 'Swipe Down'],
-  ['H', 'Wait'], ['PAUSE', 'Pause'], ['Q', 'Close Browser'], ['P', 'Screenshot'],
+const FALLBACK_COMMANDS: CommandDefinition[] = [
+  { code: 'SET', label: 'Set Value', target: 'variable' },
+  { code: 'GET', label: 'Get Value', target: 'variable' },
+  { code: 'CK', label: 'Check Value', target: 'variable' },
+  { code: 'GOTO', label: 'GOTO', target: 'block' },
+  { code: 'H', label: 'Wait', target: 'number' },
 ];
-const SPECIAL_ACTIONS = new Set(COMMANDS.map(([code]) => code).concat(['Q', 'P', 'H', 'ELSEIF', 'ELSE', 'ENDIF', 'NEXT ROW']));
+const SPECIAL_ACTIONS = new Set(['SET', 'GET', 'CK', 'Q', 'P', 'H', 'E', 'GOTO', 'IF', 'ELSEIF', 'ELSE', 'ENDIF', 'PAUSE', 'REFRESH', 'LOOP', 'REFRESH_LOOP', 'NEXT_ENTER', 'SWIPE_UP', 'SWIPE_DOWN', 'EXCEL GOTO', 'NEXT ROW', 'CSV CHECK', 'PDF CHECK']);
 
 const InstructionCommandPanel: React.FC<Props> = (props) => {
   const { instruction } = props;
@@ -70,6 +70,7 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
   const [variables, setVariables] = useState<VariableRow[]>([]);
   const [webFields, setWebFields] = useState<WebFieldRow[]>([]);
   const [blocks, setBlocks] = useState<BlockRow[]>([]);
+  const [commands, setCommands] = useState<CommandDefinition[]>(FALLBACK_COMMANDS);
   const [selectedWebFieldId, setSelectedWebFieldId] = useState<number | undefined>(instruction.parentId || instruction.id);
   const [selectedVariableId, setSelectedVariableId] = useState<number | undefined>(instruction.variableId || undefined);
   const [selectedBlockId, setSelectedBlockId] = useState<number | undefined>(instruction.parentBlockId || undefined);
@@ -119,6 +120,7 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
         if (Array.isArray(body?.variables)) setVariables(body.variables.filter((row: VariableRow & { error?: string }) => !row.error));
         if (Array.isArray(body?.webFields)) setWebFields(body.webFields);
         if (Array.isArray(body?.blocks)) setBlocks(body.blocks);
+        if (Array.isArray(body?.commands) && body.commands.length > 0) setCommands(body.commands);
         return;
       }
       if (operationId.startsWith('variableEditor.')) {
@@ -131,14 +133,14 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
   }, [props.messages]);
 
   const selectedLabel = useMemo(
-    () => COMMANDS.find(([code]) => code === action)?.[1] || action,
-    [action]
+    () => commands.find(command => command.code === action)?.label || action,
+    [action, commands]
   );
   const selectedWebField = webFields.find(row => row.id === selectedWebFieldId);
   const selectedWebFieldTag = (selectedWebField?.tagName || '').toLowerCase();
   const availableCommands = useMemo(
-    () => COMMANDS.filter(([code]) => code !== 'SET' || ['input', 'select', 'textarea'].includes(selectedWebFieldTag)),
-    [selectedWebFieldTag]
+    () => commands.filter(command => command.code !== 'SET' || ['input', 'select', 'textarea'].includes(selectedWebFieldTag)),
+    [commands, selectedWebFieldTag]
   );
   const requiresWebField = ['SET', 'GET', 'CK', 'PDF CHECK', 'CSV CHECK', 'E', 'LOOP', 'REFRESH_LOOP'].includes(action);
   const requiresVariable = ['SET', 'GET', 'CK', 'PDF CHECK', 'CSV CHECK', 'E'].includes(action);
@@ -209,8 +211,8 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
         {view === 'command' && (
           <div className={styles.form}>
             <label>Placement<select value={mode} onChange={(e) => setMode(e.target.value as typeof mode)}><option value="before">Before selected step</option><option value="after">After selected step</option><option value="edit">Update selected step</option></select></label>
-            <label>Command<select value={action} onChange={(e) => { const value = e.target.value; setAction(value); setName(COMMANDS.find(([code]) => code === value)?.[1] || value); }}>
-              {availableCommands.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+            <label>Command<select value={action} onChange={(e) => { const value = e.target.value; setAction(value); setName(commands.find(command => command.code === value)?.label || value); }}>
+              {availableCommands.map(command => <option key={command.code} value={command.code}>{command.label}</option>)}
             </select></label>
             <label>Name<input value={name} onChange={(e) => setName(e.target.value)} /></label>
             <div className={styles.anchorSummary}>
