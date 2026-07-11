@@ -192,6 +192,8 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
   );
   const [createBlockOpen, setCreateBlockOpen] = useState<boolean>(false);
   const [memoryCapabilities, setMemoryCapabilities] = useState<Map<number, { canAdd: boolean; reason: string }>>(new Map());
+  const [pendingMemoryMove, setPendingMemoryMove] = useState<{ requestId: string; ids: Set<number> } | null>(null);
+  const [memoryMoveStatus, setMemoryMoveStatus] = useState('');
 
   const handleAddToMemory = (instruction: BlockLoopInstructionLoadDTO) => {
     if (!memoryCapabilities.get(instruction.id)?.canAdd) return;
@@ -301,12 +303,9 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
       }));
     });
 
-    setGroupedData(updatedGroupedData);
     const updatedInstructionsData = Object.values(updatedGroupedData).flatMap(
       (block) => block.instructions
     );
-    setInstructionsData(updatedInstructionsData);
-    setIsDataReordered(false);
 
     if (webSocket && connected) {
       const updatedRows = updatedInstructionsData.map((ins) => ({
@@ -315,9 +314,10 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
         instructionOrderNumber: ins.instructionOrderNumber,
       }));
 
+      const requestId = `${Date.now()}-bot-memory-row-move`;
       const message = {
         type: 'ROW_MOVE',
-        requestId: `${Date.now()}-bot-row-move`,
+        requestId,
         botJobId: targetBotJobId,
         botJobName,
         deleteBlockId,
@@ -328,14 +328,14 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
       try {
         webSocket.send(JSON.stringify(message));
+        setPendingMemoryMove({ requestId, ids: movableIds });
+        setMemoryMoveStatus('Applying...');
         console.log('Sent memory apply (row move) message:', message);
       } catch (error) {
         console.log('Error sending WebSocket message:', error);
       }
     }
 
-    // Applied steps leave the list; non-movable ones (IF/ELSE/loop) stay visible.
-    setMemorySteps((prev) => prev.filter((step) => !movableIds.has(step.id)));
   };
 
   // Java backend owns block creation and mints the new blockId. It refreshes the
@@ -962,7 +962,18 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
         }
 
 
-        if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "instructionEditor.memoryCapabilitiesResponse") {
+        if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "instructionEditor.rowMoveResponse") {
+          const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
+          if (pendingMemoryMove && bodyData?.requestId === pendingMemoryMove.requestId) {
+            if (bodyData?.ok) {
+              setMemorySteps(prev => prev.filter(step => !pendingMemoryMove.ids.has(step.id)));
+              setMemoryMoveStatus('Applied.');
+            } else {
+              setMemoryMoveStatus(bodyData?.error || 'Memory Apply was refused.');
+            }
+            setPendingMemoryMove(null);
+          }
+        } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "instructionEditor.memoryCapabilitiesResponse") {
           const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
           const next = new Map<number, { canAdd: boolean; reason: string }>();
           if (Array.isArray(bodyData?.capabilities)) {
@@ -1048,7 +1059,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
         console.error("Error parsing WebSocket message:", error);
       }
     }
-  }, [messages]);
+  }, [messages, pendingMemoryMove]);
 
 
   useEffect(() => {
@@ -3331,17 +3342,19 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
             )}
           </div>
           <div className={styles.memoryPanelFooter}>
+            {memoryMoveStatus && <span>{memoryMoveStatus}</span>}
             <button
               type="button"
               className={styles.memoryApplyButton}
               disabled={
                 memoryTargetBlockId === null
                 || memorySteps.length === 0
+                || pendingMemoryMove !== null
                 || !memoryBlockOptions.some((block) => block.blockId === memoryTargetBlockId)
               }
               onClick={handleApplyMemory}
             >
-              Apply
+              {pendingMemoryMove ? 'Applying...' : 'Apply'}
             </button>
           </div>
         </div>
