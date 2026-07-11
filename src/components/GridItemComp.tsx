@@ -146,7 +146,8 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
   const [alertDismissed, setAlertDismissed] = useState(false);
   const [alertOnConfirm, setAlertOnConfirm] = useState<(() => void) | undefined>(undefined);
   const [findText, setFindText] = useState<string>('');
-  const [moveCapabilities, setMoveCapabilities] = useState<Map<number, { canMove: boolean; canDelete: boolean; deleteCount: number; reason: string; deleteReason: string }>>(new Map());
+  const [moveCapabilities, setMoveCapabilities] = useState<Map<number, { canMove: boolean; canDelete: boolean; deleteCount: number; reason: string; deleteReason: string; allowedBlockIds: number[] }>>(new Map());
+  const [activeDraggedInstructionId, setActiveDraggedInstructionId] = useState<number | null>(null);
   const [moveGraphRevision, setMoveGraphRevision] = useState('');
   const submitInstructionMove = useInstructionDrag({
     webSocket, connected, graphRevision: moveGraphRevision, botJobId, botJobName,
@@ -708,10 +709,10 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
           }
         } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "instructionEditor.memoryCapabilitiesResponse") {
           const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
-          const next = new Map<number, { canMove: boolean; canDelete: boolean; deleteCount: number; reason: string; deleteReason: string }>();
+          const next = new Map<number, { canMove: boolean; canDelete: boolean; deleteCount: number; reason: string; deleteReason: string; allowedBlockIds: number[] }>();
           if (Array.isArray(bodyData?.capabilities)) {
-            bodyData.capabilities.forEach((capability: { instructionId: number; canMove: boolean; canDelete: boolean; deleteCount?: number; reason?: string; deleteReason?: string }) => {
-              next.set(capability.instructionId, { canMove: capability.canMove === true, canDelete: capability.canDelete === true, deleteCount: capability.deleteCount || 1, reason: capability.reason || '', deleteReason: capability.deleteReason || '' });
+            bodyData.capabilities.forEach((capability: { instructionId: number; canMove: boolean; canDelete: boolean; deleteCount?: number; reason?: string; deleteReason?: string; allowedBlockIds?: number[] }) => {
+              next.set(capability.instructionId, { canMove: capability.canMove === true, canDelete: capability.canDelete === true, deleteCount: capability.deleteCount || 1, reason: capability.reason || '', deleteReason: capability.deleteReason || '', allowedBlockIds: Array.isArray(capability.allowedBlockIds) ? capability.allowedBlockIds : [] });
             });
           }
           setMoveCapabilities(next);
@@ -2837,7 +2838,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       </div>
       <div className={styles.gridScroll}>
         <div className={styles.gridContent}>
-          <DragDropContext onDragEnd={onDragEnd} // Define the onDragEnd handler to update the state when the dragging stops
+          <DragDropContext onDragStart={(start) => setActiveDraggedInstructionId(Number(start.draggableId))} onDragEnd={(result) => { setActiveDraggedInstructionId(null); onDragEnd(result); }} // Define the onDragEnd handler to update the state when the dragging stops
           >
             {
               Object.keys(groupedData).length === 0 ? (
@@ -3036,7 +3037,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                       <Droppable droppableId={blockGroupIndex} key={blockData.instructions[0].blockId}>
                         {(provided) => (
                           <div
-                            className={styles.instructionsList}
+                            className={`${styles.instructionsList} ${activeDraggedInstructionId === null ? '' : moveCapabilities.get(activeDraggedInstructionId)?.allowedBlockIds.includes(Number(blockData.instructions[0].blockId)) ? styles.validDropZone : styles.invalidDropZone}`}
                             ref={provided.innerRef}
                             {...provided.droppableProps}
                           >

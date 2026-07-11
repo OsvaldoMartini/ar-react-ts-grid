@@ -192,7 +192,8 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     blockOptionsFromInstructions(data)
   );
   const [createBlockOpen, setCreateBlockOpen] = useState<boolean>(false);
-  const [memoryCapabilities, setMemoryCapabilities] = useState<Map<number, { canAdd: boolean; canMove: boolean; canDelete: boolean; deleteCount: number; reason: string; deleteReason: string }>>(new Map());
+  const [memoryCapabilities, setMemoryCapabilities] = useState<Map<number, { canAdd: boolean; canMove: boolean; canDelete: boolean; deleteCount: number; reason: string; deleteReason: string; allowedBlockIds: number[] }>>(new Map());
+  const [activeDraggedInstructionId, setActiveDraggedInstructionId] = useState<number | null>(null);
   const [moveGraphRevision, setMoveGraphRevision] = useState('');
   const submitInstructionMove = useInstructionDrag({
     webSocket, connected, graphRevision: moveGraphRevision, botJobId, botJobName,
@@ -956,10 +957,10 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
           }
         } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "instructionEditor.memoryCapabilitiesResponse") {
           const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
-          const next = new Map<number, { canAdd: boolean; canMove: boolean; canDelete: boolean; deleteCount: number; reason: string; deleteReason: string }>();
+          const next = new Map<number, { canAdd: boolean; canMove: boolean; canDelete: boolean; deleteCount: number; reason: string; deleteReason: string; allowedBlockIds: number[] }>();
           if (Array.isArray(bodyData?.capabilities)) {
-            bodyData.capabilities.forEach((capability: { instructionId: number; canAddToMemory: boolean; canMove: boolean; canDelete: boolean; deleteCount?: number; reason?: string; deleteReason?: string }) => {
-              next.set(capability.instructionId, { canAdd: capability.canAddToMemory === true, canMove: capability.canMove === true, canDelete: capability.canDelete === true, deleteCount: capability.deleteCount || 1, reason: capability.reason || '', deleteReason: capability.deleteReason || '' });
+            bodyData.capabilities.forEach((capability: { instructionId: number; canAddToMemory: boolean; canMove: boolean; canDelete: boolean; deleteCount?: number; reason?: string; deleteReason?: string; allowedBlockIds?: number[] }) => {
+              next.set(capability.instructionId, { canAdd: capability.canAddToMemory === true, canMove: capability.canMove === true, canDelete: capability.canDelete === true, deleteCount: capability.deleteCount || 1, reason: capability.reason || '', deleteReason: capability.deleteReason || '', allowedBlockIds: Array.isArray(capability.allowedBlockIds) ? capability.allowedBlockIds : [] });
             });
           }
           setMemoryCapabilities(next);
@@ -3285,7 +3286,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
       )}
       <div className={styles.gridScroll}>
         <div className={styles.gridContent}>
-          <DragDropContext onDragEnd={onDragEnd} // Define the onDragEnd handler to update the state when the dragging stops
+          <DragDropContext onDragStart={(start) => setActiveDraggedInstructionId(Number(start.draggableId))} onDragEnd={(result) => { setActiveDraggedInstructionId(null); onDragEnd(result); }} // Define the onDragEnd handler to update the state when the dragging stops
           >
             {
               Object.keys(groupedData).length === 0 ? (
@@ -3543,7 +3544,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                       <Droppable droppableId={blockGroupIndex} key={blockData.instructions[0].blockId}>
                         {(provided) => (
                           <div
-                            className={styles.instructionsList}
+                            className={`${styles.instructionsList} ${activeDraggedInstructionId === null ? '' : memoryCapabilities.get(activeDraggedInstructionId)?.allowedBlockIds.includes(Number(blockData.instructions[0].blockId)) ? styles.validDropZone : styles.invalidDropZone}`}
                             ref={provided.innerRef}
                             {...provided.droppableProps}
                           >

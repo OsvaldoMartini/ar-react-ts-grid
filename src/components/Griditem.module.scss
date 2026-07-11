@@ -502,7 +502,12 @@
   display: flex;
   flex-direction: column;
   gap: 3px; /* Decreased gap */
+  border: 1px solid transparent;
+  transition: border-color 120ms ease, background-color 120ms ease, opacity 120ms ease;
 }
+
+.validDropZone { border-color: #48a87a; background-color: rgba(134, 239, 172, 0.16); }
+.invalidDropZone { border-color: #c9a3a0; background-color: rgba(180, 35, 24, 0.05); opacity: 0.58; }
 
 // Per-row "Keep this element" checkbox (GridItemScann only). Lives in the
 // first 26px column of .instructionItem. Clicking it toggles membership in
