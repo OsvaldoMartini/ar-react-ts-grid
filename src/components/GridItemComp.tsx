@@ -3034,7 +3034,11 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
 
                         </div>
                       </div>
-                      <Droppable droppableId={blockGroupIndex} key={blockData.instructions[0].blockId}>
+                      <Droppable
+                        droppableId={blockGroupIndex}
+                        key={blockData.instructions[0].blockId}
+                        isDropDisabled={activeDraggedInstructionId !== null && !moveCapabilities.get(activeDraggedInstructionId)?.allowedBlockIds.includes(Number(blockData.instructions[0].blockId))}
+                      >
                         {(provided) => (
                           <div
                             className={`${styles.instructionsList} ${activeDraggedInstructionId === null ? '' : moveCapabilities.get(activeDraggedInstructionId)?.allowedBlockIds.includes(Number(blockData.instructions[0].blockId)) ? styles.validDropZone : styles.invalidDropZone}`}

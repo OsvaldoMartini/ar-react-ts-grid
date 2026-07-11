@@ -3541,7 +3541,11 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                         </div>
                       </div>
                       {!collapsedBlocks.has(Number(blockData.instructions[0].blockId)) && (
-                      <Droppable droppableId={blockGroupIndex} key={blockData.instructions[0].blockId}>
+                      <Droppable
+                        droppableId={blockGroupIndex}
+                        key={blockData.instructions[0].blockId}
+                        isDropDisabled={activeDraggedInstructionId !== null && !memoryCapabilities.get(activeDraggedInstructionId)?.allowedBlockIds.includes(Number(blockData.instructions[0].blockId))}
+                      >
                         {(provided) => (
                           <div
                             className={`${styles.instructionsList} ${activeDraggedInstructionId === null ? '' : memoryCapabilities.get(activeDraggedInstructionId)?.allowedBlockIds.includes(Number(blockData.instructions[0].blockId)) ? styles.validDropZone : styles.invalidDropZone}`}
