@@ -145,7 +145,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
   const [alertDismissed, setAlertDismissed] = useState(false);
   const [alertOnConfirm, setAlertOnConfirm] = useState<(() => void) | undefined>(undefined);
   const [findText, setFindText] = useState<string>('');
-  const [moveCapabilities, setMoveCapabilities] = useState<Map<number, { canMove: boolean; canDelete: boolean; reason: string; deleteReason: string }>>(new Map());
+  const [moveCapabilities, setMoveCapabilities] = useState<Map<number, { canMove: boolean; canDelete: boolean; deleteCount: number; reason: string; deleteReason: string }>>(new Map());
   const [moveGraphRevision, setMoveGraphRevision] = useState('');
 
   //  const [executionId, setExecutionId] = useState<number>(0);
@@ -717,10 +717,10 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
           }
         } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "instructionEditor.memoryCapabilitiesResponse") {
           const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
-          const next = new Map<number, { canMove: boolean; canDelete: boolean; reason: string; deleteReason: string }>();
+          const next = new Map<number, { canMove: boolean; canDelete: boolean; deleteCount: number; reason: string; deleteReason: string }>();
           if (Array.isArray(bodyData?.capabilities)) {
-            bodyData.capabilities.forEach((capability: { instructionId: number; canMove: boolean; canDelete: boolean; reason?: string; deleteReason?: string }) => {
-              next.set(capability.instructionId, { canMove: capability.canMove === true, canDelete: capability.canDelete === true, reason: capability.reason || '', deleteReason: capability.deleteReason || '' });
+            bodyData.capabilities.forEach((capability: { instructionId: number; canMove: boolean; canDelete: boolean; deleteCount?: number; reason?: string; deleteReason?: string }) => {
+              next.set(capability.instructionId, { canMove: capability.canMove === true, canDelete: capability.canDelete === true, deleteCount: capability.deleteCount || 1, reason: capability.reason || '', deleteReason: capability.deleteReason || '' });
             });
           }
           setMoveCapabilities(next);
@@ -2021,11 +2021,12 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     const instruction = componentsData.find(row => row.id === instructionId);
     if (!instruction) return;
     const familyDelete = ["IF", "ELSE", "ENDIF"].includes(instruction.actions);
+    const deleteCount = moveCapabilities.get(instructionId)?.deleteCount || 1;
     setAlertImage(warningRedImage);
     setAlertClass('construction-image');
     setAlertMessageHeader(familyDelete ? 'Delete Conditional Family' : 'Delete Instruction');
     setAlertMessageBody(familyDelete
-      ? `Delete the complete IF family containing "${instruction.name}"?`
+      ? `Delete ${deleteCount} linked conditional row(s) containing "${instruction.name}"?`
       : `Delete "${instruction.name}"?`);
     setAlertMessageFooter('Java will verify attached steps and graph integrity before deletion.');
     setErrorFlag(true);
