@@ -26,6 +26,7 @@ export type CommandDraft = {
   variableId?: number;
   parentId?: number;
   parentBlockId?: number;
+  graphRevision: string;
 };
 
 type Props = {
@@ -34,7 +35,7 @@ type Props = {
   allowElseIf: boolean;
   onClose: () => void;
   onSplit?: () => void;
-  onInsertElseIf?: () => void;
+  onInsertElseIf?: (graphRevision: string) => void;
   onApplyCommand: (draft: CommandDraft) => void;
   messages: string[];
   context: { sessionId: string; targetSessionId: string; homeBankingId: number; botJobId: number | null; botJobName: string | null };
@@ -78,6 +79,7 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
   const [variable, setVariable] = useState<VariableRow>({ type: '$String', name: '', value: '$EMPTY' });
   const [variableStatus, setVariableStatus] = useState('');
   const [storedDraft, setStoredDraft] = useState<StoredCommandDraft | null>(null);
+  const [graphRevision, setGraphRevision] = useState('');
 
   const clamp = (next: { x: number; y: number }) => {
     const width = panelRef.current?.offsetWidth || 480;
@@ -125,6 +127,7 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
         if (Array.isArray(body?.blocks)) setBlocks(body.blocks);
         if (Array.isArray(body?.commands) && body.commands.length > 0) setCommands(body.commands);
         if (body?.draft) setStoredDraft(body.draft);
+        if (typeof body?.graphRevision === 'string') setGraphRevision(body.graphRevision);
         return;
       }
       if (operationId.startsWith('variableEditor.')) {
@@ -234,7 +237,7 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
             <button onClick={() => openCommand('after')}><b>Add command after</b><span>Create and insert a configured operation</span></button>
             {isCommandRow && !['IF', 'ELSEIF', 'ELSE', 'ENDIF'].includes(instruction.actions) && <button onClick={() => openCommand('edit')}><b>Edit command</b><span>Update {instruction.actions || 'this instruction'}</span></button>}
             {props.allowSplit && props.onSplit && <button onClick={props.onSplit}><b>Split component</b><span>Move the selected sequence into a component</span></button>}
-            {props.allowElseIf && props.onInsertElseIf && <button onClick={props.onInsertElseIf}><b>Insert ElseIf</b><span>Extend the current conditional structure</span></button>}
+            {props.allowElseIf && props.onInsertElseIf && <button disabled={!graphRevision} onClick={() => props.onInsertElseIf?.(graphRevision)}><b>Insert ElseIf</b><span>Extend the current conditional structure</span></button>}
           </div>
         )}
 
@@ -296,7 +299,7 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
 
       {view === 'command' && <footer className={styles.footer}>
         <button type="button" onClick={() => setView('actions')}>Back</button>
-        <button type="button" className={styles.primary} disabled={!name.trim() || !action || (requiresWebField && !selectedWebFieldId) || (requiresVariable && !selectedVariableId) || (requiresBlock && !selectedBlockId)} onClick={() => props.onApplyCommand({ mode, action, name: name.trim(), hold, operator, interval, count, parentId: selectedWebFieldId, variableId: selectedVariableId, parentBlockId: selectedBlockId })}>Apply</button>
+        <button type="button" className={styles.primary} disabled={!graphRevision || !name.trim() || !action || (requiresWebField && !selectedWebFieldId) || (requiresVariable && !selectedVariableId) || (requiresBlock && !selectedBlockId)} onClick={() => props.onApplyCommand({ mode, action, name: name.trim(), hold, operator, interval, count, parentId: selectedWebFieldId, variableId: selectedVariableId, parentBlockId: selectedBlockId, graphRevision })}>Apply</button>
       </footer>}
     </div>
   );

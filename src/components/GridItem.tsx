@@ -3807,7 +3807,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                                             allowElseIf={["IF", "ELSEIF"].includes(instruction.actions) || isBetweenIfAndElseExcluded(instruction.instructionOrderNumber, blockData.instructions)}
                                             onClose={() => setOpenDropdown(null)}
                                             onSplit={() => handleSplitComponent(instruction.id, groupedData, setGroupedData, instructionsData, isLastInstruction)}
-                                            onInsertElseIf={() => {
+                                            onInsertElseIf={(graphRevision) => {
                                               webSocket?.send(JSON.stringify({
                                                 type: 'commandEditor.insertElseIf',
                                                 sessionId,
@@ -3822,6 +3822,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                                                   blockName: instruction.blockName,
                                                   blockOrderNumber: instruction.blockOrderNumber,
                                                   instructionId: instruction.id,
+                                                  graphRevision,
                                                 }),
                                               }));
                                               setOpenDropdown(null);
