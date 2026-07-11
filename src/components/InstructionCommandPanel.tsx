@@ -45,17 +45,18 @@ type Props = {
 type VariableRow = { id?: number; type: string; name: string; value: string; instructionId?: number; localFormat?: string; delimiter?: string; usedVars?: string };
 type WebFieldRow = { id: number; name: string; actions: string; tagName?: string; blockId: number; blockName?: string };
 type BlockRow = { id: number; name: string; blockOrderNumber?: number };
-type CommandDefinition = { code: string; label: string; target: string; fields: string[]; insertAllowed?: boolean; editAllowed?: boolean; disabledReason?: string };
+type CommandDefinition = { code: string; label: string; target: string; fields: string[]; allowedTags?: string[]; insertAllowed?: boolean; editAllowed?: boolean; disabledReason?: string };
 type StoredCommandDraft = Omit<CommandDraft, 'mode'>;
 
 const FALLBACK_COMMANDS: CommandDefinition[] = [
-  { code: 'SET', label: 'Set Value', target: 'variable', fields: ['webField', 'variable'] },
+  { code: 'SET', label: 'Set Value', target: 'variable', fields: ['webField', 'variable'], allowedTags: ['input', 'select', 'textarea'] },
   { code: 'GET', label: 'Get Value', target: 'variable', fields: ['webField', 'variable'] },
   { code: 'CK', label: 'Check Value', target: 'variable', fields: ['webField', 'variable', 'operator'] },
   { code: 'GOTO', label: 'GOTO', target: 'block', fields: ['block', 'count'] },
   { code: 'H', label: 'Wait', target: 'number', fields: ['hold'] },
 ];
 const SPECIAL_ACTIONS = new Set(['SET', 'GET', 'CK', 'Q', 'P', 'H', 'E', 'GOTO', 'IF', 'ELSEIF', 'ELSE', 'ENDIF', 'PAUSE', 'REFRESH', 'LOOP', 'REFRESH_LOOP', 'NEXT_ENTER', 'SWIPE_UP', 'SWIPE_DOWN', 'EXCEL GOTO', 'NEXT ROW', 'CSV CHECK', 'PDF CHECK']);
+const supportsTag = (command: CommandDefinition, tagName: string) => !command.allowedTags?.length || command.allowedTags.includes(tagName);
 
 const InstructionCommandPanel: React.FC<Props> = (props) => {
   const { instruction } = props;
@@ -154,8 +155,7 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
   const availableCommands = useMemo(
     () => commands.filter(command => {
       const modeAllowed = mode === 'edit' ? command.editAllowed !== false : command.insertAllowed !== false;
-      const elementAllowed = command.code !== 'SET' || ['input', 'select', 'textarea'].includes(selectedWebFieldTag);
-      return modeAllowed && elementAllowed;
+      return modeAllowed && supportsTag(command, selectedWebFieldTag);
     }),
     [commands, mode, selectedWebFieldTag]
   );
@@ -193,9 +193,11 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
       setView('command');
       return;
     }
-    const allowed = commands.filter(command => nextMode === 'edit' ? command.editAllowed !== false : command.insertAllowed !== false);
+    const allowed = commands.filter(command =>
+      (nextMode === 'edit' ? command.editAllowed !== false : command.insertAllowed !== false)
+      && supportsTag(command, selectedWebFieldTag));
     if (nextMode !== 'edit' || !allowed.some(command => command.code === action)) {
-      const preferredAction = ['input', 'select', 'textarea'].includes(selectedWebFieldTag) ? 'SET' : 'GET';
+      const preferredAction = allowed.some(command => command.code === 'SET') ? 'SET' : 'GET';
       const defaultAction = allowed.some(command => command.code === preferredAction) ? preferredAction : (allowed[0]?.code || '');
       setAction(defaultAction);
       setName(commands.find(command => command.code === defaultAction)?.label || defaultAction);
