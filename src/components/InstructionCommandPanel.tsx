@@ -44,7 +44,7 @@ type Props = {
 type VariableRow = { id?: number; type: string; name: string; value: string; instructionId?: number; localFormat?: string; delimiter?: string; usedVars?: string };
 type WebFieldRow = { id: number; name: string; actions: string; tagName?: string; blockId: number; blockName?: string };
 type BlockRow = { id: number; name: string; blockOrderNumber?: number };
-type CommandDefinition = { code: string; label: string; target: string; fields: string[] };
+type CommandDefinition = { code: string; label: string; target: string; fields: string[]; insertAllowed?: boolean; editAllowed?: boolean; disabledReason?: string };
 
 const FALLBACK_COMMANDS: CommandDefinition[] = [
   { code: 'SET', label: 'Set Value', target: 'variable', fields: ['webField', 'variable'] },
@@ -97,6 +97,7 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
       ...props.context,
       instructionId: instruction.id,
       instructionName: instruction.name,
+      instructionActions: instruction.actions,
       blockId: instruction.blockId,
     });
   }, [instruction.id]);
@@ -139,8 +140,12 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
   const selectedWebField = webFields.find(row => row.id === selectedWebFieldId);
   const selectedWebFieldTag = (selectedWebField?.tagName || '').toLowerCase();
   const availableCommands = useMemo(
-    () => commands.filter(command => command.code !== 'SET' || ['input', 'select', 'textarea'].includes(selectedWebFieldTag)),
-    [commands, selectedWebFieldTag]
+    () => commands.filter(command => {
+      const modeAllowed = mode === 'edit' ? command.editAllowed !== false : command.insertAllowed !== false;
+      const elementAllowed = command.code !== 'SET' || ['input', 'select', 'textarea'].includes(selectedWebFieldTag);
+      return modeAllowed && elementAllowed;
+    }),
+    [commands, mode, selectedWebFieldTag]
   );
   const selectedCommand = commands.find(command => command.code === action);
   const commandFields = selectedCommand?.fields || [];
@@ -150,6 +155,11 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
   const requiresOperator = commandFields.includes('operator');
   const requiresIntervalAndCount = commandFields.includes('interval') && commandFields.includes('count');
   const requiresCount = commandFields.includes('count') && !commandFields.includes('interval');
+  useEffect(() => {
+    if (availableCommands.length === 0 || availableCommands.some(command => command.code === action)) return;
+    setAction(availableCommands[0].code);
+    setName(availableCommands[0].label);
+  }, [availableCommands, action]);
   const relatedVariables = useMemo(
     () => variables.filter(row => !selectedWebFieldId || row.instructionId === selectedWebFieldId),
     [variables, selectedWebFieldId]
@@ -158,10 +168,12 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
 
   const openCommand = (nextMode: 'before' | 'after' | 'edit') => {
     setMode(nextMode);
-    if (nextMode !== 'edit') {
-      const defaultAction = ['input', 'select', 'textarea'].includes(selectedWebFieldTag) ? 'SET' : 'GET';
+    const allowed = commands.filter(command => nextMode === 'edit' ? command.editAllowed !== false : command.insertAllowed !== false);
+    if (nextMode !== 'edit' || !allowed.some(command => command.code === action)) {
+      const preferredAction = ['input', 'select', 'textarea'].includes(selectedWebFieldTag) ? 'SET' : 'GET';
+      const defaultAction = allowed.some(command => command.code === preferredAction) ? preferredAction : (allowed[0]?.code || '');
       setAction(defaultAction);
-      setName(defaultAction === 'SET' ? 'Set Value' : 'Get Value');
+      setName(commands.find(command => command.code === defaultAction)?.label || defaultAction);
     }
     setView('command');
   };
