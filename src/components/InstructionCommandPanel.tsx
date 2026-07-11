@@ -45,6 +45,8 @@ type WebFieldRow = { id: number; name: string; actions: string; tagName?: string
 type BlockRow = { id: number; name: string; blockOrderNumber?: number };
 type CommandDefinition = { code: string; label: string; target: string; fields: string[]; allowedTags?: string[]; insertAllowed?: boolean; editAllowed?: boolean; disabledReason?: string };
 type StoredCommandDraft = Omit<CommandDraft, 'mode'>;
+type SplitPreviewRow = { id: number; order: number; name: string; action: string; parentId?: number | null };
+type SplitPreview = { graphRevision: string; retainedRows: SplitPreviewRow[]; movedRows: SplitPreviewRow[]; retainedCount: number; movedCount: number };
 const supportsTag = (command: CommandDefinition, tagName: string) => !command.allowedTags?.length || command.allowedTags.includes(tagName);
 
 const InstructionCommandPanel: React.FC<Props> = (props) => {
@@ -73,6 +75,19 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
   const [graphRevision, setGraphRevision] = useState('');
   const [canInsertElseIf, setCanInsertElseIf] = useState(false);
   const [canSplit, setCanSplit] = useState(false);
+  const [splitPreview, setSplitPreview] = useState<SplitPreview | null>(null);
+  const [splitStatus, setSplitStatus] = useState('');
+
+  const requestSplitPreview = () => {
+    setSplitPreview(null);
+    setSplitStatus('Checking split...');
+    props.onSocketCommand('instructionGraph.previewSplit', {
+      ...props.context,
+      requestId: `${Date.now()}-split-preview-${instruction.id}`,
+      instructionId: instruction.id,
+      graphRevision,
+    });
+  };
 
   const requestCommandBootstrap = () => props.onSocketCommand('commandEditor.bootstrap', {
     ...props.context,
@@ -125,6 +140,16 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
         if (typeof body?.graphRevision === 'string') setGraphRevision(body.graphRevision);
         setCanInsertElseIf(body?.rowCapabilities?.canInsertElseIf === true);
         setCanSplit(body?.rowCapabilities?.canSplit === true);
+        return;
+      }
+      if (operationId === 'instructionGraph.previewSplitResponse') {
+        if (body?.ok && Array.isArray(body?.retainedRows) && Array.isArray(body?.movedRows)) {
+          setSplitPreview(body as SplitPreview);
+          setSplitStatus('');
+        } else {
+          setSplitPreview(null);
+          setSplitStatus(body?.error || 'Split preview was refused.');
+        }
         return;
       }
       if (operationId.startsWith('variableEditor.')) {
@@ -241,9 +266,20 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
             <button disabled={!commandsReady} onClick={() => openCommand('before')}><b>Add command before</b><span>Create and insert a configured operation</span></button>
             <button disabled={!commandsReady} onClick={() => openCommand('after')}><b>Add command after</b><span>Create and insert a configured operation</span></button>
             {canEditSelected && <button onClick={() => openCommand('edit')}><b>Edit command</b><span>Update {instruction.actions || 'this instruction'}</span></button>}
-            {canSplit && props.onSplit && <button disabled={!graphRevision} onClick={() => props.onSplit?.(graphRevision)}><b>Split component</b><span>Move the selected sequence into a component</span></button>}
+            {canSplit && props.onSplit && <button disabled={!graphRevision} onClick={requestSplitPreview}><b>Split component</b><span>Preview the exact sequence before moving it</span></button>}
             {canInsertElseIf && props.onInsertElseIf && <button disabled={!graphRevision} onClick={() => props.onInsertElseIf?.(graphRevision)}><b>Insert ElseIf</b><span>Extend the current conditional structure</span></button>}
           </div>
+        )}
+        {view === 'actions' && splitStatus && <p className={styles.status}>{splitStatus}</p>}
+        {view === 'actions' && splitPreview && (
+          <section className={styles.splitPreview} aria-label="Split preview">
+            <header><b>Confirm split</b><span>{splitPreview.movedCount} instructions will move</span></header>
+            <div className={styles.splitColumns}>
+              <div><strong>Keep ({splitPreview.retainedCount})</strong>{splitPreview.retainedRows.map(row => <span key={row.id}>#{row.order} {row.name} <small>{row.action}</small></span>)}</div>
+              <div><strong>Move ({splitPreview.movedCount})</strong>{splitPreview.movedRows.map(row => <span key={row.id}>#{row.order} {row.name} <small>{row.action}</small></span>)}</div>
+            </div>
+            <footer><button type="button" onClick={() => setSplitPreview(null)}>Cancel</button><button type="button" className={styles.primary} onClick={() => props.onSplit?.(splitPreview.graphRevision)}>Apply split</button></footer>
+          </section>
         )}
 
         {view === 'command' && (

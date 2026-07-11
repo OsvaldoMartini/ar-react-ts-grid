@@ -48,6 +48,19 @@
 .variableButtons .primary { border-color: #075a75; background: #0b6b8a; color: #fff; }
 .variableButtons .deleteButton { margin-right: auto; border-color: #c83b31; color: #a21d15; }
 .status { margin: 0; color: #8b3d15; font-size: 11px; }
+.splitPreview { margin-top: 10px; border: 1px solid #9aa7ae; background: #fff; }
+.splitPreview > header { display: flex; justify-content: space-between; gap: 10px; padding: 8px 9px; border-bottom: 1px solid #d5dade; }
+.splitPreview > header b { font-size: 12px; }
+.splitPreview > header span { color: #536169; font-size: 11px; }
+.splitColumns { display: grid; grid-template-columns: 1fr 1fr; min-height: 80px; max-height: 190px; overflow: auto; }
+.splitColumns > div { min-width: 0; display: flex; flex-direction: column; gap: 3px; padding: 8px; }
+.splitColumns > div + div { border-left: 1px solid #d9dee1; }
+.splitColumns strong { margin-bottom: 3px; color: #334249; font-size: 10px; text-transform: uppercase; }
+.splitColumns span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+.splitColumns small { color: #647178; }
+.splitPreview > footer { display: flex; justify-content: flex-end; gap: 6px; padding: 7px 8px; border-top: 1px solid #d5dade; background: #eef1f3; }
+.splitPreview button { border: 1px solid #aeb8be; background: #fff; padding: 5px 9px; cursor: pointer; }
+.splitPreview .primary { border-color: #075a75; background: #0b6b8a; color: #fff; font-weight: 700; }
 .deleteConfirm { display: grid; gap: 5px; padding: 8px; border: 1px solid #d89a94; border-left: 3px solid #b42318; background: #fff5f4; }
 .deleteConfirm b { color: #8f1d15; font-size: 12px; }
 .deleteConfirm span { color: #604744; font-size: 10px; line-height: 1.35; }
@@ -58,4 +71,4 @@
 .footer button { min-width: 76px; border: 1px solid #aeb8be; border-radius: 3px; background: #fff; padding: 5px 12px; cursor: pointer; }
 .footer .primary { border-color: #075a75; background: #0b6b8a; color: #fff; font-weight: 700; }
 .footer button:disabled { opacity: .5; cursor: not-allowed; }
-@media (max-width: 560px) { .panel { left: 8px !important; top: 8px !important; } .actionGrid, .form, .variablesWorkspace { grid-template-columns: 1fr; } .form label, .preview { grid-column: 1; } .variableList { max-height: 140px; overflow: auto; border-right: 0; border-bottom: 1px solid #d1d7db; padding: 0 0 8px; } }
+@media (max-width: 560px) { .panel { left: 8px !important; top: 8px !important; } .actionGrid, .form, .variablesWorkspace, .splitColumns { grid-template-columns: 1fr; } .splitColumns > div + div { border-left: 0; border-top: 1px solid #d9dee1; } .form label, .preview { grid-column: 1; } .variableList { max-height: 140px; overflow: auto; border-right: 0; border-bottom: 1px solid #d1d7db; padding: 0 0 8px; } }
