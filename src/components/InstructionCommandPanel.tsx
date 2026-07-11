@@ -32,7 +32,7 @@ export type CommandDraft = {
 type Props = {
   instruction: CommandPanelInstruction;
   onClose: () => void;
-  onSplit?: () => void;
+  onSplit?: (graphRevision: string) => void;
   onInsertElseIf?: (graphRevision: string) => void;
   onApplyCommand: (draft: CommandDraft) => void;
   messages: string[];
@@ -238,7 +238,7 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
             <button disabled={!commandsReady} onClick={() => openCommand('before')}><b>Add command before</b><span>Create and insert a configured operation</span></button>
             <button disabled={!commandsReady} onClick={() => openCommand('after')}><b>Add command after</b><span>Create and insert a configured operation</span></button>
             {canEditSelected && <button onClick={() => openCommand('edit')}><b>Edit command</b><span>Update {instruction.actions || 'this instruction'}</span></button>}
-            {canSplit && props.onSplit && <button onClick={props.onSplit}><b>Split component</b><span>Move the selected sequence into a component</span></button>}
+            {canSplit && props.onSplit && <button disabled={!graphRevision} onClick={() => props.onSplit?.(graphRevision)}><b>Split component</b><span>Move the selected sequence into a component</span></button>}
             {canInsertElseIf && props.onInsertElseIf && <button disabled={!graphRevision} onClick={() => props.onInsertElseIf?.(graphRevision)}><b>Insert ElseIf</b><span>Extend the current conditional structure</span></button>}
           </div>
         )}

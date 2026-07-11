@@ -1779,7 +1779,8 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     groupedData: { [blockId: string]: { blockName: string; instructions: BlockLoopInstructionLoadDTO[] } },
     setGroupedData: (data: { [blockId: string]: { blockName: string; instructions: BlockLoopInstructionLoadDTO[] } }) => void,
     instructionsData: BlockLoopInstructionLoadDTO[],
-    isLastInstruction: boolean
+    isLastInstruction: boolean,
+    graphRevision: string
   ) => {
 
     // Find the block and instruction related to the instructionId
@@ -1984,6 +1985,8 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
       const message = {
         type: 'BLOCKS_SPLITTER',
+        instructionId: adjustedInstructionId,
+        graphRevision,
         botJobId: botJobId,
         botJobName: botJobName,
         homeBankingId: homeBankingId,
@@ -3760,7 +3763,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                                           <InstructionCommandPanel
                                             instruction={instruction}
                                             onClose={() => setOpenDropdown(null)}
-                                            onSplit={() => handleSplitComponent(instruction.id, groupedData, setGroupedData, instructionsData, isLastInstruction)}
+                                            onSplit={(graphRevision) => handleSplitComponent(instruction.id, groupedData, setGroupedData, instructionsData, isLastInstruction, graphRevision)}
                                             onInsertElseIf={(graphRevision) => {
                                               webSocket?.send(JSON.stringify({
                                                 type: 'commandEditor.insertElseIf',
