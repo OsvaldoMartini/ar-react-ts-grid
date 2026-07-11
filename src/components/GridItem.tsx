@@ -192,6 +192,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
   );
   const [createBlockOpen, setCreateBlockOpen] = useState<boolean>(false);
   const [memoryCapabilities, setMemoryCapabilities] = useState<Map<number, { canAdd: boolean; canMove: boolean; reason: string }>>(new Map());
+  const [moveGraphRevision, setMoveGraphRevision] = useState('');
   const [pendingMemoryMove, setPendingMemoryMove] = useState<{ requestId: string; ids: Set<number> } | null>(null);
   const [memoryMoveStatus, setMemoryMoveStatus] = useState('');
 
@@ -318,6 +319,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
       const message = {
         type: 'ROW_MOVE',
         requestId,
+        graphRevision: moveGraphRevision,
         botJobId: targetBotJobId,
         botJobName,
         deleteBlockId,
@@ -922,6 +924,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
       const message = {
         type: 'ROW_MOVE',
         requestId: `${Date.now()}-bot-row-move`,
+        graphRevision: moveGraphRevision,
         botJobId,
         botJobName,
         deleteBlockId,
@@ -982,6 +985,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
             });
           }
           setMemoryCapabilities(next);
+          setMoveGraphRevision(typeof bodyData?.graphRevision === 'string' ? bodyData.graphRevision : '');
         } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "updateInstructions") {
 
           const bodyData = typeof parsedMessage.body === "string"
@@ -2158,6 +2162,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
           const message = {
             type: 'ROW_MOVE',
             requestId: `${Date.now()}-bot-row-move`,
+            graphRevision: moveGraphRevision,
             botJobId: currentInstruction.botJobId,
             botJobName: botJobName,
             homeBankingId: homeBankingId,
@@ -2228,6 +2233,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
           const message = {
             type: 'ROW_MOVE',
             requestId: `${Date.now()}-bot-row-move`,
+            graphRevision: moveGraphRevision,
             botJobId: currentInstruction.botJobId,
             botJobName: botJobName,
             homeBankingId: homeBankingId,

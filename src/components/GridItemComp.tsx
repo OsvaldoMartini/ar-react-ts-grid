@@ -146,6 +146,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
   const [alertOnConfirm, setAlertOnConfirm] = useState<(() => void) | undefined>(undefined);
   const [findText, setFindText] = useState<string>('');
   const [moveCapabilities, setMoveCapabilities] = useState<Map<number, { canMove: boolean; reason: string }>>(new Map());
+  const [moveGraphRevision, setMoveGraphRevision] = useState('');
 
   //  const [executionId, setExecutionId] = useState<number>(0);
   //  const [executionState, setExecutionState] = useState<string>();
@@ -662,6 +663,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       const message = {
         type: 'ROW_MOVE',
         requestId: `${Date.now()}-component-row-move`,
+        graphRevision: moveGraphRevision,
         botJobId,
         botJobName,
         deleteBlockId,
@@ -711,6 +713,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
             });
           }
           setMoveCapabilities(next);
+          setMoveGraphRevision(typeof bodyData?.graphRevision === 'string' ? bodyData.graphRevision : '');
         } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "componentsUpdate") {
 
           const bodyData = typeof parsedMessage.body === "string"
@@ -1849,6 +1852,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
           const message = {
             type: 'ROW_MOVE',
             requestId: `${Date.now()}-component-row-move`,
+            graphRevision: moveGraphRevision,
             botJobId: currentInstruction.botJobId,
             botJobName: botJobName,
             homeBankingId: homeBankingId,
@@ -1919,6 +1923,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
           const message = {
             type: 'ROW_MOVE',
             requestId: `${Date.now()}-component-row-move`,
+            graphRevision: moveGraphRevision,
             botJobId: currentInstruction.botJobId,
             botJobName: botJobName,
             homeBankingId: homeBankingId,
