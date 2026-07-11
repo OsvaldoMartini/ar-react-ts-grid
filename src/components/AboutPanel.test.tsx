@@ -62,7 +62,8 @@ test('opens and closes the shared License Manager', () => {
 test('keeps safe fallback values for malformed backend responses', () => {
   mockMessages = ['{invalid-json'];
   render(<AboutPanel socketPort={59772} sessionId="aboutPanel-test"/>);
-  expect(screen.getByRole('heading', { name: 'AR Web' })).toBeInTheDocument();
-  expect(screen.getAllByText('Unavailable')).toHaveLength(3);
+  expect(screen.getByRole('heading', { name: 'Unavailable' })).toBeInTheDocument();
+  expect(screen.getAllByText('Unavailable')).toHaveLength(4);
+  expect(screen.getByText('Copyright unavailable')).toBeInTheDocument();
   expect(screen.getByText('Checking...')).toBeInTheDocument();
 });
