@@ -1945,13 +1945,13 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     if (!moveGraphRevision || !moveCapabilities.get(instructionId)?.canDelete) return;
     const instruction = componentsData.find(row => row.id === instructionId);
     if (!instruction) return;
-    const familyDelete = ["IF", "ELSE", "ENDIF"].includes(instruction.actions);
+    const familyDelete = ["IF", "ELSEIF", "ELSE", "ENDIF"].includes(instruction.actions);
     const capability = moveCapabilities.get(instructionId);
     const deleteCount = capability?.deleteCount || 1;
     const deleteRows = capability?.deleteRows || [];
     setAlertImage(warningRedImage);
     setAlertClass('construction-image');
-    setAlertMessageHeader(familyDelete ? 'Delete Conditional Family' : 'Delete Instruction');
+    setAlertMessageHeader(instruction.actions === 'ELSEIF' ? 'Delete ElseIf Branch' : familyDelete ? 'Delete Conditional Family' : 'Delete Instruction');
     setAlertMessageBody(deleteRows.length > 0 ? deleteRows.map(row => ({
       parentNameWithId: `#${row.order} (${row.id}) ${row.name}`,
       connectionLabel: 'Action',
