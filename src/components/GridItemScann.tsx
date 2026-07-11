@@ -650,6 +650,22 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
             sendOcrConfigCommand('ocrConfig.bootstrap', { homeBankingId });
             break;
           }
+          case "ocrConfig.cleanupPreviewResponse": {
+            setOcrConfigBusy(false);
+            if (!bodyData?.ok) { setOcrConfigError(String(bodyData?.error || 'Cleanup preview failed.')); break; }
+            const candidates = Array.isArray(bodyData.candidates) ? bodyData.candidates : [];
+            if (!candidates.length) { setOcrConfigError('No orphan locators found.'); break; }
+            const details = candidates.slice(0,10).map((item:any)=>`${item.definedName}: ${item.reason}`).join('\n');
+            if (window.confirm(`Delete ${candidates.length} orphan locator(s)?\n\n${details}${candidates.length>10?'\n...':''}`)) {
+              sendOcrConfigCommand('ocrConfig.cleanupApply',{homeBankingId,confirmed:true});
+            }
+            break;
+          }
+          case "ocrConfig.cleanupApplyResponse": {
+            setOcrConfigBusy(false);
+            setOcrConfigError(bodyData?.ok ? `Cleanup complete: ${Number(bodyData.deleted||0)} locator(s) deleted.` : String(bodyData?.error || 'Cleanup failed.'));
+            break;
+          }
 
           case "activate-update-all": {
             setIsUpdatingAll(false);
@@ -1940,7 +1956,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
                         </button>
                       </>
       )}
-      {ocrConfig && <OCRConfigPanel key={ocrConfig.activeProfileId || 'new'} data={ocrConfig} busy={ocrConfigBusy} error={ocrConfigError} onSelect={profileId=>sendOcrConfigCommand('ocrConfig.profile',{profileId})} onSave={saveOcrConfig} onDelete={deleteOcrConfig} onClose={()=>setOcrConfig(null)}/>}
+      {ocrConfig && <OCRConfigPanel key={ocrConfig.activeProfileId || 'new'} data={ocrConfig} busy={ocrConfigBusy} error={ocrConfigError} onSelect={profileId=>sendOcrConfigCommand('ocrConfig.profile',{profileId})} onSave={saveOcrConfig} onDelete={deleteOcrConfig} onCleanup={()=>sendOcrConfigCommand('ocrConfig.cleanupPreview',{homeBankingId})} onClose={()=>setOcrConfig(null)}/>}
                     {isInputTextBlock(typeElement) && (
                       <img
                         src={testInputImage}
