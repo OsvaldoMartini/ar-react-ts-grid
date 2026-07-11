@@ -391,7 +391,18 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
         }
 
 
-        if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "instructionGraph.previewMoveResponse") {
+        if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "license.statusChanged") {
+          const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
+          if (bodyData?.active !== true) {
+            setAlertImage(warningRedImage);
+            setAlertClass('construction-image');
+            setAlertMessageHeader('License Activation Required');
+            setAlertMessageBody(bodyData?.error || bodyData?.status || 'Protected component operations are unavailable.');
+            setAlertMessageFooter('Open License Manager and activate this installation before continuing.');
+            setErrorFlag(true);
+            setAlertOnConfirm(undefined);
+          }
+        } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "instructionGraph.previewMoveResponse") {
           const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
           if (pendingDragPreview && bodyData?.requestId === pendingDragPreview.requestId) {
             const pendingResult = pendingDragPreview.result;

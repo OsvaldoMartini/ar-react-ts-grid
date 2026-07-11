@@ -121,6 +121,13 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId }) 
             level: body.level === 'error' ? 'error' : body.level === 'warning' ? 'warn' : 'ok',
             text: body.message || 'Status update',
           });
+        } else if (operationId === 'license.statusChanged') {
+          setStatus({
+            level: body.active === true ? 'ok' : 'error',
+            text: body.active === true
+              ? (body.message || 'License active')
+              : (body.error || body.status || 'License activation is required'),
+          });
         }
       } catch (err) {
         console.warn('MainDashboard ignored socket message', err, raw);
