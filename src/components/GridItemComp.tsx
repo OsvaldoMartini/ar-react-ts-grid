@@ -46,7 +46,6 @@ import AlertModal from './AlertModal';
 import CompForce from './CompForce';
 import InstructionCommandPanel, { CommandDraft } from './InstructionCommandPanel';
 import ExcelExportPanel, { ExcelExportContext } from './ExcelExportPanel';
-import SaveComponentPanel, { SaveComponentContext } from './SaveComponentPanel';
 import { useWebSocket } from './useWebSocket';
 import { useInstructionDrag } from './useInstructionDrag';
 import styles from './Griditem.module.scss';
@@ -157,7 +156,6 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
   const [blockDeleteCapabilities, setBlockDeleteCapabilities] = useState<Map<number, BlockDeleteCapability>>(new Map());
   const [moveGraphRevision, setMoveGraphRevision] = useState('');
   const [excelExportContext, setExcelExportContext] = useState<ExcelExportContext | null>(null);
-  const [saveComponentContext, setSaveComponentContext] = useState<SaveComponentContext | null>(null);
 
   useLayoutEffect(() => {
     if (pendingScrollTopRef.current === null || !gridScrollRef.current) return;
@@ -395,14 +393,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
         }
 
 
-        if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "componentSave.applyResponse") {
-          const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
-          setAlertImage(bodyData?.ok === false ? warningRedImage : constructionImage);
-          setAlertClass('construction-image'); setErrorFlag(bodyData?.ok === false);
-          setAlertMessageHeader(bodyData?.ok === false ? 'Component Not Saved' : 'Component Saved');
-          setAlertMessageBody(bodyData?.error || bodyData?.message || 'Component saved successfully.');
-          setAlertMessageFooter(bodyData?.ok === false ? 'Review the component name and try again.' : 'The component grid was refreshed.');
-        } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "excelExport.saveResponse") {
+        if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "excelExport.saveResponse") {
           const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
           if (bodyData?.ok === false) {
             setAlertImage(warningRedImage); setAlertClass('construction-image'); setErrorFlag(true);
@@ -897,11 +888,15 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       })),
     };
 
-    setSaveComponentContext({ blockId: newBlock.id, blockName: newBlock.blockName,
-      blockOrderNumber: newBlock.blockOrderNumber, instructions: newBlock.instructions.map(instruction => ({
-        instructionId: instruction.id, blockId: newBlock.id, blockOrderNumber: newBlock.blockOrderNumber,
-        instructionOrderNumber: instruction.instructionOrderNumber,
-      })) });
+    if (webSocket && connected) {
+      const message = { type: "COMPONENT_INJECT", botJobId, botJobName, homeBankingId, sessionId: 'botJobTasks',
+        details: { newBlock: { homeBankingId, botJobId, blockId: newBlock.id, blockName: newBlock.blockName,
+          blockOrderNumber: newBlock.blockOrderNumber, instructions: newBlock.instructions.map(instruction => ({
+            id: instruction.id, blockId: newBlock.id, blockOrderNumber: newBlock.blockOrderNumber,
+            instructionOrderNumber: instruction.instructionOrderNumber,
+          })) } } };
+      webSocket.send(JSON.stringify(message));
+    }
     setOpenDropdown(null);
   };
 
@@ -2511,21 +2506,9 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     setExcelExportContext(null);
   };
 
-  const submitSaveComponent = (name: string, description: string) => {
-    if (!saveComponentContext || !webSocket || !connected || !botJobId) return;
-    webSocket.send(JSON.stringify({
-      type: 'componentSave.apply', sessionId, homeBankingId,
-      body: JSON.stringify({ ...saveComponentContext, name, description,
-        requestId: `${Date.now()}-component-${saveComponentContext.blockId}`,
-        sessionId, botJobId, botJobName, homeBankingId }),
-    }));
-    setSaveComponentContext(null);
-  };
-
   return (
     <div className={styles.gridContainer}>
       {excelExportContext && <ExcelExportPanel context={excelExportContext} onSubmit={submitExcelExport} onClose={() => setExcelExportContext(null)}/>}
-      {saveComponentContext && <SaveComponentPanel context={saveComponentContext} onSubmit={submitSaveComponent} onClose={() => setSaveComponentContext(null)}/>}
       {alertMessageBody && alertMessageBody.length > 0 && (
         <AlertModal
           header={alertMessageHeader || ''}
