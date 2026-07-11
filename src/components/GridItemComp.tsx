@@ -45,6 +45,7 @@ import ArrowLeft from '../assets/ArrowLeft.png';
 import AlertModal from './AlertModal';
 import CompForce from './CompForce';
 import InstructionCommandPanel, { CommandDraft } from './InstructionCommandPanel';
+import ExcelExportPanel, { ExcelExportContext } from './ExcelExportPanel';
 import { useWebSocket } from './useWebSocket';
 import { useInstructionDrag } from './useInstructionDrag';
 import styles from './Griditem.module.scss';
@@ -154,6 +155,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
   const [pendingDragPreview, setPendingDragPreview] = useState<{ requestId: string; result: any } | null>(null);
   const [blockDeleteCapabilities, setBlockDeleteCapabilities] = useState<Map<number, BlockDeleteCapability>>(new Map());
   const [moveGraphRevision, setMoveGraphRevision] = useState('');
+  const [excelExportContext, setExcelExportContext] = useState<ExcelExportContext | null>(null);
 
   useLayoutEffect(() => {
     if (pendingScrollTopRef.current === null || !gridScrollRef.current) return;
@@ -391,7 +393,15 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
         }
 
 
-        if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "license.statusChanged") {
+        if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "excelExport.saveResponse") {
+          const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
+          if (bodyData?.ok === false) {
+            setAlertImage(warningRedImage); setAlertClass('construction-image'); setErrorFlag(true);
+            setAlertMessageHeader('Excel Export Not Saved');
+            setAlertMessageBody(bodyData?.error || 'The export configuration could not be saved.');
+            setAlertMessageFooter('Review the path and filename, then try again.');
+          }
+        } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "license.statusChanged") {
           const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
           if (bodyData?.active !== true) {
             setAlertImage(warningRedImage);
@@ -917,42 +927,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
 
 
   const handleExcelFileBlockName = (blockId: number, blockName: string, blockOrderNumber: number, exportFile?: string) => {
-
-
-
-    // Check if botJobId is found, if not handle the error
-    if (!botJobId) {
-      setAlertImage(warningRedImage);
-      setAlertClass('construction-image');
-      setAlertMessageHeader(
-        `Error Bot Job not found`
-      );
-      setErrorFlag(true);
-      setAlertMessageBody(`botJobId not found for blockId: ${blockId}`);
-      return;
-    }
-
-    // Send WebSocket message for block name update
-    if (webSocket && connected) {
-      const message = {
-        type: 'BLOCK_EXCEL_FILE',
-        botJobId: botJobId,
-        botJobName: botJobName,
-        blockId: blockId,
-        blockName: blockName, // Send the updated block name
-        blockOrderNumber: blockOrderNumber,
-        exportFile: exportFile,
-        homeBankingId: homeBankingId,
-        sessionId: `componentTasks`, //-${botJobId}`
-      };
-
-      try {
-        webSocket.send(JSON.stringify(message));
-        console.log('Sent block name update message:', message);
-      } catch (error) {
-        console.log('Error sending WebSocket message:', error);
-      }
-    }
+    setExcelExportContext({ blockId, blockName, blockOrderNumber, exportFile });
   };
 
 
@@ -2546,8 +2521,19 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     setOpenDropdown(null);
   };
 
+  const submitExcelExport = (draft: { directory: string; filename: string; fileType: '.xlsx' | '.csv'; delimiter: ',' | '|'; clear?: boolean }) => {
+    if (!excelExportContext || !webSocket || !connected || !botJobId) return;
+    webSocket.send(JSON.stringify({
+      type: draft.clear ? 'excelExport.clear' : 'excelExport.save', sessionId, homeBankingId,
+      body: JSON.stringify({ ...excelExportContext, ...draft, requestId: `${Date.now()}-excel-${excelExportContext.blockId}`,
+        sessionId, botJobId, botJobName, homeBankingId }),
+    }));
+    setExcelExportContext(null);
+  };
+
   return (
     <div className={styles.gridContainer}>
+      {excelExportContext && <ExcelExportPanel context={excelExportContext} onSubmit={submitExcelExport} onClose={() => setExcelExportContext(null)}/>}
       {alertMessageBody && alertMessageBody.length > 0 && (
         <AlertModal
           header={alertMessageHeader || ''}
