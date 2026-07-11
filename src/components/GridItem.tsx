@@ -191,7 +191,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     blockOptionsFromInstructions(data)
   );
   const [createBlockOpen, setCreateBlockOpen] = useState<boolean>(false);
-  const [memoryCapabilities, setMemoryCapabilities] = useState<Map<number, { canAdd: boolean; reason: string }>>(new Map());
+  const [memoryCapabilities, setMemoryCapabilities] = useState<Map<number, { canAdd: boolean; canMove: boolean; reason: string }>>(new Map());
   const [pendingMemoryMove, setPendingMemoryMove] = useState<{ requestId: string; ids: Set<number> } | null>(null);
   const [memoryMoveStatus, setMemoryMoveStatus] = useState('');
 
@@ -975,10 +975,10 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
           }
         } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "instructionEditor.memoryCapabilitiesResponse") {
           const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
-          const next = new Map<number, { canAdd: boolean; reason: string }>();
+          const next = new Map<number, { canAdd: boolean; canMove: boolean; reason: string }>();
           if (Array.isArray(bodyData?.capabilities)) {
-            bodyData.capabilities.forEach((capability: { instructionId: number; canAddToMemory: boolean; reason?: string }) => {
-              next.set(capability.instructionId, { canAdd: capability.canAddToMemory === true, reason: capability.reason || '' });
+            bodyData.capabilities.forEach((capability: { instructionId: number; canAddToMemory: boolean; canMove: boolean; reason?: string }) => {
+              next.set(capability.instructionId, { canAdd: capability.canAddToMemory === true, canMove: capability.canMove === true, reason: capability.reason || '' });
             });
           }
           setMemoryCapabilities(next);
@@ -2806,10 +2806,8 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
   };
 
   // Function to render the move buttons based on the action type
-  const renderMoveButtons = (actionType: string, instructionId: number) => {
-    if (["IF", "ELSEIF", "ELSE", "ENDIF"].includes(actionType)) {
-      return null; // Don't render buttons for these action types
-    }
+  const renderMoveButtons = (instructionId: number) => {
+    if (!memoryCapabilities.get(instructionId)?.canMove) return null;
 
     return (
       <>
@@ -3653,7 +3651,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                                   key={instruction.id}
                                   draggableId={instruction.id.toString()}
                                   index={index}
-                                  isDragDisabled={findText.trim().length > 0}
+                                  isDragDisabled={findText.trim().length > 0 || !memoryCapabilities.get(instruction.id)?.canMove}
                                 >
                                   {(provided) => (
                                     <div
@@ -3757,7 +3755,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                                             editImage,
                                             instruction
                                           )}
-                                          {renderMoveButtons(instruction.actions, instruction.id)}
+                                          {renderMoveButtons(instruction.id)}
                                           {renderTestClick(instruction.actions, instruction)}
                                           <img
                                             src={crossImage}
