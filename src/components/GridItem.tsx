@@ -986,6 +986,14 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
               setMemoryMoveStatus(bodyData?.error || 'Memory Apply was refused.');
             }
             setPendingMemoryMove(null);
+          } else if (bodyData?.ok === false) {
+            setAlertImage(warningRedImage);
+            setAlertClass('construction-image');
+            setAlertMessageHeader(bodyData?.errorTitle || 'Move Instruction Refused');
+            setAlertMessageBody(bodyData?.error || 'The instruction move could not be applied.');
+            setAlertMessageFooter(bodyData?.errorHeader || 'The grid was restored from the backend.');
+            setErrorFlag(true);
+            setAlertOnConfirm(undefined);
           }
         } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "instructionEditor.memoryCapabilitiesResponse") {
           const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
