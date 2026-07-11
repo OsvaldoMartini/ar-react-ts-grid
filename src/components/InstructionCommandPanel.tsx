@@ -47,14 +47,6 @@ type WebFieldRow = { id: number; name: string; actions: string; tagName?: string
 type BlockRow = { id: number; name: string; blockOrderNumber?: number };
 type CommandDefinition = { code: string; label: string; target: string; fields: string[]; allowedTags?: string[]; insertAllowed?: boolean; editAllowed?: boolean; disabledReason?: string };
 type StoredCommandDraft = Omit<CommandDraft, 'mode'>;
-
-const FALLBACK_COMMANDS: CommandDefinition[] = [
-  { code: 'SET', label: 'Set Value', target: 'variable', fields: ['webField', 'variable'], allowedTags: ['input', 'select', 'textarea'] },
-  { code: 'GET', label: 'Get Value', target: 'variable', fields: ['webField', 'variable'] },
-  { code: 'CK', label: 'Check Value', target: 'variable', fields: ['webField', 'variable', 'operator'] },
-  { code: 'GOTO', label: 'GOTO', target: 'block', fields: ['block', 'count'] },
-  { code: 'H', label: 'Wait', target: 'number', fields: ['hold'] },
-];
 const supportsTag = (command: CommandDefinition, tagName: string) => !command.allowedTags?.length || command.allowedTags.includes(tagName);
 
 const InstructionCommandPanel: React.FC<Props> = (props) => {
@@ -72,7 +64,7 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
   const [variables, setVariables] = useState<VariableRow[]>([]);
   const [webFields, setWebFields] = useState<WebFieldRow[]>([]);
   const [blocks, setBlocks] = useState<BlockRow[]>([]);
-  const [commands, setCommands] = useState<CommandDefinition[]>(FALLBACK_COMMANDS);
+  const [commands, setCommands] = useState<CommandDefinition[]>([]);
   const [selectedWebFieldId, setSelectedWebFieldId] = useState<number | undefined>(instruction.parentId || instruction.id);
   const [selectedVariableId, setSelectedVariableId] = useState<number | undefined>(instruction.variableId || undefined);
   const [selectedBlockId, setSelectedBlockId] = useState<number | undefined>(instruction.parentBlockId || undefined);
@@ -127,7 +119,7 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
         if (Array.isArray(body?.variables)) setVariables(body.variables.filter((row: VariableRow & { error?: string }) => !row.error));
         if (Array.isArray(body?.webFields)) setWebFields(body.webFields);
         if (Array.isArray(body?.blocks)) setBlocks(body.blocks);
-        if (Array.isArray(body?.commands) && body.commands.length > 0) setCommands(body.commands);
+        if (Array.isArray(body?.commands)) setCommands(body.commands);
         if (body?.draft) setStoredDraft(body.draft);
         if (typeof body?.graphRevision === 'string') setGraphRevision(body.graphRevision);
         return;
@@ -176,6 +168,7 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
     [variables, selectedWebFieldId]
   );
   const canEditSelected = storedDraft != null && commands.some(command => command.editAllowed === true);
+  const commandsReady = graphRevision.length > 0 && commands.length > 0;
 
   const openCommand = (nextMode: 'before' | 'after' | 'edit') => {
     setMode(nextMode);
@@ -240,8 +233,8 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
       <main className={styles.body}>
         {view === 'actions' && (
           <div className={styles.actionGrid}>
-            <button onClick={() => openCommand('before')}><b>Add command before</b><span>Create and insert a configured operation</span></button>
-            <button onClick={() => openCommand('after')}><b>Add command after</b><span>Create and insert a configured operation</span></button>
+            <button disabled={!commandsReady} onClick={() => openCommand('before')}><b>Add command before</b><span>Create and insert a configured operation</span></button>
+            <button disabled={!commandsReady} onClick={() => openCommand('after')}><b>Add command after</b><span>Create and insert a configured operation</span></button>
             {canEditSelected && <button onClick={() => openCommand('edit')}><b>Edit command</b><span>Update {instruction.actions || 'this instruction'}</span></button>}
             {props.allowSplit && props.onSplit && <button onClick={props.onSplit}><b>Split component</b><span>Move the selected sequence into a component</span></button>}
             {props.allowElseIf && props.onInsertElseIf && <button disabled={!graphRevision} onClick={() => props.onInsertElseIf?.(graphRevision)}><b>Insert ElseIf</b><span>Extend the current conditional structure</span></button>}
