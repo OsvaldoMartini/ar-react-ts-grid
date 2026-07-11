@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, FileKey2, FolderOpen, RefreshCw, ShieldAlert, X } from 'lucide-react';
 import { useWebSocket } from './useWebSocket';
+import { LICENSE_AGREEMENT_V1, LICENSE_AGREEMENT_VERSION } from './licenseAgreement';
 import styles from './LicenseManager.module.scss';
 
 type LicenseState = {
@@ -84,7 +85,13 @@ const LicenseManager: React.FC<Props> = ({ socketPort, sessionId, onClose, onAct
         <label>Owner<input value={form.owner} onChange={e => setForm({...form,owner:e.target.value})}/></label>
         <label>Email<input type="email" value={form.email} onChange={e => setForm({...form,email:e.target.value})}/></label>
       </> : <label>{mode === 'activate' ? 'Response file' : 'License file'}<span className={styles.pathInput}><FolderOpen size={17}/><input value={form.file} onChange={e => setForm({...form,file:e.target.value})} placeholder={mode === 'activate' ? 'Configured directory/response file' : 'Configured directory/ARWeb.lic'}/></span></label>}
-      {mode !== 'existing' && <label className={styles.agreement}><input type="checkbox" checked={form.agreementAccepted} onChange={e => setForm({...form,agreementAccepted:e.target.checked})}/><span>I accept the software license agreement.</span></label>}
+      {mode !== 'existing' && <>
+        <section className={styles.agreementText} aria-labelledby="license-agreement-title" tabIndex={0}>
+          <h2 id="license-agreement-title">Software License Agreement <small>v{LICENSE_AGREEMENT_VERSION}</small></h2>
+          <p>{LICENSE_AGREEMENT_V1}</p>
+        </section>
+        <label className={styles.agreement}><input type="checkbox" checked={form.agreementAccepted} onChange={e => setForm({...form,agreementAccepted:e.target.checked})}/><span>I accept the software license agreement.</span></label>
+      </>}
       {feedback && <p className={styles.feedback}>{feedback}</p>}
       <button className={styles.submit} onClick={submit} disabled={pending || (mode !== 'existing' && !form.agreementAccepted)}>{pending ? 'Processing...' : mode === 'request' ? 'Generate request' : mode === 'activate' ? 'Activate license' : 'Use existing license'}</button>
     </div>

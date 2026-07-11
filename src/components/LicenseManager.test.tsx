@@ -26,6 +26,8 @@ const sentOperation = (type: string) => mockSend.mock.calls
 test('renders status and sends an agreement-gated license request', () => {
   render(<LicenseManager socketPort={59772} sessionId="licenseManager-test"/>);
   expect(screen.getByText('Missing license')).toBeInTheDocument();
+  expect(screen.getByRole('region', { name: /Software License Agreement v1.0/ })).toBeInTheDocument();
+  expect(screen.getByText(/7\. Miscellaneous/)).toBeInTheDocument();
   fireEvent.change(screen.getByLabelText('Organization'), { target: { value: 'Client Org' } });
   fireEvent.change(screen.getByLabelText('Owner'), { target: { value: 'Client Owner' } });
   fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'client@example.com' } });
@@ -42,6 +44,7 @@ test('renders status and sends an agreement-gated license request', () => {
 test('sends the activation response path', () => {
   render(<LicenseManager socketPort={59772} sessionId="licenseManager-test"/>);
   fireEvent.click(screen.getByRole('button', { name: 'Activate' }));
+  expect(screen.getByRole('region', { name: /Software License Agreement v1.0/ })).toBeInTheDocument();
   fireEvent.change(screen.getByLabelText('Response file'), { target: { value: '/licenses/client.response' } });
   fireEvent.click(screen.getByText('I accept the software license agreement.'));
   fireEvent.click(screen.getByRole('button', { name: 'Activate license' }));
@@ -51,6 +54,7 @@ test('sends the activation response path', () => {
 test('sends the existing-license path', () => {
   render(<LicenseManager socketPort={59772} sessionId="licenseManager-test"/>);
   fireEvent.click(screen.getByRole('button', { name: 'Use existing' }));
+  expect(screen.queryByRole('region', { name: /Software License Agreement/ })).not.toBeInTheDocument();
   fireEvent.change(screen.getByLabelText('License file'), { target: { value: '/licenses/ARWeb.lic' } });
   fireEvent.click(screen.getByRole('button', { name: 'Use existing license' }));
   expect(sentOperation('license.useExisting')).toBeDefined();
