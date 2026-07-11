@@ -1985,6 +1985,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
       const message = {
         type: 'BLOCKS_SPLITTER',
+        requestId: `${Date.now()}-split-${adjustedInstructionId}`,
         instructionId: adjustedInstructionId,
         graphRevision,
         botJobId: botJobId,
