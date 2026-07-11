@@ -698,6 +698,17 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
             setErrorFlag(true);
             setAlertOnConfirm(undefined);
           }
+        } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "instructionEditor.blockDeleteResponse") {
+          const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
+          if (bodyData?.ok === false) {
+            setAlertImage(warningRedImage);
+            setAlertClass('construction-image');
+            setAlertMessageHeader(bodyData?.errorTitle || 'Delete Block Refused');
+            setAlertMessageBody(bodyData?.error || 'The block could not be deleted.');
+            setAlertMessageFooter(bodyData?.errorHeader || 'The grid was restored from the backend.');
+            setErrorFlag(true);
+            setAlertOnConfirm(undefined);
+          }
         } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "instructionEditor.rowMoveResponse") {
           const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
           if (bodyData?.ok === false) {
