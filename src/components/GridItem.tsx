@@ -514,404 +514,77 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
   // Drag-and-drop event handler
   const onDragEnd = (result: any) => {
-    const { destination, source } = result;
+    const { source, destination, draggableId } = result;
+    setActiveDraggedInstructionId(null);
+    if (!destination) return;
 
-    // No destination (dropped outside a droppable area)
-    if (!destination) {
+    const sourceBlockId = Number(source.droppableId);
+    const destinationBlockId = Number(destination.droppableId);
+    const sourceBlock = groupedData[sourceBlockId];
+    const destinationBlock = groupedData[destinationBlockId];
+    if (!sourceBlock || !destinationBlock) return;
+
+    const instructionId = Number(draggableId);
+    const capability = memoryCapabilities.get(instructionId);
+    const destinationId = destinationBlockId;
+    if (!capability?.canMove || !capability.allowedBlockIds.includes(destinationId)) {
+      setAlertImage(forbiddenImage);
+      setAlertClass('construction-image');
+      setAlertMessageHeader('Drag & Drop not Allowed');
+      setAlertMessageBody(capability?.reason || 'The backend does not allow this movement.');
+      setAlertMessageFooter('Select one of the highlighted destinations.');
+      setErrorFlag(true);
       return;
     }
 
-    const sourceBlockId = source.droppableId;
-    const destinationBlockId = destination.droppableId;
-
-    // Check if source and destination blocks exist
-    if (!groupedData[sourceBlockId] || !groupedData[destinationBlockId]) {
-      return;
-    }
-
+    const sourceInstructions = [...sourceBlock.instructions];
+    const movedIndex = sourceInstructions.findIndex(instruction => instruction.id === instructionId);
+    if (movedIndex < 0) return;
+    const [movedInstruction] = sourceInstructions.splice(movedIndex, 1);
     let updatedGroupedData = { ...groupedData };
-    let deleteBlockId = -1; // Default value for deleted blockId
-    // Retrieve botJobId from the first instruction in the source block
-    const botJobId = groupedData[destinationBlockId].instructions?.[0]?.botJobId;
+    let deleteBlockId = -1;
 
     if (sourceBlockId === destinationBlockId) {
-
-      // Moving instruction to a different block
-      const sourceInstructions = Array.from(groupedData[sourceBlockId].instructions);
-
-      const instructionToMove = sourceInstructions[source.index];
-
-
-      if (instructionToMove.actions === "IF" || instructionToMove.actions === "ELSEIF" || instructionToMove.actions === "ELSE" || instructionToMove.actions === "ENDIF") {
-
-        // Find all the instructions whose parentId matches instructionToMove.parentId
-        const matchingInstructions = sourceInstructions
-          .map((instruction, index) => ({ index, instruction })) // Add index to each instruction
-          .filter(({ instruction }) => instruction.parentId === instructionToMove.parentId); // Filter by parentId matching
-
-        // Map to get a final list with the index and action (or any other data you need)
-        const parentList = matchingInstructions.map(({ index, instruction }) => ({
-          index,
-          action: instruction.actions, // Adjust this to any property you need
-        }));
-
-        // Check for invalid moves involving "IF", "ELSE", and "ENDIF"
-        if (instructionToMove.actions === "IF") {
-          // Prevent "IF" from being moved after "ELSE" or "ENDIF"
-          const isMoveForbidden = parentList.some(parent =>
-            (parent.action === "ELSEIF" || parent.action === "ELSE" || parent.action === "ENDIF") && destination.index >= parent.index
-          );
-
-          if (isMoveForbidden) {
-            setAlertImage(forbiddenImage);
-            setAlertClass('construction-image');
-            setAlertMessageHeader(
-              `Drag & Drop not Allowed`
-            );
-            setErrorFlag(true);
-            setErrorFlag(true);
-            setAlertMessageBody(
-              `Moving "${instructionToMove.actions}" is not allowed!"`
-            );
-            setAlertMessageFooter(
-              `It cannot be placed after "ELSEIF", "ELSE" or "ENDIF"`
-            );
-            return;
-          }
-        }
-
-        if (instructionToMove.actions === "ELSEIF") {
-          // Prevent "ELSE" from being moved after its corresponding "ENDIF"
-          const isMoveForbidden = parentList.some(parent =>
-            (parent.action === "ELSE" || parent.action === "ENDIF") && destination.index >= parent.index
-          );
-
-          if (isMoveForbidden) {
-            setAlertImage(forbiddenImage);
-            setAlertClass('construction-image');
-            setAlertMessageHeader(
-              `Drag & Drop not Allowed`
-            );
-            setErrorFlag(true);
-            setErrorFlag(true);
-            setAlertMessageBody(
-              `Moving "${instructionToMove.actions}" is not allowed!"`
-            );
-            setAlertMessageFooter(
-              `It cannot be placed after "ELSE" OR "ENDIF"`
-            );
-            return;
-          }
-        }
-
-        if (instructionToMove.actions === "ELSEIF") {
-          // Prevent "ELSE" from being moved after its corresponding "ENDIF"
-          const isMoveForbidden = parentList.some(parent =>
-            parent.action === "IF" && destination.index <= parent.index
-          );
-
-          if (isMoveForbidden) {
-            setAlertImage(forbiddenImage);
-            setAlertClass('construction-image');
-            setAlertMessageHeader(
-              `Drag & Drop not Allowed`
-            );
-            setErrorFlag(true);
-            setErrorFlag(true);
-            setAlertMessageBody(
-              `Moving "${instructionToMove.actions}" is not allowed!"`
-            );
-            setAlertMessageFooter(
-              `It cannot be placed before "IF"`
-            );
-            return;
-          }
-        }
-
-
-        if (instructionToMove.actions === "ELSE") {
-          // Prevent "ELSE" from being moved after its corresponding "ENDIF"
-          const isMoveForbidden = parentList.some(parent =>
-            parent.action === "ENDIF" && destination.index >= parent.index
-          );
-
-          if (isMoveForbidden) {
-            setAlertImage(forbiddenImage);
-            setAlertClass('construction-image');
-            setAlertMessageHeader(
-              `Drag & Drop not Allowed`
-            );
-            setErrorFlag(true);
-            setErrorFlag(true);
-            setAlertMessageBody(
-              `Moving "${instructionToMove.actions}" is not allowed!"`
-            );
-            setAlertMessageFooter(
-              `It cannot be placed after "ENDIF"`
-            );
-            return;
-          }
-        }
-
-
-
-        if (instructionToMove.actions === "ELSE") {
-          // Prevent "ENDIF" or "ELSE" from being moved before "IF" or another "ELSE"
-          const isMoveForbidden = parentList.some(parent =>
-            (parent.action === "IF" || parent.action === "ELSEIF") && destination.index <= parent.index
-          );
-
-          if (isMoveForbidden) {
-            setAlertImage(forbiddenImage);
-            setAlertClass('construction-image');
-            setAlertMessageHeader(
-              `Drag & Drop not Allowed`
-            );
-            setErrorFlag(true);
-            setErrorFlag(true);
-            setAlertMessageBody(
-              `Moving "${instructionToMove.actions}" is not allowed!"`
-            );
-            setAlertMessageFooter(
-              ` It cannot be placed before "IF" or "ELSEIF"`
-            );
-            return;
-          }
-        }
-
-
-        if (instructionToMove.actions === "ENDIF") {
-          // Prevent "ENDIF" or "ELSE" from being moved before "IF" or another "ELSE"
-          const isMoveForbidden = parentList.some(parent =>
-            (parent.action === "IF" || parent.action === "ELSE") && destination.index <= parent.index
-          );
-
-          if (isMoveForbidden) {
-            setAlertImage(forbiddenImage);
-            setAlertClass('construction-image');
-            setAlertMessageHeader(
-              `Drag & Drop not Allowed`
-            );
-            setErrorFlag(true);
-            setAlertMessageBody(
-              `Moving "${instructionToMove.actions}" is not allowed!"`
-            );
-            setAlertMessageFooter(
-              `It cannot be placed before "IF" or "ELSE"`
-            );
-            return;
-          }
-        }
-
-
-      }
-
-      if (instructionToMove.refreshLoop || instructionToMove.loopOnly) {
-
-        // Find all the instructions whose parentId matches instructionToMove.id
-        const matchingInstructions = sourceInstructions
-          .map((instruction, index) => ({ index, instruction })) // Add index to each instruction
-          .filter(({ instruction }) => instruction.parentId === instructionToMove.id); // Filter by parentId matching
-
-        // Map to get a final list with the index and action (or any other data you need)
-        const parentList = matchingInstructions.map(({ index, instruction }) => ({
-          index,
-          action: instruction.actions, // Adjust this to any property you need
-        }));
-
-        // Check for invalid moves involving "refreshLoop" and "loopOnly"
-        // Prevent "IF" from being moved after "ELSE" or "ENDIF"
-        const isMoveForbidden = parentList.some(parent =>
-          (parent.action === "REFRESH_LOOP" || parent.action === "LOOP") && destination.index >= parent.index
-        );
-
-        if (isMoveForbidden) {
-          setAlertImage(forbiddenImage);
-          setAlertClass('construction-image');
-          setAlertMessageHeader(
-            `Drag & Drop not Allowed`
-          );
-          setErrorFlag(true);
-          setAlertMessageBody(
-            `Moving "${instructionToMove.name}" is not allowed!"`
-          );
-          setAlertMessageFooter(
-            `It cannot be placed after "REFRESH_LOOP" or "LOOP"`
-          );
-          return;
-        }
-      }
-
-
-      if (instructionToMove.actions === "REFRESH_LOOP" || instructionToMove.actions === "LOOP") {
-        // Find all the instructions whose id matches instructionToMove.parentId
-        const matchingInstructions = sourceInstructions
-          .map((instruction, index) => ({ index, instruction })) // Add index to each instruction
-          .filter(({ instruction }) => instruction.id === instructionToMove.parentId); // Filter by parentId matching
-
-        // Map to get a final list with the index, action, and additional properties
-        const parentList = matchingInstructions.map(({ index, instruction }) => ({
-          index,
-          name: instruction.name,
-          refreshLoop: instruction.refreshLoop, // Include refreshLoop
-          loopOnly: instruction.loopOnly,       // Include loopOnly
-        }));
-
-        // Check for invalid moves involving "refreshLoop" and "loopOnly"
-        const forbiddenInstruction = parentList.find(parent =>
-          (parent.refreshLoop || parent.loopOnly) && destination.index <= parent.index
-        );
-
-        const isMoveForbidden = !!forbiddenInstruction; // Convert to boolean
-
-        if (isMoveForbidden) {
-          setAlertImage(forbiddenImage);
-          setAlertClass('construction-image');
-          setAlertMessageHeader(
-            `Drag & Drop not Allowed`
-          );
-          setErrorFlag(true);
-          setAlertMessageBody(
-            `Moving "${instructionToMove.name}" is not allowed!"`
-          );
-          setAlertMessageFooter(
-            `It cannot be placed before "${forbiddenInstruction?.name}"`
-          );
-
-          return { isMoveForbidden, forbiddenInstruction }; // Return both values if needed
-        }
-
-      }
-
-      // Remove the dragged instruction from source block
-      const [movedInstruction] = sourceInstructions.splice(source.index, 1);
-
-      // Reordering within the same block
-      const updatedBlockData = reorder(
-        groupedData[sourceBlockId].instructions,
-        source.index,
-        destination.index
-      );
-
-      // Reassign instructionOrderNumbers within the block
-      const updatedInstructions = updatedBlockData.map((instruction, index) => ({
-        ...instruction,
-        instructionOrderNumber: index + 1, // Reassign order numbers
-      }));
-
-      updatedGroupedData = {
-        ...groupedData,
-        [sourceBlockId]: {
-          ...groupedData[sourceBlockId],
-          instructions: updatedInstructions,
-        },
+      sourceInstructions.splice(destination.index, 0, movedInstruction);
+      updatedGroupedData[sourceBlockId] = {
+        ...sourceBlock,
+        instructions: sourceInstructions.map((instruction, index) => ({
+          ...instruction,
+          instructionOrderNumber: index + 1,
+        })),
       };
     } else {
-      // Handle moving between different blocks
-      const sourceInstructions = Array.from(groupedData[sourceBlockId].instructions);
-      const destinationInstructions = Array.from(groupedData[destinationBlockId].instructions);
-
-      // Remove the dragged instruction from source block
-      const [movedInstruction] = sourceInstructions.splice(source.index, 1);
-
-      if (movedInstruction.actions === "REFRESH_LOOP" || movedInstruction.actions === "LOOP" || movedInstruction.actions === "IF" || movedInstruction.actions === "ELSEIF" || movedInstruction.actions === "ELSE" || movedInstruction.actions === "ENDIF") {
-        setAlertImage(forbiddenImage);
-        setAlertClass('construction-image');
-        setAlertMessageHeader(
-          `Drag & Drop not Allowed`
-        );
-        setErrorFlag(true);
-        setAlertMessageBody(`Moving "${movedInstruction.actions}"!`);
-        setAlertMessageFooter(
-          `Is not allowed Outside of a Block"`
-        );
-        return;
-      }
-
-      if (movedInstruction.refreshLoop || movedInstruction.loopOnly) {
-
-        setAlertImage(forbiddenImage);
-        setAlertClass('construction-image');
-        setAlertMessageHeader(
-          `Drag & Drop not Allowed`
-        );
-        setErrorFlag(true);
-        setAlertMessageBody(`Moving "${movedInstruction.name}" is not allowed!`);
-        setAlertMessageFooter(
-          `It's attached to "REFRESH_LOOP" or "LOOP"!"`
-        );
-        return;
-
-      }
-
-
-      // Update the blockId of the moved instruction
-      movedInstruction.blockId = parseInt(destinationBlockId, 10);
-
-      // Insert the moved instruction into destination block at the specified position
+      const destinationInstructions = [...destinationBlock.instructions];
       destinationInstructions.splice(destination.index, 0, movedInstruction);
-
-      // Check if sourceInstructions is empty and movedInstruction.blockOrderNumber is 1
-      if (sourceInstructions.length === 0 && movedInstruction.blockOrderNumber === 1) {
-        // Set all destination instructions' blockOrderNumber to 1
-        destinationInstructions.forEach(instruction => {
-          instruction.blockOrderNumber = 1;
-        });
-      }
-
-      // Reassign instructionOrderNumbers in source block
-      const updatedSourceInstructions = sourceInstructions.map((instruction, index) => ({
-        ...instruction,
-        instructionOrderNumber: index + 1,
-      }));
-
-      const { blockId, blockName, blockOrderNumber } = groupedData[destinationBlockId].instructions[0] || {};
-
-      // Reassign instructionOrderNumbers in destination block
-      const updatedDestinationInstructions = destinationInstructions.map((instruction, index) => ({
-        ...instruction,
-        instructionOrderNumber: index + 1,
-        blockId: blockId,
-        blockName: blockName,
-        blockOrderNumber: blockOrderNumber
-      }));
-
-      updatedGroupedData = {
-        ...groupedData,
-        [sourceBlockId]: {
-          ...groupedData[sourceBlockId],
-          instructions: updatedSourceInstructions,
-        },
-        [destinationBlockId]: {
-          ...groupedData[destinationBlockId],
-          instructions: updatedDestinationInstructions,
-        },
+      updatedGroupedData[sourceBlockId] = {
+        ...sourceBlock,
+        instructions: sourceInstructions.map((instruction, index) => ({
+          ...instruction,
+          instructionOrderNumber: index + 1,
+        })),
       };
-
-
-      // Remove the block from `groupedData` if it has no instructions left
-      if (updatedSourceInstructions.length === 0) {
-        deleteBlockId = parseInt(sourceBlockId, 10); // Track the blockId to delete
+      updatedGroupedData[destinationBlockId] = {
+        ...destinationBlock,
+        instructions: destinationInstructions.map((instruction, index) => ({
+          ...instruction,
+          blockId: destinationId,
+          blockName: destinationBlock.blockName,
+          blockOrderNumber: destinationBlock.instructions[0]?.blockOrderNumber,
+          instructionOrderNumber: index + 1,
+        })),
+      };
+      if (sourceInstructions.length === 0) {
+        deleteBlockId = sourceBlockId;
         delete updatedGroupedData[sourceBlockId];
       }
     }
 
-    // Update state with the new grouped data, ensuring no empty blocks
+    const updatedInstructionsData = Object.values(updatedGroupedData).flatMap(block => block.instructions);
     setGroupedData(updatedGroupedData);
-
-    // Flatten updatedGroupedData into instructionsData array, excluding empty blocks
-    const updatedInstructionsData = Object.values(updatedGroupedData)
-      .flatMap(block => block.instructions);
-
-    // Update instructionsData state
     setInstructionsData(updatedInstructionsData);
-
-    setIsDataReordered(false); // To trigger reordering logic if needed
-
-    // Send WebSocket message with the updated instructions
+    setIsDataReordered(false);
     submitInstructionMove(updatedInstructionsData, deleteBlockId, 'drag');
   };
-
 
   // Memoized function to handle outside clicks on the dropdown
   const handleClickOutside = useCallback((event: MouseEvent) => {
