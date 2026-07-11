@@ -660,6 +660,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
 
       const message = {
         type: 'ROW_MOVE',
+        requestId: `${Date.now()}-component-row-move`,
         botJobId,
         botJobName,
         deleteBlockId,
@@ -1827,6 +1828,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
         if (webSocket && connected) {
           const message = {
             type: 'ROW_MOVE',
+            requestId: `${Date.now()}-component-row-move`,
             botJobId: currentInstruction.botJobId,
             botJobName: botJobName,
             homeBankingId: homeBankingId,
@@ -1896,6 +1898,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
         if (webSocket && connected) {
           const message = {
             type: 'ROW_MOVE',
+            requestId: `${Date.now()}-component-row-move`,
             botJobId: currentInstruction.botJobId,
             botJobName: botJobName,
             homeBankingId: homeBankingId,
