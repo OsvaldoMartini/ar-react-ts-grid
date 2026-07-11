@@ -146,7 +146,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
   const [alertDismissed, setAlertDismissed] = useState(false);
   const [alertOnConfirm, setAlertOnConfirm] = useState<(() => void) | undefined>(undefined);
   const [findText, setFindText] = useState<string>('');
-  const [moveCapabilities, setMoveCapabilities] = useState<Map<number, { canMove: boolean; canDelete: boolean; deleteCount: number; reason: string; deleteReason: string; allowedBlockIds: number[] }>>(new Map());
+  const [moveCapabilities, setMoveCapabilities] = useState<Map<number, { canMove: boolean; canDelete: boolean; deleteCount: number; reason: string; deleteReason: string; allowedBlockIds: number[]; deleteRows: { id: number; name: string; action: string; order: number }[] }>>(new Map());
   const [activeDraggedInstructionId, setActiveDraggedInstructionId] = useState<number | null>(null);
   const [moveGraphRevision, setMoveGraphRevision] = useState('');
   const submitInstructionMove = useInstructionDrag({
@@ -709,10 +709,10 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
           }
         } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "instructionEditor.memoryCapabilitiesResponse") {
           const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
-          const next = new Map<number, { canMove: boolean; canDelete: boolean; deleteCount: number; reason: string; deleteReason: string; allowedBlockIds: number[] }>();
+          const next = new Map<number, { canMove: boolean; canDelete: boolean; deleteCount: number; reason: string; deleteReason: string; allowedBlockIds: number[]; deleteRows: { id: number; name: string; action: string; order: number }[] }>();
           if (Array.isArray(bodyData?.capabilities)) {
-            bodyData.capabilities.forEach((capability: { instructionId: number; canMove: boolean; canDelete: boolean; deleteCount?: number; reason?: string; deleteReason?: string; allowedBlockIds?: number[] }) => {
-              next.set(capability.instructionId, { canMove: capability.canMove === true, canDelete: capability.canDelete === true, deleteCount: capability.deleteCount || 1, reason: capability.reason || '', deleteReason: capability.deleteReason || '', allowedBlockIds: Array.isArray(capability.allowedBlockIds) ? capability.allowedBlockIds : [] });
+            bodyData.capabilities.forEach((capability: { instructionId: number; canMove: boolean; canDelete: boolean; deleteCount?: number; reason?: string; deleteReason?: string; allowedBlockIds?: number[]; deleteRows?: { id: number; name: string; action: string; order: number }[] }) => {
+              next.set(capability.instructionId, { canMove: capability.canMove === true, canDelete: capability.canDelete === true, deleteCount: capability.deleteCount || 1, reason: capability.reason || '', deleteReason: capability.deleteReason || '', allowedBlockIds: Array.isArray(capability.allowedBlockIds) ? capability.allowedBlockIds : [], deleteRows: Array.isArray(capability.deleteRows) ? capability.deleteRows : [] });
             });
           }
           setMoveCapabilities(next);
@@ -1946,14 +1946,18 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     const instruction = componentsData.find(row => row.id === instructionId);
     if (!instruction) return;
     const familyDelete = ["IF", "ELSE", "ENDIF"].includes(instruction.actions);
-    const deleteCount = moveCapabilities.get(instructionId)?.deleteCount || 1;
+    const capability = moveCapabilities.get(instructionId);
+    const deleteCount = capability?.deleteCount || 1;
+    const deleteRows = capability?.deleteRows || [];
     setAlertImage(warningRedImage);
     setAlertClass('construction-image');
     setAlertMessageHeader(familyDelete ? 'Delete Conditional Family' : 'Delete Instruction');
-    setAlertMessageBody(familyDelete
-      ? `Delete ${deleteCount} linked conditional row(s) containing "${instruction.name}"?`
-      : `Delete "${instruction.name}"?`);
-    setAlertMessageFooter('Java will verify attached steps and graph integrity before deletion.');
+    setAlertMessageBody(deleteRows.length > 0 ? deleteRows.map(row => ({
+      parentNameWithId: `#${row.order} (${row.id}) ${row.name}`,
+      connectionLabel: 'Action',
+      actions: row.action,
+    })) : [{ parentNameWithId: `(${instruction.id}) ${instruction.name}`, connectionLabel: 'Action', actions: instruction.actions }]);
+    setAlertMessageFooter(`Delete ${deleteCount} row(s). Java will verify graph integrity before deletion.`);
     setErrorFlag(true);
     setAlertOnConfirm(() => () => executeRemoveInstruction(instructionId));
   };
