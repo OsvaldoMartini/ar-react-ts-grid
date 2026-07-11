@@ -58,6 +58,7 @@ interface GridItemCompProps {
   botJobIdInitial: number;
   botJobNameInitial: string;
 }
+type BlockDeleteCapability = { canDelete: boolean; reason: string; instructionCount: number; deleteRows: { id: number; name: string; action: string; order: number }[] };
 
 // Helper function to reorder items in an array based on drag-and-drop actions
 const reorder = (list: any[], startIndex: number, endIndex: number) => {
@@ -148,6 +149,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
   const [findText, setFindText] = useState<string>('');
   const [moveCapabilities, setMoveCapabilities] = useState<Map<number, { canMove: boolean; canDelete: boolean; deleteCount: number; reason: string; deleteReason: string; allowedBlockIds: number[]; deleteRows: { id: number; name: string; action: string; order: number }[] }>>(new Map());
   const [activeDraggedInstructionId, setActiveDraggedInstructionId] = useState<number | null>(null);
+  const [blockDeleteCapabilities, setBlockDeleteCapabilities] = useState<Map<number, BlockDeleteCapability>>(new Map());
   const [moveGraphRevision, setMoveGraphRevision] = useState('');
   const submitInstructionMove = useInstructionDrag({
     webSocket, connected, graphRevision: moveGraphRevision, botJobId, botJobName,
@@ -716,6 +718,13 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
             });
           }
           setMoveCapabilities(next);
+          const nextBlocks = new Map<number, BlockDeleteCapability>();
+          if (Array.isArray(bodyData?.blockCapabilities)) {
+            bodyData.blockCapabilities.forEach((capability: { blockId: number; canDelete: boolean; reason?: string; instructionCount?: number; deleteRows?: BlockDeleteCapability['deleteRows'] }) => {
+              nextBlocks.set(capability.blockId, { canDelete: capability.canDelete === true, reason: capability.reason || '', instructionCount: capability.instructionCount || 0, deleteRows: Array.isArray(capability.deleteRows) ? capability.deleteRows : [] });
+            });
+          }
+          setBlockDeleteCapabilities(nextBlocks);
           setMoveGraphRevision(typeof bodyData?.graphRevision === 'string' ? bodyData.graphRevision : '');
         } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "componentsUpdate") {
 
@@ -2003,6 +2012,8 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
 
   // Function to remove a block by its blockId and reassign order numbers within each block
   const handleRemoveBlock = (blockId: number) => {
+    const capability = blockDeleteCapabilities.get(blockId);
+    if (!moveGraphRevision || !capability?.canDelete) return;
 
     // Find the botJobId and blockOrderNumber associated with the blockId
     const blockInstruction = componentsData.find(instruction => instruction.blockId === blockId);
@@ -2012,8 +2023,8 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     setAlertImage(warningRedImage);
     setAlertClass('construction-image');
     setAlertMessageHeader('Delete Block');
-    setAlertMessageBody(`Are you sure you want to delete "${blockDisplayName}"?`);
-    setAlertMessageFooter('This action cannot be undone.');
+    setAlertMessageBody(capability.deleteRows.map(row => ({ parentNameWithId: `#${row.order} (${row.id}) ${row.name}`, connectionLabel: 'Action', actions: row.action })));
+    setAlertMessageFooter(`Delete "${blockDisplayName}" and ${capability.instructionCount} instruction(s). This action cannot be undone.`);
     setErrorFlag(true);
     setAlertOnConfirm(() => () => executeRemoveBlock(blockId));
     return;
@@ -2072,6 +2083,8 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     if (webSocket && connected) {
       const message = {
         type: 'DELETE_BLOCK',
+        requestId: `${Date.now()}-component-block-delete-${blockId}`,
+        graphRevision: moveGraphRevision,
         blockId: blockId,
         botJobId: botJobId,
         botJobName: botJobName,
@@ -3033,6 +3046,8 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                             src={crossImage}
                             alt=""
                             className={styles.crossButton}
+                            title={blockDeleteCapabilities.get(Number(blockData.instructions[0].blockId))?.reason || 'Delete block'}
+                            style={{ opacity: blockDeleteCapabilities.get(Number(blockData.instructions[0].blockId))?.canDelete ? 1 : 0.35 }}
                             onClick={() => handleRemoveBlock(Number(blockData.instructions[0].blockId))}
                           />
 
