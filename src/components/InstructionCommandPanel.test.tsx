@@ -14,7 +14,7 @@ const bootstrapMessage = JSON.stringify({
     }],
     webFields: [{ id: 10, name: 'Account', actions: 'INPUT', tagName: 'input', blockId: 5 }],
     variables: [
-      { id: 20, type: '$String', name: 'accepted', value: 'yes', instructionId: 10 },
+      { id: 20, type: '$String', name: 'accepted', value: 'yes', instructionId: 10, usedVars: '2' },
       { id: 21, type: '#Numeric', name: 'rejected', value: '1', instructionId: 10 },
     ],
     draft: {
@@ -25,10 +25,12 @@ const bootstrapMessage = JSON.stringify({
   }),
 });
 
+const instruction = { id: 10, name: 'Account', actions: 'SET', blockId: 5, blockName: 'Login', blockOrderNumber: 1, instructionOrderNumber: 1 };
+
 test('renders codec warnings and filters variables from backend metadata', () => {
   const onSocketCommand = jest.fn();
   render(<InstructionCommandPanel
-    instruction={{ id: 10, name: 'Account', actions: 'SET', blockId: 5, blockName: 'Login', blockOrderNumber: 1, instructionOrderNumber: 1 }}
+    instruction={instruction}
     onClose={jest.fn()}
     onApplyCommand={jest.fn()}
     messages={[bootstrapMessage]}
@@ -42,4 +44,33 @@ test('renders codec warnings and filters variables from backend metadata', () =>
   expect(screen.getByRole('option', { name: /accepted/ })).toBeInTheDocument();
   expect(screen.queryByRole('option', { name: /rejected/ })).not.toBeInTheDocument();
   expect(onSocketCommand).toHaveBeenCalledWith('commandEditor.bootstrap', expect.objectContaining({ instructionId: 10 }));
+});
+
+test('creates variables in component context and protects used variables from deletion', () => {
+  const onSocketCommand = jest.fn();
+  render(<InstructionCommandPanel
+    instruction={instruction}
+    onClose={jest.fn()}
+    onApplyCommand={jest.fn()}
+    messages={[bootstrapMessage]}
+    context={{ sessionId: 'componentTasks', targetSessionId: 'componentTasks', homeBankingId: 2, botJobId: 19, botJobName: 'Banca Stato' }}
+    onSocketCommand={onSocketCommand}
+  />);
+
+  expect(onSocketCommand).toHaveBeenCalledWith('commandEditor.bootstrap', expect.objectContaining({ targetSessionId: 'componentTasks' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Variables' }));
+  expect(onSocketCommand).toHaveBeenCalledWith('variableEditor.bootstrap', expect.objectContaining({ targetSessionId: 'componentTasks' }));
+
+  fireEvent.click(screen.getByRole('button', { name: 'New' }));
+  fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'created' } });
+  fireEvent.change(screen.getByLabelText('Value'), { target: { value: 'ready' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+  expect(onSocketCommand).toHaveBeenCalledWith('variableEditor.save', expect.objectContaining({
+    targetSessionId: 'componentTasks',
+    variable: expect.objectContaining({ name: 'created', value: 'ready', type: '$String' }),
+  }));
+
+  fireEvent.click(screen.getByRole('button', { name: /accepted/ }));
+  expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Delete' })).toHaveAttribute('title', 'Used by 2 instruction(s)');
 });
