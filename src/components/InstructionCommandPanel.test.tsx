@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import InstructionCommandPanel from './InstructionCommandPanel';
 
 const bootstrapMessage = JSON.stringify({
@@ -16,6 +16,7 @@ const bootstrapMessage = JSON.stringify({
     variables: [
       { id: 20, type: '$String', name: 'accepted', value: 'yes', instructionId: 10, usedVars: '2' },
       { id: 21, type: '#Numeric', name: 'rejected', value: '1', instructionId: 10 },
+      { id: 22, type: '$String', name: 'unused', value: 'old', instructionId: 10, usedVars: '0' },
     ],
     draft: {
       action: 'SET', name: 'Set Value', hold: 1, operator: '=', interval: 1, count: 1,
@@ -73,4 +74,35 @@ test('creates variables in component context and protects used variables from de
   fireEvent.click(screen.getByRole('button', { name: /accepted/ }));
   expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();
   expect(screen.getByRole('button', { name: 'Delete' })).toHaveAttribute('title', 'Used by 2 instruction(s)');
+});
+
+test('edits, selects, and deletes an unused bot-job variable', () => {
+  const onSocketCommand = jest.fn();
+  render(<InstructionCommandPanel
+    instruction={instruction}
+    onClose={jest.fn()}
+    onApplyCommand={jest.fn()}
+    messages={[bootstrapMessage]}
+    context={{ sessionId: 'botJobTasks', targetSessionId: 'botJobTasks', homeBankingId: 2, botJobId: 19, botJobName: 'Banca Stato' }}
+    onSocketCommand={onSocketCommand}
+  />);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Variables' }));
+  fireEvent.click(screen.getByRole('button', { name: /unused/ }));
+  fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'renamed' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Update' }));
+  expect(onSocketCommand).toHaveBeenCalledWith('variableEditor.save', expect.objectContaining({
+    targetSessionId: 'botJobTasks',
+    variable: expect.objectContaining({ id: 22, name: 'renamed' }),
+  }));
+
+  fireEvent.click(screen.getByRole('button', { name: 'Use in command' }));
+  expect(screen.getByRole('option', { name: /unused/ })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Variables' }));
+  fireEvent.click(screen.getByRole('button', { name: /unused/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+  fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }));
+  expect(onSocketCommand).toHaveBeenCalledWith('variableEditor.delete', expect.objectContaining({
+    targetSessionId: 'botJobTasks', variableId: 22,
+  }));
 });
