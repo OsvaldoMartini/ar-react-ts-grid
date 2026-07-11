@@ -45,6 +45,7 @@ type VariableRow = { id?: number; type: string; name: string; value: string; ins
 type WebFieldRow = { id: number; name: string; actions: string; tagName?: string; blockId: number; blockName?: string };
 type BlockRow = { id: number; name: string; blockOrderNumber?: number };
 type CommandDefinition = { code: string; label: string; target: string; fields: string[]; insertAllowed?: boolean; editAllowed?: boolean; disabledReason?: string };
+type StoredCommandDraft = Omit<CommandDraft, 'mode'>;
 
 const FALLBACK_COMMANDS: CommandDefinition[] = [
   { code: 'SET', label: 'Set Value', target: 'variable', fields: ['webField', 'variable'] },
@@ -76,6 +77,7 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
   const [selectedBlockId, setSelectedBlockId] = useState<number | undefined>(instruction.parentBlockId || undefined);
   const [variable, setVariable] = useState<VariableRow>({ type: '$String', name: '', value: '$EMPTY' });
   const [variableStatus, setVariableStatus] = useState('');
+  const [storedDraft, setStoredDraft] = useState<StoredCommandDraft | null>(null);
 
   const clamp = (next: { x: number; y: number }) => {
     const width = panelRef.current?.offsetWidth || 480;
@@ -122,6 +124,7 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
         if (Array.isArray(body?.webFields)) setWebFields(body.webFields);
         if (Array.isArray(body?.blocks)) setBlocks(body.blocks);
         if (Array.isArray(body?.commands) && body.commands.length > 0) setCommands(body.commands);
+        if (body?.draft) setStoredDraft(body.draft);
         return;
       }
       if (operationId.startsWith('variableEditor.')) {
@@ -168,6 +171,19 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
 
   const openCommand = (nextMode: 'before' | 'after' | 'edit') => {
     setMode(nextMode);
+    if (nextMode === 'edit' && storedDraft) {
+      setAction(storedDraft.action);
+      setName(storedDraft.name);
+      setHold(storedDraft.hold);
+      setOperator(storedDraft.operator);
+      setIntervalValue(storedDraft.interval);
+      setCount(storedDraft.count);
+      setSelectedVariableId(storedDraft.variableId);
+      setSelectedWebFieldId(storedDraft.parentId);
+      setSelectedBlockId(storedDraft.parentBlockId);
+      setView('command');
+      return;
+    }
     const allowed = commands.filter(command => nextMode === 'edit' ? command.editAllowed !== false : command.insertAllowed !== false);
     if (nextMode !== 'edit' || !allowed.some(command => command.code === action)) {
       const preferredAction = ['input', 'select', 'textarea'].includes(selectedWebFieldTag) ? 'SET' : 'GET';
