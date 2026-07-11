@@ -2005,7 +2005,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     if (webSocket && connected) {
       const message = {
         type: "DELETE_INSTRUCTION",
-        requestId: `${Date.now()}-instruction-delete-${instructionId}`,
+        requestId: `${Date.now()}-component-instruction-delete-${instructionId}`,
         instructionId,
         actions,
         parentId,
