@@ -74,6 +74,22 @@ test('creates variables in component context and protects used variables from de
   fireEvent.click(screen.getByRole('button', { name: /accepted/ }));
   expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();
   expect(screen.getByRole('button', { name: 'Delete' })).toHaveAttribute('title', 'Used by 2 instruction(s)');
+
+  fireEvent.click(screen.getByRole('button', { name: /unused/ }));
+  fireEvent.change(screen.getByLabelText('Value'), { target: { value: 'component-ready' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Update' }));
+  expect(onSocketCommand).toHaveBeenCalledWith('variableEditor.save', expect.objectContaining({
+    targetSessionId: 'componentTasks',
+    variable: expect.objectContaining({ id: 22, value: 'component-ready' }),
+  }));
+  fireEvent.click(screen.getByRole('button', { name: 'Use in command' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Variables' }));
+  fireEvent.click(screen.getByRole('button', { name: /unused/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+  fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }));
+  expect(onSocketCommand).toHaveBeenCalledWith('variableEditor.delete', expect.objectContaining({
+    targetSessionId: 'componentTasks', variableId: 22,
+  }));
 });
 
 test('edits, selects, and deletes an unused bot-job variable', () => {
@@ -90,12 +106,16 @@ test('edits, selects, and deletes an unused bot-job variable', () => {
   fireEvent.click(screen.getByRole('button', { name: 'Variables' }));
   fireEvent.click(screen.getByRole('button', { name: /unused/ }));
   fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'renamed' } });
+  fireEvent.change(screen.getByLabelText('Type'), { target: { value: '#Numeric' } });
+  fireEvent.change(screen.getByLabelText('Number format'), { target: { value: 'EU' } });
+  fireEvent.change(screen.getByLabelText('CSV delimiter'), { target: { value: ';' } });
   fireEvent.click(screen.getByRole('button', { name: 'Update' }));
   expect(onSocketCommand).toHaveBeenCalledWith('variableEditor.save', expect.objectContaining({
     targetSessionId: 'botJobTasks',
-    variable: expect.objectContaining({ id: 22, name: 'renamed' }),
+    variable: expect.objectContaining({ id: 22, name: 'renamed', type: '#Numeric', localFormat: 'EU', delimiter: ';' }),
   }));
 
+  fireEvent.change(screen.getByLabelText('Type'), { target: { value: '$String' } });
   fireEvent.click(screen.getByRole('button', { name: 'Use in command' }));
   expect(screen.getByRole('option', { name: /unused/ })).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Variables' }));
