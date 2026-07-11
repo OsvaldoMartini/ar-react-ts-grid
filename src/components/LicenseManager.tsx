@@ -15,6 +15,9 @@ const LicenseManager: React.FC<Props> = ({ socketPort, sessionId, onClose }) => 
   const { webSocket, connected, messages } = useWebSocket(socketPort, sessionId);
   const [state, setState] = useState<LicenseState | null>(null);
   const [mode, setMode] = useState<'request' | 'activate' | 'existing'>('request');
+  const [form, setForm] = useState({ organization: '', owner: '', email: '', file: '', agreementAccepted: false });
+  const [pending, setPending] = useState(false);
+  const [feedback, setFeedback] = useState('');
 
   const refresh = useCallback(() => webSocket?.send(JSON.stringify({ type: 'license.bootstrap', sessionId })), [webSocket, sessionId]);
   useEffect(() => { if (connected) refresh(); }, [connected, refresh]);
@@ -22,8 +25,14 @@ const LicenseManager: React.FC<Props> = ({ socketPort, sessionId, onClose }) => 
     if (!messages.length) return;
     try {
       const message = JSON.parse(messages[messages.length - 1]);
-      if (message.sessionId !== sessionId || !['license.bootstrapResponse', 'license.statusResponse'].includes(message.operationId)) return;
-      setState(typeof message.body === 'string' ? JSON.parse(message.body) : message.body);
+      if (message.sessionId !== sessionId || !message.operationId?.startsWith('license.')) return;
+      const body = typeof message.body === 'string' ? JSON.parse(message.body) : message.body;
+      setPending(false);
+      if (body?.ok) {
+        setState(body);
+        setFeedback(body.message || 'License status refreshed.');
+        if (!['license.bootstrapResponse', 'license.statusResponse'].includes(message.operationId)) refresh();
+      } else setFeedback(body?.error || 'License operation failed.');
     } catch (_) { }
   }, [messages, sessionId]);
 
@@ -32,6 +41,18 @@ const LicenseManager: React.FC<Props> = ({ socketPort, sessionId, onClose }) => 
     { id: 'activate' as const, label: 'Activate', enabled: state?.capabilities?.activate !== false },
     { id: 'existing' as const, label: 'Use existing', enabled: state?.capabilities?.useExisting !== false },
   ], [state]);
+
+  const submit = () => {
+    if (!webSocket || pending) return;
+    setPending(true); setFeedback('');
+    const type = mode === 'request' ? 'license.request' : mode === 'activate' ? 'license.activate' : 'license.useExisting';
+    webSocket.send(JSON.stringify({ type, sessionId, body: JSON.stringify({
+      requestId: `${Date.now()}-${type}`, organization: form.organization, owner: form.owner, email: form.email,
+      agreementAccepted: form.agreementAccepted,
+      responseFile: mode === 'activate' ? form.file : undefined,
+      licenseFile: mode === 'existing' ? form.file : undefined,
+    }) }));
+  };
 
   return <section className={styles.panel} aria-label="License manager">
     <header className={styles.header}>
@@ -56,8 +77,15 @@ const LicenseManager: React.FC<Props> = ({ socketPort, sessionId, onClose }) => 
     <nav className={styles.segmented} aria-label="License action">
       {modes.map(item => <button key={item.id} disabled={!item.enabled} className={mode === item.id ? styles.selected : ''} onClick={() => setMode(item.id)}>{item.label}</button>)}
     </nav>
-    <div className={styles.pending}>
-      <FolderOpen size={18}/><span><strong>{mode === 'request' ? 'Request a new license' : mode === 'activate' ? 'Activate a response file' : 'Select an existing license'}</strong><small>This action becomes available when the secure backend mutation API is enabled.</small></span>
+    <div className={styles.form}>
+      {mode === 'request' ? <>
+        <label>Organization<input value={form.organization} onChange={e => setForm({...form,organization:e.target.value})}/></label>
+        <label>Owner<input value={form.owner} onChange={e => setForm({...form,owner:e.target.value})}/></label>
+        <label>Email<input type="email" value={form.email} onChange={e => setForm({...form,email:e.target.value})}/></label>
+      </> : <label>{mode === 'activate' ? 'Response file' : 'License file'}<span className={styles.pathInput}><FolderOpen size={17}/><input value={form.file} onChange={e => setForm({...form,file:e.target.value})} placeholder={mode === 'activate' ? 'Configured directory/response file' : 'Configured directory/ARWeb.lic'}/></span></label>}
+      {mode !== 'existing' && <label className={styles.agreement}><input type="checkbox" checked={form.agreementAccepted} onChange={e => setForm({...form,agreementAccepted:e.target.checked})}/><span>I accept the software license agreement.</span></label>}
+      {feedback && <p className={styles.feedback}>{feedback}</p>}
+      <button className={styles.submit} onClick={submit} disabled={pending || (mode !== 'existing' && !form.agreementAccepted)}>{pending ? 'Processing...' : mode === 'request' ? 'Generate request' : mode === 'activate' ? 'Activate license' : 'Use existing license'}</button>
     </div>
   </section>;
 };
