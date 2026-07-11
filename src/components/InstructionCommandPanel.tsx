@@ -55,7 +55,6 @@ const FALLBACK_COMMANDS: CommandDefinition[] = [
   { code: 'GOTO', label: 'GOTO', target: 'block', fields: ['block', 'count'] },
   { code: 'H', label: 'Wait', target: 'number', fields: ['hold'] },
 ];
-const SPECIAL_ACTIONS = new Set(['SET', 'GET', 'CK', 'Q', 'P', 'H', 'E', 'GOTO', 'IF', 'ELSEIF', 'ELSE', 'ENDIF', 'PAUSE', 'REFRESH', 'LOOP', 'REFRESH_LOOP', 'NEXT_ENTER', 'SWIPE_UP', 'SWIPE_DOWN', 'EXCEL GOTO', 'NEXT ROW', 'CSV CHECK', 'PDF CHECK']);
 const supportsTag = (command: CommandDefinition, tagName: string) => !command.allowedTags?.length || command.allowedTags.includes(tagName);
 
 const InstructionCommandPanel: React.FC<Props> = (props) => {
@@ -176,7 +175,7 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
     () => variables.filter(row => !selectedWebFieldId || row.instructionId === selectedWebFieldId),
     [variables, selectedWebFieldId]
   );
-  const isCommandRow = SPECIAL_ACTIONS.has((instruction.actions || '').split(':', 1)[0].toUpperCase());
+  const canEditSelected = storedDraft != null && commands.some(command => command.editAllowed === true);
 
   const openCommand = (nextMode: 'before' | 'after' | 'edit') => {
     setMode(nextMode);
@@ -243,7 +242,7 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
           <div className={styles.actionGrid}>
             <button onClick={() => openCommand('before')}><b>Add command before</b><span>Create and insert a configured operation</span></button>
             <button onClick={() => openCommand('after')}><b>Add command after</b><span>Create and insert a configured operation</span></button>
-            {isCommandRow && !['IF', 'ELSEIF', 'ELSE', 'ENDIF'].includes(instruction.actions) && <button onClick={() => openCommand('edit')}><b>Edit command</b><span>Update {instruction.actions || 'this instruction'}</span></button>}
+            {canEditSelected && <button onClick={() => openCommand('edit')}><b>Edit command</b><span>Update {instruction.actions || 'this instruction'}</span></button>}
             {props.allowSplit && props.onSplit && <button onClick={props.onSplit}><b>Split component</b><span>Move the selected sequence into a component</span></button>}
             {props.allowElseIf && props.onInsertElseIf && <button disabled={!graphRevision} onClick={() => props.onInsertElseIf?.(graphRevision)}><b>Insert ElseIf</b><span>Extend the current conditional structure</span></button>}
           </div>
@@ -251,7 +250,7 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
 
         {view === 'command' && (
           <div className={styles.form}>
-            <label>Placement<select value={mode} onChange={(e) => setMode(e.target.value as typeof mode)}><option value="before">Before selected step</option><option value="after">After selected step</option><option value="edit">Update selected step</option></select></label>
+            <label>Placement<select value={mode} onChange={(e) => openCommand(e.target.value as typeof mode)}><option value="before">Before selected step</option><option value="after">After selected step</option>{canEditSelected && <option value="edit">Update selected step</option>}</select></label>
             <label>Command<select value={action} onChange={(e) => { const value = e.target.value; setAction(value); setName(commands.find(command => command.code === value)?.label || value); }}>
               {availableCommands.map(command => <option key={command.code} value={command.code}>{command.label}</option>)}
             </select></label>
