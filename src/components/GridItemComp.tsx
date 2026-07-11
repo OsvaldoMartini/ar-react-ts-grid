@@ -145,7 +145,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
   const [alertDismissed, setAlertDismissed] = useState(false);
   const [alertOnConfirm, setAlertOnConfirm] = useState<(() => void) | undefined>(undefined);
   const [findText, setFindText] = useState<string>('');
-  const [moveCapabilities, setMoveCapabilities] = useState<Map<number, { canMove: boolean; reason: string }>>(new Map());
+  const [moveCapabilities, setMoveCapabilities] = useState<Map<number, { canMove: boolean; canDelete: boolean; reason: string; deleteReason: string }>>(new Map());
   const [moveGraphRevision, setMoveGraphRevision] = useState('');
 
   //  const [executionId, setExecutionId] = useState<number>(0);
@@ -717,10 +717,10 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
           }
         } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "instructionEditor.memoryCapabilitiesResponse") {
           const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
-          const next = new Map<number, { canMove: boolean; reason: string }>();
+          const next = new Map<number, { canMove: boolean; canDelete: boolean; reason: string; deleteReason: string }>();
           if (Array.isArray(bodyData?.capabilities)) {
-            bodyData.capabilities.forEach((capability: { instructionId: number; canMove: boolean; reason?: string }) => {
-              next.set(capability.instructionId, { canMove: capability.canMove === true, reason: capability.reason || '' });
+            bodyData.capabilities.forEach((capability: { instructionId: number; canMove: boolean; canDelete: boolean; reason?: string; deleteReason?: string }) => {
+              next.set(capability.instructionId, { canMove: capability.canMove === true, canDelete: capability.canDelete === true, reason: capability.reason || '', deleteReason: capability.deleteReason || '' });
             });
           }
           setMoveCapabilities(next);
@@ -2017,7 +2017,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
 
 
   const handleRemoveInstruction = (instructionId: number) => {
-    if (!moveGraphRevision) return;
+    if (!moveGraphRevision || !moveCapabilities.get(instructionId)?.canDelete) return;
     const instruction = componentsData.find(row => row.id === instructionId);
     if (!instruction) return;
     const familyDelete = ["IF", "ELSE", "ENDIF"].includes(instruction.actions);
@@ -3056,6 +3056,8 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                                   src={crossImage}
                                   alt=""
                                   className={styles.crossButton}
+                                  title={moveCapabilities.get(Number(excelGotoInstruction.id))?.deleteReason || 'Delete instruction'}
+                                  style={{ opacity: moveCapabilities.get(Number(excelGotoInstruction.id))?.canDelete ? 1 : 0.35 }}
                                   onClick={() => handleRemoveInstruction(Number(excelGotoInstruction.id))}
                                 />
                                 {openDropdown === excelGotoInstruction.id && (
@@ -3233,6 +3235,8 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                                             src={crossImage}
                                             alt=""
                                             className={styles.crossButton}
+                                            title={moveCapabilities.get(instruction.id)?.deleteReason || 'Delete instruction'}
+                                            style={{ opacity: moveCapabilities.get(instruction.id)?.canDelete ? 1 : 0.35 }}
                                             onClick={() =>
                                               handleRemoveInstruction(instruction.id)
                                             }

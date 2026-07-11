@@ -191,7 +191,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     blockOptionsFromInstructions(data)
   );
   const [createBlockOpen, setCreateBlockOpen] = useState<boolean>(false);
-  const [memoryCapabilities, setMemoryCapabilities] = useState<Map<number, { canAdd: boolean; canMove: boolean; reason: string }>>(new Map());
+  const [memoryCapabilities, setMemoryCapabilities] = useState<Map<number, { canAdd: boolean; canMove: boolean; canDelete: boolean; reason: string; deleteReason: string }>>(new Map());
   const [moveGraphRevision, setMoveGraphRevision] = useState('');
   const [pendingMemoryMove, setPendingMemoryMove] = useState<{ requestId: string; ids: Set<number> } | null>(null);
   const [memoryMoveStatus, setMemoryMoveStatus] = useState('');
@@ -989,10 +989,10 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
           }
         } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "instructionEditor.memoryCapabilitiesResponse") {
           const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
-          const next = new Map<number, { canAdd: boolean; canMove: boolean; reason: string }>();
+          const next = new Map<number, { canAdd: boolean; canMove: boolean; canDelete: boolean; reason: string; deleteReason: string }>();
           if (Array.isArray(bodyData?.capabilities)) {
-            bodyData.capabilities.forEach((capability: { instructionId: number; canAddToMemory: boolean; canMove: boolean; reason?: string }) => {
-              next.set(capability.instructionId, { canAdd: capability.canAddToMemory === true, canMove: capability.canMove === true, reason: capability.reason || '' });
+            bodyData.capabilities.forEach((capability: { instructionId: number; canAddToMemory: boolean; canMove: boolean; canDelete: boolean; reason?: string; deleteReason?: string }) => {
+              next.set(capability.instructionId, { canAdd: capability.canAddToMemory === true, canMove: capability.canMove === true, canDelete: capability.canDelete === true, reason: capability.reason || '', deleteReason: capability.deleteReason || '' });
             });
           }
           setMemoryCapabilities(next);
@@ -2327,7 +2327,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
 
   const handleRemoveInstruction = (instructionId: number) => {
-    if (!moveGraphRevision) return;
+    if (!moveGraphRevision || !memoryCapabilities.get(instructionId)?.canDelete) return;
     const instruction = instructionsData.find(row => row.id === instructionId);
     if (!instruction) return;
     const familyDelete = ["IF", "ELSE", "ENDIF"].includes(instruction.actions);
@@ -3580,6 +3580,8 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                                   src={crossImage}
                                   alt=""
                                   className={styles.crossButton}
+                                  title={memoryCapabilities.get(Number(excelGotoInstruction.id))?.deleteReason || 'Delete instruction'}
+                                  style={{ opacity: memoryCapabilities.get(Number(excelGotoInstruction.id))?.canDelete ? 1 : 0.35 }}
                                   onClick={() => handleRemoveInstruction(Number(excelGotoInstruction.id))}
                                 />
                                 {openDropdown === excelGotoInstruction.id && (
@@ -3780,6 +3782,8 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                                             src={crossImage}
                                             alt=""
                                             className={styles.crossButton}
+                                            title={memoryCapabilities.get(instruction.id)?.deleteReason || 'Delete instruction'}
+                                            style={{ opacity: memoryCapabilities.get(instruction.id)?.canDelete ? 1 : 0.35 }}
                                             onClick={() =>
                                               handleRemoveInstruction(instruction.id)
                                             }
