@@ -518,7 +518,7 @@
 /* Instruction Item */
 .instructionItem {
   display: grid;
-  grid-template-columns: 240px auto minmax(60px, 1fr) auto;
+  grid-template-columns: 28px 240px auto minmax(60px, 1fr) auto;
   // gap: 8px; /* Decreased gap */
   // padding: 8px; /* Decreased padding */
   background-color: #e0f7fa;
@@ -566,6 +566,23 @@
     }
 
 }
+
+.dragHandle {
+  width: 28px;
+  height: 32px;
+  align-self: stretch;
+  border: 0;
+  border-right: 1px solid #c6d9dd;
+  background: rgba(255, 255, 255, 0.45);
+  color: #52666d;
+  font-size: 18px;
+  line-height: 1;
+  cursor: grab;
+}
+
+.dragHandle:active { cursor: grabbing; }
+.dragHandle:hover:not(:disabled) { background: #fff; color: #075a75; }
+.dragHandle:disabled { opacity: 0.35; cursor: not-allowed; }
 
 /* Change background to white when dropdown is open */
 .instructionItem.dropdownOpen {

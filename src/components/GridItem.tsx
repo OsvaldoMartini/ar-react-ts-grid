@@ -3578,7 +3578,6 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                                     <div
                                       ref={provided.innerRef}
                                       {...provided.draggableProps}
-                                      {...provided.dragHandleProps}
                                       className={`${styles.instructionItem} ${openDropdown === instruction.id ? styles.dropdownOpen : ''
                                         } ${instruction.actions === 'IF' || instruction.actions === 'ELSEIF' || instruction.actions === 'ELSE' || instruction.actions === 'ENDIF'
                                           ? styles.lightYellowBackground
@@ -3586,6 +3585,14 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                                         }`}
                                     // data-executing={instruction.id === executionId}
                                     >
+                                      <button
+                                        type="button"
+                                        className={styles.dragHandle}
+                                        {...provided.dragHandleProps}
+                                        disabled={findText.trim().length > 0 || !memoryCapabilities.get(instruction.id)?.canMove}
+                                        title={findText.trim().length > 0 ? 'Clear Find before moving instructions' : memoryCapabilities.get(instruction.id)?.reason || 'Move instruction'}
+                                        aria-label={`Move instruction ${instruction.instructionOrderNumber}`}
+                                      >≡</button>
                                       {instruction.id === executionId && (
                                         <div className={`${styles.executionBackground} ${(styles as Record<string,string>)[executionState?.toLowerCase() ?? ''] ?? ''}`} />
                                       )}

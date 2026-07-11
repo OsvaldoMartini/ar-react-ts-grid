@@ -3071,7 +3071,6 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                                     <div
                                       ref={provided.innerRef}
                                       {...provided.draggableProps}
-                                      {...provided.dragHandleProps}
                                       className={`${styles.instructionItem} ${openDropdown === instruction.id ? styles.dropdownOpen : ''
                                         } ${instruction.actions === 'IF' || instruction.actions === 'ELSEIF' || instruction.actions === 'ELSE' || instruction.actions === 'ENDIF'
                                           ? styles.lightYellowBackground
@@ -3079,6 +3078,14 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                                         }`}
                                     // data-executing={instruction.id === executionId}
                                     >
+                                      <button
+                                        type="button"
+                                        className={styles.dragHandle}
+                                        {...provided.dragHandleProps}
+                                        disabled={findText.trim().length > 0 || !moveCapabilities.get(instruction.id)?.canMove}
+                                        title={findText.trim().length > 0 ? 'Clear Find before moving instructions' : moveCapabilities.get(instruction.id)?.reason || 'Move instruction'}
+                                        aria-label={`Move instruction ${instruction.instructionOrderNumber}`}
+                                      >≡</button>
                                       {editingInstructionId === instruction.id ? (
                                         <div className={styles.editContainer}>
                                           <input
