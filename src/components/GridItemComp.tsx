@@ -2006,6 +2006,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
 
 
   const handleRemoveInstruction = (instructionId: number) => {
+    if (!moveGraphRevision) return;
     const instruction = componentsData.find(row => row.id === instructionId);
     if (!instruction) return;
     const familyDelete = ["IF", "ELSE", "ENDIF"].includes(instruction.actions);
@@ -2034,6 +2035,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       const message = {
         type: "DELETE_INSTRUCTION",
         requestId: `${Date.now()}-component-instruction-delete-${instructionId}`,
+        graphRevision: moveGraphRevision,
         instructionId,
         actions,
         parentId,

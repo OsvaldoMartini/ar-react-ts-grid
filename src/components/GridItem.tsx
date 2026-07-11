@@ -2316,6 +2316,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
 
   const handleRemoveInstruction = (instructionId: number) => {
+    if (!moveGraphRevision) return;
     const instruction = instructionsData.find(row => row.id === instructionId);
     if (!instruction) return;
     const familyDelete = ["IF", "ELSE", "ENDIF"].includes(instruction.actions);
@@ -2344,6 +2345,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
       const message = {
         type: "DELETE_INSTRUCTION",
         requestId: `${Date.now()}-bot-instruction-delete-${instructionId}`,
+        graphRevision: moveGraphRevision,
         instructionId,
         actions,
         parentId,
