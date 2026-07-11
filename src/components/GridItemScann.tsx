@@ -22,6 +22,7 @@ import NameDropdown from './NameDropdown';
 import CreateNewBlock, { CreateBlockOption, CreateBlockPosition } from './CreateNewBlock';
 import OCRPanel from './OCRPanel';
 import OCRConfigPanel, { OCRConfigData, OCRParameter } from './OCRConfigPanel';
+import OCRTestResultsPanel, { OCRTestResult } from './OCRTestResultsPanel';
 import styles from './GridItemScann.module.scss';
 
 
@@ -292,6 +293,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   const [ocrConfig, setOcrConfig] = useState<OCRConfigData | null>(null);
   const [ocrConfigBusy, setOcrConfigBusy] = useState(false);
   const [ocrConfigError, setOcrConfigError] = useState('');
+  const [ocrTestResult, setOcrTestResult] = useState<OCRTestResult | null>(null);
 
   const scannedTextOf = (el: ElementDTO): string | null => {
     const attrs = (el as any).attributeData as Array<{ name: string; value: string }> | undefined;
@@ -333,6 +335,13 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
       }
       return updated;
     });
+  };
+  const acceptOcrSuggestions = (suggestions:Array<{xPath:string;clientNamed:string}>) => {
+    const values = new Map(suggestions.map(item=>[item.xPath,item.clientNamed]));
+    const apply = (element:ElementDTO):ElementDTO => values.has(element.xPath) ? {...element,clientNamed:values.get(element.xPath)} as ElementDTO : element;
+    setElementDTO(previous=>previous.map(apply));
+    setElementGrouped(previous=>Object.fromEntries(Object.entries(previous).map(([key,group])=>[key,{...group,elements:group.elements.map(apply)}])));
+    setOcrTestResult(null);
   };
 
   const handleApplyMemory = () => {
@@ -664,6 +673,12 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
           case "ocrConfig.cleanupApplyResponse": {
             setOcrConfigBusy(false);
             setOcrConfigError(bodyData?.ok ? `Cleanup complete: ${Number(bodyData.deleted||0)} locator(s) deleted.` : String(bodyData?.error || 'Cleanup failed.'));
+            break;
+          }
+          case "ocrTest.runResponse": {
+            setOcrConfigBusy(false);
+            if (!bodyData?.ok) { setOcrConfigError(String(bodyData?.error || 'OCR test failed.')); break; }
+            setOcrTestResult(bodyData as OCRTestResult);
             break;
           }
 
@@ -1956,7 +1971,8 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
                         </button>
                       </>
       )}
-      {ocrConfig && <OCRConfigPanel key={ocrConfig.activeProfileId || 'new'} data={ocrConfig} busy={ocrConfigBusy} error={ocrConfigError} onSelect={profileId=>sendOcrConfigCommand('ocrConfig.profile',{profileId})} onSave={saveOcrConfig} onDelete={deleteOcrConfig} onCleanup={()=>sendOcrConfigCommand('ocrConfig.cleanupPreview',{homeBankingId})} onClose={()=>setOcrConfig(null)}/>}
+      {ocrConfig && <OCRConfigPanel key={ocrConfig.activeProfileId || 'new'} data={ocrConfig} busy={ocrConfigBusy} error={ocrConfigError} onSelect={profileId=>sendOcrConfigCommand('ocrConfig.profile',{profileId})} onSave={saveOcrConfig} onDelete={deleteOcrConfig} onCleanup={()=>sendOcrConfigCommand('ocrConfig.cleanupPreview',{homeBankingId})} onTest={parameters=>sendOcrConfigCommand('ocrTest.run',{parameters})} onClose={()=>setOcrConfig(null)}/>}
+      {ocrTestResult && <OCRTestResultsPanel result={ocrTestResult} onAccept={acceptOcrSuggestions} onClose={()=>setOcrTestResult(null)}/>}
                     {isInputTextBlock(typeElement) && (
                       <img
                         src={testInputImage}

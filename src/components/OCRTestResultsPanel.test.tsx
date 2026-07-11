@@ -1,0 +1,6 @@
+import React from 'react';
+import {fireEvent,render,screen} from '@testing-library/react';
+import OCRTestResultsPanel,{OCRTestResult} from './OCRTestResultsPanel';
+const result:OCRTestResult={source:'elementDTO-PS.json',wordCount:4,counts:{EXACT_CONTAIN:1,NONE:1},rows:[{definedName:'login',quality:'EXACT_CONTAIN',tag:'button',domText:'Log in',ocrText:'Login now',xPath:'/html/button'},{definedName:'user',quality:'NONE',tag:'input',domText:'',ocrText:'',xPath:'/html/input'}]};
+test('approves rows and emits meaningful OCR suggestions',()=>{const accept=jest.fn();render(<OCRTestResultsPanel result={result} onAccept={accept} onClose={jest.fn()}/>);fireEvent.click(screen.getByLabelText('Approve login'));fireEvent.click(screen.getByRole('button',{name:/accept ocr names/i}));expect(accept).toHaveBeenCalledWith([{xPath:'/html/button',clientNamed:'Login now'}]);});
+test('shows full xpath for selected rows',()=>{render(<OCRTestResultsPanel result={result} onAccept={jest.fn()} onClose={jest.fn()}/>);fireEvent.click(screen.getByText('user'));expect(screen.getByDisplayValue('/html/input')).toBeInTheDocument();});
