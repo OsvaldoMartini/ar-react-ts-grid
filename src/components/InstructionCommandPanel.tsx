@@ -43,7 +43,7 @@ type Props = {
 type VariableRow = { id?: number; type: string; name: string; value: string; instructionId?: number; localFormat?: string; delimiter?: string; usedVars?: string };
 type WebFieldRow = { id: number; name: string; actions: string; tagName?: string; blockId: number; blockName?: string };
 type BlockRow = { id: number; name: string; blockOrderNumber?: number };
-type CommandDefinition = { code: string; label: string; target: string; fields: string[]; allowedTags?: string[]; insertAllowed?: boolean; editAllowed?: boolean; disabledReason?: string };
+type CommandDefinition = { code: string; label: string; target: string; fields: string[]; allowedTags?: string[]; allowedVariableTypes?: string[]; insertAllowed?: boolean; editAllowed?: boolean; disabledReason?: string };
 type StoredCommandDraft = Omit<CommandDraft, 'mode'>;
 type SplitPreviewRow = { id: number; order: number; name: string; action: string; parentId?: number | null };
 type SplitPreview = { graphRevision: string; retainedRows: SplitPreviewRow[]; movedRows: SplitPreviewRow[]; retainedCount: number; movedCount: number };
@@ -193,9 +193,15 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
     setName(availableCommands[0].label);
   }, [availableCommands, action]);
   const relatedVariables = useMemo(
-    () => variables.filter(row => !selectedWebFieldId || row.instructionId === selectedWebFieldId),
-    [variables, selectedWebFieldId]
+    () => variables.filter(row =>
+      (!selectedWebFieldId || row.instructionId === selectedWebFieldId)
+      && (selectedCommand?.allowedVariableTypes || []).includes(row.type)),
+    [variables, selectedWebFieldId, selectedCommand]
   );
+  useEffect(() => {
+    if (!selectedVariableId || relatedVariables.some(row => row.id === selectedVariableId)) return;
+    setSelectedVariableId(undefined);
+  }, [relatedVariables, selectedVariableId]);
   const canEditSelected = storedDraft != null && commands.some(command => command.editAllowed === true);
   const commandsReady = graphRevision.length > 0 && commands.length > 0;
   const variableUsageCount = Number.parseInt(variable.usedVars || '0', 10) || 0;
@@ -336,7 +342,7 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
               <div className={styles.variableButtons}>
                 {variable.id != null && <button className={styles.deleteButton} disabled={variableUsageCount > 0} title={variableUsageCount > 0 ? `Used by ${variableUsageCount} instruction(s)` : 'Delete variable'} onClick={() => setDeleteCandidate(variable)}>Delete</button>}
                 <button className={styles.primary} disabled={!variable.name.trim()} onClick={() => props.onSocketCommand('variableEditor.save', { ...props.context, requestId: `${Date.now()}-variable-save-${variable.id ?? 'new'}`, instructionId: instruction.id, instructionName: instruction.name, variable })}>{variable.id == null ? 'Create' : 'Update'}</button>
-                <button onClick={() => { setSelectedVariableId(variable.id); if (variable.instructionId) setSelectedWebFieldId(variable.instructionId); setView('command'); }}>Use in command</button>
+                <button disabled={!selectedCommand?.allowedVariableTypes?.includes(variable.type)} title={selectedCommand?.allowedVariableTypes?.includes(variable.type) ? 'Use variable in command' : 'Variable type is not compatible with this command'} onClick={() => { setSelectedVariableId(variable.id); if (variable.instructionId) setSelectedWebFieldId(variable.instructionId); setView('command'); }}>Use in command</button>
               </div>
             </div>
           </div>
