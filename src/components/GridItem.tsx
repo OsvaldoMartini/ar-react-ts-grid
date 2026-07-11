@@ -50,6 +50,7 @@ import CompForce from './CompForce';
 import CreateNewBlock, { CreateBlockOption, CreateBlockPosition } from './CreateNewBlock';
 import InstructionCommandPanel, { CommandDraft } from './InstructionCommandPanel';
 import { useWebSocket } from './useWebSocket';
+import { useInstructionDrag } from './useInstructionDrag';
 import styles from './Griditem.module.scss';
 
 
@@ -193,6 +194,10 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
   const [createBlockOpen, setCreateBlockOpen] = useState<boolean>(false);
   const [memoryCapabilities, setMemoryCapabilities] = useState<Map<number, { canAdd: boolean; canMove: boolean; canDelete: boolean; deleteCount: number; reason: string; deleteReason: string }>>(new Map());
   const [moveGraphRevision, setMoveGraphRevision] = useState('');
+  const submitInstructionMove = useInstructionDrag({
+    webSocket, connected, graphRevision: moveGraphRevision, botJobId, botJobName,
+    homeBankingId, targetSessionId: 'botJobTasks',
+  });
   const [pendingMemoryMove, setPendingMemoryMove] = useState<{ requestId: string; ids: Set<number> } | null>(null);
   const [memoryMoveStatus, setMemoryMoveStatus] = useState('');
 
@@ -914,32 +919,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     setIsDataReordered(false); // To trigger reordering logic if needed
 
     // Send WebSocket message with the updated instructions
-    if (webSocket && connected) {
-      const updatedRows = updatedInstructionsData.map(instruction => ({
-        blockId: instruction.blockId,
-        instructionId: instruction.id,
-        instructionOrderNumber: instruction.instructionOrderNumber,
-      }));
-
-      const message = {
-        type: 'ROW_MOVE',
-        requestId: `${Date.now()}-bot-row-move`,
-        graphRevision: moveGraphRevision,
-        botJobId,
-        botJobName,
-        deleteBlockId,
-        homeBankingId: homeBankingId,
-        sessionId: `botJobTasks`, //-${botJobId}`,
-        updatedRows,
-      };
-
-      try {
-        webSocket.send(JSON.stringify(message));
-        console.log('Sent row move message:', message);
-      } catch (error) {
-        console.log('Error sending WebSocket message:', error);
-      }
-    }
+    submitInstructionMove(updatedInstructionsData, deleteBlockId, 'drag');
   };
 
 
