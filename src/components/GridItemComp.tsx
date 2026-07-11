@@ -1564,77 +1564,35 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
 
   // Function to move an instruction down considering blockOrderNumber
   const handleMoveRowDown = (instructionId: number) => {
-    const updatedData = [...componentsData];
-    const instructionIndex = updatedData.findIndex(instruction => instruction.id === instructionId);
-
-    // Ensure that the instruction exists
-    if (instructionIndex !== -1) {
-      const currentInstruction = updatedData[instructionIndex];
-
-      // Find all instructions within the same block (determined by blockOrderNumber)
-      const blockInstructions = updatedData.filter(
-        instruction => instruction.blockId === currentInstruction.blockId && instruction.blockOrderNumber === currentInstruction.blockOrderNumber
-      );
-
-      // Find the index of the current instruction within its block
-      const blockInstructionIndex = blockInstructions.findIndex(instruction => instruction.id === instructionId);
-
-      // Ensure that the instruction isn't already the last one within its block
-      if (blockInstructionIndex < blockInstructions.length - 1) {
-        const nextInstruction = blockInstructions[blockInstructionIndex + 1];
-
-
-        // Capture rowsSwaps for WebSocket message including blockId
-        // Swap their instructionOrderNumbers
-        const tempOrderNumber = currentInstruction.instructionOrderNumber;
-        currentInstruction.instructionOrderNumber = nextInstruction.instructionOrderNumber;
-        nextInstruction.instructionOrderNumber = tempOrderNumber;
-
-        // Reassign the updatedData array and update the state
-        const normalizedData = reassignInstructionOrderNumbersByBlock(updatedData);
-        setComponentsData([...normalizedData]);
-        setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
-
-        submitInstructionMove(normalizedData, -1, 'arrow-down');
-      }
-    }
+    const instruction = componentsData.find(row => row.id === instructionId);
+    if (!instruction) return;
+    const blockInstructions = componentsData
+      .filter(row => row.blockId === instruction.blockId)
+      .sort((left, right) => left.instructionOrderNumber - right.instructionOrderNumber);
+    const sourceIndex = blockInstructions.findIndex(row => row.id === instructionId);
+    const destinationIndex = sourceIndex + (1);
+    if (sourceIndex < 0 || destinationIndex < 0 || destinationIndex >= blockInstructions.length) return;
+    onDragEnd({
+      draggableId: String(instructionId),
+      source: { droppableId: String(instruction.blockId), index: sourceIndex },
+      destination: { droppableId: String(instruction.blockId), index: destinationIndex },
+    });
   };
 
-
-  // Function to move an instruction up considering blockOrderNumber
   const handleMoveRowUp = (instructionId: number) => {
-    const updatedData = [...componentsData];
-    const instructionIndex = updatedData.findIndex(instruction => instruction.id === instructionId);
-
-    // Ensure that the instruction exists
-    if (instructionIndex !== -1) {
-      const currentInstruction = updatedData[instructionIndex];
-
-      // Find all instructions within the same block (determined by blockId and blockOrderNumber)
-      const blockInstructions = updatedData.filter(
-        instruction => instruction.blockId === currentInstruction.blockId && instruction.blockOrderNumber === currentInstruction.blockOrderNumber
-      );
-
-      // Find the index of the current instruction within its block
-      const blockInstructionIndex = blockInstructions.findIndex(instruction => instruction.id === instructionId);
-
-      // Ensure that the instruction isn't already the first one within its block
-      if (blockInstructionIndex > 0) {
-        const previousInstruction = blockInstructions[blockInstructionIndex - 1];
-
-        // Swap their instructionOrderNumbers
-        const tempOrderNumber = currentInstruction.instructionOrderNumber;
-        currentInstruction.instructionOrderNumber = previousInstruction.instructionOrderNumber;
-        previousInstruction.instructionOrderNumber = tempOrderNumber;
-
-        // Reassign the updatedData array
-        const normalizedData = reassignInstructionOrderNumbersByBlock(updatedData);
-        setComponentsData([...normalizedData]);
-        setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
-
-        submitInstructionMove(normalizedData, -1, 'arrow-up');
-      }
-    }
+    const instruction = componentsData.find(row => row.id === instructionId);
+    if (!instruction) return;
+    const blockInstructions = componentsData
+      .filter(row => row.blockId === instruction.blockId)
+      .sort((left, right) => left.instructionOrderNumber - right.instructionOrderNumber);
+    const sourceIndex = blockInstructions.findIndex(row => row.id === instructionId);
+    const destinationIndex = sourceIndex + (-1);
+    if (sourceIndex < 0 || destinationIndex < 0 || destinationIndex >= blockInstructions.length) return;
+    onDragEnd({
+      draggableId: String(instructionId),
+      source: { droppableId: String(instruction.blockId), index: sourceIndex },
+      destination: { droppableId: String(instruction.blockId), index: destinationIndex },
+    });
   };
 
   const handleRowSelectedClick = (
