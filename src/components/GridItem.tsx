@@ -1742,29 +1742,6 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
   };
 
 
-  const isBetweenIfAndElseExcluded = (currentOrderNumber: number, instructions: BlockLoopInstructionLoadDTO[]) => {
-    let ifFound = false;
-
-    for (const instr of instructions) {
-      if (instr.actions === "IF") {
-        ifFound = true;
-        continue; // Skip further checks for the current "IF" instruction
-      }
-
-      if (ifFound && instr.actions === "ELSE") {
-        ifFound = false; // Reset when "ELSE" is found
-        continue; // Skip further checks for the current "ELSE" instruction
-      }
-
-      if (ifFound && instr.instructionOrderNumber === currentOrderNumber) {
-        return true; // The instruction is between IF and ELSE, excluding them
-      }
-    }
-    return false;
-  };
-
-
-
   const isBetweenIfAndElse = (currentOrderNumber: number, instructions: BlockLoopInstructionLoadDTO[]) => {
     let ifFound = false;
 
@@ -3585,7 +3562,6 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                                   <InstructionCommandPanel
                                     instruction={excelGotoInstruction}
                                     allowSplit={false}
-                                    allowElseIf={false}
                                     onClose={() => setOpenDropdown(null)}
                                     onApplyCommand={(draft) => applyCommandFromPanel(excelGotoInstruction, draft)}
                                     messages={messages}
@@ -3804,7 +3780,6 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                                           <InstructionCommandPanel
                                             instruction={instruction}
                                             allowSplit={!isJustOne && !["IF", "ELSEIF", "ELSE", "ENDIF"].includes(instruction.actions) && !isBetweenIfAndEndIf(instruction.instructionOrderNumber, blockData.instructions)}
-                                            allowElseIf={["IF", "ELSEIF"].includes(instruction.actions) || isBetweenIfAndElseExcluded(instruction.instructionOrderNumber, blockData.instructions)}
                                             onClose={() => setOpenDropdown(null)}
                                             onSplit={() => handleSplitComponent(instruction.id, groupedData, setGroupedData, instructionsData, isLastInstruction)}
                                             onInsertElseIf={(graphRevision) => {

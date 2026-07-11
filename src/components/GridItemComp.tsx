@@ -1443,29 +1443,6 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
   };
 
 
-  const isBetweenIfAndElseExcluded = (currentOrderNumber: number, instructions: ComponentsInstructionsDTO[]) => {
-    let ifFound = false;
-
-    for (const instr of instructions) {
-      if (instr.actions === "IF") {
-        ifFound = true;
-        continue; // Skip further checks for the current "IF" instruction
-      }
-
-      if (ifFound && instr.actions === "ELSE") {
-        ifFound = false; // Reset when "ELSE" is found
-        continue; // Skip further checks for the current "ELSE" instruction
-      }
-
-      if (ifFound && instr.instructionOrderNumber === currentOrderNumber) {
-        return true; // The instruction is between IF and ELSE, excluding them
-      }
-    }
-    return false;
-  };
-
-
-
   const isBetweenIfAndElse = (currentOrderNumber: number, instructions: ComponentsInstructionsDTO[]) => {
     let ifFound = false;
 
@@ -3075,7 +3052,6 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                                   <InstructionCommandPanel
                                     instruction={excelGotoInstruction}
                                     allowSplit={false}
-                                    allowElseIf={false}
                                     onClose={() => setOpenDropdown(null)}
                                     onApplyCommand={(draft) => applyCommandFromPanel(excelGotoInstruction, draft)}
                                     messages={messages}
@@ -3270,7 +3246,6 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                                           <InstructionCommandPanel
                                             instruction={instruction}
                                             allowSplit={false}
-                                            allowElseIf={["IF", "ELSEIF"].includes(instruction.actions) || isBetweenIfAndElseExcluded(instruction.instructionOrderNumber, blockData.instructions)}
                                             onClose={() => setOpenDropdown(null)}
                                             onInsertElseIf={(graphRevision) => {
                                               webSocket?.send(JSON.stringify({

@@ -32,7 +32,6 @@ export type CommandDraft = {
 type Props = {
   instruction: CommandPanelInstruction;
   allowSplit: boolean;
-  allowElseIf: boolean;
   onClose: () => void;
   onSplit?: () => void;
   onInsertElseIf?: (graphRevision: string) => void;
@@ -72,6 +71,7 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
   const [variableStatus, setVariableStatus] = useState('');
   const [storedDraft, setStoredDraft] = useState<StoredCommandDraft | null>(null);
   const [graphRevision, setGraphRevision] = useState('');
+  const [canInsertElseIf, setCanInsertElseIf] = useState(false);
 
   const requestCommandBootstrap = () => props.onSocketCommand('commandEditor.bootstrap', {
     ...props.context,
@@ -122,6 +122,7 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
         if (Array.isArray(body?.commands)) setCommands(body.commands);
         if (body?.draft) setStoredDraft(body.draft);
         if (typeof body?.graphRevision === 'string') setGraphRevision(body.graphRevision);
+        setCanInsertElseIf(body?.rowCapabilities?.canInsertElseIf === true);
         return;
       }
       if (operationId.startsWith('variableEditor.')) {
@@ -237,7 +238,7 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
             <button disabled={!commandsReady} onClick={() => openCommand('after')}><b>Add command after</b><span>Create and insert a configured operation</span></button>
             {canEditSelected && <button onClick={() => openCommand('edit')}><b>Edit command</b><span>Update {instruction.actions || 'this instruction'}</span></button>}
             {props.allowSplit && props.onSplit && <button onClick={props.onSplit}><b>Split component</b><span>Move the selected sequence into a component</span></button>}
-            {props.allowElseIf && props.onInsertElseIf && <button disabled={!graphRevision} onClick={() => props.onInsertElseIf?.(graphRevision)}><b>Insert ElseIf</b><span>Extend the current conditional structure</span></button>}
+            {canInsertElseIf && props.onInsertElseIf && <button disabled={!graphRevision} onClick={() => props.onInsertElseIf?.(graphRevision)}><b>Insert ElseIf</b><span>Extend the current conditional structure</span></button>}
           </div>
         )}
 
