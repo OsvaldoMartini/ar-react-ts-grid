@@ -3591,8 +3591,17 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                                         className={styles.dragHandle}
                                         {...provided.dragHandleProps}
                                         disabled={findText.trim().length > 0 || !memoryCapabilities.get(instruction.id)?.canMove}
-                                        title={findText.trim().length > 0 ? 'Clear Find before moving instructions' : memoryCapabilities.get(instruction.id)?.reason || 'Move instruction'}
+                                        title={findText.trim().length > 0 ? 'Clear Find before moving instructions' : memoryCapabilities.get(instruction.id)?.reason || 'Move instruction; Alt+Arrow keys move one position'}
                                         aria-label={`Move instruction ${instruction.instructionOrderNumber}`}
+                                        onKeyUp={(event) => {
+                                          if (event.altKey && event.key === 'ArrowUp') {
+                                            event.preventDefault();
+                                            handleMoveRowUp(instruction.id);
+                                          } else if (event.altKey && event.key === 'ArrowDown') {
+                                            event.preventDefault();
+                                            handleMoveRowDown(instruction.id);
+                                          }
+                                        }}
                                       >≡</button>
                                       {instruction.id === executionId && (
                                         <div className={`${styles.executionBackground} ${(styles as Record<string,string>)[executionState?.toLowerCase() ?? ''] ?? ''}`} />

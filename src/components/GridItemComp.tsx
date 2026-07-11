@@ -3084,8 +3084,17 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                                         className={styles.dragHandle}
                                         {...provided.dragHandleProps}
                                         disabled={findText.trim().length > 0 || !moveCapabilities.get(instruction.id)?.canMove}
-                                        title={findText.trim().length > 0 ? 'Clear Find before moving instructions' : moveCapabilities.get(instruction.id)?.reason || 'Move instruction'}
+                                        title={findText.trim().length > 0 ? 'Clear Find before moving instructions' : moveCapabilities.get(instruction.id)?.reason || 'Move instruction; Alt+Arrow keys move one position'}
                                         aria-label={`Move instruction ${instruction.instructionOrderNumber}`}
+                                        onKeyUp={(event) => {
+                                          if (event.altKey && event.key === 'ArrowUp') {
+                                            event.preventDefault();
+                                            handleMoveRowUp(instruction.id);
+                                          } else if (event.altKey && event.key === 'ArrowDown') {
+                                            event.preventDefault();
+                                            handleMoveRowDown(instruction.id);
+                                          }
+                                        }}
                                       >≡</button>
                                       {editingInstructionId === instruction.id ? (
                                         <div className={styles.editContainer}>
