@@ -151,6 +151,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
   const [findText, setFindText] = useState<string>('');
   const [moveCapabilities, setMoveCapabilities] = useState<Map<number, { canMove: boolean; canDelete: boolean; deleteCount: number; reason: string; deleteReason: string; allowedBlockIds: number[]; deleteRows: { id: number; name: string; action: string; order: number }[] }>>(new Map());
   const [activeDraggedInstructionId, setActiveDraggedInstructionId] = useState<number | null>(null);
+  const [pendingDragPreview, setPendingDragPreview] = useState<{ requestId: string; result: any } | null>(null);
   const [blockDeleteCapabilities, setBlockDeleteCapabilities] = useState<Map<number, BlockDeleteCapability>>(new Map());
   const [moveGraphRevision, setMoveGraphRevision] = useState('');
 
@@ -273,7 +274,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
   };
 
   // Drag-and-drop event handler
-  const onDragEnd = (result: any) => {
+  const applyDragMove = (result: any, previewRows: { id: number }[]) => {
     const { source, destination, draggableId } = result;
     setActiveDraggedInstructionId(null);
     if (!destination) return;
@@ -297,15 +298,15 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       return;
     }
 
-    const sourceInstructions = [...sourceBlock.instructions];
-    const movedIndex = sourceInstructions.findIndex(instruction => instruction.id === instructionId);
-    if (movedIndex < 0) return;
-    const [movedInstruction] = sourceInstructions.splice(movedIndex, 1);
+    const groupIds = new Set(previewRows.map(row => Number(row.id)));
+    const movedInstructions = sourceBlock.instructions.filter(instruction => groupIds.has(instruction.id));
+    const sourceInstructions = sourceBlock.instructions.filter(instruction => !groupIds.has(instruction.id));
+    if (movedInstructions.length !== groupIds.size) return;
     let updatedGroupedData = { ...groupedData };
     let deleteBlockId = -1;
 
     if (sourceBlockId === destinationBlockId) {
-      sourceInstructions.splice(destination.index, 0, movedInstruction);
+      sourceInstructions.splice(destination.index, 0, ...movedInstructions);
       updatedGroupedData[sourceBlockId] = {
         ...sourceBlock,
         instructions: sourceInstructions.map((instruction, index) => ({
@@ -315,7 +316,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       };
     } else {
       const destinationInstructions = [...destinationBlock.instructions];
-      destinationInstructions.splice(destination.index, 0, movedInstruction);
+      destinationInstructions.splice(destination.index, 0, ...movedInstructions);
       updatedGroupedData[sourceBlockId] = {
         ...sourceBlock,
         instructions: sourceInstructions.map((instruction, index) => ({
@@ -346,6 +347,28 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     submitInstructionMove(updatedInstructionsData, deleteBlockId, 'drag');
   };
 
+  const onDragEnd = (result: any) => {
+    setActiveDraggedInstructionId(null);
+    if (!result.destination || !webSocket || !connected || !moveGraphRevision) return;
+    const requestId = `${Date.now()}-componentTasks-move-preview`;
+    setPendingDragPreview({ requestId, result });
+    webSocket.send(JSON.stringify({
+      type: 'instructionGraph.previewMove',
+      sessionId,
+      homeBankingId,
+      body: JSON.stringify({
+        requestId,
+        targetSessionId: 'componentTasks',
+        botJobId,
+        homeBankingId,
+        graphRevision: moveGraphRevision,
+        instructionId: Number(result.draggableId),
+        destinationBlockId: Number(result.destination.droppableId),
+        destinationIndex: result.destination.index,
+      }),
+    }));
+  };
+
   // Memoized function to handle outside clicks on the dropdown
   const handleClickOutside = useCallback((event: MouseEvent) => {
     if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -368,7 +391,38 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
         }
 
 
-        if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "instructionEditor.deleteResponse") {
+        if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "instructionGraph.previewMoveResponse") {
+          const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
+          if (pendingDragPreview && bodyData?.requestId === pendingDragPreview.requestId) {
+            const pendingResult = pendingDragPreview.result;
+            const groupRows = Array.isArray(bodyData?.groupRows) ? bodyData.groupRows : [];
+            setPendingDragPreview(null);
+            if (bodyData?.ok === false || groupRows.length === 0) {
+              setAlertImage(forbiddenImage);
+              setAlertClass('construction-image');
+              setAlertMessageHeader('Move Preview Refused');
+              setAlertMessageBody(bodyData?.error || 'The backend could not preview this movement.');
+              setAlertMessageFooter('Refresh the grid and try again.');
+              setErrorFlag(true);
+              setAlertOnConfirm(undefined);
+            } else if (groupRows.length === 1) {
+              applyDragMove(pendingResult, groupRows);
+            } else {
+              const summary = groupRows.map((row: { order: number; name: string; action: string }) =>
+                `#${row.order} ${row.name || row.action}`).join('\n');
+              setAlertImage(constructionImage);
+              setAlertClass('construction-image');
+              setAlertMessageHeader(`Move ${groupRows.length} connected instructions?`);
+              setAlertMessageBody(summary);
+              setAlertMessageFooter('The complete connected group will move together.');
+              setErrorFlag(false);
+              setAlertOnConfirm(() => () => {
+                handleClose();
+                applyDragMove(pendingResult, groupRows);
+              });
+            }
+          }
+        } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "instructionEditor.deleteResponse") {
           const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
           if (bodyData?.ok === false) {
             setAlertImage(warningRedImage);
@@ -460,7 +514,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
         console.error("Error parsing WebSocket message:", error);
       }
     }
-  }, [messages]);
+  }, [messages, pendingDragPreview]);
 
   useEffect(() => {
     if (!webSocket || !connected || componentsData.length === 0) return;
