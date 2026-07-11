@@ -681,6 +681,13 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
             setOcrTestResult(bodyData as OCRTestResult);
             break;
           }
+          case "openOcrConfig": {
+            openOcrConfig({
+              homeBankingId: Number(bodyData?.homeBankingId || homeBankingId),
+              homeUrlId: Number(bodyData?.homeUrlId || 0) || undefined,
+            });
+            break;
+          }
 
           case "activate-update-all": {
             setIsUpdatingAll(false);
@@ -1022,7 +1029,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     setOcrConfigBusy(true);
     webSocket.send(JSON.stringify({type,sessionId,homeBankingId,body:JSON.stringify(body)}));
   };
-  const openOcrConfig = () => { setOcrConfigError(''); setOcrConfig({profiles:[],categories:[],parameters:[]}); sendOcrConfigCommand('ocrConfig.bootstrap',{homeBankingId}); };
+  const openOcrConfig = (scope:Record<string,unknown>={homeBankingId}) => { setOcrConfigError(''); setOcrConfig({profiles:[],categories:[],parameters:[]}); sendOcrConfigCommand('ocrConfig.bootstrap',scope); };
   const saveOcrConfig = (draft:{profileId?:number;name:string;description:string;parameters:OCRParameter[];asNew:boolean}) => sendOcrConfigCommand('ocrConfig.save',{...draft,homeBankingId});
   const deleteOcrConfig = (profileId:number) => { if(window.confirm('Delete this OCR profile?')) sendOcrConfigCommand('ocrConfig.delete',{profileId,confirmed:true}); };
 
@@ -1515,7 +1522,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
             <button
               type="button"
               className={styles.preScanIconButton}
-              onClick={openOcrConfig}
+              onClick={()=>openOcrConfig()}
               title="OCR Configuration"
             >
               OCR Config
