@@ -145,6 +145,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
   const [alertDismissed, setAlertDismissed] = useState(false);
   const [alertOnConfirm, setAlertOnConfirm] = useState<(() => void) | undefined>(undefined);
   const [findText, setFindText] = useState<string>('');
+  const [moveCapabilities, setMoveCapabilities] = useState<Map<number, { canMove: boolean; reason: string }>>(new Map());
 
   //  const [executionId, setExecutionId] = useState<number>(0);
   //  const [executionState, setExecutionState] = useState<string>();
@@ -701,7 +702,16 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
         }
 
 
-        if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "componentsUpdate") {
+        if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "instructionEditor.memoryCapabilitiesResponse") {
+          const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
+          const next = new Map<number, { canMove: boolean; reason: string }>();
+          if (Array.isArray(bodyData?.capabilities)) {
+            bodyData.capabilities.forEach((capability: { instructionId: number; canMove: boolean; reason?: string }) => {
+              next.set(capability.instructionId, { canMove: capability.canMove === true, reason: capability.reason || '' });
+            });
+          }
+          setMoveCapabilities(next);
+        } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "componentsUpdate") {
 
           const bodyData = typeof parsedMessage.body === "string"
             ? JSON.parse(parsedMessage.body)
@@ -742,6 +752,16 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       }
     }
   }, [messages]);
+
+  useEffect(() => {
+    if (!webSocket || !connected || componentsData.length === 0) return;
+    webSocket.send(JSON.stringify({
+      type: 'instructionEditor.memoryCapabilities',
+      sessionId,
+      homeBankingId,
+      body: JSON.stringify({ targetSessionId: 'componentTasks', botJobId, homeBankingId }),
+    }));
+  }, [webSocket, connected, componentsData, botJobId, homeBankingId, sessionId]);
 
 
   useEffect(() => {
@@ -2449,10 +2469,8 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
 
 
   // Function to render the move buttons based on the action type
-  const renderMoveButtons = (actionType: string, instructionId: number) => {
-    if (["IF", "ELSEIF", "ELSE", "ENDIF"].includes(actionType)) {
-      return null; // Don't render buttons for these action types
-    }
+  const renderMoveButtons = (instructionId: number) => {
+    if (!moveCapabilities.get(instructionId)?.canMove) return null;
 
     return (
       <>
@@ -3102,7 +3120,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                                   key={instruction.id}
                                   draggableId={instruction.id.toString()}
                                   index={index}
-                                  isDragDisabled={findText.trim().length > 0}
+                                  isDragDisabled={findText.trim().length > 0 || !moveCapabilities.get(instruction.id)?.canMove}
                                 >
                                   {(provided) => (
                                     <div
@@ -3191,7 +3209,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                                             editImage,
                                             instruction
                                           )}
-                                          {renderMoveButtons(instruction.actions, instruction.id)}
+                                          {renderMoveButtons(instruction.id)}
                                           {renderTestClick(instruction.actions, instruction)}
                                           <img
                                             src={crossImage}
