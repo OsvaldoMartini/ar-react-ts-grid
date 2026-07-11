@@ -295,11 +295,11 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
               {deleteCandidate && <div className={styles.deleteConfirm} role="alertdialog" aria-label="Confirm variable deletion">
                 <b>Delete ${deleteCandidate.name}?</b>
                 <span>This variable has no reported instruction references. Java will verify usage again before deletion.</span>
-                <div><button onClick={() => setDeleteCandidate(null)}>Cancel</button><button className={styles.confirmDelete} onClick={() => props.onSocketCommand('variableEditor.delete', { ...props.context, instructionId: instruction.id, instructionName: instruction.name, variableId: deleteCandidate.id })}>Delete</button></div>
+                <div><button onClick={() => setDeleteCandidate(null)}>Cancel</button><button className={styles.confirmDelete} onClick={() => props.onSocketCommand('variableEditor.delete', { ...props.context, requestId: `${Date.now()}-variable-delete-${deleteCandidate.id}`, instructionId: instruction.id, instructionName: instruction.name, variableId: deleteCandidate.id })}>Delete</button></div>
               </div>}
               <div className={styles.variableButtons}>
                 {variable.id != null && <button className={styles.deleteButton} disabled={variableUsageCount > 0} title={variableUsageCount > 0 ? `Used by ${variableUsageCount} instruction(s)` : 'Delete variable'} onClick={() => setDeleteCandidate(variable)}>Delete</button>}
-                <button className={styles.primary} disabled={!variable.name.trim()} onClick={() => props.onSocketCommand('variableEditor.save', { ...props.context, instructionId: instruction.id, instructionName: instruction.name, variable })}>{variable.id == null ? 'Create' : 'Update'}</button>
+                <button className={styles.primary} disabled={!variable.name.trim()} onClick={() => props.onSocketCommand('variableEditor.save', { ...props.context, requestId: `${Date.now()}-variable-save-${variable.id ?? 'new'}`, instructionId: instruction.id, instructionName: instruction.name, variable })}>{variable.id == null ? 'Create' : 'Update'}</button>
                 <button onClick={() => { setSelectedVariableId(variable.id); if (variable.instructionId) setSelectedWebFieldId(variable.instructionId); setView('command'); }}>Use in command</button>
               </div>
             </div>
