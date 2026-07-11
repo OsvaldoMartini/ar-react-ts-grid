@@ -9,9 +9,9 @@ type LicenseState = {
   capabilities?: Record<string, boolean>;
 };
 
-type Props = { socketPort: number; sessionId: string; onClose?: () => void };
+type Props = { socketPort: number; sessionId: string; onClose?: () => void; onActivated?: () => void };
 
-const LicenseManager: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
+const LicenseManager: React.FC<Props> = ({ socketPort, sessionId, onClose, onActivated }) => {
   const { webSocket, connected, messages } = useWebSocket(socketPort, sessionId);
   const [state, setState] = useState<LicenseState | null>(null);
   const [mode, setMode] = useState<'request' | 'activate' | 'existing'>('request');
@@ -41,6 +41,7 @@ const LicenseManager: React.FC<Props> = ({ socketPort, sessionId, onClose }) => 
     { id: 'activate' as const, label: 'Activate', enabled: state?.capabilities?.activate !== false },
     { id: 'existing' as const, label: 'Use existing', enabled: state?.capabilities?.useExisting !== false },
   ], [state]);
+  useEffect(() => { if (state?.active) onActivated?.(); }, [state?.active, onActivated]);
 
   const submit = () => {
     if (!webSocket || pending) return;
