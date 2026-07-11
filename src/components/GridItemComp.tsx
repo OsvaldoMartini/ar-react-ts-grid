@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { BotJobData, ComplexMessage, ComponentsInstructionsDTO, ElementDTO, UpdatedBlock } from './instructionsMockData';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd'; // Import from react-beautiful-dnd
 import setValueImage from '../assets/setValueBtn3.png';
@@ -112,6 +112,8 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
   const { webSocket, connected, reconnectAttempts, messages, error } = useWebSocket(socketPort, sessionId);
 
   const [componentsData, setComponentsData] = useState<ComponentsInstructionsDTO[]>(dataComp);
+  const gridScrollRef = useRef<HTMLDivElement>(null);
+  const pendingScrollTopRef = useRef<number | null>(null);
   const [excelGotoInstruction, setExcelGotoInstruction] = useState<ComponentsInstructionsDTO | null>(null);
 
   // Use state to manage the instructions data
@@ -151,6 +153,12 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
   const [activeDraggedInstructionId, setActiveDraggedInstructionId] = useState<number | null>(null);
   const [blockDeleteCapabilities, setBlockDeleteCapabilities] = useState<Map<number, BlockDeleteCapability>>(new Map());
   const [moveGraphRevision, setMoveGraphRevision] = useState('');
+
+  useLayoutEffect(() => {
+    if (pendingScrollTopRef.current === null || !gridScrollRef.current) return;
+    gridScrollRef.current.scrollTop = pendingScrollTopRef.current;
+    pendingScrollTopRef.current = null;
+  }, [componentsData]);
   const submitInstructionMove = useInstructionDrag({
     webSocket, connected, graphRevision: moveGraphRevision, botJobId, botJobName,
     homeBankingId, targetSessionId: 'componentTasks',
@@ -738,6 +746,8 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
           setBlockDeleteCapabilities(nextBlocks);
           setMoveGraphRevision(typeof bodyData?.graphRevision === 'string' ? bodyData.graphRevision : '');
         } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "componentsUpdate") {
+
+          pendingScrollTopRef.current = gridScrollRef.current?.scrollTop ?? null;
 
           const bodyData = typeof parsedMessage.body === "string"
             ? JSON.parse(parsedMessage.body)
@@ -2865,7 +2875,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
           placeholder="Type to find…"
         />
       </div>
-      <div className={styles.gridScroll}>
+      <div ref={gridScrollRef} className={styles.gridScroll}>
         <div className={styles.gridContent}>
           <DragDropContext onDragStart={(start) => setActiveDraggedInstructionId(Number(start.draggableId))} onDragEnd={(result) => { setActiveDraggedInstructionId(null); onDragEnd(result); }} // Define the onDragEnd handler to update the state when the dragging stops
           >

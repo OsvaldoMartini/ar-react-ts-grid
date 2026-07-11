@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { BlockLoopInstructionLoadDTO, BotJobData, ComplexMessage, ElementDTO, UpdatedBlock } from './instructionsMockData';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd'; // Import from react-beautiful-dnd
 import setValueImage from '../assets/setValueBtn3.png';
@@ -139,6 +139,8 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
   const { webSocket, connected, reconnectAttempts, messages, error } = useWebSocket(socketPort, sessionId);
 
   const [instructionsData, setInstructionsData] = useState<BlockLoopInstructionLoadDTO[]>(data);
+  const gridScrollRef = useRef<HTMLDivElement>(null);
+  const pendingScrollTopRef = useRef<number | null>(null);
   const [excelGotoInstruction, setExcelGotoInstruction] = useState<BlockLoopInstructionLoadDTO | null>(null);
   // const [homeBanking, setHomeBanking] = useState<number>(homeBankingId);
   // const [botJobId, setBotJobId] = useState<number>(botJobId);
@@ -182,6 +184,12 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
   const [executionState, setExecutionState] = useState<string>();
   const [findText, setFindText] = useState<string>('');
   const [collapsedBlocks, setCollapsedBlocks] = useState<Set<number>>(new Set());
+
+  useLayoutEffect(() => {
+    if (pendingScrollTopRef.current === null || !gridScrollRef.current) return;
+    gridScrollRef.current.scrollTop = pendingScrollTopRef.current;
+    pendingScrollTopRef.current = null;
+  }, [instructionsData]);
 
   // Memory list: steps hand-picked via the row "+" button, kept in insertion order,
   // shown in a floating (non-modal, draggable) panel.
@@ -986,6 +994,8 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
           setBlockDeleteCapabilities(nextBlocks);
           setMoveGraphRevision(typeof bodyData?.graphRevision === 'string' ? bodyData.graphRevision : '');
         } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "updateInstructions") {
+
+          pendingScrollTopRef.current = gridScrollRef.current?.scrollTop ?? null;
 
           const bodyData = typeof parsedMessage.body === "string"
             ? JSON.parse(parsedMessage.body)
@@ -3313,7 +3323,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
           onClose={() => setCreateBlockOpen(false)}
         />
       )}
-      <div className={styles.gridScroll}>
+      <div ref={gridScrollRef} className={styles.gridScroll}>
         <div className={styles.gridContent}>
           <DragDropContext onDragStart={(start) => setActiveDraggedInstructionId(Number(start.draggableId))} onDragEnd={(result) => { setActiveDraggedInstructionId(null); onDragEnd(result); }} // Define the onDragEnd handler to update the state when the dragging stops
           >
