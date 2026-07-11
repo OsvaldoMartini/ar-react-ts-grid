@@ -23,7 +23,8 @@ export const useInstructionDrag = (context: MoveContext) => useCallback((
 ) => {
   if (!context.webSocket || !context.connected || !context.graphRevision) return null;
   const requestId = `${Date.now()}-${context.targetSessionId}-${requestLabel}`;
-  context.webSocket.send(JSON.stringify({
+  try {
+    context.webSocket.send(JSON.stringify({
     type: 'ROW_MOVE',
     requestId,
     graphRevision: context.graphRevision,
@@ -37,6 +38,9 @@ export const useInstructionDrag = (context: MoveContext) => useCallback((
       instructionId: row.id,
       instructionOrderNumber: row.instructionOrderNumber,
     })),
-  }));
-  return requestId;
+    }));
+    return requestId;
+  } catch (_) {
+    return null;
+  }
 }, [context]);

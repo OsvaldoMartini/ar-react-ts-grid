@@ -1827,50 +1827,17 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
 
 
         // Capture rowsSwaps for WebSocket message including blockId
-        const updatedRows = [
-          {
-            blockId: currentInstruction.blockId, // Add the blockId of the instruction
-            instructionId: currentInstruction.id,
-            instructionOrderNumber: nextInstruction.instructionOrderNumber,
-          },
-          {
-            blockId: currentInstruction.blockId, // Add the blockId of the instruction
-            instructionId: nextInstruction.id,
-            instructionOrderNumber: currentInstruction.instructionOrderNumber,
-          },
-        ];
-
         // Swap their instructionOrderNumbers
         const tempOrderNumber = currentInstruction.instructionOrderNumber;
         currentInstruction.instructionOrderNumber = nextInstruction.instructionOrderNumber;
         nextInstruction.instructionOrderNumber = tempOrderNumber;
 
         // Reassign the updatedData array and update the state
-        setComponentsData([...reassignInstructionOrderNumbersByBlock(updatedData)]);
+        const normalizedData = reassignInstructionOrderNumbersByBlock(updatedData);
+        setComponentsData([...normalizedData]);
         setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
 
-        // Send WebSocket message with the row swap details
-        if (webSocket && connected) {
-          const message = {
-            type: 'ROW_MOVE',
-            requestId: `${Date.now()}-component-row-move`,
-            graphRevision: moveGraphRevision,
-            botJobId: currentInstruction.botJobId,
-            botJobName: botJobName,
-            homeBankingId: homeBankingId,
-            sessionId: `componentTasks`, //-${botJobId}`,
-            updatedRows: updatedRows,
-          };
-
-          try {
-            webSocket.send(JSON.stringify(message),
-            );
-
-            console.log('Sent row move message:', message);
-          } catch (error) {
-            console.log('Error sending WebSocket message:', error);
-          }
-        }
+        submitInstructionMove(normalizedData, -1, 'arrow-down');
       }
     }
   };
@@ -1897,51 +1864,17 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       if (blockInstructionIndex > 0) {
         const previousInstruction = blockInstructions[blockInstructionIndex - 1];
 
-        // Capture rowsSwaps for WebSocket message including blockId
-        const updatedRows = [
-          {
-            blockId: currentInstruction.blockId, // Add the blockId of the instruction
-            instructionId: currentInstruction.id,
-            instructionOrderNumber: previousInstruction.instructionOrderNumber,
-          },
-          {
-            blockId: currentInstruction.blockId, // Add the blockId of the instruction
-            instructionId: previousInstruction.id,
-            instructionOrderNumber: currentInstruction.instructionOrderNumber,
-          },
-        ];
-
         // Swap their instructionOrderNumbers
         const tempOrderNumber = currentInstruction.instructionOrderNumber;
         currentInstruction.instructionOrderNumber = previousInstruction.instructionOrderNumber;
         previousInstruction.instructionOrderNumber = tempOrderNumber;
 
         // Reassign the updatedData array
-        setComponentsData([...reassignInstructionOrderNumbersByBlock(updatedData)]);
+        const normalizedData = reassignInstructionOrderNumbersByBlock(updatedData);
+        setComponentsData([...normalizedData]);
         setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
 
-        // Send WebSocket message with the row swap details
-        if (webSocket && connected) {
-          const message = {
-            type: 'ROW_MOVE',
-            requestId: `${Date.now()}-component-row-move`,
-            graphRevision: moveGraphRevision,
-            botJobId: currentInstruction.botJobId,
-            botJobName: botJobName,
-            homeBankingId: homeBankingId,
-            sessionId: `componentTasks`, //-${botJobId}`,
-            updatedRows: updatedRows,
-          };
-
-          try {
-            webSocket.send(JSON.stringify(message),
-            );
-
-            console.log('Sent row move message:', message);
-          } catch (error) {
-            console.log('Error sending WebSocket message:', error);
-          }
-        }
+        submitInstructionMove(normalizedData, -1, 'arrow-up');
       }
     }
   };
