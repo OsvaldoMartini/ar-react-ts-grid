@@ -44,7 +44,7 @@ type VariableRow = { id?: number; type: string; name: string; value: string; ins
 type WebFieldRow = { id: number; name: string; actions: string; tagName?: string; blockId: number; blockName?: string };
 type BlockRow = { id: number; name: string; blockOrderNumber?: number };
 type CommandDefinition = { code: string; label: string; target: string; fields: string[]; allowedTags?: string[]; allowedVariableTypes?: string[]; insertAllowed?: boolean; editAllowed?: boolean; disabledReason?: string };
-type StoredCommandDraft = Omit<CommandDraft, 'mode'>;
+type StoredCommandDraft = Omit<CommandDraft, 'mode'> & { warnings?: string[] };
 type SplitPreviewRow = { id: number; order: number; name: string; action: string; parentId?: number | null };
 type SplitPreview = { graphRevision: string; retainedRows: SplitPreviewRow[]; movedRows: SplitPreviewRow[]; retainedCount: number; movedCount: number };
 const supportsTag = (command: CommandDefinition, tagName: string) => !command.allowedTags?.length || command.allowedTags.includes(tagName);
@@ -300,6 +300,12 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
               <b>#{instruction.instructionOrderNumber} ({instruction.id}) {instruction.name}</b>
               <small>{instruction.blockName}</small>
             </div>
+            {storedDraft?.warnings && storedDraft.warnings.length > 0 && (
+              <div className={styles.codecWarnings} role="status">
+                <strong>Historical operation warning</strong>
+                {storedDraft.warnings.map((warning, index) => <span key={`${warning}-${index}`}>{warning}</span>)}
+              </div>
+            )}
             {requiresWebField && <label>Web Field<select value={selectedWebFieldId || ''} onChange={(e) => { setSelectedWebFieldId(Number(e.target.value) || undefined); setSelectedVariableId(undefined); }}>
               <option value="">Select Web Field</option>
               {webFields.filter(row => row.blockId === instruction.blockId).map(row => <option key={row.id} value={row.id}>#{row.id} {row.name} [{row.tagName || row.actions}]</option>)}
