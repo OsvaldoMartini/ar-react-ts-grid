@@ -1530,6 +1530,15 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
             <button
               type="button"
               className={styles.preScanButton}
+              onClick={()=>sendOcrConfigCommand('ocrTest.run',{homeBankingId,parameters:[]})}
+              disabled={preScanStatus.status === 'running' || preScanStatus.status === 'waiting' || ocrConfigBusy}
+              title="Open highlighted OCR results for the newest page scan"
+            >
+              OCR Results
+            </button>
+            <button
+              type="button"
+              className={styles.preScanButton}
               onClick={() => sendDashboardCommand('PRE_SCAN_REFRESH_PAGE')}
               disabled={preScanStatus.status === 'running' || preScanStatus.status === 'waiting'}
               title="Refresh the pre-scan browser page"
