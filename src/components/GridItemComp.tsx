@@ -899,7 +899,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
 
     setSaveComponentContext({ blockId: newBlock.id, blockName: newBlock.blockName,
       blockOrderNumber: newBlock.blockOrderNumber, instructions: newBlock.instructions.map(instruction => ({
-        id: instruction.id, blockId: newBlock.id, blockOrderNumber: newBlock.blockOrderNumber,
+        instructionId: instruction.id, blockId: newBlock.id, blockOrderNumber: newBlock.blockOrderNumber,
         instructionOrderNumber: instruction.instructionOrderNumber,
       })) });
     setOpenDropdown(null);

@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import SaveComponentPanel from './SaveComponentPanel';
 
 const context = { blockId: 10, blockName: 'Payments', blockOrderNumber: 2,
-  instructions: [{ id: 100, blockId: 10, blockOrderNumber: 2, instructionOrderNumber: 1 }] };
+  instructions: [{ instructionId: 100, blockId: 10, blockOrderNumber: 2, instructionOrderNumber: 1 }] };
 
 test('hydrates defaults and submits trimmed values', () => {
   const onSubmit = jest.fn();

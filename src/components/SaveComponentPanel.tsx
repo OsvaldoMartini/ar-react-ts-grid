@@ -4,7 +4,7 @@ import styles from './SaveComponentPanel.module.scss';
 
 export type SaveComponentContext = {
   blockId: number; blockName: string; blockOrderNumber: number;
-  instructions: Array<{ id: number; blockId: number; blockOrderNumber: number; instructionOrderNumber: number }>;
+  instructions: Array<{ instructionId: number; blockId: number; blockOrderNumber: number; instructionOrderNumber: number }>;
 };
 type Props = { context: SaveComponentContext; onSubmit: (name: string, description: string) => void; onClose: () => void };
 
