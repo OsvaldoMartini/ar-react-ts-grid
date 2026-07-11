@@ -81,6 +81,14 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
   const [storedDraft, setStoredDraft] = useState<StoredCommandDraft | null>(null);
   const [graphRevision, setGraphRevision] = useState('');
 
+  const requestCommandBootstrap = () => props.onSocketCommand('commandEditor.bootstrap', {
+    ...props.context,
+    instructionId: instruction.id,
+    instructionName: instruction.name,
+    instructionActions: instruction.actions,
+    blockId: instruction.blockId,
+  });
+
   const clamp = (next: { x: number; y: number }) => {
     const width = panelRef.current?.offsetWidth || 480;
     const height = panelRef.current?.offsetHeight || 520;
@@ -97,13 +105,7 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
   }, []);
 
   useEffect(() => {
-    props.onSocketCommand('commandEditor.bootstrap', {
-      ...props.context,
-      instructionId: instruction.id,
-      instructionName: instruction.name,
-      instructionActions: instruction.actions,
-      blockId: instruction.blockId,
-    });
+    requestCommandBootstrap();
   }, [instruction.id]);
 
   useEffect(() => {
@@ -133,6 +135,10 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
       if (operationId.startsWith('variableEditor.')) {
         if (Array.isArray(body?.variables)) setVariables(body.variables);
         setVariableStatus(body?.ok ? (body.message || '') : (body?.error || 'Variable operation failed.'));
+        if (body?.ok && ['variableEditor.saveResponse', 'variableEditor.deleteResponse'].includes(operationId)) {
+          setGraphRevision('');
+          requestCommandBootstrap();
+        }
       }
     } catch (_) {
       // Other socket messages are handled by the owning grid.
