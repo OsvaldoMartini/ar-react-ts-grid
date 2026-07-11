@@ -965,7 +965,18 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
         }
 
 
-        if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "instructionEditor.rowMoveResponse") {
+        if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "instructionEditor.deleteResponse") {
+          const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
+          if (bodyData?.ok === false) {
+            setAlertImage(warningRedImage);
+            setAlertClass('construction-image');
+            setAlertMessageHeader(bodyData?.errorTitle || 'Delete Instruction Refused');
+            setAlertMessageBody(bodyData?.error || 'The instruction could not be deleted.');
+            setAlertMessageFooter(bodyData?.errorHeader || 'Refresh the grid and review attached steps.');
+            setErrorFlag(true);
+            setAlertOnConfirm(undefined);
+          }
+        } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "instructionEditor.rowMoveResponse") {
           const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
           if (pendingMemoryMove && bodyData?.requestId === pendingMemoryMove.requestId) {
             if (bodyData?.ok) {
