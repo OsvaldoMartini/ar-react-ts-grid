@@ -68,6 +68,7 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
   const [selectedBlockId, setSelectedBlockId] = useState<number | undefined>(instruction.parentBlockId || undefined);
   const [variable, setVariable] = useState<VariableRow>({ type: '$String', name: '', value: '$EMPTY' });
   const [variableStatus, setVariableStatus] = useState('');
+  const [deleteCandidate, setDeleteCandidate] = useState<VariableRow | null>(null);
   const [storedDraft, setStoredDraft] = useState<StoredCommandDraft | null>(null);
   const [graphRevision, setGraphRevision] = useState('');
   const [canInsertElseIf, setCanInsertElseIf] = useState(false);
@@ -130,6 +131,7 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
         if (Array.isArray(body?.variables)) setVariables(body.variables);
         setVariableStatus(body?.ok ? (body.message || '') : (body?.error || 'Variable operation failed.'));
         if (body?.ok && ['variableEditor.saveResponse', 'variableEditor.deleteResponse'].includes(operationId)) {
+          if (operationId === 'variableEditor.deleteResponse') setDeleteCandidate(null);
           setGraphRevision('');
           requestCommandBootstrap();
         }
@@ -171,6 +173,7 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
   );
   const canEditSelected = storedDraft != null && commands.some(command => command.editAllowed === true);
   const commandsReady = graphRevision.length > 0 && commands.length > 0;
+  const variableUsageCount = Number.parseInt(variable.usedVars || '0', 10) || 0;
 
   const openCommand = (nextMode: 'before' | 'after' | 'edit') => {
     setMode(nextMode);
@@ -278,9 +281,9 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
         {view === 'variables' && (
           <div className={styles.variablesWorkspace}>
             <div className={styles.variableList}>
-              <div className={styles.variableListHeader}><strong>Variables</strong><button onClick={() => setVariable({ type: '$String', name: '', value: '$EMPTY' })}>New</button></div>
+              <div className={styles.variableListHeader}><strong>Variables</strong><button onClick={() => { setDeleteCandidate(null); setVariable({ type: '$String', name: '', value: '$EMPTY' }); }}>New</button></div>
               {variables.length === 0 && <span className={styles.emptyText}>No variables available for this instruction.</span>}
-              {variables.map((row) => <button key={row.id} className={variable.id === row.id ? styles.selectedVariable : ''} onClick={() => setVariable(row)}><b>{row.type === '#Numeric' ? '#' : '$'}{row.name}</b><span>{row.value || '$EMPTY'}</span><small>{row.usedVars || '0'} use(s)</small></button>)}
+              {variables.map((row) => <button key={row.id} className={variable.id === row.id ? styles.selectedVariable : ''} onClick={() => { setDeleteCandidate(null); setVariable(row); }}><b>{row.type === '#Numeric' ? '#' : '$'}{row.name}</b><span>{row.value || '$EMPTY'}</span><small>{row.usedVars || '0'} use(s)</small></button>)}
             </div>
             <div className={styles.variableForm}>
               <label>Type<select value={variable.type} onChange={(e) => setVariable({ ...variable, type: e.target.value })}><option value="$String">String</option><option value="#Numeric">Numeric</option></select></label>
@@ -289,8 +292,13 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
               {variable.type === '#Numeric' && <label>Number format<select value={variable.localFormat || ''} onChange={(e) => setVariable({ ...variable, localFormat: e.target.value })}><option value="">None</option><option value="US">American (9,999.99)</option><option value="EU">European (9.999,99)</option></select></label>}
               <label>CSV delimiter<select value={variable.delimiter || ''} onChange={(e) => setVariable({ ...variable, delimiter: e.target.value })}><option value="">None</option><option value=",">Comma</option><option value=";">Semicolon</option><option value="\t">Tab</option></select></label>
               {variableStatus && <p className={styles.status}>{variableStatus}</p>}
+              {deleteCandidate && <div className={styles.deleteConfirm} role="alertdialog" aria-label="Confirm variable deletion">
+                <b>Delete ${deleteCandidate.name}?</b>
+                <span>This variable has no reported instruction references. Java will verify usage again before deletion.</span>
+                <div><button onClick={() => setDeleteCandidate(null)}>Cancel</button><button className={styles.confirmDelete} onClick={() => props.onSocketCommand('variableEditor.delete', { ...props.context, instructionId: instruction.id, instructionName: instruction.name, variableId: deleteCandidate.id })}>Delete</button></div>
+              </div>}
               <div className={styles.variableButtons}>
-                {variable.id != null && <button className={styles.deleteButton} onClick={() => { if (window.confirm(`Delete variable ${variable.name}?`)) props.onSocketCommand('variableEditor.delete', { ...props.context, instructionId: instruction.id, instructionName: instruction.name, variableId: variable.id }); }}>Delete</button>}
+                {variable.id != null && <button className={styles.deleteButton} disabled={variableUsageCount > 0} title={variableUsageCount > 0 ? `Used by ${variableUsageCount} instruction(s)` : 'Delete variable'} onClick={() => setDeleteCandidate(variable)}>Delete</button>}
                 <button className={styles.primary} disabled={!variable.name.trim()} onClick={() => props.onSocketCommand('variableEditor.save', { ...props.context, instructionId: instruction.id, instructionName: instruction.name, variable })}>{variable.id == null ? 'Create' : 'Update'}</button>
                 <button onClick={() => { setSelectedVariableId(variable.id); if (variable.instructionId) setSelectedWebFieldId(variable.instructionId); setView('command'); }}>Use in command</button>
               </div>
