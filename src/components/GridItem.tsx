@@ -131,7 +131,6 @@ const normalizeBlockOptions = (blocks: CreateBlockOption[]): CreateBlockOption[]
   return Array.from(byBlockId.values()).sort((a, b) => a.blockOrderNumber - b.blockOrderNumber);
 };
 
-const CONDITIONAL_BOUNDARY_ACTIONS = new Set(['IF', 'ELSEIF', 'ELSE', 'ENDIF']);
 
 const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketPort, sessionId, botJobIdInitial, botJobNameInitial }) => {
   // Using the custom WebSocket hook
@@ -192,9 +191,10 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     blockOptionsFromInstructions(data)
   );
   const [createBlockOpen, setCreateBlockOpen] = useState<boolean>(false);
+  const [memoryCapabilities, setMemoryCapabilities] = useState<Map<number, { canAdd: boolean; reason: string }>>(new Map());
 
   const handleAddToMemory = (instruction: BlockLoopInstructionLoadDTO) => {
-    if (CONDITIONAL_BOUNDARY_ACTIONS.has(instruction.actions)) return;
+    if (!memoryCapabilities.get(instruction.id)?.canAdd) return;
     setMemorySteps((prev) =>
       prev.some((step) => step.id === instruction.id) ? prev : [...prev, instruction]
     );
@@ -202,10 +202,11 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
   };
 
   const handleAddBlockToMemory = (instructions: BlockLoopInstructionLoadDTO[]) => {
+    const eligible = instructions.filter(instruction => memoryCapabilities.get(instruction.id)?.canAdd);
     setMemorySteps((prev) => {
       const seen = new Set(prev.map((step) => step.id));
       const next = [...prev];
-      instructions.forEach((instruction) => {
+      eligible.forEach((instruction) => {
         if (!seen.has(instruction.id)) {
           seen.add(instruction.id);
           next.push(instruction);
@@ -227,6 +228,16 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     ]));
   }, [instructionsData]);
 
+  useEffect(() => {
+    if (!webSocket || !connected || instructionsData.length === 0) return;
+    webSocket.send(JSON.stringify({
+      type: 'instructionEditor.memoryCapabilities',
+      sessionId,
+      homeBankingId,
+      body: JSON.stringify({ targetSessionId: 'botJobTasks', botJobId, homeBankingId }),
+    }));
+  }, [webSocket, connected, instructionsData, botJobId, homeBankingId, sessionId]);
+
   // Apply: move the memorized steps (in insertion order) to the end of the
   // selected block, then persist exactly like a drag & drop move (ROW_MOVE).
   const handleApplyMemory = () => {
@@ -235,13 +246,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     const targetBlockOption = memoryBlockOptions.find((block) => block.blockId === memoryTargetBlockId);
     if (!targetBlockOption) return;
 
-    // Same rules as drag & drop: structural and loop-attached steps can't change block.
-    const isMovable = (step: BlockLoopInstructionLoadDTO) =>
-      !["IF", "ELSEIF", "ELSE", "ENDIF"].includes(step.actions) &&
-      !step.refreshLoop &&
-      !step.loopOnly;
-
-    const movable = memorySteps.filter(isMovable);
+    const movable = memorySteps.filter(step => memoryCapabilities.get(step.id)?.canAdd);
     if (movable.length === 0) return;
     const movableIds = new Set(movable.map((step) => step.id));
 
@@ -957,7 +962,16 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
         }
 
 
-        if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "updateInstructions") {
+        if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "instructionEditor.memoryCapabilitiesResponse") {
+          const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
+          const next = new Map<number, { canAdd: boolean; reason: string }>();
+          if (Array.isArray(bodyData?.capabilities)) {
+            bodyData.capabilities.forEach((capability: { instructionId: number; canAddToMemory: boolean; reason?: string }) => {
+              next.set(capability.instructionId, { canAdd: capability.canAddToMemory === true, reason: capability.reason || '' });
+            });
+          }
+          setMemoryCapabilities(next);
+        } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "updateInstructions") {
 
           const bodyData = typeof parsedMessage.body === "string"
             ? JSON.parse(parsedMessage.body)
@@ -3494,7 +3508,8 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                         <button
                           type="button"
                           className={styles.memoryAddButton}
-                          title="Add all steps in this block to memory list"
+                          disabled={!blockData.instructions.some(instruction => memoryCapabilities.get(instruction.id)?.canAdd)}
+                          title="Add eligible steps in this block to memory list"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleAddBlockToMemory(blockData.instructions);
@@ -3687,19 +3702,18 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                                               } />
                                           )}
                                           {getInstructionTypeElement(instruction)}
-                                          {!CONDITIONAL_BOUNDARY_ACTIONS.has(instruction.actions) && (
-                                            <button
-                                              type="button"
-                                              className={styles.memoryAddButton}
-                                              title="Add step to memory list"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleAddToMemory(instruction);
-                                              }}
-                                            >
-                                              +
-                                            </button>
-                                          )}
+                                          <button
+                                            type="button"
+                                            className={styles.memoryAddButton}
+                                            disabled={!memoryCapabilities.get(instruction.id)?.canAdd}
+                                            title={memoryCapabilities.get(instruction.id)?.reason || 'Add step to memory list'}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleAddToMemory(instruction);
+                                            }}
+                                          >
+                                            +
+                                          </button>
                                           {instruction.refreshLoop && (
                                             <img
                                               src={refreshLoopImage}
