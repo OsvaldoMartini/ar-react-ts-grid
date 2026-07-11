@@ -2281,6 +2281,22 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
 
   const handleRemoveInstruction = (instructionId: number) => {
+    const instruction = instructionsData.find(row => row.id === instructionId);
+    if (!instruction) return;
+    const familyDelete = ["IF", "ELSE", "ENDIF"].includes(instruction.actions);
+    setAlertImage(warningRedImage);
+    setAlertClass('construction-image');
+    setAlertMessageHeader(familyDelete ? 'Delete Conditional Family' : 'Delete Instruction');
+    setAlertMessageBody(familyDelete
+      ? `Delete the complete IF family containing "${instruction.name}"?`
+      : `Delete "${instruction.name}"?`);
+    setAlertMessageFooter('Java will verify attached steps and graph integrity before deletion.');
+    setErrorFlag(true);
+    setAlertOnConfirm(() => () => executeRemoveInstruction(instructionId));
+  };
+
+  const executeRemoveInstruction = (instructionId: number) => {
+    handleClose();
     // Find the instruction to remove
     const instructionToRemove = instructionsData.find(instruction => instruction.id === instructionId);
 
@@ -2288,38 +2304,11 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
     const { botJobId, botJobName, blockId, actions, parentId, id } = instructionToRemove;
 
-    // Filter instructionsData
-    const updatedData = actions === "IF" || actions === "ELSE" || actions === "ENDIF"
-      ? instructionsData.filter(
-        instruction =>
-          instruction.parentId !== parentId)
-      : instructionsData.filter(instruction => instruction.id !== instructionId);
-
-    // Reassign order numbers
-    const reassignedData = reassignInstructionOrderNumbersByBlock(updatedData);
-    setInstructionsData([...reassignedData]);
-
-    // Update groupedData based on the reassigned instructionsData
-    const newGroupedData = reassignedData.reduce((acc, instruction) => {
-      if (!acc[instruction.blockId]) {
-        acc[instruction.blockId] = {
-          blockName: instruction.blockName,
-          exportFile: instruction.exportFile,
-          instructions: [],
-        };
-      }
-      acc[instruction.blockId].instructions.push(instruction);
-      return acc;
-    }, {} as { [blockId: number]: { blockName: string; exportFile?: string; instructions: BlockLoopInstructionLoadDTO[] } });
-
-    setGroupedData(newGroupedData);
-
-    setIsDataReordered(false); // Allow for potential reordering logic
-
     // Send WebSocket message if connected
     if (webSocket && connected) {
       const message = {
         type: "DELETE_INSTRUCTION",
+        requestId: `${Date.now()}-instruction-delete-${instructionId}`,
         instructionId,
         actions,
         parentId,
