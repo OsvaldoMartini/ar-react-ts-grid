@@ -23,7 +23,7 @@ import CreateNewBlock, { CreateBlockOption, CreateBlockPosition } from './Create
 import OCRPanel from './OCRPanel';
 import OCRConfigPanel, { OCRConfigData, OCRParameter } from './OCRConfigPanel';
 import OCRTestResultsPanel, { OCRTestResult } from './OCRTestResultsPanel';
-import BotJobDetailsHeader from './bot-job-details/BotJobDetailsHeader';
+import BotJobDetailsChrome from './bot-job-details/BotJobDetailsChrome';
 import { useBotJobDetailsController } from './bot-job-details/useBotJobDetailsController';
 import ScannerWorkspaceHeader from './scanner/ScannerWorkspaceHeader';
 import styles from './GridItemScann.module.scss';
@@ -143,8 +143,15 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   const [collapsedBlocks, setCollapsedBlocks] = useState<Set<string>>(new Set());
   const isPreScanMode = mode === 'preScan' || sessionId.includes('preScannerGrid');
   const botJobHeader = useBotJobDetailsController({
-    webSocket, connected, messages, sessionId, homeBankingId, botJobId,
+    webSocket, connected, messages, sessionId, homeBankingId, botJobId, enabled: isPreScanMode,
   });
+
+  useEffect(() => {
+    if (!botJobHeader.state) return;
+    setBotJobId(botJobHeader.state.botJobId);
+    setBotJobName(botJobHeader.state.name);
+    setHomeBankingId(botJobHeader.state.homeBankingId);
+  }, [botJobHeader.state]);
 
   // Per-block display mode (preScan dashboard): 'name' = normal display chain,
   // 'id' = raw DOM id (locator planning), 'testid' = testing attribute
@@ -1489,15 +1496,12 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   return (
     <div className={styles.gridContainer}>
       {isPreScanMode ? (
-        <BotJobDetailsHeader
-          botJobId={botJobId}
-          botJobName={botJobName}
-          activeSurface="preScan"
+        <BotJobDetailsChrome
+          fallbackBotJobId={botJobId}
+          fallbackBotJobName={botJobName}
+          fallbackSurface="preScan"
           connected={connected}
-          pendingAction={botJobHeader.pendingAction}
-          status={botJobHeader.status}
-          statusTone={botJobHeader.statusTone}
-          onAction={botJobHeader.sendAction}
+          controller={botJobHeader}
         />
       ) : (
         <ScannerWorkspaceHeader

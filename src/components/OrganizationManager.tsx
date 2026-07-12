@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import styles from './OrganizationManager.module.scss';
 import { useWebSocket } from './useWebSocket';
+import OrganizationAdvancedFields from './organization/OrganizationAdvancedFields';
 
 type StatusLevel = 'ok' | 'warn' | 'error';
 type ConfirmTarget =
@@ -50,11 +51,11 @@ const emptyUrl: HomeUrlRow = {
   url: '',
 };
 
-function parseMessage(raw: string): { operationId?: string; body: any } {
+function parseMessage(raw: string): { sessionId?: string; operationId?: string; body: any } {
   const outer = JSON.parse(raw);
   const operationId = outer.operationId || outer.type;
   const body = typeof outer.body === 'string' ? JSON.parse(outer.body) : outer.body ?? outer;
-  return { operationId, body };
+  return { sessionId: outer.sessionId, operationId, body };
 }
 
 function responseMessage(body: any, fallback: string): string {
@@ -115,7 +116,8 @@ const OrganizationManager: React.FC<OrganizationManagerProps> = ({ socketPort, s
     processedMessageCountRef.current = messages.length;
     for (const raw of nextMessages) {
       try {
-        const { operationId, body } = parseMessage(raw);
+        const { sessionId: responseSessionId, operationId, body } = parseMessage(raw);
+        if (responseSessionId && responseSessionId !== sessionId) continue;
         if (operationId === 'organization.listResponse') {
           setOrganizations(body.organizations || []);
           setHomeUrls(body.homeUrls || []);
@@ -330,6 +332,15 @@ const OrganizationManager: React.FC<OrganizationManagerProps> = ({ socketPort, s
                   />
                 </label>
               </div>
+              <OrganizationAdvancedFields
+                value={{
+                  priority: orgDraft.priority || '',
+                  searchConfig: orgDraft.searchConfig || '',
+                  optionsConfig: orgDraft.optionsConfig || '',
+                }}
+                onChange={(advanced) => setOrgDraft(prev => ({ ...prev, ...advanced }))}
+                onLoadTemplate={() => send('organization.template')}
+              />
             </div>
 
             <div className={styles.footer}>

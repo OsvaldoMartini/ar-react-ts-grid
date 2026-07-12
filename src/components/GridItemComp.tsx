@@ -128,6 +128,13 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     webSocket, connected, messages, sessionId, homeBankingId, botJobId,
   });
 
+  useEffect(() => {
+    if (!botJobHeader.state) return;
+    setBotJobId(botJobHeader.state.botJobId);
+    setBotJobName(botJobHeader.state.name);
+    setHomeBankingId(botJobHeader.state.homeBankingId);
+  }, [botJobHeader.state]);
+
   const instructionRef = useRef<HTMLInputElement>(null);
   const blockRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -2514,7 +2521,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
   return (
     <div className={styles.gridContainer}>
       <ComponentWorkspaceHeader
-        botJobName={botJobName}
+        botJobName={botJobHeader.state?.name ?? botJobName}
         connected={connected}
         pendingAction={botJobHeader.pendingAction}
         status={botJobHeader.status}
