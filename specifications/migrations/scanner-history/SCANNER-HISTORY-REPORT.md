@@ -26,6 +26,7 @@ AR Web Factory Page Scanner return DIFFERENT web elements than the build that pr
 | 7 | `SCANNER-53691e5c-2026-07-09_05-02-27.java` | 53691e5c | 07-09 05:02 | this terminal |
 | 8 | `SCANNER-f6d494ad-2026-07-09_07-57-21.java` | f6d494ad | 07-09 07:57 | this terminal |
 | 9 | `SCANNER-abad7d2f-2026-07-11_22-40-26.java` | abad7d2f | 07-11 22:40 | this terminal |
+| 10 | `SCANNER-288a2995-2026-07-11_23-11-13.java` | 288a2995 | 07-11 23:11 | this terminal |
 
 Reference dumps: `elementDTO-PS-GOOD.json` (07-08 11:51) was produced by the code of
 snapshot **#5 (a4cd2e02)** — inputs-focus scan, 12 elements, all correct.
@@ -107,6 +108,16 @@ snapshot **#5 (a4cd2e02)** — inputs-focus scan, 12 elements, all correct.
 - Label hunt: a preceding sibling that contains NO form controls can now donate its text
   (Avaloq `awInfobox_header` divs with `<span class='awLabel'>`) ⇒ unlabeled inputs get
   the human header text ("E-mail address") instead of "aw id gen 1".
+
+### 10. `288a2995` — 07-11 23:11 — "Scan icon-only clickables and pure text labels"
+- `controlKind`: span/div with a DIRECT-child svg and no own text ⇒ `icon-button`
+  (Avaloq `awIcon` language flags now scan as buttons); span/label text LEAVES ⇒
+  `output-text`.
+- `typeElementFor`: `output-text` ⇒ `output`, or `button` when the leaf sits inside a
+  clickable (button captions stay buttons).
+- `someText`: icon-buttons are named from the sprite `<use>` href's last dotted segment
+  minus the trailing size (`#ext.defaulticons.languagefrempty-32` ⇒ "languagefrempty"),
+  checked BEFORE the label hunt so neighbouring headers cannot mislabel icons.
 
 ## Where the differences most likely come from (ranked)
 
