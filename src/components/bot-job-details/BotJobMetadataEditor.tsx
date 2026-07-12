@@ -152,7 +152,7 @@ const BotJobMetadataEditor: React.FC<BotJobMetadataEditorProps> = ({
             <input
               value={draft.name}
               maxLength={100}
-              disabled={saving || !connected}
+              disabled={saving || !connected || !state.capabilities.canEditMetadata}
               aria-invalid={Boolean(errors.name)}
               onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
             />
@@ -162,7 +162,7 @@ const BotJobMetadataEditor: React.FC<BotJobMetadataEditorProps> = ({
             Description
             <textarea
               value={draft.description}
-              disabled={saving || !connected}
+              disabled={saving || !connected || !state.capabilities.canEditMetadata}
               onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))}
             />
           </label>
@@ -170,7 +170,7 @@ const BotJobMetadataEditor: React.FC<BotJobMetadataEditorProps> = ({
             Environment
             <select
               value={draft.homeUrlId || ''}
-              disabled={saving || !connected || state.environments.length === 0}
+              disabled={saving || !connected || !state.capabilities.canEditMetadata || state.environments.length === 0}
               aria-invalid={Boolean(errors.homeUrlId)}
               onChange={(event) => setDraft((current) => ({ ...current, homeUrlId: Number(event.target.value) }))}
             >
@@ -189,7 +189,12 @@ const BotJobMetadataEditor: React.FC<BotJobMetadataEditorProps> = ({
           </div>
           <div className={styles.formActions}>
             <button type="button" onClick={cancelEdit} disabled={saving}>Cancel</button>
-            <button type="button" className={styles.primary} onClick={save} disabled={saving || !connected}>
+            <button
+              type="button"
+              className={styles.primary}
+              onClick={save}
+              disabled={saving || !connected || !state.capabilities.canEditMetadata}
+            >
               {saving ? 'Saving…' : 'Save'}
             </button>
           </div>

@@ -2526,6 +2526,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
         pendingAction={botJobHeader.pendingAction}
         status={botJobHeader.status}
         statusTone={botJobHeader.statusTone}
+        canUseWorkspaceActions={botJobHeader.state?.capabilities.canUseWorkspaceActions === true}
         onHide={() => botJobHeader.sendAction('HIDE_COMPONENTS')}
       />
       {excelExportContext && <ExcelExportPanel context={excelExportContext} onSubmit={submitExcelExport} onClose={() => setExcelExportContext(null)}/>}

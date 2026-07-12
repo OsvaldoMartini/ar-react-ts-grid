@@ -16,3 +16,16 @@ test('exposes only the component-specific hide action', () => {
   fireEvent.click(screen.getByRole('button', { name: 'Hide Components' }));
   expect(onHide).toHaveBeenCalledTimes(1);
 });
+
+test('disables the compact hide action when workspace capability is revoked', () => {
+  render(
+    <ComponentWorkspaceHeader
+      botJobName="Saldo Banca Stato"
+      connected
+      canUseWorkspaceActions={false}
+      onHide={jest.fn()}
+    />,
+  );
+
+  expect(screen.getByRole('button', { name: 'Hide Components' })).toBeDisabled();
+});

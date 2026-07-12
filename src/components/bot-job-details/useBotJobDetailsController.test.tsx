@@ -166,6 +166,16 @@ test('invalidates capabilities on license loss and reboots state after activatio
   view.rerender(<Harness socket={socket} messages={messages} />);
   await waitFor(() => expect(send).toHaveBeenCalledTimes(2));
   expect(JSON.parse(send.mock.calls[1][0]).type).toBe('botJobDetails.bootstrap');
+
+  const restoredRequest = sentBody(send, 1);
+  messages = [...messages, response('botJobDetails.bootstrapResponse', {
+    ok: true,
+    botJobId: 42,
+    requestId: restoredRequest.requestId,
+    state,
+  })];
+  view.rerender(<Harness socket={socket} messages={messages} />);
+  await waitFor(() => expect(screen.getByTestId('workspace-capability')).toHaveTextContent('true'));
 });
 
 test('times out bootstrap and retries explicitly on the same socket', () => {

@@ -10,6 +10,7 @@ interface ComponentWorkspaceHeaderProps {
   status?: string;
   statusTone?: BotJobWorkspaceStatusTone;
   onHide: () => void;
+  canUseWorkspaceActions?: boolean;
 }
 
 const ComponentWorkspaceHeader: React.FC<ComponentWorkspaceHeaderProps> = ({
@@ -19,12 +20,13 @@ const ComponentWorkspaceHeader: React.FC<ComponentWorkspaceHeaderProps> = ({
   status = 'Ready',
   statusTone = 'neutral',
   onHide,
+  canUseWorkspaceActions = true,
 }) => {
   const actions: WorkspaceHeaderAction<'HIDE_COMPONENTS'>[] = [{
     id: 'HIDE_COMPONENTS',
     label: pendingAction === 'HIDE_COMPONENTS' ? 'Hiding…' : 'Hide Components',
     tone: 'primary',
-    disabled: !connected || pendingAction !== null,
+    disabled: !connected || pendingAction !== null || !canUseWorkspaceActions,
   }];
 
   return (

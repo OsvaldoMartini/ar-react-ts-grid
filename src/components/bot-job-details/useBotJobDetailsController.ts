@@ -178,6 +178,7 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
     }
     if (!force && bootstrapSocketRef.current === webSocket) return;
     clearTimer(bootstrapTimeoutRef);
+    clearTimer(statusResetRef);
     const bootstrapRequestId = requestId('bootstrap');
     bootstrapSocketRef.current = webSocket;
     bootstrapRequestRef.current = bootstrapRequestId;
@@ -239,7 +240,10 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
         bootstrapRequestRef.current = null;
         setLoadingState(false);
         if (body.state) {
-          setState((current) => reduceBotJobDetailsState(current, body.state));
+          setState((current) => {
+            if (current && body.state!.revision < current.revision) return current;
+            return body.state!;
+          });
         }
         if (body.ok === false) {
           if (body.errorCode === 'LICENSE_REQUIRED') invalidateLicenseCapabilities();
@@ -345,6 +349,7 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
     }
     const actionRequestId = requestId(action.toLowerCase());
     clearTimer(actionTimeoutRef);
+    clearTimer(statusResetRef);
     pendingActionRef.current = { requestId: actionRequestId, action };
     setPendingAction(action);
     setStatus(`Sending ${action.toLowerCase().replaceAll('_', ' ')}…`);
@@ -375,6 +380,7 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
     }
     const metadataRequestId = requestId(kind);
     clearTimer(metadataTimeoutRef);
+    clearTimer(statusResetRef);
     pendingMetadataRef.current = { requestId: metadataRequestId, kind };
     setSavingMetadata(true);
     setFieldErrors({});

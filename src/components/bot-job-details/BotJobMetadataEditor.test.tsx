@@ -87,3 +87,29 @@ test('gates edit and organization management from backend capabilities', () => {
   expect(screen.getByRole('button', { name: 'Refresh environments' })).toBeDisabled();
   expect(screen.getByRole('button', { name: 'Manage environments' })).toBeDisabled();
 });
+
+test('disables an already-open editor as soon as metadata capability is revoked', () => {
+  const props = {
+    loading: false,
+    connected: true,
+    saving: false,
+    onSave: jest.fn(),
+    onRefreshEnvironments: jest.fn(),
+    onOpenOrganizations: jest.fn(),
+    onRetry: jest.fn(),
+  };
+  const view = render(<BotJobMetadataEditor {...props} state={state} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+
+  view.rerender(
+    <BotJobMetadataEditor
+      {...props}
+      state={{ ...state, capabilities: { ...state.capabilities, canEditMetadata: false } }}
+    />,
+  );
+
+  expect(screen.getByLabelText('Bot Job name')).toBeDisabled();
+  expect(screen.getByLabelText('Description')).toBeDisabled();
+  expect(screen.getByLabelText('Environment')).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+});
