@@ -27,6 +27,10 @@ const BotJobDetailsChrome: React.FC<BotJobDetailsChromeProps> = ({
   const operationBusy = Boolean(
     controller.pendingAction || controller.pendingToolbarAction || controller.savingMetadata,
   );
+  const executionActive = ['STARTING', 'RUNNING', 'STOPPING'].includes(
+    state?.executionState ?? '',
+  );
+  const workspaceBusy = operationBusy || executionActive;
   return (
     <div className={styles.chrome}>
       <BotJobDetailsHeader
@@ -35,7 +39,7 @@ const BotJobDetailsChrome: React.FC<BotJobDetailsChromeProps> = ({
         activeSurface={state?.activeSurface ?? fallbackSurface}
         connected={connected}
         pendingAction={controller.pendingAction}
-        busy={operationBusy}
+        busy={workspaceBusy}
         status={controller.status}
         statusTone={controller.statusTone}
         onAction={controller.sendAction}
@@ -49,7 +53,7 @@ const BotJobDetailsChrome: React.FC<BotJobDetailsChromeProps> = ({
           loading={controller.loadingState}
           connected={connected}
           saving={controller.savingMetadata}
-          busy={operationBusy}
+          busy={workspaceBusy}
           fieldErrors={controller.fieldErrors}
           metadataSavedRevision={controller.metadataSavedRevision}
           onSave={controller.saveMetadata}
@@ -69,14 +73,14 @@ const BotJobDetailsChrome: React.FC<BotJobDetailsChromeProps> = ({
             state={state}
             connected={connected}
             pendingAction={controller.pendingToolbarAction}
-            busy={operationBusy}
+            busy={workspaceBusy}
             onAction={controller.sendToolbarAction}
           />
           <BotJobFileActions
             state={state}
             connected={connected}
             pendingAction={controller.pendingToolbarAction}
-            busy={operationBusy}
+            busy={workspaceBusy}
             transferPath={controller.transferPath}
             onAction={controller.sendToolbarAction}
           />
