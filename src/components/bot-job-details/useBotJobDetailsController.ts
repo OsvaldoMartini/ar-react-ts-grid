@@ -451,9 +451,19 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
       setTransientStatus('Bot Job identity is unavailable', 'error');
       return;
     }
-    if (pendingActionRef.current || pendingToolbarActionRef.current || pendingMetadataRef.current) {
+    const stopDuringStartup = action === 'STOP_TEST_RUN'
+      && pendingToolbarActionRef.current?.action === 'TEST_RUN'
+      && !pendingActionRef.current
+      && !pendingMetadataRef.current;
+    if ((pendingActionRef.current || pendingToolbarActionRef.current || pendingMetadataRef.current)
+      && !stopDuringStartup) {
       setTransientStatus('Wait for the current Bot Job operation to finish', 'warning');
       return;
+    }
+    if (stopDuringStartup) {
+      clearTimer(toolbarTimeoutRef);
+      pendingToolbarActionRef.current = null;
+      setPendingToolbarAction(null);
     }
     const toolbarRequestId = requestId(action.toLowerCase());
     clearTimer(toolbarTimeoutRef);

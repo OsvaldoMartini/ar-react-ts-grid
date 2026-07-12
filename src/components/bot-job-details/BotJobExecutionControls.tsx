@@ -45,6 +45,7 @@ const BotJobExecutionControls: React.FC<BotJobExecutionControlsProps> = ({
   }, [selectedBlockId]);
 
   const executionActive = activeExecutionStates.has(state?.executionState ?? 'UNKNOWN');
+  const testRunStarting = pendingAction === 'TEST_RUN';
   const busy = operationBusy || pendingAction !== null;
   const canExecute = Boolean(connected && state?.capabilities.canExecute);
   const canLaunch = Boolean(connected && state?.capabilities.canLaunch);
@@ -91,11 +92,11 @@ const BotJobExecutionControls: React.FC<BotJobExecutionControlsProps> = ({
               max={10}
               step={1}
               value={navigationTime}
-              disabled={!canConfigure || busy}
+              disabled={!canConfigure || busy || executionActive}
               onChange={(event) => setNavigationTime(event.target.value)}
             />
             <span>seconds</span>
-            <button type="submit" disabled={!canConfigure || busy}>Apply</button>
+            <button type="submit" disabled={!canConfigure || busy || executionActive}>Apply</button>
           </div>
         </form>
 
@@ -168,7 +169,10 @@ const BotJobExecutionControls: React.FC<BotJobExecutionControlsProps> = ({
             <button
               type="button"
               className={styles.stopButton}
-              disabled={!connected || busy || !executionActive || state?.executionState === 'STOPPING'}
+              disabled={!connected
+                || (busy && !testRunStarting)
+                || (!executionActive && !testRunStarting)
+                || state?.executionState === 'STOPPING'}
               onClick={() => onAction('STOP_TEST_RUN')}
             >
               <Square size={15} fill="currentColor" aria-hidden="true" />

@@ -33,6 +33,8 @@ const Harness: React.FC<HarnessProps> = ({ socket, messages, botJobId = 42 }) =>
     <button type="button" onClick={() => controller.sendAction('SHOW_COMPONENTS')}>Show components</button>
     <button type="button" onClick={() => controller.sendToolbarAction('CHOOSE_TRANSFER_PATH')}>Choose transfer folder</button>
     <button type="button" onClick={() => controller.sendToolbarAction('EXPORT_JOB', { confirmed: true, transferPath: 'D:\\exports' })}>Export toolbar</button>
+    <button type="button" onClick={() => controller.sendToolbarAction('TEST_RUN', { executionMode: 'ALL', blockId: 0 })}>Start test run</button>
+    <button type="button" onClick={() => controller.sendToolbarAction('STOP_TEST_RUN')}>Stop test run</button>
     <button type="button" onClick={() => controller.sendAction('CLOSE')}>Close workspace</button>
     <button type="button" onClick={controller.retryBootstrap}>Retry bootstrap</button>
   </div>;
@@ -202,6 +204,33 @@ test('allows Close to supersede a pending native chooser operation', async () =>
   expect(sentBody(send, 2).action).toBe('CLOSE');
   expect(screen.getByTestId('pending-toolbar')).toBeEmptyDOMElement();
   view.unmount();
+});
+
+test('allows prompt STOP to supersede a pending TEST RUN startup request', async () => {
+  const send = jest.fn();
+  const socket = { readyState: WebSocket.OPEN, send } as unknown as WebSocket;
+  const view = render(<Harness socket={socket} messages={[]} />);
+  let messages = await completeBootstrap(view, socket, send);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Start test run' }));
+  const startRequest = sentBody(send, 1);
+  expect(screen.getByTestId('pending-toolbar')).toHaveTextContent('TEST_RUN');
+  fireEvent.click(screen.getByRole('button', { name: 'Stop test run' }));
+  const stopRequest = sentBody(send, 2);
+  expect(stopRequest.action).toBe('STOP_TEST_RUN');
+  expect(screen.getByTestId('pending-toolbar')).toHaveTextContent('STOP_TEST_RUN');
+
+  messages = [...messages, response('botJobDetails.toolbar.actionResponse', {
+    ok: true, botJobId: 42, requestId: startRequest.requestId, action: 'TEST_RUN',
+  })];
+  view.rerender(<Harness socket={socket} messages={messages} />);
+  expect(screen.getByTestId('pending-toolbar')).toHaveTextContent('STOP_TEST_RUN');
+
+  messages = [...messages, response('botJobDetails.toolbar.actionResponse', {
+    ok: true, botJobId: 42, requestId: stopRequest.requestId, action: 'STOP_TEST_RUN',
+  })];
+  view.rerender(<Harness socket={socket} messages={messages} />);
+  await waitFor(() => expect(screen.getByTestId('pending-toolbar')).toBeEmptyDOMElement());
 });
 
 test('closes the saved draft when persistence committed but desktop synchronization failed', async () => {

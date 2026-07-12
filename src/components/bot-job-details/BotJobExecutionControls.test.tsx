@@ -66,6 +66,26 @@ test('dispatches navigation, reload, launch, and terminal execution actions with
   );
   expect(screen.getByRole('button', { name: 'Test run' })).toBeDisabled();
   expect(screen.getByRole('button', { name: 'Stop' })).toBeEnabled();
+  expect(screen.getByLabelText('Navigation time')).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Apply' })).toBeDisabled();
   fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
   expect(onAction).toHaveBeenLastCalledWith('STOP_TEST_RUN');
+});
+
+test('keeps prompt STOP available while TEST RUN startup is still pending', () => {
+  const onAction = jest.fn();
+  render(
+    <BotJobExecutionControls
+      state={state}
+      connected
+      pendingAction="TEST_RUN"
+      busy
+      onAction={onAction}
+    />,
+  );
+
+  expect(screen.getByRole('button', { name: 'Stop' })).toBeEnabled();
+  expect(screen.getByRole('button', { name: 'Test run' })).toBeDisabled();
+  fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
+  expect(onAction).toHaveBeenCalledWith('STOP_TEST_RUN');
 });
