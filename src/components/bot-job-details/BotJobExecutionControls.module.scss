@@ -1,9 +1,8 @@
 .panel {
   min-width: 0;
-  border: 1px solid #c9d9e7;
-  border-radius: 12px;
+  border: 1px solid #c8c8c8;
+  border-radius: 6px;
   background: #fff;
-  box-shadow: 0 2px 8px rgb(24 57 83 / 7%);
   color: #243447;
   overflow: hidden;
 }
@@ -13,20 +12,20 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 12px 14px;
-  border-bottom: 1px solid #dce7ef;
-  background: linear-gradient(135deg, #f5f9fc, #eef6f1);
+  padding: 7px 10px;
+  border-bottom: 1px solid #d4d4d4;
+  background: #f0f0f0;
 }
 
-.heading h2 { margin: 0; color: #174a73; font-size: 0.95rem; }
-.heading p { margin: 3px 0 0; color: #667b8e; font-size: 0.72rem; }
+.heading h2 { margin: 0; color: #2b2b2b; font-size: 0.88rem; }
+.heading p { margin: 2px 0 0; color: #6e6e6e; font-size: 0.7rem; }
 
 .state {
   flex: 0 0 auto;
   border-radius: 999px;
-  background: #e7edf3;
-  color: #41566a;
-  padding: 4px 9px;
+  background: #e4e4e4;
+  color: #3f3f3f;
+  padding: 3px 9px;
   font-size: 0.66rem;
   font-weight: 800;
   letter-spacing: 0.06em;
@@ -35,39 +34,39 @@
 .controls {
   display: grid;
   grid-template-columns: minmax(190px, 0.75fr) minmax(250px, 1.25fr) minmax(330px, 1.5fr);
-  gap: 14px;
+  gap: 10px;
   align-items: end;
-  padding: 13px 14px 14px;
+  padding: 8px 10px 10px;
 }
 
 .navigationForm, .scopeField, .runActions {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
 }
 
 .navigationForm label, .scopeField label, .fieldLabel {
-  color: #4d6579;
+  color: #5a5a5a;
   font-size: 0.7rem;
   font-weight: 800;
 }
 
-.inlineField, .actionRow { display: flex; align-items: center; gap: 7px; }
+.inlineField, .actionRow { display: flex; align-items: center; gap: 6px; }
 
 .inlineField {
-  min-height: 38px;
-  border: 1px solid #adbfce;
-  border-radius: 7px;
+  min-height: 30px;
+  border: 1px solid #adadad;
+  border-radius: 4px;
   background: #fff;
-  padding: 0 7px;
+  padding: 0 6px;
 }
 
 .inlineField input { min-width: 42px; width: 48px; }
 .inlineField select { min-width: 0; flex: 1; }
 
 .inlineField input, .inlineField select {
-  height: 34px;
+  height: 26px;
   border: 0;
   outline: 0;
   background: transparent;
@@ -76,15 +75,15 @@
   font-size: 0.76rem;
 }
 
-.inlineField span { color: #6c8092; font-size: 0.68rem; }
+.inlineField span { color: #6e6e6e; font-size: 0.68rem; }
 
 .inlineField button, .actionRow button {
-  min-height: 34px;
-  border: 1px solid #9fb4c7;
-  border-radius: 7px;
-  background: #fff;
-  color: #174a73;
-  padding: 5px 10px;
+  min-height: 28px;
+  border: 1px solid #adadad;
+  border-radius: 4px;
+  background: #f5f5f5;
+  color: #2b2b2b;
+  padding: 4px 10px;
   font-size: 0.72rem;
   font-weight: 800;
   cursor: pointer;
@@ -109,14 +108,14 @@
   cursor: not-allowed;
 }
 
-.iconButton { flex: 0 0 34px; padding: 4px !important; }
+.iconButton { flex: 0 0 30px; padding: 4px !important; }
 .actionRow .modeAll, .actionRow .modeOne { min-width: 54px; color: #fff; }
 .actionRow .modeAll { border-color: #16803f; background: #16803f; }
 .actionRow .modeOne { border-color: #db6b16; background: #e8791b; }
 .actionRow .launchButton { border-color: #176b3a; color: #176b3a; }
 .actionRow .testButton { border-color: #dc6b18; background: #e8791b; color: #fff; }
 .actionRow .stopButton { border-color: #b42318; background: #b42318; color: #fff; }
-.scopeHint { min-height: 1em; color: #6b7e8f; font-size: 0.66rem; }
+.scopeHint { min-height: 1em; color: #6e6e6e; font-size: 0.66rem; }
 
 @media (max-width: 1080px) {
   .controls { grid-template-columns: repeat(2, minmax(220px, 1fr)); }

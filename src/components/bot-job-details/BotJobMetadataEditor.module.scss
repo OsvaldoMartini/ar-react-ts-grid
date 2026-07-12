@@ -1,14 +1,13 @@
 .panel {
-  border: 1px solid #c8d6e5;
-  border-radius: 12px;
+  border: 1px solid #c8c8c8;
+  border-radius: 6px;
   background: #fff;
-  box-shadow: 0 2px 8px rgb(24 57 83 / 7%);
   color: #243447;
   overflow: hidden;
 }
 
 .unavailable {
-  padding: 10px 12px;
+  padding: 8px 10px;
   color: #8a3b12;
   background: #fff7ed;
 }
@@ -18,20 +17,20 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 14px;
-  background: linear-gradient(135deg, #f5f9fc, #eef6f1);
-  border-bottom: 1px solid #d8e2ec;
+  padding: 7px 10px;
+  background: #f0f0f0;
+  border-bottom: 1px solid #d4d4d4;
 }
 
 .title {
   margin: 0;
-  color: #174a73;
-  font-size: 0.9rem;
+  color: #2b2b2b;
+  font-size: 0.85rem;
 }
 
 .revision {
-  color: #66788a;
-  font-size: 0.68rem;
+  color: #6e6e6e;
+  font-size: 0.66rem;
 }
 
 .actions,
@@ -43,11 +42,11 @@
 
 .actions button,
 .formActions button {
-  min-height: 34px;
-  border: 1px solid #9fb4c7;
-  border-radius: 7px;
-  background: #fff;
-  color: #174a73;
+  min-height: 28px;
+  border: 1px solid #adadad;
+  border-radius: 4px;
+  background: #f5f5f5;
+  color: #2b2b2b;
   padding: 4px 9px;
   font-size: 0.72rem;
   font-weight: 700;
@@ -62,16 +61,16 @@
 
 .actions .primary,
 .formActions .primary {
-  border-color: #176b3a;
-  background: #176b3a;
+  border-color: #2563eb;
+  background: #2563eb;
   color: #fff;
 }
 
 .summary,
 .form {
   display: grid;
-  gap: 10px 12px;
-  padding: 13px 14px 14px;
+  gap: 7px 10px;
+  padding: 8px 10px 10px;
 }
 
 .summary {
@@ -98,7 +97,7 @@
 .summary span,
 .readOnlyField span,
 .field {
-  color: #52697d;
+  color: #5a5a5a;
   font-size: 0.7rem;
   font-weight: 700;
 }
@@ -122,8 +121,8 @@
 
 .contextField input,
 .urlField input {
-  background: #f4f7f9;
-  color: #53697b;
+  background: #f0f0f0;
+  color: #5a5a5a;
 }
 
 .field input,
@@ -131,18 +130,18 @@
 .field select {
   width: 100%;
   box-sizing: border-box;
-  border: 1px solid #aebfce;
-  min-height: 38px;
-  border-radius: 7px;
+  border: 1px solid #adadad;
+  min-height: 30px;
+  border-radius: 4px;
   background: #fff;
   color: #243447;
-  padding: 6px 7px;
+  padding: 5px 7px;
   font: inherit;
   font-size: 0.76rem;
 }
 
 .field textarea {
-  min-height: 76px;
+  min-height: 56px;
   resize: vertical;
 }
 

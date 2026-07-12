@@ -43,6 +43,7 @@ const BotJobDetailsChrome: React.FC<BotJobDetailsChromeProps> = ({
         status={controller.status}
         statusTone={controller.statusTone}
         onAction={controller.sendAction}
+        compact
         canUseWorkspaceActions={state?.capabilities.canUseWorkspaceActions === true}
         canUsePreScan={state?.capabilities.canUsePreScan === true}
         canShowComponents={state?.capabilities.canShowComponents === true}
