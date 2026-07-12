@@ -3,6 +3,7 @@ import type { BotJobDetailsState } from './BotJobDetails.types';
 
 const state = (revision: number): BotJobDetailsState => ({
   revision,
+  metadataRevision: revision,
   botJobId: 42,
   name: `Job ${revision}`,
   description: '',
@@ -14,6 +15,7 @@ const state = (revision: number): BotJobDetailsState => ({
   environmentName: 'TEST',
   environmentUrl: 'https://example.test',
   navigationTimeSeconds: 1,
+  transferPathConfigured: true,
   environments: [],
   blocks: [],
   capabilities: {
@@ -23,6 +25,7 @@ const state = (revision: number): BotJobDetailsState => ({
     canShowComponents: true,
     canExecute: true,
     canLaunch: true,
+    canUseFileActions: true,
     canOpenOrganizations: true,
   },
   executionState: 'IDLE',

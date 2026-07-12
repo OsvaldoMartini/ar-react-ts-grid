@@ -1,6 +1,9 @@
 import React from 'react';
 import BotJobDetailsHeader from './BotJobDetailsHeader';
 import BotJobMetadataEditor from './BotJobMetadataEditor';
+import BotJobExecutionControls from './BotJobExecutionControls';
+import BotJobDataActions from './BotJobDataActions';
+import BotJobFileActions from './BotJobFileActions';
 import type { BotJobDetailsControllerState } from './useBotJobDetailsController';
 import type { BotJobWorkspaceSurface } from './BotJobDetails.types';
 import styles from './BotJobDetailsChrome.module.scss';
@@ -21,6 +24,9 @@ const BotJobDetailsChrome: React.FC<BotJobDetailsChromeProps> = ({
   controller,
 }) => {
   const state = controller.state;
+  const operationBusy = Boolean(
+    controller.pendingAction || controller.pendingToolbarAction || controller.savingMetadata,
+  );
   return (
     <div className={styles.chrome}>
       <BotJobDetailsHeader
@@ -29,6 +35,7 @@ const BotJobDetailsChrome: React.FC<BotJobDetailsChromeProps> = ({
         activeSurface={state?.activeSurface ?? fallbackSurface}
         connected={connected}
         pendingAction={controller.pendingAction}
+        busy={operationBusy}
         status={controller.status}
         statusTone={controller.statusTone}
         onAction={controller.sendAction}
@@ -36,18 +43,45 @@ const BotJobDetailsChrome: React.FC<BotJobDetailsChromeProps> = ({
         canUsePreScan={state?.capabilities.canUsePreScan === true}
         canShowComponents={state?.capabilities.canShowComponents === true}
       />
-      <BotJobMetadataEditor
-        state={state}
-        loading={controller.loadingState}
-        connected={connected}
-        saving={controller.savingMetadata}
-        fieldErrors={controller.fieldErrors}
-        metadataSavedRevision={controller.metadataSavedRevision}
-        onSave={controller.saveMetadata}
-        onRefreshEnvironments={controller.refreshEnvironments}
-        onOpenOrganizations={() => controller.sendAction('OPEN_ORGANIZATIONS')}
-        onRetry={controller.retryBootstrap}
-      />
+      <div className={styles.sections}>
+        <BotJobMetadataEditor
+          state={state}
+          loading={controller.loadingState}
+          connected={connected}
+          saving={controller.savingMetadata}
+          busy={operationBusy}
+          fieldErrors={controller.fieldErrors}
+          metadataSavedRevision={controller.metadataSavedRevision}
+          onSave={controller.saveMetadata}
+          onRefreshEnvironments={controller.refreshEnvironments}
+          onOpenOrganizations={() => controller.sendAction('OPEN_ORGANIZATIONS')}
+          onRetry={controller.retryBootstrap}
+        />
+        <BotJobExecutionControls
+          state={state}
+          connected={connected}
+          pendingAction={controller.pendingToolbarAction}
+          busy={operationBusy}
+          onAction={controller.sendToolbarAction}
+        />
+        <div className={styles.fileGrid}>
+          <BotJobDataActions
+            state={state}
+            connected={connected}
+            pendingAction={controller.pendingToolbarAction}
+            busy={operationBusy}
+            onAction={controller.sendToolbarAction}
+          />
+          <BotJobFileActions
+            state={state}
+            connected={connected}
+            pendingAction={controller.pendingToolbarAction}
+            busy={operationBusy}
+            transferPath={controller.transferPath}
+            onAction={controller.sendToolbarAction}
+          />
+        </div>
+      </div>
     </div>
   );
 };

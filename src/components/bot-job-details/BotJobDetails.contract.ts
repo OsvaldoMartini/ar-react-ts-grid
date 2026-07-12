@@ -6,6 +6,7 @@ import type {
 
 const BOT_JOB_DETAILS_OPERATIONS = new Set([
   'botJobDetails.actionResponse',
+  'botJobDetails.toolbar.actionResponse',
   'botJobDetails.bootstrapResponse',
   'botJobDetails.metadata.updateResponse',
   'botJobDetails.environments.refreshResponse',
@@ -53,6 +54,7 @@ function isBlock(value: unknown): boolean {
 function isBotJobDetailsState(value: unknown, expectedBotJobId: number): value is BotJobDetailsState {
   if (!isRecord(value)) return false;
   return isInteger(value.revision, 1)
+    && isInteger(value.metadataRevision, 1)
     && isInteger(value.botJobId, 1)
     && value.botJobId === expectedBotJobId
     && typeof value.name === 'string'
@@ -65,6 +67,7 @@ function isBotJobDetailsState(value: unknown, expectedBotJobId: number): value i
     && typeof value.environmentName === 'string'
     && typeof value.environmentUrl === 'string'
     && isInteger(value.navigationTimeSeconds, 0)
+    && typeof value.transferPathConfigured === 'boolean'
     && Array.isArray(value.environments)
     && value.environments.every(isEnvironment)
     && Array.isArray(value.blocks)
@@ -76,6 +79,7 @@ function isBotJobDetailsState(value: unknown, expectedBotJobId: number): value i
       'canShowComponents',
       'canExecute',
       'canLaunch',
+      'canUseFileActions',
       'canOpenOrganizations',
     ])
     && typeof value.executionState === 'string'

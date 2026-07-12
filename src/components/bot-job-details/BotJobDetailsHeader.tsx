@@ -13,6 +13,7 @@ interface BotJobDetailsHeaderProps {
   activeSurface: BotJobWorkspaceSurface;
   connected: boolean;
   pendingAction?: BotJobWorkspaceAction | null;
+  busy?: boolean;
   status?: string;
   statusTone?: BotJobWorkspaceStatusTone;
   onAction: (action: BotJobWorkspaceAction) => void;
@@ -28,6 +29,7 @@ const BotJobDetailsHeader: React.FC<BotJobDetailsHeaderProps> = ({
   activeSurface,
   connected,
   pendingAction = null,
+  busy = false,
   status = 'Ready',
   statusTone = 'neutral',
   onAction,
@@ -37,7 +39,7 @@ const BotJobDetailsHeader: React.FC<BotJobDetailsHeaderProps> = ({
   canShowComponents = true,
 }) => {
   const actions = useMemo<WorkspaceHeaderAction<BotJobWorkspaceAction>[]>(() => {
-    const pending = pendingAction !== null;
+    const pending = busy || pendingAction !== null;
     const unavailable = !connected || !botJobId || botJobId <= 0;
     return [
       { id: 'REFRESH', label: pendingAction === 'REFRESH' ? 'Refreshing…' : 'Refresh', disabled: pending || unavailable || !canUseWorkspaceActions },
@@ -52,7 +54,7 @@ const BotJobDetailsHeader: React.FC<BotJobDetailsHeaderProps> = ({
       { id: 'SHOW_PRE_SCAN', label: 'Pre Scan', tone: 'success', active: activeSurface === 'preScan', disabled: pending || unavailable || !canUsePreScan || activeSurface === 'preScan' },
       { id: 'CLOSE', label: 'Close', tone: 'danger', disabled: false },
     ];
-  }, [activeSurface, botJobId, canShowComponents, canUsePreScan, canUseWorkspaceActions, connected, pendingAction]);
+  }, [activeSurface, botJobId, busy, canShowComponents, canUsePreScan, canUseWorkspaceActions, connected, pendingAction]);
 
   return (
     <div className={styles.wrapper}>

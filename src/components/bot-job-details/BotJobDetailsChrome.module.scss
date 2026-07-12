@@ -5,3 +5,25 @@
   min-width: 0;
   flex: 0 0 auto;
 }
+
+.sections {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 8px 10px;
+}
+
+.fileGrid {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(430px, 1.2fr);
+  gap: 10px;
+}
+
+@media (max-width: 980px) {
+  .fileGrid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 620px) {
+  .sections { padding-inline: 5px; }
+}

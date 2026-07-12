@@ -5,6 +5,7 @@ import type { BotJobDetailsState } from './BotJobDetails.types';
 
 const state: BotJobDetailsState = {
   revision: 3,
+  metadataRevision: 3,
   botJobId: 42,
   name: 'Payments',
   description: 'Payment flow',
@@ -16,6 +17,7 @@ const state: BotJobDetailsState = {
   environmentName: 'TEST',
   environmentUrl: 'https://test.example',
   navigationTimeSeconds: 2,
+  transferPathConfigured: true,
   environments: [
     { id: 8, name: 'TEST', url: 'https://test.example', homeBankingId: 7, organizationName: 'Bank' },
     { id: 9, name: 'QA', url: 'https://qa.example', homeBankingId: 7, organizationName: 'Bank' },
@@ -28,6 +30,7 @@ const state: BotJobDetailsState = {
     canShowComponents: true,
     canExecute: true,
     canLaunch: true,
+    canUseFileActions: true,
     canOpenOrganizations: true,
   },
   executionState: 'IDLE',
@@ -56,7 +59,7 @@ test('edits and submits name, description, and stable environment id', () => {
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
   expect(onSave).toHaveBeenCalledWith({
-    expectedRevision: 3, name: 'Payments QA', description: 'Payment flow', homeUrlId: 9,
+    expectedMetadataRevision: 3, name: 'Payments QA', description: 'Payment flow', homeUrlId: 9,
   });
 });
 

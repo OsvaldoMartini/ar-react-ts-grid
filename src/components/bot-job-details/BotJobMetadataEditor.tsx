@@ -10,6 +10,7 @@ interface BotJobMetadataEditorProps {
   loading: boolean;
   connected: boolean;
   saving: boolean;
+  busy?: boolean;
   fieldErrors?: Record<string, string>;
   metadataSavedRevision?: number | null;
   onSave: (draft: BotJobMetadataDraft) => void;
@@ -18,13 +19,19 @@ interface BotJobMetadataEditorProps {
   onRetry: () => void;
 }
 
-const emptyDraft: BotJobMetadataDraft = { expectedRevision: 0, name: '', description: '', homeUrlId: 0 };
+const emptyDraft: BotJobMetadataDraft = {
+  expectedMetadataRevision: 0,
+  name: '',
+  description: '',
+  homeUrlId: 0,
+};
 
 const BotJobMetadataEditor: React.FC<BotJobMetadataEditorProps> = ({
   state,
   loading,
   connected,
   saving,
+  busy = false,
   fieldErrors = {},
   metadataSavedRevision = null,
   onSave,
@@ -42,7 +49,7 @@ const BotJobMetadataEditor: React.FC<BotJobMetadataEditorProps> = ({
     if (activeJobIdRef.current !== state.botJobId) {
       activeJobIdRef.current = state.botJobId;
       setDraft({
-        expectedRevision: state.revision,
+        expectedMetadataRevision: state.metadataRevision,
         name: state.name,
         description: state.description,
         homeUrlId: state.homeUrlId,
@@ -51,7 +58,7 @@ const BotJobMetadataEditor: React.FC<BotJobMetadataEditorProps> = ({
       setLocalErrors({});
     } else if (!editing) {
       setDraft({
-        expectedRevision: state.revision,
+        expectedMetadataRevision: state.metadataRevision,
         name: state.name,
         description: state.description,
         homeUrlId: state.homeUrlId,
@@ -60,7 +67,7 @@ const BotJobMetadataEditor: React.FC<BotJobMetadataEditorProps> = ({
   }, [editing, state]);
 
   useEffect(() => {
-    if (state && metadataSavedRevision === state.revision) setEditing(false);
+    if (state && metadataSavedRevision === state.metadataRevision) setEditing(false);
   }, [metadataSavedRevision, state]);
 
   const selectedEnvironment = useMemo(
@@ -68,12 +75,12 @@ const BotJobMetadataEditor: React.FC<BotJobMetadataEditorProps> = ({
     [draft.homeUrlId, state?.environments],
   );
   const errors = { ...localErrors, ...fieldErrors };
-  const canEdit = Boolean(state?.capabilities.canEditMetadata && connected && !loading && !saving);
+  const canEdit = Boolean(state?.capabilities.canEditMetadata && connected && !loading && !busy);
 
   const beginEdit = () => {
     if (!state || !canEdit) return;
     setDraft({
-      expectedRevision: state.revision,
+      expectedMetadataRevision: state.metadataRevision,
       name: state.name,
       description: state.description,
       homeUrlId: state.homeUrlId,
@@ -85,7 +92,7 @@ const BotJobMetadataEditor: React.FC<BotJobMetadataEditorProps> = ({
   const cancelEdit = () => {
     if (state) {
       setDraft({
-        expectedRevision: state.revision,
+        expectedMetadataRevision: state.metadataRevision,
         name: state.name,
         description: state.description,
         homeUrlId: state.homeUrlId,
@@ -124,20 +131,20 @@ const BotJobMetadataEditor: React.FC<BotJobMetadataEditorProps> = ({
       <div className={styles.headingRow}>
         <div>
           <h2 className={styles.title}>Job metadata</h2>
-          <span className={styles.revision}>Revision {state.revision}</span>
+          <span className={styles.revision}>Metadata revision {state.metadataRevision}</span>
         </div>
         <div className={styles.actions}>
           <button
             type="button"
             onClick={onRefreshEnvironments}
-            disabled={!connected || saving || !state.capabilities.canUseWorkspaceActions}
+            disabled={!connected || busy || !state.capabilities.canUseWorkspaceActions}
           >
             Refresh environments
           </button>
           <button
             type="button"
             onClick={onOpenOrganizations}
-            disabled={!connected || saving || !state.capabilities.canOpenOrganizations}
+            disabled={!connected || busy || !state.capabilities.canOpenOrganizations}
           >
             Manage environments
           </button>
@@ -146,23 +153,31 @@ const BotJobMetadataEditor: React.FC<BotJobMetadataEditorProps> = ({
       </div>
 
       {editing ? (
-        <div className={styles.form}>
+        <form className={styles.form} onSubmit={(event) => { event.preventDefault(); save(); }}>
           <label className={styles.field}>
             Bot Job name
             <input
               value={draft.name}
               maxLength={100}
-              disabled={saving || !connected || !state.capabilities.canEditMetadata}
+              disabled={busy || !connected || !state.capabilities.canEditMetadata}
               aria-invalid={Boolean(errors.name)}
               onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
             />
-            {errors.name && <span className={styles.error}>{errors.name}</span>}
+            {errors.name && <span className={styles.error} role="alert">{errors.name}</span>}
+          </label>
+          <label className={[styles.field, styles.contextField].join(' ')}>
+            Project type
+            <input value={state.projectType} readOnly aria-readonly="true" />
+          </label>
+          <label className={[styles.field, styles.contextField].join(' ')}>
+            Organization
+            <input value={state.organizationName || 'Unavailable'} readOnly aria-readonly="true" />
           </label>
           <label className={`${styles.field} ${styles.description}`}>
             Description
             <textarea
               value={draft.description}
-              disabled={saving || !connected || !state.capabilities.canEditMetadata}
+              disabled={busy || !connected || !state.capabilities.canEditMetadata}
               onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))}
             />
           </label>
@@ -170,7 +185,7 @@ const BotJobMetadataEditor: React.FC<BotJobMetadataEditorProps> = ({
             Environment
             <select
               value={draft.homeUrlId || ''}
-              disabled={saving || !connected || !state.capabilities.canEditMetadata || state.environments.length === 0}
+              disabled={busy || !connected || !state.capabilities.canEditMetadata || state.environments.length === 0}
               aria-invalid={Boolean(errors.homeUrlId)}
               onChange={(event) => setDraft((current) => ({ ...current, homeUrlId: Number(event.target.value) }))}
             >
@@ -181,24 +196,23 @@ const BotJobMetadataEditor: React.FC<BotJobMetadataEditorProps> = ({
                 </option>
               ))}
             </select>
-            {errors.homeUrlId && <span className={styles.error}>{errors.homeUrlId}</span>}
+            {errors.homeUrlId && <span className={styles.error} role="alert">{errors.homeUrlId}</span>}
           </label>
-          <div className={styles.readOnlyField}>
-            <span>Selected URL</span>
-            <strong>{selectedEnvironment?.url || 'Unavailable'}</strong>
-          </div>
+          <label className={[styles.field, styles.urlField].join(' ')}>
+            Selected URL
+            <input value={selectedEnvironment?.url || 'Unavailable'} readOnly aria-readonly="true" />
+          </label>
           <div className={styles.formActions}>
             <button type="button" onClick={cancelEdit} disabled={saving}>Cancel</button>
             <button
-              type="button"
+              type="submit"
               className={styles.primary}
-              onClick={save}
-              disabled={saving || !connected || !state.capabilities.canEditMetadata}
+              disabled={busy || !connected || !state.capabilities.canEditMetadata}
             >
               {saving ? 'Saving…' : 'Save'}
             </button>
           </div>
-        </div>
+        </form>
       ) : (
         <div className={styles.summary}>
           <div><span>Name</span><strong>{state.name}</strong></div>

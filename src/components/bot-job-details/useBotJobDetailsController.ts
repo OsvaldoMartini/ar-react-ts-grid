@@ -3,6 +3,8 @@ import { parseBotJobDetailsEnvelope, reduceBotJobDetailsState } from './BotJobDe
 import type {
   BotJobDetailsState,
   BotJobMetadataDraft,
+  BotJobToolbarAction,
+  BotJobToolbarPayload,
   BotJobWorkspaceAction,
   BotJobWorkspaceStatusTone,
 } from './BotJobDetails.types';
@@ -24,19 +26,35 @@ export interface BotJobDetailsControllerState {
   fieldErrors: Record<string, string>;
   metadataSavedRevision: number | null;
   pendingAction: BotJobWorkspaceAction | null;
+  pendingToolbarAction: BotJobToolbarAction | null;
+  transferPath: string;
   status: string;
   statusTone: BotJobWorkspaceStatusTone;
   sendAction: (action: BotJobWorkspaceAction) => void;
+  sendToolbarAction: (action: BotJobToolbarAction, payload?: BotJobToolbarPayload) => void;
   saveMetadata: (draft: BotJobMetadataDraft) => void;
   refreshEnvironments: () => void;
   retryBootstrap: () => void;
 }
 
 type PendingAction = { requestId: string; action: BotJobWorkspaceAction };
+type PendingToolbarAction = { requestId: string; action: BotJobToolbarAction };
 type PendingMetadata = { requestId: string; kind: 'save' | 'environments' };
 
 const RESPONSE_TIMEOUT_MS = 10000;
 const STATUS_RESET_MS = 3500;
+const TOOLBAR_TIMEOUT_MS: Partial<Record<BotJobToolbarAction, number>> = {
+  GENERATE_EXCEL: 120000,
+  EXPORT_JOB: 120000,
+  IMPORT_JOB: 120000,
+  LAUNCH: 30000,
+  TEST_RUN: 30000,
+  STOP_TEST_RUN: 30000,
+};
+const USER_DRIVEN_TOOLBAR_ACTIONS = new Set<BotJobToolbarAction>([
+  'CHOOSE_TRANSFER_PATH',
+  'OPEN_REPORT',
+]);
 const METADATA_RESPONSE_OPERATIONS: Record<PendingMetadata['kind'], string> = {
   save: 'botJobDetails.metadata.updateResponse',
   environments: 'botJobDetails.environments.refreshResponse',
@@ -81,9 +99,11 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
   const bootstrapSocketRef = useRef<WebSocket | null>(null);
   const bootstrapRequestRef = useRef<string | null>(null);
   const pendingActionRef = useRef<PendingAction | null>(null);
+  const pendingToolbarActionRef = useRef<PendingToolbarAction | null>(null);
   const pendingMetadataRef = useRef<PendingMetadata | null>(null);
   const bootstrapTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const actionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const toolbarTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const metadataTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const statusResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [state, setState] = useState<BotJobDetailsState | null>(null);
@@ -92,6 +112,8 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [metadataSavedRevision, setMetadataSavedRevision] = useState<number | null>(null);
   const [pendingAction, setPendingAction] = useState<BotJobWorkspaceAction | null>(null);
+  const [pendingToolbarAction, setPendingToolbarAction] = useState<BotJobToolbarAction | null>(null);
+  const [transferPath, setTransferPath] = useState('');
   const [status, setStatus] = useState(enabled ? 'Loading Bot Job details' : 'Ready');
   const [statusTone, setStatusTone] = useState<BotJobWorkspaceStatusTone>('neutral');
 
@@ -110,12 +132,15 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
   const invalidateLicenseCapabilities = useCallback(() => {
     clearTimer(bootstrapTimeoutRef);
     clearTimer(actionTimeoutRef);
+    clearTimer(toolbarTimeoutRef);
     clearTimer(metadataTimeoutRef);
     bootstrapRequestRef.current = null;
     pendingActionRef.current = null;
+    pendingToolbarActionRef.current = null;
     pendingMetadataRef.current = null;
     setLoadingState(false);
     setPendingAction(null);
+    setPendingToolbarAction(null);
     setSavingMetadata(false);
     setFieldErrors({});
     setState((current) => current ? {
@@ -128,6 +153,7 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
         canShowComponents: false,
         canExecute: false,
         canLaunch: false,
+        canUseFileActions: false,
         canOpenOrganizations: false,
       },
     } : current);
@@ -155,13 +181,17 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
     bootstrapSocketRef.current = null;
     bootstrapRequestRef.current = null;
     pendingActionRef.current = null;
+    pendingToolbarActionRef.current = null;
     pendingMetadataRef.current = null;
     clearTimer(bootstrapTimeoutRef);
     clearTimer(actionTimeoutRef);
+    clearTimer(toolbarTimeoutRef);
     clearTimer(metadataTimeoutRef);
     clearTimer(statusResetRef);
     setState(null);
     setPendingAction(null);
+    setPendingToolbarAction(null);
+    setTransferPath('');
     setSavingMetadata(false);
     setFieldErrors({});
     setMetadataSavedRevision(null);
@@ -281,6 +311,28 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
         return;
       }
 
+      if (operationId === 'botJobDetails.toolbar.actionResponse') {
+        const pending = pendingToolbarActionRef.current;
+        const actionMatches = body.action === pending?.action
+          || (body.ok === false && body.action == null);
+        if (!pending || body.requestId !== pending.requestId || !actionMatches) return;
+        clearTimer(toolbarTimeoutRef);
+        pendingToolbarActionRef.current = null;
+        setPendingToolbarAction(null);
+        if (body.state) {
+          setState((current) => reduceBotJobDetailsState(current, body.state));
+        }
+        if (typeof body.selectedPath === 'string' && body.selectedPath.trim()) {
+          setTransferPath(body.selectedPath);
+        }
+        setTransientStatus(
+          body.message || (body.ok === false ? 'Toolbar action failed' : 'Toolbar action completed'),
+          body.ok === false ? 'error' : 'success',
+        );
+        if (body.errorCode === 'LICENSE_REQUIRED') invalidateLicenseCapabilities();
+        return;
+      }
+
       const pending = pendingMetadataRef.current;
       if (
         !pending ||
@@ -301,12 +353,12 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
           && body.errorCode === 'DESKTOP_STATE_SYNC_FAILED'
           && body.state
         ) {
-          setMetadataSavedRevision(body.state.revision);
+          setMetadataSavedRevision(body.state.metadataRevision);
         }
         setTransientStatus(body.message || 'Bot Job details were not saved', 'error');
       } else {
         if (operationId === 'botJobDetails.metadata.updateResponse' && body.state) {
-          setMetadataSavedRevision(body.state.revision);
+          setMetadataSavedRevision(body.state.metadataRevision);
         }
         setTransientStatus(body.message || 'Bot Job details updated', 'success');
       }
@@ -318,13 +370,16 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
     if (!connected) {
       clearTimer(bootstrapTimeoutRef);
       clearTimer(actionTimeoutRef);
+      clearTimer(toolbarTimeoutRef);
       clearTimer(metadataTimeoutRef);
       clearTimer(statusResetRef);
       bootstrapSocketRef.current = null;
       bootstrapRequestRef.current = null;
       pendingActionRef.current = null;
+      pendingToolbarActionRef.current = null;
       pendingMetadataRef.current = null;
       setPendingAction(null);
+      setPendingToolbarAction(null);
       setSavingMetadata(false);
       setLoadingState(true);
       setStatus('Waiting for backend connection');
@@ -338,6 +393,7 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
   useEffect(() => () => {
     clearTimer(bootstrapTimeoutRef);
     clearTimer(actionTimeoutRef);
+    clearTimer(toolbarTimeoutRef);
     clearTimer(metadataTimeoutRef);
     clearTimer(statusResetRef);
   }, []);
@@ -346,6 +402,24 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
     if (!enabled || !botJobId || botJobId <= 0) {
       setTransientStatus('Bot Job identity is unavailable', 'error');
       return;
+    }
+    const operationPending = Boolean(
+      pendingActionRef.current || pendingToolbarActionRef.current || pendingMetadataRef.current,
+    );
+    if (operationPending && action !== 'CLOSE') {
+      setTransientStatus('Wait for the current Bot Job operation to finish', 'warning');
+      return;
+    }
+    if (action === 'CLOSE' && operationPending) {
+      clearTimer(actionTimeoutRef);
+      clearTimer(toolbarTimeoutRef);
+      clearTimer(metadataTimeoutRef);
+      pendingActionRef.current = null;
+      pendingToolbarActionRef.current = null;
+      pendingMetadataRef.current = null;
+      setPendingAction(null);
+      setPendingToolbarAction(null);
+      setSavingMetadata(false);
     }
     const actionRequestId = requestId(action.toLowerCase());
     clearTimer(actionTimeoutRef);
@@ -369,6 +443,47 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
     }
   }, [botJobId, enabled, requestId, send, setTransientStatus]);
 
+  const sendToolbarAction = useCallback((
+    action: BotJobToolbarAction,
+    payload: BotJobToolbarPayload = {},
+  ) => {
+    if (!enabled || !botJobId || botJobId <= 0) {
+      setTransientStatus('Bot Job identity is unavailable', 'error');
+      return;
+    }
+    if (pendingActionRef.current || pendingToolbarActionRef.current || pendingMetadataRef.current) {
+      setTransientStatus('Wait for the current Bot Job operation to finish', 'warning');
+      return;
+    }
+    const toolbarRequestId = requestId(action.toLowerCase());
+    clearTimer(toolbarTimeoutRef);
+    clearTimer(statusResetRef);
+    pendingToolbarActionRef.current = { requestId: toolbarRequestId, action };
+    setPendingToolbarAction(action);
+    setStatus(`Running ${action.toLowerCase().replaceAll('_', ' ')}…`);
+    setStatusTone('neutral');
+    try {
+      send('botJobDetails.toolbar.action', {
+        ...payload,
+        action,
+        botJobId,
+        requestId: toolbarRequestId,
+      });
+      if (!USER_DRIVEN_TOOLBAR_ACTIONS.has(action)) {
+        toolbarTimeoutRef.current = setTimeout(() => {
+          if (pendingToolbarActionRef.current?.requestId !== toolbarRequestId) return;
+          pendingToolbarActionRef.current = null;
+          setPendingToolbarAction(null);
+          setTransientStatus('The backend did not finish the toolbar action', 'error');
+        }, TOOLBAR_TIMEOUT_MS[action] ?? RESPONSE_TIMEOUT_MS);
+      }
+    } catch (error) {
+      pendingToolbarActionRef.current = null;
+      setPendingToolbarAction(null);
+      setTransientStatus(error instanceof Error ? error.message : 'Could not run the toolbar action', 'error');
+    }
+  }, [botJobId, enabled, requestId, send, setTransientStatus]);
+
   const sendMetadataRequest = useCallback((
     type: 'botJobDetails.metadata.update' | 'botJobDetails.environments.refresh',
     kind: PendingMetadata['kind'],
@@ -376,6 +491,10 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
   ) => {
     if (!enabled || !botJobId || botJobId <= 0) {
       setTransientStatus('Bot Job identity is unavailable', 'error');
+      return;
+    }
+    if (pendingActionRef.current || pendingToolbarActionRef.current || pendingMetadataRef.current) {
+      setTransientStatus('Wait for the current Bot Job operation to finish', 'warning');
       return;
     }
     const metadataRequestId = requestId(kind);
@@ -406,7 +525,7 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
       return;
     }
     sendMetadataRequest('botJobDetails.metadata.update', 'save', {
-      expectedRevision: draft.expectedRevision,
+      expectedMetadataRevision: draft.expectedMetadataRevision,
       name: draft.name,
       description: draft.description,
       homeUrlId: draft.homeUrlId,
@@ -428,9 +547,12 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
     fieldErrors,
     metadataSavedRevision,
     pendingAction,
+    pendingToolbarAction,
+    transferPath,
     status,
     statusTone,
     sendAction,
+    sendToolbarAction,
     saveMetadata,
     refreshEnvironments,
     retryBootstrap,

@@ -9,6 +9,24 @@ export type BotJobWorkspaceAction =
   | 'OPEN_ORGANIZATIONS'
   | 'CLOSE';
 
+export type BotJobToolbarAction =
+  | 'OPEN_EXCEL'
+  | 'GENERATE_EXCEL'
+  | 'OPEN_REPORT'
+  | 'SET_NAVIGATION_TIME'
+  | 'LAUNCH'
+  | 'REFRESH_BLOCKS'
+  | 'TEST_RUN'
+  | 'STOP_TEST_RUN'
+  | 'EXPORT_JOB'
+  | 'IMPORT_JOB'
+  | 'CHOOSE_TRANSFER_PATH'
+  | 'CREATE_BAT';
+
+export type BotJobExecutionMode = 'ALL' | 'ONE';
+
+export type BotJobToolbarPayload = Record<string, string | number | boolean | null | undefined>;
+
 export type BotJobWorkspaceStatusTone = 'neutral' | 'success' | 'warning' | 'error';
 
 export type BotJobExecutionState =
@@ -46,11 +64,13 @@ export interface BotJobCapabilities {
   canShowComponents: boolean;
   canExecute: boolean;
   canLaunch: boolean;
+  canUseFileActions: boolean;
   canOpenOrganizations: boolean;
 }
 
 export interface BotJobDetailsState {
   revision: number;
+  metadataRevision: number;
   botJobId: number;
   name: string;
   description: string;
@@ -62,6 +82,7 @@ export interface BotJobDetailsState {
   environmentName: string;
   environmentUrl: string;
   navigationTimeSeconds: number;
+  transferPathConfigured: boolean;
   environments: BotJobEnvironment[];
   blocks: BotJobBlockSummary[];
   capabilities: BotJobCapabilities;
@@ -71,7 +92,7 @@ export interface BotJobDetailsState {
 }
 
 export interface BotJobMetadataDraft {
-  expectedRevision: number;
+  expectedMetadataRevision: number;
   name: string;
   description: string;
   homeUrlId: number;
@@ -85,7 +106,8 @@ export interface BotJobDetailsResponse {
   state?: BotJobDetailsState | null;
   activeSurface?: BotJobWorkspaceSurface;
   componentsVisible?: boolean;
-  action?: BotJobWorkspaceAction;
+  action?: BotJobWorkspaceAction | BotJobToolbarAction;
+  selectedPath?: string;
   errorCode?: string | null;
   fieldErrors?: Record<string, string>;
 }

@@ -4,12 +4,12 @@ import type { BotJobDetailsState } from './BotJobDetails.types';
 import { useBotJobDetailsController } from './useBotJobDetailsController';
 
 const state: BotJobDetailsState = {
-  revision: 5, botJobId: 42, name: 'Payments', description: 'Flow', projectType: 'Web App', active: true,
+  revision: 5, metadataRevision: 5, botJobId: 42, name: 'Payments', description: 'Flow', projectType: 'Web App', active: true,
   homeBankingId: 7, organizationName: 'Bank', homeUrlId: 8, environmentName: 'TEST',
-  environmentUrl: 'https://test.example', navigationTimeSeconds: 2,
+  environmentUrl: 'https://test.example', navigationTimeSeconds: 2, transferPathConfigured: true,
   environments: [{ id: 8, name: 'TEST', url: 'https://test.example', homeBankingId: 7, organizationName: 'Bank' }],
   blocks: [],
-  capabilities: { canUseWorkspaceActions: true, canEditMetadata: true, canUsePreScan: true, canShowComponents: true, canExecute: true, canLaunch: true, canOpenOrganizations: true },
+  capabilities: { canUseWorkspaceActions: true, canEditMetadata: true, canUsePreScan: true, canShowComponents: true, canExecute: true, canLaunch: true, canUseFileActions: true, canOpenOrganizations: true },
   executionState: 'IDLE', activeSurface: 'botJob', componentsVisible: false,
 };
 
@@ -26,9 +26,14 @@ const Harness: React.FC<HarnessProps> = ({ socket, messages, botJobId = 42 }) =>
     <span data-testid="saving">{String(controller.savingMetadata)}</span>
     <span data-testid="saved-revision">{controller.metadataSavedRevision ?? ''}</span>
     <span data-testid="workspace-capability">{String(controller.state?.capabilities.canUseWorkspaceActions)}</span>
+    <span data-testid="pending-toolbar">{controller.pendingToolbarAction || ''}</span>
+    <span data-testid="transfer-path">{controller.transferPath}</span>
     <span data-testid="status">{controller.status}</span>
-    <button type="button" onClick={() => controller.saveMetadata({ expectedRevision: 3, name: 'Payments QA', description: 'Flow', homeUrlId: 8 })}>Save metadata</button>
+    <button type="button" onClick={() => controller.saveMetadata({ expectedMetadataRevision: 3, name: 'Payments QA', description: 'Flow', homeUrlId: 8 })}>Save metadata</button>
     <button type="button" onClick={() => controller.sendAction('SHOW_COMPONENTS')}>Show components</button>
+    <button type="button" onClick={() => controller.sendToolbarAction('CHOOSE_TRANSFER_PATH')}>Choose transfer folder</button>
+    <button type="button" onClick={() => controller.sendToolbarAction('EXPORT_JOB', { confirmed: true, transferPath: 'D:\\exports' })}>Export toolbar</button>
+    <button type="button" onClick={() => controller.sendAction('CLOSE')}>Close workspace</button>
     <button type="button" onClick={controller.retryBootstrap}>Retry bootstrap</button>
   </div>;
 };
@@ -67,7 +72,7 @@ test('applies bootstrap state only after request correlation and sends the draft
   view.rerender(<Harness socket={socket} messages={[wrong, correct]} />);
   await waitFor(() => expect(screen.getByTestId('job-name')).toHaveTextContent('Payments'));
   fireEvent.click(screen.getByRole('button', { name: 'Save metadata' }));
-  expect(sentBody(send, 1)).toMatchObject({ expectedRevision: 3, botJobId: 42 });
+  expect(sentBody(send, 1)).toMatchObject({ expectedMetadataRevision: 3, botJobId: 42 });
 });
 
 test('requires matching action and a successful known surface before updating workspace state', async () => {
@@ -121,11 +126,82 @@ test('matches metadata response operation before applying its state', async () =
 
   messages = [...messages, response('botJobDetails.metadata.updateResponse', {
     ok: true, botJobId: 42, requestId: updateRequest.requestId,
-    state: { ...state, revision: 6, name: 'Payments QA' },
+    state: { ...state, revision: 6, metadataRevision: 6, name: 'Payments QA' },
   })];
   view.rerender(<Harness socket={socket} messages={messages} />);
   await waitFor(() => expect(screen.getByTestId('job-name')).toHaveTextContent('Payments QA'));
   expect(screen.getByTestId('saving')).toHaveTextContent('false');
+});
+
+test('keeps the toolbar action pending until request and action correlation both match', async () => {
+  const send = jest.fn();
+  const socket = { readyState: WebSocket.OPEN, send } as unknown as WebSocket;
+  const view = render(<Harness socket={socket} messages={[]} />);
+  let messages = await completeBootstrap(view, socket, send);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Choose transfer folder' }));
+  expect(send).toHaveBeenCalledTimes(2);
+  expect(JSON.parse(send.mock.calls[1][0]).type).toBe('botJobDetails.toolbar.action');
+  const request = sentBody(send, 1);
+  expect(request).toMatchObject({ action: 'CHOOSE_TRANSFER_PATH', botJobId: 42 });
+  expect(screen.getByTestId('pending-toolbar')).toHaveTextContent('CHOOSE_TRANSFER_PATH');
+
+  messages = [...messages, response('botJobDetails.toolbar.actionResponse', {
+    ok: true, botJobId: 42, requestId: 'wrong-request', action: 'CHOOSE_TRANSFER_PATH',
+    selectedPath: 'D:\\wrong',
+  })];
+  view.rerender(<Harness socket={socket} messages={messages} />);
+  expect(screen.getByTestId('pending-toolbar')).toHaveTextContent('CHOOSE_TRANSFER_PATH');
+  expect(screen.getByTestId('transfer-path')).toBeEmptyDOMElement();
+
+  messages = [...messages, response('botJobDetails.toolbar.actionResponse', {
+    ok: true, botJobId: 42, requestId: request.requestId, action: 'OPEN_REPORT',
+    selectedPath: 'D:\\also-wrong',
+  })];
+  view.rerender(<Harness socket={socket} messages={messages} />);
+  expect(screen.getByTestId('pending-toolbar')).toHaveTextContent('CHOOSE_TRANSFER_PATH');
+  expect(screen.getByTestId('transfer-path')).toBeEmptyDOMElement();
+
+  messages = [...messages, response('botJobDetails.toolbar.actionResponse', {
+    ok: true, botJobId: 42, requestId: request.requestId, action: 'CHOOSE_TRANSFER_PATH',
+    selectedPath: 'D:\\exports\\payments', message: 'Transfer folder selected',
+  })];
+  view.rerender(<Harness socket={socket} messages={messages} />);
+
+  await waitFor(() => expect(screen.getByTestId('pending-toolbar')).toBeEmptyDOMElement());
+  expect(screen.getByTestId('transfer-path')).toHaveTextContent('D:\\exports\\payments');
+  expect(screen.getByTestId('status')).toHaveTextContent('Transfer folder selected');
+});
+
+test('does not replace a correlated toolbar request with a concurrent operation', async () => {
+  const send = jest.fn();
+  const socket = { readyState: WebSocket.OPEN, send } as unknown as WebSocket;
+  const view = render(<Harness socket={socket} messages={[]} />);
+  await completeBootstrap(view, socket, send);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Choose transfer folder' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Export toolbar' }));
+
+  expect(send).toHaveBeenCalledTimes(2);
+  expect(sentBody(send, 1).action).toBe('CHOOSE_TRANSFER_PATH');
+  expect(screen.getByTestId('pending-toolbar')).toHaveTextContent('CHOOSE_TRANSFER_PATH');
+  expect(screen.getByTestId('status')).toHaveTextContent('Wait for the current Bot Job operation');
+});
+
+test('allows Close to supersede a pending native chooser operation', async () => {
+  const send = jest.fn();
+  const socket = { readyState: WebSocket.OPEN, send } as unknown as WebSocket;
+  const view = render(<Harness socket={socket} messages={[]} />);
+  await completeBootstrap(view, socket, send);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Choose transfer folder' }));
+  expect(screen.getByTestId('pending-toolbar')).toHaveTextContent('CHOOSE_TRANSFER_PATH');
+  fireEvent.click(screen.getByRole('button', { name: 'Close workspace' }));
+
+  expect(send).toHaveBeenCalledTimes(3);
+  expect(sentBody(send, 2).action).toBe('CLOSE');
+  expect(screen.getByTestId('pending-toolbar')).toBeEmptyDOMElement();
+  view.unmount();
 });
 
 test('closes the saved draft when persistence committed but desktop synchronization failed', async () => {
@@ -142,7 +218,7 @@ test('closes the saved draft when persistence committed but desktop synchronizat
     message: 'Metadata was saved but the desktop context could not be synchronized',
     botJobId: 42,
     requestId: updateRequest.requestId,
-    state: { ...state, revision: 6, name: 'Payments QA' },
+    state: { ...state, revision: 6, metadataRevision: 6, name: 'Payments QA' },
   })];
   view.rerender(<Harness socket={socket} messages={messages} />);
 

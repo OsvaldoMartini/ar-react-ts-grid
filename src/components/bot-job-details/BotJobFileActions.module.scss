@@ -1,0 +1,85 @@
+.panel {
+  min-width: 0;
+  border: 1px solid #c9d9e7;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgb(24 57 83 / 7%);
+  overflow: hidden;
+}
+.heading { padding: 12px 14px; border-bottom: 1px solid #dce7ef; background: #f5f9fc; }
+.heading h2 { margin: 0; color: #174a73; font-size: 0.92rem; }
+.heading p { margin: 3px 0 0; color: #667b8e; font-size: 0.7rem; }
+.form {
+  display: grid;
+  grid-template-columns: minmax(125px, 0.45fr) minmax(220px, 1.55fr);
+  gap: 10px 12px;
+  padding: 12px 14px 14px;
+}
+.dateField, .pathField {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: #4d6579;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+.dateField input, .pathInput {
+  min-height: 38px;
+  box-sizing: border-box;
+  border: 1px solid #adbfce;
+  border-radius: 7px;
+  background: #fff;
+}
+.dateField input { width: 100%; padding: 6px 8px; color: #243447; font: inherit; font-size: 0.76rem; }
+.pathInput { min-width: 0; display: flex; align-items: center; overflow: hidden; }
+.pathInput input {
+  min-width: 0;
+  flex: 1;
+  height: 36px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #243447;
+  padding: 0 9px;
+  font-size: 0.72rem;
+}
+.pathInput button {
+  align-self: stretch;
+  flex: 0 0 42px;
+  border: 0;
+  border-left: 1px solid #c5d3de;
+  background: #f3f8fb;
+  color: #174a73;
+  cursor: pointer;
+}
+.actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 8px; }
+.actions button {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid #176b3a;
+  border-radius: 7px;
+  background: #176b3a;
+  color: #fff;
+  padding: 6px 12px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.actions .importButton { border-color: #a94f12; background: #d86818; }
+.actions button:disabled, .pathInput button:disabled, .dateField input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.actions button:focus-visible, .pathInput button:focus-visible, .dateField input:focus-visible {
+  outline: 3px solid rgb(37 99 235 / 25%);
+  outline-offset: 2px;
+}
+@media (max-width: 620px) {
+  .form { grid-template-columns: 1fr; }
+  .actions { grid-column: auto; }
+  .actions button { flex: 1; min-height: 40px; }
+}
