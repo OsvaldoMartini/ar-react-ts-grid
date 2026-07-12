@@ -25,6 +25,7 @@ AR Web Factory Page Scanner return DIFFERENT web elements than the build that pr
 | 6 | `SCANNER-e8980ef1-2026-07-08_12-28-03.java` | e8980ef1 | 07-08 12:28 | backend terminal |
 | 7 | `SCANNER-53691e5c-2026-07-09_05-02-27.java` | 53691e5c | 07-09 05:02 | this terminal |
 | 8 | `SCANNER-f6d494ad-2026-07-09_07-57-21.java` | f6d494ad | 07-09 07:57 | this terminal |
+| 9 | `SCANNER-abad7d2f-2026-07-11_22-40-26.java` | abad7d2f | 07-11 22:40 | this terminal |
 
 Reference dumps: `elementDTO-PS-GOOD.json` (07-08 11:51) was produced by the code of
 snapshot **#5 (a4cd2e02)** — inputs-focus scan, 12 elements, all correct.
@@ -95,6 +96,17 @@ snapshot **#5 (a4cd2e02)** — inputs-focus scan, 12 elements, all correct.
 ### 8. `f6d494ad` — 07-09 07:57 — (this terminal) "radio inputs classify as input again"
 - Removes "radio" from `isWritableControl`'s exclusion list ⇒ radios classify input
   again (as the committed test demands). Checkbox/submit/etc. unchanged from #6.
+
+### 9. `abad7d2f` — 07-11 22:40 — "Exclude hidden framework inputs and machine names from scanner"
+- `isVisibleEnough`: `input[type=hidden]` now EXCLUDED unless "search hidden fields" is on
+  ⇒ Avaloq framework rows (componentstate, events, pageresponse, param1..5, xpos/ypos,
+  CSRF tokens, base64 `rO0AB...` serialized state) disappear from default scans.
+- New `looksGeneratedToken`: generated ids (`aw-id-gen-32`), opaque alnum tokens and
+  path-style names (`__pagevalue__/0/11/...`) are rejected as name sources in the
+  container-id step, semanticAttributeText and the final name/id fallback.
+- Label hunt: a preceding sibling that contains NO form controls can now donate its text
+  (Avaloq `awInfobox_header` divs with `<span class='awLabel'>`) ⇒ unlabeled inputs get
+  the human header text ("E-mail address") instead of "aw id gen 1".
 
 ## Where the differences most likely come from (ranked)
 
