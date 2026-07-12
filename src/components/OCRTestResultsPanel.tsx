@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { CheckCheck, X } from 'lucide-react';
 import styles from './OCRTestResultsPanel.module.scss';
+import './OCRFloatingPanel.scss';
 export type OCRTestRow={definedName:string;quality:string;tag:string;domText:string;ocrText:string;xPath:string};
 export type OCRTestResult={source:string;wordCount:number;counts:Record<string,number>;rows:OCRTestRow[];annotatedImage?:string};
 type Props={result:OCRTestResult;onAccept:(suggestions:Array<{xPath:string;clientNamed:string}>)=>void;onClose:()=>void};

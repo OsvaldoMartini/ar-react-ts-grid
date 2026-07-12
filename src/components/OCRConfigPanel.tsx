@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Eraser, Play, Save, Trash2, X } from 'lucide-react';
 import styles from './OCRConfigPanel.module.scss';
+import './OCRFloatingPanel.scss';
 
 export type OCRProfile = { id:number; name:string; description?:string; homeBankingId?:number|null; homeUrlId?:number|null; default:boolean };
 export type OCRParameter = { category:string; name:string; valueType:string; value:string; description?:string; options?:string[]; min?:number; max?:number; step?:number };

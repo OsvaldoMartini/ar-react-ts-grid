@@ -1,0 +1,36 @@
+div:has(> section[aria-label="OCR configuration"]),
+div:has(> section[aria-label="OCR test results"]) {
+  display: block;
+  padding: 0;
+  background: transparent;
+  pointer-events: none;
+}
+
+section[aria-label="OCR configuration"],
+section[aria-label="OCR test results"] {
+  position: absolute;
+  pointer-events: auto;
+}
+
+section[aria-label="OCR configuration"] {
+  top: 72px;
+  right: 18px;
+  width: min(920px, calc(100vw - 36px));
+  height: min(700px, calc(100vh - 92px));
+}
+
+section[aria-label="OCR test results"] {
+  top: 64px;
+  left: 18px;
+  width: min(1120px, calc(100vw - 36px));
+  height: min(760px, calc(100vh - 84px));
+}
+
+@media (max-width: 640px) {
+  section[aria-label="OCR configuration"],
+  section[aria-label="OCR test results"] {
+    inset: 8px;
+    width: auto;
+    height: calc(100vh - 16px);
+  }
+}
