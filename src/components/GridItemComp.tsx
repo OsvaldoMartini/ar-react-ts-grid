@@ -46,6 +46,8 @@ import AlertModal from './AlertModal';
 import CompForce from './CompForce';
 import InstructionCommandPanel, { CommandDraft } from './InstructionCommandPanel';
 import ExcelExportPanel, { ExcelExportContext } from './ExcelExportPanel';
+import ComponentWorkspaceHeader from './bot-job-details/ComponentWorkspaceHeader';
+import { useBotJobDetailsController } from './bot-job-details/useBotJobDetailsController';
 import { useWebSocket } from './useWebSocket';
 import { useInstructionDrag } from './useInstructionDrag';
 import styles from './Griditem.module.scss';
@@ -122,6 +124,9 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
   const [botJobId, setBotJobId] = useState<number | null>(botJobIdInitial);
   const [blockId, setBlockId] = useState<number | null>(-1);
   const [botJobName, setBotJobName] = useState<string | null>(botJobNameInitial);
+  const botJobHeader = useBotJobDetailsController({
+    webSocket, connected, messages, sessionId, homeBankingId, botJobId,
+  });
 
   const instructionRef = useRef<HTMLInputElement>(null);
   const blockRef = useRef<HTMLInputElement>(null);
@@ -2508,6 +2513,14 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
 
   return (
     <div className={styles.gridContainer}>
+      <ComponentWorkspaceHeader
+        botJobName={botJobName}
+        connected={connected}
+        pendingAction={botJobHeader.pendingAction}
+        status={botJobHeader.status}
+        statusTone={botJobHeader.statusTone}
+        onHide={() => botJobHeader.sendAction('HIDE_COMPONENTS')}
+      />
       {excelExportContext && <ExcelExportPanel context={excelExportContext} onSubmit={submitExcelExport} onClose={() => setExcelExportContext(null)}/>}
       {alertMessageBody && alertMessageBody.length > 0 && (
         <AlertModal

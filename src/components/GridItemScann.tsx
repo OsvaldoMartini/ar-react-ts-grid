@@ -23,6 +23,9 @@ import CreateNewBlock, { CreateBlockOption, CreateBlockPosition } from './Create
 import OCRPanel from './OCRPanel';
 import OCRConfigPanel, { OCRConfigData, OCRParameter } from './OCRConfigPanel';
 import OCRTestResultsPanel, { OCRTestResult } from './OCRTestResultsPanel';
+import BotJobDetailsHeader from './bot-job-details/BotJobDetailsHeader';
+import { useBotJobDetailsController } from './bot-job-details/useBotJobDetailsController';
+import ScannerWorkspaceHeader from './scanner/ScannerWorkspaceHeader';
 import styles from './GridItemScann.module.scss';
 
 
@@ -139,6 +142,9 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   });
   const [collapsedBlocks, setCollapsedBlocks] = useState<Set<string>>(new Set());
   const isPreScanMode = mode === 'preScan' || sessionId.includes('preScannerGrid');
+  const botJobHeader = useBotJobDetailsController({
+    webSocket, connected, messages, sessionId, homeBankingId, botJobId,
+  });
 
   // Per-block display mode (preScan dashboard): 'name' = normal display chain,
   // 'id' = raw DOM id (locator planning), 'testid' = testing attribute
@@ -1482,19 +1488,27 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
 
   return (
     <div className={styles.gridContainer}>
+      {isPreScanMode ? (
+        <BotJobDetailsHeader
+          botJobId={botJobId}
+          botJobName={botJobName}
+          activeSurface="preScan"
+          connected={connected}
+          pendingAction={botJobHeader.pendingAction}
+          status={botJobHeader.status}
+          statusTone={botJobHeader.statusTone}
+          onAction={botJobHeader.sendAction}
+        />
+      ) : (
+        <ScannerWorkspaceHeader
+          botJobName={botJobName}
+          connected={connected}
+          reconnectAttempts={reconnectAttempts}
+          error={error}
+        />
+      )}
       {isPreScanMode && (
         <div className={styles.preScanDashboard}>
-          <div className={styles.preScanHeader}>
-            <div>
-              <div className={styles.preScanTitle}>PRE SCAN Dashboard</div>
-              <div className={styles.preScanSubtitle}>
-                {botJobName || 'Bot Job'} - memory only until Apply
-              </div>
-            </div>
-            <div className={styles.preScanConnection}>
-              {connected ? 'Connected' : `Disconnected${reconnectAttempts > 0 ? ` (${reconnectAttempts})` : ''}`}
-            </div>
-          </div>
           <div className={`${styles.preScanStatus} ${styles[`preScanStatus_${preScanStatus.status}`]}`}>
             <span className={styles.preScanStatusLabel}>
               {preScanStatus.status === 'running'

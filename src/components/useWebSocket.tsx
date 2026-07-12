@@ -16,6 +16,7 @@ export const useWebSocket = (socketPort: number, sessionId: string) => {
 
     ws.onopen = () => {
       console.log(`✅ WebSocket connected for session: ${sessionId}`);
+      setError(null);
       setConnected(true);
       setReconnectAttempts(0);
       setWebSocket(ws);

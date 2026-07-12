@@ -199,31 +199,6 @@
   border-bottom: 1px solid #b9cdd6;
 }
 
-.preScanHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.preScanTitle {
-  color: #0b5394;
-  font-size: 15px;
-  font-weight: 700;
-}
-
-.preScanSubtitle {
-  color: #455a64;
-  font-size: 12px;
-}
-
-.preScanConnection {
-  flex: 0 0 auto;
-  color: #1b5e20;
-  font-size: 12px;
-  font-weight: 700;
-}
-
 .preScanStatus {
   display: flex;
   align-items: center;
