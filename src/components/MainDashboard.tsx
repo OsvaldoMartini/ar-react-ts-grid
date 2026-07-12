@@ -24,6 +24,45 @@ interface BotJobRow {
   launchable?: boolean;
 }
 
+type SortKey = 'id' | 'name' | 'description' | 'organization' | 'environment' | 'type' | 'status' | 'blocks';
+
+interface SortState {
+  key: SortKey;
+  dir: 1 | -1;
+}
+
+const SORT_COLUMNS: { key: SortKey; label: string }[] = [
+  { key: 'id', label: 'ID' },
+  { key: 'name', label: 'Name' },
+  { key: 'description', label: 'Description' },
+  { key: 'organization', label: 'Organization' },
+  { key: 'environment', label: 'Environment' },
+  { key: 'type', label: 'Type' },
+  { key: 'status', label: 'Status' },
+  { key: 'blocks', label: 'Blocks' },
+];
+
+function sortValue(row: BotJobRow, key: SortKey): string | number {
+  switch (key) {
+    case 'id':
+      return row.id;
+    case 'name':
+      return row.name || '';
+    case 'description':
+      return row.description || '';
+    case 'organization':
+      return row.organizationName || '';
+    case 'environment':
+      return row.environmentName || row.environmentUrl || '';
+    case 'type':
+      return row.priority || '';
+    case 'status':
+      return row.active ? 0 : 1;
+    case 'blocks':
+      return row.blockCount || 0;
+  }
+}
+
 function parseMessage(raw: string): { operationId?: string; body: any } {
   const outer = JSON.parse(raw);
   const operationId = outer.operationId || outer.type;
@@ -46,6 +85,7 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId }) 
   const processedMessageCountRef = useRef(0);
   const [botJobs, setBotJobs] = useState<BotJobRow[]>([]);
   const [findText, setFindText] = useState('');
+  const [sort, setSort] = useState<SortState | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<BotJobRow | null>(null);
   const [status, setStatus] = useState<{ level: StatusLevel; text: string }>({
@@ -66,6 +106,25 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId }) 
       (row.organizationName || '').toLowerCase().includes(query)
     );
   }, [botJobs, findText]);
+
+  const sortedBotJobs = useMemo(() => {
+    if (!sort) return filteredBotJobs;
+    const { key, dir } = sort;
+    return [...filteredBotJobs].sort((a, b) => {
+      const va = sortValue(a, key);
+      const vb = sortValue(b, key);
+      if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
+      return String(va).localeCompare(String(vb), undefined, { sensitivity: 'base', numeric: true }) * dir;
+    });
+  }, [filteredBotJobs, sort]);
+
+  const toggleSort = (key: SortKey) => {
+    setSort(prev => {
+      if (!prev || prev.key !== key) return { key, dir: 1 };
+      if (prev.dir === 1) return { key, dir: -1 };
+      return null;
+    });
+  };
 
   const send = useCallback(
     (type: string, body: unknown = {}) => {
@@ -233,14 +292,19 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId }) 
             <table className={styles.grid}>
               <thead>
                 <tr>
-                  <th>ID</th>
-                  <th>Name</th>
-                  <th>Description</th>
-                  <th>Organization</th>
-                  <th>Environment</th>
-                  <th>Type</th>
-                  <th>Status</th>
-                  <th>Blocks</th>
+                  {SORT_COLUMNS.map(column => (
+                    <th
+                      key={column.key}
+                      className={styles.sortableTh}
+                      title="Click to sort"
+                      onClick={() => toggleSort(column.key)}
+                    >
+                      {column.label}
+                      {sort?.key === column.key && (
+                        <span className={styles.sortIndicator}>{sort.dir === 1 ? '▲' : '▼'}</span>
+                      )}
+                    </th>
+                  ))}
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -252,7 +316,7 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId }) 
                     </td>
                   </tr>
                 ) : (
-                  filteredBotJobs.map(row => (
+                  sortedBotJobs.map(row => (
                     <tr
                       key={row.id}
                       className={selectedId === row.id ? styles.selectedRow : undefined}

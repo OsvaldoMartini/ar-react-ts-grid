@@ -325,6 +325,20 @@
   text-align: center;
 }
 
+.sortableTh {
+  cursor: pointer;
+  user-select: none;
+}
+
+.sortableTh:hover {
+  background: #dcebf4;
+}
+
+.sortIndicator {
+  margin-left: 4px;
+  font-size: 9px;
+}
+
 .grid tbody tr {
   cursor: pointer;
 }
