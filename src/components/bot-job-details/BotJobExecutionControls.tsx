@@ -85,7 +85,7 @@ const BotJobExecutionControls: React.FC<BotJobExecutionControlsProps> = ({
 
       <div className={styles.controls}>
         <div className={styles.navigationForm}>
-          <span className={styles.fieldLabel}>Navigation time</span>
+          <span className={styles.fieldLabel}>Nav time</span>
           <button
             type="button"
             className={`${styles.navTimeToggle} ${navigationTimeTone(navigationTime)}`}
@@ -176,9 +176,6 @@ const BotJobExecutionControls: React.FC<BotJobExecutionControlsProps> = ({
             >
               <Square size={15} fill="currentColor" aria-hidden="true" />
               Stop
-            </button>
-            <button type="button" onClick={() => {}}>
-              martini
             </button>
             <BotJobFileActions
               state={state}

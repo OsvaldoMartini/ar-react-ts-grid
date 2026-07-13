@@ -10,15 +10,10 @@
 }
 
 .sections {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  align-items: start;
+  display: flex;
+  flex-direction: column;
   gap: 6px;
   padding: 6px 8px 8px;
-}
-
-@media (max-width: 720px) {
-  .sections { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 620px) {
