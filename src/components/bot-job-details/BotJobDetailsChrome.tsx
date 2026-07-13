@@ -1,6 +1,5 @@
 import React from 'react';
 import BotJobDetailsHeader from './BotJobDetailsHeader';
-import BotJobMetadataEditor from './BotJobMetadataEditor';
 import BotJobExecutionControls from './BotJobExecutionControls';
 import BotJobFileActions from './BotJobFileActions';
 import type { BotJobDetailsControllerState } from './useBotJobDetailsController';
@@ -52,19 +51,6 @@ const BotJobDetailsChrome: React.FC<BotJobDetailsChromeProps> = ({
         onFileAction={controller.sendToolbarAction}
       />
       <div className={styles.sections}>
-        <BotJobMetadataEditor
-          state={state}
-          loading={controller.loadingState}
-          connected={connected}
-          saving={controller.savingMetadata}
-          busy={workspaceBusy}
-          fieldErrors={controller.fieldErrors}
-          metadataSavedRevision={controller.metadataSavedRevision}
-          onSave={controller.saveMetadata}
-          onRefreshEnvironments={controller.refreshEnvironments}
-          onOpenOrganizations={() => controller.sendAction('OPEN_ORGANIZATIONS')}
-          onRetry={controller.retryBootstrap}
-        />
         <BotJobExecutionControls
           state={state}
           connected={connected}

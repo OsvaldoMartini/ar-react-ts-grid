@@ -70,7 +70,6 @@ test('keeps Stop available but disables editing, navigation, and file mutations 
 
   expect(screen.getByRole('button', { name: 'Close' })).toBeEnabled();
   expect(screen.getByRole('button', { name: 'Stop' })).toBeEnabled();
-  expect(screen.getByRole('button', { name: 'Edit' })).toBeDisabled();
   expect(screen.getByRole('button', { name: /Excel/ })).toBeDisabled();
   expect(screen.getByRole('button', { name: 'Export' })).toBeDisabled();
   expect(screen.getByRole('button', { name: 'Pre Scan' })).toBeDisabled();
