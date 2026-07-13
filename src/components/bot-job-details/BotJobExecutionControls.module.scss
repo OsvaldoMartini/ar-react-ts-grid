@@ -58,7 +58,7 @@
 .inlineField, .actionRow { display: flex; align-items: center; gap: 6px; }
 
 .inlineField {
-  min-height: 30px;
+  min-height: 26px;
   border: 1px solid #adadad;
   border-radius: 4px;
   background: #fff;
@@ -69,13 +69,14 @@
 .inlineField select { min-width: 0; flex: 1; }
 
 .inlineField input, .inlineField select {
-  height: 26px;
+  height: 20px;
   border: 0;
   outline: 0;
   background: transparent;
   color: #243447;
   font: inherit;
-  font-size: 0.76rem;
+  font-size: 10px;
+  font-weight: 800;
 }
 
 .inlineField span { color: #6e6e6e; font-size: 0.68rem; }
@@ -136,7 +137,7 @@
 .navTimeOrangeLight { background: #ffcc80; color: #7a4a00; }
 .navTimeOrangeDark { background: #e65100; color: #fff; }
 
-.iconButton { flex: 0 0 30px; padding: 4px !important; }
+.iconButton { flex: 0 0 26px; padding: 3px !important; }
 .inlineField .iconButton { border-color: #2563eb; background: #eaf1ff; color: #2563eb; }
 .actionRow .modeAll, .actionRow .modeOne { min-width: 54px; color: #fff; }
 .actionRow .modeAll { border-color: #16803f; background: #16803f; }
