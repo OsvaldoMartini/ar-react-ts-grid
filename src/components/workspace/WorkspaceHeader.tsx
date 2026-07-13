@@ -23,6 +23,10 @@ interface WorkspaceHeaderProps<ActionId extends string = string> {
   onAction?: (actionId: ActionId) => void;
   compact?: boolean;
   className?: string;
+  /** Arbitrary extra content rendered inline inside the actions row. */
+  extraActions?: React.ReactNode;
+  /** Action id the extraActions content is inserted immediately before; appended at the end when omitted. */
+  extraActionsBeforeId?: ActionId;
 }
 
 function WorkspaceHeader<ActionId extends string = string>({
@@ -36,6 +40,8 @@ function WorkspaceHeader<ActionId extends string = string>({
   onAction,
   compact = false,
   className,
+  extraActions,
+  extraActionsBeforeId,
 }: WorkspaceHeaderProps<ActionId>): React.ReactElement {
   return (
   <header className={`${styles.header} ${compact ? styles.compact : ''} ${className || ''}`}>
@@ -58,21 +64,24 @@ function WorkspaceHeader<ActionId extends string = string>({
       </div>
     )}
 
-    {actions.length > 0 && (
+    {(actions.length > 0 || extraActions) && (
       <nav className={styles.actions} aria-label={`${title} actions`}>
         {actions.map((action) => (
-          <button
-            key={action.id}
-            type="button"
-            className={`${styles.actionButton} ${styles[`tone_${action.tone || 'default'}`]} ${action.active ? styles.active : ''}`}
-            title={action.title || action.label}
-            aria-pressed={action.active || undefined}
-            disabled={action.disabled}
-            onClick={() => onAction?.(action.id)}
-          >
-            {action.label}
-          </button>
+          <React.Fragment key={action.id}>
+            {extraActions && extraActionsBeforeId === action.id && extraActions}
+            <button
+              type="button"
+              className={`${styles.actionButton} ${styles[`tone_${action.tone || 'default'}`]} ${action.active ? styles.active : ''}`}
+              title={action.title || action.label}
+              aria-pressed={action.active || undefined}
+              disabled={action.disabled}
+              onClick={() => onAction?.(action.id)}
+            >
+              {action.label}
+            </button>
+          </React.Fragment>
         ))}
+        {extraActions && extraActionsBeforeId === undefined && extraActions}
       </nav>
     )}
   </header>

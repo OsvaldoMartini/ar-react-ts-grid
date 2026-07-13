@@ -20,50 +20,48 @@ const BotJobDataActions: React.FC<Props> = ({ state, connected, pendingAction, b
   };
 
   return (
-    <section className={styles.panel} aria-label="Job files">
-      <div className={styles.actions}>
-        <button
-          type="button"
-          className={styles.excelButton}
-          title="Open job data"
-          disabled={!enabled}
-          onClick={() => onAction('OPEN_EXCEL')}
-        >
-          <FileText size={18} aria-hidden="true" />
-          <strong>Excel</strong>
-        </button>
-        <button
-          type="button"
-          className={styles.generateButton}
-          title="Rebuild spreadsheet"
-          disabled={!enabled}
-          onClick={generate}
-        >
-          <PlusCircle size={18} aria-hidden="true" />
-          <strong>Generate</strong>
-        </button>
-        <button
-          type="button"
-          className={styles.reportButton}
-          title="Choose and open"
-          disabled={!enabled}
-          onClick={() => onAction('OPEN_REPORT')}
-        >
-          <BarChart2 size={18} aria-hidden="true" />
-          <strong>Report</strong>
-        </button>
-        <button
-          type="button"
-          className={styles.batButton}
-          title="Write local launcher"
-          disabled={!enabled}
-          onClick={() => onAction('CREATE_BAT')}
-        >
-          <Flame size={18} aria-hidden="true" />
-          <strong>Create BAT</strong>
-        </button>
-      </div>
-    </section>
+    <div className={styles.actions} role="group" aria-label="Job files">
+      <button
+        type="button"
+        className={styles.excelButton}
+        aria-label="Excel"
+        title="Excel — Open job data"
+        disabled={!enabled}
+        onClick={() => onAction('OPEN_EXCEL')}
+      >
+        <FileText size={16} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        className={styles.generateButton}
+        aria-label="Generate"
+        title="Generate — Rebuild spreadsheet"
+        disabled={!enabled}
+        onClick={generate}
+      >
+        <PlusCircle size={16} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        className={styles.reportButton}
+        aria-label="Report"
+        title="Report — Choose and open"
+        disabled={!enabled}
+        onClick={() => onAction('OPEN_REPORT')}
+      >
+        <BarChart2 size={16} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        className={styles.batButton}
+        aria-label="Create BAT"
+        title="Create BAT — Write local launcher"
+        disabled={!enabled}
+        onClick={() => onAction('CREATE_BAT')}
+      >
+        <Flame size={16} aria-hidden="true" />
+      </button>
+    </div>
   );
 };
 

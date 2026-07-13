@@ -1,40 +1,29 @@
-.panel {
-  min-width: 0;
-  border: 1px solid #c8c8c8;
-  border-radius: 6px;
-  background: #fff;
-  overflow: hidden;
-}
+/* Compact icon-only strip, sized to sit inline with the Bot Job Details
+   header row (WorkspaceHeader's .actionButton is 26px min-height). */
 .actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(130px, 1fr));
-  gap: 7px;
-  padding: 8px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 .actions button {
-  min-width: 0;
-  min-height: 38px;
+  flex: 0 0 auto;
+  min-width: 26px;
+  min-height: 26px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
   border: 1px solid transparent;
-  border-radius: 5px;
+  border-radius: 4px;
   color: #fff;
-  padding: 6px 9px;
-  font-size: 0.76rem;
+  padding: 0;
   cursor: pointer;
 }
 .actions button:hover:not(:disabled) { filter: brightness(1.08); }
 .actions button:focus-visible { outline: 3px solid rgb(37 99 235 / 25%); outline-offset: 2px; }
 .actions button:disabled { opacity: 0.5; cursor: not-allowed; }
-.actions strong { font-size: 0.76rem; }
 
 .excelButton { background: #1d6f42; }
 .generateButton { background: #2563eb; }
 .reportButton { background: #6d28d9; }
 .batButton { background: #e8791b; }
-
-@media (max-width: 560px) {
-  .actions { grid-template-columns: 1fr; }
-}

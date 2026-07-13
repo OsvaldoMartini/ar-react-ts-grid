@@ -2,7 +2,6 @@ import React from 'react';
 import BotJobDetailsHeader from './BotJobDetailsHeader';
 import BotJobMetadataEditor from './BotJobMetadataEditor';
 import BotJobExecutionControls from './BotJobExecutionControls';
-import BotJobDataActions from './BotJobDataActions';
 import BotJobFileActions from './BotJobFileActions';
 import type { BotJobDetailsControllerState } from './useBotJobDetailsController';
 import type { BotJobWorkspaceSurface } from './BotJobDetails.types';
@@ -47,6 +46,10 @@ const BotJobDetailsChrome: React.FC<BotJobDetailsChromeProps> = ({
         canUseWorkspaceActions={state?.capabilities.canUseWorkspaceActions === true}
         canUsePreScan={state?.capabilities.canUsePreScan === true}
         canShowComponents={state?.capabilities.canShowComponents === true}
+        fileState={state}
+        filePendingAction={controller.pendingToolbarAction}
+        fileBusy={workspaceBusy}
+        onFileAction={controller.sendToolbarAction}
       />
       <div className={styles.sections}>
         <BotJobMetadataEditor
@@ -69,23 +72,14 @@ const BotJobDetailsChrome: React.FC<BotJobDetailsChromeProps> = ({
           busy={operationBusy}
           onAction={controller.sendToolbarAction}
         />
-        <div className={styles.fileGrid}>
-          <BotJobDataActions
-            state={state}
-            connected={connected}
-            pendingAction={controller.pendingToolbarAction}
-            busy={workspaceBusy}
-            onAction={controller.sendToolbarAction}
-          />
-          <BotJobFileActions
-            state={state}
-            connected={connected}
-            pendingAction={controller.pendingToolbarAction}
-            busy={workspaceBusy}
-            transferPath={controller.transferPath}
-            onAction={controller.sendToolbarAction}
-          />
-        </div>
+        <BotJobFileActions
+          state={state}
+          connected={connected}
+          pendingAction={controller.pendingToolbarAction}
+          busy={workspaceBusy}
+          transferPath={controller.transferPath}
+          onAction={controller.sendToolbarAction}
+        />
       </div>
     </div>
   );

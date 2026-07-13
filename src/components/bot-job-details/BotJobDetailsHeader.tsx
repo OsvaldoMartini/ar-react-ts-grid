@@ -1,6 +1,10 @@
 import React, { useMemo } from 'react';
 import WorkspaceHeader, { type WorkspaceHeaderAction } from '../workspace/WorkspaceHeader';
+import BotJobDataActions from './BotJobDataActions';
 import type {
+  BotJobDetailsState,
+  BotJobToolbarAction,
+  BotJobToolbarPayload,
   BotJobWorkspaceAction,
   BotJobWorkspaceStatusTone,
   BotJobWorkspaceSurface,
@@ -21,6 +25,10 @@ interface BotJobDetailsHeaderProps {
   canUseWorkspaceActions?: boolean;
   canUsePreScan?: boolean;
   canShowComponents?: boolean;
+  fileState?: BotJobDetailsState | null;
+  filePendingAction?: BotJobToolbarAction | null;
+  fileBusy?: boolean;
+  onFileAction?: (action: BotJobToolbarAction, payload?: BotJobToolbarPayload) => void;
 }
 
 const BotJobDetailsHeader: React.FC<BotJobDetailsHeaderProps> = ({
@@ -37,6 +45,10 @@ const BotJobDetailsHeader: React.FC<BotJobDetailsHeaderProps> = ({
   canUseWorkspaceActions = true,
   canUsePreScan = true,
   canShowComponents = true,
+  fileState = null,
+  filePendingAction = null,
+  fileBusy = false,
+  onFileAction,
 }) => {
   const actions = useMemo<WorkspaceHeaderAction<BotJobWorkspaceAction>[]>(() => {
     const pending = busy || pendingAction !== null;
@@ -69,6 +81,16 @@ const BotJobDetailsHeader: React.FC<BotJobDetailsHeaderProps> = ({
         onAction={onAction}
         compact={compact}
         className={styles.keepButtonsOnTop}
+        extraActionsBeforeId="CLOSE"
+        extraActions={onFileAction && (
+          <BotJobDataActions
+            state={fileState}
+            connected={connected}
+            pendingAction={filePendingAction}
+            busy={fileBusy}
+            onAction={onFileAction}
+          />
+        )}
       />
     </div>
   );
