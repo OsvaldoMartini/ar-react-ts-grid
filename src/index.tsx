@@ -15,6 +15,7 @@ import ApiTestToolAINew from './components/ApiTestToolAINew';
 import OrganizationManager from './components/OrganizationManager';
 import MainDashboard from './components/MainDashboard';
 import NewBotJobManager from './components/NewBotJobManager';
+import CloneJobManager from './components/CloneJobManager';
 import ConfigManager from './components/ConfigManager';
 import LicenseManager from './components/LicenseManager';
 import AboutPanel from './components/AboutPanel';
@@ -155,6 +156,10 @@ const App: React.FC = () => {
 
       {sessionId && (sessionId.includes("newBotJobManager")) && (
         <NewBotJobManager socketPort={socketPort} sessionId={sessionId} />
+      )}
+
+      {sessionId && sessionId.includes("cloneJobManager") && (
+        <CloneJobManager socketPort={socketPort} sessionId={sessionId} sourceBotJobId={botJobId} />
       )}
 
       {sessionId && (sessionId.includes("configManager")) && (
