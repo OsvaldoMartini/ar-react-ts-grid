@@ -26,8 +26,14 @@
 .actions button:disabled { opacity: 0.5; cursor: not-allowed; }
 .actions button:focus-visible { outline: 3px solid rgb(37 99 235 / 25%); outline-offset: 2px; }
 
-.exportButton { border: 1px solid #176b3a; background: #176b3a; color: #fff; }
-.importButton { border: 1px solid #a94f12; background: #d86818; color: #fff; }
+/*
+ * !important: these buttons are also reused "bare" inside BotJobExecutionControls'
+ * .actionRow (see the bare prop), whose own ".actionRow button" rule combines a
+ * class + type selector and would otherwise out-specificity this plain class,
+ * overriding the intended color with its grey default.
+ */
+.exportButton { border: 1px solid #176b3a !important; background: #176b3a !important; color: #fff !important; }
+.importButton { border: 1px solid #a94f12 !important; background: #d86818 !important; color: #fff !important; }
 
 /* Transfer modal — same backdrop/header/form/footer pattern as ExcelExportPanel/SaveComponentPanel. */
 .backdrop {
