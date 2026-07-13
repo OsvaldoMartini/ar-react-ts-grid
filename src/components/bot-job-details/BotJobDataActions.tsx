@@ -24,32 +24,32 @@ const BotJobDataActions: React.FC<Props> = ({ state, connected, pendingAction, b
       <button
         type="button"
         className={styles.excelButton}
-        aria-label="Excel"
         title="Excel — Open job data"
         disabled={!enabled}
         onClick={() => onAction('OPEN_EXCEL')}
       >
         <FileText size={16} aria-hidden="true" />
+        Excel
       </button>
       <button
         type="button"
         className={styles.generateButton}
-        aria-label="Generate"
         title="Generate — Rebuild spreadsheet"
         disabled={!enabled}
         onClick={generate}
       >
         <PlusCircle size={16} aria-hidden="true" />
+        Generate
       </button>
       <button
         type="button"
         className={styles.reportButton}
-        aria-label="Report"
         title="Report — Choose and open"
         disabled={!enabled}
         onClick={() => onAction('OPEN_REPORT')}
       >
         <BarChart2 size={16} aria-hidden="true" />
+        Report
       </button>
       <button
         type="button"

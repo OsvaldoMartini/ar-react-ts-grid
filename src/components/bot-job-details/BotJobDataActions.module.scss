@@ -13,12 +13,17 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 5px;
   border: 1px solid transparent;
   border-radius: 4px;
   color: #fff;
-  padding: 0;
+  padding: 0 8px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  white-space: nowrap;
   cursor: pointer;
 }
+.batButton { padding: 0; }
 .actions button:hover:not(:disabled) { filter: brightness(1.08); }
 .actions button:focus-visible { outline: 3px solid rgb(37 99 235 / 25%); outline-offset: 2px; }
 .actions button:disabled { opacity: 0.5; cursor: not-allowed; }
