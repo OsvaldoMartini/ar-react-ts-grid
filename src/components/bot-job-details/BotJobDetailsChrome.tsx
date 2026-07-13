@@ -1,7 +1,6 @@
 import React from 'react';
 import BotJobDetailsHeader from './BotJobDetailsHeader';
 import BotJobExecutionControls from './BotJobExecutionControls';
-import BotJobFileActions from './BotJobFileActions';
 import type { BotJobDetailsControllerState } from './useBotJobDetailsController';
 import type { BotJobWorkspaceSurface } from './BotJobDetails.types';
 import styles from './BotJobDetailsChrome.module.scss';
@@ -58,14 +57,6 @@ const BotJobDetailsChrome: React.FC<BotJobDetailsChromeProps> = ({
           busy={operationBusy}
           transferPath={controller.transferPath}
           transferBusy={workspaceBusy}
-          onAction={controller.sendToolbarAction}
-        />
-        <BotJobFileActions
-          state={state}
-          connected={connected}
-          pendingAction={controller.pendingToolbarAction}
-          busy={workspaceBusy}
-          transferPath={controller.transferPath}
           onAction={controller.sendToolbarAction}
         />
       </div>

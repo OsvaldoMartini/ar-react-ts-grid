@@ -181,7 +181,6 @@ const BotJobExecutionControls: React.FC<BotJobExecutionControlsProps> = ({
               martini
             </button>
             <BotJobFileActions
-              bare
               state={state}
               connected={connected}
               pendingAction={pendingAction}

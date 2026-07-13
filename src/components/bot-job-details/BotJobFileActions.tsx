@@ -10,8 +10,6 @@ interface Props {
   busy?: boolean;
   transferPath: string;
   onAction: (action: BotJobToolbarAction, payload?: BotJobToolbarPayload) => void;
-  /** When true, renders just the Export/Import buttons + modal, without the Transfer panel/heading. */
-  bare?: boolean;
 }
 
 function today(): string {
@@ -23,7 +21,7 @@ function today(): string {
 type TransferMode = 'export' | 'import' | null;
 
 const BotJobFileActions: React.FC<Props> = ({
-  state, connected, pendingAction, busy = false, transferPath, onAction, bare = false,
+  state, connected, pendingAction, busy = false, transferPath, onAction,
 }) => {
   const [restoreDate, setRestoreDate] = useState(today);
   const [path, setPath] = useState(transferPath);
@@ -43,7 +41,7 @@ const BotJobFileActions: React.FC<Props> = ({
     setOpenMode(null);
   };
 
-  const buttonsAndModal = (
+  return (
     <>
       <button type="button" className={styles.exportButton} disabled={!enabled} onClick={() => setOpenMode('export')}>
         <Download size={17} aria-hidden="true" /> Export
@@ -122,19 +120,6 @@ const BotJobFileActions: React.FC<Props> = ({
         </div>
       )}
     </>
-  );
-
-  if (bare) {
-    return buttonsAndModal;
-  }
-
-  return (
-    <section className={styles.panel} aria-labelledby="job-transfer-title">
-      <div className={styles.heading} title="Export or restore a scoped Bot Job backup.">
-        <h2 id="job-transfer-title">Transfer</h2>
-      </div>
-      <div className={styles.actions}>{buttonsAndModal}</div>
-    </section>
   );
 };
 

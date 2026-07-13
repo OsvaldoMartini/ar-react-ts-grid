@@ -1,36 +1,8 @@
-.panel {
-  min-width: 0;
-  border: 1px solid #c8c8c8;
-  border-radius: 6px;
-  background: #fff;
-  overflow: hidden;
-}
-.heading { padding: 6px 10px; border-bottom: 1px solid #d4d4d4; background: #f0f0f0; cursor: default; }
-.heading h2 { margin: 0; color: #2b2b2b; font-size: 0.88rem; }
-
-.actions { display: flex; gap: 8px; padding: 8px 10px 10px; }
-.actions button {
-  flex: 1 1 0;
-  min-height: 30px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  border-radius: 4px;
-  padding: 5px 12px;
-  font-size: 0.72rem;
-  font-weight: 800;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.actions button:disabled { opacity: 0.5; cursor: not-allowed; }
-.actions button:focus-visible { outline: 3px solid rgb(37 99 235 / 25%); outline-offset: 2px; }
-
 /*
- * !important: these buttons are also reused "bare" inside BotJobExecutionControls'
- * .actionRow (see the bare prop), whose own ".actionRow button" rule combines a
- * class + type selector and would otherwise out-specificity this plain class,
- * overriding the intended color with its grey default.
+ * !important: these buttons render inline inside BotJobExecutionControls'
+ * .actionRow, whose own ".actionRow button" rule combines a class + type
+ * selector and would otherwise out-specificity this plain class, overriding
+ * the intended color with its grey default.
  */
 .exportButton { border: 1px solid #176b3a !important; background: #176b3a !important; color: #fff !important; }
 .importButton { border: 1px solid #a94f12 !important; background: #d86818 !important; color: #fff !important; }
