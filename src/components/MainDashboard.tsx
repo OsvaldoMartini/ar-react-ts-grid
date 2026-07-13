@@ -301,7 +301,7 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId }) 
                     >
                       {column.label}
                       <span className={styles.sortIndicator}>
-                        {sort?.key === column.key ? (sort.dir === 1 ? '▲' : '▼') : '⇅'}
+                        {sort?.key === column.key ? (sort.dir === 1 ? '↑' : '↓') : '⇅'}
                       </span>
                     </th>
                   ))}
