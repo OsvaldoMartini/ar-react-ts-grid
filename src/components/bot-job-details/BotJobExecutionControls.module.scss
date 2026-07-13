@@ -32,24 +32,27 @@
 }
 
 .controls {
-  display: grid;
-  grid-template-columns: minmax(190px, 0.75fr) minmax(250px, 1.25fr) minmax(330px, 1.5fr);
-  gap: 10px;
-  align-items: end;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-end;
+  gap: 8px;
   padding: 8px 10px 10px;
+  overflow-x: auto;
 }
 
 .navigationForm, .scopeField, .runActions {
-  min-width: 0;
+  min-width: 31px;
   display: flex;
   flex-direction: column;
   gap: 5px;
+  max-width: 197px;
 }
 
 .navigationForm label, .scopeField label, .fieldLabel {
   color: #5a5a5a;
   font-size: 0.7rem;
   font-weight: 800;
+  white-space: nowrap;
 }
 
 .inlineField, .actionRow { display: flex; align-items: center; gap: 6px; }
@@ -86,13 +89,19 @@
   padding: 4px 10px;
   font-size: 0.72rem;
   font-weight: 800;
+  white-space: nowrap;
   cursor: pointer;
+}
+
+.actionRow {
+  flex-wrap: nowrap;
 }
 
 .actionRow button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex: 0 0 auto;
   gap: 6px;
 }
 
@@ -135,17 +144,8 @@
 .actionRow .launchButton { border-color: #176b3a; background: #176b3a; color: #fff; }
 .actionRow .testButton { border-color: #dc6b18; background: #e8791b; color: #fff; }
 .actionRow .stopButton { border-color: #b42318; background: #b42318; color: #fff; }
-.scopeHint { min-height: 1em; color: #6e6e6e; font-size: 0.66rem; }
-
-@media (max-width: 1080px) {
-  .controls { grid-template-columns: repeat(2, minmax(220px, 1fr)); }
-  .runActions { grid-column: 1 / -1; }
-}
+.scopeHint { min-height: 1em; color: #6e6e6e; font-size: 0.66rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 @media (max-width: 680px) {
   .heading { align-items: flex-start; }
-  .controls { grid-template-columns: 1fr; }
-  .runActions { grid-column: auto; }
-  .actionRow { display: grid; grid-template-columns: repeat(2, 1fr); }
-  .actionRow button { min-height: 40px; }
 }
