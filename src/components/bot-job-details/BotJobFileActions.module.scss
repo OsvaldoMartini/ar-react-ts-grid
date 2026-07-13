@@ -1,11 +1,30 @@
 /*
- * !important: these buttons render inline inside BotJobExecutionControls'
- * .actionRow, whose own ".actionRow button" rule combines a class + type
- * selector and would otherwise out-specificity this plain class, overriding
- * the intended color with its grey default.
+ * Self-contained sizing: these buttons render as a standalone sibling in the
+ * header's extraActions (not inside any ancestor button-styling rule), so
+ * they must carry their own dimensions instead of inheriting one. Matches
+ * WorkspaceHeader's .actionButton exactly: 26px min-height, 3px 9px padding,
+ * 10px font-size, weight 800.
  */
-.exportButton { border: 1px solid #176b3a !important; background: #176b3a !important; color: #fff !important; }
-.importButton { border: 1px solid #a94f12 !important; background: #d86818 !important; color: #fff !important; }
+.exportButton, .importButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 26px;
+  border-radius: 4px;
+  padding: 3px 9px;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.exportButton:disabled, .importButton:disabled { opacity: 0.5; cursor: not-allowed; }
+.exportButton:focus-visible, .importButton:focus-visible {
+  outline: 3px solid rgb(37 99 235 / 25%);
+  outline-offset: 2px;
+}
+.exportButton { border: 1px solid #176b3a; background: #176b3a; color: #fff; }
+.importButton { border: 1px solid #a94f12; background: #d86818; color: #fff; }
 
 /* Transfer modal — same backdrop/header/form/footer pattern as ExcelExportPanel/SaveComponentPanel. */
 .backdrop {

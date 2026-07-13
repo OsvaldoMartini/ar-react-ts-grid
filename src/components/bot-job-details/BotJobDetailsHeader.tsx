@@ -174,17 +174,17 @@ const BotJobDetailsHeader: React.FC<BotJobDetailsHeaderProps> = ({
                   </option>
                 ))}
               </select>
-              <button
-                type="button"
-                className={execStyles.iconButton}
-                aria-label="Reload blocks"
-                title="Reload blocks"
-                disabled={!canConfigure || executionBusy || executionActive}
-                onClick={() => onToolbarAction('REFRESH_BLOCKS')}
-              >
-                <RefreshCw size={17} aria-hidden="true" />
-              </button>
             </div>
+            <button
+              type="button"
+              className={execStyles.iconButton}
+              aria-label="Reload blocks"
+              title="Reload blocks"
+              disabled={!canConfigure || executionBusy || executionActive}
+              onClick={() => onToolbarAction('REFRESH_BLOCKS')}
+            >
+              <RefreshCw size={15} aria-hidden="true" />
+            </button>
             <button
               type="button"
               className={`${execStyles.navTimeToggle} ${navigationTimeTone(navigationTime)}`}
