@@ -151,11 +151,7 @@ const BotJobDetailsHeader: React.FC<BotJobDetailsHeaderProps> = ({
       />
       <WorkspaceHeader
         eyebrow="Execution"
-        title={botJobName || 'Unnamed Bot Job'}
-        subtitle={jobState?.executionState ?? 'UNKNOWN'}
-        connected={connected}
-        status={status}
-        statusTone={statusTone}
+        title={jobState?.executionState ?? 'IDLE'}
         compact={compact}
         className={styles.keepButtonsOnTop}
         extraActions={onToolbarAction && (
