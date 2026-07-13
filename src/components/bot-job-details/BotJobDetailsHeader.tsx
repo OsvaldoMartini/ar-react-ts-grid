@@ -68,6 +68,7 @@ const BotJobDetailsHeader: React.FC<BotJobDetailsHeaderProps> = ({
         actions={actions}
         onAction={onAction}
         compact={compact}
+        className={styles.keepButtonsOnTop}
       />
     </div>
   );

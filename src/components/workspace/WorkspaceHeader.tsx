@@ -22,6 +22,7 @@ interface WorkspaceHeaderProps<ActionId extends string = string> {
   actions?: WorkspaceHeaderAction<ActionId>[];
   onAction?: (actionId: ActionId) => void;
   compact?: boolean;
+  className?: string;
 }
 
 function WorkspaceHeader<ActionId extends string = string>({
@@ -34,9 +35,10 @@ function WorkspaceHeader<ActionId extends string = string>({
   actions = [],
   onAction,
   compact = false,
+  className,
 }: WorkspaceHeaderProps<ActionId>): React.ReactElement {
   return (
-  <header className={`${styles.header} ${compact ? styles.compact : ''}`}>
+  <header className={`${styles.header} ${compact ? styles.compact : ''} ${className || ''}`}>
     <div className={styles.identity}>
       {eyebrow && <span className={styles.eyebrow}>{eyebrow}</span>}
       <div className={styles.titleRow}>
