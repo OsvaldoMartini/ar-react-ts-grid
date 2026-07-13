@@ -1,0 +1,151 @@
+/*
+ * Self-contained sizing: these buttons render as a standalone sibling in the
+ * header's extraActions (not inside any ancestor button-styling rule), so
+ * they must carry their own dimensions instead of inheriting one. Matches
+ * WorkspaceHeader's .actionButton exactly: 26px min-height, 3px 9px padding,
+ * 10px font-size, weight 800.
+ */
+.exportButton, .importButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 26px;
+  border-radius: 4px;
+  padding: 3px 9px;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.exportButton:disabled, .importButton:disabled { opacity: 0.5; cursor: not-allowed; }
+.exportButton:focus-visible, .importButton:focus-visible {
+  outline: 3px solid rgb(37 99 235 / 25%);
+  outline-offset: 2px;
+}
+.exportButton { border: 1px solid #176b3a; background: #176b3a; color: #fff; }
+.importButton { border: 1px solid #a94f12; background: #d86818; color: #fff; }
+
+/* Transfer modal — same backdrop/header/form/footer pattern as ExcelExportPanel/SaveComponentPanel. */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  background: rgba(15, 23, 42, 0.34);
+  padding: 16px;
+}
+.modal {
+  width: min(420px, 100%);
+  border: 1px solid #94a3b8;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.25);
+  overflow: hidden;
+}
+.modalHeaderExport, .modalHeaderImport {
+  height: 48px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #fff;
+  font-weight: 700;
+}
+.modalHeaderExport { background: #176b3a; }
+.modalHeaderImport { background: #d86818; }
+.modalHeaderExport button, .modalHeaderImport button {
+  margin-left: auto;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+}
+
+.modalForm {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dateField, .pathField {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: #5a5a5a;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+.dateField input {
+  min-height: 32px;
+  box-sizing: border-box;
+  border: 1px solid #adadad;
+  border-radius: 4px;
+  background: #fff;
+  padding: 5px 8px;
+  color: #243447;
+  font: inherit;
+  font-size: 0.8rem;
+}
+.pathInput {
+  min-height: 32px;
+  box-sizing: border-box;
+  border: 1px solid #adadad;
+  border-radius: 4px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+.pathInput input {
+  min-width: 0;
+  flex: 1;
+  height: 30px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #243447;
+  padding: 0 9px;
+  font-size: 0.78rem;
+}
+.pathInput button {
+  align-self: stretch;
+  flex: 0 0 38px;
+  border: 0;
+  border-left: 1px solid #c8c8c8;
+  background: #f0f0f0;
+  color: #2b2b2b;
+  cursor: pointer;
+}
+.pathInput button:disabled, .dateField input:disabled { opacity: 0.5; cursor: not-allowed; }
+.pathInput button:focus-visible, .dateField input:focus-visible {
+  outline: 3px solid rgb(37 99 235 / 25%);
+  outline-offset: 2px;
+}
+.modalWarning { margin: 0; color: #8a3b12; font-size: 0.7rem; }
+
+.modalFooter {
+  padding: 0 14px 14px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.modalFooter button {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 4px;
+  padding: 6px 14px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.modalFooter button:disabled { opacity: 0.5; cursor: not-allowed; }
+.cancelButton { border: 1px solid #adadad; background: #f5f5f5; color: #2b2b2b; }

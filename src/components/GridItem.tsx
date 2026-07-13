@@ -51,6 +51,8 @@ import CreateNewBlock, { CreateBlockOption, CreateBlockPosition } from './Create
 import InstructionCommandPanel, { CommandDraft } from './InstructionCommandPanel';
 import ExcelExportPanel, { ExcelExportContext } from './ExcelExportPanel';
 import SaveComponentPanel, { SaveComponentContext } from './SaveComponentPanel';
+import BotJobDetailsChrome from './bot-job-details/BotJobDetailsChrome';
+import { useBotJobDetailsController } from './bot-job-details/useBotJobDetailsController';
 import { useWebSocket } from './useWebSocket';
 import { useInstructionDrag } from './useInstructionDrag';
 import styles from './Griditem.module.scss';
@@ -153,6 +155,16 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
   const [botJobId, setBotJobId] = useState<number | null>(botJobIdInitial);
   const [blockId, setBlockId] = useState<number | null>(-1);
   const [botJobName, setBotJobName] = useState<string | null>(botJobNameInitial);
+  const botJobHeader = useBotJobDetailsController({
+    webSocket, connected, messages, sessionId, homeBankingId, botJobId,
+  });
+
+  useEffect(() => {
+    if (!botJobHeader.state) return;
+    setBotJobId(botJobHeader.state.botJobId);
+    setBotJobName(botJobHeader.state.name);
+    setHomeBankingId(botJobHeader.state.homeBankingId);
+  }, [botJobHeader.state]);
 
   const instructionRef = useRef<HTMLInputElement>(null);
   const blockRef = useRef<HTMLInputElement>(null);
@@ -2850,6 +2862,13 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
   return (
     <div className={styles.gridContainer}>
+      <BotJobDetailsChrome
+        fallbackBotJobId={botJobId}
+        fallbackBotJobName={botJobName}
+        fallbackSurface="botJob"
+        connected={connected}
+        controller={botJobHeader}
+      />
       {excelExportContext && <ExcelExportPanel context={excelExportContext} onSubmit={submitExcelExport} onClose={() => setExcelExportContext(null)}/>}
       {saveComponentContext && <SaveComponentPanel context={saveComponentContext} onSubmit={submitSaveComponent} onClose={() => setSaveComponentContext(null)}/>}
       {alertMessageBody && alertMessageBody.length > 0 && (

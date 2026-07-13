@@ -1,4 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+
+const MAX_RECONNECT_ATTEMPTS = 5;
+const RECONNECT_DELAY_MS = 2000;
+const MAX_RECONNECT_DELAY_MS = 10000;
+const PING_INTERVAL_MS = 15000;
 
 export const useWebSocket = (socketPort: number, sessionId: string) => {
   const [webSocket, setWebSocket] = useState<WebSocket | null>(null);
@@ -6,89 +11,171 @@ export const useWebSocket = (socketPort: number, sessionId: string) => {
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
   const [messages, setMessages] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const reconnectTimeout = useRef<NodeJS.Timeout | null>(null);
-  const pingInterval = useRef<NodeJS.Timeout | null>(null); // Ref for the ping interval
-
-  const connectWebSocket = () => {
-    if (webSocket) return; // Prevent multiple instances
-
-    const ws = new WebSocket(`ws://localhost:${socketPort}/websocket?sessionId=${sessionId}`);
-
-    ws.onopen = () => {
-      console.log(`✅ WebSocket connected for session: ${sessionId}`);
-      setConnected(true);
-      setReconnectAttempts(0);
-      setWebSocket(ws);
-      // Start sending ping messages
-      startPing(ws);
-    };
-
-    ws.onmessage = (event) => {
-      setMessages((prev) => [...prev, event.data]);
-    };
-
-    ws.onerror = () => {
-      console.error('❌ WebSocket error');
-      setError('WebSocket encountered an error');
-    };
-
-    ws.onclose = () => {
-      console.warn('⚠️ WebSocket closed');
-      setConnected(false);
-      setWebSocket(null);
-      stopPing(); // Clear the ping interval
-
-      if (reconnectAttempts < 5) {
-        const delay = Math.min(2000 * reconnectAttempts, 10000); // Exponential backoff
-        console.log(`🔄 Attempting to reconnect in ${delay / 1000} seconds...`);
-
-        reconnectTimeout.current = setTimeout(() => {
-          setReconnectAttempts((prev) => prev + 1);
-          connectWebSocket(); // Retry connection
-        }, delay);
-      } else {
-        setError('❌ Max reconnect attempts reached.');
-      }
-    };
-  };
-
-  const startPing = (ws: WebSocket) => {
-    pingInterval.current = setInterval(() => {
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        try {
-          ws.send('ping-' + sessionId); // Or a more structured ping message, e.g., { type: 'ping' }
-          console.log('ping sent');
-        } catch (error) {
-          console.error('Failed to send ping:', error);
-          //  Handle error, e.g., consider closing and reconnecting.
-        }
-      } else {
-        //  Consider clearing the interval if the socket is not open
-        stopPing();
-      }
-    }, 15000); // Send ping every 15 seconds (15000 milliseconds)
-  };
-
-  const stopPing = () => {
-    if (pingInterval.current) {
-      clearInterval(pingInterval.current);
-      pingInterval.current = null;
-    }
-  };
+  const socketRef = useRef<WebSocket | null>(null);
+  const reconnectAttemptsRef = useRef(0);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const disposedRef = useRef(false);
 
   useEffect(() => {
-    connectWebSocket(); // Establish the initial connection
+    disposedRef.current = false;
+    reconnectAttemptsRef.current = 0;
+    setReconnectAttempts(0);
+    setConnected(false);
+    setWebSocket(null);
+    setMessages([]);
+    setError(null);
+
+    const stopPing = () => {
+      if (pingIntervalRef.current) {
+        clearInterval(pingIntervalRef.current);
+        pingIntervalRef.current = null;
+      }
+    };
+
+    const clearReconnectTimeout = () => {
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+    };
+
+    const startPing = (socket: WebSocket) => {
+      stopPing();
+      pingIntervalRef.current = setInterval(() => {
+        if (
+          disposedRef.current ||
+          socketRef.current !== socket ||
+          socket.readyState !== WebSocket.OPEN
+        ) {
+          stopPing();
+          return;
+        }
+
+        try {
+          socket.send(`ping-${sessionId}`);
+          console.log('ping sent');
+        } catch (pingError) {
+          console.error('Failed to send ping:', pingError);
+        }
+      }, PING_INTERVAL_MS);
+    };
+
+    const scheduleReconnect = (connect: () => void) => {
+      if (disposedRef.current || reconnectTimeoutRef.current) return;
+
+      const nextAttempt = reconnectAttemptsRef.current + 1;
+      if (nextAttempt > MAX_RECONNECT_ATTEMPTS) {
+        setError('❌ Max reconnect attempts reached.');
+        return;
+      }
+
+      reconnectAttemptsRef.current = nextAttempt;
+      setReconnectAttempts(nextAttempt);
+      const delay = Math.min(
+        RECONNECT_DELAY_MS * Math.max(0, nextAttempt - 1),
+        MAX_RECONNECT_DELAY_MS,
+      );
+      console.log(`🔄 Attempting to reconnect in ${delay / 1000} seconds...`);
+
+      reconnectTimeoutRef.current = setTimeout(() => {
+        reconnectTimeoutRef.current = null;
+        connect();
+      }, delay);
+    };
+
+    const connectWebSocket = () => {
+      if (disposedRef.current) return;
+
+      const currentSocket = socketRef.current;
+      if (
+        currentSocket &&
+        currentSocket.readyState !== WebSocket.CLOSED
+      ) {
+        return;
+      }
+
+      let socket: WebSocket;
+      try {
+        socket = new WebSocket(`ws://localhost:${socketPort}/websocket?sessionId=${sessionId}`);
+      } catch (connectionError) {
+        setError(connectionError instanceof Error ? connectionError.message : 'WebSocket connection failed');
+        scheduleReconnect(connectWebSocket);
+        return;
+      }
+
+      socketRef.current = socket;
+
+      socket.onopen = () => {
+        if (disposedRef.current || socketRef.current !== socket) {
+          try {
+            socket.close();
+          } catch {
+            // The connection is already unavailable.
+          }
+          return;
+        }
+
+        console.log(`✅ WebSocket connected for session: ${sessionId}`);
+        clearReconnectTimeout();
+        reconnectAttemptsRef.current = 0;
+        setReconnectAttempts(0);
+        setError(null);
+        setConnected(true);
+        setWebSocket(socket);
+        startPing(socket);
+      };
+
+      socket.onmessage = (event) => {
+        if (!disposedRef.current && socketRef.current === socket) {
+          setMessages((previous) => [...previous, event.data]);
+        }
+      };
+
+      socket.onerror = () => {
+        if (!disposedRef.current && socketRef.current === socket) {
+          console.error('❌ WebSocket error');
+          setError('WebSocket encountered an error');
+        }
+      };
+
+      socket.onclose = () => {
+        if (socketRef.current !== socket) return;
+
+        console.warn('⚠️ WebSocket closed');
+        socketRef.current = null;
+        stopPing();
+        setConnected(false);
+        setWebSocket((current) => (current === socket ? null : current));
+
+        if (!disposedRef.current) {
+          scheduleReconnect(connectWebSocket);
+        }
+      };
+    };
+
+    connectWebSocket();
 
     return () => {
-      if (webSocket) {
-        webSocket.close();
+      disposedRef.current = true;
+      clearReconnectTimeout();
+      stopPing();
+
+      const socket = socketRef.current;
+      socketRef.current = null;
+      if (socket) {
+        socket.onopen = null;
+        socket.onmessage = null;
+        socket.onerror = null;
+        socket.onclose = null;
+        try {
+          socket.close();
+        } catch {
+          // Closing a socket that failed during construction is best-effort cleanup.
+        }
       }
-      if (reconnectTimeout.current) {
-        clearTimeout(reconnectTimeout.current);
-      }
-      stopPing(); // Clear the ping interval when the component unmounts
     };
-  }, [socketPort, sessionId]); // Re-run effect if port or sessionId changes
+  }, [socketPort, sessionId]);
 
   return { webSocket, connected, reconnectAttempts, messages, error };
 };
