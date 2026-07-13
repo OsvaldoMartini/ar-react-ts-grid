@@ -85,7 +85,7 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId }) 
   const processedMessageCountRef = useRef(0);
   const [botJobs, setBotJobs] = useState<BotJobRow[]>([]);
   const [findText, setFindText] = useState('');
-  const [sort, setSort] = useState<SortState | null>(null);
+  const [sort, setSort] = useState<SortState | null>({ key: 'id', dir: 1 });
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<BotJobRow | null>(null);
   const [status, setStatus] = useState<{ level: StatusLevel; text: string }>({
@@ -300,9 +300,9 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId }) 
                       onClick={() => toggleSort(column.key)}
                     >
                       {column.label}
-                      {sort?.key === column.key && (
-                        <span className={styles.sortIndicator}>{sort.dir === 1 ? '▲' : '▼'}</span>
-                      )}
+                      <span className={styles.sortIndicator}>
+                        {sort?.key === column.key ? (sort.dir === 1 ? '▲' : '▼') : '⇅'}
+                      </span>
                     </th>
                   ))}
                   <th>Actions</th>
