@@ -7,78 +7,148 @@
 }
 .heading { padding: 6px 10px; border-bottom: 1px solid #d4d4d4; background: #f0f0f0; cursor: default; }
 .heading h2 { margin: 0; color: #2b2b2b; font-size: 0.88rem; }
-.form {
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: flex-end;
-  gap: 8px;
-  padding: 8px 10px 10px;
-  overflow-x: auto;
-}
-.dateField, .pathField {
-  min-width: 31px;
-  max-width: 220px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  color: #5a5a5a;
-  font-size: 0.7rem;
-  font-weight: 800;
-  white-space: nowrap;
-}
-.dateField input, .pathInput {
-  min-height: 30px;
-  box-sizing: border-box;
-  border: 1px solid #adadad;
-  border-radius: 4px;
-  background: #fff;
-}
-.dateField input { width: 100%; padding: 5px 8px; color: #243447; font: inherit; font-size: 0.76rem; }
-.pathInput { min-width: 0; display: flex; align-items: center; overflow: hidden; }
-.pathInput input {
-  min-width: 0;
-  flex: 1;
-  height: 28px;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: #243447;
-  padding: 0 9px;
-  font-size: 0.72rem;
-}
-.pathInput button {
-  align-self: stretch;
-  flex: 0 0 36px;
-  border: 0;
-  border-left: 1px solid #c8c8c8;
-  background: #f0f0f0;
-  color: #2b2b2b;
-  cursor: pointer;
-}
-.actions { flex: 0 0 auto; display: flex; gap: 8px; }
+
+.actions { display: flex; gap: 8px; padding: 8px 10px 10px; }
 .actions button {
-  flex: 0 0 auto;
+  flex: 1 1 0;
   min-height: 30px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  border: 1px solid #176b3a;
   border-radius: 4px;
-  background: #176b3a;
-  color: #fff;
   padding: 5px 12px;
   font-size: 0.72rem;
   font-weight: 800;
   white-space: nowrap;
   cursor: pointer;
 }
-.actions .importButton { border-color: #a94f12; background: #d86818; }
-.actions button:disabled, .pathInput button:disabled, .dateField input:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.actions button:disabled { opacity: 0.5; cursor: not-allowed; }
+.actions button:focus-visible { outline: 3px solid rgb(37 99 235 / 25%); outline-offset: 2px; }
+
+.exportButton { border: 1px solid #176b3a; background: #176b3a; color: #fff; }
+.importButton { border: 1px solid #a94f12; background: #d86818; color: #fff; }
+
+/* Transfer modal — same backdrop/header/form/footer pattern as ExcelExportPanel/SaveComponentPanel. */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  background: rgba(15, 23, 42, 0.34);
+  padding: 16px;
 }
-.actions button:focus-visible, .pathInput button:focus-visible, .dateField input:focus-visible {
+.modal {
+  width: min(420px, 100%);
+  border: 1px solid #94a3b8;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.25);
+  overflow: hidden;
+}
+.modalHeaderExport, .modalHeaderImport {
+  height: 48px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #fff;
+  font-weight: 700;
+}
+.modalHeaderExport { background: #176b3a; }
+.modalHeaderImport { background: #d86818; }
+.modalHeaderExport button, .modalHeaderImport button {
+  margin-left: auto;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+}
+
+.modalForm {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dateField, .pathField {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: #5a5a5a;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+.dateField input {
+  min-height: 32px;
+  box-sizing: border-box;
+  border: 1px solid #adadad;
+  border-radius: 4px;
+  background: #fff;
+  padding: 5px 8px;
+  color: #243447;
+  font: inherit;
+  font-size: 0.8rem;
+}
+.pathInput {
+  min-height: 32px;
+  box-sizing: border-box;
+  border: 1px solid #adadad;
+  border-radius: 4px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+.pathInput input {
+  min-width: 0;
+  flex: 1;
+  height: 30px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #243447;
+  padding: 0 9px;
+  font-size: 0.78rem;
+}
+.pathInput button {
+  align-self: stretch;
+  flex: 0 0 38px;
+  border: 0;
+  border-left: 1px solid #c8c8c8;
+  background: #f0f0f0;
+  color: #2b2b2b;
+  cursor: pointer;
+}
+.pathInput button:disabled, .dateField input:disabled { opacity: 0.5; cursor: not-allowed; }
+.pathInput button:focus-visible, .dateField input:focus-visible {
   outline: 3px solid rgb(37 99 235 / 25%);
   outline-offset: 2px;
 }
+.modalWarning { margin: 0; color: #8a3b12; font-size: 0.7rem; }
+
+.modalFooter {
+  padding: 0 14px 14px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.modalFooter button {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 4px;
+  padding: 6px 14px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.modalFooter button:disabled { opacity: 0.5; cursor: not-allowed; }
+.cancelButton { border: 1px solid #adadad; background: #f5f5f5; color: #2b2b2b; }

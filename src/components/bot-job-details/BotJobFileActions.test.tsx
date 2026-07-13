@@ -3,13 +3,8 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import BotJobFileActions from './BotJobFileActions';
 import { botJobDetailsTestState as state } from './BotJobDetails.testData';
 
-afterEach(() => {
-  jest.restoreAllMocks();
-});
-
-test('chooses a session transfer path and sends confirmed export/import payloads', () => {
+test('opens the export modal, chooses a folder, and sends the confirmed export payload', () => {
   const onAction = jest.fn();
-  jest.spyOn(window, 'confirm').mockReturnValue(true);
   const view = render(
     <BotJobFileActions
       state={state}
@@ -20,8 +15,10 @@ test('chooses a session transfer path and sends confirmed export/import payloads
     />,
   );
 
-  expect(screen.getByRole('button', { name: 'Export' })).toBeDisabled();
-  expect(screen.getByRole('button', { name: 'Import' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Export' })).toBeEnabled();
+  fireEvent.click(screen.getByRole('button', { name: 'Export' }));
+
+  expect(screen.getByRole('button', { name: 'Confirm export' })).toBeDisabled();
   fireEvent.click(screen.getByRole('button', { name: 'Choose transfer folder' }));
   expect(onAction).toHaveBeenLastCalledWith('CHOOSE_TRANSFER_PATH');
 
@@ -34,23 +31,40 @@ test('chooses a session transfer path and sends confirmed export/import payloads
       onAction={onAction}
     />,
   );
-  expect(screen.getByLabelText('Transfer folder')).toHaveValue('D:\\exports\\payments');
-  fireEvent.change(screen.getByLabelText('Restore date'), { target: { value: '2026-07-11' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Export' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Import' }));
+  expect(screen.getByLabelText('Destination folder')).toHaveValue('D:\\exports\\payments');
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm export' }));
 
   expect(onAction).toHaveBeenCalledWith('EXPORT_JOB', {
     transferPath: 'D:\\exports\\payments', confirmed: true,
   });
+  expect(screen.queryByLabelText('Destination folder')).not.toBeInTheDocument();
+});
+
+test('opens the import modal with a restore date and sends the confirmed import payload', () => {
+  const onAction = jest.fn();
+  render(
+    <BotJobFileActions
+      state={state}
+      connected
+      pendingAction={null}
+      transferPath={'D:\\exports\\payments'}
+      onAction={onAction}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: 'Import' }));
+  expect(screen.getByLabelText('Source folder')).toHaveValue('D:\\exports\\payments');
+  fireEvent.change(screen.getByLabelText('Restore date'), { target: { value: '2026-07-11' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm import' }));
+
   expect(onAction).toHaveBeenCalledWith('IMPORT_JOB', {
     transferPath: 'D:\\exports\\payments', restoreDate: '2026-07-11', confirmed: true,
   });
 });
 
-test('cancellation suppresses transfer commands and a pending toolbar action disables the form', () => {
+test('Cancel closes the modal without dispatching a transfer command', () => {
   const onAction = jest.fn();
-  jest.spyOn(window, 'confirm').mockReturnValue(false);
-  const view = render(
+  render(
     <BotJobFileActions
       state={state}
       connected
@@ -59,11 +73,16 @@ test('cancellation suppresses transfer commands and a pending toolbar action dis
       onAction={onAction}
     />,
   );
-  fireEvent.click(screen.getByRole('button', { name: 'Export' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Import' }));
-  expect(onAction).not.toHaveBeenCalled();
 
-  view.rerender(
+  fireEvent.click(screen.getByRole('button', { name: 'Export' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+  expect(onAction).not.toHaveBeenCalled();
+  expect(screen.queryByLabelText('Destination folder')).not.toBeInTheDocument();
+});
+
+test('a pending toolbar action disables Export and Import so the modal cannot be opened', () => {
+  const onAction = jest.fn();
+  render(
     <BotJobFileActions
       state={state}
       connected
@@ -72,8 +91,7 @@ test('cancellation suppresses transfer commands and a pending toolbar action dis
       onAction={onAction}
     />,
   );
-  expect(screen.getByLabelText('Restore date')).toBeDisabled();
-  expect(screen.getByRole('button', { name: 'Choose transfer folder' })).toBeDisabled();
+
   expect(screen.getByRole('button', { name: 'Export' })).toBeDisabled();
   expect(screen.getByRole('button', { name: 'Import' })).toBeDisabled();
 });
