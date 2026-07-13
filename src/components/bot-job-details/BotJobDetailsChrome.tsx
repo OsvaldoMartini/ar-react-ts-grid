@@ -56,6 +56,8 @@ const BotJobDetailsChrome: React.FC<BotJobDetailsChromeProps> = ({
           connected={connected}
           pendingAction={controller.pendingToolbarAction}
           busy={operationBusy}
+          transferPath={controller.transferPath}
+          transferBusy={workspaceBusy}
           onAction={controller.sendToolbarAction}
         />
         <BotJobFileActions

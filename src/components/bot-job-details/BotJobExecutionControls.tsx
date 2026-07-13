@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Clock, Play, RefreshCw, Rocket, Square } from 'lucide-react';
+import BotJobFileActions from './BotJobFileActions';
 import type {
   BotJobDetailsState,
   BotJobExecutionMode,
@@ -13,6 +14,8 @@ interface BotJobExecutionControlsProps {
   connected: boolean;
   pendingAction: BotJobToolbarAction | null;
   busy?: boolean;
+  transferPath?: string;
+  transferBusy?: boolean;
   onAction: (action: BotJobToolbarAction, payload?: BotJobToolbarPayload) => void;
 }
 
@@ -23,6 +26,8 @@ const BotJobExecutionControls: React.FC<BotJobExecutionControlsProps> = ({
   connected,
   pendingAction,
   busy: operationBusy = false,
+  transferPath = '',
+  transferBusy = false,
   onAction,
 }) => {
   const [selectedBlockId, setSelectedBlockId] = useState<'all' | number>('all');
@@ -175,6 +180,15 @@ const BotJobExecutionControls: React.FC<BotJobExecutionControlsProps> = ({
             <button type="button" onClick={() => {}}>
               martini
             </button>
+            <BotJobFileActions
+              bare
+              state={state}
+              connected={connected}
+              pendingAction={pendingAction}
+              busy={transferBusy}
+              transferPath={transferPath}
+              onAction={onAction}
+            />
           </div>
         </div>
       </div>
