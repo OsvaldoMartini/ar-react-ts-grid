@@ -51,10 +51,6 @@ const BotJobExecutionControls: React.FC<BotJobExecutionControlsProps> = ({
   const canLaunch = Boolean(connected && state?.capabilities.canLaunch);
   const canConfigure = Boolean(connected && state?.capabilities.canUseWorkspaceActions);
   const hasBlocks = blocks.length > 0;
-  const selectedLabel = useMemo(() => {
-    if (selectedBlockId === 'all') return 'the complete job';
-    return blocks.find((block) => block.id === selectedBlockId)?.name ?? 'the selected block';
-  }, [blocks, selectedBlockId]);
 
   const cycleNavigationTime = () => {
     const next = navigationTime >= 10 ? 0 : navigationTime + 1;
@@ -177,11 +173,6 @@ const BotJobExecutionControls: React.FC<BotJobExecutionControlsProps> = ({
               Stop
             </button>
           </div>
-          <span className={styles.scopeHint}>
-            {mode === 'ONE'
-              ? 'Run only ' + selectedLabel + '.'
-              : 'Run from ' + selectedLabel + ' and continue.'}
-          </span>
         </div>
       </div>
     </section>
