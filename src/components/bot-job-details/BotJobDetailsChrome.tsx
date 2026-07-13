@@ -1,6 +1,5 @@
 import React from 'react';
 import BotJobDetailsHeader from './BotJobDetailsHeader';
-import BotJobExecutionControls from './BotJobExecutionControls';
 import type { BotJobDetailsControllerState } from './useBotJobDetailsController';
 import type { BotJobWorkspaceSurface } from './BotJobDetails.types';
 import styles from './BotJobDetailsChrome.module.scss';
@@ -44,22 +43,13 @@ const BotJobDetailsChrome: React.FC<BotJobDetailsChromeProps> = ({
         canUseWorkspaceActions={state?.capabilities.canUseWorkspaceActions === true}
         canUsePreScan={state?.capabilities.canUsePreScan === true}
         canShowComponents={state?.capabilities.canShowComponents === true}
-        fileState={state}
-        filePendingAction={controller.pendingToolbarAction}
-        fileBusy={workspaceBusy}
-        onFileAction={controller.sendToolbarAction}
+        jobState={state}
+        pendingToolbarAction={controller.pendingToolbarAction}
+        operationBusy={operationBusy}
+        transferBusy={workspaceBusy}
+        transferPath={controller.transferPath}
+        onToolbarAction={controller.sendToolbarAction}
       />
-      <div className={styles.sections}>
-        <BotJobExecutionControls
-          state={state}
-          connected={connected}
-          pendingAction={controller.pendingToolbarAction}
-          busy={operationBusy}
-          transferPath={controller.transferPath}
-          transferBusy={workspaceBusy}
-          onAction={controller.sendToolbarAction}
-        />
-      </div>
     </div>
   );
 };
