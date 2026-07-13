@@ -12,13 +12,13 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 7px 10px;
+  padding: 6px 10px;
   border-bottom: 1px solid #d4d4d4;
   background: #f0f0f0;
+  cursor: default;
 }
 
 .heading h2 { margin: 0; color: #2b2b2b; font-size: 0.88rem; }
-.heading p { margin: 2px 0 0; color: #6e6e6e; font-size: 0.7rem; }
 
 .state {
   flex: 0 0 auto;
@@ -108,11 +108,13 @@
   cursor: not-allowed;
 }
 
+.inlineField .applyButton { border-color: #2563eb; background: #2563eb; color: #fff; }
 .iconButton { flex: 0 0 30px; padding: 4px !important; }
+.inlineField .iconButton { border-color: #2563eb; background: #eaf1ff; color: #2563eb; }
 .actionRow .modeAll, .actionRow .modeOne { min-width: 54px; color: #fff; }
 .actionRow .modeAll { border-color: #16803f; background: #16803f; }
 .actionRow .modeOne { border-color: #db6b16; background: #e8791b; }
-.actionRow .launchButton { border-color: #176b3a; color: #176b3a; }
+.actionRow .launchButton { border-color: #176b3a; background: #176b3a; color: #fff; }
 .actionRow .testButton { border-color: #dc6b18; background: #e8791b; color: #fff; }
 .actionRow .stopButton { border-color: #b42318; background: #b42318; color: #fff; }
 .scopeHint { min-height: 1em; color: #6e6e6e; font-size: 0.66rem; }

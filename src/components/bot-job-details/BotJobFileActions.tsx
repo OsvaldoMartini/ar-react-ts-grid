@@ -40,9 +40,8 @@ const BotJobFileActions: React.FC<Props> = ({
 
   return (
     <section className={styles.panel} aria-labelledby="job-transfer-title">
-      <div className={styles.heading}>
+      <div className={styles.heading} title="Export or restore a scoped Bot Job backup.">
         <h2 id="job-transfer-title">Transfer</h2>
-        <p>Export or restore a scoped Bot Job backup.</p>
       </div>
       <form className={styles.form} onSubmit={(event) => event.preventDefault()}>
         <label className={styles.dateField} htmlFor="bot-job-restore-date">

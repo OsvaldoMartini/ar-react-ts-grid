@@ -72,11 +72,8 @@ const BotJobExecutionControls: React.FC<BotJobExecutionControlsProps> = ({
 
   return (
     <section className={styles.panel} aria-labelledby="execution-controls-title">
-      <div className={styles.heading}>
-        <div>
-          <h2 id="execution-controls-title">Execution</h2>
-          <p>Launch the Engine or validate this job locally with a test run.</p>
-        </div>
+      <div className={styles.heading} title="Launch the Engine or validate this job locally with a test run.">
+        <h2 id="execution-controls-title">Execution</h2>
         <span className={styles.state}>{state?.executionState ?? 'UNKNOWN'}</span>
       </div>
 
@@ -96,7 +93,13 @@ const BotJobExecutionControls: React.FC<BotJobExecutionControlsProps> = ({
               onChange={(event) => setNavigationTime(event.target.value)}
             />
             <span>seconds</span>
-            <button type="submit" disabled={!canConfigure || busy || executionActive}>Apply</button>
+            <button
+              type="submit"
+              className={styles.applyButton}
+              disabled={!canConfigure || busy || executionActive}
+            >
+              Apply
+            </button>
           </div>
         </form>
 
