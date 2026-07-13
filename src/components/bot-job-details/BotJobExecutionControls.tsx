@@ -27,11 +27,11 @@ const BotJobExecutionControls: React.FC<BotJobExecutionControlsProps> = ({
 }) => {
   const [selectedBlockId, setSelectedBlockId] = useState<'all' | number>('all');
   const [mode, setMode] = useState<BotJobExecutionMode>('ALL');
-  const [navigationTime, setNavigationTime] = useState('0');
+  const [navigationTime, setNavigationTime] = useState(0);
   const blocks = useMemo(() => state?.blocks ?? [], [state?.blocks]);
 
   useEffect(() => {
-    setNavigationTime(String(state?.navigationTimeSeconds ?? 0));
+    setNavigationTime(state?.navigationTimeSeconds ?? 0);
   }, [state?.navigationTimeSeconds]);
 
   useEffect(() => {
@@ -56,11 +56,16 @@ const BotJobExecutionControls: React.FC<BotJobExecutionControlsProps> = ({
     return blocks.find((block) => block.id === selectedBlockId)?.name ?? 'the selected block';
   }, [blocks, selectedBlockId]);
 
-  const updateNavigationTime = (event: React.FormEvent) => {
-    event.preventDefault();
-    const seconds = Number(navigationTime);
-    if (!Number.isInteger(seconds) || seconds < 0 || seconds > 10) return;
-    onAction('SET_NAVIGATION_TIME', { navigationTimeSeconds: seconds });
+  const cycleNavigationTime = () => {
+    const next = navigationTime >= 10 ? 0 : navigationTime + 1;
+    setNavigationTime(next);
+    onAction('SET_NAVIGATION_TIME', { navigationTimeSeconds: next });
+  };
+
+  const navigationTimeTone = (seconds: number): string => {
+    if (seconds <= 1) return styles.navTimeGreen;
+    if (seconds <= 6) return styles.navTimeOrangeLight;
+    return styles.navTimeOrangeDark;
   };
 
   const startTestRun = () => {
@@ -78,30 +83,20 @@ const BotJobExecutionControls: React.FC<BotJobExecutionControlsProps> = ({
       </div>
 
       <div className={styles.controls}>
-        <form className={styles.navigationForm} onSubmit={updateNavigationTime}>
-          <label htmlFor="bot-job-navigation-time">Navigation time</label>
-          <div className={styles.inlineField}>
+        <div className={styles.navigationForm}>
+          <span className={styles.fieldLabel}>Navigation time</span>
+          <button
+            type="button"
+            className={`${styles.navTimeToggle} ${navigationTimeTone(navigationTime)}`}
+            aria-label={`Navigation time: ${navigationTime} seconds`}
+            title="Click to cycle 0-10 seconds; saves automatically"
+            disabled={!canConfigure || busy || executionActive}
+            onClick={cycleNavigationTime}
+          >
             <Clock size={16} aria-hidden="true" />
-            <input
-              id="bot-job-navigation-time"
-              type="number"
-              min={0}
-              max={10}
-              step={1}
-              value={navigationTime}
-              disabled={!canConfigure || busy || executionActive}
-              onChange={(event) => setNavigationTime(event.target.value)}
-            />
-            <span>seconds</span>
-            <button
-              type="submit"
-              className={styles.applyButton}
-              disabled={!canConfigure || busy || executionActive}
-            >
-              Apply
-            </button>
-          </div>
-        </form>
+            {navigationTime}s
+          </button>
+        </div>
 
         <div className={styles.scopeField}>
           <label htmlFor="bot-job-execution-block">Starting block</label>

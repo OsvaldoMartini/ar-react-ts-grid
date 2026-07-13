@@ -108,7 +108,25 @@
   cursor: not-allowed;
 }
 
-.inlineField .applyButton { border-color: #2563eb; background: #2563eb; color: #fff; }
+.navTimeToggle {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 6px;
+  min-height: 30px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.navTimeToggle:disabled { opacity: 0.5; cursor: not-allowed; }
+.navTimeToggle:focus-visible { outline: 3px solid rgb(37 99 235 / 25%); outline-offset: 2px; }
+.navTimeGreen { background: #a5d6a7; color: #1b5e20; }
+.navTimeOrangeLight { background: #ffcc80; color: #7a4a00; }
+.navTimeOrangeDark { background: #e65100; color: #fff; }
+
 .iconButton { flex: 0 0 30px; padding: 4px !important; }
 .inlineField .iconButton { border-color: #2563eb; background: #eaf1ff; color: #2563eb; }
 .actionRow .modeAll, .actionRow .modeOne { min-width: 54px; color: #fff; }
