@@ -172,6 +172,9 @@ const BotJobExecutionControls: React.FC<BotJobExecutionControlsProps> = ({
               <Square size={15} fill="currentColor" aria-hidden="true" />
               Stop
             </button>
+            <button type="button" onClick={() => {}}>
+              martini
+            </button>
           </div>
         </div>
       </div>
