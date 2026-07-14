@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { parseScannerEnvelope, reduceScannerState } from './Scanner.contract';
+import { isMatchingScannerActionResponse } from './Scanner.responseMatching';
+import type { PendingScannerAction } from './Scanner.responseMatching';
 import type { ScannerAction, ScannerActionPayload, ScannerState, ScannerStatusTone } from './Scanner.types';
 
 interface ControllerOptions {
@@ -23,8 +25,6 @@ export interface ScannerControllerState {
   retryBootstrap: () => void;
 }
 
-type PendingAction = { requestId: string; action: ScannerAction };
-
 const RESPONSE_TIMEOUT_MS = 10000;
 const STATUS_RESET_MS = 3500;
 
@@ -47,7 +47,7 @@ export function useScannerController(options: ControllerOptions): ScannerControl
   const requestSequenceRef = useRef(0);
   const bootstrapSocketRef = useRef<WebSocket | null>(null);
   const bootstrapRequestRef = useRef<string | null>(null);
-  const pendingActionRef = useRef<PendingAction | null>(null);
+  const pendingActionRef = useRef<PendingScannerAction | null>(null);
   const bootstrapTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const actionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const statusResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -163,13 +163,7 @@ export function useScannerController(options: ControllerOptions): ScannerControl
         return;
       }
       if (operationId === 'scanner.actionResponse') {
-        const pendingActionValue = pendingActionRef.current;
-        if (!pendingActionValue || body.requestId !== pendingActionValue.requestId) {
-          return;
-        }
-        if (body.action && body.action !== pendingActionValue.action) {
-          return;
-        }
+        if (!isMatchingScannerActionResponse(body, pendingActionRef.current)) return;
         clearTimer(actionTimeoutRef);
         pendingActionRef.current = null;
         setPendingAction(null);
