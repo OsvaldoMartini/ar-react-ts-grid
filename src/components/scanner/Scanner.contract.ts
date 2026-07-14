@@ -94,7 +94,8 @@ export function parseScannerEnvelope(
   if (!SCANNER_OPERATIONS.has(operationId)) return null;
   const body = parseJsonObject(outer.body) as ScannerResponse | null;
   if (!body || typeof body.botJobId !== 'number' || !Number.isInteger(body.botJobId)) return null;
-  const failureWithoutState = body.ok === false && body.state == null && body.botJobId === -1;
+  const responseFailure = operationId === 'scanner.bootstrapResponse' || operationId === 'scanner.actionResponse';
+  const failureWithoutState = responseFailure && body.ok === false && body.state == null && body.botJobId === -1;
   if (!failureWithoutState && (!isInteger(body.botJobId, 1) || body.botJobId !== expectedBotJobId)) return null;
   if (body.state != null && !isScannerState(body.state, expectedBotJobId)) return null;
   return {

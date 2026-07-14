@@ -73,6 +73,41 @@ test('parses malformed scanner failure with unknown bot job fallback', () => {
   expect(parsed?.body.errorCode).toBe('INVALID_SCANNER_REQUEST');
 });
 
+test('parses malformed bootstrap failure with unknown bot job fallback', () => {
+  const envelope = {
+    sessionId: 'scannerGrid',
+    operationId: 'scanner.bootstrapResponse',
+    body: JSON.stringify({
+      ok: false,
+      botJobId: -1,
+      requestId: 'scanner-bootstrap-fail-1',
+      errorCode: 'INVALID_SCANNER_REQUEST',
+      message: 'Scanner request body must be valid JSON',
+    }),
+  };
+
+  const parsed = parseScannerEnvelope(JSON.stringify(envelope), 'scannerGrid', 42);
+
+  expect(parsed?.body.ok).toBe(false);
+  expect(parsed?.body.botJobId).toBe(-1);
+});
+
+test('rejects state events with unknown bot job fallback', () => {
+  const envelope = {
+    sessionId: 'scannerGrid',
+    operationId: 'scanner.state',
+    body: JSON.stringify({
+      ok: false,
+      botJobId: -1,
+      requestId: 'scanner-state-fail-1',
+      errorCode: 'INVALID_SCANNER_REQUEST',
+      message: 'Scanner request body must be valid JSON',
+    }),
+  };
+
+  expect(parseScannerEnvelope(JSON.stringify(envelope), 'scannerGrid', 42)).toBeNull();
+});
+
 test('rejects unknown scanner browser states', () => {
   const malformed = {
     sessionId: 'scannerGrid',
