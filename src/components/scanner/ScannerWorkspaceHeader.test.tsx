@@ -90,3 +90,40 @@ test('sends page scanner action', () => {
 
   expect(onAction).toHaveBeenCalledWith('PAGE_SCANNER');
 });
+
+test('sends page scanner action with search terms', () => {
+  const onAction = jest.fn();
+  render(
+    <ScannerWorkspaceHeader
+      botJobName="Fallback"
+      connected
+      scannerState={{
+        ...state,
+        focus: { profile: 'custom', searchTerms: ['input', 'textarea'] },
+      }}
+      onAction={onAction}
+    />,
+  );
+
+  const search = screen.getByLabelText('Scanner search terms');
+  expect(search).toHaveValue('input, textarea');
+
+  fireEvent.change(search, { target: { value: 'button, [role="tab"] ' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+
+  expect(onAction).toHaveBeenCalledWith('PAGE_SCANNER', { searchTerms: 'button, [role="tab"]' });
+});
+
+test('disables search while scanner action is pending', () => {
+  render(
+    <ScannerWorkspaceHeader
+      botJobName="Fallback"
+      connected
+      scannerState={state}
+      pendingAction="PAGE_SCANNER"
+    />,
+  );
+
+  expect(screen.getByLabelText('Scanner search terms')).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Search' })).toBeDisabled();
+});

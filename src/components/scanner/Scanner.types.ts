@@ -1,5 +1,9 @@
 export type ScannerAction = 'REFRESH_STATE' | 'CLEAR_GRID' | 'REFRESH_PAGE' | 'PAGE_SCANNER';
 
+export interface ScannerActionPayload {
+  searchTerms?: string;
+}
+
 export type ScannerStatusTone = 'neutral' | 'success' | 'warning' | 'error';
 
 export interface ScannerBlock {

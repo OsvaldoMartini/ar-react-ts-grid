@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import WorkspaceHeader, { type WorkspaceHeaderAction } from '../workspace/WorkspaceHeader';
-import type { ScannerAction, ScannerState, ScannerStatusTone } from './Scanner.types';
+import type { ScannerAction, ScannerActionPayload, ScannerState, ScannerStatusTone } from './Scanner.types';
 import styles from './ScannerWorkspaceHeader.module.scss';
 
 interface ScannerWorkspaceHeaderProps {
@@ -13,7 +13,7 @@ interface ScannerWorkspaceHeaderProps {
   pendingAction?: ScannerAction | null;
   status?: string;
   statusTone?: ScannerStatusTone;
-  onAction?: (action: ScannerAction) => void;
+  onAction?: (action: ScannerAction, payload?: ScannerActionPayload) => void;
 }
 
 const ScannerWorkspaceHeader: React.FC<ScannerWorkspaceHeaderProps> = ({
@@ -29,6 +29,13 @@ const ScannerWorkspaceHeader: React.FC<ScannerWorkspaceHeaderProps> = ({
   onAction,
 }) => {
   const busy = loading || pendingAction !== null;
+  const initialSearchTerms = scannerState?.focus.searchTerms.join(', ') || '';
+  const [searchTerms, setSearchTerms] = useState(initialSearchTerms);
+
+  useEffect(() => {
+    setSearchTerms(initialSearchTerms);
+  }, [initialSearchTerms]);
+
   const actions: WorkspaceHeaderAction<ScannerAction>[] = [
     {
       id: 'PAGE_SCANNER',
@@ -63,6 +70,12 @@ const ScannerWorkspaceHeader: React.FC<ScannerWorkspaceHeaderProps> = ({
     || status
     || (connected ? 'Scanner workspace ready' : `Reconnecting${reconnectAttempts ? ` (${reconnectAttempts})` : ''}`);
   const resolvedTone = error ? 'error' : connected ? statusTone : 'warning';
+  const searchDisabled = !connected || busy || !scannerState?.capabilities.canUsePageScanner;
+
+  const submitSearch = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    onAction?.('PAGE_SCANNER', { searchTerms: searchTerms.trim() });
+  };
 
   return (
     <div className={styles.wrapper}>
@@ -82,6 +95,24 @@ const ScannerWorkspaceHeader: React.FC<ScannerWorkspaceHeaderProps> = ({
           {scannerState.environmentUrl}
         </div>
       )}
+      <form className={styles.searchRow} onSubmit={submitSearch}>
+        <input
+          className={styles.searchInput}
+          value={searchTerms}
+          onChange={(event) => setSearchTerms(event.target.value)}
+          disabled={searchDisabled}
+          placeholder="input, textarea, button, a, select, label"
+          aria-label="Scanner search terms"
+        />
+        <button
+          type="submit"
+          className={styles.searchButton}
+          disabled={searchDisabled}
+          title="Scan using these search terms"
+        >
+          Search
+        </button>
+      </form>
     </div>
   );
 };

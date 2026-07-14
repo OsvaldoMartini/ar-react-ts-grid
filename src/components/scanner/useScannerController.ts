@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { parseScannerEnvelope, reduceScannerState } from './Scanner.contract';
-import type { ScannerAction, ScannerState, ScannerStatusTone } from './Scanner.types';
+import type { ScannerAction, ScannerActionPayload, ScannerState, ScannerStatusTone } from './Scanner.types';
 
 interface ControllerOptions {
   webSocket: WebSocket | null;
@@ -19,7 +19,7 @@ export interface ScannerControllerState {
   completedAction: ScannerAction | null;
   status: string;
   statusTone: ScannerStatusTone;
-  sendAction: (action: ScannerAction) => void;
+  sendAction: (action: ScannerAction, payload?: ScannerActionPayload) => void;
   retryBootstrap: () => void;
 }
 
@@ -182,7 +182,7 @@ export function useScannerController(options: ControllerOptions): ScannerControl
     });
   }, [botJobId, enabled, messages, sessionId, setTransientStatus]);
 
-  const sendAction = useCallback((action: ScannerAction) => {
+  const sendAction = useCallback((action: ScannerAction, payload: ScannerActionPayload = {}) => {
     if (!enabled || !botJobId || pendingActionRef.current) return;
     clearTimer(actionTimeoutRef);
     const actionRequestId = requestId(action.toLowerCase());
@@ -198,7 +198,7 @@ export function useScannerController(options: ControllerOptions): ScannerControl
           : 'Clearing scanner grid');
     setStatusTone('neutral');
     try {
-      send('scanner.action', { action, botJobId, requestId: actionRequestId });
+      send('scanner.action', { ...payload, action, botJobId, requestId: actionRequestId });
       actionTimeoutRef.current = setTimeout(() => {
         if (pendingActionRef.current?.requestId !== actionRequestId) return;
         pendingActionRef.current = null;
