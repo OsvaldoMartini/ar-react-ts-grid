@@ -69,6 +69,7 @@ const ScannerWorkspaceHeader: React.FC<ScannerWorkspaceHeaderProps> = ({
   const subtitle = scannerState
     ? `${scannerState.botJobName} · ${scannerState.blocks.length} blocks · ${scannerState.browser.state}`
     : botJobName || 'No Bot Job selected';
+  const displayUrl = scannerState?.browser.activeUrl || scannerState?.environmentUrl || '';
   const resolvedStatus = error
     || status
     || (connected ? 'Scanner workspace ready' : `Reconnecting${reconnectAttempts ? ` (${reconnectAttempts})` : ''}`);
@@ -94,9 +95,9 @@ const ScannerWorkspaceHeader: React.FC<ScannerWorkspaceHeaderProps> = ({
         onAction={onAction}
         compact
       />
-      {scannerState?.environmentUrl && (
-        <div className={styles.urlLine} title={scannerState.environmentUrl}>
-          {scannerState.environmentUrl}
+      {displayUrl && (
+        <div className={styles.urlLine} title={displayUrl}>
+          {displayUrl}
         </div>
       )}
       <form className={styles.searchRow} onSubmit={submitSearch}>

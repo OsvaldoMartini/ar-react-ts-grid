@@ -59,6 +59,26 @@ test('sends clear grid action', () => {
   expect(onAction).toHaveBeenCalledWith('CLEAR_GRID');
 });
 
+test('shows active browser URL before environment URL', () => {
+  render(
+    <ScannerWorkspaceHeader
+      botJobName="Fallback"
+      connected
+      scannerState={{
+        ...state,
+        browser: {
+          ...state.browser,
+          state: 'OPEN',
+          activeUrl: 'https://active.bank.example/login',
+        },
+      }}
+    />,
+  );
+
+  expect(screen.getByText('https://active.bank.example/login')).toBeInTheDocument();
+  expect(screen.queryByText('https://bank.example')).not.toBeInTheDocument();
+});
+
 test('sends refresh page action', () => {
   const onAction = jest.fn();
   render(
