@@ -167,6 +167,29 @@ test('clears pending action for matching backend failure without parsed action',
   expect(latestController?.statusTone).toBe('error');
 });
 
+test('clears pending action for malformed backend failure with unknown job fallback', () => {
+  const ws = socket();
+  const { rerender } = render(<Harness socket={ws} />);
+  fireEvent.click(screen.getByRole('button', { name: 'scan' }));
+  const action = sentMessages(ws).find((entry) => entry.type === 'scanner.action');
+  const requestId = JSON.parse(action.body).requestId;
+
+  rerender(<Harness socket={ws} messages={[
+    message('scanner.actionResponse', {
+      ok: false,
+      botJobId: -1,
+      requestId,
+      errorCode: 'INVALID_SCANNER_REQUEST',
+      message: 'Scanner request body must be valid JSON',
+    }),
+  ]} />);
+
+  expect(latestController?.pendingAction).toBeNull();
+  expect(latestController?.completedAction).toBeNull();
+  expect(latestController?.status).toBe('Scanner request body must be valid JSON');
+  expect(latestController?.statusTone).toBe('error');
+});
+
 test('ignores matching request responses with conflicting action', () => {
   const ws = socket();
   const { rerender } = render(<Harness socket={ws} />);

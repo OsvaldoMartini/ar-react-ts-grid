@@ -93,7 +93,9 @@ export function parseScannerEnvelope(
   const operationId = typeof outer.operationId === 'string' ? outer.operationId : '';
   if (!SCANNER_OPERATIONS.has(operationId)) return null;
   const body = parseJsonObject(outer.body) as ScannerResponse | null;
-  if (!body || !isInteger(body.botJobId, 1) || body.botJobId !== expectedBotJobId) return null;
+  if (!body || typeof body.botJobId !== 'number' || !Number.isInteger(body.botJobId)) return null;
+  const failureWithoutState = body.ok === false && body.state == null && body.botJobId === -1;
+  if (!failureWithoutState && (!isInteger(body.botJobId, 1) || body.botJobId !== expectedBotJobId)) return null;
   if (body.state != null && !isScannerState(body.state, expectedBotJobId)) return null;
   return {
     sessionId: expectedSessionId,

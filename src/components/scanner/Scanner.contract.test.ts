@@ -53,6 +53,26 @@ test('parses structured scanner failure without state', () => {
   expect(parsed?.body.errorCode).toBe('INVALID_SCANNER_REQUEST');
 });
 
+test('parses malformed scanner failure with unknown bot job fallback', () => {
+  const envelope = {
+    sessionId: 'scannerGrid',
+    operationId: 'scanner.actionResponse',
+    body: JSON.stringify({
+      ok: false,
+      botJobId: -1,
+      requestId: 'scanner-fail-2',
+      errorCode: 'INVALID_SCANNER_REQUEST',
+      message: 'Scanner request body must be valid JSON',
+    }),
+  };
+
+  const parsed = parseScannerEnvelope(JSON.stringify(envelope), 'scannerGrid', 42);
+
+  expect(parsed?.body.ok).toBe(false);
+  expect(parsed?.body.botJobId).toBe(-1);
+  expect(parsed?.body.errorCode).toBe('INVALID_SCANNER_REQUEST');
+});
+
 test('rejects unknown scanner browser states', () => {
   const malformed = {
     sessionId: 'scannerGrid',
