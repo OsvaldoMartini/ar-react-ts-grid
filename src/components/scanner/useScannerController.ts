@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { scannerActionResponseStatus } from './Scanner.actionResponse';
 import { scannerActionPendingStatus } from './Scanner.actionStatus';
 import {
   isMatchingScannerBootstrapResponse,
@@ -174,11 +175,11 @@ export function useScannerController(options: ControllerOptions): ScannerControl
         if (body.ok && body.state) {
           setState((current) => reduceScannerState(current, body.state));
           setCompletedAction(body.action || null);
-          setTransientStatus(body.message || 'Scanner action completed', 'success');
         } else {
           setCompletedAction(null);
-          setTransientStatus(body.message || 'Scanner action failed', 'error');
         }
+        const nextStatus = scannerActionResponseStatus(body);
+        setTransientStatus(nextStatus.message, nextStatus.tone);
       }
     });
   }, [botJobId, enabled, messages, sessionId, setTransientStatus]);
