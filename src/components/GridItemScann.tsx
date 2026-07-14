@@ -26,6 +26,7 @@ import OCRTestResultsPanel, { OCRTestResult } from './OCRTestResultsPanel';
 import BotJobDetailsChrome from './bot-job-details/BotJobDetailsChrome';
 import { useBotJobDetailsController } from './bot-job-details/useBotJobDetailsController';
 import ScannerWorkspaceHeader from './scanner/ScannerWorkspaceHeader';
+import { useScannerController } from './scanner/useScannerController';
 import styles from './GridItemScann.module.scss';
 
 
@@ -145,6 +146,9 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   const botJobHeader = useBotJobDetailsController({
     webSocket, connected, messages, sessionId, homeBankingId, botJobId, enabled: isPreScanMode,
   });
+  const scannerController = useScannerController({
+    webSocket, connected, messages, sessionId, homeBankingId, botJobId, enabled: !isPreScanMode,
+  });
 
   useEffect(() => {
     if (!botJobHeader.state) return;
@@ -152,6 +156,13 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     setBotJobName(botJobHeader.state.name);
     setHomeBankingId(botJobHeader.state.homeBankingId);
   }, [botJobHeader.state]);
+
+  useEffect(() => {
+    if (!scannerController.state) return;
+    setBotJobId(scannerController.state.botJobId);
+    setBotJobName(scannerController.state.botJobName);
+    setHomeBankingId(scannerController.state.homeBankingId);
+  }, [scannerController.state]);
 
   // Per-block display mode (preScan dashboard): 'name' = normal display chain,
   // 'id' = raw DOM id (locator planning), 'testid' = testing attribute
@@ -1509,6 +1520,12 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
           connected={connected}
           reconnectAttempts={reconnectAttempts}
           error={error}
+          scannerState={scannerController.state}
+          loading={scannerController.loadingState}
+          pendingAction={scannerController.pendingAction}
+          status={scannerController.status}
+          statusTone={scannerController.statusTone}
+          onAction={scannerController.sendAction}
         />
       )}
       {isPreScanMode && (

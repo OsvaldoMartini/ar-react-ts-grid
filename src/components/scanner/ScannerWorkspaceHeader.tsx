@@ -1,5 +1,6 @@
 import React from 'react';
-import WorkspaceHeader from '../workspace/WorkspaceHeader';
+import WorkspaceHeader, { type WorkspaceHeaderAction } from '../workspace/WorkspaceHeader';
+import type { ScannerAction, ScannerState, ScannerStatusTone } from './Scanner.types';
 import styles from './ScannerWorkspaceHeader.module.scss';
 
 interface ScannerWorkspaceHeaderProps {
@@ -7,6 +8,12 @@ interface ScannerWorkspaceHeaderProps {
   connected: boolean;
   reconnectAttempts?: number;
   error?: string | null;
+  scannerState?: ScannerState | null;
+  loading?: boolean;
+  pendingAction?: ScannerAction | null;
+  status?: string;
+  statusTone?: ScannerStatusTone;
+  onAction?: (action: ScannerAction) => void;
 }
 
 const ScannerWorkspaceHeader: React.FC<ScannerWorkspaceHeaderProps> = ({
@@ -14,18 +21,47 @@ const ScannerWorkspaceHeader: React.FC<ScannerWorkspaceHeaderProps> = ({
   connected,
   reconnectAttempts = 0,
   error,
-}) => (
-  <div className={styles.wrapper}>
-    <WorkspaceHeader
-      eyebrow="Scanner"
-      title="AR Web Factory"
-      subtitle={botJobName || 'No Bot Job selected'}
-      connected={connected}
-      status={error || (connected ? 'Scanner workspace ready' : `Reconnecting${reconnectAttempts ? ` (${reconnectAttempts})` : ''}`)}
-      statusTone={error ? 'error' : connected ? 'success' : 'warning'}
-      compact
-    />
-  </div>
-);
+  scannerState,
+  loading = false,
+  pendingAction = null,
+  status,
+  statusTone = 'neutral',
+  onAction,
+}) => {
+  const actions: WorkspaceHeaderAction<ScannerAction>[] = [{
+    id: 'REFRESH_STATE',
+    label: 'Refresh',
+    title: 'Refresh scanner state',
+    disabled: !connected || loading || pendingAction !== null || !scannerState?.capabilities.canRefreshState,
+  }];
+  const subtitle = scannerState
+    ? `${scannerState.botJobName} · ${scannerState.blocks.length} blocks · ${scannerState.browser.state}`
+    : botJobName || 'No Bot Job selected';
+  const resolvedStatus = error
+    || status
+    || (connected ? 'Scanner workspace ready' : `Reconnecting${reconnectAttempts ? ` (${reconnectAttempts})` : ''}`);
+  const resolvedTone = error ? 'error' : connected ? statusTone : 'warning';
+
+  return (
+    <div className={styles.wrapper}>
+      <WorkspaceHeader
+        eyebrow="Scanner"
+        title="AR Web Factory"
+        subtitle={subtitle}
+        connected={connected}
+        status={resolvedStatus}
+        statusTone={resolvedTone}
+        actions={actions}
+        onAction={onAction}
+        compact
+      />
+      {scannerState?.environmentUrl && (
+        <div className={styles.urlLine} title={scannerState.environmentUrl}>
+          {scannerState.environmentUrl}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default ScannerWorkspaceHeader;
