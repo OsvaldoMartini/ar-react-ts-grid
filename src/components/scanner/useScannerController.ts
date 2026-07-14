@@ -5,6 +5,7 @@ import {
   isMatchingScannerBootstrapResponse,
   scannerBootstrapResponseStatus,
 } from './Scanner.bootstrapResponse';
+import { scannerControllerResetState } from './Scanner.controllerState';
 import { parseScannerEnvelope, reduceScannerState } from './Scanner.contract';
 import { isMatchingScannerActionResponse } from './Scanner.responseMatching';
 import { scannerTransportMessage } from './Scanner.transport';
@@ -58,12 +59,13 @@ export function useScannerController(options: ControllerOptions): ScannerControl
   const bootstrapTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const actionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const statusResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const resetState = scannerControllerResetState(enabled);
   const [state, setState] = useState<ScannerState | null>(null);
-  const [loadingState, setLoadingState] = useState(enabled);
+  const [loadingState, setLoadingState] = useState(resetState.loadingState);
   const [pendingAction, setPendingAction] = useState<ScannerAction | null>(null);
   const [completedAction, setCompletedAction] = useState<ScannerAction | null>(null);
-  const [status, setStatus] = useState(enabled ? 'Loading scanner state' : 'Ready');
-  const [statusTone, setStatusTone] = useState<ScannerStatusTone>('neutral');
+  const [status, setStatus] = useState(resetState.status);
+  const [statusTone, setStatusTone] = useState<ScannerStatusTone>(resetState.statusTone);
 
   const setTransientStatus = useCallback((message: string, tone: ScannerStatusTone) => {
     clearTimer(statusResetRef);
@@ -100,9 +102,9 @@ export function useScannerController(options: ControllerOptions): ScannerControl
     setState(null);
     setPendingAction(null);
     setCompletedAction(null);
-    setLoadingState(enabled);
-    setStatus(enabled ? 'Loading scanner state' : 'Ready');
-    setStatusTone('neutral');
+    setLoadingState(resetState.loadingState);
+    setStatus(resetState.status);
+    setStatusTone(resetState.statusTone);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [botJobId, enabled, sessionId]);
 
