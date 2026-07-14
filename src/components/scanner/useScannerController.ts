@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { scannerActionPendingStatus } from './Scanner.actionStatus';
 import { parseScannerEnvelope, reduceScannerState } from './Scanner.contract';
 import { isMatchingScannerActionResponse } from './Scanner.responseMatching';
 import type { PendingScannerAction } from './Scanner.responseMatching';
@@ -186,21 +187,7 @@ export function useScannerController(options: ControllerOptions): ScannerControl
     pendingActionRef.current = { requestId: actionRequestId, action };
     setPendingAction(action);
     setCompletedAction(null);
-    setStatus(action === 'REFRESH_STATE'
-      ? 'Refreshing scanner state'
-      : action === 'REFRESH_PAGE'
-        ? 'Refreshing scanner browser page'
-        : action === 'PAGE_SCANNER'
-          ? 'Scanning browser page'
-          : action === 'PREVIOUS_TAB'
-            ? 'Switching to previous browser tab'
-            : action === 'NEXT_TAB'
-              ? 'Switching to next browser tab'
-              : action === 'PRE_LAUNCH'
-                ? 'Starting scanner Pre-Launch'
-                : action === 'STOP_PRE_LAUNCH'
-                  ? 'Stopping scanner Pre-Launch'
-                  : 'Clearing scanner grid');
+    setStatus(scannerActionPendingStatus(action));
     setStatusTone('neutral');
     try {
       send('scanner.action', { ...payload, action, botJobId, requestId: actionRequestId });
