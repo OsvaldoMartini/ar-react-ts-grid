@@ -1,26 +1,11 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import ScannerToolbar from './ScannerToolbar';
-import type { ScannerState } from './Scanner.types';
+import { scannerState } from './Scanner.testUtils';
 
-const state: ScannerState = {
-  revision: 1,
-  botJobId: 42,
-  botJobName: 'Apre Acconto',
-  homeBankingId: 2,
-  environmentUrl: 'https://bank.example',
-  blocks: [{ id: 100, order: 1, name: 'Login', active: true }],
+const state = scannerState({
   browser: { state: 'OPEN', activeUrl: 'https://bank.example/login', activeTitle: 'Login', openTabs: 2, scannable: true },
   focus: { profile: 'default', searchTerms: ['input', 'button'] },
-  ocr: { available: true, status: 'IDLE' },
-  capabilities: {
-    canRefreshState: true,
-    canUsePageScanner: true,
-    canUseOcr: true,
-    canExecute: true,
-    canApplyElements: true,
-  },
-  executionState: 'IDLE',
-};
+});
 
 test('sends search, tab, OCR, and execution commands', () => {
   const onAction = jest.fn();

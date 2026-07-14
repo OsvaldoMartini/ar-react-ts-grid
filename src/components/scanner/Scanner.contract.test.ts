@@ -1,25 +1,8 @@
 import { parseScannerEnvelope, reduceScannerState } from './Scanner.contract';
 import type { ScannerState } from './Scanner.types';
+import { scannerState } from './Scanner.testUtils';
 
-const state = (revision: number): ScannerState => ({
-  revision,
-  botJobId: 42,
-  botJobName: 'Apre Acconto',
-  homeBankingId: 2,
-  environmentUrl: 'https://bank.example',
-  blocks: [{ id: 100, order: 1, name: 'Login', active: true }],
-  browser: { state: 'UNKNOWN', activeUrl: '', activeTitle: '', openTabs: 0, scannable: false },
-  focus: { profile: 'default', searchTerms: [] },
-  ocr: { available: true, status: 'IDLE' },
-  capabilities: {
-    canRefreshState: true,
-    canUsePageScanner: true,
-    canUseOcr: true,
-    canExecute: true,
-    canApplyElements: true,
-  },
-  executionState: 'IDLE',
-});
+const state = (revision: number): ScannerState => scannerState({ revision });
 
 test('parses scanner envelopes and rejects wrong session or job', () => {
   const body = { ok: true, botJobId: 42, requestId: 'scanner-1', state: state(1) };

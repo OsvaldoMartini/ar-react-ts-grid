@@ -1,26 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import ScannerWorkspaceHeader from './ScannerWorkspaceHeader';
-import type { ScannerState } from './Scanner.types';
+import { scannerState } from './Scanner.testUtils';
 
-const state: ScannerState = {
-  revision: 1,
-  botJobId: 42,
-  botJobName: 'Apre Acconto',
-  homeBankingId: 2,
-  environmentUrl: 'https://bank.example',
-  blocks: [{ id: 100, order: 1, name: 'Login', active: true }],
-  browser: { state: 'UNKNOWN', activeUrl: '', activeTitle: '', openTabs: 0, scannable: false },
-  focus: { profile: 'default', searchTerms: [] },
-  ocr: { available: true, status: 'IDLE' },
-  capabilities: {
-    canRefreshState: true,
-    canUsePageScanner: true,
-    canUseOcr: true,
-    canExecute: true,
-    canApplyElements: true,
-  },
-  executionState: 'IDLE',
-};
+const state = scannerState();
 
 test('renders scanner state and sends refresh action', async () => {
   const onAction = jest.fn();
