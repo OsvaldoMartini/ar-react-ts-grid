@@ -16,6 +16,7 @@ export interface ScannerControllerState {
   state: ScannerState | null;
   loadingState: boolean;
   pendingAction: ScannerAction | null;
+  completedAction: ScannerAction | null;
   status: string;
   statusTone: ScannerStatusTone;
   sendAction: (action: ScannerAction) => void;
@@ -53,6 +54,7 @@ export function useScannerController(options: ControllerOptions): ScannerControl
   const [state, setState] = useState<ScannerState | null>(null);
   const [loadingState, setLoadingState] = useState(enabled);
   const [pendingAction, setPendingAction] = useState<ScannerAction | null>(null);
+  const [completedAction, setCompletedAction] = useState<ScannerAction | null>(null);
   const [status, setStatus] = useState(enabled ? 'Loading scanner state' : 'Ready');
   const [statusTone, setStatusTone] = useState<ScannerStatusTone>('neutral');
 
@@ -95,6 +97,7 @@ export function useScannerController(options: ControllerOptions): ScannerControl
     clearTimer(statusResetRef);
     setState(null);
     setPendingAction(null);
+    setCompletedAction(null);
     setLoadingState(enabled);
     setStatus(enabled ? 'Loading scanner state' : 'Ready');
     setStatusTone('neutral');
@@ -169,8 +172,10 @@ export function useScannerController(options: ControllerOptions): ScannerControl
         setPendingAction(null);
         if (body.ok && body.state) {
           setState((current) => reduceScannerState(current, body.state));
+          setCompletedAction(body.action || null);
           setTransientStatus(body.message || 'Scanner action completed', 'success');
         } else {
+          setCompletedAction(null);
           setTransientStatus(body.message || 'Scanner action failed', 'error');
         }
       }
@@ -183,7 +188,8 @@ export function useScannerController(options: ControllerOptions): ScannerControl
     const actionRequestId = requestId(action.toLowerCase());
     pendingActionRef.current = { requestId: actionRequestId, action };
     setPendingAction(action);
-    setStatus(action === 'REFRESH_STATE' ? 'Refreshing scanner state' : 'Running scanner action');
+    setCompletedAction(null);
+    setStatus(action === 'REFRESH_STATE' ? 'Refreshing scanner state' : 'Clearing scanner grid');
     setStatusTone('neutral');
     try {
       send('scanner.action', { action, botJobId, requestId: actionRequestId });
@@ -210,6 +216,7 @@ export function useScannerController(options: ControllerOptions): ScannerControl
     state,
     loadingState,
     pendingAction,
+    completedAction,
     status,
     statusTone,
     sendAction,

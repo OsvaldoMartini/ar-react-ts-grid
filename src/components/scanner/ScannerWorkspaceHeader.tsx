@@ -28,12 +28,22 @@ const ScannerWorkspaceHeader: React.FC<ScannerWorkspaceHeaderProps> = ({
   statusTone = 'neutral',
   onAction,
 }) => {
-  const actions: WorkspaceHeaderAction<ScannerAction>[] = [{
-    id: 'REFRESH_STATE',
-    label: 'Refresh',
-    title: 'Refresh scanner state',
-    disabled: !connected || loading || pendingAction !== null || !scannerState?.capabilities.canRefreshState,
-  }];
+  const busy = loading || pendingAction !== null;
+  const actions: WorkspaceHeaderAction<ScannerAction>[] = [
+    {
+      id: 'REFRESH_STATE',
+      label: 'Refresh',
+      title: 'Refresh scanner state',
+      disabled: !connected || busy || !scannerState?.capabilities.canRefreshState,
+    },
+    {
+      id: 'CLEAR_GRID',
+      label: 'Clear Grid',
+      title: 'Clear the scanner result grid',
+      tone: 'warning',
+      disabled: !connected || busy || !scannerState?.capabilities.canRefreshState,
+    },
+  ];
   const subtitle = scannerState
     ? `${scannerState.botJobName} · ${scannerState.blocks.length} blocks · ${scannerState.browser.state}`
     : botJobName || 'No Bot Job selected';

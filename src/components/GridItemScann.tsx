@@ -1022,6 +1022,12 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     setIsElementGrouped(false);
   };
 
+  useEffect(() => {
+    if (scannerController.completedAction === 'CLEAR_GRID') {
+      handleClearGridAll();
+    }
+  }, [scannerController.completedAction]);
+
   const sendDashboardCommand = (type: string, extra: Record<string, unknown> = {}) => {
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
       console.warn("WebSocket is not connected. Cannot send dashboard command.");

@@ -42,3 +42,19 @@ test('renders scanner state and sends refresh action', async () => {
 
   expect(onAction).toHaveBeenCalledWith('REFRESH_STATE');
 });
+
+test('sends clear grid action', () => {
+  const onAction = jest.fn();
+  render(
+    <ScannerWorkspaceHeader
+      botJobName="Fallback"
+      connected
+      scannerState={state}
+      onAction={onAction}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: 'Clear Grid' }));
+
+  expect(onAction).toHaveBeenCalledWith('CLEAR_GRID');
+});
