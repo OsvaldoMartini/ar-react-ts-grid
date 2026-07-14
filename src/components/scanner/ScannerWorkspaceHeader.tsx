@@ -14,6 +14,7 @@ interface ScannerWorkspaceHeaderProps {
   status?: string;
   statusTone?: ScannerStatusTone;
   onAction?: (action: ScannerAction, payload?: ScannerActionPayload) => void;
+  onOpenOcrConfig?: () => void;
 }
 
 const ScannerWorkspaceHeader: React.FC<ScannerWorkspaceHeaderProps> = ({
@@ -27,6 +28,7 @@ const ScannerWorkspaceHeader: React.FC<ScannerWorkspaceHeaderProps> = ({
   status,
   statusTone = 'neutral',
   onAction,
+  onOpenOcrConfig,
 }) => {
   const busy = loading || pendingAction !== null;
   const initialSearchTerms = scannerState?.focus.searchTerms.join(', ') || '';
@@ -111,6 +113,15 @@ const ScannerWorkspaceHeader: React.FC<ScannerWorkspaceHeaderProps> = ({
           title="Scan using these search terms"
         >
           Search
+        </button>
+        <button
+          type="button"
+          className={styles.ocrButton}
+          disabled={!connected || busy || !scannerState?.capabilities.canUseOcr}
+          title="OCR Configuration"
+          onClick={onOpenOcrConfig}
+        >
+          OCR Config
         </button>
       </form>
     </div>

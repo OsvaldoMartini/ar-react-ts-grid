@@ -16,7 +16,7 @@
 
 .searchRow {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 6px;
   align-items: center;
   padding: 4px 4px 0;
@@ -61,4 +61,32 @@
   color: #64748b;
   background: #e5e7eb;
   cursor: default;
+}
+
+.ocrButton {
+  height: 30px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 0 10px;
+  color: #1f2937;
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ocrButton:disabled {
+  color: #64748b;
+  background: #e5e7eb;
+  cursor: default;
+}
+
+@media (max-width: 560px) {
+  .searchRow {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .ocrButton {
+    grid-column: 1 / -1;
+  }
 }

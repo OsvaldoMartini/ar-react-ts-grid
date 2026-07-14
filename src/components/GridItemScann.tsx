@@ -1532,6 +1532,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
           status={scannerController.status}
           statusTone={scannerController.statusTone}
           onAction={scannerController.sendAction}
+          onOpenOcrConfig={() => openOcrConfig()}
         />
       )}
       {isPreScanMode && (

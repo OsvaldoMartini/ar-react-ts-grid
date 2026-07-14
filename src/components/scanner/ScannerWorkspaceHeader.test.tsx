@@ -127,3 +127,34 @@ test('disables search while scanner action is pending', () => {
   expect(screen.getByLabelText('Scanner search terms')).toBeDisabled();
   expect(screen.getByRole('button', { name: 'Search' })).toBeDisabled();
 });
+
+test('opens OCR configuration', () => {
+  const onOpenOcrConfig = jest.fn();
+  render(
+    <ScannerWorkspaceHeader
+      botJobName="Fallback"
+      connected
+      scannerState={state}
+      onOpenOcrConfig={onOpenOcrConfig}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: 'OCR Config' }));
+
+  expect(onOpenOcrConfig).toHaveBeenCalledTimes(1);
+});
+
+test('disables OCR configuration when unavailable', () => {
+  render(
+    <ScannerWorkspaceHeader
+      botJobName="Fallback"
+      connected
+      scannerState={{
+        ...state,
+        capabilities: { ...state.capabilities, canUseOcr: false },
+      }}
+    />,
+  );
+
+  expect(screen.getByRole('button', { name: 'OCR Config' })).toBeDisabled();
+});
