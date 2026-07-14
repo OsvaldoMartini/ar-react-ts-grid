@@ -4,7 +4,9 @@ export type ScannerAction =
   | 'REFRESH_PAGE'
   | 'PAGE_SCANNER'
   | 'PREVIOUS_TAB'
-  | 'NEXT_TAB';
+  | 'NEXT_TAB'
+  | 'PRE_LAUNCH'
+  | 'STOP_PRE_LAUNCH';
 
 export interface ScannerActionPayload {
   searchTerms?: string;

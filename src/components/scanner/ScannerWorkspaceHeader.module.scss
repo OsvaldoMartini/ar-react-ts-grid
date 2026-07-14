@@ -16,7 +16,7 @@
 
 .searchRow {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto auto auto auto;
   gap: 6px;
   align-items: center;
   padding: 4px 4px 0;
@@ -99,6 +99,44 @@
   cursor: default;
 }
 
+.preLaunchButton {
+  height: 30px;
+  border: 1px solid #176b3a;
+  border-radius: 6px;
+  padding: 0 12px;
+  color: #ffffff;
+  background: #176b3a;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.preLaunchButton:disabled {
+  border-color: #cbd5e1;
+  color: #64748b;
+  background: #e5e7eb;
+  cursor: default;
+}
+
+.stopButton {
+  height: 30px;
+  border: 1px solid #b42318;
+  border-radius: 6px;
+  padding: 0 12px;
+  color: #ffffff;
+  background: #b42318;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.stopButton:disabled {
+  border-color: #cbd5e1;
+  color: #64748b;
+  background: #e5e7eb;
+  cursor: default;
+}
+
 @media (max-width: 560px) {
   .searchRow {
     grid-template-columns: minmax(0, 1fr) auto auto;
@@ -106,5 +144,10 @@
 
   .ocrButton {
     grid-column: 1 / -1;
+  }
+
+  .preLaunchButton,
+  .stopButton {
+    grid-column: span 1;
   }
 }

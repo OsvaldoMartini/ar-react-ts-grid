@@ -199,7 +199,11 @@ export function useScannerController(options: ControllerOptions): ScannerControl
             ? 'Switching to previous browser tab'
             : action === 'NEXT_TAB'
               ? 'Switching to next browser tab'
-              : 'Clearing scanner grid');
+              : action === 'PRE_LAUNCH'
+                ? 'Starting scanner Pre-Launch'
+                : action === 'STOP_PRE_LAUNCH'
+                  ? 'Stopping scanner Pre-Launch'
+                  : 'Clearing scanner grid');
     setStatusTone('neutral');
     try {
       send('scanner.action', { ...payload, action, botJobId, requestId: actionRequestId });

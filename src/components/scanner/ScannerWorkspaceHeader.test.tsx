@@ -93,6 +93,24 @@ test('sends browser tab actions', () => {
   expect(onAction).toHaveBeenNthCalledWith(2, 'NEXT_TAB');
 });
 
+test('sends scanner execution actions', () => {
+  const onAction = jest.fn();
+  render(
+    <ScannerWorkspaceHeader
+      botJobName="Fallback"
+      connected
+      scannerState={state}
+      onAction={onAction}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: 'Pre-Launch' }));
+  fireEvent.click(screen.getByRole('button', { name: 'STOP' }));
+
+  expect(onAction).toHaveBeenNthCalledWith(1, 'PRE_LAUNCH');
+  expect(onAction).toHaveBeenNthCalledWith(2, 'STOP_PRE_LAUNCH');
+});
+
 test('sends page scanner action', () => {
   const onAction = jest.fn();
   render(
@@ -146,6 +164,20 @@ test('disables search while scanner action is pending', () => {
   expect(screen.getByRole('button', { name: 'Search' })).toBeDisabled();
   expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled();
   expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Pre-Launch' })).toBeDisabled();
+});
+
+test('keeps STOP available while scanner execution is active', () => {
+  render(
+    <ScannerWorkspaceHeader
+      botJobName="Fallback"
+      connected
+      scannerState={{ ...state, executionState: 'RUNNING' }}
+    />,
+  );
+
+  expect(screen.getByRole('button', { name: 'Pre-Launch' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'STOP' })).not.toBeDisabled();
 });
 
 test('opens OCR configuration', () => {

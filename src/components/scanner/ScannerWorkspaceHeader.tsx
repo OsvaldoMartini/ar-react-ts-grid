@@ -65,6 +65,7 @@ const ScannerWorkspaceHeader: React.FC<ScannerWorkspaceHeaderProps> = ({
       disabled: !connected || busy || !scannerState?.capabilities.canRefreshState,
     },
   ];
+  const executionActive = ['STARTING', 'RUNNING', 'STOPPING'].includes(scannerState?.executionState || '');
   const subtitle = scannerState
     ? `${scannerState.botJobName} · ${scannerState.blocks.length} blocks · ${scannerState.browser.state}`
     : botJobName || 'No Bot Job selected';
@@ -74,6 +75,9 @@ const ScannerWorkspaceHeader: React.FC<ScannerWorkspaceHeaderProps> = ({
   const resolvedTone = error ? 'error' : connected ? statusTone : 'warning';
   const searchDisabled = !connected || busy || !scannerState?.capabilities.canUsePageScanner;
   const tabDisabled = !connected || busy || !scannerState?.capabilities.canRefreshState;
+  const preLaunchDisabled = !connected || busy || executionActive || !scannerState?.capabilities.canExecute;
+  const stopDisabled = !connected || loading || pendingAction === 'STOP_PRE_LAUNCH'
+    || !scannerState?.capabilities.canExecute;
 
   const submitSearch = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -141,6 +145,24 @@ const ScannerWorkspaceHeader: React.FC<ScannerWorkspaceHeaderProps> = ({
           onClick={onOpenOcrConfig}
         >
           OCR Config
+        </button>
+        <button
+          type="button"
+          className={styles.preLaunchButton}
+          disabled={preLaunchDisabled}
+          title="Run scanner Pre-Launch"
+          onClick={() => onAction?.('PRE_LAUNCH')}
+        >
+          Pre-Launch
+        </button>
+        <button
+          type="button"
+          className={styles.stopButton}
+          disabled={stopDisabled}
+          title="Stop scanner Pre-Launch"
+          onClick={() => onAction?.('STOP_PRE_LAUNCH')}
+        >
+          STOP
         </button>
       </form>
     </div>
