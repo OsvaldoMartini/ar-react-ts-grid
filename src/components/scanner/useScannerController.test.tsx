@@ -144,6 +144,52 @@ test('ignores stale action responses with mismatched request id', () => {
   expect(latestController?.state).toBeNull();
 });
 
+test('clears pending action for matching backend failure without parsed action', () => {
+  const ws = socket();
+  const { rerender } = render(<Harness socket={ws} />);
+  fireEvent.click(screen.getByRole('button', { name: 'scan' }));
+  const action = sentMessages(ws).find((entry) => entry.type === 'scanner.action');
+  const requestId = JSON.parse(action.body).requestId;
+
+  rerender(<Harness socket={ws} messages={[
+    message('scanner.actionResponse', {
+      ok: false,
+      botJobId: 42,
+      requestId,
+      errorCode: 'INVALID_SCANNER_REQUEST',
+      message: 'Scanner request body is required',
+    }),
+  ]} />);
+
+  expect(latestController?.pendingAction).toBeNull();
+  expect(latestController?.completedAction).toBeNull();
+  expect(latestController?.status).toBe('Scanner request body is required');
+  expect(latestController?.statusTone).toBe('error');
+});
+
+test('ignores matching request responses with conflicting action', () => {
+  const ws = socket();
+  const { rerender } = render(<Harness socket={ws} />);
+  fireEvent.click(screen.getByRole('button', { name: 'scan' }));
+  const action = sentMessages(ws).find((entry) => entry.type === 'scanner.action');
+  const requestId = JSON.parse(action.body).requestId;
+
+  rerender(<Harness socket={ws} messages={[
+    message('scanner.actionResponse', {
+      ok: true,
+      botJobId: 42,
+      requestId,
+      action: 'CLEAR_GRID',
+      state: scannerState({ revision: 3 }),
+      message: 'wrong action',
+    }),
+  ]} />);
+
+  expect(latestController?.pendingAction).toBe('PAGE_SCANNER');
+  expect(latestController?.completedAction).toBeNull();
+  expect(latestController?.state).toBeNull();
+});
+
 test('action timeout clears pending state and reports error', () => {
   jest.useFakeTimers();
   const ws = socket();

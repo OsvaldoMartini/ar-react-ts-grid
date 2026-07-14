@@ -164,7 +164,10 @@ export function useScannerController(options: ControllerOptions): ScannerControl
       }
       if (operationId === 'scanner.actionResponse') {
         const pendingActionValue = pendingActionRef.current;
-        if (!pendingActionValue || body.requestId !== pendingActionValue.requestId || body.action !== pendingActionValue.action) {
+        if (!pendingActionValue || body.requestId !== pendingActionValue.requestId) {
+          return;
+        }
+        if (body.action && body.action !== pendingActionValue.action) {
           return;
         }
         clearTimer(actionTimeoutRef);
