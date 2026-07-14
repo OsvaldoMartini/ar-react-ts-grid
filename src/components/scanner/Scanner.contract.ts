@@ -14,6 +14,8 @@ const EXECUTION_STATES = new Set([
   'UNKNOWN', 'IDLE', 'STARTING', 'RUNNING', 'STOPPING', 'PASSED', 'FAILED', 'INTERRUPTED',
 ]);
 
+const BROWSER_STATES = new Set(['UNKNOWN', 'OPEN', 'CLOSED']);
+
 function isRecord(value: unknown): value is Record<string, any> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
@@ -58,6 +60,7 @@ function isScannerState(value: unknown, expectedBotJobId: number): value is Scan
     && value.blocks.every(isBlock)
     && isRecord(value.browser)
     && typeof value.browser.state === 'string'
+    && BROWSER_STATES.has(value.browser.state)
     && typeof value.browser.activeUrl === 'string'
     && typeof value.browser.activeTitle === 'string'
     && isInteger(value.browser.openTabs, 0)

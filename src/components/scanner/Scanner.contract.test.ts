@@ -49,3 +49,17 @@ test('rejects malformed scanner state', () => {
 
   expect(parseScannerEnvelope(JSON.stringify(malformed), 'scannerGrid', 42)).toBeNull();
 });
+
+test('rejects unknown scanner browser states', () => {
+  const malformed = {
+    sessionId: 'scannerGrid',
+    operationId: 'scanner.state',
+    body: JSON.stringify({
+      ok: true,
+      botJobId: 42,
+      state: { ...state(1), browser: { ...state(1).browser, state: 'DRIFTED' } },
+    }),
+  };
+
+  expect(parseScannerEnvelope(JSON.stringify(malformed), 'scannerGrid', 42)).toBeNull();
+});

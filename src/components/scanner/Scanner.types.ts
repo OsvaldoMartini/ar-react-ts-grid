@@ -14,6 +14,8 @@ export interface ScannerActionPayload {
 
 export type ScannerStatusTone = 'neutral' | 'success' | 'warning' | 'error';
 
+export type ScannerBrowserStatus = 'UNKNOWN' | 'OPEN' | 'CLOSED';
+
 export interface ScannerBlock {
   id: number;
   order: number;
@@ -22,7 +24,7 @@ export interface ScannerBlock {
 }
 
 export interface ScannerBrowserState {
-  state: string;
+  state: ScannerBrowserStatus;
   activeUrl: string;
   activeTitle: string;
   openTabs: number;
