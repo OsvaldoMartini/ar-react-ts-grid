@@ -5,6 +5,7 @@ import {
   isMatchingScannerBootstrapResponse,
   scannerBootstrapResponseStatus,
 } from './Scanner.bootstrapResponse';
+import { canRequestScannerBootstrap } from './Scanner.bootstrapRequest';
 import { scannerControllerResetState } from './Scanner.controllerState';
 import { parseScannerEnvelope, reduceScannerState } from './Scanner.contract';
 import { isMatchingScannerActionResponse } from './Scanner.responseMatching';
@@ -109,10 +110,15 @@ export function useScannerController(options: ControllerOptions): ScannerControl
   }, [botJobId, enabled, sessionId]);
 
   const requestBootstrap = useCallback((force: boolean) => {
-    if (!enabled || !connected || !webSocket || webSocket.readyState !== WebSocket.OPEN || !botJobId || botJobId <= 0) {
-      return;
-    }
-    if (!force && bootstrapSocketRef.current === webSocket) return;
+    if (!canRequestScannerBootstrap({
+      enabled,
+      connected,
+      socketReadyState: webSocket?.readyState ?? null,
+      openReadyState: WebSocket.OPEN,
+      botJobId,
+      force,
+      alreadyBootstrappedOnSocket: bootstrapSocketRef.current === webSocket,
+    })) return;
     clearTimer(bootstrapTimeoutRef);
     const bootstrapRequestId = requestId('bootstrap');
     bootstrapSocketRef.current = webSocket;
