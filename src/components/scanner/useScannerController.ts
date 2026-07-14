@@ -189,7 +189,11 @@ export function useScannerController(options: ControllerOptions): ScannerControl
     pendingActionRef.current = { requestId: actionRequestId, action };
     setPendingAction(action);
     setCompletedAction(null);
-    setStatus(action === 'REFRESH_STATE' ? 'Refreshing scanner state' : 'Clearing scanner grid');
+    setStatus(action === 'REFRESH_STATE'
+      ? 'Refreshing scanner state'
+      : action === 'REFRESH_PAGE'
+        ? 'Refreshing scanner browser page'
+        : 'Clearing scanner grid');
     setStatusTone('neutral');
     try {
       send('scanner.action', { action, botJobId, requestId: actionRequestId });

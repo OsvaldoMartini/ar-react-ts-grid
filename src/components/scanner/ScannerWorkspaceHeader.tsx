@@ -43,6 +43,12 @@ const ScannerWorkspaceHeader: React.FC<ScannerWorkspaceHeaderProps> = ({
       tone: 'warning',
       disabled: !connected || busy || !scannerState?.capabilities.canRefreshState,
     },
+    {
+      id: 'REFRESH_PAGE',
+      label: 'Refresh Web Page',
+      title: 'Refresh the scanner browser page',
+      disabled: !connected || busy || !scannerState?.capabilities.canRefreshState,
+    },
   ];
   const subtitle = scannerState
     ? `${scannerState.botJobName} · ${scannerState.blocks.length} blocks · ${scannerState.browser.state}`

@@ -58,3 +58,19 @@ test('sends clear grid action', () => {
 
   expect(onAction).toHaveBeenCalledWith('CLEAR_GRID');
 });
+
+test('sends refresh page action', () => {
+  const onAction = jest.fn();
+  render(
+    <ScannerWorkspaceHeader
+      botJobName="Fallback"
+      connected
+      scannerState={state}
+      onAction={onAction}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh Web Page' }));
+
+  expect(onAction).toHaveBeenCalledWith('REFRESH_PAGE');
+});

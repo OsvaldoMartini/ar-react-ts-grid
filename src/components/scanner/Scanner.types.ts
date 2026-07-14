@@ -1,4 +1,4 @@
-export type ScannerAction = 'REFRESH_STATE' | 'CLEAR_GRID';
+export type ScannerAction = 'REFRESH_STATE' | 'CLEAR_GRID' | 'REFRESH_PAGE';
 
 export type ScannerStatusTone = 'neutral' | 'success' | 'warning' | 'error';
 
