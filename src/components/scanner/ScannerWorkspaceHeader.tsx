@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import WorkspaceHeader, { type WorkspaceHeaderAction } from '../workspace/WorkspaceHeader';
-import ScannerExecutionPanel from './ScannerExecutionPanel';
+import ScannerToolbar from './ScannerToolbar';
 import type { ScannerAction, ScannerActionPayload, ScannerState, ScannerStatusTone } from './Scanner.types';
 import styles from './ScannerWorkspaceHeader.module.scss';
 
@@ -32,13 +32,6 @@ const ScannerWorkspaceHeader: React.FC<ScannerWorkspaceHeaderProps> = ({
   onOpenOcrConfig,
 }) => {
   const busy = loading || pendingAction !== null;
-  const initialSearchTerms = scannerState?.focus.searchTerms.join(', ') || '';
-  const [searchTerms, setSearchTerms] = useState(initialSearchTerms);
-
-  useEffect(() => {
-    setSearchTerms(initialSearchTerms);
-  }, [initialSearchTerms]);
-
   const actions: WorkspaceHeaderAction<ScannerAction>[] = [
     {
       id: 'PAGE_SCANNER',
@@ -74,13 +67,6 @@ const ScannerWorkspaceHeader: React.FC<ScannerWorkspaceHeaderProps> = ({
     || status
     || (connected ? 'Scanner workspace ready' : `Reconnecting${reconnectAttempts ? ` (${reconnectAttempts})` : ''}`);
   const resolvedTone = error ? 'error' : connected ? statusTone : 'warning';
-  const searchDisabled = !connected || busy || !scannerState?.capabilities.canUsePageScanner;
-  const tabDisabled = !connected || busy || !scannerState?.capabilities.canRefreshState;
-
-  const submitSearch = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    onAction?.('PAGE_SCANNER', { searchTerms: searchTerms.trim() });
-  };
 
   return (
     <div className={styles.wrapper}>
@@ -100,58 +86,14 @@ const ScannerWorkspaceHeader: React.FC<ScannerWorkspaceHeaderProps> = ({
           {displayUrl}
         </div>
       )}
-      <form className={styles.searchRow} onSubmit={submitSearch}>
-        <input
-          className={styles.searchInput}
-          value={searchTerms}
-          onChange={(event) => setSearchTerms(event.target.value)}
-          disabled={searchDisabled}
-          placeholder="input, textarea, button, a, select, label"
-          aria-label="Scanner search terms"
-        />
-        <button
-          type="submit"
-          className={styles.searchButton}
-          disabled={searchDisabled}
-          title="Scan using these search terms"
-        >
-          Search
-        </button>
-        <button
-          type="button"
-          className={styles.tabButton}
-          disabled={tabDisabled}
-          title="Previous browser tab"
-          onClick={() => onAction?.('PREVIOUS_TAB')}
-        >
-          Previous
-        </button>
-        <button
-          type="button"
-          className={styles.tabButton}
-          disabled={tabDisabled}
-          title="Next browser tab"
-          onClick={() => onAction?.('NEXT_TAB')}
-        >
-          Next
-        </button>
-        <button
-          type="button"
-          className={styles.ocrButton}
-          disabled={!connected || busy || !scannerState?.capabilities.canUseOcr}
-          title="OCR Configuration"
-          onClick={onOpenOcrConfig}
-        >
-          OCR Config
-        </button>
-        <ScannerExecutionPanel
-          connected={connected}
-          loading={loading}
-          pendingAction={pendingAction}
-          scannerState={scannerState}
-          onAction={onAction}
-        />
-      </form>
+      <ScannerToolbar
+        connected={connected}
+        loading={loading}
+        pendingAction={pendingAction}
+        scannerState={scannerState}
+        onAction={onAction}
+        onOpenOcrConfig={onOpenOcrConfig}
+      />
     </div>
   );
 };
