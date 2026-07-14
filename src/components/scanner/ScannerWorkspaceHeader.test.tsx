@@ -74,3 +74,19 @@ test('sends refresh page action', () => {
 
   expect(onAction).toHaveBeenCalledWith('REFRESH_PAGE');
 });
+
+test('sends page scanner action', () => {
+  const onAction = jest.fn();
+  render(
+    <ScannerWorkspaceHeader
+      botJobName="Fallback"
+      connected
+      scannerState={state}
+      onAction={onAction}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: 'Page Scanner' }));
+
+  expect(onAction).toHaveBeenCalledWith('PAGE_SCANNER');
+});

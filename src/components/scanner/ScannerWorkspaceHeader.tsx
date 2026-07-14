@@ -31,6 +31,12 @@ const ScannerWorkspaceHeader: React.FC<ScannerWorkspaceHeaderProps> = ({
   const busy = loading || pendingAction !== null;
   const actions: WorkspaceHeaderAction<ScannerAction>[] = [
     {
+      id: 'PAGE_SCANNER',
+      label: 'Page Scanner',
+      title: 'Scan the active browser page',
+      disabled: !connected || busy || !scannerState?.capabilities.canUsePageScanner,
+    },
+    {
       id: 'REFRESH_STATE',
       label: 'Refresh',
       title: 'Refresh scanner state',

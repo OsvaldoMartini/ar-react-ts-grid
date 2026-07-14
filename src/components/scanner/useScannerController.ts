@@ -193,7 +193,9 @@ export function useScannerController(options: ControllerOptions): ScannerControl
       ? 'Refreshing scanner state'
       : action === 'REFRESH_PAGE'
         ? 'Refreshing scanner browser page'
-        : 'Clearing scanner grid');
+        : action === 'PAGE_SCANNER'
+          ? 'Scanning browser page'
+          : 'Clearing scanner grid');
     setStatusTone('neutral');
     try {
       send('scanner.action', { action, botJobId, requestId: actionRequestId });
