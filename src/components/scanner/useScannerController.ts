@@ -7,6 +7,7 @@ import {
 } from './Scanner.bootstrapResponse';
 import { parseScannerEnvelope, reduceScannerState } from './Scanner.contract';
 import { isMatchingScannerActionResponse } from './Scanner.responseMatching';
+import { scannerTransportMessage } from './Scanner.transport';
 import type { PendingScannerAction } from './Scanner.responseMatching';
 import type { ScannerAction, ScannerActionPayload, ScannerState, ScannerStatusTone } from './Scanner.types';
 
@@ -85,12 +86,7 @@ export function useScannerController(options: ControllerOptions): ScannerControl
     if (!webSocket || !connected || webSocket.readyState !== WebSocket.OPEN) {
       throw new Error('Backend socket is not connected');
     }
-    webSocket.send(JSON.stringify({
-      type,
-      sessionId,
-      homeBankingId,
-      body: JSON.stringify(requestBody),
-    }));
+    webSocket.send(scannerTransportMessage(type, sessionId, homeBankingId, requestBody));
   }, [connected, homeBankingId, sessionId, webSocket]);
 
   useEffect(() => {
