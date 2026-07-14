@@ -195,7 +195,11 @@ export function useScannerController(options: ControllerOptions): ScannerControl
         ? 'Refreshing scanner browser page'
         : action === 'PAGE_SCANNER'
           ? 'Scanning browser page'
-          : 'Clearing scanner grid');
+          : action === 'PREVIOUS_TAB'
+            ? 'Switching to previous browser tab'
+            : action === 'NEXT_TAB'
+              ? 'Switching to next browser tab'
+              : 'Clearing scanner grid');
     setStatusTone('neutral');
     try {
       send('scanner.action', { ...payload, action, botJobId, requestId: actionRequestId });

@@ -75,6 +75,24 @@ test('sends refresh page action', () => {
   expect(onAction).toHaveBeenCalledWith('REFRESH_PAGE');
 });
 
+test('sends browser tab actions', () => {
+  const onAction = jest.fn();
+  render(
+    <ScannerWorkspaceHeader
+      botJobName="Fallback"
+      connected
+      scannerState={state}
+      onAction={onAction}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: 'Previous' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+
+  expect(onAction).toHaveBeenNthCalledWith(1, 'PREVIOUS_TAB');
+  expect(onAction).toHaveBeenNthCalledWith(2, 'NEXT_TAB');
+});
+
 test('sends page scanner action', () => {
   const onAction = jest.fn();
   render(
@@ -126,6 +144,8 @@ test('disables search while scanner action is pending', () => {
 
   expect(screen.getByLabelText('Scanner search terms')).toBeDisabled();
   expect(screen.getByRole('button', { name: 'Search' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
 });
 
 test('opens OCR configuration', () => {

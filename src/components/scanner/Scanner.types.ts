@@ -1,4 +1,10 @@
-export type ScannerAction = 'REFRESH_STATE' | 'CLEAR_GRID' | 'REFRESH_PAGE' | 'PAGE_SCANNER';
+export type ScannerAction =
+  | 'REFRESH_STATE'
+  | 'CLEAR_GRID'
+  | 'REFRESH_PAGE'
+  | 'PAGE_SCANNER'
+  | 'PREVIOUS_TAB'
+  | 'NEXT_TAB';
 
 export interface ScannerActionPayload {
   searchTerms?: string;

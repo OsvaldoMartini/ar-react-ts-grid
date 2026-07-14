@@ -73,6 +73,7 @@ const ScannerWorkspaceHeader: React.FC<ScannerWorkspaceHeaderProps> = ({
     || (connected ? 'Scanner workspace ready' : `Reconnecting${reconnectAttempts ? ` (${reconnectAttempts})` : ''}`);
   const resolvedTone = error ? 'error' : connected ? statusTone : 'warning';
   const searchDisabled = !connected || busy || !scannerState?.capabilities.canUsePageScanner;
+  const tabDisabled = !connected || busy || !scannerState?.capabilities.canRefreshState;
 
   const submitSearch = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -113,6 +114,24 @@ const ScannerWorkspaceHeader: React.FC<ScannerWorkspaceHeaderProps> = ({
           title="Scan using these search terms"
         >
           Search
+        </button>
+        <button
+          type="button"
+          className={styles.tabButton}
+          disabled={tabDisabled}
+          title="Previous browser tab"
+          onClick={() => onAction?.('PREVIOUS_TAB')}
+        >
+          Previous
+        </button>
+        <button
+          type="button"
+          className={styles.tabButton}
+          disabled={tabDisabled}
+          title="Next browser tab"
+          onClick={() => onAction?.('NEXT_TAB')}
+        >
+          Next
         </button>
         <button
           type="button"
