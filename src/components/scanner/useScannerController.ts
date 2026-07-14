@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { scannerActionPendingStatus } from './Scanner.actionStatus';
+import {
+  isMatchingScannerBootstrapResponse,
+  scannerBootstrapResponseStatus,
+} from './Scanner.bootstrapResponse';
 import { parseScannerEnvelope, reduceScannerState } from './Scanner.contract';
 import { isMatchingScannerActionResponse } from './Scanner.responseMatching';
 import type { PendingScannerAction } from './Scanner.responseMatching';
@@ -151,16 +155,15 @@ export function useScannerController(options: ControllerOptions): ScannerControl
         return;
       }
       if (operationId === 'scanner.bootstrapResponse') {
-        if (!bootstrapRequestRef.current || body.requestId !== bootstrapRequestRef.current) return;
+        if (!isMatchingScannerBootstrapResponse(body, bootstrapRequestRef.current)) return;
         clearTimer(bootstrapTimeoutRef);
         bootstrapRequestRef.current = null;
         setLoadingState(false);
         if (body.ok && body.state) {
           setState((current) => reduceScannerState(current, body.state));
-          setTransientStatus(body.message || 'Scanner state loaded', 'success');
-        } else {
-          setTransientStatus(body.message || 'Could not load scanner state', 'error');
         }
+        const nextStatus = scannerBootstrapResponseStatus(body);
+        setTransientStatus(nextStatus.message, nextStatus.tone);
         return;
       }
       if (operationId === 'scanner.actionResponse') {
