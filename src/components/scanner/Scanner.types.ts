@@ -16,6 +16,16 @@ export type ScannerStatusTone = 'neutral' | 'success' | 'warning' | 'error';
 
 export type ScannerBrowserStatus = 'UNKNOWN' | 'OPEN' | 'CLOSED';
 
+export type ScannerExecutionStatus =
+  | 'UNKNOWN'
+  | 'IDLE'
+  | 'STARTING'
+  | 'RUNNING'
+  | 'STOPPING'
+  | 'PASSED'
+  | 'FAILED'
+  | 'INTERRUPTED';
+
 export interface ScannerBlock {
   id: number;
   order: number;
@@ -54,7 +64,7 @@ export interface ScannerState {
     canExecute: boolean;
     canApplyElements: boolean;
   };
-  executionState: string;
+  executionState: ScannerExecutionStatus;
 }
 
 export interface ScannerResponse {
