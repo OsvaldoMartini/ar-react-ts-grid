@@ -18,6 +18,13 @@ import {
 } from './Scanner.controllerStatus';
 import { parseScannerEnvelope, reduceScannerState } from './Scanner.contract';
 import { scannerPendingMessages } from './Scanner.messageCursor';
+import {
+  SCANNER_ACTION_COMMAND,
+  SCANNER_ACTION_RESPONSE,
+  SCANNER_BOOTSTRAP_COMMAND,
+  SCANNER_BOOTSTRAP_RESPONSE,
+  SCANNER_STATE_EVENT,
+} from './Scanner.operations';
 import { scannerRequestId } from './Scanner.requestId';
 import { isMatchingScannerActionResponse } from './Scanner.responseMatching';
 import { scannerTransportMessage } from './Scanner.transport';
@@ -138,7 +145,7 @@ export function useScannerController(options: ControllerOptions): ScannerControl
     setStatus('Loading scanner state');
     setStatusTone('neutral');
     try {
-      send('scanner.bootstrap', { requestId: bootstrapRequestId, botJobId });
+      send(SCANNER_BOOTSTRAP_COMMAND, { requestId: bootstrapRequestId, botJobId });
       bootstrapTimeoutRef.current = setTimeout(() => {
         if (bootstrapRequestRef.current !== bootstrapRequestId) return;
         bootstrapRequestRef.current = null;
@@ -165,11 +172,11 @@ export function useScannerController(options: ControllerOptions): ScannerControl
       const envelope = parseScannerEnvelope(raw, sessionId, botJobId);
       if (!envelope) return;
       const { operationId, body } = envelope;
-      if (operationId === 'scanner.state') {
+      if (operationId === SCANNER_STATE_EVENT) {
         setState((current) => reduceScannerState(current, body.state));
         return;
       }
-      if (operationId === 'scanner.bootstrapResponse') {
+      if (operationId === SCANNER_BOOTSTRAP_RESPONSE) {
         if (!isMatchingScannerBootstrapResponse(body, bootstrapRequestRef.current)) return;
         clearTimer(bootstrapTimeoutRef);
         bootstrapRequestRef.current = null;
@@ -181,7 +188,7 @@ export function useScannerController(options: ControllerOptions): ScannerControl
         setTransientStatus(nextStatus.message, nextStatus.tone);
         return;
       }
-      if (operationId === 'scanner.actionResponse') {
+      if (operationId === SCANNER_ACTION_RESPONSE) {
         if (!isMatchingScannerActionResponse(body, pendingActionRef.current)) return;
         clearTimer(actionTimeoutRef);
         pendingActionRef.current = null;
@@ -212,7 +219,7 @@ export function useScannerController(options: ControllerOptions): ScannerControl
     setStatus(scannerActionPendingStatus(action));
     setStatusTone('neutral');
     try {
-      send('scanner.action', { ...payload, action, botJobId, requestId: actionRequestId });
+      send(SCANNER_ACTION_COMMAND, { ...payload, action, botJobId, requestId: actionRequestId });
       actionTimeoutRef.current = setTimeout(() => {
         if (pendingActionRef.current?.requestId !== actionRequestId) return;
         pendingActionRef.current = null;

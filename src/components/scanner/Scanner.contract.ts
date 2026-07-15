@@ -3,12 +3,11 @@ import type {
   ScannerResponse,
   ScannerState,
 } from './Scanner.types';
-
-const SCANNER_OPERATIONS = new Set([
-  'scanner.bootstrapResponse',
-  'scanner.actionResponse',
-  'scanner.state',
-]);
+import {
+  SCANNER_ACTION_RESPONSE,
+  SCANNER_BOOTSTRAP_RESPONSE,
+  SCANNER_OPERATIONS,
+} from './Scanner.operations';
 
 const EXECUTION_STATES = new Set([
   'UNKNOWN', 'IDLE', 'STARTING', 'RUNNING', 'STOPPING', 'PASSED', 'FAILED', 'INTERRUPTED',
@@ -94,7 +93,7 @@ export function parseScannerEnvelope(
   if (!SCANNER_OPERATIONS.has(operationId)) return null;
   const body = parseJsonObject(outer.body) as ScannerResponse | null;
   if (!body || typeof body.botJobId !== 'number' || !Number.isInteger(body.botJobId)) return null;
-  const responseFailure = operationId === 'scanner.bootstrapResponse' || operationId === 'scanner.actionResponse';
+  const responseFailure = operationId === SCANNER_BOOTSTRAP_RESPONSE || operationId === SCANNER_ACTION_RESPONSE;
   const failureWithoutState = responseFailure && body.ok === false && body.state == null && body.botJobId === -1;
   if (!failureWithoutState && (!isInteger(body.botJobId, 1) || body.botJobId !== expectedBotJobId)) return null;
   if (body.state != null && !isScannerState(body.state, expectedBotJobId)) return null;
