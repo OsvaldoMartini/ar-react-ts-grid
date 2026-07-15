@@ -10,6 +10,7 @@ import { canRequestScannerBootstrap } from './Scanner.bootstrapRequest';
 import { scannerControllerResetState } from './Scanner.controllerState';
 import { parseScannerEnvelope, reduceScannerState } from './Scanner.contract';
 import { scannerPendingMessages } from './Scanner.messageCursor';
+import { scannerRequestId } from './Scanner.requestId';
 import { isMatchingScannerActionResponse } from './Scanner.responseMatching';
 import { scannerTransportMessage } from './Scanner.transport';
 import type { PendingScannerAction } from './Scanner.responseMatching';
@@ -84,7 +85,7 @@ export function useScannerController(options: ControllerOptions): ScannerControl
 
   const requestId = useCallback((label: string) => {
     requestSequenceRef.current += 1;
-    return `${Date.now()}-${requestSequenceRef.current}-scanner-${label}`;
+    return scannerRequestId(Date.now(), requestSequenceRef.current, label);
   }, []);
 
   const send = useCallback((type: string, requestBody: Record<string, unknown>) => {
