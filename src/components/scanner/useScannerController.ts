@@ -13,6 +13,8 @@ import {
   SCANNER_ACTION_TIMEOUT_MESSAGE,
   SCANNER_BOOTSTRAP_SEND_FAILURE_MESSAGE,
   SCANNER_BOOTSTRAP_TIMEOUT_MESSAGE,
+  SCANNER_LOADING_STATUS_MESSAGE,
+  SCANNER_READY_STATUS_MESSAGE,
   SCANNER_SOCKET_DISCONNECTED_MESSAGE,
   scannerErrorMessage,
 } from './Scanner.controllerStatus';
@@ -89,7 +91,7 @@ export function useScannerController(options: ControllerOptions): ScannerControl
     setStatusTone(tone);
     if (tone === 'success') {
       statusResetRef.current = setTimeout(() => {
-        setStatus('Ready');
+        setStatus(SCANNER_READY_STATUS_MESSAGE);
         setStatusTone('neutral');
       }, SCANNER_STATUS_RESET_MS);
     }
@@ -139,7 +141,7 @@ export function useScannerController(options: ControllerOptions): ScannerControl
     bootstrapSocketRef.current = webSocket;
     bootstrapRequestRef.current = bootstrapRequestId;
     setLoadingState(true);
-    setStatus('Loading scanner state');
+    setStatus(SCANNER_LOADING_STATUS_MESSAGE);
     setStatusTone('neutral');
     try {
       send(SCANNER_BOOTSTRAP_COMMAND, { requestId: bootstrapRequestId, botJobId });

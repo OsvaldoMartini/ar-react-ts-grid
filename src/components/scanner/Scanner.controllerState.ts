@@ -1,4 +1,8 @@
 import type { ScannerStatusTone } from './Scanner.types';
+import {
+  SCANNER_LOADING_STATUS_MESSAGE,
+  SCANNER_READY_STATUS_MESSAGE,
+} from './Scanner.controllerStatus';
 
 export interface ScannerControllerResetState {
   loadingState: boolean;
@@ -9,7 +13,7 @@ export interface ScannerControllerResetState {
 export function scannerControllerResetState(enabled: boolean): ScannerControllerResetState {
   return {
     loadingState: enabled,
-    status: enabled ? 'Loading scanner state' : 'Ready',
+    status: enabled ? SCANNER_LOADING_STATUS_MESSAGE : SCANNER_READY_STATUS_MESSAGE,
     statusTone: 'neutral',
   };
 }

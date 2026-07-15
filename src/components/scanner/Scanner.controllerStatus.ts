@@ -1,3 +1,5 @@
+export const SCANNER_READY_STATUS_MESSAGE = 'Ready';
+export const SCANNER_LOADING_STATUS_MESSAGE = 'Loading scanner state';
 export const SCANNER_SOCKET_DISCONNECTED_MESSAGE = 'Backend socket is not connected';
 export const SCANNER_BOOTSTRAP_TIMEOUT_MESSAGE = 'The backend did not return scanner state';
 export const SCANNER_BOOTSTRAP_SEND_FAILURE_MESSAGE = 'Could not load scanner state';
