@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { canRequestScannerAction } from './Scanner.actionRequest';
 import { scannerActionResponseStatus } from './Scanner.actionResponse';
 import { scannerActionPendingStatus } from './Scanner.actionStatus';
 import {
@@ -189,7 +190,11 @@ export function useScannerController(options: ControllerOptions): ScannerControl
   }, [botJobId, enabled, messages, sessionId, setTransientStatus]);
 
   const sendAction = useCallback((action: ScannerAction, payload: ScannerActionPayload = {}) => {
-    if (!enabled || !botJobId || pendingActionRef.current) return;
+    if (!canRequestScannerAction({
+      enabled,
+      botJobId,
+      hasPendingAction: Boolean(pendingActionRef.current),
+    })) return;
     clearTimer(actionTimeoutRef);
     const actionRequestId = requestId(action.toLowerCase());
     pendingActionRef.current = { requestId: actionRequestId, action };
