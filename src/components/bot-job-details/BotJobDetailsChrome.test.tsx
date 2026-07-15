@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import BotJobDetailsChrome from './BotJobDetailsChrome';
 import type { BotJobDetailsControllerState } from './useBotJobDetailsController';
 import { botJobDetailsTestState } from './BotJobDetails.testData';
@@ -73,4 +73,48 @@ test('keeps Stop available but disables editing, navigation, and file mutations 
   expect(screen.getByRole('button', { name: /Excel/ })).toBeDisabled();
   expect(screen.getByRole('button', { name: 'Export' })).toBeDisabled();
   expect(screen.getByRole('button', { name: 'Pre Scan' })).toBeDisabled();
+});
+
+test('saves metadata through the restored editor entry point', () => {
+  const saveMetadata = jest.fn();
+  const controller: BotJobDetailsControllerState = {
+    state: botJobDetailsTestState,
+    loadingState: false,
+    savingMetadata: false,
+    fieldErrors: {},
+    metadataSavedRevision: null,
+    pendingAction: null,
+    pendingToolbarAction: null,
+    transferPath: '',
+    status: 'Ready',
+    statusTone: 'neutral',
+    sendAction: jest.fn(),
+    sendToolbarAction: jest.fn(),
+    saveMetadata,
+    refreshEnvironments: jest.fn(),
+    retryBootstrap: jest.fn(),
+  };
+
+  render(
+    <BotJobDetailsChrome
+      fallbackBotJobId={42}
+      fallbackBotJobName="Payments"
+      fallbackSurface="botJob"
+      connected
+      controller={controller}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+  fireEvent.change(screen.getByRole('textbox', { name: 'Bot Job name' }), {
+    target: { value: 'Payments QA' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+  expect(saveMetadata).toHaveBeenCalledWith({
+    expectedMetadataRevision: botJobDetailsTestState.metadataRevision,
+    name: 'Payments QA',
+    description: botJobDetailsTestState.description,
+    homeUrlId: botJobDetailsTestState.homeUrlId,
+  });
 });

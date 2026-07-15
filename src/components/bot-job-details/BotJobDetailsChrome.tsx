@@ -1,5 +1,6 @@
 import React from 'react';
 import BotJobDetailsHeader from './BotJobDetailsHeader';
+import BotJobMetadataPanel from './BotJobMetadataPanel';
 import type { BotJobDetailsControllerState } from './useBotJobDetailsController';
 import type { BotJobWorkspaceSurface } from './BotJobDetails.types';
 import styles from './BotJobDetailsChrome.module.scss';
@@ -49,6 +50,13 @@ const BotJobDetailsChrome: React.FC<BotJobDetailsChromeProps> = ({
         transferBusy={workspaceBusy}
         transferPath={controller.transferPath}
         onToolbarAction={controller.sendToolbarAction}
+      />
+      <BotJobMetadataPanel
+        state={state}
+        saving={controller.savingMetadata}
+        fieldErrors={controller.fieldErrors}
+        onSave={controller.saveMetadata}
+        onRefresh={controller.refreshEnvironments}
       />
     </div>
   );

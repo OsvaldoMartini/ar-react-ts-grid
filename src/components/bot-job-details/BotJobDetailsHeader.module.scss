@@ -1,4 +1,6 @@
 .wrapper {
+  position: relative;
+  z-index: 1;
   flex: 0 0 auto;
   width: 100%;
   display: flex;
@@ -8,21 +10,12 @@
   box-sizing: border-box;
 }
 
-/*
- * WorkspaceHeader collapses to a single column under 900px, which stacks the
- * Refresh/Bot Job/Components/Pre Scan/Close buttons below the bot job name
- * instead of beside it. Force the buttons to stay in the same top row as the
- * title at every width for this page. !important is required: this class is
- * combined onto the same <header> element as WorkspaceHeader's own .header
- * class from a different CSS module, so specificity alone cannot guarantee
- * this file's rule wins over WorkspaceHeader's media query.
- */
 .keepButtonsOnTop {
-  grid-template-columns: minmax(140px, auto) minmax(80px, 1fr) auto !important;
+  grid-template-columns: minmax(160px, 1fr) minmax(96px, auto) max-content !important;
 }
 
 @media (max-width: 900px) {
   .keepButtonsOnTop {
-    grid-template-columns: minmax(140px, auto) minmax(80px, 1fr) auto !important;
+    grid-template-columns: 1fr !important;
   }
 }

@@ -1,4 +1,6 @@
 .chrome {
+  position: relative;
+  z-index: 10000;
   display: flex;
   flex-direction: column;
   width: 100%;

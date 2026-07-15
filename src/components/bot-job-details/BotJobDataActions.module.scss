@@ -5,12 +5,16 @@
  * row regardless of which component rendered it.
  */
 .actions {
+  position: relative;
+  z-index: 2;
   flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 5px;
 }
 .actions button {
+  position: relative;
+  z-index: 2;
   flex: 0 0 auto;
   min-width: 26px;
   min-height: 26px;
@@ -27,7 +31,7 @@
   white-space: nowrap;
   cursor: pointer;
 }
-.batButton { padding: 3px; }
+.batButton { width: 28px; padding: 3px; z-index: 3; }
 .actions button:hover:not(:disabled) { filter: brightness(1.08); }
 .actions button:focus-visible { outline: 3px solid rgb(37 99 235 / 25%); outline-offset: 2px; }
 .actions button:disabled { opacity: 0.5; cursor: not-allowed; }
