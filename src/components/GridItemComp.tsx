@@ -50,6 +50,10 @@ import ComponentWorkspaceHeader from './bot-job-details/ComponentWorkspaceHeader
 import { useBotJobDetailsController } from './bot-job-details/useBotJobDetailsController';
 import { useWebSocket } from './useWebSocket';
 import { useInstructionDrag } from './useInstructionDrag';
+import {
+  SCANNER_ELEMENT_PANE_SESSION_ID,
+  SCANNER_TOOL_SESSION_ID,
+} from './scanner/Scanner.sessions';
 import styles from './Griditem.module.scss';
 
 
@@ -1608,8 +1612,8 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     //   : `scanner-element-pane-${homeBankingId}`;
 
     const sessionDestine = action === "HOVERED_ROW"
-      ? `scannerTool`
-      : `scanner-element-pane`;
+      ? SCANNER_TOOL_SESSION_ID
+      : SCANNER_ELEMENT_PANE_SESSION_ID;
 
     const message = {
       type: action,

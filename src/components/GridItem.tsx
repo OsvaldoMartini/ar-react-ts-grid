@@ -55,6 +55,10 @@ import BotJobDetailsChrome from './bot-job-details/BotJobDetailsChrome';
 import { useBotJobDetailsController } from './bot-job-details/useBotJobDetailsController';
 import { useWebSocket } from './useWebSocket';
 import { useInstructionDrag } from './useInstructionDrag';
+import {
+  SCANNER_ELEMENT_PANE_SESSION_ID,
+  SCANNER_TOOL_SESSION_ID,
+} from './scanner/Scanner.sessions';
 import styles from './Griditem.module.scss';
 
 
@@ -1897,8 +1901,8 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     //   : `scanner-element-pane-${homeBankingId}`;
 
     const sessionDestine = action === "HOVERED_ROW"
-      ? `scannerTool`
-      : `scanner-element-pane`;
+      ? SCANNER_TOOL_SESSION_ID
+      : SCANNER_ELEMENT_PANE_SESSION_ID;
 
     const message = {
       type: action,
