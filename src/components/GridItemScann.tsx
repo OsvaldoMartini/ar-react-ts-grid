@@ -916,10 +916,6 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
       console.warn("🚨 WebSocket is not connected. Cannot send message.");
       return;
     }
-    // const sessionDestine = action === "HOVERED_ROW"
-    //   ? `scannerTool-${homeBankingId}`
-    //   : `scanner-element-pane-${homeBankingId}`;
-
     const sessionDestine = action === "HOVERED_ROW"
       ? SCANNER_TOOL_SESSION_ID
       : SCANNER_ELEMENT_PANE_SESSION_ID;
@@ -1861,9 +1857,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
           <>
             {/* Toggle Button and Pagination Controls on the same row */}
             <div className={styles.controlsRow}>
-            {/* Pane-dependent bulk actions, hidden in preScan mode: Insert All sends no
-                blockId (Memory List "+" → Apply is the single insert path) and Update All
-                is a scanner-element-pane-only path — both dead ends without AR Web Factory. */}
+            {/* Pane-dependent bulk actions are hidden in preScan mode. */}
             {!isPreScanMode && (
               <>
                 <button

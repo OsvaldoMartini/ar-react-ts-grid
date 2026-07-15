@@ -934,10 +934,6 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       console.warn("🚨 WebSocket is not connected. Cannot send message.");
       return;
     }
-    // const sessionDestine = action === "HOVERED_ROW"
-    //   ? `scannerTool-${homeBankingId}`
-    //   : `mobile-return-server-${homeBankingId}`;
-
     const sessionDestine = action === "HOVERED_ROW"
       ? `mobile-return-server`
       : `mobile-return-server`;

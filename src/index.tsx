@@ -38,7 +38,7 @@ const App: React.FC = () => {
   const [botJobName, setBotJobName] = useState<string>("");
   const [homeBanking, setHomeBanking] = useState<number>(0);
   const [homeBankName, setHomeBankName] = useState<string>("");
-  const [sessionId, setSessionId] = useState<string>(""); // (SENDER: scannerTool) -> scannerGrid-1  -> componentTasks-1 -> mobileScannerGrid
+  const [sessionId, setSessionId] = useState<string>("");
   const [errorFlag, setErrorFlag] = useState<boolean>(false)  //(SENDER: insertTool) -> botJobTasks-1 -> componentTasks  -> capiApiTestToolAI
   const [alertImage, setAlertImage] = useState(constructionImage);
   const [alertClass, setAlertClass] = useState('construction-image')
@@ -146,8 +146,7 @@ const App: React.FC = () => {
       {sessionId && (sessionId.includes("componentTasks")) && (
         <GridItemComp homeBankingIdInitial={homeBanking} dataComp={componentsData} socketPort={socketPort} sessionId={sessionId} botJobIdInitial={botJobId} botJobNameInitial={botJobName} />
       )}
-      {/* Guard against preScannerGrid double-mounting: only case ("S") separates
-          the two session ids, so exclude it explicitly. */}
+      {/* Guard against scanner/pre-scan double-mounting. */}
       {sessionId
         && sessionId.includes(SCANNER_GRID_SESSION_ID)
         && !sessionId.includes(PRE_SCANNER_GRID_SESSION_ID) && (

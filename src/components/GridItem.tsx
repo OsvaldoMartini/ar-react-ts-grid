@@ -1896,10 +1896,6 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
       console.warn("🚨 WebSocket is not connected. Cannot send message.");
       return;
     }
-    // const sessionDestine = action === "HOVERED_ROW"
-    //   ? `scannerTool-${homeBankingId}`
-    //   : `scanner-element-pane-${homeBankingId}`;
-
     const sessionDestine = action === "HOVERED_ROW"
       ? SCANNER_TOOL_SESSION_ID
       : SCANNER_ELEMENT_PANE_SESSION_ID;
