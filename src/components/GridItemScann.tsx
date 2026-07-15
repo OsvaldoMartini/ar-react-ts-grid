@@ -27,9 +27,12 @@ import BotJobDetailsChrome from './bot-job-details/BotJobDetailsChrome';
 import { useBotJobDetailsController } from './bot-job-details/useBotJobDetailsController';
 import ScannerWorkspaceHeader from './scanner/ScannerWorkspaceHeader';
 import { useScannerController } from './scanner/useScannerController';
+import { SCANNER_SEARCH_TERMS_OPERATION } from './scanner/Scanner.operations';
 import {
+  SCANNER_ELEMENT_PANE_SESSION_ID,
   PRE_SCANNER_GRID_SESSION_ID,
   SCANNER_GRID_SESSION_ID,
+  SCANNER_TOOL_SESSION_ID,
 } from './scanner/Scanner.sessions';
 import styles from './GridItemScann.module.scss';
 
@@ -387,7 +390,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
       homeBankingId,
       botJobId,
       botJobName,
-      sessionId: 'scanner-element-pane',
+      sessionId: SCANNER_ELEMENT_PANE_SESSION_ID,
       blockId: targetBlock.blockId,
       blockName: targetBlock.blockName,
       blockOrderNumber: targetBlock.blockOrderNumber,
@@ -409,7 +412,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
       botJobId,
       botJobName,
       homeBankingId,
-      sessionId: 'scanner-element-pane',
+      sessionId: SCANNER_ELEMENT_PANE_SESSION_ID,
       blockName: newBlockName,
       insertPosition: position.type === 'end' ? 'END' : 'BEFORE',
       beforeBlockId: position.type === 'before' ? position.blockId : -1,
@@ -508,8 +511,8 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
       sessionId, // the one passed as prop
       SCANNER_GRID_SESSION_ID,
       PRE_SCANNER_GRID_SESSION_ID,
-      "scannerTool",
-      "scanner-element-pane",
+      SCANNER_TOOL_SESSION_ID,
+      SCANNER_ELEMENT_PANE_SESSION_ID,
     ]);
 
     // ✅ process only NEW messages since last effect run
@@ -539,7 +542,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
             break;
           }
 
-          case "searchTerms": {
+          case SCANNER_SEARCH_TERMS_OPERATION: {
             setIsSendingAll(false);
             setIsUpdatingAll(false);
 
@@ -845,7 +848,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
       homeBankingId: homeBankingId,
       botJobId: botJobId,
       botJobName: botJobName,
-      sessionId: `scanner-element-pane`,
+      sessionId: SCANNER_ELEMENT_PANE_SESSION_ID,
       elementDetails: allElements,
     };
 
@@ -876,7 +879,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
       homeBankingId: homeBankingId,
       botJobId: botJobId,
       botJobName: botJobName,
-      sessionId: `scanner-element-pane`,
+      sessionId: SCANNER_ELEMENT_PANE_SESSION_ID,
       elementDetails: allElements,
     };
 
@@ -910,8 +913,8 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     //   : `scanner-element-pane-${homeBankingId}`;
 
     const sessionDestine = action === "HOVERED_ROW"
-      ? `scannerTool`
-      : `scanner-element-pane`;
+      ? SCANNER_TOOL_SESSION_ID
+      : SCANNER_ELEMENT_PANE_SESSION_ID;
 
     const message: Record<string, unknown> = {
       type: action,
