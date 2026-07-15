@@ -16,6 +16,11 @@ import {
   SCANNER_SOCKET_DISCONNECTED_MESSAGE,
   scannerErrorMessage,
 } from './Scanner.controllerStatus';
+import {
+  SCANNER_RESPONSE_TIMEOUT_MS,
+  SCANNER_STATUS_RESET_MS,
+  clearScannerTimer,
+} from './Scanner.controllerTiming';
 import { parseScannerEnvelope, reduceScannerState } from './Scanner.contract';
 import { scannerPendingMessages } from './Scanner.messageCursor';
 import {
@@ -52,14 +57,6 @@ export interface ScannerControllerState {
   retryBootstrap: () => void;
 }
 
-const RESPONSE_TIMEOUT_MS = 10000;
-const STATUS_RESET_MS = 3500;
-
-function clearTimer(ref: { current: ReturnType<typeof setTimeout> | null }): void {
-  if (ref.current) clearTimeout(ref.current);
-  ref.current = null;
-}
-
 export function useScannerController(options: ControllerOptions): ScannerControllerState {
   const {
     webSocket,
@@ -87,14 +84,14 @@ export function useScannerController(options: ControllerOptions): ScannerControl
   const [statusTone, setStatusTone] = useState<ScannerStatusTone>(resetState.statusTone);
 
   const setTransientStatus = useCallback((message: string, tone: ScannerStatusTone) => {
-    clearTimer(statusResetRef);
+    clearScannerTimer(statusResetRef);
     setStatus(message);
     setStatusTone(tone);
     if (tone === 'success') {
       statusResetRef.current = setTimeout(() => {
         setStatus('Ready');
         setStatusTone('neutral');
-      }, STATUS_RESET_MS);
+      }, SCANNER_STATUS_RESET_MS);
     }
   }, []);
 
@@ -115,9 +112,9 @@ export function useScannerController(options: ControllerOptions): ScannerControl
     bootstrapSocketRef.current = null;
     bootstrapRequestRef.current = null;
     pendingActionRef.current = null;
-    clearTimer(bootstrapTimeoutRef);
-    clearTimer(actionTimeoutRef);
-    clearTimer(statusResetRef);
+    clearScannerTimer(bootstrapTimeoutRef);
+    clearScannerTimer(actionTimeoutRef);
+    clearScannerTimer(statusResetRef);
     setState(null);
     setPendingAction(null);
     setCompletedAction(null);
@@ -137,7 +134,7 @@ export function useScannerController(options: ControllerOptions): ScannerControl
       force,
       alreadyBootstrappedOnSocket: bootstrapSocketRef.current === webSocket,
     })) return;
-    clearTimer(bootstrapTimeoutRef);
+    clearScannerTimer(bootstrapTimeoutRef);
     const bootstrapRequestId = requestId('bootstrap');
     bootstrapSocketRef.current = webSocket;
     bootstrapRequestRef.current = bootstrapRequestId;
@@ -151,7 +148,7 @@ export function useScannerController(options: ControllerOptions): ScannerControl
         bootstrapRequestRef.current = null;
         setLoadingState(false);
         setTransientStatus(SCANNER_BOOTSTRAP_TIMEOUT_MESSAGE, 'error');
-      }, RESPONSE_TIMEOUT_MS);
+      }, SCANNER_RESPONSE_TIMEOUT_MS);
     } catch (error) {
       bootstrapSocketRef.current = null;
       bootstrapRequestRef.current = null;
@@ -178,7 +175,7 @@ export function useScannerController(options: ControllerOptions): ScannerControl
       }
       if (operationId === SCANNER_BOOTSTRAP_RESPONSE) {
         if (!isMatchingScannerBootstrapResponse(body, bootstrapRequestRef.current)) return;
-        clearTimer(bootstrapTimeoutRef);
+        clearScannerTimer(bootstrapTimeoutRef);
         bootstrapRequestRef.current = null;
         setLoadingState(false);
         if (body.ok && body.state) {
@@ -190,7 +187,7 @@ export function useScannerController(options: ControllerOptions): ScannerControl
       }
       if (operationId === SCANNER_ACTION_RESPONSE) {
         if (!isMatchingScannerActionResponse(body, pendingActionRef.current)) return;
-        clearTimer(actionTimeoutRef);
+        clearScannerTimer(actionTimeoutRef);
         pendingActionRef.current = null;
         setPendingAction(null);
         if (body.ok && body.state) {
@@ -211,7 +208,7 @@ export function useScannerController(options: ControllerOptions): ScannerControl
       botJobId,
       hasPendingAction: Boolean(pendingActionRef.current),
     })) return;
-    clearTimer(actionTimeoutRef);
+    clearScannerTimer(actionTimeoutRef);
     const actionRequestId = requestId(action.toLowerCase());
     pendingActionRef.current = { requestId: actionRequestId, action };
     setPendingAction(action);
@@ -225,7 +222,7 @@ export function useScannerController(options: ControllerOptions): ScannerControl
         pendingActionRef.current = null;
         setPendingAction(null);
         setTransientStatus(SCANNER_ACTION_TIMEOUT_MESSAGE, 'error');
-      }, RESPONSE_TIMEOUT_MS);
+      }, SCANNER_RESPONSE_TIMEOUT_MS);
     } catch (error) {
       pendingActionRef.current = null;
       setPendingAction(null);
@@ -234,9 +231,9 @@ export function useScannerController(options: ControllerOptions): ScannerControl
   }, [botJobId, enabled, requestId, send, setTransientStatus]);
 
   useEffect(() => () => {
-    clearTimer(bootstrapTimeoutRef);
-    clearTimer(actionTimeoutRef);
-    clearTimer(statusResetRef);
+    clearScannerTimer(bootstrapTimeoutRef);
+    clearScannerTimer(actionTimeoutRef);
+    clearScannerTimer(statusResetRef);
   }, []);
 
   return {
