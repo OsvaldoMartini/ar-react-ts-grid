@@ -27,6 +27,10 @@ import BotJobDetailsChrome from './bot-job-details/BotJobDetailsChrome';
 import { useBotJobDetailsController } from './bot-job-details/useBotJobDetailsController';
 import ScannerWorkspaceHeader from './scanner/ScannerWorkspaceHeader';
 import { useScannerController } from './scanner/useScannerController';
+import {
+  PRE_SCANNER_GRID_SESSION_ID,
+  SCANNER_GRID_SESSION_ID,
+} from './scanner/Scanner.sessions';
 import styles from './GridItemScann.module.scss';
 
 
@@ -142,7 +146,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     elementCount: 0,
   });
   const [collapsedBlocks, setCollapsedBlocks] = useState<Set<string>>(new Set());
-  const isPreScanMode = mode === 'preScan' || sessionId.includes('preScannerGrid');
+  const isPreScanMode = mode === 'preScan' || sessionId.includes(PRE_SCANNER_GRID_SESSION_ID);
   const botJobHeader = useBotJobDetailsController({
     webSocket, connected, messages, sessionId, homeBankingId, botJobId, enabled: isPreScanMode,
   });
@@ -502,8 +506,8 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     // Accept messages for this component from multiple sessions your backend may use.
     const acceptedSessions = new Set([
       sessionId, // the one passed as prop
-      "scannerGrid",
-      "preScannerGrid",
+      SCANNER_GRID_SESSION_ID,
+      PRE_SCANNER_GRID_SESSION_ID,
       "scannerTool",
       "scanner-element-pane",
     ]);
@@ -1039,7 +1043,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
       homeBankingId,
       botJobId,
       botJobName,
-      sessionId: 'preScannerGrid',
+      sessionId: PRE_SCANNER_GRID_SESSION_ID,
       focusProfile: dashboardFocus,
       searchTerms: dashboardSearchText,
       searchHiddenFields: dashboardSearchHidden,

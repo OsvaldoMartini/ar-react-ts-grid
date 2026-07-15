@@ -1,7 +1,8 @@
 import { scannerTransportMessage } from './Scanner.transport';
+import { SCANNER_GRID_SESSION_ID } from './Scanner.sessions';
 
 test('serializes scanner websocket envelope with string body', () => {
-  const raw = scannerTransportMessage('scanner.action', 'scannerGrid', 2, {
+  const raw = scannerTransportMessage('scanner.action', SCANNER_GRID_SESSION_ID, 2, {
     requestId: 'action-1',
     botJobId: 42,
     action: 'PAGE_SCANNER',
@@ -12,7 +13,7 @@ test('serializes scanner websocket envelope with string body', () => {
 
   expect(parsed).toMatchObject({
     type: 'scanner.action',
-    sessionId: 'scannerGrid',
+    sessionId: SCANNER_GRID_SESSION_ID,
     homeBankingId: 2,
   });
   expect(JSON.parse(parsed.body)).toEqual({

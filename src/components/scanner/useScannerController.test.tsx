@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { useScannerController } from './useScannerController';
 import { scannerState } from './Scanner.testUtils';
+import { SCANNER_GRID_SESSION_ID } from './Scanner.sessions';
 import type { ScannerControllerState } from './useScannerController';
 
 let latestController: ScannerControllerState | null = null;
@@ -20,7 +21,7 @@ function Harness({
     webSocket: socket,
     connected: true,
     messages,
-    sessionId: 'scannerGrid',
+    sessionId: SCANNER_GRID_SESSION_ID,
     homeBankingId: 2,
     botJobId,
   });
@@ -51,7 +52,7 @@ function sentMessages(socketValue: WebSocket) {
 
 function message(operationId: string, body: Record<string, unknown>) {
   return JSON.stringify({
-    sessionId: 'scannerGrid',
+    sessionId: SCANNER_GRID_SESSION_ID,
     operationId,
     homeBankingId: 2,
     body: JSON.stringify(body),
@@ -77,7 +78,7 @@ test('sends scanner action payload through websocket envelope', () => {
   const raw = sentMessages(ws)
     .find((message) => message.type === 'scanner.action');
 
-  expect(raw.sessionId).toBe('scannerGrid');
+  expect(raw.sessionId).toBe(SCANNER_GRID_SESSION_ID);
   expect(raw.homeBankingId).toBe(2);
   expect(JSON.parse(raw.body)).toMatchObject({
     action: 'PAGE_SCANNER',
@@ -92,7 +93,7 @@ test('requests scanner bootstrap when connected', () => {
   render(<Harness socket={ws} />);
 
   const raw = sentMessages(ws).find((entry) => entry.type === 'scanner.bootstrap');
-  expect(raw.sessionId).toBe('scannerGrid');
+  expect(raw.sessionId).toBe(SCANNER_GRID_SESSION_ID);
   expect(raw.homeBankingId).toBe(2);
   expect(JSON.parse(raw.body)).toMatchObject({ botJobId: 42 });
   expect(JSON.parse(raw.body).requestId).toContain('scanner-bootstrap');
