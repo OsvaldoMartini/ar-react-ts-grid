@@ -23,6 +23,9 @@ import {
   SCANNER_APP_OPERATION,
   SCANNER_SEARCH_TERMS_OPERATION,
 } from './scanner/Scanner.operations';
+import {
+  MOBILE_RETURN_SERVER_SESSION_ID,
+} from './scanner/Scanner.sessions';
 import styles from './Griditem.module.scss';
 
 
@@ -283,7 +286,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
 
       const acceptedSessions = new Set([
         sessionId,
-        "mobile-return-server",
+        MOBILE_RETURN_SERVER_SESSION_ID,
       ]);
       if (!acceptedSessions.has(parsedMessage.sessionId)) return;
 
@@ -538,7 +541,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       homeBankingId,
       botJobId,
       botJobName,
-      sessionId: "mobile-return-server",
+      sessionId: MOBILE_RETURN_SERVER_SESSION_ID,
       appQueryApp,        // e.g. "InLinea"
       appQueryPackage,    // e.g. "ch.bsct.ebanking.mobile" or dropdown selection
       appMainActivity,
@@ -567,7 +570,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       homeBankingId,
       botJobId,
       botJobName,
-      sessionId: "mobile-return-server",
+      sessionId: MOBILE_RETURN_SERVER_SESSION_ID,
       appQueryApp,
       appQueryPackage,
       scannerType
@@ -595,7 +598,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       homeBankingId,
       botJobId,
       botJobName,
-      sessionId: "mobile-return-server",
+      sessionId: MOBILE_RETURN_SERVER_SESSION_ID,
       scrollTimes: scrollStep,
       scannerType,
     };
@@ -653,7 +656,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       type: "MOBILE_LOAD_JOBS",
       homeBankingId: -9999,
       botJobId: -9999,
-      sessionId: "mobile-return-server",
+      sessionId: MOBILE_RETURN_SERVER_SESSION_ID,
     };
 
     try {
@@ -674,7 +677,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       type: "MOBILE_SCROLL_UP",
       homeBankingId: -9999,
       botJobId: -9999,
-      sessionId: "mobile-return-server",
+      sessionId: MOBILE_RETURN_SERVER_SESSION_ID,
     };
 
     try {
@@ -692,7 +695,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       type: "MOBILE_SCROLL_DOWN",
       homeBankingId: -9999,
       botJobId: -9999,
-      sessionId: "mobile-return-server",
+      sessionId: MOBILE_RETURN_SERVER_SESSION_ID,
     };
 
     try {
@@ -710,7 +713,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       type: "MOBILE_BACK",
       homeBankingId: -9999,
       botJobId: -9999,
-      sessionId: "mobile-return-server",
+      sessionId: MOBILE_RETURN_SERVER_SESSION_ID,
     }));
   };
 
@@ -722,7 +725,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       type: "MOBILE_CLOSE_ALL",
       homeBankingId: -9999,
       botJobId: -9999,
-      sessionId: "mobile-return-server",
+      sessionId: MOBILE_RETURN_SERVER_SESSION_ID,
       appQueryApp,
       appQueryPackage,
     }));
@@ -735,7 +738,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       type: "MOBILE_HOME",
       homeBankingId: -9999,
       botJobId: -9999,
-      sessionId: "mobile-return-server",
+      sessionId: MOBILE_RETURN_SERVER_SESSION_ID,
     }));
   };
 
@@ -746,7 +749,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       type: "MOBILE_RECENTS",
       homeBankingId: -9999,
       botJobId: -9999,
-      sessionId: "mobile-return-server",
+      sessionId: MOBILE_RETURN_SERVER_SESSION_ID,
     }));
   };
 
@@ -757,7 +760,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       type: "MOBILE_NEXT_DONE",
       homeBankingId: -9999,
       botJobId: -9999,
-      sessionId: "mobile-return-server",
+      sessionId: MOBILE_RETURN_SERVER_SESSION_ID,
     };
 
     try {
@@ -775,7 +778,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       type: "MOBILE_CLOSE_KEYBOARD",
       homeBankingId: -9999,
       botJobId: -9999,
-      sessionId: "mobile-return-server",
+      sessionId: MOBILE_RETURN_SERVER_SESSION_ID,
     };
 
     try {
@@ -797,7 +800,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       homeBankingId,                     // updated from selected job
       botJobId,                          // updated from selected job
       botJobName,                        // updated from selected job
-      sessionId: "mobile-return-server",
+      sessionId: MOBILE_RETURN_SERVER_SESSION_ID,
       selectedJobName: selectedJob.name, // optional
       // ✅ array of VALUES that are checked
       fieldsToValidate: buildFieldsToValidate(),
@@ -844,7 +847,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       botJobId: selectedJob.id,
       blockId: selectedBlock,
       botJobName: botJobName,
-      sessionId: `mobile-return-server`,
+      sessionId: MOBILE_RETURN_SERVER_SESSION_ID,
       elementDetails: allElements.map(mapElementForSend),
     };
 
@@ -938,8 +941,8 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
       return;
     }
     const sessionDestine = action === "HOVERED_ROW"
-      ? `mobile-return-server`
-      : `mobile-return-server`;
+      ? MOBILE_RETURN_SERVER_SESSION_ID
+      : MOBILE_RETURN_SERVER_SESSION_ID;
 
     const message = {
       type: action,
