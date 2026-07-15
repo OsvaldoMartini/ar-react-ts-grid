@@ -19,6 +19,7 @@ import AlertModal from './AlertModal';
 import { useWebSocket } from './useWebSocket';
 import AttributeDropdown from './AttributeDropdown';
 import NameDropdown from './NameDropdown';
+import { SCANNER_SEARCH_TERMS_OPERATION } from './scanner/Scanner.operations';
 import styles from './Griditem.module.scss';
 
 
@@ -347,7 +348,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
         }
 
         // ---------- EXISTING FLOWS ----------
-        case "searchTerms": {
+        case SCANNER_SEARCH_TERMS_OPERATION: {
           setIsSendingAll(false);
           const detailsData = Array.isArray(bodyData?.details) ? bodyData.details : [];
           if (detailsData.length === 0) {
