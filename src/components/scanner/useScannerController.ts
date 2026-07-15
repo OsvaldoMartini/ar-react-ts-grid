@@ -9,6 +9,7 @@ import {
 import { canRequestScannerBootstrap } from './Scanner.bootstrapRequest';
 import { scannerControllerResetState } from './Scanner.controllerState';
 import { parseScannerEnvelope, reduceScannerState } from './Scanner.contract';
+import { scannerPendingMessages } from './Scanner.messageCursor';
 import { isMatchingScannerActionResponse } from './Scanner.responseMatching';
 import { scannerTransportMessage } from './Scanner.transport';
 import type { PendingScannerAction } from './Scanner.responseMatching';
@@ -149,10 +150,9 @@ export function useScannerController(options: ControllerOptions): ScannerControl
 
   useEffect(() => {
     if (!enabled || !botJobId || botJobId <= 0) return;
-    if (processedMessagesRef.current > messages.length) processedMessagesRef.current = 0;
-    const pending = messages.slice(processedMessagesRef.current);
-    processedMessagesRef.current = messages.length;
-    pending.forEach((raw) => {
+    const cursor = scannerPendingMessages(messages, processedMessagesRef.current);
+    processedMessagesRef.current = cursor.nextProcessedCount;
+    cursor.pendingMessages.forEach((raw) => {
       const envelope = parseScannerEnvelope(raw, sessionId, botJobId);
       if (!envelope) return;
       const { operationId, body } = envelope;
