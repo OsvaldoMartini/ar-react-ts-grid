@@ -27,7 +27,15 @@ import BotJobDetailsChrome from './bot-job-details/BotJobDetailsChrome';
 import { useBotJobDetailsController } from './bot-job-details/useBotJobDetailsController';
 import ScannerWorkspaceHeader from './scanner/ScannerWorkspaceHeader';
 import { useScannerController } from './scanner/useScannerController';
-import { SCANNER_SEARCH_TERMS_OPERATION } from './scanner/Scanner.operations';
+import {
+  SCANNER_DOM_REVIEW_RESPONSE_OPERATION,
+  SCANNER_REQUEST_SUPPORT_ELEMENTS_OPERATION,
+  SCANNER_REQUEST_SUPPORT_OPERATION,
+  SCANNER_SEARCH_TERMS_OPERATION,
+  SCANNER_SEND_DOM_REVIEW_OPERATION,
+  SCANNER_SUPPORT_REQUEST_ELEMENTS_RESPONSE_OPERATION,
+  SCANNER_SUPPORT_REQUEST_RESPONSE_OPERATION,
+} from './scanner/Scanner.operations';
 import {
   SCANNER_ELEMENT_PANE_SESSION_ID,
   PRE_SCANNER_GRID_SESSION_ID,
@@ -738,7 +746,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
             break;
           }
 
-          case "SEND_DOM_REVIEW": {
+          case SCANNER_SEND_DOM_REVIEW_OPERATION: {
             const reviewData: DomReviewData = {
               url: bodyData?.url || '',
               title: bodyData?.title || '',
@@ -750,7 +758,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
             break;
           }
 
-          case "REQUEST_SUPPORT": {
+          case SCANNER_REQUEST_SUPPORT_OPERATION: {
             const reqData: SupportRequestData = {
               url: bodyData?.url || '',
               pcName: bodyData?.pcName || '',
@@ -760,7 +768,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
             break;
           }
 
-          case "REQUEST_SUPPORT_ELEMENTS": {
+          case SCANNER_REQUEST_SUPPORT_ELEMENTS_OPERATION: {
             const reqData: SupportRequestData = {
               url: bodyData?.url || '',
               pcName: bodyData?.pcName || '',
@@ -1443,7 +1451,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
 
     if (webSocket && connected && webSocket.readyState === WebSocket.OPEN) {
       webSocket.send(JSON.stringify({
-        type: 'SUPPORT_REQUEST_RESPONSE',
+        type: SCANNER_SUPPORT_REQUEST_RESPONSE_OPERATION,
         sessionId,
         homeBankingId,
         action,
@@ -1457,7 +1465,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     // Ask backend for context (pc/email/url) — reuses the same pattern as REQUEST_SUPPORT.
     if (webSocket && connected && webSocket.readyState === WebSocket.OPEN) {
       webSocket.send(JSON.stringify({
-        type: 'REQUEST_SUPPORT_ELEMENTS',
+        type: SCANNER_REQUEST_SUPPORT_ELEMENTS_OPERATION,
         sessionId,
         homeBankingId,
       }));
@@ -1475,7 +1483,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
 
     if (webSocket && connected && webSocket.readyState === WebSocket.OPEN) {
       webSocket.send(JSON.stringify({
-        type: 'SUPPORT_REQUEST_ELEMENTS_RESPONSE',
+        type: SCANNER_SUPPORT_REQUEST_ELEMENTS_RESPONSE_OPERATION,
         sessionId,
         homeBankingId,
         action,
@@ -1492,7 +1500,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
 
     if (webSocket && connected && webSocket.readyState === WebSocket.OPEN) {
       const message = {
-        type: 'DOM_REVIEW_RESPONSE',
+        type: SCANNER_DOM_REVIEW_RESPONSE_OPERATION,
         sessionId,
         homeBankingId,
         action,
