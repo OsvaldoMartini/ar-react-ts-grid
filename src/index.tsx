@@ -20,6 +20,10 @@ import ConfigManager from './components/ConfigManager';
 import LicenseManager from './components/LicenseManager';
 import AboutPanel from './components/AboutPanel';
 import ActivationRequired from './components/ActivationRequired';
+import {
+  PRE_SCANNER_GRID_SESSION_ID,
+  SCANNER_GRID_SESSION_ID,
+} from './components/scanner/Scanner.sessions';
 
 // Initialize the root
 const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
@@ -86,9 +90,17 @@ const App: React.FC = () => {
           setInstructionsData(dataLoad as BlockLoopInstructionLoadDTO[]);
         } else if (Array.isArray(dataLoad) && dataLoad.length > 0 && sessionIdFromJava.includes("componentTasks")) {
           setComponentsData(dataLoad as BlockLoopInstructionLoadDTO[]);
-        } else if (Array.isArray(dataLoad) && dataLoad.length > 0 && sessionIdFromJava.includes("preScannerGrid")) {
+        } else if (
+          Array.isArray(dataLoad)
+          && dataLoad.length > 0
+          && sessionIdFromJava.includes(PRE_SCANNER_GRID_SESSION_ID)
+        ) {
           setElementDTO(dataLoad as ElementDTO[]);
-        } else if (Array.isArray(dataLoad) && dataLoad.length > 0 && sessionIdFromJava.includes("scannerGrid")) {
+        } else if (
+          Array.isArray(dataLoad)
+          && dataLoad.length > 0
+          && sessionIdFromJava.includes(SCANNER_GRID_SESSION_ID)
+        ) {
           // existing desktop scanner
           setElementDTO(dataLoad as ElementDTO[]);
         } else if (Array.isArray(dataLoad) && dataLoad.length > 0 && sessionIdFromJava.includes("mobileScannerGrid")) {
@@ -136,10 +148,12 @@ const App: React.FC = () => {
       )}
       {/* Guard against preScannerGrid double-mounting: only case ("S") separates
           the two session ids, so exclude it explicitly. */}
-      {sessionId && sessionId.includes("scannerGrid") && !sessionId.includes("preScannerGrid") && (
+      {sessionId
+        && sessionId.includes(SCANNER_GRID_SESSION_ID)
+        && !sessionId.includes(PRE_SCANNER_GRID_SESSION_ID) && (
         <GridItemScann homeBankingIdInitial={homeBanking} dataDTO={elementDTO} socketPort={socketPort} sessionId={sessionId} botJobIdInitial={botJobId} botJobNameInitial={botJobName} />
       )}
-      {sessionId && (sessionId.includes("preScannerGrid")) && (
+      {sessionId && (sessionId.includes(PRE_SCANNER_GRID_SESSION_ID)) && (
         <GridItemScann mode="preScan" homeBankingIdInitial={homeBanking} dataDTO={elementDTO} socketPort={socketPort} sessionId={sessionId} botJobIdInitial={botJobId} botJobNameInitial={botJobName} />
       )}
       {sessionId && (sessionId.includes("mobileScannerGrid")) && (
