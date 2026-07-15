@@ -19,7 +19,10 @@ import AlertModal from './AlertModal';
 import { useWebSocket } from './useWebSocket';
 import AttributeDropdown from './AttributeDropdown';
 import NameDropdown from './NameDropdown';
-import { SCANNER_SEARCH_TERMS_OPERATION } from './scanner/Scanner.operations';
+import {
+  SCANNER_APP_OPERATION,
+  SCANNER_SEARCH_TERMS_OPERATION,
+} from './scanner/Scanner.operations';
 import styles from './Griditem.module.scss';
 
 
@@ -588,7 +591,7 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
     setIsSendingScanner(true);
 
     const message = {
-      type: "SCANNER_APP",
+      type: SCANNER_APP_OPERATION,
       homeBankingId,
       botJobId,
       botJobName,
@@ -599,9 +602,9 @@ const GridItemScannMobile: React.FC<GridItemScannMobileProps> = ({ homeBankingId
 
     try {
       webSocket.send(JSON.stringify(message));
-      console.log("📤 Sent SCANNER_APP:", message);
+      console.log(`📤 Sent ${SCANNER_APP_OPERATION}:`, message);
     } catch (err) {
-      console.error("❌ Error sending SCANNER_APP:", err);
+      console.error(`❌ Error sending ${SCANNER_APP_OPERATION}:`, err);
       setIsSendingScanner(false);
     }
   };
