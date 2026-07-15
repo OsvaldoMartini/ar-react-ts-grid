@@ -28,6 +28,11 @@ import { useBotJobDetailsController } from './bot-job-details/useBotJobDetailsCo
 import ScannerWorkspaceHeader from './scanner/ScannerWorkspaceHeader';
 import { useScannerController } from './scanner/useScannerController';
 import {
+  PRE_SCAN_CLEAR_GRID_OPERATION,
+  PRE_SCAN_PAGE_OPERATION,
+  PRE_SCAN_REFRESH_PAGE_OPERATION,
+  PRE_SCAN_REQUEST_SUPPORT_OPERATION,
+  PRE_SCAN_SEND_DOM_REVIEW_OPERATION,
   SCANNER_DOM_REVIEW_RESPONSE_OPERATION,
   SCANNER_REQUEST_SUPPORT_ELEMENTS_OPERATION,
   SCANNER_REQUEST_SUPPORT_OPERATION,
@@ -1084,7 +1089,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
 
   const handleDashboardClearGrid = () => {
     handleClearGridAll();
-    sendDashboardCommand('PRE_SCAN_CLEAR_GRID');
+    sendDashboardCommand(PRE_SCAN_CLEAR_GRID_OPERATION);
   };
 
   const handleRemoveElementDTO = (elementToRemove: ElementDTO) => {
@@ -1566,7 +1571,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
             <button
               type="button"
               className={styles.preScanPrimaryButton}
-              onClick={() => sendDashboardCommand('PRE_SCAN_PAGE')}
+              onClick={() => sendDashboardCommand(PRE_SCAN_PAGE_OPERATION)}
               disabled={preScanStatus.status === 'running' || preScanStatus.status === 'waiting'}
               title="Run the Playwright page scanner for the selected URL"
             >
@@ -1592,7 +1597,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
             <button
               type="button"
               className={styles.preScanButton}
-              onClick={() => sendDashboardCommand('PRE_SCAN_REFRESH_PAGE')}
+              onClick={() => sendDashboardCommand(PRE_SCAN_REFRESH_PAGE_OPERATION)}
               disabled={preScanStatus.status === 'running' || preScanStatus.status === 'waiting'}
               title="Refresh the pre-scan browser page"
             >
@@ -1601,7 +1606,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
             <button
               type="button"
               className={`${styles.preScanButton} ${styles.preScanHiddenControl}`}
-              onClick={() => sendDashboardCommand('PRE_SCAN_SEND_DOM_REVIEW')}
+              onClick={() => sendDashboardCommand(PRE_SCAN_SEND_DOM_REVIEW_OPERATION)}
               title="Send sanitized HTML for review"
             >
               Send Pure HTML Review
@@ -1609,7 +1614,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
             <button
               type="button"
               className={`${styles.preScanButton} ${styles.preScanHiddenControl}`}
-              onClick={() => sendDashboardCommand('PRE_SCAN_REQUEST_SUPPORT')}
+              onClick={() => sendDashboardCommand(PRE_SCAN_REQUEST_SUPPORT_OPERATION)}
               title="Request support for the current page"
             >
               Request Support
@@ -1661,7 +1666,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
             <button
               type="button"
               className={styles.preScanPrimaryButton}
-              onClick={() => sendDashboardCommand('PRE_SCAN_PAGE')}
+              onClick={() => sendDashboardCommand(PRE_SCAN_PAGE_OPERATION)}
               disabled={preScanStatus.status === 'running' || preScanStatus.status === 'waiting'}
               title="Run scanner with current focus and search terms"
             >
