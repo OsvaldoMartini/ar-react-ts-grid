@@ -8,6 +8,14 @@ import {
 } from './Scanner.bootstrapResponse';
 import { canRequestScannerBootstrap } from './Scanner.bootstrapRequest';
 import { scannerControllerResetState } from './Scanner.controllerState';
+import {
+  SCANNER_ACTION_SEND_FAILURE_MESSAGE,
+  SCANNER_ACTION_TIMEOUT_MESSAGE,
+  SCANNER_BOOTSTRAP_SEND_FAILURE_MESSAGE,
+  SCANNER_BOOTSTRAP_TIMEOUT_MESSAGE,
+  SCANNER_SOCKET_DISCONNECTED_MESSAGE,
+  scannerErrorMessage,
+} from './Scanner.controllerStatus';
 import { parseScannerEnvelope, reduceScannerState } from './Scanner.contract';
 import { scannerPendingMessages } from './Scanner.messageCursor';
 import { scannerRequestId } from './Scanner.requestId';
@@ -90,7 +98,7 @@ export function useScannerController(options: ControllerOptions): ScannerControl
 
   const send = useCallback((type: string, requestBody: Record<string, unknown>) => {
     if (!webSocket || !connected || webSocket.readyState !== WebSocket.OPEN) {
-      throw new Error('Backend socket is not connected');
+      throw new Error(SCANNER_SOCKET_DISCONNECTED_MESSAGE);
     }
     webSocket.send(scannerTransportMessage(type, sessionId, homeBankingId, requestBody));
   }, [connected, homeBankingId, sessionId, webSocket]);
@@ -135,13 +143,13 @@ export function useScannerController(options: ControllerOptions): ScannerControl
         if (bootstrapRequestRef.current !== bootstrapRequestId) return;
         bootstrapRequestRef.current = null;
         setLoadingState(false);
-        setTransientStatus('The backend did not return scanner state', 'error');
+        setTransientStatus(SCANNER_BOOTSTRAP_TIMEOUT_MESSAGE, 'error');
       }, RESPONSE_TIMEOUT_MS);
     } catch (error) {
       bootstrapSocketRef.current = null;
       bootstrapRequestRef.current = null;
       setLoadingState(false);
-      setTransientStatus(error instanceof Error ? error.message : 'Could not load scanner state', 'error');
+      setTransientStatus(scannerErrorMessage(error, SCANNER_BOOTSTRAP_SEND_FAILURE_MESSAGE), 'error');
     }
   }, [botJobId, connected, enabled, requestId, send, setTransientStatus, webSocket]);
 
@@ -209,12 +217,12 @@ export function useScannerController(options: ControllerOptions): ScannerControl
         if (pendingActionRef.current?.requestId !== actionRequestId) return;
         pendingActionRef.current = null;
         setPendingAction(null);
-        setTransientStatus('The backend did not answer the scanner action', 'error');
+        setTransientStatus(SCANNER_ACTION_TIMEOUT_MESSAGE, 'error');
       }, RESPONSE_TIMEOUT_MS);
     } catch (error) {
       pendingActionRef.current = null;
       setPendingAction(null);
-      setTransientStatus(error instanceof Error ? error.message : 'Could not send scanner action', 'error');
+      setTransientStatus(scannerErrorMessage(error, SCANNER_ACTION_SEND_FAILURE_MESSAGE), 'error');
     }
   }, [botJobId, enabled, requestId, send, setTransientStatus]);
 
