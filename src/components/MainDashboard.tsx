@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronDown, FlaskConical, ShieldCheck, User } from 'lucide-react';
+import AutoTestWorkspace, { AutomationTestCatalog } from './auto-test/AutoTestWorkspace';
 import styles from './MainDashboard.module.scss';
 import { useWebSocket } from './useWebSocket';
 
@@ -7,6 +9,7 @@ type StatusLevel = 'ok' | 'warn' | 'error';
 interface MainDashboardProps {
   socketPort: number;
   sessionId: string;
+  onSessionOpen?: (targetSession: string, port: number, botJobId?: number) => void;
 }
 
 interface BotJobRow {
@@ -29,6 +32,15 @@ type SortKey = 'id' | 'name' | 'description' | 'organization' | 'environment' | 
 interface SortState {
   key: SortKey;
   dir: 1 | -1;
+}
+
+interface LicenseProfile {
+  active?: boolean;
+  status?: string;
+  statusCode?: string;
+  organization?: string;
+  owner?: string;
+  licensedUser?: string;
 }
 
 const SORT_COLUMNS: { key: SortKey; label: string }[] = [
@@ -80,14 +92,21 @@ function responseMessage(body: any, fallback: string): string {
   );
 }
 
-const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId }) => {
+const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, onSessionOpen }) => {
   const { webSocket, connected, messages, error } = useWebSocket(socketPort, sessionId);
   const processedMessageCountRef = useRef(0);
+  const userMenuRef = useRef<HTMLDivElement | null>(null);
   const [botJobs, setBotJobs] = useState<BotJobRow[]>([]);
   const [findText, setFindText] = useState('');
   const [sort, setSort] = useState<SortState | null>({ key: 'id', dir: 1 });
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<BotJobRow | null>(null);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [licenseProfile, setLicenseProfile] = useState<LicenseProfile | null>(null);
+  const [autoTestOpen, setAutoTestOpen] = useState(false);
+  const [testCatalog, setTestCatalog] = useState<AutomationTestCatalog | null>(null);
+  const [testCatalogLoading, setTestCatalogLoading] = useState(false);
+  const [testCatalogError, setTestCatalogError] = useState('');
   const [status, setStatus] = useState<{ level: StatusLevel; text: string }>({
     level: 'warn',
     text: 'Waiting for backend data',
@@ -141,11 +160,39 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId }) 
     send('mainDashboard.list');
   }, [send]);
 
+  const loadTestCatalog = useCallback(() => {
+    if (!connected) {
+      setTestCatalogLoading(false);
+      setTestCatalogError('The dashboard is not connected to the backend.');
+      return;
+    }
+    setTestCatalogLoading(true);
+    setTestCatalogError('');
+    send('automationTests.list');
+  }, [connected, send]);
+
   useEffect(() => {
     if (connected) {
       refresh();
+      send('license.bootstrap');
     }
-  }, [connected, refresh]);
+  }, [connected, refresh, send]);
+
+  useEffect(() => {
+    if (!userMenuOpen) return;
+    const closeOutside = (event: MouseEvent) => {
+      if (!userMenuRef.current?.contains(event.target as Node)) setUserMenuOpen(false);
+    };
+    const closeWithEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setUserMenuOpen(false);
+    };
+    document.addEventListener('mousedown', closeOutside);
+    document.addEventListener('keydown', closeWithEscape);
+    return () => {
+      document.removeEventListener('mousedown', closeOutside);
+      document.removeEventListener('keydown', closeWithEscape);
+    };
+  }, [userMenuOpen]);
 
   useEffect(() => {
     if (error) {
@@ -181,18 +228,42 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId }) 
             text: body.message || 'Status update',
           });
         } else if (operationId === 'license.statusChanged') {
+          setLicenseProfile(previous => ({ ...previous, ...body }));
           setStatus({
             level: body.active === true ? 'ok' : 'error',
             text: body.active === true
               ? (body.message || 'License active')
               : (body.error || body.status || 'License activation is required'),
           });
+        } else if (operationId === 'license.bootstrapResponse' || operationId === 'license.statusResponse') {
+          setLicenseProfile(body);
+        } else if (operationId === 'automationTests.listResponse') {
+          setTestCatalogLoading(false);
+          if (body?.ok === false) {
+            setTestCatalogError(body.error || 'The automation catalog could not be loaded.');
+          } else {
+            setTestCatalog(body as AutomationTestCatalog);
+            setTestCatalogError('');
+          }
+        } else if (operationId === 'react.session.open') {
+          onSessionOpen?.(body.targetSession, body.port, body.botJobId);
         }
       } catch (err) {
         console.warn('MainDashboard ignored socket message', err, raw);
       }
     }
-  }, [messages]);
+  }, [messages, onSessionOpen]);
+
+  const openAutoTest = () => {
+    setUserMenuOpen(false);
+    setAutoTestOpen(true);
+    if (!testCatalog) loadTestCatalog();
+  };
+
+  const licensedUser = licenseProfile?.owner || licenseProfile?.licensedUser || 'Licensed user';
+  const licenseDetail = licenseProfile?.owner && licenseProfile?.licensedUser
+    ? licenseProfile.licensedUser
+    : licenseProfile?.organization || 'AR Web';
 
   const selectedRequired = (action: string, command: string) => {
     if (!selectedJob) {
@@ -200,6 +271,24 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId }) 
       return;
     }
     send(command, { botJobId: selectedJob.id });
+  };
+
+  // Open Job is a real new browser tab, not a same-tab view switch -- the tab's URL carries the
+  // job id directly, so it can bootstrap itself without any round trip through this socket. The
+  // WS message still fires so the backend does its normal open-job preparation (reload blocks
+  // etc.); only one Bot Job workspace can be active in the backend at a time, so opening another
+  // job here will take over from whatever tab had it before.
+  const openBotJob = (targetBotJobId: number) => {
+    send('mainDashboard.openBotJob', { botJobId: targetBotJobId });
+    window.open(`${window.location.origin}${window.location.pathname}?openBotJob=${targetBotJobId}`, '_blank');
+  };
+
+  const openSelectedBotJob = () => {
+    if (!selectedJob) {
+      setStatus({ level: 'warn', text: 'Select a Bot Job before Open Job' });
+      return;
+    }
+    openBotJob(selectedJob.id);
   };
 
   const launchSelected = () => {
@@ -231,7 +320,49 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId }) 
             <h1 className={styles.title}>AR Web</h1>
             <p className={styles.subtitle}>Main Dashboard</p>
           </div>
-          <div className={`${styles.status} ${statusClass}`}>{status.text}</div>
+          <div className={styles.topBarRight}>
+            <div className={`${styles.status} ${statusClass}`}>{status.text}</div>
+            <div className={styles.userMenu} ref={userMenuRef}>
+              <button
+                type="button"
+                className={styles.userMenuTrigger}
+                aria-label="Open user menu"
+                aria-haspopup="menu"
+                aria-expanded={userMenuOpen}
+                onClick={() => setUserMenuOpen(open => !open)}
+              >
+                <span className={styles.userAvatar}><User size={15} aria-hidden="true" /></span>
+                <span className={styles.userTriggerText}>
+                  <strong>{licensedUser}</strong>
+                  <small>{licenseProfile?.active ? 'Licensed' : 'License status'}</small>
+                </span>
+                <ChevronDown size={15} aria-hidden="true" />
+              </button>
+              {userMenuOpen && (
+                <div className={styles.userDropdown} role="menu" aria-label="User menu">
+                  <div className={styles.licenseIdentity}>
+                    <span className={styles.identityIcon}><User size={19} aria-hidden="true" /></span>
+                    <span className={styles.identityText}>
+                      <small>Licensed user</small>
+                      <strong>{licensedUser}</strong>
+                      <em>{licenseDetail}</em>
+                    </span>
+                    <span className={licenseProfile?.active ? styles.licenseActive : styles.licenseUnknown}>
+                      <ShieldCheck size={13} aria-hidden="true" />
+                      {licenseProfile?.status || 'Checking license'}
+                    </span>
+                  </div>
+                  <button type="button" role="menuitem" className={styles.autoTestMenuItem} onClick={openAutoTest}>
+                    <FlaskConical size={19} aria-hidden="true" />
+                    <span>
+                      <strong>Auto Test</strong>
+                      <small>Browse every automation test</small>
+                    </span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         </header>
 
         <div className={styles.commandBar}>
@@ -253,7 +384,7 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId }) 
           <button type="button" className={styles.commandBtn} disabled={!selectedJob || selectedJob.launchable === false} onClick={launchSelected}>
             Launch
           </button>
-          <button type="button" className={styles.commandBtn} disabled={!selectedJob} onClick={() => selectedRequired('Open Job', 'mainDashboard.openBotJob')}>
+          <button type="button" className={styles.commandBtn} disabled={!selectedJob} onClick={openSelectedBotJob}>
             Open Job
           </button>
           <button type="button" className={styles.commandBtn} onClick={refresh}>
@@ -321,7 +452,7 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId }) 
                       key={row.id}
                       className={selectedId === row.id ? styles.selectedRow : undefined}
                       onClick={() => setSelectedId(row.id)}
-                      onDoubleClick={() => send('mainDashboard.openBotJob', { botJobId: row.id })}
+                      onDoubleClick={() => openBotJob(row.id)}
                     >
                       <td title={String(row.id)}>{row.id}</td>
                       <td title={row.name}>{row.name}</td>
@@ -376,6 +507,15 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId }) 
               </div>
             </div>
           </div>
+        )}
+        {autoTestOpen && (
+          <AutoTestWorkspace
+            catalog={testCatalog}
+            loading={testCatalogLoading}
+            error={testCatalogError}
+            onRefresh={loadTestCatalog}
+            onClose={() => setAutoTestOpen(false)}
+          />
         )}
       </section>
     </main>

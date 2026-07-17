@@ -832,20 +832,26 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
           setExecutionId(bodyData.instructionId);
           setExecutionState(bodyData.color);
-          // #fcba03  deep carmine yellow 
+          // #fcba03  deep carmine yellow
           // #56dfc1 deep carmine green
           // #1d9c06 Neon green
           // #ba0f34 red
           // #FF3131 Neon Red
           // #a52a2a red
 
+        } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "react.session.open") {
+          // Bot Job Tasks is always its own browser tab now (opened via window.open from the
+          // dashboard); any "go back" signal here means leaving this tab, not switching its own
+          // view -- switching would try to open a second "mainDashboard" session and collide with
+          // the actual dashboard tab.
+          window.close();
         }
 
       } catch (error) {
         console.error("Error parsing WebSocket message:", error);
       }
     }
-  }, [messages, pendingMemoryMove, pendingDragPreview]);
+  }, [messages, pendingMemoryMove, pendingDragPreview, sessionId]);
 
 
   useEffect(() => {
@@ -2867,7 +2873,20 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
         fallbackBotJobName={botJobName}
         fallbackSurface="botJob"
         connected={connected}
-        controller={botJobHeader}
+        controller={{
+          ...botJobHeader,
+          sendAction: (action: Parameters<typeof botJobHeader.sendAction>[0]) => {
+            // Close leaves immediately, client-side: this tab is its own browser tab (opened via
+            // window.open from the dashboard), so "going back" means closing this tab, not
+            // switching its own view to "mainDashboard" -- that would try to open a second
+            // dashboard session and collide with the actual dashboard tab. The action is still
+            // sent below so the backend does its normal CLOSE-side cleanup.
+            if (action === 'CLOSE') {
+              window.close();
+            }
+            botJobHeader.sendAction(action);
+          },
+        }}
       />
       {excelExportContext && <ExcelExportPanel context={excelExportContext} onSubmit={submitExcelExport} onClose={() => setExcelExportContext(null)}/>}
       {saveComponentContext && <SaveComponentPanel context={saveComponentContext} onSubmit={submitSaveComponent} onClose={() => setSaveComponentContext(null)}/>}

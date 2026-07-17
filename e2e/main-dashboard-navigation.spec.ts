@@ -1,0 +1,293 @@
+import { expect, test, type Page } from '@playwright/test';
+import automationCatalog from './fixtures/automation-catalog.json';
+
+const botJobs = [
+  {
+    id: 101,
+    name: 'Primary Checkout',
+    description: 'Desktop checkout flow',
+    priority: 'WEB',
+    active: true,
+    organizationName: 'AllinWeb QA',
+    environmentName: 'QA',
+    blockCount: 12,
+    launchable: true,
+  },
+  {
+    id: 202,
+    name: 'Secondary Mobile',
+    description: 'Mobile handoff flow',
+    priority: 'MOBILE',
+    active: false,
+    organizationName: 'AllinWeb Lab',
+    environmentName: 'STAGE',
+    blockCount: 4,
+    launchable: false,
+  },
+];
+
+const installMockBackend = async (page: Page) => {
+  await page.addInitScript(
+    ({ catalog, jobs }) => {
+      const state = {
+        requests: [] as Array<{ type?: string; body?: string }>,
+        openCalls: [] as string[],
+        botJobs: jobs,
+      };
+
+      Object.defineProperty(window, '__AR_E2E__', {
+        configurable: true,
+        value: state,
+      });
+      Object.defineProperty(window, 'open', {
+        configurable: true,
+        value: (url?: string | URL) => {
+          state.openCalls.push(String(url || ''));
+          return null;
+        },
+      });
+
+      class MockWebSocket extends EventTarget {
+        static readonly CONNECTING = 0;
+        static readonly OPEN = 1;
+        static readonly CLOSING = 2;
+        static readonly CLOSED = 3;
+
+        readonly url: string;
+        readyState = MockWebSocket.CONNECTING;
+        bufferedAmount = 0;
+        extensions = '';
+        protocol = '';
+        binaryType: BinaryType = 'blob';
+        onopen: ((event: Event) => void) | null = null;
+        onmessage: ((event: MessageEvent) => void) | null = null;
+        onerror: ((event: Event) => void) | null = null;
+        onclose: ((event: CloseEvent) => void) | null = null;
+
+        constructor(url: string | URL) {
+          super();
+          this.url = String(url);
+          queueMicrotask(() => {
+            if (this.readyState !== MockWebSocket.CONNECTING) return;
+            this.readyState = MockWebSocket.OPEN;
+            const openEvent = new Event('open');
+            this.onopen?.(openEvent);
+            this.dispatchEvent(openEvent);
+
+            if (this.url.includes('sessionId=mainDashboardBootstrap')) {
+              queueMicrotask(() => this.reply('react.session.open', {
+                targetSession: 'mainDashboard',
+                port: 4173,
+                botJobId: -9999,
+              }));
+            }
+          });
+        }
+
+        send(payload: string | ArrayBufferLike | Blob | ArrayBufferView) {
+          if (typeof payload !== 'string' || payload.startsWith('ping-')) return;
+
+          let request: { type?: string; body?: string };
+          try {
+            request = JSON.parse(payload);
+          } catch {
+            return;
+          }
+          if (!request.type) return;
+          state.requests.push(request);
+
+          if (request.type === 'mainDashboard.list') {
+            this.reply('mainDashboard.listResponse', { botJobs: state.botJobs });
+          } else if (request.type === 'license.bootstrap') {
+            this.reply('license.bootstrapResponse', {
+              active: true,
+              status: 'ACTIVE',
+              statusCode: 'ACTIVE',
+              organization: 'AllinWeb QA',
+              owner: 'QA License Owner',
+              licensedUser: 'qa.user',
+            });
+          } else if (request.type === 'automationTests.list') {
+            this.reply('automationTests.listResponse', catalog);
+          } else if (request.type === 'mainDashboard.deleteBotJob') {
+            const body = request.body ? JSON.parse(request.body) : {};
+            state.botJobs = state.botJobs.filter(job => job.id !== body.botJobId);
+            this.reply('mainDashboard.actionResponse', {
+              ok: true,
+              message: 'Bot Job deleted in mock mode',
+              botJobs: state.botJobs,
+            });
+          } else if (request.type.startsWith('mainDashboard.')) {
+            this.reply('mainDashboard.actionResponse', {
+              ok: true,
+              message: `Mocked ${request.type}`,
+            });
+          }
+        }
+
+        close(code = 1000, reason = '') {
+          if (this.readyState === MockWebSocket.CLOSED) return;
+          this.readyState = MockWebSocket.CLOSED;
+          const closeEvent = new CloseEvent('close', { code, reason, wasClean: true });
+          this.onclose?.(closeEvent);
+          this.dispatchEvent(closeEvent);
+        }
+
+        private reply(operationId: string, body: unknown) {
+          queueMicrotask(() => {
+            if (this.readyState !== MockWebSocket.OPEN) return;
+            const event = new MessageEvent('message', {
+              data: JSON.stringify({ operationId, body }),
+            });
+            this.onmessage?.(event);
+            this.dispatchEvent(event);
+          });
+        }
+      }
+
+      Object.defineProperty(window, 'WebSocket', {
+        configurable: true,
+        value: MockWebSocket,
+      });
+    },
+    { catalog: automationCatalog, jobs: botJobs },
+  );
+};
+
+const operationCount = (page: Page, type: string) =>
+  page.evaluate((operation) => {
+    const state = (window as typeof window & {
+      __AR_E2E__: { requests: Array<{ type?: string }> };
+    }).__AR_E2E__;
+    return state.requests.filter(request => request.type === operation).length;
+  }, type);
+
+test('navigates every safe dashboard control and the Auto Test workspace without a backend', async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on('pageerror', error => pageErrors.push(error.message));
+  await installMockBackend(page);
+  await page.goto('/');
+
+  await expect(page.getByRole('heading', { name: 'AR Web' })).toBeVisible();
+  await expect(page.getByText('Loaded 2 bot jobs')).toBeVisible();
+  await expect.poll(() => operationCount(page, 'mainDashboard.list')).toBeGreaterThan(0);
+  await expect.poll(() => operationCount(page, 'license.bootstrap')).toBeGreaterThan(0);
+
+  await expect(page.getByRole('button', { name: 'Clone Job' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Launch' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Open Job' })).toBeDisabled();
+
+  for (const command of ['Organizations', 'New Bot Job', 'Config', 'Info', 'Refresh', 'Exit']) {
+    await page.getByRole('button', { name: command, exact: true }).click();
+  }
+
+  const findInput = page.getByRole('textbox', { name: 'Find:' });
+  await findInput.fill('Secondary');
+  await expect(page.getByRole('row', { name: /Secondary Mobile/ })).toBeVisible();
+  await expect(page.getByRole('row', { name: /Primary Checkout/ })).toHaveCount(0);
+  await page.getByTitle('Clear Find').click();
+  await expect(page.getByRole('row', { name: /Primary Checkout/ })).toBeVisible();
+
+  for (const column of ['ID', 'Name', 'Description', 'Organization', 'Environment', 'Type', 'Status', 'Blocks']) {
+    await page.getByRole('columnheader', { name: new RegExp(`^${column}`) }).click();
+  }
+
+  const primaryRow = page.getByRole('row', { name: /Primary Checkout/ });
+  await primaryRow.click();
+  await expect(page.getByRole('button', { name: 'Clone Job' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Launch' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Open Job' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Clone Job' }).click();
+  await page.getByRole('button', { name: 'Launch' }).click();
+  await page.getByRole('button', { name: 'Open Job' }).click();
+
+  await primaryRow.getByTitle('Delete Bot Job').click();
+  await expect(page.getByText('Bot Job Deletion')).toBeVisible();
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await expect.poll(() => operationCount(page, 'mainDashboard.deleteBotJob')).toBe(0);
+  await primaryRow.getByTitle('Delete Bot Job').click();
+  await page.getByRole('button', { name: 'Delete', exact: true }).click();
+  await expect(page.getByRole('row', { name: /Primary Checkout/ })).toHaveCount(0);
+
+  await page.getByRole('row', { name: /Secondary Mobile/ }).dblclick();
+  const openedUrls = await page.evaluate(() => (
+    window as typeof window & { __AR_E2E__: { openCalls: string[] } }
+  ).__AR_E2E__.openCalls);
+  expect(openedUrls).toHaveLength(2);
+  expect(openedUrls.every(url => url.includes('?openBotJob='))).toBe(true);
+
+  const userMenuButton = page.getByRole('button', { name: 'Open user menu' });
+  const suppliedUserIcon = userMenuButton.locator('svg').first();
+  await expect(suppliedUserIcon).toHaveAttribute('width', '15');
+  await expect(suppliedUserIcon).toHaveAttribute('height', '15');
+  await expect(suppliedUserIcon).toHaveAttribute('viewBox', '0 0 24 24');
+  await expect(suppliedUserIcon).toHaveAttribute('fill', 'none');
+  await expect(suppliedUserIcon).toHaveAttribute('stroke', 'currentColor');
+  await expect(suppliedUserIcon).toHaveAttribute('stroke-width', '2');
+  await expect(suppliedUserIcon.locator('path[d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"]')).toHaveCount(1);
+  await expect(suppliedUserIcon.locator('circle[cx="12"][cy="7"][r="4"]')).toHaveCount(1);
+
+  await userMenuButton.click();
+  const userMenu = page.getByRole('menu', { name: 'User menu' });
+  await expect(userMenu).toBeVisible();
+  await expect(userMenu.getByText('Licensed user')).toBeVisible();
+  await expect(userMenu.getByText('QA License Owner')).toBeVisible();
+  await expect(userMenu.getByText('qa.user')).toBeVisible();
+  await expect(userMenu.getByText('ACTIVE')).toBeVisible();
+  await userMenu.getByRole('menuitem', { name: /Auto Test/ }).click();
+
+  const workspace = page.getByRole('region', { name: 'Auto Test automation catalog' });
+  await expect(workspace).toBeVisible();
+  await expect(workspace.getByRole('heading', { name: 'Auto Test' })).toBeVisible();
+  await expect(workspace.getByText('3', { exact: true }).first()).toBeVisible();
+  await expect(workspace.locator('tbody tr')).toHaveCount(4);
+
+  await workspace.getByRole('combobox', { name: 'Filter by repository' }).selectOption('AR React UI');
+  await expect(workspace.locator('tbody tr')).toHaveCount(2);
+  await workspace.getByRole('combobox', { name: 'Filter by test type' }).selectOption('PLAYWRIGHT');
+  await workspace.getByRole('combobox', { name: 'Filter by safety' }).selectOption('SAFE');
+  await workspace.getByRole('textbox', { name: 'Find tests' }).fill('navigation');
+  await expect(workspace.locator('tbody tr')).toHaveCount(1);
+  await expect(workspace.getByText('Dashboard safe navigation and Auto Test workspace')).toBeVisible();
+  await workspace.getByRole('button', { name: 'Clear' }).click();
+  await expect(workspace.locator('tbody tr')).toHaveCount(4);
+
+  const beforeDrag = await workspace.boundingBox();
+  const dragHandle = workspace.getByTestId('auto-test-drag-handle');
+  const handleBox = await dragHandle.boundingBox();
+  expect(beforeDrag).not.toBeNull();
+  expect(handleBox).not.toBeNull();
+  await page.mouse.move(handleBox!.x + 120, handleBox!.y + 20);
+  await page.mouse.down();
+  await page.mouse.move(handleBox!.x + 200, handleBox!.y + 70, { steps: 5 });
+  await page.mouse.up();
+  const afterDrag = await workspace.boundingBox();
+  expect(afterDrag).not.toBeNull();
+  expect(afterDrag!.x).toBeGreaterThan(beforeDrag!.x + 40);
+  expect(afterDrag!.y).toBeGreaterThan(beforeDrag!.y + 20);
+
+  const catalogRequestsBeforeRefresh = await operationCount(page, 'automationTests.list');
+  await workspace.getByRole('button', { name: 'Refresh test catalog' }).click();
+  await expect.poll(() => operationCount(page, 'automationTests.list')).toBeGreaterThan(catalogRequestsBeforeRefresh);
+  await workspace.getByRole('button', { name: 'Close Auto Test' }).click();
+  await expect(workspace).toHaveCount(0);
+
+  const expectedOperations = [
+    'mainDashboard.openOrganizations',
+    'mainDashboard.newBotJob',
+    'mainDashboard.openConfig',
+    'mainDashboard.openInfo',
+    'mainDashboard.list',
+    'mainDashboard.exit',
+    'mainDashboard.cloneBotJob',
+    'mainDashboard.launchBotJob',
+    'mainDashboard.openBotJob',
+    'mainDashboard.deleteBotJob',
+    'license.bootstrap',
+    'automationTests.list',
+  ];
+  for (const operation of expectedOperations) {
+    await expect.poll(() => operationCount(page, operation)).toBeGreaterThan(0);
+  }
+  expect(pageErrors).toEqual([]);
+});

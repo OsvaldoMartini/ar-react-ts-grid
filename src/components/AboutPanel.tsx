@@ -4,13 +4,15 @@ import LicenseManager from './LicenseManager';
 import { useWebSocket } from './useWebSocket';
 import styles from './AboutPanel.module.scss';
 
-type Props = { socketPort: number; sessionId: string };
-const AboutPanel: React.FC<Props> = ({ socketPort, sessionId }) => {
+type Props = { socketPort: number; sessionId: string; onSessionOpen?: (targetSession: string, port: number, botJobId?: number) => void };
+const AboutPanel: React.FC<Props> = ({ socketPort, sessionId, onSessionOpen }) => {
   const { webSocket, connected, messages } = useWebSocket(socketPort, sessionId);
   const [about, setAbout] = useState<any>(null);
   const [licenseOpen, setLicenseOpen] = useState(false);
   const refresh = useCallback(() => webSocket?.send(JSON.stringify({ type: 'about.bootstrap', sessionId })), [webSocket, sessionId]);
-  const goBack = () => (window as any).receiveDataFromJava?.('[]', socketPort, 'mainDashboard', -9999, '', -9999, '');
+  // Going back to the dashboard doesn't need a server round-trip -- same socketPort, just switch
+  // the session client-side (the old window.receiveDataFromJava JCEF-push bridge is gone).
+  const goBack = () => onSessionOpen?.('mainDashboard', socketPort, -9999);
   useEffect(() => { if (connected) refresh(); }, [connected, refresh]);
   useEffect(() => { try { const message=JSON.parse(messages[messages.length-1]); if(message?.operationId==='about.bootstrapResponse') setAbout(typeof message.body==='string'?JSON.parse(message.body):message.body); } catch(_){} }, [messages]);
   return <main className={styles.page}>

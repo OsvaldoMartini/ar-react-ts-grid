@@ -8,6 +8,7 @@ type AppType = 'Web App' | 'Android' | 'iOS' | 'Rest Api';
 interface NewBotJobManagerProps {
   socketPort: number;
   sessionId: string;
+  onSessionOpen?: (targetSession: string, port: number, botJobId?: number) => void;
 }
 
 interface EnvironmentRow {
@@ -37,7 +38,7 @@ function responseMessage(body: any, fallback: string): string {
   );
 }
 
-const NewBotJobManager: React.FC<NewBotJobManagerProps> = ({ socketPort, sessionId }) => {
+const NewBotJobManager: React.FC<NewBotJobManagerProps> = ({ socketPort, sessionId, onSessionOpen }) => {
   const { webSocket, connected, messages, error } = useWebSocket(socketPort, sessionId);
   const processedMessageCountRef = useRef(0);
   const [appTypes, setAppTypes] = useState<AppType[]>(DEFAULT_APP_TYPES);
@@ -118,12 +119,14 @@ const NewBotJobManager: React.FC<NewBotJobManagerProps> = ({ socketPort, session
             level: body.level === 'error' ? 'error' : body.level === 'warning' ? 'warn' : 'ok',
             text: body.message || 'Status update',
           });
+        } else if (operationId === 'react.session.open') {
+          onSessionOpen?.(body.targetSession, body.port, body.botJobId);
         }
       } catch (err) {
         console.warn('NewBotJobManager ignored socket message', err, raw);
       }
     }
-  }, [messages]);
+  }, [messages, onSessionOpen]);
 
   const createBotJob = () => {
     const trimmedName = name.trim();

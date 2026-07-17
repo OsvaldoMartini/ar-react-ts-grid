@@ -42,6 +42,9 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
+    "test:e2e": "node e2e/run-playwright.mjs test",
+    "test:e2e:install": "node e2e/run-playwright.mjs install chromium",
+    "test:e2e:headed": "node e2e/run-playwright.mjs test --headed",
     "eject": "react-scripts eject",
     "deploy": "gh-pages -d build"
   },
@@ -64,6 +67,7 @@
     ]
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "gh-pages": "^6.1.1"
   }
 }

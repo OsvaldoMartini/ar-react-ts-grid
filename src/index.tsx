@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import reportWebVitals from './reportWebVitals';
@@ -54,6 +54,60 @@ const App: React.FC = () => {
     setAlertMessageHeader('');
     setAlertMessageBody('');
   };
+
+  // Every navigation button used to work by Java calling window.receiveDataFromJava directly into
+  // an embedded JCEF browser. That bridge is gone; navigation now arrives as a "react.session.open"
+  // WebSocket message (on whichever session sent the triggering request), telling the shell which
+  // session/port to switch to. Every top-level view that can trigger navigation gets this callback.
+  const onSessionOpen = useCallback((targetSession: string, port: number, nextBotJobId?: number) => {
+    setSocketPort(port);
+    setSessionId(targetSession);
+    if (nextBotJobId !== undefined && nextBotJobId !== -9999) {
+      setBotJobId(nextBotJobId);
+    }
+  }, []);
+
+  // A Bot Job opened via "Open Job" is a real new browser tab (see MainDashboard's Open Job
+  // handler), not a session switch inside the dashboard's own tab. Its URL carries the job id
+  // directly, so this tab can bootstrap itself client-side -- no WebSocket handshake needed, same
+  // origin/port as the page itself.
+  useEffect(() => {
+    const openBotJobId = new URLSearchParams(window.location.search).get('openBotJob');
+    if (!openBotJobId) return;
+    const parsedBotJobId = Number(openBotJobId);
+    onSessionOpen('botJobTasks', Number(window.location.port), Number.isNaN(parsedBotJobId) ? undefined : parsedBotJobId);
+  }, [onSessionOpen]);
+
+  // Bootstrap over WebSocket: the shell opens a short-lived handshake connection under its own
+  // session id ("mainDashboardBootstrap", never a real target session) and waits for the initial
+  // "react.session.open" reply to learn which session/port to start on. It closes right after so
+  // the real session (e.g. MainDashboard's own socket) can register under that id without
+  // colliding with this one. Skipped entirely for a Bot Job tab (see above).
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).has('openBotJob')) return;
+    const ws = new WebSocket(`ws://${window.location.hostname}:${window.location.port}/websocket?sessionId=mainDashboardBootstrap`);
+
+    ws.onmessage = (event) => {
+      try {
+        const envelope = JSON.parse(event.data);
+        if (envelope?.operationId !== 'react.session.open') return;
+        const body = typeof envelope.body === 'string' ? JSON.parse(envelope.body) : envelope.body;
+        onSessionOpen(body.targetSession, body.port, body.botJobId);
+      } catch (error) {
+        console.error('Error parsing bootstrap WebSocket message:', error);
+      } finally {
+        ws.close();
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error('Bootstrap WebSocket error:', error);
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, [onSessionOpen]);
 
   useEffect(() => {
     (window as any).receiveDataFromJava = (
@@ -164,15 +218,15 @@ const App: React.FC = () => {
       )}
 
       {sessionId && (sessionId.includes("mainDashboard")) && (
-        <MainDashboard socketPort={socketPort} sessionId={sessionId} />
+        <MainDashboard socketPort={socketPort} sessionId={sessionId} onSessionOpen={onSessionOpen} />
       )}
 
       {sessionId && (sessionId.includes("newBotJobManager")) && (
-        <NewBotJobManager socketPort={socketPort} sessionId={sessionId} />
+        <NewBotJobManager socketPort={socketPort} sessionId={sessionId} onSessionOpen={onSessionOpen} />
       )}
 
       {sessionId && sessionId.includes("cloneJobManager") && (
-        <CloneJobManager socketPort={socketPort} sessionId={sessionId} sourceBotJobId={botJobId} />
+        <CloneJobManager socketPort={socketPort} sessionId={sessionId} sourceBotJobId={botJobId} onSessionOpen={onSessionOpen} />
       )}
 
       {sessionId && (sessionId.includes("configManager")) && (
@@ -182,7 +236,7 @@ const App: React.FC = () => {
         <LicenseManager socketPort={socketPort} sessionId={sessionId} />
       )}
       {sessionId && sessionId.includes("aboutPanel") && (
-        <AboutPanel socketPort={socketPort} sessionId={sessionId} />
+        <AboutPanel socketPort={socketPort} sessionId={sessionId} onSessionOpen={onSessionOpen} />
       )}
       {sessionId && sessionId.includes("activationRequired") && (
         <ActivationRequired socketPort={socketPort} sessionId={sessionId} />

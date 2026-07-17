@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import styles from './CloneJobManager.module.scss';
 import { useWebSocket } from './useWebSocket';
 
-interface Props { socketPort: number; sessionId: string; sourceBotJobId: number; }
+interface Props { socketPort: number; sessionId: string; sourceBotJobId: number; onSessionOpen?: (targetSession: string, port: number, botJobId?: number) => void; }
 interface Source { id: number; name: string; description?: string; homeBankingId: number; homeUrlId: number; organizationName?: string; environmentName?: string; environmentUrl?: string; }
 interface Environment { id: number; homeBankingId: number; orgName: string; name?: string; url: string; }
 
@@ -11,7 +11,7 @@ const decode = (raw: string) => {
   return { operationId: outer.operationId || outer.type, body: typeof outer.body === 'string' ? JSON.parse(outer.body) : outer.body ?? outer };
 };
 
-const CloneJobManager: React.FC<Props> = ({ socketPort, sessionId, sourceBotJobId }) => {
+const CloneJobManager: React.FC<Props> = ({ socketPort, sessionId, sourceBotJobId, onSessionOpen }) => {
   const { webSocket, connected, messages, error } = useWebSocket(socketPort, sessionId);
   const cursor = useRef(0);
   const [source, setSource] = useState<Source | null>(null);
@@ -47,11 +47,13 @@ const CloneJobManager: React.FC<Props> = ({ socketPort, sessionId, sourceBotJobI
           setSaving(false); setStatus({ level: body.ok === false ? 'error' : 'ok', text: body.message || 'Clone completed' });
         } else if (operationId === 'cloneJob.actionResponse') {
           setStatus({ level: body.ok === false ? 'error' : 'ok', text: body.message });
+        } else if (operationId === 'react.session.open') {
+          onSessionOpen?.(body.targetSession, body.port, body.botJobId);
         }
       } catch (reason) { console.warn('CloneJobManager ignored socket message', reason, raw); }
     }
     cursor.current = messages.length;
-  }, [messages]);
+  }, [messages, onSessionOpen]);
 
   const chooseEnvironment = (value: string) => {
     setEnvironmentId(value);
