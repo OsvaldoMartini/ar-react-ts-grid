@@ -29,17 +29,17 @@ test('requires a profile name',()=>{
   expect(onSave).not.toHaveBeenCalled();
 });
 
-test('renders outside its owner as an independent non-modal floating workspace',()=>{
+test('renders as a non-modal full-window page without a DOM drag surface',()=>{
   const owner=document.createElement('div');
   document.body.appendChild(owner);
   const onClose=jest.fn();
   const view=render(<OCRConfigPanel data={data} onSelect={jest.fn()} onSave={jest.fn()} onDelete={jest.fn()} onCleanup={jest.fn()} onTest={jest.fn()} onClose={onClose}/>,{container:owner});
   const workspace=screen.getByTestId('ocr-config-workspace');
   expect(workspace.tagName).toBe('SECTION');
-  expect(workspace.parentElement).toBe(document.body);
+  expect(workspace.parentElement).toBe(owner);
   expect(workspace).toHaveAttribute('aria-label','OCR configuration');
   expect(workspace).not.toHaveAttribute('aria-modal');
-  expect(screen.getByTestId('ocr-config-drag-handle')).toHaveAttribute('data-floating-workspace-drag-handle');
+  expect(screen.getByTestId('ocr-config-header')).not.toHaveAttribute('data-floating-workspace-drag-handle');
   fireEvent.click(screen.getByRole('button',{name:'Close OCR configuration'}));
   expect(onClose).toHaveBeenCalledTimes(1);
   view.unmount();

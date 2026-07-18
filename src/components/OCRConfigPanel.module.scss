@@ -1,10 +1,13 @@
 .panel {
-  width: min(1040px, calc(100vw - 32px));
-  height: min(720px, calc(100dvh - 32px));
-  min-width: min(640px, calc(100vw - 16px));
-  min-height: 360px;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
   display: grid;
   grid-template-rows: 58px 1fr auto auto;
+  overflow: hidden;
+  background: #ffffff;
+  font-family: Arial, Helvetica, sans-serif;
 }
 
 .header {
@@ -15,8 +18,7 @@
   gap: 12px;
   background: #0b5394;
   color: #ffffff;
-  cursor: move;
-  touch-action: none;
+  cursor: default;
   user-select: none;
 }
 
@@ -174,10 +176,8 @@
 
 @media (max-width: 760px) {
   .panel {
-    width: calc(100vw - 16px);
-    height: calc(100dvh - 16px);
-    min-width: 0;
-    min-height: 0;
+    width: 100%;
+    height: 100%;
   }
 
   .layout {

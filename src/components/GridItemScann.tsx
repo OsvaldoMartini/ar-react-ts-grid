@@ -21,8 +21,6 @@ import AttributeDropdown from './AttributeDropdown';
 import NameDropdown from './NameDropdown';
 import CreateNewBlock, { CreateBlockOption, CreateBlockPosition } from './CreateNewBlock';
 import OCRPanel from './OCRPanel';
-import OCRConfigPanel, { OCRConfigData, OCRParameter } from './OCRConfigPanel';
-import OCRTestResultsPanel, { OCRTestResult } from './OCRTestResultsPanel';
 import BotJobDetailsChrome from './bot-job-details/BotJobDetailsChrome';
 import { useBotJobDetailsController } from './bot-job-details/useBotJobDetailsController';
 import ScannerWorkspaceHeader from './scanner/ScannerWorkspaceHeader';
@@ -42,6 +40,9 @@ import {
   SCANNER_SUPPORT_REQUEST_RESPONSE_OPERATION,
 } from './scanner/Scanner.operations';
 import {
+  OCR_CONFIG_WORKSPACE_KIND,
+  OCR_RESULTS_WORKSPACE_KIND,
+  type OcrWorkspaceKind,
   SCANNER_ELEMENT_PANE_SESSION_ID,
   PRE_SCANNER_GRID_SESSION_ID,
   SCANNER_GRID_SESSION_ID,
@@ -336,10 +337,8 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   // backend stashes the pre-OCR text in attributeData['scanned-text'] whenever the
   // resolver changed it; rows without it are shown as "same".
   const [ocrReviewBlock, setOcrReviewBlock] = useState<string | null>(null);
-  const [ocrConfig, setOcrConfig] = useState<OCRConfigData | null>(null);
-  const [ocrConfigBusy, setOcrConfigBusy] = useState(false);
-  const [ocrConfigError, setOcrConfigError] = useState('');
-  const [ocrTestResult, setOcrTestResult] = useState<OCRTestResult | null>(null);
+  const [ocrWorkspaceBusy, setOcrWorkspaceBusy] = useState(false);
+  const [ocrWorkspaceError, setOcrWorkspaceError] = useState('');
 
   const scannedTextOf = (el: ElementDTO): string | null => {
     const attrs = (el as any).attributeData as Array<{ name: string; value: string }> | undefined;
@@ -382,14 +381,6 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
       return updated;
     });
   };
-  const acceptOcrSuggestions = (suggestions:Array<{xPath:string;clientNamed:string}>) => {
-    const values = new Map(suggestions.map(item=>[item.xPath,item.clientNamed]));
-    const apply = (element:ElementDTO):ElementDTO => values.has(element.xPath) ? {...element,clientNamed:values.get(element.xPath)} as ElementDTO : element;
-    setElementDTO(previous=>previous.map(apply));
-    setElementGrouped(previous=>Object.fromEntries(Object.entries(previous).map(([key,group])=>[key,{...group,elements:group.elements.map(apply)}])));
-    setOcrTestResult(null);
-  };
-
   const handleApplyMemory = () => {
     if (memoryTargetBlockId === null || memoryElements.length === 0) return;
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
@@ -685,46 +676,11 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
             break;
           }
 
-          case "ocrConfig.bootstrapResponse":
-          case "ocrConfig.profileResponse": {
-            setOcrConfigBusy(false);
-            if (!bodyData?.ok) { setOcrConfigError(String(bodyData?.error || 'OCR configuration could not be loaded.')); break; }
-            setOcrConfig(previous => ({
-              profiles: bodyData.profiles || previous?.profiles || [],
-              activeProfileId: bodyData.profile?.id ?? bodyData.activeProfileId ?? previous?.activeProfileId,
-              categories: bodyData.categories || previous?.categories || [],
-              parameters: bodyData.parameters || [],
-            }));
-            setOcrConfigError('');
-            break;
-          }
-          case "ocrConfig.saveResponse":
-          case "ocrConfig.deleteResponse": {
-            setOcrConfigBusy(false);
-            if (!bodyData?.ok) { setOcrConfigError(String(bodyData?.error || 'OCR profile operation failed.')); break; }
-            sendOcrConfigCommand('ocrConfig.bootstrap', { homeBankingId });
-            break;
-          }
-          case "ocrConfig.cleanupPreviewResponse": {
-            setOcrConfigBusy(false);
-            if (!bodyData?.ok) { setOcrConfigError(String(bodyData?.error || 'Cleanup preview failed.')); break; }
-            const candidates = Array.isArray(bodyData.candidates) ? bodyData.candidates : [];
-            if (!candidates.length) { setOcrConfigError('No orphan locators found.'); break; }
-            const details = candidates.slice(0,10).map((item:any)=>`${item.definedName}: ${item.reason}`).join('\n');
-            if (window.confirm(`Delete ${candidates.length} orphan locator(s)?\n\n${details}${candidates.length>10?'\n...':''}`)) {
-              sendOcrConfigCommand('ocrConfig.cleanupApply',{homeBankingId,confirmed:true});
-            }
-            break;
-          }
-          case "ocrConfig.cleanupApplyResponse": {
-            setOcrConfigBusy(false);
-            setOcrConfigError(bodyData?.ok ? `Cleanup complete: ${Number(bodyData.deleted||0)} locator(s) deleted.` : String(bodyData?.error || 'Cleanup failed.'));
-            break;
-          }
-          case "ocrTest.runResponse": {
-            setOcrConfigBusy(false);
-            if (!bodyData?.ok) { setOcrConfigError(String(bodyData?.error || 'OCR test failed.')); break; }
-            setOcrTestResult(bodyData as OCRTestResult);
+          case "ocrWorkspace.openResponse": {
+            setOcrWorkspaceBusy(false);
+            setOcrWorkspaceError(bodyData?.ok === false
+              ? String(bodyData?.message || bodyData?.error || 'OCR workspace could not be opened.')
+              : '');
             break;
           }
           case "openOcrConfig": {
@@ -1072,14 +1028,50 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     }
   };
 
-  const sendOcrConfigCommand = (type:string, body:Record<string,unknown>) => {
-    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) { setOcrConfigError('WebSocket is not connected.'); return; }
-    setOcrConfigBusy(true);
-    webSocket.send(JSON.stringify({type,sessionId,homeBankingId,body:JSON.stringify(body)}));
+  const openOcrWorkspace = (
+    kind: OcrWorkspaceKind,
+    scope: Record<string, unknown> = {},
+  ) => {
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
+      setOcrWorkspaceError('WebSocket is not connected.');
+      return;
+    }
+
+    const requestedHomeBankingId = Number(scope.homeBankingId ?? homeBankingId);
+    const requestedBotJobId = Number(scope.botJobId ?? botJobId);
+    const requestedHomeUrlId = Number(scope.homeUrlId ?? 0);
+    const parameters = Array.isArray(scope.parameters) ? scope.parameters : [];
+    const requestId = `ocr-${kind}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    const body = {
+      requestId,
+      kind,
+      homeBankingId: requestedHomeBankingId,
+      botJobId: requestedBotJobId,
+      ...(requestedHomeUrlId > 0 ? { homeUrlId: requestedHomeUrlId } : {}),
+      parameters,
+    };
+
+    setOcrWorkspaceBusy(true);
+    setOcrWorkspaceError('');
+    try {
+      webSocket.send(JSON.stringify({
+        type: 'ocrWorkspace.open',
+        sessionId,
+        homeBankingId: requestedHomeBankingId,
+        botJobId: requestedBotJobId,
+        body: JSON.stringify(body),
+      }));
+    } catch (sendError) {
+      setOcrWorkspaceBusy(false);
+      setOcrWorkspaceError(sendError instanceof Error
+        ? sendError.message
+        : 'OCR workspace could not be opened.');
+    }
   };
-  const openOcrConfig = (scope:Record<string,unknown>={homeBankingId}) => { setOcrConfigError(''); setOcrConfig({profiles:[],categories:[],parameters:[]}); sendOcrConfigCommand('ocrConfig.bootstrap',scope); };
-  const saveOcrConfig = (draft:{profileId?:number;name:string;description:string;parameters:OCRParameter[];asNew:boolean}) => sendOcrConfigCommand('ocrConfig.save',{...draft,homeBankingId});
-  const deleteOcrConfig = (profileId:number) => { if(window.confirm('Delete this OCR profile?')) sendOcrConfigCommand('ocrConfig.delete',{profileId,confirmed:true}); };
+  const openOcrConfig = (scope: Record<string, unknown> = {}) =>
+    openOcrWorkspace(OCR_CONFIG_WORKSPACE_KIND, scope);
+  const openOcrResults = (scope: Record<string, unknown> = {}) =>
+    openOcrWorkspace(OCR_RESULTS_WORKSPACE_KIND, scope);
 
   const handleDashboardFocusChange = (value: string) => {
     setDashboardFocus(value);
@@ -1559,6 +1551,11 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
           onOpenOcrConfig={() => openOcrConfig()}
         />
       )}
+      {ocrWorkspaceError && (
+        <p className={styles.ocrWorkspaceError} role="alert">
+          {ocrWorkspaceError}
+        </p>
+      )}
       {isPreScanMode && (
         <div className={styles.preScanDashboard}>
           <div className={`${styles.preScanStatus} ${styles[`preScanStatus_${preScanStatus.status}`]}`}>
@@ -1588,7 +1585,8 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
             <button
               type="button"
               className={styles.preScanIconButton}
-              onClick={()=>openOcrConfig()}
+              onClick={() => openOcrConfig()}
+              disabled={ocrWorkspaceBusy}
               title="OCR Configuration"
             >
               OCR Config
@@ -1596,8 +1594,8 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
             <button
               type="button"
               className={styles.preScanButton}
-              onClick={()=>sendOcrConfigCommand('ocrTest.run',{homeBankingId,parameters:[]})}
-              disabled={preScanStatus.status === 'running' || preScanStatus.status === 'waiting' || ocrConfigBusy}
+              onClick={() => openOcrResults()}
+              disabled={preScanStatus.status === 'running' || preScanStatus.status === 'waiting' || ocrWorkspaceBusy}
               title="Open highlighted OCR results for the newest page scan"
             >
               OCR Results
@@ -1755,28 +1753,6 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
           scannedTextOf={scannedTextOf}
           onDecision={applyOcrDecision}
           onClose={() => setOcrReviewBlock(null)}
-        />
-      )}
-
-      {ocrConfig && (
-        <OCRConfigPanel
-          data={ocrConfig}
-          busy={ocrConfigBusy}
-          error={ocrConfigError}
-          onSelect={profileId => sendOcrConfigCommand('ocrConfig.profile', { profileId })}
-          onSave={saveOcrConfig}
-          onDelete={deleteOcrConfig}
-          onCleanup={() => sendOcrConfigCommand('ocrConfig.cleanupPreview', { homeBankingId })}
-          onTest={parameters => sendOcrConfigCommand('ocrTest.run', { parameters })}
-          onClose={() => setOcrConfig(null)}
-        />
-      )}
-
-      {ocrTestResult && (
-        <OCRTestResultsPanel
-          result={ocrTestResult}
-          onAccept={acceptOcrSuggestions}
-          onClose={() => setOcrTestResult(null)}
         />
       )}
 

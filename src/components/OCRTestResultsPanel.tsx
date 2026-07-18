@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { CheckCheck, GripHorizontal, ScanSearch, X } from 'lucide-react';
-import FloatingWorkspacePortal from './workspace/FloatingWorkspacePortal';
+import { CheckCheck, ScanSearch, X } from 'lucide-react';
 import styles from './OCRTestResultsPanel.module.scss';
 
 export type OCRTestRow = {
@@ -26,11 +25,6 @@ type Props = {
   onClose: () => void;
 };
 
-const initialPosition = () => {
-  const viewportHeight = typeof window === 'undefined' ? 820 : window.innerHeight;
-  return { x: 16, y: Math.max(16, Math.min(40, viewportHeight - 360)) };
-};
-
 const OCRTestResultsPanel: React.FC<Props> = ({ result, onAccept, onClose }) => {
   const [approved, setApproved] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<OCRTestRow | null>(result.rows[0] || null);
@@ -50,20 +44,16 @@ const OCRTestResultsPanel: React.FC<Props> = ({ result, onAccept, onClose }) => 
   });
 
   return (
-    <FloatingWorkspacePortal
+    <section
       className={styles.panel}
-      initialPosition={initialPosition}
-      initialZIndex={10030}
       aria-label="OCR test results"
       data-testid="ocr-results-workspace"
     >
       <header
         className={styles.header}
-        data-testid="ocr-results-drag-handle"
-        data-floating-workspace-drag-handle
+        data-testid="ocr-results-header"
       >
         <div className={styles.heading}>
-          <GripHorizontal size={18} aria-hidden="true" />
           <ScanSearch size={20} aria-hidden="true" />
           <span>
             <strong>OCR test results</strong>
@@ -131,7 +121,7 @@ const OCRTestResultsPanel: React.FC<Props> = ({ result, onAccept, onClose }) => 
           <CheckCheck size={15} aria-hidden="true" />Accept OCR names ({suggestions.length})
         </button>
       </footer>
-    </FloatingWorkspacePortal>
+    </section>
   );
 };
 

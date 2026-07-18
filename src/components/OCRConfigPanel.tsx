@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Eraser, GripHorizontal, Play, Save, Settings2, Trash2, X } from 'lucide-react';
-import FloatingWorkspacePortal from './workspace/FloatingWorkspacePortal';
+import { Eraser, Play, Save, Settings2, Trash2, X } from 'lucide-react';
 import styles from './OCRConfigPanel.module.scss';
 
 export type OCRProfile = {
@@ -47,16 +46,6 @@ type Props = {
   onCleanup: () => void;
   onTest: (parameters: OCRParameter[]) => void;
   onClose: () => void;
-};
-
-const initialPosition = () => {
-  const viewportWidth = typeof window === 'undefined' ? 1280 : window.innerWidth;
-  const viewportHeight = typeof window === 'undefined' ? 820 : window.innerHeight;
-  const width = Math.min(1040, Math.max(320, viewportWidth - 32));
-  return {
-    x: Math.max(16, viewportWidth - width - 32),
-    y: Math.max(16, Math.min(64, viewportHeight - 360)),
-  };
 };
 
 const OCRConfigPanel: React.FC<Props> = ({
@@ -111,20 +100,16 @@ const OCRConfigPanel: React.FC<Props> = ({
   };
 
   return (
-    <FloatingWorkspacePortal
+    <section
       className={styles.panel}
-      initialPosition={initialPosition}
-      initialZIndex={10020}
       aria-label="OCR configuration"
       data-testid="ocr-config-workspace"
     >
       <header
         className={styles.header}
-        data-testid="ocr-config-drag-handle"
-        data-floating-workspace-drag-handle
+        data-testid="ocr-config-header"
       >
         <div className={styles.heading}>
-          <GripHorizontal size={18} aria-hidden="true" />
           <Settings2 size={20} aria-hidden="true" />
           <span>
             <strong>OCR configuration</strong>
@@ -216,7 +201,7 @@ const OCRConfigPanel: React.FC<Props> = ({
           <Save size={15} aria-hidden="true" />Save
         </button>
       </footer>
-    </FloatingWorkspacePortal>
+    </section>
   );
 };
 

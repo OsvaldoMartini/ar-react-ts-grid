@@ -21,7 +21,13 @@ import LicenseManager from './components/LicenseManager';
 import AboutPanel from './components/AboutPanel';
 import DesktopWorkspaceShell from './components/workspace/DesktopWorkspaceShell';
 import ActivationRequired from './components/ActivationRequired';
+import OCRConfigWorkspace from './components/ocr/OCRConfigWorkspace';
+import OCRResultsWorkspace from './components/ocr/OCRResultsWorkspace';
 import {
+  OCR_CONFIG_WORKSPACE_KIND,
+  OCR_CONFIG_WORKSPACE_SESSION_PREFIX,
+  OCR_RESULTS_WORKSPACE_KIND,
+  OCR_RESULTS_WORKSPACE_SESSION_PREFIX,
   PRE_SCANNER_GRID_SESSION_ID,
   SCANNER_GRID_SESSION_ID,
 } from './components/scanner/Scanner.sessions';
@@ -71,7 +77,29 @@ const App: React.FC = () => {
   // A Bot Job opened by the Java host gets its own Chromium application window. Its URL carries
   // the job id directly, so the address-bar-free shell can bootstrap without another handshake.
   useEffect(() => {
-    const openBotJobId = new URLSearchParams(window.location.search).get('openBotJob');
+    const search = new URLSearchParams(window.location.search);
+    const openOcr = search.get('openOcr');
+    const ocrSession = search.get('ocrSession');
+    if (openOcr || ocrSession) {
+      const validConfig = openOcr === OCR_CONFIG_WORKSPACE_KIND
+        && Boolean(
+          ocrSession?.startsWith(OCR_CONFIG_WORKSPACE_SESSION_PREFIX)
+          && ocrSession.length > OCR_CONFIG_WORKSPACE_SESSION_PREFIX.length,
+        );
+      const validResults = openOcr === OCR_RESULTS_WORKSPACE_KIND
+        && Boolean(
+          ocrSession?.startsWith(OCR_RESULTS_WORKSPACE_SESSION_PREFIX)
+          && ocrSession.length > OCR_RESULTS_WORKSPACE_SESSION_PREFIX.length,
+        );
+      if (!ocrSession || (!validConfig && !validResults)) {
+        console.error('Rejected invalid detached OCR workspace route.');
+        return;
+      }
+      onSessionOpen(ocrSession, Number(window.location.port));
+      return;
+    }
+
+    const openBotJobId = search.get('openBotJob');
     if (!openBotJobId) return;
     const parsedBotJobId = Number(openBotJobId);
     onSessionOpen('botJobTasks', Number(window.location.port), Number.isNaN(parsedBotJobId) ? undefined : parsedBotJobId);
@@ -83,7 +111,8 @@ const App: React.FC = () => {
   // the real session (e.g. MainDashboard's own socket) can register under that id without
   // colliding with this one. Skipped entirely for a Bot Job app window (see above).
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).has('openBotJob')) return;
+    const search = new URLSearchParams(window.location.search);
+    if (search.has('openBotJob') || search.has('openOcr') || search.has('ocrSession')) return;
     const ws = new WebSocket(`ws://${window.location.hostname}:${window.location.port}/websocket?sessionId=mainDashboardBootstrap`);
 
     ws.onmessage = (event) => {
@@ -214,6 +243,16 @@ const App: React.FC = () => {
       {sessionId && (sessionId.includes(PRE_SCANNER_GRID_SESSION_ID)) && (
         <DesktopWorkspaceShell ariaLabel="Page Scanner Grid" testId="pre-scan-workspace">
           <GridItemScann mode="preScan" homeBankingIdInitial={homeBanking} dataDTO={elementDTO} socketPort={socketPort} sessionId={sessionId} botJobIdInitial={botJobId} botJobNameInitial={botJobName} onSessionOpen={onSessionOpen} />
+        </DesktopWorkspaceShell>
+      )}
+      {sessionId.startsWith(OCR_CONFIG_WORKSPACE_SESSION_PREFIX) && (
+        <DesktopWorkspaceShell ariaLabel="OCR configuration" testId="ocr-config-window">
+          <OCRConfigWorkspace socketPort={socketPort} sessionId={sessionId} />
+        </DesktopWorkspaceShell>
+      )}
+      {sessionId.startsWith(OCR_RESULTS_WORKSPACE_SESSION_PREFIX) && (
+        <DesktopWorkspaceShell ariaLabel="OCR test results" testId="ocr-results-window">
+          <OCRResultsWorkspace socketPort={socketPort} sessionId={sessionId} />
         </DesktopWorkspaceShell>
       )}
       {sessionId && (sessionId.includes("mobileScannerGrid")) && (
