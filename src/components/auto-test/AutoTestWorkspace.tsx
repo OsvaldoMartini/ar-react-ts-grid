@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { FlaskConical, GripHorizontal, RefreshCw, Search, ShieldAlert, X } from 'lucide-react';
+import FloatingWorkspaceFrame from '../workspace/FloatingWorkspaceFrame';
 import styles from './AutoTestWorkspace.module.scss';
 
 export interface AutomationTestEntry {
@@ -65,8 +66,6 @@ type Props = {
   onClose: () => void;
 };
 
-type Position = { x: number; y: number };
-
 const formatToken = (value: string) =>
   value
     .toLowerCase()
@@ -74,7 +73,7 @@ const formatToken = (value: string) =>
     .map(part => part ? part[0].toUpperCase() + part.slice(1) : part)
     .join(' ');
 
-const initialPosition = (): Position => {
+const initialPosition = () => {
   const width = Math.min(1120, Math.max(320, window.innerWidth - 32));
   return {
     x: Math.max(16, Math.round((window.innerWidth - width) / 2)),
@@ -83,8 +82,6 @@ const initialPosition = (): Position => {
 };
 
 const AutoTestWorkspace: React.FC<Props> = ({ catalog, loading, error, onRefresh, onClose }) => {
-  const panelRef = useRef<HTMLElement | null>(null);
-  const [position, setPosition] = useState<Position>(initialPosition);
   const [findText, setFindText] = useState('');
   const [project, setProject] = useState('ALL');
   const [kind, setKind] = useState('ALL');
@@ -94,47 +91,9 @@ const AutoTestWorkspace: React.FC<Props> = ({ catalog, loading, error, onRefresh
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
     };
-    const keepInsideViewport = () => {
-      const bounds = panelRef.current?.getBoundingClientRect();
-      if (!bounds) return;
-      setPosition(previous => ({
-        x: Math.min(Math.max(8, previous.x), Math.max(8, window.innerWidth - bounds.width - 8)),
-        y: Math.min(Math.max(8, previous.y), Math.max(8, window.innerHeight - 56)),
-      }));
-    };
     document.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('resize', keepInsideViewport);
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('resize', keepInsideViewport);
-    };
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
-
-  const startDrag = (event: React.MouseEvent<HTMLElement>) => {
-    if (event.button !== 0 || (event.target as HTMLElement).closest('button, input, select, a')) return;
-    event.preventDefault();
-    const startX = event.clientX;
-    const startY = event.clientY;
-    const startPosition = position;
-    const bounds = panelRef.current?.getBoundingClientRect();
-    const width = bounds?.width || 0;
-    const height = bounds?.height || 0;
-
-    const move = (moveEvent: MouseEvent) => {
-      const requestedX = startPosition.x + moveEvent.clientX - startX;
-      const requestedY = startPosition.y + moveEvent.clientY - startY;
-      setPosition({
-        x: Math.min(Math.max(8, requestedX), Math.max(8, window.innerWidth - width - 8)),
-        y: Math.min(Math.max(8, requestedY), Math.max(8, window.innerHeight - Math.min(height, 56))),
-      });
-    };
-    const stop = () => {
-      document.removeEventListener('mousemove', move);
-      document.removeEventListener('mouseup', stop);
-    };
-    document.addEventListener('mousemove', move);
-    document.addEventListener('mouseup', stop);
-  };
 
   const entries = useMemo(() => catalog?.tests || [], [catalog]);
   const projects = useMemo(
@@ -181,14 +140,17 @@ const AutoTestWorkspace: React.FC<Props> = ({ catalog, loading, error, onRefresh
     : 'Not loaded';
 
   return (
-    <section
-      ref={panelRef}
+    <FloatingWorkspaceFrame
       className={styles.panel}
-      style={{ left: position.x, top: position.y }}
+      initialPosition={initialPosition}
       aria-label="Auto Test automation catalog"
       data-testid="auto-test-workspace"
     >
-      <header className={styles.header} onMouseDown={startDrag} data-testid="auto-test-drag-handle">
+      <header
+        className={styles.header}
+        data-testid="auto-test-drag-handle"
+        data-floating-workspace-drag-handle
+      >
         <div className={styles.heading}>
           <GripHorizontal size={18} aria-hidden="true" />
           <FlaskConical size={22} aria-hidden="true" />
@@ -313,7 +275,7 @@ const AutoTestWorkspace: React.FC<Props> = ({ catalog, loading, error, onRefresh
           </table>
         )}
       </div>
-    </section>
+    </FloatingWorkspaceFrame>
   );
 };
 

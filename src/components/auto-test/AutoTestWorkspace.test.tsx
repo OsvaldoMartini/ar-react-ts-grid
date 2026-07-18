@@ -100,5 +100,7 @@ test('exposes refresh, close, and non-modal draggable workspace controls', () =>
   fireEvent.click(screen.getByRole('button', { name: 'Close Auto Test' }));
   expect(onClose).toHaveBeenCalledTimes(1);
   expect(screen.getByTestId('auto-test-drag-handle')).toBeInTheDocument();
+  expect(screen.getByLabelText('Auto Test automation catalog').tagName).toBe('SECTION');
+  expect(screen.getByLabelText('Auto Test automation catalog')).not.toHaveAttribute('aria-modal');
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 });

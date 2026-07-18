@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, FlaskConical, ShieldCheck, User } from 'lucide-react';
+import { ChevronDown, FlaskConical, GripHorizontal, ShieldCheck, User } from 'lucide-react';
 import AutoTestWorkspace, { AutomationTestCatalog } from './auto-test/AutoTestWorkspace';
+import FloatingWorkspaceFrame from './workspace/FloatingWorkspaceFrame';
 import styles from './MainDashboard.module.scss';
 import { useWebSocket } from './useWebSocket';
 
@@ -91,6 +92,15 @@ function responseMessage(body: any, fallback: string): string {
     fallback
   );
 }
+
+const initialDashboardPosition = () => {
+  const width = Math.min(1240, Math.max(0, window.innerWidth - 32));
+  const height = Math.min(820, Math.max(0, window.innerHeight - 32));
+  return {
+    x: Math.max(16, Math.round((window.innerWidth - width) / 2)),
+    y: Math.max(16, Math.round((window.innerHeight - height) / 2)),
+  };
+};
 
 const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, onSessionOpen }) => {
   const { webSocket, connected, messages, error } = useWebSocket(socketPort, sessionId);
@@ -314,13 +324,25 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, on
 
   return (
     <main className={styles.shell}>
-      <section className={styles.window}>
-        <header className={styles.topBar}>
+      <FloatingWorkspaceFrame
+        className={styles.window}
+        initialPosition={initialDashboardPosition}
+        aria-label="Main Dashboard"
+        data-testid="main-dashboard-workspace"
+      >
+        <header
+          className={styles.topBar}
+          data-testid="main-dashboard-drag-handle"
+          data-floating-workspace-drag-handle
+        >
           <div className={styles.titleBlock}>
-            <h1 className={styles.title}>AR Web</h1>
-            <p className={styles.subtitle}>Main Dashboard</p>
+            <GripHorizontal className={styles.dragGrip} size={18} aria-hidden="true" />
+            <div className={styles.titleText}>
+              <h1 className={styles.title}>AR Web</h1>
+              <p className={styles.subtitle}>Main Dashboard</p>
+            </div>
           </div>
-          <div className={styles.topBarRight}>
+          <div className={styles.topBarRight} data-floating-drag-ignore>
             <div className={`${styles.status} ${statusClass}`}>{status.text}</div>
             <div className={styles.userMenu} ref={userMenuRef}>
               <button
@@ -517,7 +539,7 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, on
             onClose={() => setAutoTestOpen(false)}
           />
         )}
-      </section>
+      </FloatingWorkspaceFrame>
     </main>
   );
 };

@@ -1,25 +1,9 @@
 .panel {
-  position: fixed;
   z-index: 10000;
   width: min(1120px, calc(100vw - 32px));
   height: min(760px, calc(100vh - 48px));
   min-width: min(720px, calc(100vw - 16px));
   min-height: 360px;
-  border: 1px solid #0b5394;
-  border-radius: 8px;
-  background: #ffffff;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
-  color: #1f2933;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  font-family: Arial, Helvetica, sans-serif;
-}
-
-.panel *,
-.panel *::before,
-.panel *::after {
-  box-sizing: border-box;
 }
 
 .header {
@@ -32,6 +16,7 @@
   background: #0b5394;
   color: #ffffff;
   cursor: move;
+  touch-action: none;
   user-select: none;
 }
 

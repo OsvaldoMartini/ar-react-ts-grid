@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import automationCatalog from './fixtures/automation-catalog.json';
 
 const botJobs = [
@@ -162,6 +162,17 @@ const operationCount = (page: Page, type: string) =>
     return state.requests.filter(request => request.type === operation).length;
   }, type);
 
+const dragBy = async (page: Page, handle: Locator, deltaX: number, deltaY: number) => {
+  const bounds = await handle.boundingBox();
+  expect(bounds).not.toBeNull();
+  const startX = bounds!.x + Math.min(48, bounds!.width / 2);
+  const startY = bounds!.y + bounds!.height / 2;
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX + deltaX, startY + deltaY, { steps: 5 });
+  await page.mouse.up();
+};
+
 test('navigates every safe dashboard control and the Auto Test workspace without a backend', async ({ page }) => {
   const pageErrors: string[] = [];
   page.on('pageerror', error => pageErrors.push(error.message));
@@ -172,6 +183,21 @@ test('navigates every safe dashboard control and the Auto Test workspace without
   await expect(page.getByText('Loaded 2 bot jobs')).toBeVisible();
   await expect.poll(() => operationCount(page, 'mainDashboard.list')).toBeGreaterThan(0);
   await expect.poll(() => operationCount(page, 'license.bootstrap')).toBeGreaterThan(0);
+
+  const dashboard = page.getByRole('region', { name: 'Main Dashboard' });
+  await expect(dashboard).toBeVisible();
+  await expect(dashboard).toHaveAttribute('data-testid', 'main-dashboard-workspace');
+  expect(await dashboard.getAttribute('aria-modal')).toBeNull();
+  expect(await dashboard.evaluate(element => window.getComputedStyle(element).position)).toBe('fixed');
+  await expect(page.locator('[role="dialog"]')).toHaveCount(0);
+
+  const dashboardBeforeDrag = await dashboard.boundingBox();
+  expect(dashboardBeforeDrag).not.toBeNull();
+  await dragBy(page, dashboard.getByTestId('main-dashboard-drag-handle'), 72, 44);
+  const dashboardAfterDrag = await dashboard.boundingBox();
+  expect(dashboardAfterDrag).not.toBeNull();
+  expect(dashboardAfterDrag!.x).toBeGreaterThan(dashboardBeforeDrag!.x + 20);
+  expect(dashboardAfterDrag!.y).toBeGreaterThan(dashboardBeforeDrag!.y + 20);
 
   await expect(page.getByRole('button', { name: 'Clone Job' })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Launch' })).toBeDisabled();
@@ -227,7 +253,13 @@ test('navigates every safe dashboard control and the Auto Test workspace without
   await expect(suppliedUserIcon.locator('path[d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"]')).toHaveCount(1);
   await expect(suppliedUserIcon.locator('circle[cx="12"][cy="7"][r="4"]')).toHaveCount(1);
 
+  const dashboardBeforeMenu = await dashboard.boundingBox();
   await userMenuButton.click();
+  const dashboardAfterMenu = await dashboard.boundingBox();
+  expect(dashboardBeforeMenu).not.toBeNull();
+  expect(dashboardAfterMenu).not.toBeNull();
+  expect(Math.abs(dashboardAfterMenu!.x - dashboardBeforeMenu!.x)).toBeLessThan(1);
+  expect(Math.abs(dashboardAfterMenu!.y - dashboardBeforeMenu!.y)).toBeLessThan(1);
   const userMenu = page.getByRole('menu', { name: 'User menu' });
   await expect(userMenu).toBeVisible();
   await expect(userMenu.getByText('Licensed user')).toBeVisible();
@@ -238,6 +270,8 @@ test('navigates every safe dashboard control and the Auto Test workspace without
 
   const workspace = page.getByRole('region', { name: 'Auto Test automation catalog' });
   await expect(workspace).toBeVisible();
+  await expect(dashboard).toBeVisible();
+  expect(await dashboard.getAttribute('aria-modal')).toBeNull();
   await expect(workspace.getByRole('heading', { name: 'Auto Test' })).toBeVisible();
   await expect(workspace.getByText('3', { exact: true }).first()).toBeVisible();
   await expect(workspace.locator('tbody tr')).toHaveCount(4);
@@ -252,25 +286,44 @@ test('navigates every safe dashboard control and the Auto Test workspace without
   await workspace.getByRole('button', { name: 'Clear' }).click();
   await expect(workspace.locator('tbody tr')).toHaveCount(4);
 
+  const dashboardBeforeAutoTestDrag = await dashboard.boundingBox();
   const beforeDrag = await workspace.boundingBox();
-  const dragHandle = workspace.getByTestId('auto-test-drag-handle');
-  const handleBox = await dragHandle.boundingBox();
   expect(beforeDrag).not.toBeNull();
-  expect(handleBox).not.toBeNull();
-  await page.mouse.move(handleBox!.x + 120, handleBox!.y + 20);
-  await page.mouse.down();
-  await page.mouse.move(handleBox!.x + 200, handleBox!.y + 70, { steps: 5 });
-  await page.mouse.up();
+  await dragBy(page, workspace.getByTestId('auto-test-drag-handle'), 80, 50);
   const afterDrag = await workspace.boundingBox();
+  const dashboardAfterAutoTestDrag = await dashboard.boundingBox();
   expect(afterDrag).not.toBeNull();
+  expect(dashboardBeforeAutoTestDrag).not.toBeNull();
+  expect(dashboardAfterAutoTestDrag).not.toBeNull();
   expect(afterDrag!.x).toBeGreaterThan(beforeDrag!.x + 40);
   expect(afterDrag!.y).toBeGreaterThan(beforeDrag!.y + 20);
+  expect(Math.abs(dashboardAfterAutoTestDrag!.x - dashboardBeforeAutoTestDrag!.x)).toBeLessThan(1);
+  expect(Math.abs(dashboardAfterAutoTestDrag!.y - dashboardBeforeAutoTestDrag!.y)).toBeLessThan(1);
 
   const catalogRequestsBeforeRefresh = await operationCount(page, 'automationTests.list');
   await workspace.getByRole('button', { name: 'Refresh test catalog' }).click();
   await expect.poll(() => operationCount(page, 'automationTests.list')).toBeGreaterThan(catalogRequestsBeforeRefresh);
   await workspace.getByRole('button', { name: 'Close Auto Test' }).click();
   await expect(workspace).toHaveCount(0);
+  await expect(dashboard).toBeVisible();
+
+  await page.setViewportSize({ width: 700, height: 900 });
+  await expect.poll(async () => {
+    const bounds = await dashboard.boundingBox();
+    return Boolean(
+      bounds
+      && bounds.x >= 7
+      && bounds.x + bounds.width <= 701
+      && bounds.y >= 7
+      && bounds.y < 900,
+    );
+  }).toBe(true);
+  await expect(dashboard.getByTestId('main-dashboard-drag-handle')).toBeVisible();
+  await expect(userMenuButton).toBeVisible();
+  const listRequestsBeforeResponsiveRefresh = await operationCount(page, 'mainDashboard.list');
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect.poll(() => operationCount(page, 'mainDashboard.list'))
+    .toBeGreaterThan(listRequestsBeforeResponsiveRefresh);
 
   const expectedOperations = [
     'mainDashboard.openOrganizations',
