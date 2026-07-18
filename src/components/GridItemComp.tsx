@@ -64,6 +64,7 @@ interface GridItemCompProps {
   sessionId: string;
   botJobIdInitial: number;
   botJobNameInitial: string;
+  onSessionOpen: (targetSession: string, port: number, botJobId?: number) => void;
 }
 type BlockDeleteCapability = { canDelete: boolean; reason: string; instructionCount: number; deleteRows: { id: number; name: string; action: string; order: number }[] };
 
@@ -114,7 +115,7 @@ const reassignInstructionOrderNumbersByBlock = (instructions: ComponentsInstruct
   return updatedInstructions;
 };
 
-const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataComp, socketPort, sessionId, botJobIdInitial, botJobNameInitial }) => {
+const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataComp, socketPort, sessionId, botJobIdInitial, botJobNameInitial, onSessionOpen }) => {
   // Using the custom WebSocket hook
   const { webSocket, connected, reconnectAttempts, messages, error } = useWebSocket(socketPort, sessionId);
 
@@ -130,6 +131,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
   const [botJobName, setBotJobName] = useState<string | null>(botJobNameInitial);
   const botJobHeader = useBotJobDetailsController({
     webSocket, connected, messages, sessionId, homeBankingId, botJobId,
+    onSurfaceOpen: (targetSession, nextBotJobId) => onSessionOpen(targetSession, socketPort, nextBotJobId),
   });
 
   useEffect(() => {

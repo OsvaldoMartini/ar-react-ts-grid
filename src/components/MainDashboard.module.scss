@@ -681,3 +681,19 @@
   border-top: 1px solid #d9d9d9;
   background: #ececec;
 }
+
+.shell.desktopShell {
+  background: #ffffff;
+}
+
+.window.desktopShellWindow {
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.desktopShell .topBar {
+  cursor: default;
+}

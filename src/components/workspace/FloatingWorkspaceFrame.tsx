@@ -8,6 +8,7 @@ type Props = Omit<React.HTMLAttributes<HTMLElement>, 'children' | 'onPointerDown
   edgeMargin?: number;
   visibleHeaderHeight?: number;
   dragHandleSelector?: string;
+  dragEnabled?: boolean;
   children: React.ReactNode;
 };
 
@@ -27,6 +28,7 @@ const FloatingWorkspaceFrame: React.FC<Props> = ({
   edgeMargin = 8,
   visibleHeaderHeight = 56,
   dragHandleSelector = DEFAULT_DRAG_HANDLE_SELECTOR,
+  dragEnabled = true,
   children,
   className,
   style,
@@ -73,7 +75,8 @@ const FloatingWorkspaceFrame: React.FC<Props> = ({
   const startDrag = useCallback<React.PointerEventHandler<HTMLElement>>((event) => {
     const target = event.target as HTMLElement;
     if (
-      event.button !== 0
+      !dragEnabled
+      || event.button !== 0
       || !target.closest(dragHandleSelector)
       || target.closest(INTERACTIVE_SELECTOR)
     ) return;
@@ -115,7 +118,7 @@ const FloatingWorkspaceFrame: React.FC<Props> = ({
     window.addEventListener('pointerup', stop);
     window.addEventListener('pointercancel', stop);
     stopActiveDragRef.current = stopDrag;
-  }, [clampPosition, dragHandleSelector]);
+  }, [clampPosition, dragEnabled, dragHandleSelector]);
 
   return (
     <section

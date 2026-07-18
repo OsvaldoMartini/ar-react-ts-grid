@@ -13,11 +13,17 @@ const state: BotJobDetailsState = {
   executionState: 'IDLE', activeSurface: 'botJob', componentsVisible: false,
 };
 
-interface HarnessProps { socket: WebSocket; messages: string[]; botJobId?: number }
+interface HarnessProps {
+  socket: WebSocket;
+  messages: string[];
+  botJobId?: number;
+  onSurfaceOpen?: (targetSession: string, botJobId: number) => void;
+}
 
-const Harness: React.FC<HarnessProps> = ({ socket, messages, botJobId = 42 }) => {
+const Harness: React.FC<HarnessProps> = ({ socket, messages, botJobId = 42, onSurfaceOpen }) => {
   const controller = useBotJobDetailsController({
     webSocket: socket, connected: true, messages, sessionId: 'botJobTasks', homeBankingId: 7, botJobId,
+    onSurfaceOpen,
   });
   return <div>
     <span data-testid="job-name">{controller.state?.name || ''}</span>
@@ -31,6 +37,7 @@ const Harness: React.FC<HarnessProps> = ({ socket, messages, botJobId = 42 }) =>
     <span data-testid="status">{controller.status}</span>
     <button type="button" onClick={() => controller.saveMetadata({ expectedMetadataRevision: 3, name: 'Payments QA', description: 'Flow', homeUrlId: 8 })}>Save metadata</button>
     <button type="button" onClick={() => controller.sendAction('SHOW_COMPONENTS')}>Show components</button>
+    <button type="button" onClick={() => controller.sendAction('SHOW_PRE_SCAN')}>Show pre scan</button>
     <button type="button" onClick={() => controller.sendToolbarAction('CHOOSE_TRANSFER_PATH')}>Choose transfer folder</button>
     <button type="button" onClick={() => controller.sendToolbarAction('EXPORT_JOB', { confirmed: true, transferPath: 'D:\\exports' })}>Export toolbar</button>
     <button type="button" onClick={() => controller.sendToolbarAction('TEST_RUN', { executionMode: 'ALL', blockId: 0 })}>Start test run</button>
@@ -48,12 +55,17 @@ function sentBody(send: jest.Mock, index: number): Record<string, any> {
   return JSON.parse(JSON.parse(send.mock.calls[index][0]).body);
 }
 
-async function completeBootstrap(view: ReturnType<typeof render>, socket: WebSocket, send: jest.Mock): Promise<string[]> {
+async function completeBootstrap(
+  view: ReturnType<typeof render>,
+  socket: WebSocket,
+  send: jest.Mock,
+  onSurfaceOpen?: HarnessProps['onSurfaceOpen'],
+): Promise<string[]> {
   await waitFor(() => expect(send).toHaveBeenCalledTimes(1));
   const message = response('botJobDetails.bootstrapResponse', {
     ok: true, botJobId: 42, requestId: sentBody(send, 0).requestId, state,
   });
-  view.rerender(<Harness socket={socket} messages={[message]} />);
+  view.rerender(<Harness socket={socket} messages={[message]} onSurfaceOpen={onSurfaceOpen} />);
   await waitFor(() => expect(screen.getByTestId('job-name')).toHaveTextContent('Payments'));
   return [message];
 }
@@ -108,6 +120,54 @@ test('requires matching action and a successful known surface before updating wo
   })];
   view.rerender(<Harness socket={socket} messages={messages} />);
   await waitFor(() => expect(screen.getByTestId('surface')).toHaveTextContent('components'));
+});
+
+test('opens the Pre Scan surface only after a successful correlated action response', async () => {
+  const send = jest.fn();
+  const onSurfaceOpen = jest.fn();
+  const socket = { readyState: WebSocket.OPEN, send } as unknown as WebSocket;
+  const view = render(<Harness socket={socket} messages={[]} onSurfaceOpen={onSurfaceOpen} />);
+  let messages = await completeBootstrap(view, socket, send, onSurfaceOpen);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Show pre scan' }));
+  const firstRequest = sentBody(send, 1);
+
+  messages = [...messages, response('botJobDetails.actionResponse', {
+    ok: true,
+    botJobId: 42,
+    requestId: firstRequest.requestId,
+    action: 'SHOW_COMPONENTS',
+    activeSurface: 'preScan',
+  })];
+  view.rerender(<Harness socket={socket} messages={messages} onSurfaceOpen={onSurfaceOpen} />);
+  expect(onSurfaceOpen).not.toHaveBeenCalled();
+
+  messages = [...messages, response('botJobDetails.actionResponse', {
+    ok: false,
+    botJobId: 42,
+    requestId: firstRequest.requestId,
+    action: 'SHOW_PRE_SCAN',
+    activeSurface: 'preScan',
+    message: 'Pre Scan unavailable',
+  })];
+  view.rerender(<Harness socket={socket} messages={messages} onSurfaceOpen={onSurfaceOpen} />);
+  await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('Pre Scan unavailable'));
+  expect(onSurfaceOpen).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Show pre scan' }));
+  const successRequest = sentBody(send, 2);
+  messages = [...messages, response('botJobDetails.actionResponse', {
+    ok: true,
+    botJobId: 42,
+    requestId: successRequest.requestId,
+    action: 'SHOW_PRE_SCAN',
+    activeSurface: 'preScan',
+    componentsVisible: false,
+  })];
+  view.rerender(<Harness socket={socket} messages={messages} onSurfaceOpen={onSurfaceOpen} />);
+
+  await waitFor(() => expect(onSurfaceOpen).toHaveBeenCalledWith('preScannerGrid', 42));
+  expect(onSurfaceOpen).toHaveBeenCalledTimes(1);
 });
 
 test('matches metadata response operation before applying its state', async () => {

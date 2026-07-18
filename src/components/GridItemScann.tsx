@@ -58,6 +58,7 @@ interface GridItemScannProps {
   socketPort: number;
   sessionId: string;
   mode?: 'scanner' | 'preScan';
+  onSessionOpen: (targetSession: string, port: number, botJobId?: number) => void;
 }
 
 // Canonical group buckets. The scanner's DECIDED category (typeElement) wins over
@@ -132,7 +133,7 @@ const PRE_SCAN_FOCUS_PROFILES = [
   { value: 'data-ids', label: 'Data/test id attributes', searchText: 'data-testid, data-test, data-cy, data-qa, id, name' },
 ];
 
-const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, botJobIdInitial, botJobNameInitial, dataDTO, socketPort, sessionId, mode = 'scanner' }) => {
+const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, botJobIdInitial, botJobNameInitial, dataDTO, socketPort, sessionId, mode = 'scanner', onSessionOpen }) => {
   // Using the custom WebSocket hook
   const { webSocket, connected, reconnectAttempts, messages, error } = useWebSocket(socketPort, sessionId);
 
@@ -165,6 +166,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   const isPreScanMode = mode === 'preScan' || sessionId.includes(PRE_SCANNER_GRID_SESSION_ID);
   const botJobHeader = useBotJobDetailsController({
     webSocket, connected, messages, sessionId, homeBankingId, botJobId, enabled: isPreScanMode,
+    onSurfaceOpen: (targetSession, nextBotJobId) => onSessionOpen(targetSession, socketPort, nextBotJobId),
   });
   const scannerController = useScannerController({
     webSocket, connected, messages, sessionId, homeBankingId, botJobId, enabled: !isPreScanMode,
@@ -1534,7 +1536,13 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
           fallbackBotJobName={botJobName}
           fallbackSurface="preScan"
           connected={connected}
-          controller={botJobHeader}
+          controller={{
+            ...botJobHeader,
+            sendAction: (action: Parameters<typeof botJobHeader.sendAction>[0]) => {
+              if (action === 'CLOSE') window.close();
+              botJobHeader.sendAction(action);
+            },
+          }}
         />
       ) : (
         <ScannerWorkspaceHeader

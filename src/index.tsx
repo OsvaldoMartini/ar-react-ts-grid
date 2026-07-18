@@ -19,6 +19,7 @@ import CloneJobManager from './components/CloneJobManager';
 import ConfigManager from './components/ConfigManager';
 import LicenseManager from './components/LicenseManager';
 import AboutPanel from './components/AboutPanel';
+import DesktopWorkspaceShell from './components/workspace/DesktopWorkspaceShell';
 import ActivationRequired from './components/ActivationRequired';
 import {
   PRE_SCANNER_GRID_SESSION_ID,
@@ -67,10 +68,8 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // A Bot Job opened via "Open Job" is a real new browser tab (see MainDashboard's Open Job
-  // handler), not a session switch inside the dashboard's own tab. Its URL carries the job id
-  // directly, so this tab can bootstrap itself client-side -- no WebSocket handshake needed, same
-  // origin/port as the page itself.
+  // A Bot Job opened by the Java host gets its own Chromium application window. Its URL carries
+  // the job id directly, so the address-bar-free shell can bootstrap without another handshake.
   useEffect(() => {
     const openBotJobId = new URLSearchParams(window.location.search).get('openBotJob');
     if (!openBotJobId) return;
@@ -82,7 +81,7 @@ const App: React.FC = () => {
   // session id ("mainDashboardBootstrap", never a real target session) and waits for the initial
   // "react.session.open" reply to learn which session/port to start on. It closes right after so
   // the real session (e.g. MainDashboard's own socket) can register under that id without
-  // colliding with this one. Skipped entirely for a Bot Job tab (see above).
+  // colliding with this one. Skipped entirely for a Bot Job app window (see above).
   useEffect(() => {
     if (new URLSearchParams(window.location.search).has('openBotJob')) return;
     const ws = new WebSocket(`ws://${window.location.hostname}:${window.location.port}/websocket?sessionId=mainDashboardBootstrap`);
@@ -195,19 +194,27 @@ const App: React.FC = () => {
         />
       )}
       {sessionId && (sessionId.includes("botJobTasks")) && (
-        <GridItem homeBankingIdInitial={homeBanking} data={instructionsData} socketPort={socketPort} sessionId={sessionId} botJobIdInitial={botJobId} botJobNameInitial={botJobName} />
+        <DesktopWorkspaceShell ariaLabel="Bot Job Details" testId="bot-job-details-workspace">
+          <GridItem homeBankingIdInitial={homeBanking} data={instructionsData} socketPort={socketPort} sessionId={sessionId} botJobIdInitial={botJobId} botJobNameInitial={botJobName} onSessionOpen={onSessionOpen} />
+        </DesktopWorkspaceShell>
       )}
       {sessionId && (sessionId.includes("componentTasks")) && (
-        <GridItemComp homeBankingIdInitial={homeBanking} dataComp={componentsData} socketPort={socketPort} sessionId={sessionId} botJobIdInitial={botJobId} botJobNameInitial={botJobName} />
+        <DesktopWorkspaceShell ariaLabel="Bot Job Components" testId="bot-job-components-workspace">
+          <GridItemComp homeBankingIdInitial={homeBanking} dataComp={componentsData} socketPort={socketPort} sessionId={sessionId} botJobIdInitial={botJobId} botJobNameInitial={botJobName} onSessionOpen={onSessionOpen} />
+        </DesktopWorkspaceShell>
       )}
       {/* Guard against scanner/pre-scan double-mounting. */}
       {sessionId
         && sessionId.includes(SCANNER_GRID_SESSION_ID)
         && !sessionId.includes(PRE_SCANNER_GRID_SESSION_ID) && (
-        <GridItemScann homeBankingIdInitial={homeBanking} dataDTO={elementDTO} socketPort={socketPort} sessionId={sessionId} botJobIdInitial={botJobId} botJobNameInitial={botJobName} />
+        <DesktopWorkspaceShell ariaLabel="Page Scanner Grid" testId="page-scanner-workspace">
+          <GridItemScann homeBankingIdInitial={homeBanking} dataDTO={elementDTO} socketPort={socketPort} sessionId={sessionId} botJobIdInitial={botJobId} botJobNameInitial={botJobName} onSessionOpen={onSessionOpen} />
+        </DesktopWorkspaceShell>
       )}
       {sessionId && (sessionId.includes(PRE_SCANNER_GRID_SESSION_ID)) && (
-        <GridItemScann mode="preScan" homeBankingIdInitial={homeBanking} dataDTO={elementDTO} socketPort={socketPort} sessionId={sessionId} botJobIdInitial={botJobId} botJobNameInitial={botJobName} />
+        <DesktopWorkspaceShell ariaLabel="Page Scanner Grid" testId="pre-scan-workspace">
+          <GridItemScann mode="preScan" homeBankingIdInitial={homeBanking} dataDTO={elementDTO} socketPort={socketPort} sessionId={sessionId} botJobIdInitial={botJobId} botJobNameInitial={botJobName} onSessionOpen={onSessionOpen} />
+        </DesktopWorkspaceShell>
       )}
       {sessionId && (sessionId.includes("mobileScannerGrid")) && (
         <GridItemScannMobile homeBankingIdInitial={homeBanking} dataDTO={elementDTO} socketPort={socketPort} sessionId={sessionId} botJobIdInitial={botJobId} botJobNameInitial={botJobName} />

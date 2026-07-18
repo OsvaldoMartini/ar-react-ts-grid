@@ -69,6 +69,7 @@ interface GridItemProps {
   sessionId: string;
   botJobIdInitial: number;
   botJobNameInitial: string;
+  onSessionOpen: (targetSession: string, port: number, botJobId?: number) => void;
 }
 type BlockDeleteCapability = { canDelete: boolean; reason: string; instructionCount: number; deleteRows: { id: number; name: string; action: string; order: number }[] };
 
@@ -142,7 +143,7 @@ const normalizeBlockOptions = (blocks: CreateBlockOption[]): CreateBlockOption[]
 };
 
 
-const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketPort, sessionId, botJobIdInitial, botJobNameInitial }) => {
+const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketPort, sessionId, botJobIdInitial, botJobNameInitial, onSessionOpen }) => {
   // Using the custom WebSocket hook
   const { webSocket, connected, reconnectAttempts, messages, error } = useWebSocket(socketPort, sessionId);
 
@@ -161,6 +162,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
   const [botJobName, setBotJobName] = useState<string | null>(botJobNameInitial);
   const botJobHeader = useBotJobDetailsController({
     webSocket, connected, messages, sessionId, homeBankingId, botJobId,
+    onSurfaceOpen: (targetSession, nextBotJobId) => onSessionOpen(targetSession, socketPort, nextBotJobId),
   });
 
   useEffect(() => {
@@ -840,18 +842,21 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
           // #a52a2a red
 
         } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "react.session.open") {
-          // Bot Job Tasks is always its own browser tab now (opened via window.open from the
-          // dashboard); any "go back" signal here means leaving this tab, not switching its own
-          // view -- switching would try to open a second "mainDashboard" session and collide with
-          // the actual dashboard tab.
-          window.close();
+          const bodyData = typeof parsedMessage.body === "string"
+            ? JSON.parse(parsedMessage.body)
+            : parsedMessage.body;
+          if (bodyData?.targetSession === 'mainDashboard') {
+            window.close();
+          } else if (typeof bodyData?.targetSession === 'string' && typeof bodyData?.port === 'number') {
+            onSessionOpen(bodyData.targetSession, bodyData.port, bodyData.botJobId);
+          }
         }
 
       } catch (error) {
         console.error("Error parsing WebSocket message:", error);
       }
     }
-  }, [messages, pendingMemoryMove, pendingDragPreview, sessionId]);
+  }, [messages, onSessionOpen, pendingMemoryMove, pendingDragPreview, sessionId]);
 
 
   useEffect(() => {
@@ -2876,8 +2881,8 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
         controller={{
           ...botJobHeader,
           sendAction: (action: Parameters<typeof botJobHeader.sendAction>[0]) => {
-            // Close leaves immediately, client-side: this tab is its own browser tab (opened via
-            // window.open from the dashboard), so "going back" means closing this tab, not
+            // Close leaves immediately, client-side: this workspace owns its Chromium app window,
+            // so "going back" means closing this window, not
             // switching its own view to "mainDashboard" -- that would try to open a second
             // dashboard session and collide with the actual dashboard tab. The action is still
             // sent below so the backend does its normal CLOSE-side cleanup.

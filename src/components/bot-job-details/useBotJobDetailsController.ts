@@ -17,6 +17,7 @@ interface ControllerOptions {
   homeBankingId: number;
   botJobId: number | null;
   enabled?: boolean;
+  onSurfaceOpen?: (targetSession: string, botJobId: number) => void;
 }
 
 export interface BotJobDetailsControllerState {
@@ -71,6 +72,12 @@ function isWorkspaceSurface(value: unknown): value is BotJobDetailsState['active
   return value === 'botJob' || value === 'components' || value === 'preScan';
 }
 
+function sessionForSurface(surface: BotJobDetailsState['activeSurface']): string {
+  if (surface === 'components') return 'componentTasks';
+  if (surface === 'preScan') return 'preScannerGrid';
+  return 'botJobTasks';
+}
+
 function parseLicenseStatusChanged(raw: string, expectedSessionId: string): boolean | null {
   try {
     const envelope = JSON.parse(raw);
@@ -93,6 +100,7 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
     homeBankingId,
     botJobId,
     enabled = true,
+    onSurfaceOpen,
   } = options;
   const processedMessagesRef = useRef(0);
   const requestSequenceRef = useRef(0);
@@ -302,6 +310,10 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
             activeSurface,
             componentsVisible: body.componentsVisible === true,
           } : current);
+          const targetSession = sessionForSurface(activeSurface);
+          if (targetSession !== sessionId) {
+            onSurfaceOpen?.(targetSession, botJobId);
+          }
         }
         setTransientStatus(
           body.message || (body.ok === false ? 'Action failed' : 'Action accepted'),
@@ -363,7 +375,7 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
         setTransientStatus(body.message || 'Bot Job details updated', 'success');
       }
     });
-  }, [botJobId, enabled, invalidateLicenseCapabilities, messages, requestBootstrap, sessionId, setTransientStatus]);
+  }, [botJobId, enabled, invalidateLicenseCapabilities, messages, onSurfaceOpen, requestBootstrap, sessionId, setTransientStatus]);
 
   useEffect(() => {
     if (!enabled) return;

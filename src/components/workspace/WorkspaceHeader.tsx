@@ -44,7 +44,10 @@ function WorkspaceHeader<ActionId extends string = string>({
   extraActionsBeforeId,
 }: WorkspaceHeaderProps<ActionId>): React.ReactElement {
   return (
-  <header className={`${styles.header} ${compact ? styles.compact : ''} ${className || ''}`}>
+  <header
+    className={`${styles.header} ${compact ? styles.compact : ''} ${className || ''}`}
+    data-floating-workspace-drag-handle
+  >
     <div className={styles.identity}>
       {eyebrow && <span className={styles.eyebrow}>{eyebrow}</span>}
       <div className={styles.titleRow}>

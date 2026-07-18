@@ -193,6 +193,8 @@ test('navigates every safe dashboard control and the Auto Test workspace without
 
   const dashboardBeforeDrag = await dashboard.boundingBox();
   expect(dashboardBeforeDrag).not.toBeNull();
+  expect(dashboardBeforeDrag!.width).toBeCloseTo(1240, 0);
+  expect(dashboardBeforeDrag!.height).toBeCloseTo(820, 0);
   await dragBy(page, dashboard.getByTestId('main-dashboard-drag-handle'), 72, 44);
   const dashboardAfterDrag = await dashboard.boundingBox();
   expect(dashboardAfterDrag).not.toBeNull();
@@ -239,8 +241,7 @@ test('navigates every safe dashboard control and the Auto Test workspace without
   const openedUrls = await page.evaluate(() => (
     window as typeof window & { __AR_E2E__: { openCalls: string[] } }
   ).__AR_E2E__.openCalls);
-  expect(openedUrls).toHaveLength(2);
-  expect(openedUrls.every(url => url.includes('?openBotJob='))).toBe(true);
+  expect(openedUrls).toEqual([]);
 
   const userMenuButton = page.getByRole('button', { name: 'Open user menu' });
   const suppliedUserIcon = userMenuButton.locator('svg').first();
@@ -342,5 +343,43 @@ test('navigates every safe dashboard control and the Auto Test workspace without
   for (const operation of expectedOperations) {
     await expect.poll(() => operationCount(page, operation)).toBeGreaterThan(0);
   }
+
+  await page.setViewportSize({ width: 1240, height: 820 });
+  await page.goto('/?desktopShell=1');
+  const desktopDashboard = page.getByRole('region', { name: 'Main Dashboard' });
+  await expect(desktopDashboard).toBeVisible();
+  await expect(page).toHaveTitle('AR Web');
+  await expect.poll(async () => {
+    const bounds = await desktopDashboard.boundingBox();
+    return Boolean(
+      bounds
+      && Math.abs(bounds.x) < 1
+      && Math.abs(bounds.y) < 1
+      && Math.abs(bounds.width - 1240) < 1
+      && Math.abs(bounds.height - 820) < 1,
+    );
+  }).toBe(true);
+  expect(await desktopDashboard.evaluate(element => window.getComputedStyle(element).borderRadius)).toBe('0px');
+  expect(await desktopDashboard.evaluate(element => window.getComputedStyle(element).boxShadow)).toBe('none');
+
+  const desktopBeforeDrag = await desktopDashboard.boundingBox();
+  await dragBy(page, desktopDashboard.getByTestId('main-dashboard-drag-handle'), 80, 50);
+  const desktopAfterDrag = await desktopDashboard.boundingBox();
+  expect(desktopBeforeDrag).not.toBeNull();
+  expect(desktopAfterDrag).not.toBeNull();
+  expect(Math.abs(desktopAfterDrag!.x - desktopBeforeDrag!.x)).toBeLessThan(1);
+  expect(Math.abs(desktopAfterDrag!.y - desktopBeforeDrag!.y)).toBeLessThan(1);
+
+  await page.setViewportSize({ width: 700, height: 900 });
+  await expect.poll(async () => {
+    const bounds = await desktopDashboard.boundingBox();
+    return Boolean(
+      bounds
+      && Math.abs(bounds.x) < 1
+      && Math.abs(bounds.y) < 1
+      && Math.abs(bounds.width - 700) < 1
+      && Math.abs(bounds.height - 900) < 1,
+    );
+  }).toBe(true);
   expect(pageErrors).toEqual([]);
 });

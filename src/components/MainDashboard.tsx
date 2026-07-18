@@ -102,7 +102,10 @@ const initialDashboardPosition = () => {
   };
 };
 
+const desktopShellPosition = () => ({ x: 0, y: 0 });
+
 const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, onSessionOpen }) => {
+  const desktopShell = new URLSearchParams(window.location.search).get('desktopShell') === '1';
   const { webSocket, connected, messages, error } = useWebSocket(socketPort, sessionId);
   const processedMessageCountRef = useRef(0);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
@@ -283,14 +286,10 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, on
     send(command, { botJobId: selectedJob.id });
   };
 
-  // Open Job is a real new browser tab, not a same-tab view switch -- the tab's URL carries the
-  // job id directly, so it can bootstrap itself without any round trip through this socket. The
-  // WS message still fires so the backend does its normal open-job preparation (reload blocks
-  // etc.); only one Bot Job workspace can be active in the backend at a time, so opening another
-  // job here will take over from whatever tab had it before.
+  // The backend opens Bot Job Details in another Chromium application window. Keeping window.open
+  // out of this path prevents a normal browser tab/address bar from appearing.
   const openBotJob = (targetBotJobId: number) => {
     send('mainDashboard.openBotJob', { botJobId: targetBotJobId });
-    window.open(`${window.location.origin}${window.location.pathname}?openBotJob=${targetBotJobId}`, '_blank');
   };
 
   const openSelectedBotJob = () => {
@@ -323,10 +322,12 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, on
     status.level === 'error' ? styles.statusError : status.level === 'ok' ? styles.statusOk : styles.statusWarn;
 
   return (
-    <main className={styles.shell}>
+    <main className={[styles.shell, desktopShell ? styles.desktopShell : ''].filter(Boolean).join(' ')}>
       <FloatingWorkspaceFrame
-        className={styles.window}
-        initialPosition={initialDashboardPosition}
+        className={[styles.window, desktopShell ? styles.desktopShellWindow : ''].filter(Boolean).join(' ')}
+        initialPosition={desktopShell ? desktopShellPosition : initialDashboardPosition}
+        edgeMargin={desktopShell ? 0 : 8}
+        dragEnabled={!desktopShell}
         aria-label="Main Dashboard"
         data-testid="main-dashboard-workspace"
       >
