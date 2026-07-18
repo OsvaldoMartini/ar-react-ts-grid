@@ -1758,6 +1758,28 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
         />
       )}
 
+      {ocrConfig && (
+        <OCRConfigPanel
+          data={ocrConfig}
+          busy={ocrConfigBusy}
+          error={ocrConfigError}
+          onSelect={profileId => sendOcrConfigCommand('ocrConfig.profile', { profileId })}
+          onSave={saveOcrConfig}
+          onDelete={deleteOcrConfig}
+          onCleanup={() => sendOcrConfigCommand('ocrConfig.cleanupPreview', { homeBankingId })}
+          onTest={parameters => sendOcrConfigCommand('ocrTest.run', { parameters })}
+          onClose={() => setOcrConfig(null)}
+        />
+      )}
+
+      {ocrTestResult && (
+        <OCRTestResultsPanel
+          result={ocrTestResult}
+          onAccept={acceptOcrSuggestions}
+          onClose={() => setOcrTestResult(null)}
+        />
+      )}
+
       {memoryPanelOpen && (
         <div
           className={styles.memoryPanel}
@@ -2051,8 +2073,6 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
                         </button>
                       </>
       )}
-      {ocrConfig && <OCRConfigPanel key={ocrConfig.activeProfileId || 'new'} data={ocrConfig} busy={ocrConfigBusy} error={ocrConfigError} onSelect={profileId=>sendOcrConfigCommand('ocrConfig.profile',{profileId})} onSave={saveOcrConfig} onDelete={deleteOcrConfig} onCleanup={()=>sendOcrConfigCommand('ocrConfig.cleanupPreview',{homeBankingId})} onTest={parameters=>sendOcrConfigCommand('ocrTest.run',{parameters})} onClose={()=>setOcrConfig(null)}/>}
-      {ocrTestResult && <OCRTestResultsPanel result={ocrTestResult} onAccept={acceptOcrSuggestions} onClose={()=>setOcrTestResult(null)}/>}
                     {isInputTextBlock(typeElement) && (
                       <img
                         src={testInputImage}
