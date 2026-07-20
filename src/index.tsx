@@ -24,10 +24,24 @@ import ActivationRequired from './components/ActivationRequired';
 import OCRConfigWorkspace from './components/ocr/OCRConfigWorkspace';
 import OCRResultsWorkspace from './components/ocr/OCRResultsWorkspace';
 import {
+  ocrWorkspaceRetargetDisposition,
+  ocrWorkspaceTargetUrl,
+  type OcrWorkspaceRetarget,
+} from './components/ocr/OCRWorkspace.contract';
+import PageScannerWorkspace from './components/scanner/PageScannerWorkspace';
+import BotJobWindowControl from './components/bot-job-details/BotJobWindowControl';
+import {
+  botJobWindowTargetUrl,
+  isBotJobWindowSession,
+  type BotJobWindowTarget,
+} from './components/bot-job-details/BotJobWindow.contract';
+import {
+  isOcrConfigWorkspaceSession,
+  isOcrResultsWorkspaceSession,
+  isPageScannerWorkspaceSession,
   OCR_CONFIG_WORKSPACE_KIND,
-  OCR_CONFIG_WORKSPACE_SESSION_PREFIX,
   OCR_RESULTS_WORKSPACE_KIND,
-  OCR_RESULTS_WORKSPACE_SESSION_PREFIX,
+  PAGE_SCANNER_WORKSPACE_KIND,
   PRE_SCANNER_GRID_SESSION_ID,
   SCANNER_GRID_SESSION_ID,
 } from './components/scanner/Scanner.sessions';
@@ -46,6 +60,8 @@ const App: React.FC = () => {
   const [homeBanking, setHomeBanking] = useState<number>(0);
   const [homeBankName, setHomeBankName] = useState<string>("");
   const [sessionId, setSessionId] = useState<string>("");
+  const [botJobWindowSession, setBotJobWindowSession] = useState<string>('');
+  const [botJobWorkspaceEpoch, setBotJobWorkspaceEpoch] = useState<number>(0);
   const [errorFlag, setErrorFlag] = useState<boolean>(false)  //(SENDER: insertTool) -> botJobTasks-1 -> componentTasks  -> capiApiTestToolAI
   const [alertImage, setAlertImage] = useState(constructionImage);
   const [alertClass, setAlertClass] = useState('construction-image')
@@ -69,28 +85,116 @@ const App: React.FC = () => {
   const onSessionOpen = useCallback((targetSession: string, port: number, nextBotJobId?: number) => {
     setSocketPort(port);
     setSessionId(targetSession);
+    if (isPageScannerWorkspaceSession(targetSession)) {
+      setElementDTO([]);
+      setBotJobName('');
+    }
     if (nextBotJobId !== undefined && nextBotJobId !== -9999) {
       setBotJobId(nextBotJobId);
     }
   }, []);
 
-  // A Bot Job opened by the Java host gets its own Chromium application window. Its URL carries
-  // the job id directly, so the address-bar-free shell can bootstrap without another handshake.
+  const onBotJobWindowTarget = useCallback((target: BotJobWindowTarget) => {
+    if (!isBotJobWindowSession(botJobWindowSession)) return;
+
+    if (target.botJobId === botJobId && target.workspaceEpoch === botJobWorkspaceEpoch) {
+      try {
+        window.focus();
+      } catch {
+        // Native focus is best-effort and may be refused by the window manager.
+      }
+      return;
+    }
+
+    // The native shell remains alive; only its authoritative Bot Job content changes.
+    // Reset all job-derived presentation state before reconnecting botJobTasks so no row,
+    // label, or identity from the previous target can flash in the reused panel.
+    setInstructionsData([]);
+    setComponentsData([]);
+    setElementDTO([]);
+    setBotJobId(target.botJobId);
+    setBotJobName('');
+    setHomeBanking(0);
+    setHomeBankName('');
+    setBotJobWorkspaceEpoch(target.workspaceEpoch);
+    setSessionId('botJobTasks');
+    setSocketPort((current) => current > 0 ? current : Number(window.location.port));
+
+    try {
+      const targetUrl = botJobWindowTargetUrl(
+        window.location.href,
+        botJobWindowSession,
+        target.botJobId,
+      );
+      window.history.replaceState(window.history.state, '', targetUrl);
+      window.focus();
+    } catch (targetError) {
+      console.error('Could not update the Bot Job native window target:', targetError);
+    }
+  }, [botJobId, botJobWindowSession, botJobWorkspaceEpoch]);
+
+  const onOcrWorkspaceRetarget = useCallback((target: OcrWorkspaceRetarget) => {
+    // Retarget events are accepted only by the currently connected OCR workspace. A repeated
+    // click for the same binding therefore focuses this native panel without clearing its draft.
+    if (target.previousSessionId !== sessionId) return;
+    if (ocrWorkspaceRetargetDisposition(target, sessionId) === 'FOCUS_ONLY') {
+      try {
+        window.focus();
+      } catch {
+        // Native focus is best-effort and may be refused by the window manager.
+      }
+      return;
+    }
+
+    // A different scanner/job gets a fresh logical OCR session inside this same physical window.
+    // Reset all identity-bearing shell state and key-remount the page before it bootstraps.
+    setInstructionsData([]);
+    setComponentsData([]);
+    setElementDTO([]);
+    setHomeBanking(target.homeBankingId);
+    setHomeBankName('');
+    setBotJobId(target.botJobId);
+    setBotJobName('');
+    setSessionId(target.sessionId);
+    setSocketPort((current) => current > 0 ? current : Number(window.location.port));
+
+    try {
+      const targetUrl = ocrWorkspaceTargetUrl(
+        window.location.href,
+        target.kind,
+        target.sessionId,
+      );
+      window.history.replaceState(window.history.state, '', targetUrl);
+      window.focus();
+    } catch (targetError) {
+      console.error('Could not update the detached OCR workspace target:', targetError);
+    }
+  }, [sessionId]);
+
+  // The Java host owns one reusable Bot Job Chromium application window. Its URL carries the
+  // initial job plus a persistent control-session identity used for every later retarget.
   useEffect(() => {
     const search = new URLSearchParams(window.location.search);
+    const openPageScanner = search.get('openPageScanner');
+    const pageScannerSession = search.get('pageScannerSession');
+    if (openPageScanner || pageScannerSession) {
+      const validPageScanner = openPageScanner === PAGE_SCANNER_WORKSPACE_KIND
+        && Boolean(pageScannerSession && isPageScannerWorkspaceSession(pageScannerSession));
+      if (!pageScannerSession || !validPageScanner) {
+        console.error('Rejected invalid detached Page Scanner workspace route.');
+        return;
+      }
+      onSessionOpen(pageScannerSession, Number(window.location.port));
+      return;
+    }
+
     const openOcr = search.get('openOcr');
     const ocrSession = search.get('ocrSession');
     if (openOcr || ocrSession) {
       const validConfig = openOcr === OCR_CONFIG_WORKSPACE_KIND
-        && Boolean(
-          ocrSession?.startsWith(OCR_CONFIG_WORKSPACE_SESSION_PREFIX)
-          && ocrSession.length > OCR_CONFIG_WORKSPACE_SESSION_PREFIX.length,
-        );
+        && Boolean(ocrSession && isOcrConfigWorkspaceSession(ocrSession));
       const validResults = openOcr === OCR_RESULTS_WORKSPACE_KIND
-        && Boolean(
-          ocrSession?.startsWith(OCR_RESULTS_WORKSPACE_SESSION_PREFIX)
-          && ocrSession.length > OCR_RESULTS_WORKSPACE_SESSION_PREFIX.length,
-        );
+        && Boolean(ocrSession && isOcrResultsWorkspaceSession(ocrSession));
       if (!ocrSession || (!validConfig && !validResults)) {
         console.error('Rejected invalid detached OCR workspace route.');
         return;
@@ -100,9 +204,22 @@ const App: React.FC = () => {
     }
 
     const openBotJobId = search.get('openBotJob');
-    if (!openBotJobId) return;
+    const controlSession = search.get('botJobWindowSession');
+    if (!openBotJobId && !controlSession) return;
     const parsedBotJobId = Number(openBotJobId);
-    onSessionOpen('botJobTasks', Number(window.location.port), Number.isNaN(parsedBotJobId) ? undefined : parsedBotJobId);
+    if (
+      !openBotJobId
+      || !Number.isSafeInteger(parsedBotJobId)
+      || parsedBotJobId <= 0
+      || !controlSession
+      || !isBotJobWindowSession(controlSession)
+    ) {
+      console.error('Rejected invalid Bot Job native workspace route.');
+      return;
+    }
+    setBotJobWindowSession(controlSession);
+    setBotJobWorkspaceEpoch(0);
+    onSessionOpen('botJobTasks', Number(window.location.port), parsedBotJobId);
   }, [onSessionOpen]);
 
   // Bootstrap over WebSocket: the shell opens a short-lived handshake connection under its own
@@ -112,7 +229,13 @@ const App: React.FC = () => {
   // colliding with this one. Skipped entirely for a Bot Job app window (see above).
   useEffect(() => {
     const search = new URLSearchParams(window.location.search);
-    if (search.has('openBotJob') || search.has('openOcr') || search.has('ocrSession')) return;
+    if (
+      search.has('openBotJob')
+      || search.has('openOcr')
+      || search.has('ocrSession')
+      || search.has('openPageScanner')
+      || search.has('pageScannerSession')
+    ) return;
     const ws = new WebSocket(`ws://${window.location.hostname}:${window.location.port}/websocket?sessionId=mainDashboardBootstrap`);
 
     ws.onmessage = (event) => {
@@ -175,7 +298,10 @@ const App: React.FC = () => {
         } else if (
           Array.isArray(dataLoad)
           && dataLoad.length > 0
-          && sessionIdFromJava.includes(PRE_SCANNER_GRID_SESSION_ID)
+          && (
+            sessionIdFromJava.includes(PRE_SCANNER_GRID_SESSION_ID)
+            || isPageScannerWorkspaceSession(sessionIdFromJava)
+          )
         ) {
           setElementDTO(dataLoad as ElementDTO[]);
         } else if (
@@ -209,8 +335,17 @@ const App: React.FC = () => {
 
   // }, [sessionId]);
 
+  const botJobWorkspaceKey = botJobWindowSession
+    ? `${botJobWindowSession}:${botJobId}:${botJobWorkspaceEpoch}`
+    : `bot-job:${botJobId}:${botJobWorkspaceEpoch}`;
+
   return (
     <React.StrictMode>
+      <BotJobWindowControl
+        socketPort={socketPort}
+        sessionId={botJobWindowSession}
+        onTarget={onBotJobWindowTarget}
+      />
       {alertMessageBody && alertMessageBody.length > 0 && (
         <AlertModal
           header={alertMessageHeader || ''}
@@ -224,12 +359,12 @@ const App: React.FC = () => {
       )}
       {sessionId && (sessionId.includes("botJobTasks")) && (
         <DesktopWorkspaceShell ariaLabel="Bot Job Details" testId="bot-job-details-workspace">
-          <GridItem homeBankingIdInitial={homeBanking} data={instructionsData} socketPort={socketPort} sessionId={sessionId} botJobIdInitial={botJobId} botJobNameInitial={botJobName} onSessionOpen={onSessionOpen} />
+          <GridItem key={`${botJobWorkspaceKey}:details`} homeBankingIdInitial={homeBanking} data={instructionsData} socketPort={socketPort} sessionId={sessionId} botJobIdInitial={botJobId} botJobNameInitial={botJobName} onSessionOpen={onSessionOpen} />
         </DesktopWorkspaceShell>
       )}
       {sessionId && (sessionId.includes("componentTasks")) && (
         <DesktopWorkspaceShell ariaLabel="Bot Job Components" testId="bot-job-components-workspace">
-          <GridItemComp homeBankingIdInitial={homeBanking} dataComp={componentsData} socketPort={socketPort} sessionId={sessionId} botJobIdInitial={botJobId} botJobNameInitial={botJobName} onSessionOpen={onSessionOpen} />
+          <GridItemComp key={`${botJobWorkspaceKey}:components`} homeBankingIdInitial={homeBanking} dataComp={componentsData} socketPort={socketPort} sessionId={sessionId} botJobIdInitial={botJobId} botJobNameInitial={botJobName} onSessionOpen={onSessionOpen} />
         </DesktopWorkspaceShell>
       )}
       {/* Guard against scanner/pre-scan double-mounting. */}
@@ -245,14 +380,29 @@ const App: React.FC = () => {
           <GridItemScann mode="preScan" homeBankingIdInitial={homeBanking} dataDTO={elementDTO} socketPort={socketPort} sessionId={sessionId} botJobIdInitial={botJobId} botJobNameInitial={botJobName} onSessionOpen={onSessionOpen} />
         </DesktopWorkspaceShell>
       )}
-      {sessionId.startsWith(OCR_CONFIG_WORKSPACE_SESSION_PREFIX) && (
-        <DesktopWorkspaceShell ariaLabel="OCR configuration" testId="ocr-config-window">
-          <OCRConfigWorkspace socketPort={socketPort} sessionId={sessionId} />
+      {isPageScannerWorkspaceSession(sessionId) && (
+        <DesktopWorkspaceShell ariaLabel="Page Scanner" testId="detached-page-scanner-workspace">
+          <PageScannerWorkspace key={sessionId} homeBankingIdInitial={homeBanking} dataDTO={elementDTO} socketPort={socketPort} sessionId={sessionId} botJobIdInitial={botJobId} botJobNameInitial={botJobName} onSessionOpen={onSessionOpen} />
         </DesktopWorkspaceShell>
       )}
-      {sessionId.startsWith(OCR_RESULTS_WORKSPACE_SESSION_PREFIX) && (
+      {isOcrConfigWorkspaceSession(sessionId) && (
+        <DesktopWorkspaceShell ariaLabel="OCR configuration" testId="ocr-config-window">
+          <OCRConfigWorkspace
+            key={sessionId}
+            socketPort={socketPort}
+            sessionId={sessionId}
+            onWorkspaceRetarget={onOcrWorkspaceRetarget}
+          />
+        </DesktopWorkspaceShell>
+      )}
+      {isOcrResultsWorkspaceSession(sessionId) && (
         <DesktopWorkspaceShell ariaLabel="OCR test results" testId="ocr-results-window">
-          <OCRResultsWorkspace socketPort={socketPort} sessionId={sessionId} />
+          <OCRResultsWorkspace
+            key={sessionId}
+            socketPort={socketPort}
+            sessionId={sessionId}
+            onWorkspaceRetarget={onOcrWorkspaceRetarget}
+          />
         </DesktopWorkspaceShell>
       )}
       {sessionId && (sessionId.includes("mobileScannerGrid")) && (

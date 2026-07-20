@@ -5,6 +5,7 @@ import type {
 } from './BotJobDetails.types';
 
 const BOT_JOB_DETAILS_OPERATIONS = new Set([
+  'pageScannerWorkspace.openResponse',
   'botJobDetails.actionResponse',
   'botJobDetails.toolbar.actionResponse',
   'botJobDetails.bootstrapResponse',

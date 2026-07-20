@@ -24,6 +24,15 @@ import OCRPanel from './OCRPanel';
 import BotJobDetailsChrome from './bot-job-details/BotJobDetailsChrome';
 import { useBotJobDetailsController } from './bot-job-details/useBotJobDetailsController';
 import ScannerWorkspaceHeader from './scanner/ScannerWorkspaceHeader';
+import PageScannerWorkspaceHeader from './scanner/PageScannerWorkspaceHeader';
+import {
+  pageScannerCloseMessage,
+  pageScannerRetargetDisposition,
+  pageScannerRequestForResponse,
+  pageScannerWorkspaceRetarget,
+  pageScannerWorkspaceCloseReason,
+  type PageScannerRequestOperation,
+} from './scanner/PageScanner.contract';
 import { useScannerController } from './scanner/useScannerController';
 import {
   PRE_SCAN_CLEAR_GRID_OPERATION,
@@ -42,6 +51,7 @@ import {
 import {
   OCR_CONFIG_WORKSPACE_KIND,
   OCR_RESULTS_WORKSPACE_KIND,
+  isPageScannerWorkspaceSession,
   type OcrWorkspaceKind,
   SCANNER_ELEMENT_PANE_SESSION_ID,
   PRE_SCANNER_GRID_SESSION_ID,
@@ -51,7 +61,7 @@ import {
 import styles from './GridItemScann.module.scss';
 
 
-interface GridItemScannProps {
+export interface GridItemScannProps {
   homeBankingIdInitial: number;
   botJobIdInitial: number;
   botJobNameInitial: string;
@@ -104,9 +114,9 @@ const blockOptionsFromPayload = (payload: any): CreateBlockOption[] => {
   const rawBlocks = Array.isArray(payload?.blocks) ? payload.blocks : [];
   return rawBlocks
     .map((block: any) => ({
-      blockId: Number(block.blockId),
-      blockOrderNumber: Number(block.blockOrderNumber),
-      blockName: String(block.blockName ?? ''),
+      blockId: Number(block.blockId ?? block.id),
+      blockOrderNumber: Number(block.blockOrderNumber ?? block.order),
+      blockName: String(block.blockName ?? block.name ?? ''),
     }))
     .filter((block: CreateBlockOption) =>
       Number.isFinite(block.blockId)
@@ -117,12 +127,36 @@ const blockOptionsFromPayload = (payload: any): CreateBlockOption[] => {
 };
 
 const SCANNER_TEST_INPUT_VALUE = 'abc';
+const createPageScannerRequestId = (operation: string) =>
+  `${operation}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
 type PreScanStatus = {
   // 'waiting' = browser opening / page loading & settling; 'running' = actual scan.
   status: 'idle' | 'waiting' | 'running' | 'done' | 'empty' | 'failed';
   message: string;
   elementCount: number;
 };
+
+type PendingPageScannerRequest = {
+  requestId: string;
+  operation: PageScannerRequestOperation;
+  timeout: ReturnType<typeof setTimeout>;
+};
+
+type PageScannerCreateBlockPayload = {
+  requestId: string;
+  blockName: string;
+  insertPosition: 'END' | 'BEFORE';
+  beforeBlockId: number;
+  beforeBlockOrderNumber: number;
+};
+
+type PendingPageScannerCreateBlock = {
+  requestId: string;
+  payload: PageScannerCreateBlockPayload;
+};
+
+const PAGE_SCANNER_RESPONSE_TIMEOUT_MS = 12000;
 
 const PRE_SCAN_FOCUS_PROFILES = [
   { value: 'factory-default', label: 'All page scanner controls', searchText: '' },
@@ -158,15 +192,25 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   const [dashboardSearchText, setDashboardSearchText] = useState<string>(PRE_SCAN_FOCUS_PROFILES[0].searchText);
   const [dashboardFocus, setDashboardFocus] = useState<string>(PRE_SCAN_FOCUS_PROFILES[0].value);
   const [dashboardSearchHidden, setDashboardSearchHidden] = useState<boolean>(false);
+  const [pageScannerBootstrapError, setPageScannerBootstrapError] = useState('');
   const [preScanStatus, setPreScanStatus] = useState<PreScanStatus>({
     status: 'idle',
     message: 'Ready',
     elementCount: 0,
   });
   const [collapsedBlocks, setCollapsedBlocks] = useState<Set<string>>(new Set());
-  const isPreScanMode = mode === 'preScan' || sessionId.includes(PRE_SCANNER_GRID_SESSION_ID);
+  const isDetachedPageScanner = isPageScannerWorkspaceSession(sessionId);
+  const isPreScanMode = mode === 'preScan'
+    || sessionId.includes(PRE_SCANNER_GRID_SESSION_ID)
+    || isDetachedPageScanner;
   const botJobHeader = useBotJobDetailsController({
-    webSocket, connected, messages, sessionId, homeBankingId, botJobId, enabled: isPreScanMode,
+    webSocket,
+    connected,
+    messages,
+    sessionId,
+    homeBankingId,
+    botJobId,
+    enabled: isPreScanMode && !isDetachedPageScanner,
     onSurfaceOpen: (targetSession, nextBotJobId) => onSessionOpen(targetSession, socketPort, nextBotJobId),
   });
   const scannerController = useScannerController({
@@ -174,11 +218,12 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   });
 
   useEffect(() => {
+    if (isDetachedPageScanner) return;
     if (!botJobHeader.state) return;
     setBotJobId(botJobHeader.state.botJobId);
     setBotJobName(botJobHeader.state.name);
     setHomeBankingId(botJobHeader.state.homeBankingId);
-  }, [botJobHeader.state]);
+  }, [botJobHeader.state, isDetachedPageScanner]);
 
   useEffect(() => {
     if (!scannerController.state) return;
@@ -265,6 +310,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   const [pendingDeleteCount, setPendingDeleteCount] = useState<number | null>(null);
   const [isUpdatingAll, setIsUpdatingAll] = useState(false);
   const lastProcessedIndexRef = useRef(0);
+  const pageScannerRetiredRef = useRef(false);
 
   // Inside your component:
   const [hoveredRow, setHoveredRow] = useState<ElementDTO | null>(null);
@@ -279,9 +325,136 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   const [memoryTargetBlockId, setMemoryTargetBlockId] = useState<number | null>(null);
   const [memoryBlockOptions, setMemoryBlockOptions] = useState<CreateBlockOption[]>([]);
   const [createBlockOpen, setCreateBlockOpen] = useState<boolean>(false);
+  const [createBlockRequestPending, setCreateBlockRequestPending] = useState<boolean>(false);
+  const [createBlockBusy, setCreateBlockBusy] = useState<boolean>(false);
+  const [memoryApplyBusy, setMemoryApplyBusy] = useState<boolean>(false);
+  const [pageScannerClosing, setPageScannerClosing] = useState<boolean>(false);
+  const pageScannerBootstrapSocketRef = useRef<WebSocket | null>(null);
+  const pageScannerBootstrapRequestRef = useRef<string | null>(null);
+  const pendingPageScannerApplyRef = useRef<{ requestId: string; elementKeys: string[] } | null>(null);
+  const pageScannerApplyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pageScannerCloseRequestRef = useRef<string | null>(null);
+  const pageScannerCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingPageScannerRequestsRef = useRef<Map<string, PendingPageScannerRequest>>(new Map());
+  const pendingPageScannerCreateBlockRef = useRef<PendingPageScannerCreateBlock | null>(null);
+  const pageScannerCreateBlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const memoryElementKey = (element: ElementDTO) =>
     `${element.xPath || ''}||${element.tagName || ''}||${element.typeElement || ''}||${element.attributeType || ''}||${element.someText || ''}`;
+
+  const clearPendingPageScannerRequests = () => {
+    pendingPageScannerRequestsRef.current.forEach((pending) => clearTimeout(pending.timeout));
+    pendingPageScannerRequestsRef.current.clear();
+  };
+
+  const trackPageScannerRequest = (
+    requestId: string,
+    operation: PageScannerRequestOperation,
+  ) => {
+    const previous = pendingPageScannerRequestsRef.current.get(requestId);
+    if (previous) clearTimeout(previous.timeout);
+    const timeout = setTimeout(() => {
+      const pending = pendingPageScannerRequestsRef.current.get(requestId);
+      if (!pending || pending.operation !== operation) return;
+      pendingPageScannerRequestsRef.current.delete(requestId);
+      setPreScanStatus((current) => ({
+        ...current,
+        status: 'failed',
+        message: 'The backend did not acknowledge the Page Scanner operation.',
+      }));
+    }, PAGE_SCANNER_RESPONSE_TIMEOUT_MS);
+    pendingPageScannerRequestsRef.current.set(requestId, { requestId, operation, timeout });
+  };
+
+  const takePageScannerRequest = (
+    requestId: unknown,
+    expectedOperation?: PageScannerRequestOperation,
+  ): PendingPageScannerRequest | null => {
+    if (typeof requestId !== 'string' || !requestId) return null;
+    const pending = pendingPageScannerRequestsRef.current.get(requestId);
+    if (!pending || (expectedOperation && pending.operation !== expectedOperation)) return null;
+    clearTimeout(pending.timeout);
+    pendingPageScannerRequestsRef.current.delete(requestId);
+    return pending;
+  };
+
+  const retireDetachedPageScanner = (
+    reason: 'BOT_JOB_CLOSED' | 'SUPERSEDED' | 'EXPIRED',
+    backendMessage?: unknown,
+  ) => {
+    const message = typeof backendMessage === 'string' && backendMessage.trim()
+      ? backendMessage.trim()
+      : pageScannerCloseMessage(reason);
+    clearPendingPageScannerRequests();
+    setMemoryApplyBusy(false);
+    setCreateBlockBusy(false);
+    setPageScannerBootstrapError(message);
+    setPreScanStatus((current) => ({ ...current, status: 'failed', message }));
+    setPageScannerClosing(true);
+    if (pageScannerCloseTimerRef.current) clearTimeout(pageScannerCloseTimerRef.current);
+    pageScannerCloseTimerRef.current = setTimeout(() => window.close(), 1400);
+  };
+
+  useEffect(() => {
+    if (!isDetachedPageScanner) {
+      pageScannerBootstrapSocketRef.current = null;
+      pageScannerBootstrapRequestRef.current = null;
+      setPageScannerBootstrapError('');
+      return;
+    }
+    if (!connected || !webSocket || webSocket.readyState !== WebSocket.OPEN) return;
+    if (pageScannerBootstrapSocketRef.current === webSocket) return;
+
+    const requestId = createPageScannerRequestId('page-scanner-bootstrap');
+    pageScannerBootstrapSocketRef.current = webSocket;
+    pageScannerBootstrapRequestRef.current = requestId;
+    setPageScannerBootstrapError('');
+    try {
+      webSocket.send(JSON.stringify({
+        type: 'pageScannerWorkspace.bootstrap',
+        sessionId,
+        body: JSON.stringify({ requestId, sessionId }),
+      }));
+    } catch (bootstrapError) {
+      pageScannerBootstrapSocketRef.current = null;
+      pageScannerBootstrapRequestRef.current = null;
+      setPageScannerBootstrapError(
+        bootstrapError instanceof Error
+          ? bootstrapError.message
+          : 'Page Scanner details could not be loaded.',
+      );
+    }
+  }, [connected, isDetachedPageScanner, sessionId, webSocket]);
+
+  const closeDetachedPageScanner = () => {
+    if (pageScannerClosing) return;
+    if (webSocket && webSocket.readyState === WebSocket.OPEN) {
+      const requestId = createPageScannerRequestId('page-scanner-close');
+      try {
+        webSocket.send(JSON.stringify({
+          type: 'pageScanner.close',
+          sessionId,
+          homeBankingId,
+          botJobId,
+          body: JSON.stringify({ requestId, sessionId }),
+        }));
+        pageScannerCloseRequestRef.current = requestId;
+        setPageScannerClosing(true);
+        pageScannerCloseTimerRef.current = setTimeout(() => window.close(), 1500);
+        return;
+      } catch (closeError) {
+        console.error('Could not notify the backend that Page Scanner closed:', closeError);
+      }
+    }
+    window.close();
+  };
+
+  useEffect(() => () => {
+    if (pageScannerCloseTimerRef.current) clearTimeout(pageScannerCloseTimerRef.current);
+    if (pageScannerApplyTimerRef.current) clearTimeout(pageScannerApplyTimerRef.current);
+    if (pageScannerCreateBlockTimerRef.current) clearTimeout(pageScannerCreateBlockTimerRef.current);
+    clearPendingPageScannerRequests();
+  }, []);
 
   const handleAddElementToMemory = (element: ElementDTO) => {
     const key = memoryElementKey(element);
@@ -382,7 +555,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     });
   };
   const handleApplyMemory = () => {
-    if (memoryTargetBlockId === null || memoryElements.length === 0) return;
+    if (memoryTargetBlockId === null || memoryElements.length === 0 || memoryApplyBusy) return;
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
       console.warn('WebSocket is not connected. Cannot apply scanner memory list.');
       return;
@@ -391,51 +564,155 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     const targetBlock = memoryBlockOptions.find((block) => block.blockId === memoryTargetBlockId);
     if (!targetBlock) return;
 
-    const message = {
-      type: 'SEND_ALL_ELEMENTS_DTO',
-      homeBankingId,
-      botJobId,
-      botJobName,
-      sessionId: SCANNER_ELEMENT_PANE_SESSION_ID,
+    const elementKeys = memoryElements.map(memoryElementKey);
+    const previousApply = pendingPageScannerApplyRef.current;
+    const repeatsUnacknowledgedApply = Boolean(
+      previousApply
+      && previousApply.elementKeys.length === elementKeys.length
+      && previousApply.elementKeys.every((key, index) => key === elementKeys[index]),
+    );
+    const requestId = repeatsUnacknowledgedApply
+      ? previousApply!.requestId
+      : createPageScannerRequestId('page-scanner-apply');
+    const payload = {
+      requestId,
+      targetBlockId: targetBlock.blockId,
       blockId: targetBlock.blockId,
       blockName: targetBlock.blockName,
       blockOrderNumber: targetBlock.blockOrderNumber,
       elementDetails: memoryElements,
     };
+    const message = isDetachedPageScanner
+      ? {
+        type: 'pageScanner.apply',
+        homeBankingId,
+        botJobId,
+        botJobName,
+        sessionId,
+        body: JSON.stringify(payload),
+      }
+      : {
+        type: 'SEND_ALL_ELEMENTS_DTO',
+        homeBankingId,
+        botJobId,
+        botJobName,
+        sessionId: SCANNER_ELEMENT_PANE_SESSION_ID,
+        ...payload,
+      };
 
     try {
       webSocket.send(JSON.stringify(message));
       console.log('Sent scanner memory apply:', message);
-      setMemoryElements([]);
+      if (isDetachedPageScanner) {
+        pendingPageScannerApplyRef.current = {
+          requestId,
+          elementKeys,
+        };
+        setMemoryApplyBusy(true);
+        if (pageScannerApplyTimerRef.current) clearTimeout(pageScannerApplyTimerRef.current);
+        pageScannerApplyTimerRef.current = setTimeout(() => {
+          setMemoryApplyBusy(false);
+          setAlertMessageHeader('Apply acknowledgement pending');
+          setAlertMessageBody(
+            'The selected elements remain in Memory List. Apply again to safely retry the same request.',
+          );
+        }, 15000);
+      } else {
+        setMemoryElements([]);
+      }
     } catch (error) {
       console.error('Error sending scanner memory apply:', error);
+      setMemoryApplyBusy(false);
     }
   };
 
-  const handleCreateNewBlock = (newBlockName: string, position: CreateBlockPosition) => {
-    const message = {
-      type: 'BLOCK_CREATE',
-      botJobId,
-      botJobName,
-      homeBankingId,
-      sessionId: SCANNER_ELEMENT_PANE_SESSION_ID,
-      blockName: newBlockName,
-      insertPosition: position.type === 'end' ? 'END' : 'BEFORE',
-      beforeBlockId: position.type === 'before' ? position.blockId : -1,
-      beforeBlockOrderNumber: position.type === 'before' ? position.blockOrderNumber : -1,
-    };
+  useEffect(() => {
+    if (!isDetachedPageScanner || connected) return;
+    if (pageScannerApplyTimerRef.current) {
+      clearTimeout(pageScannerApplyTimerRef.current);
+      pageScannerApplyTimerRef.current = null;
+    }
+    setMemoryApplyBusy(false);
+    setCreateBlockBusy(false);
+    if (pendingPageScannerRequestsRef.current.size > 0) {
+      clearPendingPageScannerRequests();
+      setPreScanStatus((current) => ({
+        ...current,
+        status: 'failed',
+        message: 'Page Scanner connection was lost before the operation was acknowledged.',
+      }));
+    }
+  }, [connected, isDetachedPageScanner]);
 
+  const handleCreateNewBlock = (newBlockName: string, position: CreateBlockPosition) => {
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
-      console.log('Cannot send BLOCK_CREATE: WebSocket is not connected', message);
+      setAlertMessageHeader('Could not create block');
+      setAlertMessageBody('Page Scanner is not connected. The block was not submitted.');
       return;
+    }
+
+    const pending = pendingPageScannerCreateBlockRef.current;
+    const requestId = isDetachedPageScanner && pending
+      ? pending.requestId
+      : createPageScannerRequestId('page-scanner-create-block');
+    const payload: PageScannerCreateBlockPayload = isDetachedPageScanner && pending
+      ? pending.payload
+      : {
+        requestId,
+        blockName: newBlockName,
+        insertPosition: position.type === 'end' ? 'END' : 'BEFORE',
+        beforeBlockId: position.type === 'before' ? position.blockId : -1,
+        beforeBlockOrderNumber: position.type === 'before' ? position.blockOrderNumber : -1,
+      };
+    const message = isDetachedPageScanner
+      ? {
+        type: 'pageScanner.createBlock',
+        botJobId,
+        botJobName,
+        homeBankingId,
+        sessionId,
+        body: JSON.stringify(payload),
+      }
+      : {
+        type: 'BLOCK_CREATE',
+        botJobId,
+        botJobName,
+        homeBankingId,
+        sessionId: SCANNER_ELEMENT_PANE_SESSION_ID,
+        ...payload,
+      };
+
+    if (isDetachedPageScanner && !pending) {
+      pendingPageScannerCreateBlockRef.current = { requestId, payload };
+      setCreateBlockRequestPending(true);
     }
 
     try {
       webSocket.send(JSON.stringify(message));
       console.log('Sent BLOCK_CREATE from scanner memory:', message);
-      setCreateBlockOpen(false);
+      if (isDetachedPageScanner) {
+        setCreateBlockBusy(true);
+        if (pageScannerCreateBlockTimerRef.current) {
+          clearTimeout(pageScannerCreateBlockTimerRef.current);
+        }
+        pageScannerCreateBlockTimerRef.current = setTimeout(() => {
+          pageScannerCreateBlockTimerRef.current = null;
+          setCreateBlockBusy(false);
+          setAlertMessageHeader('Create block acknowledgement pending');
+          setAlertMessageBody(
+            'The request remains unchanged. Click Retry to safely check the same block creation request.',
+          );
+        }, PAGE_SCANNER_RESPONSE_TIMEOUT_MS);
+      } else {
+        setCreateBlockOpen(false);
+      }
     } catch (err) {
       console.log('Error sending BLOCK_CREATE from scanner memory:', err);
+      setCreateBlockBusy(false);
+      setAlertMessageHeader('Could not create block');
+      setAlertMessageBody(
+        err instanceof Error ? err.message : 'The block creation request could not be sent.',
+      );
     }
   };
 
@@ -501,6 +778,16 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
 
 
   useEffect(() => {
+    // Once a retarget has retired this logical scanner identity, ignore every late envelope
+    // until React key-remounts the component for the fresh session.
+    if (pageScannerRetiredRef.current) return;
+
+    // useWebSocket clears its message array when it reconnects. Reset the cursor before
+    // returning on that empty transition so the first bootstrap/retarget message on the
+    // replacement transport is not skipped as though it belonged to the old array.
+    if (messages.length < lastProcessedIndexRef.current) {
+      lastProcessedIndexRef.current = 0;
+    }
     if (messages.length === 0) return;
 
     const tryParse = (val: any) => {
@@ -512,14 +799,18 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
       }
     };
 
-    // Accept messages for this component from multiple sessions your backend may use.
-    const acceptedSessions = new Set([
-      sessionId, // the one passed as prop
-      SCANNER_GRID_SESSION_ID,
-      PRE_SCANNER_GRID_SESSION_ID,
-      SCANNER_TOOL_SESSION_ID,
-      SCANNER_ELEMENT_PANE_SESSION_ID,
-    ]);
+    // A detached workspace has an unguessable, transport-authoritative identity and
+    // must never consume another scanner's events. Legacy embedded scanner surfaces
+    // retain their broader routing until that protocol is removed.
+    const acceptedSessions = isDetachedPageScanner
+      ? new Set([sessionId])
+      : new Set([
+        sessionId,
+        SCANNER_GRID_SESSION_ID,
+        PRE_SCANNER_GRID_SESSION_ID,
+        SCANNER_TOOL_SESSION_ID,
+        SCANNER_ELEMENT_PANE_SESSION_ID,
+      ]);
 
     // ✅ process only NEW messages since last effect run
     for (let i = lastProcessedIndexRef.current; i < messages.length; i++) {
@@ -538,6 +829,136 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
         const bodyData = tryParse(parsedMessage.body);
 
         switch (parsedMessage.operationId) {
+          case 'pageScanner.workspaceRetarget': {
+            const retarget = pageScannerWorkspaceRetarget(
+              bodyData,
+              sessionId,
+              isPageScannerWorkspaceSession,
+            );
+            if (!retarget) break;
+
+            // A repeated open for the same Bot Job is a focus request only. Keeping the
+            // exact session mounted preserves the current scan, Memory List, and pending work.
+            if (pageScannerRetargetDisposition(retarget, sessionId) === 'FOCUS_ONLY') {
+              try {
+                window.focus();
+              } catch {
+                // Native focus is best-effort and may be refused by the window manager.
+              }
+              break;
+            }
+
+            // A different Bot Job receives a fresh logical scanner identity. Updating the
+            // route and parent session causes the keyed PageScannerWorkspace to remount, so
+            // no grid, Memory List, dialog, timer, or request state crosses Bot Jobs.
+            const targetUrl = new URL(window.location.href);
+            targetUrl.searchParams.set('openPageScanner', 'preScan');
+            targetUrl.searchParams.set('pageScannerSession', retarget.sessionId);
+            window.history.replaceState(window.history.state, '', targetUrl.toString());
+            try {
+              window.focus();
+            } catch {
+              // Native focus is best-effort and may be refused by the window manager.
+            }
+            pageScannerRetiredRef.current = true;
+            onSessionOpen(retarget.sessionId, socketPort, retarget.botJobId);
+            lastProcessedIndexRef.current = messages.length;
+            return;
+          }
+
+          case 'pageScanner.scanResponse':
+          case 'pageScanner.refreshResponse':
+          case 'pageScanner.clearResponse':
+          case 'pageScanner.testElementResponse': {
+            const expectedOperation = pageScannerRequestForResponse(parsedMessage.operationId);
+            if (!expectedOperation) break;
+            const pending = takePageScannerRequest(bodyData?.requestId, expectedOperation);
+            if (!pending) break;
+            const responseMessage = String(
+              bodyData?.message
+              || (bodyData?.ok === false
+                ? 'The Page Scanner operation failed.'
+                : 'Page Scanner operation accepted.'),
+            );
+            if (bodyData?.ok === false) {
+              setPreScanStatus((current) => ({
+                ...current,
+                status: 'failed',
+                message: responseMessage,
+              }));
+              break;
+            }
+            if (expectedOperation === 'pageScanner.clear') {
+              handleClearGridAll();
+              setPreScanStatus({ status: 'idle', message: responseMessage, elementCount: 0 });
+              break;
+            }
+            setPreScanStatus((current) => {
+              if (['done', 'empty', 'failed'].includes(current.status)) return current;
+              return { ...current, status: 'waiting', message: responseMessage };
+            });
+            break;
+          }
+
+          case 'pageScanner.errorResponse': {
+            const closeReason = pageScannerWorkspaceCloseReason(bodyData);
+            if (closeReason) {
+              retireDetachedPageScanner(closeReason, bodyData?.message);
+              break;
+            }
+            takePageScannerRequest(bodyData?.requestId);
+            setPreScanStatus((current) => ({
+              ...current,
+              status: 'failed',
+              message: String(
+                bodyData?.message || bodyData?.error || 'The Page Scanner operation failed.',
+              ),
+            }));
+            break;
+          }
+
+          case 'pageScanner.workspaceClosed': {
+            const closeReason = pageScannerWorkspaceCloseReason(bodyData);
+            if (closeReason) {
+              retireDetachedPageScanner(closeReason, bodyData?.message);
+            } else {
+              const message = String(bodyData?.message || 'The Page Scanner workspace was closed.');
+              clearPendingPageScannerRequests();
+              setPageScannerBootstrapError(message);
+              setPreScanStatus((current) => ({ ...current, status: 'failed', message }));
+            }
+            break;
+          }
+
+          case 'pageScannerWorkspace.bootstrapResponse': {
+            if (
+              !pageScannerBootstrapRequestRef.current
+              || bodyData?.requestId !== pageScannerBootstrapRequestRef.current
+            ) break;
+            pageScannerBootstrapRequestRef.current = null;
+            if (bodyData?.ok === false) {
+              setPageScannerBootstrapError(String(
+                bodyData?.message || bodyData?.error || 'Page Scanner details could not be loaded.',
+              ));
+              break;
+            }
+            setPageScannerBootstrapError('');
+            if (pendingPageScannerRequestsRef.current.size === 0) {
+              setPreScanStatus((current) => current.status === 'failed'
+                ? { status: 'idle', message: 'Ready', elementCount: current.elementCount }
+                : current);
+            }
+            if (Number(bodyData?.homeBankingId) > 0) setHomeBankingId(Number(bodyData.homeBankingId));
+            if (Number(bodyData?.botJobId) > 0) setBotJobId(Number(bodyData.botJobId));
+            if (typeof bodyData?.botJobName === 'string') setBotJobName(bodyData.botJobName);
+            setMemoryBlockOptions((prev) => normalizeBlockOptions([
+              ...prev,
+              ...blockOptionsFromPayload(bodyData),
+            ]));
+            break;
+          }
+
+          case 'pageScanner.status':
           case "preScanStatus": {
             const status = String(bodyData?.status ?? 'idle') as PreScanStatus['status'];
             setPreScanStatus({
@@ -548,6 +969,15 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
             break;
           }
 
+          case 'pageScanner.reset': {
+            setElementDTO([]);
+            setElementGrouped({});
+            setKeepSelectedIds(new Set());
+            setIsElementGrouped(false);
+            break;
+          }
+
+          case 'pageScanner.chunk':
           case SCANNER_SEARCH_TERMS_OPERATION: {
             setIsSendingAll(false);
             setIsUpdatingAll(false);
@@ -709,6 +1139,85 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
             break;
           }
 
+          case 'pageScanner.createBlockResponse': {
+            const pendingCreate = pendingPageScannerCreateBlockRef.current;
+            if (!pendingCreate || bodyData?.requestId !== pendingCreate.requestId) break;
+            if (pageScannerCreateBlockTimerRef.current) {
+              clearTimeout(pageScannerCreateBlockTimerRef.current);
+              pageScannerCreateBlockTimerRef.current = null;
+            }
+            setCreateBlockBusy(false);
+            const createdBlockId = Number(bodyData?.blockId ?? bodyData?.createdBlockId);
+            const committed = bodyData?.committed === true
+              || (Number.isFinite(createdBlockId) && createdBlockId > 0);
+            pendingPageScannerCreateBlockRef.current = null;
+            setCreateBlockRequestPending(false);
+            if (!committed && bodyData?.ok === false) {
+              setAlertMessageHeader('Could not create block');
+              setAlertMessageBody(String(bodyData?.message || bodyData?.error || 'The block was not created.'));
+              break;
+            }
+            setMemoryBlockOptions((prev) => normalizeBlockOptions([
+              ...prev,
+              ...blockOptionsFromPayload(bodyData),
+            ]));
+            if (Number.isFinite(createdBlockId) && createdBlockId > 0) {
+              setMemoryTargetBlockId(createdBlockId);
+            }
+            setCreateBlockOpen(false);
+            if (bodyData?.warningCode || bodyData?.synchronized === false || bodyData?.ok === false) {
+              setAlertMessageHeader('Block created with a warning');
+              setAlertMessageBody(String(
+                bodyData?.message || 'The block was created, but the refreshed block list is not available yet.',
+              ));
+            }
+            break;
+          }
+
+          case 'pageScanner.applyResponse': {
+            const pendingApply = pendingPageScannerApplyRef.current;
+            if (!pendingApply || bodyData?.requestId !== pendingApply.requestId) break;
+            pendingPageScannerApplyRef.current = null;
+            setMemoryApplyBusy(false);
+            if (pageScannerApplyTimerRef.current) {
+              clearTimeout(pageScannerApplyTimerRef.current);
+              pageScannerApplyTimerRef.current = null;
+            }
+            const committed = bodyData?.committed === true
+              || (bodyData?.committed == null && bodyData?.ok !== false);
+            if (!committed) {
+              setAlertMessageHeader('Could not add instructions');
+              setAlertMessageBody(String(
+                bodyData?.message || bodyData?.error || 'The selected elements remain in Memory List.',
+              ));
+              break;
+            }
+            const acknowledgedKeys = new Set(pendingApply.elementKeys);
+            setMemoryElements((prev) => prev.filter((element) => !acknowledgedKeys.has(memoryElementKey(element))));
+            if (bodyData?.synchronized === false || bodyData?.warningCode) {
+              setAlertMessageHeader('Instructions added with a warning');
+              setAlertMessageBody(String(
+                bodyData?.message
+                || 'Instructions were saved, but Bot Job Details could not refresh in real time.',
+              ));
+            }
+            break;
+          }
+
+          case 'pageScanner.closeResponse': {
+            if (
+              !pageScannerCloseRequestRef.current
+              || bodyData?.requestId !== pageScannerCloseRequestRef.current
+            ) break;
+            pageScannerCloseRequestRef.current = null;
+            if (pageScannerCloseTimerRef.current) {
+              clearTimeout(pageScannerCloseTimerRef.current);
+              pageScannerCloseTimerRef.current = null;
+            }
+            window.close();
+            break;
+          }
+
           case SCANNER_SEND_DOM_REVIEW_OPERATION: {
             const reviewData: DomReviewData = {
               url: bodyData?.url || '',
@@ -751,7 +1260,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
 
     // ✅ mark all messages as processed
     lastProcessedIndexRef.current = messages.length;
-  }, [messages, sessionId]);
+  }, [isDetachedPageScanner, messages, sessionId]);
 
   useEffect(() => {
     //console.log("UseEffect -> editingInstructionId");
@@ -883,6 +1392,52 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
       ? SCANNER_TOOL_SESSION_ID
       : SCANNER_ELEMENT_PANE_SESSION_ID;
 
+    if (
+      isDetachedPageScanner
+      && (action === 'TEST_INPUT_DTO' || action === 'TEST_CLICK_DTO')
+    ) {
+      const requestId = createPageScannerRequestId('page-scanner-test-element');
+      const testedElement = action === 'TEST_INPUT_DTO'
+        ? { ...elementDTO, defaultValue: SCANNER_TEST_INPUT_VALUE }
+        : elementDTO;
+      const payload = {
+        requestId,
+        action,
+        testAction: action === 'TEST_INPUT_DTO' ? 'input' : 'click',
+        elementDetails: [testedElement],
+      };
+      const message = {
+        type: 'pageScanner.testElement',
+        homeBankingId,
+        botJobId,
+        botJobName,
+        sessionId,
+        body: JSON.stringify(payload),
+      };
+      try {
+        webSocket.send(JSON.stringify(message));
+        trackPageScannerRequest(requestId, 'pageScanner.testElement');
+        setPreScanStatus((current) => ({
+          ...current,
+          status: 'waiting',
+          message: action === 'TEST_INPUT_DTO'
+            ? 'Starting Page Scanner input test...'
+            : 'Starting Page Scanner click test...',
+        }));
+        console.log('Sent detached Page Scanner element test:', message);
+      } catch (error) {
+        console.error('Error sending Page Scanner element test:', error);
+        setPreScanStatus((current) => ({
+          ...current,
+          status: 'failed',
+          message: error instanceof Error
+            ? error.message
+            : 'The Page Scanner element test could not be sent.',
+        }));
+      }
+      return;
+    }
+
     const message: Record<string, unknown> = {
       type: action,
       homeBankingId: homeBankingId,
@@ -1008,23 +1563,70 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
       return;
     }
 
-    const message = {
-      type,
-      homeBankingId,
-      botJobId,
-      botJobName,
-      sessionId: PRE_SCANNER_GRID_SESSION_ID,
+    const requestId = createPageScannerRequestId('page-scanner-command');
+    const payload = {
+      requestId,
       focusProfile: dashboardFocus,
       searchTerms: dashboardSearchText,
       searchHiddenFields: dashboardSearchHidden,
       ...extra,
     };
+    const detachedOperation = type === PRE_SCAN_PAGE_OPERATION
+      ? 'pageScanner.scan'
+      : type === PRE_SCAN_REFRESH_PAGE_OPERATION
+        ? 'pageScanner.refresh'
+        : type === PRE_SCAN_CLEAR_GRID_OPERATION
+          ? 'pageScanner.clear'
+          : type;
+    const message = isDetachedPageScanner
+      ? {
+        type: detachedOperation,
+        homeBankingId,
+        botJobId,
+        botJobName,
+        sessionId,
+        body: JSON.stringify(payload),
+      }
+      : {
+        type,
+        homeBankingId,
+        botJobId,
+        botJobName,
+        sessionId: PRE_SCANNER_GRID_SESSION_ID,
+        ...payload,
+      };
 
     try {
       webSocket.send(JSON.stringify(message));
       console.log("Sent pre-scan dashboard command:", message);
+      if (
+        isDetachedPageScanner
+        && ['pageScanner.scan', 'pageScanner.refresh', 'pageScanner.clear'].includes(detachedOperation)
+      ) {
+        const operation = detachedOperation as PageScannerRequestOperation;
+        trackPageScannerRequest(requestId, operation);
+        const messageByOperation: Record<string, string> = {
+          'pageScanner.scan': 'Starting Page Scanner...',
+          'pageScanner.refresh': 'Refreshing the scanner web page...',
+          'pageScanner.clear': 'Clearing the Page Scanner grid...',
+        };
+        setPreScanStatus((current) => ({
+          ...current,
+          status: 'waiting',
+          message: messageByOperation[operation],
+        }));
+      }
     } catch (error) {
       console.error("Error sending pre-scan dashboard command:", error);
+      if (isDetachedPageScanner) {
+        setPreScanStatus((current) => ({
+          ...current,
+          status: 'failed',
+          message: error instanceof Error
+            ? error.message
+            : 'The Page Scanner operation could not be sent.',
+        }));
+      }
     }
   };
 
@@ -1082,7 +1684,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   };
 
   const handleDashboardClearGrid = () => {
-    handleClearGridAll();
+    if (!isDetachedPageScanner) handleClearGridAll();
     sendDashboardCommand(PRE_SCAN_CLEAR_GRID_OPERATION);
   };
 
@@ -1522,7 +2124,25 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
 
   return (
     <div className={styles.gridContainer}>
-      {isPreScanMode ? (
+      {isDetachedPageScanner ? (
+        <PageScannerWorkspaceHeader
+          botJobId={botJobId}
+          botJobName={botJobName}
+          connected={connected}
+          reconnectAttempts={reconnectAttempts}
+          error={pageScannerBootstrapError || error}
+          status={preScanStatus.message}
+          statusTone={preScanStatus.status === 'failed'
+            ? 'error'
+            : preScanStatus.status === 'done'
+              ? 'success'
+              : preScanStatus.status === 'waiting' || preScanStatus.status === 'running'
+                ? 'warning'
+                : 'neutral'}
+          closing={pageScannerClosing}
+          onClose={closeDetachedPageScanner}
+        />
+      ) : isPreScanMode ? (
         <BotJobDetailsChrome
           fallbackBotJobId={botJobId}
           fallbackBotJobName={botJobName}
@@ -1661,7 +2281,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
                 placeholder="button, label, input, data-testid"
               />
             </label>
-            <label className={`${styles.preScanToggle} ${styles.preScanHiddenControl}`}>
+            <label className={styles.preScanToggle}>
               <input
                 type="checkbox"
                 checked={dashboardSearchHidden}
@@ -1833,13 +2453,15 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
               type="button"
               className={styles.memoryApplyButton}
               disabled={
+                memoryApplyBusy
+                ||
                 memoryTargetBlockId === null
                 || memoryElements.length === 0
                 || !memoryBlockOptions.some((block) => block.blockId === memoryTargetBlockId)
               }
               onClick={handleApplyMemory}
             >
-              Apply
+              {memoryApplyBusy ? 'Applying...' : 'Apply'}
             </button>
           </div>
         </div>
@@ -1849,7 +2471,11 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
         <CreateNewBlock
           blocks={memoryBlockOptions}
           onCreate={handleCreateNewBlock}
-          onClose={() => setCreateBlockOpen(false)}
+          onClose={() => {
+            if (!createBlockRequestPending) setCreateBlockOpen(false);
+          }}
+          pending={isDetachedPageScanner && createBlockRequestPending}
+          submitting={isDetachedPageScanner && createBlockBusy}
         />
       )}
 

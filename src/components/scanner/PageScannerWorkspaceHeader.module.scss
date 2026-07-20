@@ -1,0 +1,12 @@
+.wrapper {
+  position: relative;
+  z-index: 10000;
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  background: #f0f0f0;
+  border: 1px solid #d4d4d4;
+  border-radius: 6px;
+}

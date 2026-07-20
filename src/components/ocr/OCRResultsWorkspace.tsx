@@ -3,10 +3,16 @@ import type { OCRParameter } from '../OCRConfigPanel';
 import OCRTestResultsPanel, { type OCRTestResult } from '../OCRTestResultsPanel';
 import { OCR_RESULTS_WORKSPACE_KIND } from '../scanner/Scanner.sessions';
 import { useWebSocket } from '../useWebSocket';
+import {
+  OCR_WORKSPACE_WINDOW_RETARGET_OPERATION,
+  ocrWorkspaceRetarget,
+  type OcrWorkspaceRetarget,
+} from './OCRWorkspace.contract';
 
 type Props = {
   socketPort: number;
   sessionId: string;
+  onWorkspaceRetarget: (target: OcrWorkspaceRetarget) => void;
 };
 
 type WorkspaceContext = {
@@ -41,10 +47,11 @@ const parseJson = (value: unknown) => {
 
 const responseError = (body: any, fallback: string) => String(body?.error || body?.message || fallback);
 
-const OCRResultsWorkspace: React.FC<Props> = ({ socketPort, sessionId }) => {
+const OCRResultsWorkspace: React.FC<Props> = ({ socketPort, sessionId, onWorkspaceRetarget }) => {
   const { webSocket, connected, messages, error: socketError } = useWebSocket(socketPort, sessionId);
   const processedMessageCountRef = useRef(0);
   const bootstrappedSocketRef = useRef<WebSocket | null>(null);
+  const retiredSessionRef = useRef(false);
   const [context, setContext] = useState<WorkspaceContext | null>(null);
   const [result, setResult] = useState<OCRTestResult | null>(null);
   const [busy, setBusy] = useState(true);
@@ -82,6 +89,7 @@ const OCRResultsWorkspace: React.FC<Props> = ({ socketPort, sessionId }) => {
   }, [connected, sendCommand, webSocket]);
 
   useEffect(() => {
+    if (retiredSessionRef.current) return;
     if (processedMessageCountRef.current > messages.length) processedMessageCountRef.current = 0;
 
     for (let index = processedMessageCountRef.current; index < messages.length; index += 1) {
@@ -91,6 +99,25 @@ const OCRResultsWorkspace: React.FC<Props> = ({ socketPort, sessionId }) => {
         const body: any = parseJson(envelope.body);
 
         switch (envelope.operationId) {
+          case OCR_WORKSPACE_WINDOW_RETARGET_OPERATION: {
+            const retarget = ocrWorkspaceRetarget(
+              body,
+              sessionId,
+              OCR_RESULTS_WORKSPACE_KIND,
+            );
+            if (retarget) {
+              onWorkspaceRetarget(retarget);
+              if (retarget.sessionId !== sessionId) {
+                retiredSessionRef.current = true;
+                processedMessageCountRef.current = messages.length;
+                return;
+              }
+            } else {
+              console.warn('OCR Results ignored an invalid workspace retarget message.');
+            }
+            break;
+          }
+
           case 'ocrWorkspace.bootstrapResponse': {
             if (body?.ok === false || body?.kind !== OCR_RESULTS_WORKSPACE_KIND) {
               setBusy(false);
@@ -161,7 +188,7 @@ const OCRResultsWorkspace: React.FC<Props> = ({ socketPort, sessionId }) => {
       }
     }
     processedMessageCountRef.current = messages.length;
-  }, [messages, sendCommand, sessionId]);
+  }, [messages, onWorkspaceRetarget, sendCommand, sessionId]);
 
   const displayResult = result || emptyResult(
     error || socketError || (busy ? 'Loading OCR result...' : 'No OCR result available.'),

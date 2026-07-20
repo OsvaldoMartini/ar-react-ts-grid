@@ -300,11 +300,12 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
         clearTimer(actionTimeoutRef);
         pendingActionRef.current = null;
         setPendingAction(null);
-        if (body.state) {
+        const opensDetachedPageScanner = pending.action === 'SHOW_PRE_SCAN';
+        if (body.state && !opensDetachedPageScanner) {
           setState((current) => reduceBotJobDetailsState(current, body.state));
         }
         const activeSurface = body.activeSurface;
-        if (body.ok !== false && isWorkspaceSurface(activeSurface)) {
+        if (body.ok !== false && !opensDetachedPageScanner && isWorkspaceSurface(activeSurface)) {
           setState((current) => current ? {
             ...current,
             activeSurface,
@@ -317,6 +318,26 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
         }
         setTransientStatus(
           body.message || (body.ok === false ? 'Action failed' : 'Action accepted'),
+          body.ok === false ? 'error' : 'success',
+        );
+        if (body.errorCode === 'LICENSE_REQUIRED') invalidateLicenseCapabilities();
+        return;
+      }
+
+      if (operationId === 'pageScannerWorkspace.openResponse') {
+        const pending = pendingActionRef.current;
+        if (
+          pending?.action !== 'SHOW_PRE_SCAN'
+          || body.requestId !== pending.requestId
+        ) return;
+        clearTimer(actionTimeoutRef);
+        pendingActionRef.current = null;
+        setPendingAction(null);
+        if (body.state) {
+          setState((current) => reduceBotJobDetailsState(current, body.state));
+        }
+        setTransientStatus(
+          body.message || (body.ok === false ? 'Page Scanner could not be opened' : 'Page Scanner opened'),
           body.ok === false ? 'error' : 'success',
         );
         if (body.errorCode === 'LICENSE_REQUIRED') invalidateLicenseCapabilities();
@@ -441,7 +462,10 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
     setStatus(`Sending ${action.toLowerCase().replaceAll('_', ' ')}…`);
     setStatusTone('neutral');
     try {
-      send('botJobDetails.action', { action, botJobId, requestId: actionRequestId });
+      send(
+        action === 'SHOW_PRE_SCAN' ? 'pageScannerWorkspace.open' : 'botJobDetails.action',
+        { action, botJobId, requestId: actionRequestId },
+      );
       actionTimeoutRef.current = setTimeout(() => {
         if (pendingActionRef.current?.requestId !== actionRequestId) return;
         pendingActionRef.current = null;

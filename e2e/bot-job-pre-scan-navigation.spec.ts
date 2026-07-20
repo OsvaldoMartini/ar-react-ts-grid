@@ -2,6 +2,14 @@ import { expect, test, type Page } from '@playwright/test';
 
 type RecordedRequest = Record<string, unknown> & { type?: string };
 
+const BOT_JOB_WINDOW_SESSION = 'bot-job-window-123e4567-e89b-42d3-a456-426614174000';
+const PAGE_SCANNER_SESSION = 'page-scanner-223e4567-e89b-42d3-a456-426614174000';
+const NEXT_PAGE_SCANNER_SESSION = 'page-scanner-323e4567-e89b-42d3-a456-426614174000';
+const OCR_CONFIG_SESSION = 'ocr-config-config-window-1';
+const NEXT_OCR_CONFIG_SESSION = 'ocr-config-config-window-2';
+const OCR_RESULTS_SESSION = 'ocr-results-results-window-1';
+const NEXT_OCR_RESULTS_SESSION = 'ocr-results-results-window-2';
+
 const installMockBackend = async (page: Page) => {
   await page.addInitScript(() => {
     const botJobState = {
@@ -55,6 +63,7 @@ const installMockBackend = async (page: Page) => {
       closeCalls: 0,
       socketSessions: [] as string[],
     };
+    const sockets: MockWebSocket[] = [];
 
     Object.defineProperty(window, '__AR_BOT_JOB_E2E__', {
       configurable: true,
@@ -97,6 +106,7 @@ const installMockBackend = async (page: Page) => {
         this.url = String(url);
         this.sessionId = new URL(this.url).searchParams.get('sessionId') ?? '';
         testState.socketSessions.push(this.sessionId);
+        sockets.push(this);
         queueMicrotask(() => {
           if (this.readyState !== MockWebSocket.CONNECTING) return;
           this.readyState = MockWebSocket.OPEN;
@@ -120,41 +130,63 @@ const installMockBackend = async (page: Page) => {
 
         if (request.type === 'botJobDetails.bootstrap') {
           const body = typeof request.body === 'string' ? JSON.parse(request.body) : {};
-          const surface = this.sessionId === 'preScannerGrid' ? 'preScan' : 'botJob';
+          const requestedBotJobId = Number(body.botJobId || 42);
           this.reply('botJobDetails.bootstrapResponse', {
             ok: true,
             message: 'Bot Job Details loaded',
             requestId: body.requestId,
-            botJobId: 42,
-            state: { ...botJobState, activeSurface: surface },
+            botJobId: requestedBotJobId,
+            state: {
+              ...botJobState,
+              botJobId: requestedBotJobId,
+              name: requestedBotJobId === 42 ? 'Payments' : `Bot Job ${requestedBotJobId}`,
+              activeSurface: 'botJob',
+            },
           });
           return;
         }
 
-        if (request.type === 'botJobDetails.action') {
+        if (request.type === 'pageScannerWorkspace.open') {
           const body = typeof request.body === 'string' ? JSON.parse(request.body) : {};
           if (body.action === 'SHOW_PRE_SCAN') {
-            this.reply('botJobDetails.actionResponse', {
+            this.reply('pageScannerWorkspace.openResponse', {
               ok: true,
-              message: 'Pre Scan workspace opened',
+              message: 'Page Scanner opened in its reusable window',
               requestId: body.requestId,
-              botJobId: 42,
+              botJobId: Number(body.botJobId || 42),
               action: 'SHOW_PRE_SCAN',
-              activeSurface: 'preScan',
-              componentsVisible: false,
+              sessionId: 'page-scanner-launched-by-java',
             });
           }
           return;
         }
 
-        if (request.type === 'PRE_SCAN_PAGE') {
-          this.reply('preScanStatus', {
+        if (request.type === 'pageScannerWorkspace.bootstrap') {
+          const body = typeof request.body === 'string' ? JSON.parse(request.body) : {};
+          const targetBotJobId = this.sessionId.includes('323e4567') ? 84 : 42;
+          this.reply('pageScannerWorkspace.bootstrapResponse', {
+            ok: true,
+            requestId: body.requestId,
+            sessionId: this.sessionId,
+            homeBankingId: 5,
+            botJobId: targetBotJobId,
+            botJobName: targetBotJobId === 42 ? 'Payments' : 'Bot Job 84',
+            blocks: [{ id: 11, name: 'Login' }],
+          });
+          return;
+        }
+
+        if (request.type === 'pageScanner.scan') {
+          const body = typeof request.body === 'string' ? JSON.parse(request.body) : {};
+          this.reply('pageScanner.scanResponse', {
+            ok: true,
+            requestId: body.requestId,
+            message: 'Page Scanner operation accepted.',
+          });
+          this.reply('pageScanner.status', {
             status: 'done',
             message: 'Found 2 web element(s).',
             elementCount: 2,
-            botJobId: 42,
-            botJobName: 'Payments',
-            homeBankingId: 5,
           });
           return;
         }
@@ -173,12 +205,13 @@ const installMockBackend = async (page: Page) => {
 
         if (request.type === 'ocrWorkspace.bootstrap') {
           const results = this.sessionId.startsWith('ocr-results-');
+          const nextBinding = this.sessionId.endsWith('-2');
           this.reply('ocrWorkspace.bootstrapResponse', {
             ok: true,
             kind: results ? 'results' : 'config',
             sessionId: this.sessionId,
             homeBankingId: 5,
-            botJobId: 42,
+            botJobId: nextBinding ? 84 : 42,
             homeUrlId: 8,
             parameters: results ? [{
               category: 'engine',
@@ -264,11 +297,23 @@ const installMockBackend = async (page: Page) => {
           this.dispatchEvent(event);
         });
       }
+
+      serverMessage(operationId: string, body: unknown) {
+        this.reply(operationId, body);
+      }
     }
 
     Object.defineProperty(window, 'WebSocket', {
       configurable: true,
       value: MockWebSocket,
+    });
+    Object.defineProperty(window, '__AR_E2E_SERVER_MESSAGE__', {
+      configurable: true,
+      value: (targetSessionId: string, operationId: string, body: unknown) => {
+        sockets
+          .filter(socket => socket.sessionId === targetSessionId && socket.readyState === MockWebSocket.OPEN)
+          .forEach(socket => socket.serverMessage(operationId, body));
+      },
     });
   });
 };
@@ -279,6 +324,26 @@ const recordedRequests = (page: Page, type: string) => page.evaluate((requestTyp
   }).__AR_BOT_JOB_E2E__;
   return state.requests.filter(request => request.type === requestType);
 }, type);
+
+const sendServerMessage = (
+  page: Page,
+  sessionId: string,
+  operationId: string,
+  body: Record<string, unknown>,
+) => page.evaluate(({ targetSessionId, targetOperationId, targetBody }) => {
+  const send = (window as typeof window & {
+    __AR_E2E_SERVER_MESSAGE__: (
+      sessionId: string,
+      operationId: string,
+      body: Record<string, unknown>,
+    ) => void;
+  }).__AR_E2E_SERVER_MESSAGE__;
+  send(targetSessionId, targetOperationId, targetBody);
+}, {
+  targetSessionId: sessionId,
+  targetOperationId: operationId,
+  targetBody: body,
+});
 
 const dragBy = async (page: Page, handle: ReturnType<Page['locator']>, deltaX: number, deltaY: number) => {
   const bounds = await handle.boundingBox();
@@ -294,7 +359,7 @@ const dragBy = async (page: Page, handle: ReturnType<Page['locator']>, deltaX: n
 test('uses the shared draggable non-modal Bot Job frame outside desktop-shell mode', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await installMockBackend(page);
-  await page.goto('/?openBotJob=42');
+  await page.goto(`/?openBotJob=42&botJobWindowSession=${BOT_JOB_WINDOW_SESSION}`);
 
   const botJobWorkspace = page.getByTestId('bot-job-details-workspace');
   await expect(botJobWorkspace).toBeVisible();
@@ -314,14 +379,20 @@ test('uses the shared draggable non-modal Bot Job frame outside desktop-shell mo
   expect(after).not.toBeNull();
   expect(after!.x).toBeGreaterThan(before!.x + 20);
   expect(after!.y).toBeGreaterThan(before!.y + 20);
+
+  const socketSessions = await page.evaluate(() => (
+    window as typeof window & { __AR_BOT_JOB_E2E__: { socketSessions: string[] } }
+  ).__AR_BOT_JOB_E2E__.socketSessions);
+  expect(socketSessions).toContain(BOT_JOB_WINDOW_SESSION);
+  expect(socketSessions).not.toContain('mainDashboardBootstrap');
 });
 
-test('keeps Bot Job and Page Scanner Grid in the full-client desktop shell', async ({ page }) => {
+test('keeps Bot Job mounted while one detached Page Scanner retargets in place', async ({ page }) => {
   const pageErrors: string[] = [];
-  page.on('pageerror', error => pageErrors.push(error.message));
+  page.on('pageerror', error => pageErrors.push(`bot-job: ${error.message}`));
   await page.setViewportSize({ width: 1240, height: 820 });
   await installMockBackend(page);
-  await page.goto('/?desktopShell=1&openBotJob=42');
+  await page.goto(`/?desktopShell=1&openBotJob=42&botJobWindowSession=${BOT_JOB_WINDOW_SESSION}`);
 
   const botJobWorkspace = page.getByTestId('bot-job-details-workspace');
   await expect(botJobWorkspace).toBeVisible();
@@ -338,65 +409,130 @@ test('keeps Bot Job and Page Scanner Grid in the full-client desktop shell', asy
   const initialUrl = page.url();
   await page.getByRole('button', { name: 'Pre Scan' }).click();
   await expect.poll(async () => {
-    const requests = await recordedRequests(page, 'botJobDetails.action');
+    const requests = await recordedRequests(page, 'pageScannerWorkspace.open');
     return requests.some((request) => {
       const body = typeof request.body === 'string' ? JSON.parse(request.body) : {};
       return body.action === 'SHOW_PRE_SCAN' && typeof body.requestId === 'string';
     });
   }).toBe(true);
 
-  const scannerWorkspace = page.getByTestId('pre-scan-workspace');
-  await expect(scannerWorkspace).toBeVisible();
-  await expect(page.getByRole('region', { name: 'Page Scanner Grid' })).toHaveCount(1);
-  await expect(page.getByTestId('bot-job-details-workspace')).toHaveCount(0);
+  await expect(botJobWorkspace).toBeVisible();
+  await expect(page.getByTestId('pre-scan-workspace')).toHaveCount(0);
+  await expect(page.getByTestId('detached-page-scanner-workspace')).toHaveCount(0);
   expect(page.url()).toBe(initialUrl);
   expect(await page.evaluate(() => (
     window as typeof window & { __AR_BOT_JOB_E2E__: { openCalls: string[] } }
   ).__AR_BOT_JOB_E2E__.openCalls)).toEqual([]);
 
-  await page.getByRole('button', { name: 'Page Scanner', exact: true }).click();
-  await expect.poll(async () => (await recordedRequests(page, 'PRE_SCAN_PAGE')).length).toBe(1);
-  const [scanRequest] = await recordedRequests(page, 'PRE_SCAN_PAGE');
+  const scannerPage = await page.context().newPage();
+  const scannerErrors: string[] = [];
+  scannerPage.on('pageerror', error => scannerErrors.push(error.message));
+  await scannerPage.setViewportSize({ width: 1240, height: 820 });
+  await installMockBackend(scannerPage);
+  await scannerPage.goto(
+    `/?desktopShell=1&openPageScanner=preScan&pageScannerSession=${PAGE_SCANNER_SESSION}`,
+  );
+
+  const scannerWorkspace = scannerPage.getByTestId('detached-page-scanner-workspace');
+  await expect(scannerWorkspace).toBeVisible();
+  await expect(scannerPage.getByRole('region', { name: 'Page Scanner' })).toHaveCount(1);
+  await expect(scannerPage.getByRole('button', { name: 'Page Scanner', exact: true })).toBeEnabled();
+  await expect(scannerPage.getByRole('button', { name: 'OCR Config' })).toBeEnabled();
+  await expect(scannerPage.getByRole('button', { name: 'OCR Results' })).toBeEnabled();
+  await expect(scannerPage.getByRole('button', { name: 'Refresh Web Page' })).toBeEnabled();
+  await expect(scannerPage.getByText('Search Hidden Fields', { exact: true })).toBeVisible();
+  await expect(scannerPage.getByPlaceholder('button, label, input, data-testid')).toBeVisible();
+
+  const scannerBounds = await scannerWorkspace.boundingBox();
+  expect(scannerBounds).not.toBeNull();
+  expect(scannerBounds!.x).toBeCloseTo(0, 0);
+  expect(scannerBounds!.y).toBeCloseTo(0, 0);
+  expect(scannerBounds!.width).toBeCloseTo(1240, 0);
+  expect(scannerBounds!.height).toBeCloseTo(820, 0);
+  expect(await scannerWorkspace.evaluate(element => getComputedStyle(element).borderRadius)).toBe('0px');
+  expect(await scannerWorkspace.evaluate(element => getComputedStyle(element).boxShadow)).toBe('none');
+
+  await scannerPage.getByRole('button', { name: 'Page Scanner', exact: true }).click();
+  await expect.poll(async () => (await recordedRequests(scannerPage, 'pageScanner.scan')).length).toBe(1);
+  const [scanRequest] = await recordedRequests(scannerPage, 'pageScanner.scan');
   expect(scanRequest).toMatchObject({
-    type: 'PRE_SCAN_PAGE',
-    sessionId: 'preScannerGrid',
+    type: 'pageScanner.scan',
+    sessionId: PAGE_SCANNER_SESSION,
     botJobId: 42,
+  });
+  const scanBody = typeof scanRequest.body === 'string' ? JSON.parse(scanRequest.body) : {};
+  expect(scanBody).toMatchObject({
     focusProfile: 'factory-default',
     searchTerms: '',
     searchHiddenFields: false,
   });
-  await expect(page.getByText('Found 2 web element(s).', { exact: true })).toBeVisible();
-  await expect(page.getByText('done', { exact: true })).toBeVisible();
+  expect(typeof scanBody.requestId).toBe('string');
+  await expect(scannerPage.getByRole('status')).toHaveText('Found 2 web element(s).');
+  await expect(scannerPage.getByText('done', { exact: true })).toBeVisible();
+
+  const pageCountBeforeRetarget = page.context().pages().length;
+  await sendServerMessage(scannerPage, PAGE_SCANNER_SESSION, 'pageScanner.workspaceRetarget', {
+    previousSessionId: PAGE_SCANNER_SESSION,
+    sessionId: NEXT_PAGE_SCANNER_SESSION,
+    botJobId: 84,
+    workspaceEpoch: 2,
+  });
+  await expect.poll(() => new URL(scannerPage.url()).searchParams.get('pageScannerSession'))
+    .toBe(NEXT_PAGE_SCANNER_SESSION);
+  await expect(scannerPage.getByTestId('detached-page-scanner-workspace')).toHaveCount(1);
+  await expect(scannerPage.getByText('Bot Job ID 84', { exact: true })).toBeVisible();
+  expect(page.context().pages().length).toBe(pageCountBeforeRetarget);
+  expect(scannerPage.isClosed()).toBe(false);
+  await expect(botJobWorkspace).toBeVisible();
+
+  const scannerSessions = await scannerPage.evaluate(() => (
+    window as typeof window & { __AR_BOT_JOB_E2E__: { socketSessions: string[] } }
+  ).__AR_BOT_JOB_E2E__.socketSessions);
+  expect(scannerSessions).toContain(PAGE_SCANNER_SESSION);
+  expect(scannerSessions).toContain(NEXT_PAGE_SCANNER_SESSION);
+  expect(scannerSessions).not.toContain('mainDashboardBootstrap');
   expect(pageErrors).toEqual([]);
+  expect(scannerErrors).toEqual([]);
+  await scannerPage.close();
 });
 
-test('keeps Bot Job, OCR Config, and OCR Results in three independent full-client windows', async ({ page }) => {
+test('keeps one independent OCR Config and one OCR Results window while both retarget in place', async ({ page }) => {
   const pageErrors: string[] = [];
-  page.on('pageerror', error => pageErrors.push(`scanner: ${error.message}`));
+  page.on('pageerror', error => pageErrors.push(`bot-job: ${error.message}`));
   await page.setViewportSize({ width: 1240, height: 820 });
   await installMockBackend(page);
-  await page.goto('/?desktopShell=1&openBotJob=42');
+  await page.goto(`/?desktopShell=1&openBotJob=42&botJobWindowSession=${BOT_JOB_WINDOW_SESSION}`);
 
   await page.getByRole('button', { name: 'Pre Scan' }).click();
-  await expect(page.getByTestId('pre-scan-workspace')).toBeVisible();
+  await expect(page.getByTestId('bot-job-details-workspace')).toBeVisible();
 
-  await page.getByRole('button', { name: 'OCR Config' }).click();
-  await page.getByRole('button', { name: 'OCR Results' }).click();
-  await expect.poll(async () => (await recordedRequests(page, 'ocrWorkspace.open')).length).toBe(2);
-  const parentOpenRequests = await recordedRequests(page, 'ocrWorkspace.open');
+  const scannerPage = await page.context().newPage();
+  const scannerErrors: string[] = [];
+  scannerPage.on('pageerror', error => scannerErrors.push(error.message));
+  await scannerPage.setViewportSize({ width: 1240, height: 820 });
+  await installMockBackend(scannerPage);
+  await scannerPage.goto(
+    `/?desktopShell=1&openPageScanner=preScan&pageScannerSession=${PAGE_SCANNER_SESSION}`,
+  );
+  await expect(scannerPage.getByTestId('detached-page-scanner-workspace')).toBeVisible();
+
+  await scannerPage.getByRole('button', { name: 'OCR Config' }).click();
+  await scannerPage.getByRole('button', { name: 'OCR Results' }).click();
+  await expect.poll(async () => (await recordedRequests(scannerPage, 'ocrWorkspace.open')).length).toBe(2);
+  const parentOpenRequests = await recordedRequests(scannerPage, 'ocrWorkspace.open');
   expect(parentOpenRequests.map(request => {
     const body = typeof request.body === 'string' ? JSON.parse(request.body) : {};
     return body.kind;
   })).toEqual(['config', 'results']);
-  await expect(page.getByTestId('ocr-config-workspace')).toHaveCount(0);
-  await expect(page.getByTestId('ocr-results-workspace')).toHaveCount(0);
+  await expect(scannerPage.getByTestId('ocr-config-workspace')).toHaveCount(0);
+  await expect(scannerPage.getByTestId('ocr-results-workspace')).toHaveCount(0);
 
   const configPage = await page.context().newPage();
   const configErrors: string[] = [];
   configPage.on('pageerror', error => configErrors.push(error.message));
   await configPage.setViewportSize({ width: 1240, height: 820 });
   await installMockBackend(configPage);
-  await configPage.goto('/?desktopShell=1&openOcr=config&ocrSession=ocr-config-config-window-1');
+  await configPage.goto(`/?desktopShell=1&openOcr=config&ocrSession=${OCR_CONFIG_SESSION}`);
   const configWindow = configPage.getByTestId('ocr-config-window');
   const configWorkspace = configPage.getByTestId('ocr-config-workspace');
   await expect(configWindow).toBeVisible();
@@ -413,7 +549,7 @@ test('keeps Bot Job, OCR Config, and OCR Results in three independent full-clien
   resultsPage.on('pageerror', error => resultsErrors.push(error.message));
   await resultsPage.setViewportSize({ width: 1240, height: 820 });
   await installMockBackend(resultsPage);
-  await resultsPage.goto('/?desktopShell=1&openOcr=results&ocrSession=ocr-results-results-window-1');
+  await resultsPage.goto(`/?desktopShell=1&openOcr=results&ocrSession=${OCR_RESULTS_SESSION}`);
   const resultsWindow = resultsPage.getByTestId('ocr-results-window');
   const resultsWorkspace = resultsPage.getByTestId('ocr-results-workspace');
   await expect(resultsWindow).toBeVisible();
@@ -434,6 +570,33 @@ test('keeps Bot Job, OCR Config, and OCR Results in three independent full-clien
     expect(bounds!.height).toBeCloseTo(820, 0);
   }
 
+  const pageCountBeforeRetarget = page.context().pages().length;
+  await sendServerMessage(configPage, OCR_CONFIG_SESSION, 'ocrWorkspace.windowRetarget', {
+    kind: 'config',
+    previousSessionId: OCR_CONFIG_SESSION,
+    sessionId: NEXT_OCR_CONFIG_SESSION,
+    homeBankingId: 5,
+    botJobId: 84,
+    homeUrlId: 8,
+  });
+  await sendServerMessage(resultsPage, OCR_RESULTS_SESSION, 'ocrWorkspace.windowRetarget', {
+    kind: 'results',
+    previousSessionId: OCR_RESULTS_SESSION,
+    sessionId: NEXT_OCR_RESULTS_SESSION,
+    homeBankingId: 5,
+    botJobId: 84,
+    homeUrlId: 8,
+  });
+  await expect.poll(() => new URL(configPage.url()).searchParams.get('ocrSession'))
+    .toBe(NEXT_OCR_CONFIG_SESSION);
+  await expect.poll(() => new URL(resultsPage.url()).searchParams.get('ocrSession'))
+    .toBe(NEXT_OCR_RESULTS_SESSION);
+  await expect(configPage.getByTestId('ocr-config-window')).toHaveCount(1);
+  await expect(resultsPage.getByTestId('ocr-results-window')).toHaveCount(1);
+  await expect(configPage.getByLabel('Profile')).toHaveValue('7');
+  await expect(resultsPage.getByText('Login now', { exact: true })).toBeVisible();
+  expect(page.context().pages().length).toBe(pageCountBeforeRetarget);
+
   await configPage.getByRole('button', { name: 'Test current page' }).click();
   await expect.poll(async () => (await recordedRequests(configPage, 'ocrWorkspace.open')).length).toBe(1);
   const [configOpenResults] = await recordedRequests(configPage, 'ocrWorkspace.open');
@@ -451,22 +614,28 @@ test('keeps Bot Job, OCR Config, and OCR Results in three independent full-clien
   const resultsSessions = await resultsPage.evaluate(() => (
     window as typeof window & { __AR_BOT_JOB_E2E__: { socketSessions: string[] } }
   ).__AR_BOT_JOB_E2E__.socketSessions);
-  expect(configSessions).toContain('ocr-config-config-window-1');
-  expect(resultsSessions).toContain('ocr-results-results-window-1');
+  expect(configSessions).toContain(OCR_CONFIG_SESSION);
+  expect(configSessions).toContain(NEXT_OCR_CONFIG_SESSION);
+  expect(resultsSessions).toContain(OCR_RESULTS_SESSION);
+  expect(resultsSessions).toContain(NEXT_OCR_RESULTS_SESSION);
   expect(configSessions).not.toContain('mainDashboardBootstrap');
   expect(resultsSessions).not.toContain('mainDashboardBootstrap');
 
   await configPage.close();
   expect(page.isClosed()).toBe(false);
+  expect(scannerPage.isClosed()).toBe(false);
   expect(resultsPage.isClosed()).toBe(false);
-  await expect(page.getByTestId('pre-scan-workspace')).toBeVisible();
+  await expect(page.getByTestId('bot-job-details-workspace')).toBeVisible();
+  await expect(scannerPage.getByTestId('detached-page-scanner-workspace')).toBeVisible();
   await expect(resultsWorkspace).toBeVisible();
 
   expect(await page.evaluate(() => (
     window as typeof window & { __AR_BOT_JOB_E2E__: { openCalls: string[] } }
   ).__AR_BOT_JOB_E2E__.openCalls)).toEqual([]);
   expect(pageErrors).toEqual([]);
+  expect(scannerErrors).toEqual([]);
   expect(configErrors).toEqual([]);
   expect(resultsErrors).toEqual([]);
   await resultsPage.close();
+  await scannerPage.close();
 });

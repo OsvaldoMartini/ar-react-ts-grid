@@ -17,11 +17,19 @@ interface CreateNewBlockProps {
   blocks: CreateBlockOption[];
   onCreate: (blockName: string, position: CreateBlockPosition) => void;
   onClose: () => void;
+  pending?: boolean;
+  submitting?: boolean;
 }
 
 // Floating (non-modal, draggable) "Create new block" dialog — same layout as
 // the Java backend dialog: Block name + Insert position (At end / Before N# …).
-const CreateNewBlock: React.FC<CreateNewBlockProps> = ({ blocks, onCreate, onClose }) => {
+const CreateNewBlock: React.FC<CreateNewBlockProps> = ({
+  blocks,
+  onCreate,
+  onClose,
+  pending = false,
+  submitting = false,
+}) => {
   const [blockName, setBlockName] = useState<string>('');
   const [positionValue, setPositionValue] = useState<string>('end'); // 'end' | blockId
   const [pos, setPos] = useState<{ x: number; y: number }>({ x: 160, y: 160 });
@@ -36,6 +44,7 @@ const CreateNewBlock: React.FC<CreateNewBlockProps> = ({ blocks, onCreate, onClo
   );
 
   const handleCreate = () => {
+    if (submitting) return;
     const name = blockName.trim();
     if (!name) return;
 
@@ -78,6 +87,7 @@ const CreateNewBlock: React.FC<CreateNewBlockProps> = ({ blocks, onCreate, onClo
           type="button"
           className={styles.closeBtn}
           title="Close"
+          disabled={pending}
           onMouseDown={(e) => e.stopPropagation()}
           onClick={onClose}
         >
@@ -92,6 +102,7 @@ const CreateNewBlock: React.FC<CreateNewBlockProps> = ({ blocks, onCreate, onClo
           type="text"
           className={styles.textInput}
           value={blockName}
+          disabled={pending}
           placeholder="e.g. Login Flow"
           onChange={(e) => setBlockName(e.target.value)}
           onKeyDown={(e) => {
@@ -103,6 +114,7 @@ const CreateNewBlock: React.FC<CreateNewBlockProps> = ({ blocks, onCreate, onClo
         <select
           className={styles.select}
           value={positionValue}
+          disabled={pending}
           onChange={(e) => setPositionValue(e.target.value)}
         >
           <option value="end">At end</option>
@@ -115,16 +127,16 @@ const CreateNewBlock: React.FC<CreateNewBlockProps> = ({ blocks, onCreate, onClo
       </div>
 
       <div className={styles.footer}>
-        <button type="button" className={styles.cancelBtn} onClick={onClose}>
+        <button type="button" className={styles.cancelBtn} disabled={pending} onClick={onClose}>
           Cancel
         </button>
         <button
           type="button"
           className={styles.createBtn}
-          disabled={!blockName.trim()}
+          disabled={!blockName.trim() || submitting}
           onClick={handleCreate}
         >
-          Create
+          {submitting ? 'Creating...' : pending ? 'Retry' : 'Create'}
         </button>
       </div>
     </div>

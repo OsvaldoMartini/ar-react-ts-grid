@@ -122,7 +122,7 @@ test('requires matching action and a successful known surface before updating wo
   await waitFor(() => expect(screen.getByTestId('surface')).toHaveTextContent('components'));
 });
 
-test('opens the Pre Scan surface only after a successful correlated action response', async () => {
+test('opens a detached Page Scanner without navigating the Bot Job surface', async () => {
   const send = jest.fn();
   const onSurfaceOpen = jest.fn();
   const socket = { readyState: WebSocket.OPEN, send } as unknown as WebSocket;
@@ -130,6 +130,7 @@ test('opens the Pre Scan surface only after a successful correlated action respo
   let messages = await completeBootstrap(view, socket, send, onSurfaceOpen);
 
   fireEvent.click(screen.getByRole('button', { name: 'Show pre scan' }));
+  expect(JSON.parse(send.mock.calls[1][0]).type).toBe('pageScannerWorkspace.open');
   const firstRequest = sentBody(send, 1);
 
   messages = [...messages, response('botJobDetails.actionResponse', {
@@ -142,12 +143,10 @@ test('opens the Pre Scan surface only after a successful correlated action respo
   view.rerender(<Harness socket={socket} messages={messages} onSurfaceOpen={onSurfaceOpen} />);
   expect(onSurfaceOpen).not.toHaveBeenCalled();
 
-  messages = [...messages, response('botJobDetails.actionResponse', {
+  messages = [...messages, response('pageScannerWorkspace.openResponse', {
     ok: false,
     botJobId: 42,
     requestId: firstRequest.requestId,
-    action: 'SHOW_PRE_SCAN',
-    activeSurface: 'preScan',
     message: 'Pre Scan unavailable',
   })];
   view.rerender(<Harness socket={socket} messages={messages} onSurfaceOpen={onSurfaceOpen} />);
@@ -156,18 +155,17 @@ test('opens the Pre Scan surface only after a successful correlated action respo
 
   fireEvent.click(screen.getByRole('button', { name: 'Show pre scan' }));
   const successRequest = sentBody(send, 2);
-  messages = [...messages, response('botJobDetails.actionResponse', {
+  messages = [...messages, response('pageScannerWorkspace.openResponse', {
     ok: true,
     botJobId: 42,
     requestId: successRequest.requestId,
-    action: 'SHOW_PRE_SCAN',
-    activeSurface: 'preScan',
-    componentsVisible: false,
+    message: 'Page Scanner opened',
   })];
   view.rerender(<Harness socket={socket} messages={messages} onSurfaceOpen={onSurfaceOpen} />);
 
-  await waitFor(() => expect(onSurfaceOpen).toHaveBeenCalledWith('preScannerGrid', 42));
-  expect(onSurfaceOpen).toHaveBeenCalledTimes(1);
+  await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('Page Scanner opened'));
+  expect(onSurfaceOpen).not.toHaveBeenCalled();
+  expect(screen.getByTestId('surface')).toHaveTextContent('botJob');
 });
 
 test('matches metadata response operation before applying its state', async () => {

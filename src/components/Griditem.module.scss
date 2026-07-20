@@ -229,8 +229,8 @@
 .inactiveButton,
 .arrowLeftButton,
 .brickButton {
-  width: 15px; /* Decreased button size */
-  height: 15px;
+  width: 22px;
+  height: 22px;
   background-color: transparent;
   padding: 0;
   cursor: pointer;
@@ -1086,8 +1086,8 @@
 
 .dropdownArrow {
   cursor: pointer;
-  width: 15px;
-  height: 15px;
+  width: 22px;
+  height: 22px;
   transition: transform 0.3s ease; /* Smooth scaling on hover */
 
   &:hover {
