@@ -205,6 +205,9 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
   const [findText, setFindText] = useState<string>('');
   const [collapsedBlocks, setCollapsedBlocks] = useState<Set<number>>(new Set());
   const [excelExportContext, setExcelExportContext] = useState<ExcelExportContext | null>(null);
+  const [excelExportDirectory, setExcelExportDirectory] = useState<string | undefined>(undefined);
+  const [choosingExcelExportDirectory, setChoosingExcelExportDirectory] = useState(false);
+  const pendingExcelExportDirectoryRequestRef = useRef<string | null>(null);
   const [saveComponentContext, setSaveComponentContext] = useState<SaveComponentContext | null>(null);
 
   useLayoutEffect(() => {
@@ -660,6 +663,22 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
           setAlertMessageHeader(bodyData?.ok === false ? 'Component Not Saved' : 'Component Saved');
           setAlertMessageBody(bodyData?.error || bodyData?.message || 'Component saved successfully.');
           setAlertMessageFooter(bodyData?.ok === false ? 'Review the component name and try again.' : 'The component grid was refreshed.');
+        } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "excelExport.chooseDirectoryResponse") {
+          const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
+          if (!pendingExcelExportDirectoryRequestRef.current
+              || bodyData?.requestId !== pendingExcelExportDirectoryRequestRef.current) {
+            return;
+          }
+          pendingExcelExportDirectoryRequestRef.current = null;
+          setChoosingExcelExportDirectory(false);
+          if (bodyData?.ok === false) {
+            setAlertImage(warningRedImage); setAlertClass('construction-image'); setErrorFlag(true);
+            setAlertMessageHeader('Excel Export Folder Not Selected');
+            setAlertMessageBody(bodyData?.error || 'The destination folder could not be selected.');
+            setAlertMessageFooter('Keep the Excel Export page open and try Browse again.');
+          } else if (bodyData?.cancelled !== true && typeof bodyData?.directory === 'string') {
+            setExcelExportDirectory(bodyData.directory);
+          }
         } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "excelExport.saveResponse") {
           const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
           if (bodyData?.ok === false) {
@@ -1179,6 +1198,9 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
 
   const handleExcelFileBlockName = (blockId: number, blockName: string, blockOrderNumber: number, exportFile?: string) => {
+    pendingExcelExportDirectoryRequestRef.current = null;
+    setChoosingExcelExportDirectory(false);
+    setExcelExportDirectory(undefined);
     setExcelExportContext({ blockId, blockName, blockOrderNumber, exportFile });
   };
 
@@ -2860,6 +2882,34 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     setExcelExportContext(null);
   };
 
+  const chooseExcelExportDirectory = (directory: string) => {
+    if (!excelExportContext || !webSocket || !connected || !botJobId || choosingExcelExportDirectory) return;
+    const requestId = `${Date.now()}-excel-directory-${excelExportContext.blockId}`;
+    pendingExcelExportDirectoryRequestRef.current = requestId;
+    setChoosingExcelExportDirectory(true);
+    try {
+      webSocket.send(JSON.stringify({
+        type: 'excelExport.chooseDirectory', sessionId, homeBankingId,
+        body: JSON.stringify({ ...excelExportContext, directory, requestId,
+          sessionId, botJobId, botJobName, homeBankingId }),
+      }));
+    } catch (error) {
+      pendingExcelExportDirectoryRequestRef.current = null;
+      setChoosingExcelExportDirectory(false);
+      setAlertImage(warningRedImage); setAlertClass('construction-image'); setErrorFlag(true);
+      setAlertMessageHeader('Excel Export Folder Not Selected');
+      setAlertMessageBody('The backend connection could not open the destination folder selector.');
+      setAlertMessageFooter('Check the connection and try Browse again.');
+    }
+  };
+
+  const closeExcelExport = () => {
+    pendingExcelExportDirectoryRequestRef.current = null;
+    setChoosingExcelExportDirectory(false);
+    setExcelExportDirectory(undefined);
+    setExcelExportContext(null);
+  };
+
   const submitSaveComponent = (name: string, description: string) => {
     if (!saveComponentContext || !webSocket || !connected || !botJobId) return;
     webSocket.send(JSON.stringify({
@@ -2893,7 +2943,14 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
           },
         }}
       />
-      {excelExportContext && <ExcelExportPanel context={excelExportContext} onSubmit={submitExcelExport} onClose={() => setExcelExportContext(null)}/>}
+      {excelExportContext && <ExcelExportPanel
+        context={excelExportContext}
+        onSubmit={submitExcelExport}
+        onClose={closeExcelExport}
+        onChooseDirectory={chooseExcelExportDirectory}
+        selectedDirectory={excelExportDirectory}
+        choosingDirectory={choosingExcelExportDirectory}
+      />}
       {saveComponentContext && <SaveComponentPanel context={saveComponentContext} onSubmit={submitSaveComponent} onClose={() => setSaveComponentContext(null)}/>}
       {alertMessageBody && alertMessageBody.length > 0 && (
         <AlertModal

@@ -355,7 +355,9 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
         if (body.state) {
           setState((current) => reduceBotJobDetailsState(current, body.state));
         }
-        if (typeof body.selectedPath === 'string' && body.selectedPath.trim()) {
+        if (body.action === 'CHOOSE_TRANSFER_PATH'
+          && typeof body.selectedPath === 'string'
+          && body.selectedPath.trim()) {
           setTransferPath(body.selectedPath);
         }
         setTransientStatus(

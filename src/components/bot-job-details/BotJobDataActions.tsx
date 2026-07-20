@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BarChart2, FileText, Flame, PlusCircle } from 'lucide-react';
+import QuestionsCard from '../QuestionsCard';
 import type { BotJobDetailsState, BotJobToolbarAction, BotJobToolbarPayload } from './BotJobDetails.types';
 import styles from './BotJobDataActions.module.scss';
 
@@ -12,14 +13,18 @@ interface Props {
 }
 
 const BotJobDataActions: React.FC<Props> = ({ state, connected, pendingAction, busy = false, onAction }) => {
+  const [generateConfirmationOpen, setGenerateConfirmationOpen] = useState(false);
   const enabled = Boolean(connected && state?.capabilities.canUseFileActions && !pendingAction && !busy);
   const generate = () => {
-    if (window.confirm('Generate the Excel file? Existing job data may be replaced.')) {
-      onAction('GENERATE_EXCEL', { confirmed: true });
-    }
+    setGenerateConfirmationOpen(true);
+  };
+  const confirmGenerate = () => {
+    setGenerateConfirmationOpen(false);
+    onAction('GENERATE_EXCEL', { confirmed: true });
   };
 
   return (
+    <>
     <div className={styles.actions} role="group" aria-label="Job files">
       <button
         type="button"
@@ -62,6 +67,18 @@ const BotJobDataActions: React.FC<Props> = ({ state, connected, pendingAction, b
         <Flame size={16} aria-hidden="true" />
       </button>
     </div>
+    {generateConfirmationOpen && (
+      <QuestionsCard
+        mode="confirm"
+        header="Generate Excel file?"
+        body="Existing job data may be replaced."
+        extraMsg="The workbook for the current Bot Job will be rebuilt."
+        okLabel="Generate"
+        onCancel={() => setGenerateConfirmationOpen(false)}
+        onSubmit={confirmGenerate}
+      />
+    )}
+    </>
   );
 };
 
