@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Settings2 } from 'lucide-react';
 import { ComplexMessage, ElementDTO } from './instructionsMockData';
 import crossImage from '../assets/cross.png';
 import pickItemImage from '../assets/pick-item5.png';
@@ -25,6 +26,20 @@ import BotJobDetailsChrome from './bot-job-details/BotJobDetailsChrome';
 import { useBotJobDetailsController } from './bot-job-details/useBotJobDetailsController';
 import ScannerWorkspaceHeader from './scanner/ScannerWorkspaceHeader';
 import PageScannerWorkspaceHeader from './scanner/PageScannerWorkspaceHeader';
+import PageScannerFocusProfileEditor, {
+  type PageScannerFocusProfileDraft,
+} from './scanner/PageScannerFocusProfileEditor';
+import {
+  FALLBACK_PAGE_SCANNER_PROFILES,
+  PAGE_SCANNER_CUSTOM_PROFILE_KEY,
+  PAGE_SCANNER_DEFAULT_PROFILE_KEY,
+  pageScannerProfilesEqual,
+  pageScannerProfilesOrFallback,
+  resolvePageScannerProfileResponse,
+  type PageScannerFocusProfile,
+  type PendingPageScannerProfileRequest,
+  type PageScannerProfileRequestOperation,
+} from './scanner/PageScannerFocusProfile';
 import {
   pageScannerCloseMessage,
   pageScannerRetargetDisposition,
@@ -158,16 +173,6 @@ type PendingPageScannerCreateBlock = {
 
 const PAGE_SCANNER_RESPONSE_TIMEOUT_MS = 12000;
 
-const PRE_SCAN_FOCUS_PROFILES = [
-  { value: 'factory-default', label: 'All page scanner controls', searchText: '' },
-  { value: 'all-interactive', label: 'All interactive controls', searchText: 'button, a, select, option, input, textarea, role, aria-haspopup, data-testid' },
-  { value: 'select-options', label: 'Select options', searchText: 'select, option, combobox, listbox' },
-  { value: 'inputs', label: 'Inputs and textareas', searchText: 'input, textarea, textbox, contenteditable' },
-  { value: 'clickables', label: 'Buttons and clickables', searchText: 'button, link, menuitem, tab, treeitem, svg' },
-  { value: 'outputs', label: 'Labels and outputs', searchText: 'label, span, p, div, h1, h2, h3, output' },
-  { value: 'data-ids', label: 'Data/test id attributes', searchText: 'data-testid, data-test, data-cy, data-qa, id, name' },
-];
-
 const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, botJobIdInitial, botJobNameInitial, dataDTO, socketPort, sessionId, mode = 'scanner', onSessionOpen }) => {
   // Using the custom WebSocket hook
   const { webSocket, connected, reconnectAttempts, messages, error } = useWebSocket(socketPort, sessionId);
@@ -189,9 +194,17 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   const [alertDismissed, setAlertDismissed] = useState(false);
   // const [showAttributes, setShowAttributes] = useState(false);
   const [findText, setFindText] = useState<string>('');
-  const [dashboardSearchText, setDashboardSearchText] = useState<string>(PRE_SCAN_FOCUS_PROFILES[0].searchText);
-  const [dashboardFocus, setDashboardFocus] = useState<string>(PRE_SCAN_FOCUS_PROFILES[0].value);
+  const [pageScannerProfiles, setPageScannerProfiles] = useState<PageScannerFocusProfile[]>(
+    () => pageScannerProfilesOrFallback(null),
+  );
+  const [dashboardSearchText, setDashboardSearchText] = useState<string>(
+    FALLBACK_PAGE_SCANNER_PROFILES[0].searchTerms,
+  );
+  const [dashboardFocus, setDashboardFocus] = useState<string>(PAGE_SCANNER_DEFAULT_PROFILE_KEY);
   const [dashboardSearchHidden, setDashboardSearchHidden] = useState<boolean>(false);
+  const [pageScannerProfileEditorOpen, setPageScannerProfileEditorOpen] = useState(false);
+  const [pageScannerProfileBusy, setPageScannerProfileBusy] = useState<PageScannerProfileRequestOperation | null>(null);
+  const [pageScannerProfileError, setPageScannerProfileError] = useState('');
   const [pageScannerBootstrapError, setPageScannerBootstrapError] = useState('');
   const [preScanStatus, setPreScanStatus] = useState<PreScanStatus>({
     status: 'idle',
@@ -338,6 +351,8 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   const pendingPageScannerRequestsRef = useRef<Map<string, PendingPageScannerRequest>>(new Map());
   const pendingPageScannerCreateBlockRef = useRef<PendingPageScannerCreateBlock | null>(null);
   const pageScannerCreateBlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pageScannerProfileSocketRef = useRef<WebSocket | null>(null);
+  const pendingPageScannerProfileRequestsRef = useRef<Map<string, PendingPageScannerProfileRequest>>(new Map());
 
   const memoryElementKey = (element: ElementDTO) =>
     `${element.xPath || ''}||${element.tagName || ''}||${element.typeElement || ''}||${element.attributeType || ''}||${element.someText || ''}`;
@@ -376,6 +391,57 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     clearTimeout(pending.timeout);
     pendingPageScannerRequestsRef.current.delete(requestId);
     return pending;
+  };
+
+  const selectDashboardProfile = (
+    profileKey: string,
+    availableProfiles: PageScannerFocusProfile[] = pageScannerProfiles,
+  ) => {
+    if (profileKey === PAGE_SCANNER_CUSTOM_PROFILE_KEY) {
+      setDashboardFocus(PAGE_SCANNER_CUSTOM_PROFILE_KEY);
+      return;
+    }
+    const profile = availableProfiles.find(item => item.key === profileKey);
+    if (!profile) return;
+    setDashboardFocus(profile.key);
+    setDashboardSearchText(profile.searchTerms);
+  };
+
+  const sendPageScannerProfileCommand = (
+    operation: PageScannerProfileRequestOperation,
+    body: Record<string, unknown> = {},
+    profileKey?: string,
+  ): boolean => {
+    if (
+      !isDetachedPageScanner
+      || !webSocket
+      || webSocket.readyState !== WebSocket.OPEN
+    ) {
+      setPageScannerProfileError('Page Scanner is not connected.');
+      return false;
+    }
+
+    const requestId = createPageScannerRequestId(operation);
+    pendingPageScannerProfileRequestsRef.current.set(requestId, { operation, profileKey });
+    setPageScannerProfileBusy(operation);
+    setPageScannerProfileError('');
+    try {
+      webSocket.send(JSON.stringify({
+        type: operation,
+        sessionId,
+        homeBankingId,
+        botJobId,
+        body: JSON.stringify({ requestId, ...body }),
+      }));
+      return true;
+    } catch (profileError) {
+      pendingPageScannerProfileRequestsRef.current.delete(requestId);
+      setPageScannerProfileBusy(null);
+      setPageScannerProfileError(profileError instanceof Error
+        ? profileError.message
+        : 'The Page Scanner profile request could not be sent.');
+      return false;
+    }
   };
 
   const retireDetachedPageScanner = (
@@ -426,6 +492,48 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     }
   }, [connected, isDetachedPageScanner, sessionId, webSocket]);
 
+  useEffect(() => {
+    if (!isDetachedPageScanner) {
+      pageScannerProfileSocketRef.current = null;
+      pendingPageScannerProfileRequestsRef.current.clear();
+      setPageScannerProfileBusy(null);
+      return;
+    }
+    if (!connected || !webSocket || webSocket.readyState !== WebSocket.OPEN) {
+      if (pageScannerProfileSocketRef.current) {
+        pageScannerProfileSocketRef.current = null;
+        pendingPageScannerProfileRequestsRef.current.clear();
+        setPageScannerProfileBusy(null);
+      }
+      return;
+    }
+    if (pageScannerProfileSocketRef.current === webSocket) return;
+
+    const requestId = createPageScannerRequestId('page-scanner-profile-list');
+    pageScannerProfileSocketRef.current = webSocket;
+    pendingPageScannerProfileRequestsRef.current.set(requestId, {
+      operation: 'pageScannerProfile.list',
+    });
+    setPageScannerProfileBusy('pageScannerProfile.list');
+    setPageScannerProfileError('');
+    try {
+      webSocket.send(JSON.stringify({
+        type: 'pageScannerProfile.list',
+        sessionId,
+        homeBankingId,
+        botJobId,
+        body: JSON.stringify({ requestId }),
+      }));
+    } catch (profileError) {
+      pageScannerProfileSocketRef.current = null;
+      pendingPageScannerProfileRequestsRef.current.delete(requestId);
+      setPageScannerProfileBusy(null);
+      setPageScannerProfileError(profileError instanceof Error
+        ? profileError.message
+        : 'Page Scanner profiles could not be loaded.');
+    }
+  }, [botJobId, connected, homeBankingId, isDetachedPageScanner, sessionId, webSocket]);
+
   const closeDetachedPageScanner = () => {
     if (pageScannerClosing) return;
     if (webSocket && webSocket.readyState === WebSocket.OPEN) {
@@ -454,6 +562,8 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     if (pageScannerApplyTimerRef.current) clearTimeout(pageScannerApplyTimerRef.current);
     if (pageScannerCreateBlockTimerRef.current) clearTimeout(pageScannerCreateBlockTimerRef.current);
     clearPendingPageScannerRequests();
+    pendingPageScannerProfileRequestsRef.current.clear();
+    pageScannerProfileSocketRef.current = null;
   }, []);
 
   const handleAddElementToMemory = (element: ElementDTO) => {
@@ -864,6 +974,38 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
             onSessionOpen(retarget.sessionId, socketPort, retarget.botJobId);
             lastProcessedIndexRef.current = messages.length;
             return;
+          }
+
+          case 'pageScannerProfile.listResponse':
+          case 'pageScannerProfile.saveResponse':
+          case 'pageScannerProfile.deleteResponse': {
+            const resolution = resolvePageScannerProfileResponse(
+              parsedMessage.operationId,
+              bodyData,
+              pendingPageScannerProfileRequestsRef.current,
+              pageScannerProfiles,
+              dashboardFocus,
+            );
+            if (!resolution) break;
+
+            pendingPageScannerProfileRequestsRef.current.delete(resolution.requestId);
+            setPageScannerProfileBusy(null);
+            if (resolution.replaceProfiles) {
+              setPageScannerProfiles(current => (
+                pageScannerProfilesEqual(current, resolution.profiles)
+                  ? current
+                  : resolution.profiles
+              ));
+            }
+            if (!resolution.ok) {
+              setPageScannerProfileError(resolution.error);
+              break;
+            }
+            setPageScannerProfileError('');
+            if (resolution.selectedProfileKey) {
+              selectDashboardProfile(resolution.selectedProfileKey, resolution.profiles);
+            }
+            break;
           }
 
           case 'pageScanner.scanResponse':
@@ -1676,11 +1818,39 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     openOcrWorkspace(OCR_RESULTS_WORKSPACE_KIND, scope);
 
   const handleDashboardFocusChange = (value: string) => {
-    setDashboardFocus(value);
-    const profile = PRE_SCAN_FOCUS_PROFILES.find((item) => item.value === value);
-    if (profile) {
-      setDashboardSearchText(profile.searchText);
-    }
+    selectDashboardProfile(value);
+  };
+
+  const handleDashboardSearchTextChange = (value: string) => {
+    setDashboardSearchText(value);
+    const matchingProfile = pageScannerProfiles.find(profile => profile.searchTerms === value);
+    setDashboardFocus(matchingProfile?.key || PAGE_SCANNER_CUSTOM_PROFILE_KEY);
+  };
+
+  const handleSavePageScannerProfile = (draft: PageScannerFocusProfileDraft) => {
+    sendPageScannerProfileCommand(
+      'pageScannerProfile.save',
+      {
+        ...(draft.id ? { id: draft.id } : {}),
+        key: draft.key,
+        label: draft.label,
+        searchTerms: draft.searchTerms,
+        sortOrder: draft.sortOrder,
+      },
+      draft.key,
+    );
+  };
+
+  const handleDeletePageScannerProfile = (profile: PageScannerFocusProfile) => {
+    if (profile.protected || profile.key === PAGE_SCANNER_DEFAULT_PROFILE_KEY) return;
+    sendPageScannerProfileCommand(
+      'pageScannerProfile.delete',
+      {
+        ...(profile.id ? { id: profile.id } : {}),
+        key: profile.key,
+      },
+      profile.key,
+    );
   };
 
   const handleDashboardClearGrid = () => {
@@ -2257,28 +2427,45 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
           </div>
 
           <div className={styles.preScanSearchRow}>
-            <label className={styles.preScanLabel}>
-              Focus:
-              <select
-                className={styles.preScanSelect}
-                value={dashboardFocus}
-                onChange={(event) => handleDashboardFocusChange(event.target.value)}
-              >
-                {PRE_SCAN_FOCUS_PROFILES.map((profile) => (
-                  <option key={profile.value} value={profile.value}>
-                    {profile.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className={styles.preScanFocusGroup}>
+              <label className={styles.preScanLabel}>
+                Focus:
+                <select
+                  className={styles.preScanSelect}
+                  value={dashboardFocus}
+                  onChange={(event) => handleDashboardFocusChange(event.target.value)}
+                >
+                  {dashboardFocus === PAGE_SCANNER_CUSTOM_PROFILE_KEY && (
+                    <option value={PAGE_SCANNER_CUSTOM_PROFILE_KEY}>Custom (unsaved)</option>
+                  )}
+                  {pageScannerProfiles.map((profile) => (
+                    <option key={profile.key} value={profile.key}>
+                      {profile.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {isDetachedPageScanner && (
+                <button
+                  type="button"
+                  className={styles.preScanProfileManageButton}
+                  title="Manage Page Scanner focus profiles"
+                  aria-label="Manage Page Scanner focus profiles"
+                  aria-expanded={pageScannerProfileEditorOpen}
+                  onClick={() => setPageScannerProfileEditorOpen(true)}
+                >
+                  <Settings2 size={15} aria-hidden="true" />
+                </button>
+              )}
+            </div>
             <label className={styles.preScanLabel}>
               Search by:
               <input
                 className={styles.preScanSearchInput}
                 type="text"
                 value={dashboardSearchText}
-                onChange={(event) => setDashboardSearchText(event.target.value)}
-                placeholder="button, label, input, data-testid"
+                onChange={(event) => handleDashboardSearchTextChange(event.target.value)}
+                placeholder="button, input, attr:test-id, attr:data-testid"
               />
             </label>
             <label className={styles.preScanToggle}>
@@ -2300,6 +2487,19 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
             </button>
           </div>
         </div>
+      )}
+      {isDetachedPageScanner && pageScannerProfileEditorOpen && (
+        <PageScannerFocusProfileEditor
+          profiles={pageScannerProfiles}
+          selectedProfileKey={dashboardFocus}
+          currentSearchTerms={dashboardSearchText}
+          busy={pageScannerProfileBusy !== null}
+          error={pageScannerProfileError}
+          onSelect={handleDashboardFocusChange}
+          onSave={handleSavePageScannerProfile}
+          onDelete={handleDeletePageScannerProfile}
+          onClose={() => setPageScannerProfileEditorOpen(false)}
+        />
       )}
       <div className={styles.gridFindRow}>
         <span className={styles.gridFindLabel}>Find:</span>

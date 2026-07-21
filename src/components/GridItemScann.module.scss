@@ -284,6 +284,37 @@
   flex-wrap: wrap;
 }
 
+.preScanFocusGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.preScanProfileManageButton {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  padding: 0;
+  border: 1px solid #9fb7c3;
+  border-radius: 4px;
+  background: #eef3f5;
+  color: #0b5394;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.preScanProfileManageButton:hover {
+  background: #dcecf5;
+}
+
+.preScanProfileManageButton:focus-visible {
+  outline: 2px solid rgba(11, 83, 148, 0.3);
+  outline-offset: 1px;
+}
+
 .preScanButton,
 .preScanPrimaryButton,
 .preScanIconButton,
