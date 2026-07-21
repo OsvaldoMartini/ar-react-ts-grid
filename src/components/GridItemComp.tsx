@@ -51,6 +51,7 @@ import { useBotJobDetailsController } from './bot-job-details/useBotJobDetailsCo
 import { useWebSocket } from './useWebSocket';
 import { useInstructionDrag } from './useInstructionDrag';
 import { instructionDisplayLabel } from './instructionDisplay';
+import { canStartCommandApply, resolveCommandApplyResponse } from './commandApplyResponse';
 import {
   SCANNER_ELEMENT_PANE_SESSION_ID,
   SCANNER_TOOL_SESSION_ID,
@@ -178,6 +179,11 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
   const [excelExportDirectory, setExcelExportDirectory] = useState<string | undefined>(undefined);
   const [choosingExcelExportDirectory, setChoosingExcelExportDirectory] = useState(false);
   const pendingExcelExportDirectoryRequestRef = useRef<string | null>(null);
+  const pendingCommandApplyRequestRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!connected) pendingCommandApplyRequestRef.current = null;
+  }, [connected]);
 
   useLayoutEffect(() => {
     if (pendingScrollTopRef.current === null || !gridScrollRef.current) return;
@@ -438,6 +444,28 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
             setAlertMessageHeader('Excel Export Not Saved');
             setAlertMessageBody(bodyData?.error || 'The export configuration could not be saved.');
             setAlertMessageFooter('Review the path and filename, then try again.');
+          }
+        } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "commandEditor.applyResponse") {
+          const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
+          const resolution = resolveCommandApplyResponse(pendingCommandApplyRequestRef.current, bodyData);
+          if (resolution.kind === 'ignore') return;
+          pendingCommandApplyRequestRef.current = null;
+          if (resolution.kind === 'failure') {
+            setAlertImage(warningRedImage);
+            setAlertClass('construction-image');
+            setAlertMessageHeader('Command Not Saved');
+            setAlertMessageBody(resolution.error);
+            setAlertMessageFooter('Review the command fields and try again.');
+            setErrorFlag(true);
+            setAlertOnConfirm(undefined);
+          } else {
+            const authoritativeInstructions = resolution.instructions as ComponentsInstructionsDTO[];
+            if (authoritativeInstructions.length > 0) {
+              pendingScrollTopRef.current = gridScrollRef.current?.scrollTop ?? null;
+              setComponentsData(authoritativeInstructions);
+              setIsDataReordered(false);
+            }
+            setOpenDropdown(null);
           }
         } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "license.statusChanged") {
           const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
@@ -2504,10 +2532,11 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
   };
 
   const applyCommandFromPanel = (instruction: ComponentsInstructionsDTO, draft: CommandDraft) => {
-    if (!webSocket || !connected) return;
+    if (!webSocket || !connected || !canStartCommandApply(pendingCommandApplyRequestRef.current)) return;
+    const requestId = `${Date.now()}-${instruction.id}`;
     const payload = {
       ...draft,
-      requestId: `${Date.now()}-${instruction.id}`,
+      requestId,
       targetSessionId: 'componentTasks',
       homeBankingId,
       botJobId,
@@ -2518,17 +2547,17 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       instructionId: instruction.id,
       instructionName: instruction.name,
       instructionOrderNumber: instruction.instructionOrderNumber,
-      variableId: draft.variableId ?? instruction.variableId,
-      parentId: draft.parentId ?? instruction.parentId,
-      parentBlockId: draft.parentBlockId ?? instruction.parentBlockId,
+      variableId: draft.variableId,
+      parentId: draft.parentId,
+      parentBlockId: draft.parentBlockId,
     };
+    pendingCommandApplyRequestRef.current = requestId;
     webSocket.send(JSON.stringify({
       type: 'commandEditor.apply',
       sessionId,
       homeBankingId,
       body: JSON.stringify(payload),
     }));
-    setOpenDropdown(null);
   };
 
   const submitExcelExport = (draft: { directory: string; filename: string; fileType: '.xlsx' | '.csv'; delimiter: ',' | '|'; clear?: boolean }) => {

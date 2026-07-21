@@ -21,7 +21,7 @@ export type CommandDraft = {
   mode: 'before' | 'after' | 'edit';
   action: string;
   name: string;
-  hold: number;
+  hold?: number;
   operator: string;
   interval: number;
   count: number;
@@ -59,11 +59,7 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
   const [mode, setMode] = useState<'before' | 'after' | 'edit'>('after');
   const [action, setAction] = useState(instruction.actions || 'SET');
   const [name, setName] = useState(instruction.name || 'New Command');
-  const [hold, setHold] = useState(
-    Number.isFinite(Number(instruction.onHoldSeconds)) && Number(instruction.onHoldSeconds) > 0
-      ? Math.trunc(Number(instruction.onHoldSeconds))
-      : 5
-  );
+  const [hold, setHold] = useState(5);
   const [operator, setOperator] = useState('=');
   const [interval, setIntervalValue] = useState(1);
   const [count, setCount] = useState(1);
@@ -71,7 +67,7 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
   const [webFields, setWebFields] = useState<WebFieldRow[]>([]);
   const [blocks, setBlocks] = useState<BlockRow[]>([]);
   const [commands, setCommands] = useState<CommandDefinition[]>([]);
-  const [selectedWebFieldId, setSelectedWebFieldId] = useState<number | undefined>(instruction.parentId || instruction.id);
+  const [selectedWebFieldId, setSelectedWebFieldId] = useState<number | undefined>(instruction.parentId || undefined);
   const [selectedVariableId, setSelectedVariableId] = useState<number | undefined>(instruction.variableId || undefined);
   const [selectedBlockId, setSelectedBlockId] = useState<number | undefined>(instruction.parentBlockId || undefined);
   const [variable, setVariable] = useState<VariableRow>({ type: '$String', name: '', value: '$EMPTY' });
@@ -139,7 +135,16 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
       const body = typeof envelope.body === 'string' ? JSON.parse(envelope.body) : envelope.body;
       if (operationId === 'commandEditor.bootstrapResponse') {
         if (Array.isArray(body?.variables)) setVariables(body.variables.filter((row: VariableRow & { error?: string }) => !row.error));
-        if (Array.isArray(body?.webFields)) setWebFields(body.webFields);
+        if (Array.isArray(body?.webFields)) {
+          const loadedWebFields = body.webFields as WebFieldRow[];
+          setWebFields(loadedWebFields);
+          setSelectedWebFieldId(current => {
+            const sameBlock = loadedWebFields.filter(row => row.blockId === instruction.blockId);
+            if (current && sameBlock.some(row => row.id === current)) return current;
+            if (instruction.parentId && sameBlock.some(row => row.id === instruction.parentId)) return instruction.parentId;
+            return sameBlock.some(row => row.id === instruction.id) ? instruction.id : undefined;
+          });
+        }
         if (Array.isArray(body?.blocks)) setBlocks(body.blocks);
         if (Array.isArray(body?.commands)) setCommands(body.commands);
         if (body?.draft) setStoredDraft(body.draft);
@@ -176,7 +181,7 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
     () => commands.find(command => command.code === action)?.label || action,
     [action, commands]
   );
-  const selectedWebField = webFields.find(row => row.id === selectedWebFieldId);
+  const selectedWebField = webFields.find(row => row.id === selectedWebFieldId && row.blockId === instruction.blockId);
   const selectedWebFieldTag = (selectedWebField?.tagName || '').toLowerCase();
   const availableCommands = useMemo(
     () => commands.filter(command => {
@@ -217,7 +222,7 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
     if (nextMode === 'edit' && storedDraft) {
       setAction(storedDraft.action);
       setName(storedDraft.name);
-      setHold(storedDraft.hold);
+      setHold(storedDraft.hold ?? 5);
       setOperator(storedDraft.operator);
       setIntervalValue(storedDraft.interval);
       setCount(storedDraft.count);
@@ -236,6 +241,10 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
       setAction(defaultAction);
       setName(commands.find(command => command.code === defaultAction)?.label || defaultAction);
     }
+    setHold(5);
+    setOperator('=');
+    setIntervalValue(1);
+    setCount(1);
     setView('command');
   };
 
@@ -296,8 +305,8 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
 
         {view === 'command' && (
           <div className={styles.form}>
-            <label>Placement<select value={mode} onChange={(e) => openCommand(e.target.value as typeof mode)}><option value="before">Before selected step</option><option value="after">After selected step</option>{canEditSelected && <option value="edit">Update selected step</option>}</select></label>
-            <label>Command<select value={action} onChange={(e) => { const value = e.target.value; setAction(value); setName(commands.find(command => command.code === value)?.label || value); }}>
+            <label>Placement<select value={mode} onChange={(e) => { const nextMode = e.target.value as typeof mode; if (nextMode === 'edit' || mode === 'edit') openCommand(nextMode); else setMode(nextMode); }}><option value="before">Before selected step</option><option value="after">After selected step</option>{canEditSelected && <option value="edit">Update selected step</option>}</select></label>
+            <label>Command<select value={action} onChange={(e) => { const value = e.target.value; setAction(value); setName(commands.find(command => command.code === value)?.label || value); setHold(5); setOperator('='); setIntervalValue(1); setCount(1); }}>
               {availableCommands.map(command => <option key={command.code} value={command.code}>{command.label}</option>)}
             </select></label>
             <label>Name<input value={name} onChange={(e) => setName(e.target.value)} /></label>
@@ -312,7 +321,7 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
                 {storedDraft.warnings.map((warning, index) => <span key={`${warning}-${index}`}>{warning}</span>)}
               </div>
             )}
-            {requiresWebField && <label>Web Field<select value={selectedWebFieldId || ''} onChange={(e) => { setSelectedWebFieldId(Number(e.target.value) || undefined); setSelectedVariableId(undefined); }}>
+            {requiresWebField && <label>Web Field<select value={selectedWebField?.id || ''} onChange={(e) => { setSelectedWebFieldId(Number(e.target.value) || undefined); setSelectedVariableId(undefined); }}>
               <option value="">Select Web Field</option>
               {webFields.filter(row => row.blockId === instruction.blockId).map(row => <option key={row.id} value={row.id}>#{row.id} {row.name} [{row.tagName || row.actions}]</option>)}
             </select></label>}
@@ -363,7 +372,7 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
 
       {view === 'command' && <footer className={styles.footer}>
         <button type="button" onClick={() => setView('actions')}>Back</button>
-        <button type="button" className={styles.primary} disabled={!graphRevision || !name.trim() || !action || (requiresWebField && !selectedWebFieldId) || (requiresVariable && !selectedVariableId) || (requiresBlock && !selectedBlockId)} onClick={() => props.onApplyCommand({ mode, action, name: name.trim(), hold, operator, interval, count, parentId: selectedWebFieldId, variableId: selectedVariableId, parentBlockId: selectedBlockId, graphRevision })}>Apply</button>
+        <button type="button" className={styles.primary} disabled={!graphRevision || !name.trim() || !action || (requiresWebField && !selectedWebField) || (requiresVariable && !selectedVariableId) || (requiresBlock && !selectedBlockId)} onClick={() => props.onApplyCommand({ mode, action, name: name.trim(), hold: commandFields.includes('hold') ? hold : undefined, operator, interval, count, parentId: requiresWebField ? selectedWebField?.id : undefined, variableId: requiresVariable ? selectedVariableId : undefined, parentBlockId: requiresBlock ? selectedBlockId : undefined, graphRevision })}>Apply</button>
       </footer>}
     </div>
   );
