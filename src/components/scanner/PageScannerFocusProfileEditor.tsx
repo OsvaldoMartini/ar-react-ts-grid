@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Plus, Save, Settings2, Trash2, X } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Plus, RefreshCw, Save, Settings2, Trash2, X } from 'lucide-react';
 import QuestionsCard from '../QuestionsCard';
 import FloatingWorkspaceFrame from '../workspace/FloatingWorkspaceFrame';
 import {
@@ -27,8 +27,69 @@ type Props = {
   onSelect: (profileKey: string) => void;
   onSave: (draft: PageScannerFocusProfileDraft) => void;
   onDelete: (profile: PageScannerFocusProfile) => void;
+  onRefresh: () => boolean;
   onClose: () => void;
 };
+
+type SearchTermPattern = 'selector' | 'attribute';
+
+type SearchTermRow = {
+  id: string;
+  pattern: SearchTermPattern;
+  value: string;
+};
+
+const ATTRIBUTE_NAME_PATTERN = /^[A-Za-z_:][A-Za-z0-9_.:-]{0,127}$/;
+let searchTermRowSequence = 0;
+
+const nextSearchTermRowId = () => `search-term-${++searchTermRowSequence}`;
+
+const stripAttributePrefix = (value: string) => (
+  value.trim().replace(/^attr:\s*/i, '')
+);
+
+const searchTermRowFrom = (term: string): SearchTermRow => {
+  const normalized = term.trim();
+  const attribute = normalized.toLowerCase().startsWith('attr:');
+  return {
+    id: nextSearchTermRowId(),
+    pattern: attribute ? 'attribute' : 'selector',
+    value: attribute ? normalized.slice(5).trim() : normalized,
+  };
+};
+
+const searchTermRowsFrom = (searchTerms: string): SearchTermRow[] => (
+  searchTerms
+    .split(',')
+    .map(term => term.trim())
+    .filter(Boolean)
+    .map(searchTermRowFrom)
+);
+
+const serializeSearchTermRows = (rows: SearchTermRow[]): string => (
+  rows
+    .map(row => {
+      const value = row.pattern === 'attribute'
+        ? stripAttributePrefix(row.value)
+        : row.value.trim();
+      if (!value) return '';
+      return row.pattern === 'attribute' ? `attr:${value}` : value;
+    })
+    .filter(Boolean)
+    .join(', ')
+);
+
+const activeSearchTermCount = (rows: SearchTermRow[]) => (
+  rows.filter(row => stripAttributePrefix(row.value).length > 0).length
+);
+
+const invalidAttributeRows = (rows: SearchTermRow[]) => (
+  rows.filter(row => {
+    if (row.pattern !== 'attribute') return false;
+    const attributeName = stripAttributePrefix(row.value);
+    return Boolean(attributeName) && !ATTRIBUTE_NAME_PATTERN.test(attributeName);
+  })
+);
 
 const initialPosition = () => ({
   x: Math.max(16, window.innerWidth - Math.min(500, window.innerWidth - 32) - 24),
@@ -52,6 +113,7 @@ const PageScannerFocusProfileEditor: React.FC<Props> = ({
   onSelect,
   onSave,
   onDelete,
+  onRefresh,
   onClose,
 }) => {
   const selectedProfile = useMemo(
@@ -64,6 +126,13 @@ const PageScannerFocusProfileEditor: React.FC<Props> = ({
       ? draftFrom(selectedProfile)
       : { key: '', label: '', searchTerms: '', sortOrder: 10 }
   ));
+  const [searchTermRows, setSearchTermRows] = useState<SearchTermRow[]>(() => (
+    searchTermRowsFrom(selectedProfile?.searchTerms || '')
+  ));
+  const [searchTermsFeedback, setSearchTermsFeedback] = useState('');
+  const [refreshRequested, setRefreshRequested] = useState(false);
+  const [focusSearchTermId, setFocusSearchTermId] = useState<string | null>(null);
+  const refreshObservedBusy = useRef(false);
   const [validation, setValidation] = useState('');
   const [deleteCandidate, setDeleteCandidate] = useState<PageScannerFocusProfile | null>(null);
 
@@ -71,15 +140,54 @@ const PageScannerFocusProfileEditor: React.FC<Props> = ({
     if (!selectedProfile) return;
     setCreating(false);
     setDraft(draftFrom(selectedProfile));
+    setSearchTermRows(searchTermRowsFrom(selectedProfile.searchTerms));
+    setSearchTermsFeedback('');
     setValidation('');
   }, [profiles, selectedProfile]);
+
+  useEffect(() => {
+    if (!focusSearchTermId) return;
+    document.getElementById(focusSearchTermId)?.focus();
+    setFocusSearchTermId(null);
+  }, [focusSearchTermId, searchTermRows]);
+
+  useEffect(() => {
+    if (!refreshRequested) {
+      refreshObservedBusy.current = false;
+      return;
+    }
+    if (busy) {
+      refreshObservedBusy.current = true;
+      return;
+    }
+    if (!refreshObservedBusy.current) return;
+
+    if (selectedProfile) {
+      const refreshedRows = searchTermRowsFrom(selectedProfile.searchTerms);
+      setCreating(false);
+      setDraft(draftFrom(selectedProfile));
+      setSearchTermRows(refreshedRows);
+      setSearchTermsFeedback(error
+        ? `Refresh failed: ${error}`
+        : `${activeSearchTermCount(refreshedRows)} search term${activeSearchTermCount(refreshedRows) === 1 ? '' : 's'} refreshed from the database.`);
+    }
+    setRefreshRequested(false);
+    refreshObservedBusy.current = false;
+  }, [busy, error, refreshRequested, selectedProfile]);
 
   const existingProfile = creating
     ? undefined
     : profiles.find(profile => profile.key === draft.key);
   const profileProtected = existingProfile?.protected === true
     || existingProfile?.key === PAGE_SCANNER_DEFAULT_PROFILE_KEY;
-  const canSave = Boolean(draft.key.trim() && draft.label.trim()) && !profileProtected && !busy;
+  const serializedSearchTerms = serializeSearchTermRows(searchTermRows);
+  const invalidAttributes = invalidAttributeRows(searchTermRows);
+  const searchTermsTooLong = serializedSearchTerms.length > 8192;
+  const canSave = Boolean(draft.key.trim() && draft.label.trim())
+    && invalidAttributes.length === 0
+    && !searchTermsTooLong
+    && !profileProtected
+    && !busy;
 
   const startNew = () => {
     const highestOrder = profiles.reduce((highest, profile) => Math.max(highest, profile.sortOrder), 0);
@@ -92,6 +200,11 @@ const PageScannerFocusProfileEditor: React.FC<Props> = ({
         : selectedProfile?.searchTerms || '',
       sortOrder: highestOrder + 10,
     });
+    const initialSearchTerms = selectedProfileKey === PAGE_SCANNER_CUSTOM_PROFILE_KEY
+      ? currentSearchTerms
+      : selectedProfile?.searchTerms || '';
+    setSearchTermRows(searchTermRowsFrom(initialSearchTerms));
+    setSearchTermsFeedback('');
     setValidation('');
   };
 
@@ -111,13 +224,72 @@ const PageScannerFocusProfileEditor: React.FC<Props> = ({
       setValidation('Profile name is required.');
       return;
     }
+    if (invalidAttributes.length > 0) {
+      setValidation('Attribute terms may contain only letters, numbers, underscore, dot, colon, or hyphen.');
+      return;
+    }
+    if (searchTermsTooLong) {
+      setValidation('Search terms cannot exceed 8192 characters.');
+      return;
+    }
     onSave({
       ...(draft.id ? { id: draft.id } : {}),
       key,
       label,
-      searchTerms: draft.searchTerms.trim(),
+      searchTerms: serializedSearchTerms,
       sortOrder: Number.isFinite(draft.sortOrder) ? Math.trunc(draft.sortOrder) : 0,
     });
+  };
+
+  const addSearchTerm = () => {
+    const row: SearchTermRow = {
+      id: nextSearchTermRowId(),
+      pattern: 'selector',
+      value: '',
+    };
+    setSearchTermRows(current => [...current, row]);
+    setFocusSearchTermId(`search-term-input-${row.id}`);
+    setSearchTermsFeedback('New search term row added.');
+    setValidation('');
+  };
+
+  const updateSearchTerm = (rowId: string, value: string) => {
+    setSearchTermRows(current => current.map(row => (
+      row.id === rowId ? { ...row, value } : row
+    )));
+    setSearchTermsFeedback('Search terms updated. Save the profile to persist the changes.');
+    setValidation('');
+  };
+
+  const updateSearchTermPattern = (rowId: string, pattern: SearchTermPattern) => {
+    setSearchTermRows(current => current.map(row => (
+      row.id === rowId
+        ? { ...row, pattern, value: pattern === 'attribute' ? stripAttributePrefix(row.value) : row.value }
+        : row
+    )));
+    setSearchTermsFeedback(
+      pattern === 'attribute'
+        ? 'Attribute pattern selected. The attr: prefix will be added automatically.'
+        : 'Selector pattern selected. No prefix or suffix will be added.',
+    );
+    setValidation('');
+  };
+
+  const removeSearchTerm = (rowId: string) => {
+    const nextRows = searchTermRows.filter(row => row.id !== rowId);
+    setSearchTermRows(nextRows);
+    const count = activeSearchTermCount(nextRows);
+    setSearchTermsFeedback(`Search term removed. ${count} term${count === 1 ? '' : 's'} ready; save the profile to persist the change.`);
+    setValidation('');
+  };
+
+  const refreshSearchTerms = () => {
+    setSearchTermsFeedback('Refreshing saved search terms from the database...');
+    setRefreshRequested(true);
+    if (!onRefresh()) {
+      setRefreshRequested(false);
+      setSearchTermsFeedback('The search terms refresh request could not be sent.');
+    }
   };
 
   return (
@@ -191,18 +363,124 @@ const PageScannerFocusProfileEditor: React.FC<Props> = ({
               <input value={draft.key} readOnly aria-readonly="true" />
             </label>
 
-            <label className={styles.field}>
-              <span>Search terms</span>
-              <textarea
-                aria-label="Search terms"
-                value={draft.searchTerms}
-                disabled={busy || profileProtected}
-                maxLength={8192}
-                onChange={event => setDraft(current => ({ ...current, searchTerms: event.target.value }))}
-                placeholder="button, input, attr:test-id, attr:data-testid"
-              />
-              <small>Use comma-separated Page Scanner rules; for custom attributes use syntax such as attr:test-id.</small>
-            </label>
+            <section className={styles.searchTermsField} aria-labelledby="search-terms-heading">
+              <div className={styles.searchTermsHeader}>
+                <span id="search-terms-heading">Search terms</span>
+                <div className={styles.searchTermsToolbar}>
+                  <button
+                    type="button"
+                    className={styles.termToolbarButton}
+                    disabled={busy || profileProtected}
+                    onClick={addSearchTerm}
+                    title="Add a search term"
+                    aria-label="Add search term"
+                  >
+                    <Plus size={14} aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.termToolbarButton}
+                    disabled={busy || creating}
+                    onClick={refreshSearchTerms}
+                    title={creating
+                      ? 'Save the new profile before refreshing'
+                      : 'Reload saved search terms from the database'}
+                    aria-label="Refresh search terms from database"
+                  >
+                    <RefreshCw
+                      size={14}
+                      aria-hidden="true"
+                      className={refreshRequested && busy ? styles.refreshing : undefined}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              <div className={styles.searchTermsTableWrap}>
+                <table className={styles.searchTermsTable} aria-label="Search terms">
+                  <thead>
+                    <tr>
+                      <th scope="col">Pattern</th>
+                      <th scope="col">Term</th>
+                      <th scope="col" aria-label="Actions" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {searchTermRows.length === 0 && (
+                      <tr>
+                        <td colSpan={3} className={styles.emptyTerms}>
+                          No search terms. Use + to add a selector or attribute.
+                        </td>
+                      </tr>
+                    )}
+                    {searchTermRows.map((row, index) => {
+                      const attributeName = stripAttributePrefix(row.value);
+                      const invalidAttribute = row.pattern === 'attribute'
+                        && Boolean(attributeName)
+                        && !ATTRIBUTE_NAME_PATTERN.test(attributeName);
+                      return (
+                        <tr key={row.id}>
+                          <td className={styles.patternCell}>
+                            <select
+                              aria-label={`Pattern for search term ${index + 1}`}
+                              value={row.pattern}
+                              disabled={busy || profileProtected}
+                              onChange={event => updateSearchTermPattern(
+                                row.id,
+                                event.target.value as SearchTermPattern,
+                              )}
+                            >
+                              <option value="selector">Selector</option>
+                              <option value="attribute">Attribute</option>
+                            </select>
+                          </td>
+                          <td className={styles.termCell}>
+                            <input
+                              id={`search-term-input-${row.id}`}
+                              aria-label={`Search term ${index + 1}`}
+                              value={row.value}
+                              disabled={busy || profileProtected}
+                              maxLength={8192}
+                              placeholder={row.pattern === 'attribute' ? 'test-id' : "button or [role='tab']"}
+                              onChange={event => updateSearchTerm(row.id, event.target.value)}
+                              onKeyDown={event => {
+                                if (event.key === 'Enter' && !busy && !profileProtected) {
+                                  event.preventDefault();
+                                  addSearchTerm();
+                                }
+                              }}
+                            />
+                            <small className={invalidAttribute ? styles.termHelpError : styles.termHelp}>
+                              {row.pattern === 'attribute'
+                                ? invalidAttribute
+                                  ? 'Invalid attribute name. Use letters, numbers, _, ., :, or -.'
+                                  : `Prefix attr: is automatic${attributeName ? ` — saved as attr:${attributeName}` : ' — example: attr:test-id'}.`
+                                : "No prefix or suffix — example: button or [role='tab']."}
+                            </small>
+                          </td>
+                          <td className={styles.termActionCell}>
+                            <button
+                              type="button"
+                              className={styles.removeTermButton}
+                              disabled={busy || profileProtected}
+                              onClick={() => removeSearchTerm(row.id)}
+                              title="Remove this search term"
+                              aria-label={`Remove search term ${index + 1}`}
+                            >
+                              <X size={14} aria-hidden="true" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className={styles.searchTermsSummary} role="status" aria-live="polite">
+                {searchTermsFeedback || `${activeSearchTermCount(searchTermRows)} search term${activeSearchTermCount(searchTermRows) === 1 ? '' : 's'} loaded.`}
+              </div>
+            </section>
 
             {profileProtected && (
               <p className={styles.protectedNotice}>

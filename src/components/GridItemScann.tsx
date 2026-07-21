@@ -1853,6 +1853,12 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     );
   };
 
+  const handleRefreshPageScannerProfiles = () => sendPageScannerProfileCommand(
+    'pageScannerProfile.list',
+    {},
+    dashboardFocus,
+  );
+
   const handleDashboardClearGrid = () => {
     if (!isDetachedPageScanner) handleClearGridAll();
     sendDashboardCommand(PRE_SCAN_CLEAR_GRID_OPERATION);
@@ -2498,6 +2504,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
           onSelect={handleDashboardFocusChange}
           onSave={handleSavePageScannerProfile}
           onDelete={handleDeletePageScannerProfile}
+          onRefresh={handleRefreshPageScannerProfiles}
           onClose={() => setPageScannerProfileEditorOpen(false)}
         />
       )}
