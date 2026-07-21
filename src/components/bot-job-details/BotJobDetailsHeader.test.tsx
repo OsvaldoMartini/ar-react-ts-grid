@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import BotJobDetailsHeader from './BotJobDetailsHeader';
 import { botJobDetailsTestState as state } from './BotJobDetails.testData';
 
@@ -80,6 +80,8 @@ test('uses Execute All with green ALL mode by default and requires a numbered bl
 
 test('dispatches navigation, reload, launch, and terminal execution actions with proper gating', () => {
   const onToolbarAction = jest.fn();
+  const nativeAlert = jest.spyOn(window, 'alert').mockImplementation(() => undefined);
+  const nativeConfirm = jest.spyOn(window, 'confirm').mockImplementation(() => true);
   const view = render(
     <BotJobDetailsHeader
       botJobId={5}
@@ -117,7 +119,18 @@ test('dispatches navigation, reload, launch, and terminal execution actions with
   expect(screen.getByRole('button', { name: 'Stop' })).toBeEnabled();
   expect(screen.getByRole('button', { name: /Navigation time/ })).toBeDisabled();
   fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
+  const dialog = screen.getByRole('dialog', { name: 'Stop Test Run' });
+  expect(within(dialog).getByText('Do you want to stop the execution?', { exact: true })).toBeInTheDocument();
+  expect(onToolbarAction).toHaveBeenCalledTimes(3);
+  expect(nativeAlert).not.toHaveBeenCalled();
+  expect(nativeConfirm).not.toHaveBeenCalled();
+
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Stop' }));
   expect(onToolbarAction).toHaveBeenLastCalledWith('STOP_TEST_RUN');
+  expect(nativeAlert).not.toHaveBeenCalled();
+  expect(nativeConfirm).not.toHaveBeenCalled();
+  nativeAlert.mockRestore();
+  nativeConfirm.mockRestore();
 });
 
 test('navigation time toggle cycles 0-10, wraps back to 0, and changes color band', () => {
@@ -164,7 +177,7 @@ test('navigation time toggle cycles 0-10, wraps back to 0, and changes color ban
   expect(toggle()).toHaveClass('navTimeOrangeLight');
 });
 
-test('keeps prompt STOP available while TEST RUN startup is still pending', () => {
+test('keeps prompt STOP available while TEST RUN startup is pending and Cancel sends nothing', () => {
   const onToolbarAction = jest.fn();
   render(
     <BotJobDetailsHeader
@@ -183,5 +196,15 @@ test('keeps prompt STOP available while TEST RUN startup is still pending', () =
   expect(screen.getByRole('button', { name: 'Stop' })).toBeEnabled();
   expect(screen.getByRole('button', { name: 'Test run' })).toBeDisabled();
   fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
+
+  const dialog = screen.getByRole('dialog', { name: 'Stop Test Run' });
+  expect(within(dialog).getByText('Do you want to stop the execution?', { exact: true })).toBeInTheDocument();
+  expect(onToolbarAction).not.toHaveBeenCalled();
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+  expect(onToolbarAction).not.toHaveBeenCalled();
+  expect(screen.queryByRole('dialog', { name: 'Stop Test Run' })).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
+  fireEvent.click(within(screen.getByRole('dialog', { name: 'Stop Test Run' })).getByRole('button', { name: 'Stop' }));
   expect(onToolbarAction).toHaveBeenCalledWith('STOP_TEST_RUN');
 });

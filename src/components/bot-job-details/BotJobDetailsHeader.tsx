@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Clock, Play, RefreshCw, Rocket, Square } from 'lucide-react';
+import QuestionsCard from '../QuestionsCard';
 import WorkspaceHeader, { type WorkspaceHeaderAction } from '../workspace/WorkspaceHeader';
 import BotJobDataActions from './BotJobDataActions';
 import BotJobFileActions from './BotJobFileActions';
@@ -82,6 +83,7 @@ const BotJobDetailsHeader: React.FC<BotJobDetailsHeaderProps> = ({
   const [selectedBlockId, setSelectedBlockId] = useState<'all' | number>('all');
   const [mode, setMode] = useState<BotJobExecutionMode>('ALL');
   const [navigationTime, setNavigationTime] = useState(0);
+  const [stopConfirmationOpen, setStopConfirmationOpen] = useState(false);
   const blocks = useMemo(() => jobState?.blocks ?? [], [jobState?.blocks]);
 
   useEffect(() => {
@@ -105,6 +107,15 @@ const BotJobDetailsHeader: React.FC<BotJobDetailsHeaderProps> = ({
   const canLaunch = Boolean(connected && jobState?.capabilities.canLaunch);
   const canConfigure = Boolean(connected && jobState?.capabilities.canUseWorkspaceActions);
   const hasBlocks = blocks.length > 0;
+  const stopDisabled = !connected
+    || !onToolbarAction
+    || (executionBusy && !testRunStarting)
+    || (!executionActive && !testRunStarting)
+    || jobState?.executionState === 'STOPPING';
+
+  useEffect(() => {
+    if (stopDisabled) setStopConfirmationOpen(false);
+  }, [stopDisabled]);
 
   const cycleNavigationTime = () => {
     const next = navigationTime >= 10 ? 0 : navigationTime + 1;
@@ -231,11 +242,8 @@ const BotJobDetailsHeader: React.FC<BotJobDetailsHeaderProps> = ({
               <button
                 type="button"
                 className={execStyles.stopButton}
-                disabled={!connected
-                  || (executionBusy && !testRunStarting)
-                  || (!executionActive && !testRunStarting)
-                  || jobState?.executionState === 'STOPPING'}
-                onClick={() => onToolbarAction('STOP_TEST_RUN')}
+                disabled={stopDisabled}
+                onClick={() => setStopConfirmationOpen(true)}
               >
                 <Square size={15} fill="currentColor" aria-hidden="true" />
                 Stop
@@ -252,6 +260,22 @@ const BotJobDetailsHeader: React.FC<BotJobDetailsHeaderProps> = ({
           </>
         )}
       />
+      {stopConfirmationOpen && (
+        <QuestionsCard
+          mode="confirm"
+          header="Stop Test Run"
+          body="Do you want to stop the execution?"
+          okLabel="Stop"
+          cancelLabel="Cancel"
+          destructive
+          error
+          onCancel={() => setStopConfirmationOpen(false)}
+          onSubmit={() => {
+            setStopConfirmationOpen(false);
+            if (!stopDisabled) onToolbarAction?.('STOP_TEST_RUN');
+          }}
+        />
+      )}
     </div>
   );
 };
