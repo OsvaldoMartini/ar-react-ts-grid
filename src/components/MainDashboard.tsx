@@ -108,6 +108,7 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, on
   const desktopShell = new URLSearchParams(window.location.search).get('desktopShell') === '1';
   const { webSocket, connected, messages, error } = useWebSocket(socketPort, sessionId);
   const processedMessageCountRef = useRef(0);
+  const shutdownRequestedRef = useRef(false);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
   const [botJobs, setBotJobs] = useState<BotJobRow[]>([]);
   const [findText, setFindText] = useState('');
@@ -168,6 +169,31 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, on
     },
     [sessionId, webSocket],
   );
+
+  const requestApplicationShutdown = useCallback(() => {
+    if (shutdownRequestedRef.current) return;
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
+      setStatus({ level: 'warn', text: 'Socket is not connected yet' });
+      return;
+    }
+
+    shutdownRequestedRef.current = true;
+    try {
+      webSocket.send(JSON.stringify({
+        type: 'mainDashboard.exit',
+        sessionId,
+        body: JSON.stringify({ reason: 'EXIT_BUTTON' }),
+      }));
+    } catch (shutdownError) {
+      shutdownRequestedRef.current = false;
+      setStatus({
+        level: 'error',
+        text: shutdownError instanceof Error
+          ? shutdownError.message
+          : 'The application shutdown request could not be sent',
+      });
+    }
+  }, [sessionId, webSocket]);
 
   const refresh = useCallback(() => {
     send('mainDashboard.list');
@@ -413,7 +439,7 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, on
           <button type="button" className={styles.commandBtn} onClick={refresh}>
             Refresh
           </button>
-          <button type="button" className={styles.dangerBtn} onClick={() => send('mainDashboard.exit')}>
+          <button type="button" className={styles.dangerBtn} onClick={requestApplicationShutdown}>
             Exit
           </button>
           <div className={styles.findControl}>

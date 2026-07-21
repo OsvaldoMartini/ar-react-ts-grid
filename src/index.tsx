@@ -14,6 +14,7 @@ import ApiTestToolAI from './components/ApiTestToolAI';
 import ApiTestToolAINew from './components/ApiTestToolAINew';
 import OrganizationManager from './components/OrganizationManager';
 import MainDashboard from './components/MainDashboard';
+import MainApplicationControl, { isMainApplicationWindow } from './components/MainApplicationControl';
 import NewBotJobManager from './components/NewBotJobManager';
 import CloneJobManager from './components/CloneJobManager';
 import ConfigManager from './components/ConfigManager';
@@ -338,9 +339,15 @@ const App: React.FC = () => {
   const botJobWorkspaceKey = botJobWindowSession
     ? `${botJobWindowSession}:${botJobId}:${botJobWorkspaceEpoch}`
     : `bot-job:${botJobId}:${botJobWorkspaceEpoch}`;
+  const mainApplicationControlPort = socketPort > 0 ? socketPort : Number(window.location.port);
 
   return (
     <React.StrictMode>
+      {isMainApplicationWindow(window.location.search)
+        && Number.isInteger(mainApplicationControlPort)
+        && mainApplicationControlPort > 0 && (
+        <MainApplicationControl socketPort={mainApplicationControlPort} />
+      )}
       <BotJobWindowControl
         socketPort={socketPort}
         sessionId={botJobWindowSession}

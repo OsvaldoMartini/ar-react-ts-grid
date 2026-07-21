@@ -5,6 +5,16 @@ const RECONNECT_DELAY_MS = 2000;
 const MAX_RECONNECT_DELAY_MS = 10000;
 const PING_INTERVAL_MS = 15000;
 
+const isApplicationShutdownMessage = (rawMessage: unknown): boolean => {
+  if (typeof rawMessage !== 'string') return false;
+  try {
+    const envelope = JSON.parse(rawMessage);
+    return envelope?.operationId === 'application.shutdown';
+  } catch {
+    return false;
+  }
+};
+
 export const useWebSocket = (socketPort: number, sessionId: string) => {
   const [webSocket, setWebSocket] = useState<WebSocket | null>(null);
   const [connected, setConnected] = useState(false);
@@ -127,9 +137,27 @@ export const useWebSocket = (socketPort: number, sessionId: string) => {
       };
 
       socket.onmessage = (event) => {
-        if (!disposedRef.current && socketRef.current === socket) {
-          setMessages((previous) => [...previous, event.data]);
+        if (disposedRef.current || socketRef.current !== socket) return;
+        if (isApplicationShutdownMessage(event.data)) {
+          disposedRef.current = true;
+          clearReconnectTimeout();
+          stopPing();
+          socketRef.current = null;
+          socket.onopen = null;
+          socket.onmessage = null;
+          socket.onerror = null;
+          socket.onclose = null;
+          setConnected(false);
+          setWebSocket(null);
+          try {
+            socket.close(1000, 'Application shutdown');
+          } catch {
+            // The backend may already have closed the transport.
+          }
+          window.close();
+          return;
         }
+        setMessages((previous) => [...previous, event.data]);
       };
 
       socket.onerror = () => {

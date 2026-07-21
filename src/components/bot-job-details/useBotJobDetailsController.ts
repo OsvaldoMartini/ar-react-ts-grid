@@ -360,10 +360,16 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
           && body.selectedPath.trim()) {
           setTransferPath(body.selectedPath);
         }
-        setTransientStatus(
-          body.message || (body.ok === false ? 'Toolbar action failed' : 'Toolbar action completed'),
-          body.ok === false ? 'error' : 'success',
-        );
+        const successfulBatPath = body.ok !== false
+          && body.action === 'CREATE_BAT'
+          && typeof body.selectedPath === 'string'
+          && body.selectedPath.trim()
+          ? body.selectedPath.trim()
+          : '';
+        const toolbarStatus = successfulBatPath
+          ? `${body.message || 'BAT file created'} — ${successfulBatPath}`
+          : body.message || (body.ok === false ? 'Toolbar action failed' : 'Toolbar action completed');
+        setTransientStatus(toolbarStatus, body.ok === false ? 'error' : 'success');
         if (body.errorCode === 'LICENSE_REQUIRED') invalidateLicenseCapabilities();
         return;
       }

@@ -26,6 +26,15 @@ class MockWebSocket {
     MockWebSocket.instances.push(this);
   }
 
+  openConnection() {
+    this.readyState = MockWebSocket.OPEN;
+    this.onopen?.(new Event('open'));
+  }
+
+  receive(data: string) {
+    this.onmessage?.(new MessageEvent('message', { data }));
+  }
+
   failConnection() {
     this.readyState = MockWebSocket.CLOSED;
     this.onclose?.({} as CloseEvent);
@@ -116,4 +125,26 @@ test('bounds consecutive reconnects without creating parallel sockets', () => {
   expect(MockWebSocket.instances).toHaveLength(6);
   expect(screen.getByTestId('attempts')).toHaveTextContent('5');
   expect(screen.getByTestId('error')).toHaveTextContent('Max reconnect attempts reached');
+});
+
+test('closes the current ARWeb page and never reconnects after application shutdown', () => {
+  const closeWindow = jest.spyOn(window, 'close').mockImplementation(() => undefined);
+  render(<HookHarness />);
+  const socket = MockWebSocket.instances[0];
+
+  act(() => socket.openConnection());
+  act(() => socket.receive(JSON.stringify({
+    operationId: 'application.shutdown',
+    sessionId: 'botJobTasks-test',
+    body: '{}',
+  })));
+
+  expect(closeWindow).toHaveBeenCalledTimes(1);
+  expect(socket.close).toHaveBeenCalledWith(1000, 'Application shutdown');
+
+  act(() => {
+    jest.runOnlyPendingTimers();
+  });
+  expect(MockWebSocket.instances).toHaveLength(1);
+  closeWindow.mockRestore();
 });

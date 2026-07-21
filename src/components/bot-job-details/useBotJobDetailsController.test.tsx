@@ -40,6 +40,7 @@ const Harness: React.FC<HarnessProps> = ({ socket, messages, botJobId = 42, onSu
     <button type="button" onClick={() => controller.sendAction('SHOW_PRE_SCAN')}>Show pre scan</button>
     <button type="button" onClick={() => controller.sendToolbarAction('CHOOSE_TRANSFER_PATH')}>Choose transfer folder</button>
     <button type="button" onClick={() => controller.sendToolbarAction('OPEN_EXCEL')}>Open Excel</button>
+    <button type="button" onClick={() => controller.sendToolbarAction('CREATE_BAT')}>Create BAT</button>
     <button type="button" onClick={() => controller.sendToolbarAction('EXPORT_JOB', { confirmed: true, transferPath: 'D:\\exports' })}>Export toolbar</button>
     <button type="button" onClick={() => controller.sendToolbarAction('TEST_RUN', { executionMode: 'ALL', blockId: 0 })}>Start test run</button>
     <button type="button" onClick={() => controller.sendToolbarAction('STOP_TEST_RUN')}>Stop test run</button>
@@ -257,6 +258,46 @@ test('does not treat the opened workbook path as the Bot Job transfer folder', a
   await waitFor(() => expect(screen.getByTestId('pending-toolbar')).toBeEmptyDOMElement());
   expect(screen.getByTestId('transfer-path')).toBeEmptyDOMElement();
   expect(screen.getByTestId('status')).toHaveTextContent('Excel file opened');
+});
+
+test('shows the exact BAT destination only after a correlated successful response', async () => {
+  const send = jest.fn();
+  const socket = { readyState: WebSocket.OPEN, send } as unknown as WebSocket;
+  const view = render(<Harness socket={socket} messages={[]} />);
+  let messages = await completeBootstrap(view, socket, send);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Create BAT' }));
+  expect(JSON.parse(send.mock.calls[1][0]).type).toBe('botJobDetails.toolbar.action');
+  const request = sentBody(send, 1);
+  expect(request).toMatchObject({ action: 'CREATE_BAT', botJobId: 42 });
+  expect(screen.getByTestId('pending-toolbar')).toHaveTextContent('CREATE_BAT');
+
+  messages = [...messages, response('botJobDetails.toolbar.actionResponse', {
+    ok: true,
+    botJobId: 42,
+    requestId: 'wrong-request',
+    action: 'CREATE_BAT',
+    selectedPath: 'D:\\wrong\\launcher.bat',
+    message: 'BAT file created',
+  })];
+  view.rerender(<Harness socket={socket} messages={messages} />);
+  expect(screen.getByTestId('pending-toolbar')).toHaveTextContent('CREATE_BAT');
+  expect(screen.getByTestId('status')).not.toHaveTextContent('D:\\wrong\\launcher.bat');
+
+  const destination = 'D:\\Bot Jobs\\execute_web_app_7_Botjob_42.bat';
+  messages = [...messages, response('botJobDetails.toolbar.actionResponse', {
+    ok: true,
+    botJobId: 42,
+    requestId: request.requestId,
+    action: 'CREATE_BAT',
+    selectedPath: destination,
+    message: 'BAT file created',
+  })];
+  view.rerender(<Harness socket={socket} messages={messages} />);
+
+  await waitFor(() => expect(screen.getByTestId('pending-toolbar')).toBeEmptyDOMElement());
+  expect(screen.getByTestId('status')).toHaveTextContent(`BAT file created — ${destination}`);
+  expect(screen.getByTestId('transfer-path')).toBeEmptyDOMElement();
 });
 
 test('does not replace a correlated toolbar request with a concurrent operation', async () => {
