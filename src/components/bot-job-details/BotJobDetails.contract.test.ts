@@ -1,4 +1,8 @@
-import { parseBotJobDetailsEnvelope, reduceBotJobDetailsState } from './BotJobDetails.contract';
+import {
+  parseBotJobDetailsEnvelope,
+  parseBotJobExecutionPauseRequest,
+  reduceBotJobDetailsState,
+} from './BotJobDetails.contract';
 import type { BotJobDetailsState } from './BotJobDetails.types';
 
 const state = (revision: number): BotJobDetailsState => ({
@@ -83,4 +87,24 @@ test('rejects incomplete state and malformed capabilities before Chrome can cons
 
   expect(parseBotJobDetailsEnvelope(incompleteStateEnvelope, 'botJobTasks', 42)).toBeNull();
   expect(parseBotJobDetailsEnvelope(malformedCapabilitiesEnvelope, 'botJobTasks', 42)).toBeNull();
+});
+
+test('accepts only a fully correlated PAUSE request for the bound Bot Job session', () => {
+  const pause = {
+    requestId: 'pause-1', botJobId: 42, workspaceEpoch: 9, executionId: 17,
+    executionAttemptId: 3, title: 'PAUSE BOT JOB', header: 'Paused at block',
+    blockName: 'Login', instructionName: 'Review page', body: 'Keep the browser open.',
+    continueLabel: 'Continue', stopLabel: 'Stop Run',
+  };
+  const envelope = JSON.stringify({
+    sessionId: 'botJobTasks', operationId: 'botJobExecution.pause.request', body: JSON.stringify(pause),
+  });
+
+  expect(parseBotJobExecutionPauseRequest(envelope, 'botJobTasks', 42)).toEqual(pause);
+  expect(parseBotJobExecutionPauseRequest(envelope, 'componentTasks', 42)).toBeNull();
+  expect(parseBotJobExecutionPauseRequest(envelope, 'botJobTasks', 99)).toBeNull();
+  expect(parseBotJobExecutionPauseRequest(JSON.stringify({
+    sessionId: 'botJobTasks', operationId: 'botJobExecution.pause.request',
+    body: JSON.stringify({ ...pause, executionId: 0 }),
+  }), 'botJobTasks', 42)).toBeNull();
 });

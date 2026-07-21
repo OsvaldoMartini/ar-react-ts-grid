@@ -2,6 +2,7 @@ import type {
   BotJobDetailsEnvelope,
   BotJobDetailsResponse,
   BotJobDetailsState,
+  BotJobExecutionPauseRequest,
 } from './BotJobDetails.types';
 
 const BOT_JOB_DETAILS_OPERATIONS = new Set([
@@ -122,6 +123,38 @@ export function parseBotJobDetailsEnvelope(
     homeBankingId: typeof outer.homeBankingId === 'number' ? outer.homeBankingId : undefined,
     body,
   };
+}
+
+export function parseBotJobExecutionPauseRequest(
+  raw: string,
+  expectedSessionId: string,
+  expectedBotJobId: number,
+): BotJobExecutionPauseRequest | null {
+  const outer = parseJsonObject(raw);
+  if (
+    !outer
+    || outer.sessionId !== expectedSessionId
+    || outer.operationId !== 'botJobExecution.pause.request'
+  ) return null;
+  const body = parseJsonObject(outer.body);
+  if (!body) return null;
+  const valid = typeof body.requestId === 'string'
+    && body.requestId.trim().length > 0
+    && isInteger(body.botJobId, 1)
+    && body.botJobId === expectedBotJobId
+    && isInteger(body.workspaceEpoch, 1)
+    && isInteger(body.executionId, 1)
+    && isInteger(body.executionAttemptId, 0)
+    && typeof body.title === 'string'
+    && typeof body.header === 'string'
+    && typeof body.blockName === 'string'
+    && typeof body.instructionName === 'string'
+    && typeof body.body === 'string'
+    && typeof body.continueLabel === 'string'
+    && body.continueLabel.trim().length > 0
+    && typeof body.stopLabel === 'string'
+    && body.stopLabel.trim().length > 0;
+  return valid ? body as BotJobExecutionPauseRequest : null;
 }
 
 export function reduceBotJobDetailsState(

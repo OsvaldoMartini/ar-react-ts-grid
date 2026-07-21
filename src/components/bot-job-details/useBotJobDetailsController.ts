@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { parseBotJobDetailsEnvelope, reduceBotJobDetailsState } from './BotJobDetails.contract';
+import {
+  parseBotJobDetailsEnvelope,
+  parseBotJobExecutionPauseRequest,
+  reduceBotJobDetailsState,
+} from './BotJobDetails.contract';
 import type {
+  BotJobExecutionPauseDecision,
+  BotJobExecutionPauseRequest,
   BotJobDetailsState,
   BotJobMetadataDraft,
   BotJobToolbarAction,
@@ -31,6 +37,8 @@ export interface BotJobDetailsControllerState {
   transferPath: string;
   status: string;
   statusTone: BotJobWorkspaceStatusTone;
+  executionPause: BotJobExecutionPauseRequest | null;
+  resolveExecutionPause: (decision: BotJobExecutionPauseDecision) => void;
   sendAction: (action: BotJobWorkspaceAction) => void;
   sendToolbarAction: (action: BotJobToolbarAction, payload?: BotJobToolbarPayload) => void;
   saveMetadata: (draft: BotJobMetadataDraft) => void;
@@ -109,6 +117,7 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
   const pendingActionRef = useRef<PendingAction | null>(null);
   const pendingToolbarActionRef = useRef<PendingToolbarAction | null>(null);
   const pendingMetadataRef = useRef<PendingMetadata | null>(null);
+  const executionPauseRef = useRef<BotJobExecutionPauseRequest | null>(null);
   const bootstrapTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const actionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toolbarTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -124,6 +133,7 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
   const [transferPath, setTransferPath] = useState('');
   const [status, setStatus] = useState(enabled ? 'Loading Bot Job details' : 'Ready');
   const [statusTone, setStatusTone] = useState<BotJobWorkspaceStatusTone>('neutral');
+  const [executionPause, setExecutionPause] = useState<BotJobExecutionPauseRequest | null>(null);
 
   const setTransientStatus = useCallback((message: string, tone: BotJobWorkspaceStatusTone) => {
     clearTimer(statusResetRef);
@@ -191,6 +201,7 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
     pendingActionRef.current = null;
     pendingToolbarActionRef.current = null;
     pendingMetadataRef.current = null;
+    executionPauseRef.current = null;
     clearTimer(bootstrapTimeoutRef);
     clearTimer(actionTimeoutRef);
     clearTimer(toolbarTimeoutRef);
@@ -203,6 +214,7 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
     setSavingMetadata(false);
     setFieldErrors({});
     setMetadataSavedRevision(null);
+    setExecutionPause(null);
     setLoadingState(enabled);
     setStatus(enabled ? 'Loading Bot Job details' : 'Ready');
     setStatusTone('neutral');
@@ -258,6 +270,17 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
           invalidateLicenseCapabilities();
           setTransientStatus('License activation is required for Bot Job actions', 'error');
         }
+        return;
+      }
+
+      const pauseRequest = parseBotJobExecutionPauseRequest(raw, sessionId, botJobId);
+      if (pauseRequest) {
+        const currentPause = executionPauseRef.current;
+        if (currentPause?.requestId === pauseRequest.requestId) return;
+        executionPauseRef.current = pauseRequest;
+        setExecutionPause(pauseRequest);
+        setStatus(`Paused at ${pauseRequest.blockName || 'the current block'}`);
+        setStatusTone('warning');
         return;
       }
 
@@ -419,9 +442,11 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
       pendingActionRef.current = null;
       pendingToolbarActionRef.current = null;
       pendingMetadataRef.current = null;
+      executionPauseRef.current = null;
       setPendingAction(null);
       setPendingToolbarAction(null);
       setSavingMetadata(false);
+      setExecutionPause(null);
       setLoadingState(true);
       setStatus('Waiting for backend connection');
       setStatusTone('warning');
@@ -430,6 +455,30 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
       setStatusTone('neutral');
     }
   }, [connected, enabled, status]);
+
+  const resolveExecutionPause = useCallback((decision: BotJobExecutionPauseDecision) => {
+    const active = executionPauseRef.current;
+    if (!active) return;
+    try {
+      send('botJobExecution.pause.response', {
+        requestId: active.requestId,
+        botJobId: active.botJobId,
+        workspaceEpoch: active.workspaceEpoch,
+        executionId: active.executionId,
+        executionAttemptId: active.executionAttemptId,
+        decision,
+      });
+      executionPauseRef.current = null;
+      setExecutionPause(null);
+      setStatus(decision === 'CONTINUE' ? 'Continuing TEST RUN' : 'Stopping TEST RUN');
+      setStatusTone(decision === 'CONTINUE' ? 'success' : 'warning');
+    } catch (error) {
+      setTransientStatus(
+        error instanceof Error ? error.message : 'Could not answer the PAUSE confirmation',
+        'error',
+      );
+    }
+  }, [send, setTransientStatus]);
 
   useEffect(() => () => {
     clearTimer(bootstrapTimeoutRef);
@@ -605,6 +654,8 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
     transferPath,
     status,
     statusTone,
+    executionPause,
+    resolveExecutionPause,
     sendAction,
     sendToolbarAction,
     saveMetadata,

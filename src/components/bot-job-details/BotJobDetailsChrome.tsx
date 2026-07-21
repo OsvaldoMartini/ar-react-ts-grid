@@ -1,4 +1,5 @@
 import React from 'react';
+import QuestionsCard from '../QuestionsCard';
 import BotJobDetailsHeader from './BotJobDetailsHeader';
 import BotJobMetadataPanel from './BotJobMetadataPanel';
 import type { BotJobDetailsControllerState } from './useBotJobDetailsController';
@@ -58,6 +59,23 @@ const BotJobDetailsChrome: React.FC<BotJobDetailsChromeProps> = ({
         onSave={controller.saveMetadata}
         onRefresh={controller.refreshEnvironments}
       />
+      {controller.executionPause && (
+        <QuestionsCard
+          mode="confirm"
+          header={controller.executionPause.title || 'PAUSE BOT JOB'}
+          body={[
+            `${controller.executionPause.header}: ${controller.executionPause.blockName}`,
+            controller.executionPause.instructionName
+              ? `Instruction: ${controller.executionPause.instructionName}`
+              : '',
+            controller.executionPause.body,
+          ].filter(Boolean).join('\n')}
+          okLabel={controller.executionPause.continueLabel || 'Continue'}
+          cancelLabel={controller.executionPause.stopLabel || 'Stop Run'}
+          onSubmit={() => controller.resolveExecutionPause('CONTINUE')}
+          onCancel={() => controller.resolveExecutionPause('STOP')}
+        />
+      )}
     </div>
   );
 };

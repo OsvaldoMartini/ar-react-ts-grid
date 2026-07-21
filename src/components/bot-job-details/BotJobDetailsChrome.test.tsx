@@ -16,6 +16,8 @@ test('keeps capability-gated actions disabled until bootstrap state is available
     transferPath: '',
     status: 'Loading Bot Job details',
     statusTone: 'neutral',
+    executionPause: null,
+    resolveExecutionPause: jest.fn(),
     sendAction: jest.fn(),
     sendToolbarAction: jest.fn(),
     saveMetadata: jest.fn(),
@@ -51,6 +53,8 @@ test('keeps Stop available but disables editing, navigation, and file mutations 
     transferPath: 'D:\\exports',
     status: 'TEST RUN active',
     statusTone: 'warning',
+    executionPause: null,
+    resolveExecutionPause: jest.fn(),
     sendAction: jest.fn(),
     sendToolbarAction: jest.fn(),
     saveMetadata: jest.fn(),
@@ -88,6 +92,8 @@ test('saves metadata through the restored editor entry point', () => {
     transferPath: '',
     status: 'Ready',
     statusTone: 'neutral',
+    executionPause: null,
+    resolveExecutionPause: jest.fn(),
     sendAction: jest.fn(),
     sendToolbarAction: jest.fn(),
     saveMetadata,
@@ -117,4 +123,55 @@ test('saves metadata through the restored editor entry point', () => {
     description: botJobDetailsTestState.description,
     homeUrlId: botJobDetailsTestState.homeUrlId,
   });
+});
+
+test('renders the standard React confirmation for an instruction PAUSE', () => {
+  const resolveExecutionPause = jest.fn();
+  const controller: BotJobDetailsControllerState = {
+    state: { ...botJobDetailsTestState, executionState: 'RUNNING' },
+    loadingState: false,
+    savingMetadata: false,
+    fieldErrors: {},
+    metadataSavedRevision: null,
+    pendingAction: null,
+    pendingToolbarAction: null,
+    transferPath: '',
+    status: 'Paused at Login',
+    statusTone: 'warning',
+    executionPause: {
+      requestId: 'pause-1',
+      botJobId: 42,
+      workspaceEpoch: 9,
+      executionId: 17,
+      executionAttemptId: 3,
+      title: 'PAUSE BOT JOB',
+      header: 'Paused at block',
+      blockName: 'Login',
+      instructionName: 'Review customer page',
+      body: 'The same Playwright page remains open.',
+      continueLabel: 'Continue',
+      stopLabel: 'Stop Run',
+    },
+    resolveExecutionPause,
+    sendAction: jest.fn(),
+    sendToolbarAction: jest.fn(),
+    saveMetadata: jest.fn(),
+    refreshEnvironments: jest.fn(),
+    retryBootstrap: jest.fn(),
+  };
+
+  render(
+    <BotJobDetailsChrome
+      fallbackBotJobId={42}
+      fallbackBotJobName="Payments"
+      fallbackSurface="botJob"
+      connected
+      controller={controller}
+    />,
+  );
+
+  expect(screen.getByRole('dialog', { name: 'PAUSE BOT JOB' })).toHaveTextContent('Login');
+  expect(screen.getByRole('dialog')).toHaveTextContent('Review customer page');
+  fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+  expect(resolveExecutionPause).toHaveBeenCalledWith('CONTINUE');
 });

@@ -112,6 +112,23 @@ export interface BotJobDetailsResponse {
   fieldErrors?: Record<string, string>;
 }
 
+export interface BotJobExecutionPauseRequest {
+  requestId: string;
+  botJobId: number;
+  workspaceEpoch: number;
+  executionId: number;
+  executionAttemptId: number;
+  title: string;
+  header: string;
+  blockName: string;
+  instructionName: string;
+  body: string;
+  continueLabel: string;
+  stopLabel: string;
+}
+
+export type BotJobExecutionPauseDecision = 'CONTINUE' | 'STOP';
+
 export interface BotJobDetailsEnvelope {
   sessionId: string;
   operationId: string;

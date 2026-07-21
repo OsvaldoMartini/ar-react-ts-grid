@@ -35,6 +35,7 @@ const Harness: React.FC<HarnessProps> = ({ socket, messages, botJobId = 42, onSu
     <span data-testid="pending-toolbar">{controller.pendingToolbarAction || ''}</span>
     <span data-testid="transfer-path">{controller.transferPath}</span>
     <span data-testid="status">{controller.status}</span>
+    <span data-testid="pause-request">{controller.executionPause?.requestId || ''}</span>
     <button type="button" onClick={() => controller.saveMetadata({ expectedMetadataRevision: 3, name: 'Payments QA', description: 'Flow', homeUrlId: 8 })}>Save metadata</button>
     <button type="button" onClick={() => controller.sendAction('SHOW_COMPONENTS')}>Show components</button>
     <button type="button" onClick={() => controller.sendAction('SHOW_PRE_SCAN')}>Show pre scan</button>
@@ -45,6 +46,8 @@ const Harness: React.FC<HarnessProps> = ({ socket, messages, botJobId = 42, onSu
     <button type="button" onClick={() => controller.sendToolbarAction('TEST_RUN', { executionMode: 'ALL', blockId: 0 })}>Start test run</button>
     <button type="button" onClick={() => controller.sendToolbarAction('STOP_TEST_RUN')}>Stop test run</button>
     <button type="button" onClick={() => controller.sendAction('CLOSE')}>Close workspace</button>
+    <button type="button" onClick={() => controller.resolveExecutionPause('CONTINUE')}>Continue pause</button>
+    <button type="button" onClick={() => controller.resolveExecutionPause('STOP')}>Stop pause</button>
     <button type="button" onClick={controller.retryBootstrap}>Retry bootstrap</button>
   </div>;
 };
@@ -435,4 +438,62 @@ test('identity change clears stale state and issues a new bootstrap', async () =
   await waitFor(() => expect(send).toHaveBeenCalledTimes(2));
   expect(sentBody(send, 1).botJobId).toBe(99);
   expect(screen.getByTestId('job-name')).toHaveTextContent('');
+});
+
+test('correlates PAUSE and sends one exact Continue response for the active execution', async () => {
+  const send = jest.fn();
+  const socket = { readyState: WebSocket.OPEN, send } as unknown as WebSocket;
+  const view = render(<Harness socket={socket} messages={[]} />);
+  let messages = await completeBootstrap(view, socket, send);
+  const pause = {
+    requestId: 'pause-17',
+    botJobId: 42,
+    workspaceEpoch: 9,
+    executionId: 17,
+    executionAttemptId: 3,
+    title: 'PAUSE BOT JOB',
+    header: 'Paused at block',
+    blockName: 'Login',
+    instructionName: 'Review page',
+    body: 'Use Page Scanner or continue.',
+    continueLabel: 'Continue',
+    stopLabel: 'Stop Run',
+  };
+  messages = [...messages, response('botJobExecution.pause.request', pause)];
+  view.rerender(<Harness socket={socket} messages={messages} />);
+  await waitFor(() => expect(screen.getByTestId('pause-request')).toHaveTextContent('pause-17'));
+
+  messages = [...messages, response('license.statusChanged', { active: false })];
+  view.rerender(<Harness socket={socket} messages={messages} />);
+  await waitFor(() => expect(screen.getByTestId('workspace-capability')).toHaveTextContent('false'));
+  expect(screen.getByTestId('pause-request')).toHaveTextContent('pause-17');
+
+  fireEvent.click(screen.getByRole('button', { name: 'Continue pause' }));
+  expect(JSON.parse(send.mock.calls[1][0]).type).toBe('botJobExecution.pause.response');
+  expect(sentBody(send, 1)).toEqual({
+    requestId: 'pause-17',
+    botJobId: 42,
+    workspaceEpoch: 9,
+    executionId: 17,
+    executionAttemptId: 3,
+    decision: 'CONTINUE',
+  });
+  expect(screen.getByTestId('pause-request')).toBeEmptyDOMElement();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Continue pause' }));
+  expect(send).toHaveBeenCalledTimes(2);
+});
+
+test('ignores a PAUSE request for another Bot Job', async () => {
+  const send = jest.fn();
+  const socket = { readyState: WebSocket.OPEN, send } as unknown as WebSocket;
+  const view = render(<Harness socket={socket} messages={[]} />);
+  const messages = await completeBootstrap(view, socket, send);
+  view.rerender(<Harness socket={socket} messages={[...messages, response('botJobExecution.pause.request', {
+    requestId: 'wrong-job', botJobId: 99, workspaceEpoch: 9, executionId: 17,
+    executionAttemptId: 3, title: 'PAUSE', header: 'Paused', blockName: 'Wrong',
+    instructionName: '', body: '', continueLabel: 'Continue', stopLabel: 'Stop Run',
+  })]} />);
+
+  expect(screen.getByTestId('pause-request')).toBeEmptyDOMElement();
 });
