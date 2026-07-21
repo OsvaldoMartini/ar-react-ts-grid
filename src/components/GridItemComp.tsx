@@ -50,6 +50,7 @@ import ComponentWorkspaceHeader from './bot-job-details/ComponentWorkspaceHeader
 import { useBotJobDetailsController } from './bot-job-details/useBotJobDetailsController';
 import { useWebSocket } from './useWebSocket';
 import { useInstructionDrag } from './useInstructionDrag';
+import { instructionDisplayLabel } from './instructionDisplay';
 import {
   SCANNER_ELEMENT_PANE_SESSION_ID,
   SCANNER_TOOL_SESSION_ID,
@@ -1877,9 +1878,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     // Roadmap 3 Phase 3d: prefer the user-set display label when present.
     // `instruction.name` is the canonical key the backend uses for matching/recovery
     // and must never be mutated by the FE.
-    const displayName = (instruction.clientNamed && instruction.clientNamed.length > 0)
-      ? instruction.clientNamed
-      : instruction.name;
+    const displayName = instructionDisplayLabel(instruction);
 
     // Determine the image source and text based on instruction type
     if (instruction.actions.startsWith("I:")) {
@@ -1944,6 +1943,8 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
           imageClass = styles.clickImage;
           break;
         case "H":
+        case "HOLD":
+        case "WAIT":
           imageSrc = waitImage;
           text = displayName;
           imageClass = styles.waitImage;
@@ -2441,9 +2442,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
   // over the canonical backend name), but keep matching `name` too so searching
   // by the backend key still works.
   const instructionMatchesFind = (ins: ComponentsInstructionsDTO, q: string): boolean => {
-    const shownLabel = (ins.clientNamed && ins.clientNamed.length > 0)
-      ? ins.clientNamed
-      : ins.name;
+    const shownLabel = instructionDisplayLabel(ins);
     return (shownLabel ?? "").toLowerCase().includes(q)
       || (ins.name ?? "").toLowerCase().includes(q);
   };

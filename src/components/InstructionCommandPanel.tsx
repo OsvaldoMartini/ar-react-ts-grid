@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import styles from './InstructionCommandPanel.module.scss';
+import { instructionDisplayLabel } from './instructionDisplay';
 
 export type CommandPanelInstruction = {
   id: number;
@@ -13,6 +14,7 @@ export type CommandPanelInstruction = {
   variableId?: number | null;
   parentId?: number | null;
   parentBlockId?: number | null;
+  onHoldSeconds?: number | null;
 };
 
 export type CommandDraft = {
@@ -57,7 +59,11 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
   const [mode, setMode] = useState<'before' | 'after' | 'edit'>('after');
   const [action, setAction] = useState(instruction.actions || 'SET');
   const [name, setName] = useState(instruction.name || 'New Command');
-  const [hold, setHold] = useState(5);
+  const [hold, setHold] = useState(
+    Number.isFinite(Number(instruction.onHoldSeconds)) && Number(instruction.onHoldSeconds) > 0
+      ? Math.trunc(Number(instruction.onHoldSeconds))
+      : 5
+  );
   const [operator, setOperator] = useState('=');
   const [interval, setIntervalValue] = useState(1);
   const [count, setCount] = useState(1);
@@ -255,7 +261,7 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
       <header className={styles.header} onMouseDown={startDrag}>
         <div>
           <strong>Instruction commands</strong>
-          <span>#{instruction.instructionOrderNumber} {instruction.name}</span>
+          <span>#{instruction.instructionOrderNumber} {instructionDisplayLabel(instruction)}</span>
         </div>
         <button type="button" className={styles.iconButton} onClick={props.onClose} title="Close">×</button>
       </header>
@@ -297,7 +303,7 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
             <label>Name<input value={name} onChange={(e) => setName(e.target.value)} /></label>
             <div className={styles.anchorSummary}>
               <span>Reference instruction</span>
-              <b>#{instruction.instructionOrderNumber} ({instruction.id}) {instruction.name}</b>
+              <b>#{instruction.instructionOrderNumber} ({instruction.id}) {instructionDisplayLabel(instruction)}</b>
               <small>{instruction.blockName}</small>
             </div>
             {storedDraft?.warnings && storedDraft.warnings.length > 0 && (

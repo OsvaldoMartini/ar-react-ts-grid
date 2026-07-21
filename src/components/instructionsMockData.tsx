@@ -13,6 +13,7 @@ export interface BlockLoopInstructionLoadDTO {
   blockName: string;
   blockActive: boolean;
   blockWait: number;
+  onHoldSeconds?: number | null;
   actions: string;
   instructionActive: boolean;
   parentId?: number;
@@ -45,6 +46,7 @@ export interface ComponentsInstructionsDTO {
   blockName: string;
   blockActive: boolean;
   blockWait: number;
+  onHoldSeconds?: number | null;
   actions: string;
   instructionActive: boolean;
   parentId?: number;

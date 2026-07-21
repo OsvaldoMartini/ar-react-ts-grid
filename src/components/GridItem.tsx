@@ -55,6 +55,8 @@ import BotJobDetailsChrome from './bot-job-details/BotJobDetailsChrome';
 import { useBotJobDetailsController } from './bot-job-details/useBotJobDetailsController';
 import { useWebSocket } from './useWebSocket';
 import { useInstructionDrag } from './useInstructionDrag';
+import { instructionDisplayLabel } from './instructionDisplay';
+import { buildLaterBlockOrderUpdates } from './instructionSplit';
 import {
   SCANNER_ELEMENT_PANE_SESSION_ID,
   SCANNER_TOOL_SESSION_ID,
@@ -208,6 +210,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
   const [excelExportDirectory, setExcelExportDirectory] = useState<string | undefined>(undefined);
   const [choosingExcelExportDirectory, setChoosingExcelExportDirectory] = useState(false);
   const pendingExcelExportDirectoryRequestRef = useRef<string | null>(null);
+  const pendingSplitRequestRef = useRef<string | null>(null);
   const [saveComponentContext, setSaveComponentContext] = useState<SaveComponentContext | null>(null);
 
   useLayoutEffect(() => {
@@ -727,6 +730,37 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                 handleClose();
                 applyDragMove(pendingResult, groupRows);
               });
+            }
+          }
+        } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "instructionGraph.applySplitResponse") {
+          const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
+          if (!pendingSplitRequestRef.current || bodyData?.requestId !== pendingSplitRequestRef.current) {
+            return;
+          }
+          pendingSplitRequestRef.current = null;
+          if (bodyData?.ok === false) {
+            setAlertImage(warningRedImage);
+            setAlertClass('construction-image');
+            setAlertMessageHeader(bodyData?.errorTitle || 'Split Component Refused');
+            setAlertMessageBody(bodyData?.error || 'The backend could not split this block.');
+            setAlertMessageFooter(bodyData?.errorHeader || 'Refresh the grid and try again.');
+            setErrorFlag(true);
+            setAlertOnConfirm(undefined);
+          } else {
+            const authoritativeInstructions = Array.isArray(bodyData?.instructions) ? bodyData.instructions : [];
+            if (authoritativeInstructions.length > 0) {
+              pendingScrollTopRef.current = gridScrollRef.current?.scrollTop ?? null;
+              setInstructionsData(authoritativeInstructions);
+              setIsDataReordered(false);
+            }
+            if (Array.isArray(bodyData?.blocks)) {
+              setMemoryBlockOptions(normalizeBlockOptions(bodyData.blocks.map((block: {
+                id?: number; blockId?: number; name?: string; blockName?: string; blockOrderNumber?: number;
+              }) => ({
+                blockId: Number(block.blockId ?? block.id),
+                blockName: String(block.blockName ?? block.name ?? ''),
+                blockOrderNumber: Number(block.blockOrderNumber),
+              }))));
             }
           }
         } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "instructionEditor.deleteResponse") {
@@ -1557,11 +1591,11 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
   const handleSplitComponent = (
     instructionId: number,
     groupedData: { [blockId: string]: { blockName: string; instructions: BlockLoopInstructionLoadDTO[] } },
-    setGroupedData: (data: { [blockId: string]: { blockName: string; instructions: BlockLoopInstructionLoadDTO[] } }) => void,
     instructionsData: BlockLoopInstructionLoadDTO[],
     isLastInstruction: boolean,
     graphRevision: string
   ) => {
+    if (!botJobId) return;
 
     // Find the block and instruction related to the instructionId
     const blockToSplit = Object.values(groupedData).find((blockData) =>
@@ -1713,15 +1747,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     updatedBlocks[newBlockId] = newBlock;
     updatedBlocks[blockId] = updatedBlock;
 
-    // Call setInstructionsData and setIsDataReordered BEFORE updating groupedData
-    const updatedInstructions = Object.values(updatedBlocks).flatMap(block => block.instructions);
-    setInstructionsData([...reassignInstructionOrderNumbersByBlock(updatedInstructions)]);
-    setIsDataReordered(false); // Trigger reorder logic
-
-    // Set the updated grouped data (or pass it to your state management)
-    setGroupedData(updatedBlocks);
-
-    console.log("Split component created with new block:", newBlock);
+    console.log("Split component requested with new block:", newBlock);
 
     // Send WebSocket message with block split details, including newBlock
     if (webSocket && connected) {
@@ -1750,22 +1776,18 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
             instructionOrderNumber: instruction.instructionOrderNumber
           })),
         },
-        updatedBlocks: Object.values(updatedBlocks)
-          .filter(block => block.instructions.length > 0
-            && block.instructions[0].blockOrderNumber > blockOrderNumber
-            && block.instructions[0].blockId !== newBlockId // Exclude the newBlock
-          )
-          .map(block => ({
-            blockId: block.instructions[0].blockId,
-            botJobId: botJobId,
-            blockName: block.blockName,
-            blockOrderNumber: block.instructions[0].blockOrderNumber
-          }))
+        updatedBlocks: buildLaterBlockOrderUpdates(
+          updatedBlocks,
+          blockOrderNumber,
+          newBlockId,
+          botJobId,
+        ),
       };
 
+      const splitRequestId = `${Date.now()}-split-${adjustedInstructionId}`;
       const message = {
         type: 'BLOCKS_SPLITTER',
-        requestId: `${Date.now()}-split-${adjustedInstructionId}`,
+        requestId: splitRequestId,
         instructionId: adjustedInstructionId,
         graphRevision,
         botJobId: botJobId,
@@ -1775,6 +1797,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
         details: blockSplitDetails,
       };
 
+      pendingSplitRequestRef.current = splitRequestId;
       webSocket.send(
         JSON.stringify(message),
       );
@@ -2180,9 +2203,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     // Roadmap 3 Phase 3d: prefer the user-set display label when present.
     // `instruction.name` is the canonical key the backend uses for matching/recovery
     // and must never be mutated by the FE.
-    const displayName = (instruction.clientNamed && instruction.clientNamed.length > 0)
-      ? instruction.clientNamed
-      : instruction.name;
+    const displayName = instructionDisplayLabel(instruction);
 
     // Determine the image source and text based on instruction type
     if (instruction.actions.startsWith("I:")) {
@@ -2256,6 +2277,8 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
           imageClass = styles.clickImage;
           break;
         case "H":
+        case "HOLD":
+        case "WAIT":
           imageSrc = waitImage;
           text = displayName;
           imageClass = styles.waitImage;
@@ -2781,9 +2804,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
   // over the canonical backend name), but keep matching `name` too so searching
   // by the backend key still works.
   const instructionMatchesFind = (ins: BlockLoopInstructionLoadDTO, q: string): boolean => {
-    const shownLabel = (ins.clientNamed && ins.clientNamed.length > 0)
-      ? ins.clientNamed
-      : ins.name;
+    const shownLabel = instructionDisplayLabel(ins);
     return (shownLabel ?? "").toLowerCase().includes(q)
       || (ins.name ?? "").toLowerCase().includes(q);
   };
@@ -3540,7 +3561,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                                           <InstructionCommandPanel
                                             instruction={instruction}
                                             onClose={() => setOpenDropdown(null)}
-                                            onSplit={(graphRevision) => handleSplitComponent(instruction.id, groupedData, setGroupedData, instructionsData, isLastInstruction, graphRevision)}
+                                            onSplit={(graphRevision) => handleSplitComponent(instruction.id, groupedData, instructionsData, isLastInstruction, graphRevision)}
                                             onInsertElseIf={(graphRevision) => {
                                               webSocket?.send(JSON.stringify({
                                                 type: 'commandEditor.insertElseIf',
