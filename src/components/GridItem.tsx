@@ -213,6 +213,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
   const pendingExcelExportDirectoryRequestRef = useRef<string | null>(null);
   const pendingSplitRequestRef = useRef<string | null>(null);
   const pendingCommandApplyRequestRef = useRef<string | null>(null);
+  const processedMessagesRef = useRef(0);
   const [saveComponentContext, setSaveComponentContext] = useState<SaveComponentContext | null>(null);
 
   useEffect(() => {
@@ -654,12 +655,17 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
   useEffect(() => {
     console.log("WebSocket Messages");
 
-    if (messages.length > 0) {
-      const lastMessage = messages[messages.length - 1];
-      console.log('RECEIVED -> Last WebSocket message ', lastMessage);
+    if (processedMessagesRef.current > messages.length) {
+      processedMessagesRef.current = 0;
+    }
+    const pendingMessages = messages.slice(processedMessagesRef.current);
+    processedMessagesRef.current = messages.length;
+
+    pendingMessages.forEach((message) => {
+      console.log('RECEIVED -> WebSocket message ', message);
 
       try {
-        const parsedMessage = JSON.parse(lastMessage);
+        const parsedMessage = JSON.parse(message);
         if (typeof parsedMessage.homeBankingId === "number") {
           setHomeBankingId(parsedMessage.homeBankingId);
         }
@@ -936,7 +942,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
       } catch (error) {
         console.error("Error parsing WebSocket message:", error);
       }
-    }
+    });
   }, [messages, onSessionOpen, pendingMemoryMove, pendingDragPreview, sessionId]);
 
 
