@@ -36,6 +36,12 @@ export const useWebSocket = (socketPort: number, sessionId: string) => {
     setMessages([]);
     setError(null);
 
+    if (socketPort <= 0 || !sessionId) {
+      return () => {
+        disposedRef.current = true;
+      };
+    }
+
     const stopPing = () => {
       if (pingIntervalRef.current) {
         clearInterval(pingIntervalRef.current);

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, FlaskConical, GripHorizontal, ShieldCheck, User } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, FlaskConical, GripHorizontal, ShieldCheck, User } from 'lucide-react';
 import AutoTestWorkspace, { AutomationTestCatalog } from './auto-test/AutoTestWorkspace';
 import FloatingWorkspaceFrame from './workspace/FloatingWorkspaceFrame';
 import styles from './MainDashboard.module.scss';
@@ -411,6 +411,9 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, on
                 </div>
               )}
             </div>
+            <button type="button" className={styles.dangerBtn} onClick={requestApplicationShutdown}>
+              Exit
+            </button>
           </div>
         </header>
 
@@ -438,9 +441,6 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, on
           </button>
           <button type="button" className={styles.commandBtn} onClick={refresh}>
             Refresh
-          </button>
-          <button type="button" className={styles.dangerBtn} onClick={requestApplicationShutdown}>
-            Exit
           </button>
           <div className={styles.findControl}>
             <label htmlFor="main-dashboard-find">Find:</label>
@@ -481,7 +481,15 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, on
                     >
                       {column.label}
                       <span className={styles.sortIndicator}>
-                        {sort?.key === column.key ? (sort.dir === 1 ? '↑' : '↓') : '⇅'}
+                        {sort?.key === column.key ? (
+                          sort.dir === 1 ? (
+                            <ArrowUp size={18} aria-hidden="true" />
+                          ) : (
+                            <ArrowDown size={18} aria-hidden="true" />
+                          )
+                        ) : (
+                          <ArrowUpDown size={18} aria-hidden="true" style={{ opacity: 0.35 }} />
+                        )}
                       </span>
                     </th>
                   ))}
