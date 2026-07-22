@@ -41,6 +41,7 @@ import {
   type PageScannerProfileRequestOperation,
 } from './scanner/PageScannerFocusProfile';
 import {
+  createPageScannerRequestId,
   pageScannerCloseMessage,
   pageScannerRetargetDisposition,
   pageScannerRequestForResponse,
@@ -48,6 +49,20 @@ import {
   pageScannerWorkspaceCloseReason,
   type PageScannerRequestOperation,
 } from './scanner/PageScanner.contract';
+import LocatorGeneratorPanel from './scanner/LocatorGeneratorPanel';
+import {
+  PAGE_SCANNER_LOCATOR_APPLY_RESPONSE,
+  PAGE_SCANNER_LOCATOR_GENERATE_RESPONSE,
+  pageScannerLocatorElementKey,
+  pageScannerLocatorElementLabel,
+  pageScannerLocatorApplyMessage,
+  pageScannerLocatorGenerateMessage,
+  replacePageScannerLocatorElement,
+  replacePageScannerLocatorGroupedElement,
+  resolvePageScannerLocatorApplyResponse,
+  type LocatorResult,
+  type PendingLocatorApply,
+} from './scanner/PageScannerLocator';
 import { useScannerController } from './scanner/useScannerController';
 import {
   PRE_SCAN_CLEAR_GRID_OPERATION,
@@ -142,8 +157,6 @@ const blockOptionsFromPayload = (payload: any): CreateBlockOption[] => {
 };
 
 const SCANNER_TEST_INPUT_VALUE = 'abc';
-const createPageScannerRequestId = (operation: string) =>
-  `${operation}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
 type PreScanStatus = {
   // 'waiting' = browser opening / page loading & settling; 'running' = actual scan.
@@ -335,6 +348,24 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   const [memoryElements, setMemoryElements] = useState<ElementDTO[]>([]);
   const [memoryPanelOpen, setMemoryPanelOpen] = useState<boolean>(false);
   const [memoryPanelPos, setMemoryPanelPos] = useState<{ x: number; y: number }>({ x: 80, y: 120 });
+
+  const [locatorPanelOpen, setLocatorPanelOpen] = useState<boolean>(false);
+  const [locatorPanelPos, setLocatorPanelPos] = useState<{ x: number; y: number }>({ x: 120, y: 150 });
+  const [locatorTargetKey, setLocatorTargetKey] = useState<string>('');
+  const [locatorBusy, setLocatorBusy] = useState<boolean>(false);
+  const [locatorApplying, setLocatorApplying] = useState<boolean>(false);
+  const [locatorError, setLocatorError] = useState<string>('');
+  const [locatorWarning, setLocatorWarning] = useState<string>('');
+  const [locatorFeedback, setLocatorFeedback] = useState<string>('');
+  const [locatorResults, setLocatorResults] = useState<LocatorResult[]>([]);
+  const [locatorCommittedUpdate, setLocatorCommittedUpdate] = useState<{
+    pending: PendingLocatorApply;
+    element: ElementDTO;
+  } | null>(null);
+  const locatorRequestRef = useRef<string | null>(null);
+  const locatorApplyRef = useRef<PendingLocatorApply | null>(null);
+  const locatorRequestTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const locatorApplyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [memoryTargetBlockId, setMemoryTargetBlockId] = useState<number | null>(null);
   const [memoryBlockOptions, setMemoryBlockOptions] = useState<CreateBlockOption[]>([]);
   const [createBlockOpen, setCreateBlockOpen] = useState<boolean>(false);
@@ -561,6 +592,8 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     if (pageScannerCloseTimerRef.current) clearTimeout(pageScannerCloseTimerRef.current);
     if (pageScannerApplyTimerRef.current) clearTimeout(pageScannerApplyTimerRef.current);
     if (pageScannerCreateBlockTimerRef.current) clearTimeout(pageScannerCreateBlockTimerRef.current);
+    if (locatorRequestTimerRef.current) clearTimeout(locatorRequestTimerRef.current);
+    if (locatorApplyTimerRef.current) clearTimeout(locatorApplyTimerRef.current);
     clearPendingPageScannerRequests();
     pendingPageScannerProfileRequestsRef.current.clear();
     pageScannerProfileSocketRef.current = null;
@@ -613,6 +646,147 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
+  };
+
+  const startLocatorPanelDrag = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startLeft = locatorPanelPos.x;
+    const startTop = locatorPanelPos.y;
+    const onMove = (moveEvent: MouseEvent) => {
+      setLocatorPanelPos({
+        x: Math.max(0, startLeft + moveEvent.clientX - startX),
+        y: Math.max(0, startTop + moveEvent.clientY - startY),
+      });
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  const clearLocatorGenerateRequest = () => {
+    if (locatorRequestTimerRef.current) {
+      clearTimeout(locatorRequestTimerRef.current);
+      locatorRequestTimerRef.current = null;
+    }
+    locatorRequestRef.current = null;
+    setLocatorBusy(false);
+  };
+
+  const clearLocatorApplyRequest = () => {
+    if (locatorApplyTimerRef.current) {
+      clearTimeout(locatorApplyTimerRef.current);
+      locatorApplyTimerRef.current = null;
+    }
+    locatorApplyRef.current = null;
+    setLocatorApplying(false);
+  };
+
+  const openLocatorPanel = (target?: ElementDTO) => {
+    if (target) {
+      setLocatorTargetKey(pageScannerLocatorElementKey(target));
+    } else if (elementDTO.length === 1) {
+      setLocatorTargetKey(pageScannerLocatorElementKey(elementDTO[0]));
+    } else if (!elementDTO.some((element) => pageScannerLocatorElementKey(element) === locatorTargetKey)) {
+      setLocatorTargetKey('');
+    }
+    setLocatorPanelOpen(true);
+  };
+
+  const closeLocatorPanel = () => {
+    setLocatorPanelOpen(false);
+  };
+
+  const clearLocatorFeedback = () => {
+    setLocatorResults([]);
+    setLocatorError('');
+    setLocatorWarning('');
+    setLocatorFeedback('');
+  };
+
+  const generateLocators = (htmlInput: string) => {
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
+      setLocatorError('Scanner is not connected.');
+      return;
+    }
+    const html = htmlInput.trim();
+    if (!html) {
+      setLocatorError('Paste the HTML of the controls first.');
+      return;
+    }
+    if (locatorRequestRef.current) return;
+    const requestId = createPageScannerRequestId('page-scanner-locator-generate');
+    locatorRequestRef.current = requestId;
+    setLocatorBusy(true);
+    setLocatorError('');
+    setLocatorWarning('');
+    setLocatorFeedback('');
+    setLocatorResults([]);
+    try {
+      webSocket.send(JSON.stringify(pageScannerLocatorGenerateMessage(
+        { sessionId, homeBankingId, botJobId },
+        requestId,
+        html,
+      )));
+      locatorRequestTimerRef.current = setTimeout(() => {
+        if (locatorRequestRef.current !== requestId) return;
+        clearLocatorGenerateRequest();
+        setLocatorError('Locator generation timed out. Check the Page Scanner connection and try again.');
+      }, PAGE_SCANNER_RESPONSE_TIMEOUT_MS);
+    } catch (sendError) {
+      clearLocatorGenerateRequest();
+      setLocatorError(sendError instanceof Error ? sendError.message : 'Could not send the request.');
+    }
+  };
+
+  const applyGeneratedXPath = (result: LocatorResult) => {
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
+      setLocatorError('Scanner is not connected. The XPath was not applied.');
+      return;
+    }
+    if (locatorApplyRef.current) return;
+    const target = elementDTO.find(
+      (element) => pageScannerLocatorElementKey(element) === locatorTargetKey,
+    );
+    if (!target) {
+      setLocatorError('Select a scanned element before applying an XPath.');
+      return;
+    }
+    const xpath = result.xpath.trim();
+    if (!xpath) {
+      setLocatorError('The generated XPath is empty and cannot be applied.');
+      return;
+    }
+
+    const requestId = createPageScannerRequestId('page-scanner-locator-apply');
+    const elementKey = pageScannerLocatorElementKey(target);
+    locatorApplyRef.current = { requestId, elementKey, xpath, target };
+    setLocatorApplying(true);
+    setLocatorError('');
+    setLocatorFeedback('');
+    try {
+      webSocket.send(JSON.stringify(pageScannerLocatorApplyMessage(
+        { sessionId, homeBankingId, botJobId },
+        { requestId, elementKey, xpath, target },
+        target,
+      )));
+      locatorApplyTimerRef.current = setTimeout(() => {
+        if (locatorApplyRef.current?.requestId !== requestId) return;
+        clearLocatorApplyRequest();
+        setLocatorError(
+          'The backend did not acknowledge the XPath change. Refresh or rescan before retrying so the current value can be confirmed.',
+        );
+      }, PAGE_SCANNER_RESPONSE_TIMEOUT_MS);
+    } catch (sendError) {
+      clearLocatorApplyRequest();
+      setLocatorError(sendError instanceof Error
+        ? sendError.message
+        : 'The XPath apply request could not be sent.');
+    }
   };
 
   // ── OCR review panel (preScan): per-block floating OCRPanel where the client agrees
@@ -744,6 +918,13 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     }
     setMemoryApplyBusy(false);
     setCreateBlockBusy(false);
+    if (locatorRequestRef.current || locatorApplyRef.current) {
+      clearLocatorGenerateRequest();
+      clearLocatorApplyRequest();
+      setLocatorError(
+        'The Page Scanner connection was lost before the locator request was confirmed. Reconnect and refresh or rescan before retrying.',
+      );
+    }
     if (pendingPageScannerRequestsRef.current.size > 0) {
       clearPendingPageScannerRequests();
       setPreScanStatus((current) => ({
@@ -1008,6 +1189,34 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
             break;
           }
 
+          case PAGE_SCANNER_LOCATOR_GENERATE_RESPONSE: {
+            if (!bodyData || bodyData.requestId !== locatorRequestRef.current) break;
+            clearLocatorGenerateRequest();
+            if (bodyData.ok === false) {
+              setLocatorResults([]);
+              setLocatorWarning('');
+              setLocatorError(bodyData.message || bodyData.warning || 'Locator generation failed.');
+            } else {
+              setLocatorError('');
+              setLocatorWarning(typeof bodyData.warning === 'string' ? bodyData.warning : '');
+              setLocatorResults(Array.isArray(bodyData.controls) ? bodyData.controls : []);
+            }
+            break;
+          }
+
+          case PAGE_SCANNER_LOCATOR_APPLY_RESPONSE: {
+            const pendingApply = locatorApplyRef.current;
+            const resolution = resolvePageScannerLocatorApplyResponse(bodyData, pendingApply);
+            if (resolution.status === 'stale' || !pendingApply) break;
+            clearLocatorApplyRequest();
+            if (resolution.status === 'error') {
+              setLocatorError(resolution.message);
+              break;
+            }
+            setLocatorCommittedUpdate({ pending: pendingApply, element: resolution.element });
+            break;
+          }
+
           case 'pageScanner.scanResponse':
           case 'pageScanner.refreshResponse':
           case 'pageScanner.clearResponse':
@@ -1043,6 +1252,23 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
           }
 
           case 'pageScanner.errorResponse': {
+            const locatorRequestId = typeof bodyData?.requestId === 'string'
+              ? bodyData.requestId
+              : '';
+            if (locatorRequestId && locatorRequestId === locatorRequestRef.current) {
+              clearLocatorGenerateRequest();
+              setLocatorError(String(
+                bodyData?.message || bodyData?.error || 'Locator generation failed.',
+              ));
+              break;
+            }
+            if (locatorRequestId && locatorRequestId === locatorApplyRef.current?.requestId) {
+              clearLocatorApplyRequest();
+              setLocatorError(String(
+                bodyData?.message || bodyData?.error || 'The XPath was not applied.',
+              ));
+              break;
+            }
             const closeReason = pageScannerWorkspaceCloseReason(bodyData);
             if (closeReason) {
               retireDetachedPageScanner(closeReason, bodyData?.message);
@@ -1443,6 +1669,53 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
       setIsElementGrouped(true);
     }
   }, [elementDTO, isElementGrouped]);
+
+  useEffect(() => {
+    if (!locatorTargetKey) return;
+    if (elementDTO.some((element) => pageScannerLocatorElementKey(element) === locatorTargetKey)) return;
+    setLocatorTargetKey('');
+    setLocatorFeedback('');
+  }, [elementDTO, locatorTargetKey]);
+
+  useEffect(() => {
+    if (!locatorCommittedUpdate) return;
+    const { pending, element: authoritativeElement } = locatorCommittedUpdate;
+    setLocatorCommittedUpdate(null);
+
+    const currentTarget = elementDTO.find(
+      (element) => pageScannerLocatorElementKey(element) === pending.elementKey,
+    );
+    if (!currentTarget) {
+      setLocatorFeedback('');
+      setLocatorError(
+        'The XPath was persisted, but its scanned row is no longer in the grid. Refresh or rescan to load the saved value.',
+      );
+      return;
+    }
+
+    setElementDTO((current) => replacePageScannerLocatorElement(
+      current,
+      pending.elementKey,
+      authoritativeElement,
+    ).elements);
+    setElementGrouped((current) => replacePageScannerLocatorGroupedElement(
+      current,
+      pending.elementKey,
+      authoritativeElement,
+    ));
+    setMemoryElements((current) => replacePageScannerLocatorElement(
+      current,
+      pending.elementKey,
+      authoritativeElement,
+    ).elements);
+    const updatedTarget = { ...currentTarget, ...authoritativeElement };
+    setLocatorTargetKey(pageScannerLocatorElementKey(updatedTarget));
+    setLocatorError('');
+    setLocatorFeedback(
+      `XPath applied to ${pageScannerLocatorElementLabel(updatedTarget)}. `
+      + 'Use Memory List > Apply when you are ready to add it to the Bot Job.',
+    );
+  }, [elementDTO, locatorCommittedUpdate]);
 
 
   const handleClose = () => {
@@ -2530,6 +2803,31 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
             </button>
           )}
         </div>
+        {isDetachedPageScanner && (
+          <LocatorGeneratorPanel
+            open={locatorPanelOpen}
+            position={locatorPanelPos}
+            elements={elementDTO}
+            targetKey={locatorTargetKey}
+            results={locatorResults}
+            busy={locatorBusy}
+            applying={locatorApplying}
+            error={locatorError}
+            warning={locatorWarning}
+            feedback={locatorFeedback}
+            onOpen={() => openLocatorPanel()}
+            onClose={closeLocatorPanel}
+            onDragStart={startLocatorPanelDrag}
+            onTargetChange={(elementKey) => {
+              setLocatorTargetKey(elementKey);
+              setLocatorError('');
+              setLocatorFeedback('');
+            }}
+            onGenerate={generateLocators}
+            onApplyXPath={applyGeneratedXPath}
+            onClearFeedback={clearLocatorFeedback}
+          />
+        )}
       </div>
       {/* DOM Review Modal */}
       {domReviewData && (

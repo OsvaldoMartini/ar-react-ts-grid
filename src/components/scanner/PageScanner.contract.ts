@@ -4,6 +4,9 @@ export type PageScannerRequestOperation =
   | 'pageScanner.clear'
   | 'pageScanner.testElement';
 
+export const createPageScannerRequestId = (operation: string): string =>
+  `${operation}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
 export type PageScannerWorkspaceCloseReason =
   | 'BOT_JOB_CLOSED'
   | 'SUPERSEDED'

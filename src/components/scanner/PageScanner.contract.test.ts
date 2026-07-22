@@ -1,4 +1,5 @@
 import {
+  createPageScannerRequestId,
   pageScannerCloseMessage,
   pageScannerRetargetDisposition,
   pageScannerRequestForResponse,
@@ -9,6 +10,14 @@ import { isPageScannerWorkspaceSession } from './Scanner.sessions';
 
 const CURRENT_SESSION = 'page-scanner-123e4567-e89b-42d3-a456-426614174000';
 const NEXT_SESSION = 'page-scanner-223e4567-e89b-42d3-a456-426614174000';
+
+test('creates unique Page Scanner request identifiers for correlated operations', () => {
+  const first = createPageScannerRequestId('page-scanner-locator');
+  const second = createPageScannerRequestId('page-scanner-locator');
+  expect(first).toMatch(/^page-scanner-locator-/);
+  expect(second).toMatch(/^page-scanner-locator-/);
+  expect(first).not.toBe(second);
+});
 
 test('maps correlated Page Scanner responses to their request operations', () => {
   expect(pageScannerRequestForResponse('pageScanner.scanResponse')).toBe('pageScanner.scan');
