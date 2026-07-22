@@ -624,7 +624,14 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
   const onDragEnd = (result: any) => {
     setActiveDraggedInstructionId(null);
-    if (!result.destination || !webSocket || !connected || !moveGraphRevision) return;
+    if (!result.destination) return;
+    if (
+      result.source?.droppableId === result.destination.droppableId &&
+      result.source?.index === result.destination.index
+    ) {
+      return;
+    }
+    if (!webSocket || !connected || !moveGraphRevision) return;
     const requestId = `${Date.now()}-botJobTasks-move-preview`;
     setPendingDragPreview({ requestId, result });
     webSocket.send(JSON.stringify({
@@ -990,18 +997,18 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
 
       const reassignedData = reassignInstructionOrderNumbersByBlock([...instructionsData]);
-      const { updatedData, updatedBlocks } = correctBlockOrderNumbers(reassignedData);
+      const { updatedData, updatedBlocks: nextUpdatedBlocks } = correctBlockOrderNumbers(reassignedData);
 
-      const gotoInstructionAfterReorder = reassignedData.find(
+      const gotoInstructionAfterReorder = updatedData.find(
         (instruction) => instruction.actions === 'EXCEL GOTO'
       );
 
       setInstructionsData(updatedData);
       setExcelGotoInstruction(gotoInstructionAfterReorder || null);
-      setGroupedData(groupByBlock(reassignedData));
+      setGroupedData(groupByBlock(updatedData));
 
-      if (JSON.stringify(updatedBlocks) !== JSON.stringify(updatedBlocks)) {
-        setUpdatedBlocks(updatedBlocks);
+      if (JSON.stringify(updatedBlocks) !== JSON.stringify(nextUpdatedBlocks)) {
+        setUpdatedBlocks(nextUpdatedBlocks);
       }
 
       setIsDataReordered(true);

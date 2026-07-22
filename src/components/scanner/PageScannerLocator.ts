@@ -6,11 +6,20 @@ export const PAGE_SCANNER_LOCATOR_APPLY_OPERATION = 'pageScanner.locator.apply';
 export const PAGE_SCANNER_LOCATOR_APPLY_RESPONSE = 'pageScanner.locator.applyResponse';
 
 export type LocatorResult = {
+  controlIndex?: number;
   tagName: string;
   controlKind: string;
   label: string;
+  someText?: string;
+  definedName?: string;
+  attribId?: string;
+  attribName?: string;
+  attributeType?: string;
+  attributeValue?: string;
+  attributeData?: Array<{ name: string; value: string }>;
   xpath: string;
   css: string;
+  cssSelector?: string;
   positional: boolean;
   note: string;
 };
@@ -60,6 +69,21 @@ export const pageScannerLocatorApplyMessage = (
 export const pageScannerLocatorElementKey = (element: ElementDTO): string =>
   `${element.id}||${element.xPath || ''}||${element.tagName || ''}`;
 
+const normalizeGeneratedKeyPart = (value: string | null | undefined): string =>
+  (value || '').trim().toLowerCase();
+
+export const pageScannerGeneratedElementKey = (element: ElementDTO): string => [
+  normalizeGeneratedKeyPart(element.customXPath || element.xPath),
+  normalizeGeneratedKeyPart(element.cssSelector),
+  normalizeGeneratedKeyPart(element.tagName),
+  normalizeGeneratedKeyPart(element.typeElement),
+  normalizeGeneratedKeyPart(element.attributeType),
+  normalizeGeneratedKeyPart(element.attributeValue),
+  normalizeGeneratedKeyPart(element.attribId),
+  normalizeGeneratedKeyPart(element.attribName),
+  normalizeGeneratedKeyPart(element.someText || element.definedName || element.clientNamed),
+].join('||');
+
 export const pageScannerLocatorElementLabel = (element: ElementDTO): string => {
   const displayName = element.clientNamed
     || element.definedName
@@ -68,7 +92,109 @@ export const pageScannerLocatorElementLabel = (element: ElementDTO): string => {
     || element.attribId
     || element.tagName
     || `Element ${element.id}`;
-  return `${displayName} - <${element.tagName || 'element'}>`;
+  const cssSelector = element.cssSelector || '';
+  const cssSuffix = cssSelector ? ` - CSS: ${cssSelector}` : '';
+  return `${displayName} - <${element.tagName || 'element'}>${cssSuffix}`;
+};
+
+const locatorTypeElement = (result: LocatorResult): string => {
+  const tag = (result.tagName || '').toLowerCase();
+  const kind = (result.controlKind || '').toLowerCase();
+  if (tag === 'input' || tag === 'textarea' || kind === 'text-input' || kind === 'text-area') return 'input';
+  if (tag === 'a' || tag === 'link') return 'a';
+  if (kind === 'button' || kind === 'select' || kind === 'checkbox' || kind === 'radio') return 'button';
+  return tag || 'button';
+};
+
+export const elementDTOFromLocatorResult = (
+  result: LocatorResult,
+  index: number,
+): ElementDTO => {
+  const someText = result.someText || result.label || result.definedName || result.tagName || '';
+  const definedName = result.definedName || someText || result.tagName || `generated_element_${index + 1}`;
+  const generatedReferences = [
+    { name: 'generated-source', value: 'locator-generator' },
+    { name: 'cssSelector', value: result.cssSelector || result.css || '' },
+    { name: 'generated-xpath', value: result.xpath || '' },
+  ];
+  return {
+    id: -1 * (index + 1),
+    typeElement: locatorTypeElement(result),
+    tagName: result.tagName || 'button',
+    xPath: result.xpath,
+    someText,
+    attribId: result.attribId || '',
+    attribName: result.attribName || '',
+    coordinates: '',
+    attributeData: [
+      ...(Array.isArray(result.attributeData) ? result.attributeData : []),
+      ...generatedReferences,
+    ].filter((item) => item.value.length > 0),
+    customXPath: result.xpath,
+    iFrameXPath: '',
+    attributeValue: result.attributeValue || '',
+    attributeType: result.attributeType || result.controlKind || result.tagName || '',
+    autoScroll: '',
+    autoEnter: '',
+    active: true,
+    definedName,
+    clientNamed: null,
+    cssSelector: result.cssSelector || result.css,
+  };
+};
+
+const nextTemporaryElementId = (usedIds: Set<number>, requestedId: number | null | undefined): number => {
+  if (typeof requestedId === 'number' && Number.isFinite(requestedId) && requestedId < 0 && !usedIds.has(requestedId)) {
+    usedIds.add(requestedId);
+    return requestedId;
+  }
+  let nextId = -1;
+  while (usedIds.has(nextId)) nextId -= 1;
+  usedIds.add(nextId);
+  return nextId;
+};
+
+export const mergeGeneratedLocatorElements = (
+  currentElements: ElementDTO[],
+  generatedElements: ElementDTO[],
+): { elements: ElementDTO[]; accepted: ElementDTO[] } => {
+  const usedIds = new Set(
+    currentElements
+      .map((element) => element.id)
+      .filter((id) => Number.isFinite(id)),
+  );
+  const nextElements = [...currentElements];
+  const accepted: ElementDTO[] = [];
+
+  generatedElements.forEach((candidate) => {
+    const key = pageScannerGeneratedElementKey(candidate);
+    const existingIndex = nextElements.findIndex(
+      (element) => pageScannerGeneratedElementKey(element) === key,
+    );
+
+    if (existingIndex >= 0) {
+      const existing = nextElements[existingIndex];
+      const merged = {
+        ...existing,
+        ...candidate,
+        id: existing.id,
+        active: existing.active ?? candidate.active ?? true,
+      };
+      nextElements[existingIndex] = merged;
+      accepted.push(merged);
+      return;
+    }
+
+    const inserted = {
+      ...candidate,
+      id: nextTemporaryElementId(usedIds, candidate.id),
+      active: candidate.active ?? true,
+    };
+    nextElements.push(inserted);
+    accepted.push(inserted);
+  });
+
+  return { elements: nextElements, accepted };
 };
 
 export const replacePageScannerLocatorElement = (

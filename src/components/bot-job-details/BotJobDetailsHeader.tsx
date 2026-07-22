@@ -6,7 +6,6 @@ import BotJobDataActions from './BotJobDataActions';
 import BotJobFileActions from './BotJobFileActions';
 import type {
   BotJobDetailsState,
-  BotJobExecutionMode,
   BotJobToolbarAction,
   BotJobToolbarPayload,
   BotJobWorkspaceAction,
@@ -15,6 +14,7 @@ import type {
 } from './BotJobDetails.types';
 import styles from './BotJobDetailsHeader.module.scss';
 import execStyles from './BotJobExecutionControls.module.scss';
+import { useSharedBotJobExecutionSelection } from './useSharedBotJobExecutionSelection';
 
 interface BotJobDetailsHeaderProps {
   botJobId: number | null;
@@ -80,25 +80,19 @@ const BotJobDetailsHeader: React.FC<BotJobDetailsHeaderProps> = ({
   }, [activeSurface, botJobId, busy, canShowComponents, canUsePreScan, canUseWorkspaceActions, connected, pendingAction]);
 
   // --- Execution state (moved from BotJobExecutionControls) ---
-  const [selectedBlockId, setSelectedBlockId] = useState<'all' | number>('all');
-  const [mode, setMode] = useState<BotJobExecutionMode>('ALL');
   const [navigationTime, setNavigationTime] = useState(0);
   const [stopConfirmationOpen, setStopConfirmationOpen] = useState(false);
   const blocks = useMemo(() => jobState?.blocks ?? [], [jobState?.blocks]);
+  const {
+    selectedBlockId,
+    mode,
+    selectBlock,
+    toggleMode,
+  } = useSharedBotJobExecutionSelection(jobState?.botJobId ?? botJobId, blocks);
 
   useEffect(() => {
     setNavigationTime(jobState?.navigationTimeSeconds ?? 0);
   }, [jobState?.navigationTimeSeconds]);
-
-  useEffect(() => {
-    setSelectedBlockId((current) => (
-      current === 'all' || blocks.some((block) => block.id === current) ? current : 'all'
-    ));
-  }, [blocks]);
-
-  useEffect(() => {
-    if (selectedBlockId === 'all') setMode('ALL');
-  }, [selectedBlockId]);
 
   const executionActive = activeExecutionStates.has(jobState?.executionState ?? 'UNKNOWN');
   const testRunStarting = pendingToolbarAction === 'TEST_RUN';
@@ -175,7 +169,7 @@ const BotJobDetailsHeader: React.FC<BotJobDetailsHeaderProps> = ({
                 disabled={!canExecute || executionBusy || executionActive}
                 onChange={(event) => {
                   const value = event.target.value;
-                  setSelectedBlockId(value === 'all' ? 'all' : Number(value));
+                  selectBlock(value === 'all' ? 'all' : Number(value));
                 }}
               >
                 <option value="all">Execute All</option>
@@ -217,7 +211,7 @@ const BotJobDetailsHeader: React.FC<BotJobDetailsHeaderProps> = ({
                   ? 'Execute All always uses ALL mode'
                   : 'Switch to ' + (mode === 'ALL' ? 'ONE' : 'ALL')}
                 disabled={!canExecute || executionBusy || executionActive || selectedBlockId === 'all'}
-                onClick={() => setMode((current) => (current === 'ALL' ? 'ONE' : 'ALL'))}
+                onClick={toggleMode}
               >
                 {mode}
               </button>

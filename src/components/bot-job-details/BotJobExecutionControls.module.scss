@@ -40,6 +40,15 @@
   overflow-x: auto;
 }
 
+.inlineControls {
+  display: inline-flex;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
 .navigationForm, .scopeField, .runActions {
   min-width: 31px;
   display: flex;

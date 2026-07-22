@@ -998,6 +998,15 @@
 
 }
 
+.instructionItemInactive {
+  opacity: 0.55;
+  filter: grayscale(0.25);
+}
+
+.instructionItemInactive:hover {
+  opacity: 0.7;
+}
+
 /* Change background to white when dropdown is open */
 .instructionItem.dropdownOpen {
   background-color: #9ee6ef; /* Change background to white */

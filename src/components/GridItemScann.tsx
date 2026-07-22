@@ -13,6 +13,8 @@ import outPutImage from "../assets/output1.png";
 import testInputImage from "../assets/testInput.png";
 import clickTestImage from "../assets/clickTest2.png";
 import warningRedImage from '../assets/warning_red.png';
+import activeImage from '../assets/active3.png';
+import inactiveImage from '../assets/inactive2.png';
 import CompForce from './CompForce';
 import AlertModal from './AlertModal';
 import DomReviewModal, { type DomReviewData, type DomReviewAction } from './DomReviewModal';
@@ -26,6 +28,7 @@ import BotJobDetailsChrome from './bot-job-details/BotJobDetailsChrome';
 import { useBotJobDetailsController } from './bot-job-details/useBotJobDetailsController';
 import ScannerWorkspaceHeader from './scanner/ScannerWorkspaceHeader';
 import PageScannerWorkspaceHeader from './scanner/PageScannerWorkspaceHeader';
+import PageScannerExecutionControls from './scanner/PageScannerExecutionControls';
 import PageScannerFocusProfileEditor, {
   type PageScannerFocusProfileDraft,
 } from './scanner/PageScannerFocusProfileEditor';
@@ -57,6 +60,8 @@ import {
   pageScannerLocatorElementLabel,
   pageScannerLocatorApplyMessage,
   pageScannerLocatorGenerateMessage,
+  elementDTOFromLocatorResult,
+  mergeGeneratedLocatorElements,
   replacePageScannerLocatorElement,
   replacePageScannerLocatorGroupedElement,
   resolvePageScannerLocatorApplyResponse,
@@ -131,6 +136,8 @@ const groupByTagName = (data: ElementDTO[]) => {
     return result;
   }, {} as Record<string, { tagName: string; elements: ElementDTO[] }>);
 };
+
+const isElementActive = (element: ElementDTO): boolean => element.active !== false;
 
 const normalizeBlockOptions = (blocks: CreateBlockOption[]): CreateBlockOption[] => {
   const byBlockId = new Map<number, CreateBlockOption>();
@@ -236,7 +243,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     sessionId,
     homeBankingId,
     botJobId,
-    enabled: isPreScanMode && !isDetachedPageScanner,
+    enabled: isPreScanMode,
     onSurfaceOpen: (targetSession, nextBotJobId) => onSessionOpen(targetSession, socketPort, nextBotJobId),
   });
   const scannerController = useScannerController({
@@ -244,12 +251,11 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   });
 
   useEffect(() => {
-    if (isDetachedPageScanner) return;
     if (!botJobHeader.state) return;
     setBotJobId(botJobHeader.state.botJobId);
     setBotJobName(botJobHeader.state.name);
     setHomeBankingId(botJobHeader.state.homeBankingId);
-  }, [botJobHeader.state, isDetachedPageScanner]);
+  }, [botJobHeader.state]);
 
   useEffect(() => {
     if (!scannerController.state) return;
@@ -628,6 +634,45 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     setMemoryElements((prev) => prev.filter((item) => memoryElementKey(item) !== key));
   };
 
+  const addGeneratedElementsToScannerGrid = (generatedElements: ElementDTO[]): ElementDTO[] => {
+    const merged = mergeGeneratedLocatorElements(elementDTO, generatedElements);
+    setElementDTO(merged.elements);
+    setElementGrouped(groupByTagName(merged.elements));
+    setIsElementGrouped(true);
+    if (merged.accepted.length > 0) {
+      setKeepSelectedIds((prev) => {
+        const next = new Set(prev);
+        merged.accepted.forEach((element) => next.add(element.id));
+        return next;
+      });
+      setLocatorTargetKey(pageScannerLocatorElementKey(merged.accepted[0]));
+    }
+    return merged.accepted;
+  };
+
+  const handleElementActiveToggle = (target: ElementDTO) => {
+    const nextActive = !isElementActive(target);
+    const updateElement = (element: ElementDTO): ElementDTO =>
+      element.id === target.id ? { ...element, active: nextActive } : element;
+
+    setElementDTO((prev) => prev.map(updateElement));
+    setElementGrouped((prevGrouped) => {
+      const updated = { ...prevGrouped };
+      for (const tagName of Object.keys(updated)) {
+        updated[tagName] = {
+          ...updated[tagName],
+          elements: updated[tagName].elements.map(updateElement),
+        };
+      }
+      return updated;
+    });
+    setMemoryElements((prev) => prev.map((element) =>
+      element.id === target.id || memoryElementKey(element) === memoryElementKey(target)
+        ? { ...element, active: nextActive }
+        : element
+    ));
+  };
+
   const startMemoryPanelDrag = (e: React.MouseEvent) => {
     e.preventDefault();
     const startX = e.clientX;
@@ -789,6 +834,36 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     }
   };
 
+  const addGeneratedElementDTO = (result: LocatorResult, index: number) => {
+    const generatedElement = elementDTOFromLocatorResult(result, index);
+    const [acceptedElement] = addGeneratedElementsToScannerGrid([generatedElement]);
+    const visibleElement = acceptedElement || generatedElement;
+    handleAddElementToMemory(visibleElement);
+    setLocatorError('');
+    setLocatorFeedback(
+      `${pageScannerLocatorElementLabel(visibleElement)} added to Memory List and Scanner Grid. `
+      + 'Test it here or choose a block and Apply to insert it into the Bot Job.',
+    );
+  };
+
+  const addAllGeneratedElementDTO = () => {
+    if (locatorResults.length === 0) {
+      setLocatorError('Generate locator ElementDTO candidates first.');
+      return;
+    }
+    const generatedElements = locatorResults.map((result, index) =>
+      elementDTOFromLocatorResult(result, index)
+    );
+    const acceptedElements = addGeneratedElementsToScannerGrid(generatedElements);
+    handleAddElementBlockToMemory(acceptedElements);
+    setLocatorError('');
+    setLocatorFeedback(
+      `${acceptedElements.length} generated ElementDTO candidate`
+      + `${acceptedElements.length === 1 ? '' : 's'} added to Memory List and Scanner Grid. `
+      + 'Test them here or choose a block and Apply to insert them into the Bot Job.',
+    );
+  };
+
   // ── OCR review panel (preScan): per-block floating OCRPanel where the client agrees
   // with the OCR-resolved name or keeps the scanned DOM text, per element. The
   // backend stashes the pre-OCR text in attributeData['scanned-text'] whenever the
@@ -839,7 +914,8 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     });
   };
   const handleApplyMemory = () => {
-    if (memoryTargetBlockId === null || memoryElements.length === 0 || memoryApplyBusy) return;
+    const activeMemoryElements = memoryElements.filter(isElementActive);
+    if (memoryTargetBlockId === null || activeMemoryElements.length === 0 || memoryApplyBusy) return;
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
       console.warn('WebSocket is not connected. Cannot apply scanner memory list.');
       return;
@@ -848,7 +924,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     const targetBlock = memoryBlockOptions.find((block) => block.blockId === memoryTargetBlockId);
     if (!targetBlock) return;
 
-    const elementKeys = memoryElements.map(memoryElementKey);
+    const elementKeys = activeMemoryElements.map(memoryElementKey);
     const previousApply = pendingPageScannerApplyRef.current;
     const repeatsUnacknowledgedApply = Boolean(
       previousApply
@@ -864,7 +940,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
       blockId: targetBlock.blockId,
       blockName: targetBlock.blockName,
       blockOrderNumber: targetBlock.blockOrderNumber,
-      elementDetails: memoryElements,
+      elementDetails: activeMemoryElements,
     };
     const message = isDetachedPageScanner
       ? {
@@ -1736,7 +1812,15 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     setIsSendingAll(true); // 🔒 Disable the button after first click
 
     // Flatten the elementGrouped object to get all ElementDTOs
-    const allElements = Object.values(elementGrouped).flatMap(group => group.elements);
+    const allElements = Object.values(elementGrouped)
+      .flatMap(group => group.elements)
+      .filter(isElementActive);
+    if (allElements.length === 0) {
+      setAlertMessageHeader('No active elements to insert');
+      setAlertMessageBody('Activate at least one scanned element before inserting all elements.');
+      setIsSendingAll(false);
+      return;
+    }
 
     const message = {
       type: "SEND_ALL_ELEMENTS_DTO",
@@ -1767,7 +1851,15 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     setIsUpdatingAll(true); // 🔒 Disable the button after first click
 
     // Flatten the elementGrouped object to get all ElementDTOs
-    const allElements = Object.values(elementGrouped).flatMap(group => group.elements);
+    const allElements = Object.values(elementGrouped)
+      .flatMap(group => group.elements)
+      .filter(isElementActive);
+    if (allElements.length === 0) {
+      setAlertMessageHeader('No active elements to update');
+      setAlertMessageBody('Activate at least one scanned element before updating all elements.');
+      setIsUpdatingAll(false);
+      return;
+    }
 
     const message = {
       type: "UPDATE_ALL_ELEMENTS_DTO",
@@ -1803,6 +1895,13 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
       console.warn("🚨 WebSocket is not connected. Cannot send message.");
       return;
     }
+    const actionAllowedWhenInactive = action === "HOVERED_ROW" || action === "DETAILS_ELEMENT_DTO";
+    if (!isElementActive(elementDTO) && !actionAllowedWhenInactive) {
+      setAlertMessageHeader('Element is inactive');
+      setAlertMessageBody('Activate this scanned element before saving or testing it.');
+      return;
+    }
+
     const sessionDestine = action === "HOVERED_ROW"
       ? SCANNER_TOOL_SESSION_ID
       : SCANNER_ELEMENT_PANE_SESSION_ID;
@@ -1900,7 +1999,13 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     elements: ElementDTO[]
   ) => {
     event.stopPropagation();
-    elements.forEach((element) => {
+    const activeElements = elements.filter(isElementActive);
+    if (activeElements.length === 0) {
+      setAlertMessageHeader('No active inputs to test');
+      setAlertMessageBody('Activate at least one input in this block before running the block input test.');
+      return;
+    }
+    activeElements.forEach((element) => {
       sendWebSocketMessage(withScannerTestInputValue(element), "TEST_INPUT_DTO");
     });
   };
@@ -2467,6 +2572,9 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
       }
       return updated;
     });
+    setMemoryElements(prev =>
+      prev.map(el => (el.id === elementId ? { ...el, forceCoordinates: nextForceCoordinates } : el))
+    );
   };
 
 
@@ -2703,6 +2811,15 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
             >
               Clear Grid
             </button>
+            {isDetachedPageScanner && (
+              <PageScannerExecutionControls
+                connected={connected}
+                jobState={botJobHeader.state}
+                pendingToolbarAction={botJobHeader.pendingToolbarAction}
+                operationBusy={Boolean(botJobHeader.pendingAction || botJobHeader.savingMetadata)}
+                onToolbarAction={botJobHeader.sendToolbarAction}
+              />
+            )}
           </div>
 
           <div className={styles.preScanSearchRow}>
@@ -2825,6 +2942,8 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
             }}
             onGenerate={generateLocators}
             onApplyXPath={applyGeneratedXPath}
+            onAddElementDTO={addGeneratedElementDTO}
+            onAddAllElementDTO={addAllGeneratedElementDTO}
             onClearFeedback={clearLocatorFeedback}
           />
         )}
@@ -2961,7 +3080,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
                 memoryApplyBusy
                 ||
                 memoryTargetBlockId === null
-                || memoryElements.length === 0
+                || memoryElements.filter(isElementActive).length === 0
                 || !memoryBlockOptions.some((block) => block.blockId === memoryTargetBlockId)
               }
               onClick={handleApplyMemory}
@@ -3216,7 +3335,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
                   {paginatedElements.map((elementDTO, i) => (
                     <div
                       key={i}
-                      className={styles.instructionItem}
+                      className={`${styles.instructionItem} ${!isElementActive(elementDTO) ? styles.instructionItemInactive : ''}`}
                       onMouseEnter={() => handleRowHover(elementDTO)}
                       onMouseLeave={handleRowLeave}
                     // onDoubleClick={(event) => handleRowSelectedClick(event, elementDTO, "NEW_ELEMENT_DTO")}
@@ -3281,6 +3400,16 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
                         <span className="attr-slot">{"\u00A0".repeat(20)}</span>
                       )} */}
                       <div className={styles.optionsColumn}>
+                        <img
+                          src={isElementActive(elementDTO) ? activeImage : inactiveImage}
+                          alt={isElementActive(elementDTO) ? 'Active' : 'Inactive'}
+                          title={isElementActive(elementDTO) ? 'Deactivate element' : 'Activate element'}
+                          className={isElementActive(elementDTO) ? styles.activeButton : styles.inactiveButton}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleElementActiveToggle(elementDTO);
+                          }}
+                        />
                         <CompForce item={elementDTO} onChange={handleElementForceChange} />
                         {/* Hidden — MultiPlugins support disabled
                         <img

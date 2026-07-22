@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import type { ElementDTO } from '../instructionsMockData';
 import {
   pageScannerLocatorElementKey,
@@ -24,6 +24,8 @@ type Props = {
   onTargetChange: (elementKey: string) => void;
   onGenerate: (html: string) => void;
   onApplyXPath: (result: LocatorResult) => void;
+  onAddElementDTO: (result: LocatorResult, index: number) => void;
+  onAddAllElementDTO: () => void;
   onClearFeedback: () => void;
 };
 
@@ -44,43 +46,18 @@ const LocatorGeneratorPanel: React.FC<Props> = ({
   onTargetChange,
   onGenerate,
   onApplyXPath,
+  onAddElementDTO,
+  onAddAllElementDTO,
   onClearFeedback,
 }) => {
   const [html, setHtml] = useState('');
-  const [copiedValue, setCopiedValue] = useState('');
-  const [clipboardMessage, setClipboardMessage] = useState('');
   const target = useMemo(
     () => elements.find((element) => pageScannerLocatorElementKey(element) === targetKey) || null,
     [elements, targetKey],
   );
 
-  useEffect(() => {
-    if (!open) {
-      setCopiedValue('');
-      setClipboardMessage('');
-    }
-  }, [open]);
-
-  const copy = async (value: string) => {
-    setCopiedValue('');
-    setClipboardMessage('');
-    if (!navigator.clipboard?.writeText) {
-      setClipboardMessage('Clipboard access is unavailable. Select the locator field and copy it manually.');
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopiedValue(value);
-      setClipboardMessage('Locator copied to the clipboard.');
-    } catch {
-      setClipboardMessage('The browser refused clipboard access. Select the locator field and copy it manually.');
-    }
-  };
-
   const clear = () => {
     setHtml('');
-    setCopiedValue('');
-    setClipboardMessage('');
     onClearFeedback();
   };
 
@@ -116,8 +93,8 @@ const LocatorGeneratorPanel: React.FC<Props> = ({
           </header>
           <div className={styles.body}>
             <p className={styles.help}>
-              Paste the HTML for colliding controls, generate stable locators, then select the scanned
-              element that should receive an XPath. CSS is provided for reference and copy only.
+              Paste the HTML for colliding controls, generate stable ElementDTO candidates, then add
+              them to Memory List or update one selected scanned row with the generated XPath.
             </p>
 
             <label className={styles.fieldLabel}>
@@ -176,17 +153,31 @@ const LocatorGeneratorPanel: React.FC<Props> = ({
             {error && <div className={styles.error} role="alert">{error}</div>}
             {warning && <div className={styles.warning} role="status">{warning}</div>}
             {feedback && <div className={styles.success} role="status">{feedback}</div>}
-            {clipboardMessage && (
-              <div className={styles.manualCopy} role="status">{clipboardMessage}</div>
-            )}
 
             <div className={styles.results} aria-label="Generated locators">
+              {results.length > 0 && (
+                <div className={styles.resultsToolbar}>
+                  <span className={styles.resultsCount}>{results.length} ElementDTO candidate{results.length === 1 ? '' : 's'}</span>
+                  <button
+                    type="button"
+                    className={styles.applyButton}
+                    disabled={busy || applying}
+                    onClick={onAddAllElementDTO}
+                  >
+                    Apply All ElementDTOs
+                  </button>
+                </div>
+              )}
               {results.map((result, index) => (
                 <article className={styles.result} key={`${result.xpath}-${index}`}>
                   <div className={styles.resultTitle}>
                     {result.tagName} - {result.controlKind}
-                    {result.label ? ` - ${result.label}` : ''}
+                    {(result.someText || result.label) ? ` - ${result.someText || result.label}` : ''}
                     {result.positional && <span className={styles.fragile}>positional (fragile)</span>}
+                  </div>
+                  <div className={styles.semanticRow}>
+                    <span>SomeText: {result.someText || result.label || '-'}</span>
+                    <span>Defined Name: {result.definedName || '-'}</span>
                   </div>
                   <div className={styles.locatorRow}>
                     <span className={styles.locatorKind}>XPath</span>
@@ -199,19 +190,20 @@ const LocatorGeneratorPanel: React.FC<Props> = ({
                     />
                     <button
                       type="button"
-                      className={styles.copyButton}
-                      onClick={() => copy(result.xpath)}
-                    >
-                      {copiedValue === result.xpath ? 'Copied' : 'Copy'}
-                    </button>
-                    <button
-                      type="button"
                       className={styles.applyButton}
                       disabled={!target || busy || applying}
                       title={target ? 'Apply this XPath to the selected scanned element' : 'Select a scanned element first'}
                       onClick={() => onApplyXPath(result)}
                     >
                       {applying ? 'Applying...' : 'Apply XPath'}
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.applyButton}
+                      disabled={busy || applying}
+                      onClick={() => onAddElementDTO(result, index)}
+                    >
+                      Add ElementDTO
                     </button>
                   </div>
                   <div className={styles.locatorRow}>
@@ -223,14 +215,7 @@ const LocatorGeneratorPanel: React.FC<Props> = ({
                       value={result.css}
                       onFocus={(event) => event.currentTarget.select()}
                     />
-                    <span className={styles.cssOnly}>Copy only</span>
-                    <button
-                      type="button"
-                      className={styles.copyButton}
-                      onClick={() => copy(result.css)}
-                    >
-                      {copiedValue === result.css ? 'Copied' : 'Copy'}
-                    </button>
+                    <span className={styles.cssOnly}>ElementDTO cssSelector</span>
                   </div>
                   {result.note && <p className={styles.note}>{result.note}</p>}
                 </article>

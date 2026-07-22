@@ -5,7 +5,10 @@ import {
   PAGE_SCANNER_LOCATOR_GENERATE_OPERATION,
   pageScannerLocatorApplyMessage,
   pageScannerLocatorElementKey,
+  pageScannerLocatorElementLabel,
   pageScannerLocatorGenerateMessage,
+  elementDTOFromLocatorResult,
+  mergeGeneratedLocatorElements,
   replacePageScannerLocatorElement,
   replacePageScannerLocatorGroupedElement,
   resolvePageScannerLocatorApplyResponse,
@@ -58,6 +61,88 @@ test('builds canonical locator envelopes for the exact detached session', () => 
     xpath: "//button[@test-id='go']",
     elementDetails: [target],
   });
+});
+
+test('converts a generated locator into an ElementDTO candidate with CSS and names', () => {
+  const generated = elementDTOFromLocatorResult({
+    controlIndex: 0,
+    tagName: 'button',
+    controlKind: 'button',
+    label: 'Avanti',
+    someText: 'Avanti',
+    definedName: 'avanti',
+    attribId: '',
+    attribName: '',
+    attributeType: 'test-id',
+    attributeValue: 'next',
+    attributeData: [{ name: 'test-id', value: 'next' }],
+    xpath: "//button[@test-id='next']",
+    css: "button[test-id='next']",
+    cssSelector: "button[test-id='next']",
+    positional: false,
+    note: 'Unique by test-id.',
+  }, 0);
+
+  expect(generated.customXPath).toBe("//button[@test-id='next']");
+  expect(generated.cssSelector).toBe("button[test-id='next']");
+  expect(generated.someText).toBe('Avanti');
+  expect(generated.definedName).toBe('avanti');
+  expect(generated.attributeType).toBe('test-id');
+  expect(generated.active).toBe(true);
+  expect(generated.attributeData).toEqual(expect.arrayContaining([{ name: 'test-id', value: 'next' }]));
+  expect(pageScannerLocatorElementLabel(generated)).toContain("CSS: button[test-id='next']");
+});
+
+test('merges generated locator candidates into scanner grid with stable active state', () => {
+  const nextButton = elementDTOFromLocatorResult({
+    controlIndex: 0,
+    tagName: 'button',
+    controlKind: 'button',
+    label: 'Avanti',
+    someText: 'Avanti',
+    definedName: 'avanti',
+    attribId: '',
+    attribName: '',
+    attributeType: 'test-id',
+    attributeValue: 'next',
+    attributeData: [{ name: 'test-id', value: 'next' }],
+    xpath: "//button[@test-id='next']",
+    css: "button[test-id='next']",
+    cssSelector: "button[test-id='next']",
+    positional: false,
+    note: 'Unique by test-id.',
+  }, 0);
+  const cancelButton = elementDTOFromLocatorResult({
+    controlIndex: 1,
+    tagName: 'button',
+    controlKind: 'button',
+    label: 'Annulla',
+    someText: 'Annulla',
+    definedName: 'annulla',
+    attribId: '',
+    attribName: '',
+    attributeType: 'test-id',
+    attributeValue: 'cancel',
+    attributeData: [{ name: 'test-id', value: 'cancel' }],
+    xpath: "//button[@test-id='cancel']",
+    css: "button[test-id='cancel']",
+    cssSelector: "button[test-id='cancel']",
+    positional: false,
+    note: 'Unique by test-id.',
+  }, 1);
+
+  const existingGenerated = { ...nextButton, id: -9, active: false };
+  const merged = mergeGeneratedLocatorElements(
+    [existingGenerated],
+    [nextButton, cancelButton],
+  );
+
+  expect(merged.elements).toHaveLength(2);
+  expect(merged.accepted).toHaveLength(2);
+  expect(merged.elements[0].id).toBe(-9);
+  expect(merged.elements[0].active).toBe(false);
+  expect(merged.elements[1].id).toBe(-2);
+  expect(merged.elements[1].active).toBe(true);
 });
 
 test('synchronizes only the authoritative target in grid, grouped, and memory state', () => {

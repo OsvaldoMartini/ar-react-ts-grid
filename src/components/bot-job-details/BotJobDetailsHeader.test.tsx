@@ -3,6 +3,10 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import BotJobDetailsHeader from './BotJobDetailsHeader';
 import { botJobDetailsTestState as state } from './BotJobDetails.testData';
 
+beforeEach(() => {
+  window.localStorage.clear();
+});
+
 test('marks the current surface and dispatches React-owned workspace navigation', () => {
   const onAction = jest.fn();
   render(
@@ -41,7 +45,7 @@ test('keeps Close available while other workspace actions are pending', () => {
   expect(screen.getByRole('button', { name: 'Refreshing…' })).toBeInTheDocument();
 });
 
-test('uses Execute All with green ALL mode by default and requires a numbered block for ONE', () => {
+test('uses Execute All by default and switches numbered block selections to ONE', () => {
   const onToolbarAction = jest.fn();
   render(
     <BotJobDetailsHeader
@@ -67,7 +71,6 @@ test('uses Execute All with green ALL mode by default and requires a numbered bl
   expect(screen.getByRole('button', { name: 'Execution mode: ALL' })).toHaveClass('modeAll');
 
   fireEvent.change(blockSelect, { target: { value: '12' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Execution mode: ALL' }));
   expect(screen.getByRole('button', { name: 'Execution mode: ONE' })).toHaveTextContent('ONE');
   expect(screen.getByRole('button', { name: 'Execution mode: ONE' })).toHaveClass('modeOne');
   fireEvent.click(screen.getByRole('button', { name: 'Test run' }));

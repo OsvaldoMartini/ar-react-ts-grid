@@ -181,6 +181,23 @@
   gap: 8px;
 }
 
+.resultsToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid #b9cdd6;
+  border-radius: 5px;
+  background: #eef4f6;
+  padding: 6px 8px;
+}
+
+.resultsCount {
+  color: #37474f;
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .result {
   border: 1px solid #cfd8dc;
   border-radius: 5px;
@@ -192,6 +209,22 @@
   color: #37474f;
   font-size: 12px;
   font-weight: 700;
+}
+
+.semanticRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 6px;
+  margin-top: 5px;
+  color: #455a64;
+  font-size: 10px;
+}
+
+.semanticRow span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .fragile {

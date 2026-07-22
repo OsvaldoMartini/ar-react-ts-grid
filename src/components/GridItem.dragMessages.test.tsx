@@ -39,7 +39,7 @@ jest.mock('react-beautiful-dnd', () => {
             onClick: () => onDragEnd({
               draggableId: '101',
               source: { droppableId: '10', index: 0 },
-              destination: { droppableId: '10', index: 0 },
+              destination: { droppableId: '10', index: 1 },
             }),
           },
           'Finish mocked drag',
@@ -69,6 +69,13 @@ const row: BlockLoopInstructionLoadDTO = {
   blockWait: 0,
   actions: 'CLICK',
   instructionActive: true,
+};
+
+const secondRow: BlockLoopInstructionLoadDTO = {
+  ...row,
+  id: 102,
+  instructionOrderNumber: 2,
+  name: 'Confirm',
 };
 
 const capabilityResponse = (sessionId: string) => JSON.stringify({
@@ -122,7 +129,7 @@ afterEach(() => {
 test('Bot Job grid consumes a capability response even when a later frame is queued', async () => {
   const props = {
     homeBankingIdInitial: 2,
-    data: [row],
+    data: [row, secondRow],
     socketPort: 52101,
     sessionId: 'botJobTasks',
     botJobIdInitial: 5,
@@ -140,7 +147,7 @@ test('Bot Job grid consumes a capability response even when a later frame is que
 test('Component grid consumes a capability response even when a later frame is queued', async () => {
   const props = {
     homeBankingIdInitial: 2,
-    dataComp: [row as ComponentsInstructionsDTO],
+    dataComp: [row as ComponentsInstructionsDTO, secondRow as ComponentsInstructionsDTO],
     socketPort: 52101,
     sessionId: 'componentTasks',
     botJobIdInitial: 5,

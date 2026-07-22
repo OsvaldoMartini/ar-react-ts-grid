@@ -75,11 +75,13 @@ export interface ElementDTO {
   attributeData: AttributeData[];
   customXPath: string;
   iFrameXPath: string;
+  cssSelector?: string | null;
   attributeValue: string;
   attributeType: string;
   defaultValue?: string;
   autoScroll: string;
   autoEnter: string;
+  active?: boolean | null;
   // Bitstring of F/E/T/N/S toggled in GridItemScann before the element is
   // promoted to an instruction. Flows through to instruction.force_coordinates
   // on save (NEW_ELEMENT_DTO message).
