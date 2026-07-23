@@ -7,15 +7,24 @@ const PING_INTERVAL_MS = 15000;
 
 type ApplicationControlOperation = 'application.shutdown' | 'application.workspaceClose';
 
-const workspaceFocusRequested = (
+interface WorkspaceFocusRequest {
+  nativeWindowTitleToken: string;
+}
+
+const NATIVE_FOCUS_TITLE_PATTERN = /^ARWEB_FOCUS_[0-9a-f]{32}$/i;
+const NATIVE_FOCUS_TITLE_RESTORE_MS = 3500;
+let nativeFocusOriginalTitle: string | null = null;
+let nativeFocusTitleRestoreTimer: ReturnType<typeof setTimeout> | null = null;
+
+const workspaceFocusRequest = (
   rawMessage: unknown,
   currentSessionId: string,
-): boolean => {
-  if (typeof rawMessage !== 'string') return false;
+): WorkspaceFocusRequest | null => {
+  if (typeof rawMessage !== 'string') return null;
   try {
     const envelope = JSON.parse(rawMessage);
     const operationId = envelope?.operationId || envelope?.type;
-    if (operationId !== 'application.workspaceFocus') return false;
+    if (operationId !== 'application.workspaceFocus') return null;
 
     const body = typeof envelope?.body === 'string'
       ? JSON.parse(envelope.body)
@@ -27,10 +36,36 @@ const workspaceFocusRequested = (
         : typeof body?.sessionId === 'string'
           ? body.sessionId
           : '';
-    return !targetSessionId || targetSessionId === currentSessionId;
+    if (targetSessionId && targetSessionId !== currentSessionId) return null;
+    const requestedTitleToken = typeof body?.nativeWindowTitleToken === 'string'
+      ? body.nativeWindowTitleToken
+      : '';
+    return {
+      nativeWindowTitleToken: NATIVE_FOCUS_TITLE_PATTERN.test(requestedTitleToken)
+        ? requestedTitleToken
+        : '',
+    };
   } catch {
-    return false;
+    return null;
   }
+};
+
+const exposeNativeWindowFocusToken = (titleToken: string) => {
+  if (!titleToken) return;
+  if (nativeFocusTitleRestoreTimer) {
+    clearTimeout(nativeFocusTitleRestoreTimer);
+  }
+  if (nativeFocusOriginalTitle === null) {
+    nativeFocusOriginalTitle = document.title;
+  }
+  document.title = titleToken;
+  nativeFocusTitleRestoreTimer = setTimeout(() => {
+    if (document.title === titleToken && nativeFocusOriginalTitle !== null) {
+      document.title = nativeFocusOriginalTitle;
+    }
+    nativeFocusOriginalTitle = null;
+    nativeFocusTitleRestoreTimer = null;
+  }, NATIVE_FOCUS_TITLE_RESTORE_MS);
 };
 
 const applicationControlOperation = (
@@ -191,7 +226,9 @@ export const useWebSocket = (socketPort: number, sessionId: string) => {
 
       socket.onmessage = (event) => {
         if (disposedRef.current || socketRef.current !== socket) return;
-        if (workspaceFocusRequested(event.data, sessionId)) {
+        const focusRequest = workspaceFocusRequest(event.data, sessionId);
+        if (focusRequest) {
+          exposeNativeWindowFocusToken(focusRequest.nativeWindowTitleToken);
           try {
             window.focus();
           } catch (focusError) {
