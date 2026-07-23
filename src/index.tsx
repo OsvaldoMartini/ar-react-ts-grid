@@ -22,8 +22,8 @@ import ConfigPage from './components/ConfigPage';
 import ATemplate from './components/ATemplate';
 import MemoryList, { MEMORY_LIST_SESSION_ID } from './components/MemoryList';
 import PagesOpen, { PAGES_OPEN_SESSION_ID } from './components/PagesOpen';
-import InfoPage from './components/InfoPage';
-import LicenseManager from './components/LicenseManager';
+import InfoPage, { INFO_PAGE_SESSION_ID } from './components/InfoPage';
+import LicensePage, { LICENSE_PAGE_SESSION_ID } from './components/LicensePage';
 import ActivationRequired from './components/ActivationRequired';
 import OCRConfigDetachedWorkspace from './components/ocr/OCRConfigDetachedWorkspace';
 import OCRResultsDetachedWorkspace from './components/ocr/OCRResultsDetachedWorkspace';
@@ -201,8 +201,8 @@ const App: React.FC = () => {
           'aTemplateManager',
           MEMORY_LIST_SESSION_ID,
           PAGES_OPEN_SESSION_ID,
-          'aboutPanel',
-          'licenseManager',
+          INFO_PAGE_SESSION_ID,
+          LICENSE_PAGE_SESSION_ID,
         ]
           .includes(openWorkspace)
       ) {
@@ -566,17 +566,19 @@ const App: React.FC = () => {
           onClose={closeDetachedWorkspace}
         />
       )}
-      {sessionId && sessionId.includes("licenseManager") && (
-        <DesktopWorkspaceShell key={sessionId} ariaLabel="License Manager" testId="license-manager-workspace">
-          <LicenseManager socketPort={socketPort} sessionId={sessionId} />
-        </DesktopWorkspaceShell>
+      {sessionId === LICENSE_PAGE_SESSION_ID && (
+        <LicensePage
+          key={sessionId}
+          socketPort={socketPort}
+          sessionId={sessionId}
+          onClose={closeDetachedWorkspace}
+        />
       )}
-      {sessionId && sessionId.includes("aboutPanel") && (
+      {sessionId === INFO_PAGE_SESSION_ID && (
         <InfoPage
           key={sessionId}
           socketPort={socketPort}
           sessionId={sessionId}
-          onSessionOpen={onSessionOpen}
           onClose={closeDetachedWorkspace}
         />
       )}

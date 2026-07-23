@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CheckCircle2, FileKey2, FolderOpen, RefreshCw, ShieldAlert, X } from 'lucide-react';
 import { useWebSocket } from './useWebSocket';
 import { LICENSE_AGREEMENT_V1, LICENSE_AGREEMENT_VERSION } from './licenseAgreement';
@@ -10,10 +10,17 @@ type LicenseState = {
   capabilities?: Record<string, boolean>;
 };
 
-type Props = { socketPort: number; sessionId: string; onClose?: () => void; onActivated?: () => void };
+type Props = {
+  socketPort: number;
+  sessionId: string;
+  onClose?: () => void;
+  onActivated?: () => void;
+  detached?: boolean;
+};
 
-const LicenseManager: React.FC<Props> = ({ socketPort, sessionId, onClose, onActivated }) => {
+const LicenseManager: React.FC<Props> = ({ socketPort, sessionId, onClose, onActivated, detached = false }) => {
   const { webSocket, connected, messages } = useWebSocket(socketPort, sessionId);
+  const processedMessageCountRef = useRef(0);
   const [state, setState] = useState<LicenseState | null>(null);
   const [mode, setMode] = useState<'request' | 'activate' | 'existing'>('request');
   const [form, setForm] = useState({ organization: '', owner: '', email: '', file: '', agreementAccepted: false });
@@ -23,19 +30,41 @@ const LicenseManager: React.FC<Props> = ({ socketPort, sessionId, onClose, onAct
   const refresh = useCallback(() => webSocket?.send(JSON.stringify({ type: 'license.bootstrap', sessionId })), [webSocket, sessionId]);
   useEffect(() => { if (connected) refresh(); }, [connected, refresh]);
   useEffect(() => {
-    if (!messages.length) return;
-    try {
-      const message = JSON.parse(messages[messages.length - 1]);
-      if (message.sessionId !== sessionId || !message.operationId?.startsWith('license.')) return;
-      const body = typeof message.body === 'string' ? JSON.parse(message.body) : message.body;
-      setPending(false);
-      if (body?.ok) {
-        setState(body);
-        setFeedback(body.message || 'License status refreshed.');
-        if (!['license.bootstrapResponse', 'license.statusResponse'].includes(message.operationId)) refresh();
-      } else setFeedback(body?.error || 'License operation failed.');
-    } catch (_) { }
-  }, [messages, sessionId]);
+    if (processedMessageCountRef.current > messages.length) {
+      processedMessageCountRef.current = 0;
+    }
+    const pendingMessages = messages.slice(processedMessageCountRef.current);
+    processedMessageCountRef.current = messages.length;
+    pendingMessages.forEach(raw => {
+      try {
+        const message = JSON.parse(raw);
+        if (message.sessionId && message.sessionId !== sessionId) return;
+        const operationId = message.operationId || message.type;
+        if (operationId === 'application.workspaceFocus') {
+          try {
+            window.focus();
+          } catch {
+            // Native focus is best-effort and may be refused by the window manager.
+          }
+          return;
+        }
+        if (!operationId?.startsWith('license.')) return;
+        const body = typeof message.body === 'string' ? JSON.parse(message.body) : message.body;
+        setPending(false);
+        if (body?.ok) {
+          setState(body);
+          setFeedback(body.message || 'License status refreshed.');
+          if (!['license.bootstrapResponse', 'license.statusResponse', 'license.statusChanged'].includes(operationId)) {
+            refresh();
+          }
+        } else {
+          setFeedback(body?.error || 'License operation failed.');
+        }
+      } catch {
+        // Ignore unrelated or malformed messages and preserve the current license state.
+      }
+    });
+  }, [messages, refresh, sessionId]);
 
   const modes = useMemo(() => [
     { id: 'request' as const, label: 'Request', enabled: state?.capabilities?.request !== false },
@@ -56,12 +85,23 @@ const LicenseManager: React.FC<Props> = ({ socketPort, sessionId, onClose, onAct
     }) }));
   };
 
-  return <section className={styles.panel} aria-label="License manager">
-    <header className={styles.header}>
+  return <section className={`${styles.panel} ${detached ? styles.detached : ''}`} aria-label="License manager">
+    <header
+      className={styles.header}
+      data-floating-workspace-drag-handle={detached ? true : undefined}
+    >
       <div><FileKey2 size={18}/><span><strong>License</strong><small>AR Web authorization</small></span></div>
-      <div className={styles.headerActions}>
+      <div className={styles.headerActions} data-floating-drag-ignore="true">
         <button title="Refresh license status" onClick={refresh} disabled={!connected}><RefreshCw size={16}/></button>
-        {onClose && <button title="Close" onClick={onClose}><X size={17}/></button>}
+        {onClose && (
+          <button
+            className={detached ? styles.detachedClose : undefined}
+            title={detached ? 'Close only this License Manager window' : 'Close'}
+            onClick={onClose}
+          >
+            {detached ? 'Close' : <X size={17}/>}
+          </button>
+        )}
       </div>
     </header>
     <div className={`${styles.status} ${state?.active ? styles.active : styles.required}`}>

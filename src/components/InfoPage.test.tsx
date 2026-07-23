@@ -1,12 +1,15 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import InfoPage from './InfoPage';
 
-jest.mock('./AboutPanel', () => {
-  return function MockAboutPanel() {
-    return <div data-testid="about-panel">about panel</div>;
-  };
-});
+jest.mock('./useWebSocket', () => ({
+  useWebSocket: () => ({
+    webSocket: null,
+    connected: false,
+    messages: [],
+    error: null,
+  }),
+}));
 
 jest.mock('./workspace/DesktopWorkspaceShell', () => {
   return function MockDesktopWorkspaceShell({ children }: { children: React.ReactNode }) {
@@ -15,10 +18,15 @@ jest.mock('./workspace/DesktopWorkspaceShell', () => {
 });
 
 describe('InfoPage', () => {
-  it('renders the panel inside the detached shell', () => {
-    render(<InfoPage socketPort={59772} sessionId="aboutPanel" />);
+  it('renders an independent software and license workspace with a local close action', () => {
+    const onClose = jest.fn();
+    render(<InfoPage socketPort={59772} sessionId="aboutPanel" onClose={onClose} />);
 
-    expect(screen.getByText('about panel')).toBeInTheDocument();
+    expect(screen.getByText('Software Information')).toBeInTheDocument();
+    expect(screen.getByText('License Information')).toBeInTheDocument();
     expect(screen.getByTestId('desktop-workspace-shell')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
