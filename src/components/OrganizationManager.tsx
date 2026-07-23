@@ -29,6 +29,8 @@ interface HomeUrlRow {
 interface OrganizationManagerProps {
   socketPort: number;
   sessionId: string;
+  showCloseAction?: boolean;
+  onClose?: () => void;
 }
 
 const NEW_ORG = 'new';
@@ -68,7 +70,12 @@ function responseMessage(body: any, fallback: string): string {
   );
 }
 
-const OrganizationManager: React.FC<OrganizationManagerProps> = ({ socketPort, sessionId }) => {
+const OrganizationManager: React.FC<OrganizationManagerProps> = ({
+  socketPort,
+  sessionId,
+  showCloseAction = false,
+  onClose,
+}) => {
   const { webSocket, connected, messages, error } = useWebSocket(socketPort, sessionId);
   const [organizations, setOrganizations] = useState<OrganizationRow[]>([]);
   const [homeUrls, setHomeUrls] = useState<HomeUrlRow[]>([]);
@@ -112,6 +119,9 @@ const OrganizationManager: React.FC<OrganizationManagerProps> = ({ socketPort, s
   }, [connected, send]);
 
   useEffect(() => {
+    if (processedMessageCountRef.current > messages.length) {
+      processedMessageCountRef.current = 0;
+    }
     const nextMessages = messages.slice(processedMessageCountRef.current);
     processedMessageCountRef.current = messages.length;
     for (const raw of nextMessages) {
@@ -150,6 +160,12 @@ const OrganizationManager: React.FC<OrganizationManagerProps> = ({ socketPort, s
             level: body.level === 'error' ? 'error' : body.level === 'warning' ? 'warn' : 'ok',
             text: body.message || 'Status update',
           });
+        } else if (operationId === 'application.workspaceFocus') {
+          try {
+            window.focus();
+          } catch {
+            // Native focus is best-effort and may be refused by the window manager.
+          }
         }
       } catch (err) {
         console.warn('OrganizationManager ignored socket message', err, raw);
@@ -261,12 +277,26 @@ const OrganizationManager: React.FC<OrganizationManagerProps> = ({ socketPort, s
   return (
     <main className={styles.shell}>
       <section className={styles.window}>
-        <header className={styles.topBar}>
-          <div>
-            <h1 className={styles.title}>New Organization</h1>
+        <header className={styles.topBar} data-floating-workspace-drag-handle>
+          <div className={styles.titleBlock}>
+            <h1 className={styles.title}>Organizations</h1>
             <p className={styles.subtitle}>Organizations and child environments</p>
           </div>
-          <div className={`${styles.status} ${statusClass}`}>{error ? error : status.text}</div>
+          <div className={styles.topBarRight} data-floating-drag-ignore="true">
+            <div className={`${styles.status} ${statusClass}`} role="status">
+              {error ? error : status.text}
+            </div>
+            {showCloseAction && (
+              <button
+                type="button"
+                className={styles.closeButton}
+                title="Close only this Organizations window"
+                onClick={onClose}
+              >
+                Close
+              </button>
+            )}
+          </div>
         </header>
 
         <div className={styles.selectorBand}>

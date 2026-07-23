@@ -12,7 +12,7 @@ import GridItemComp from './components/GridItemComp';
 import GridItemScannMobile from './components/GridItemScannMobile';
 import ApiTestToolAI from './components/ApiTestToolAI';
 import ApiTestToolAINew from './components/ApiTestToolAINew';
-import OrganizationManager from './components/OrganizationManager';
+import OrganizationPage from './components/OrganizationPage';
 import MainDashboard from './components/MainDashboard';
 import MainApplicationControl, { isMainApplicationWindow } from './components/MainApplicationControl';
 import DesktopWorkspaceShell from './components/workspace/DesktopWorkspaceShell';
@@ -196,6 +196,7 @@ const App: React.FC = () => {
         ![
           'newBotJobManager',
           'cloneJobManager',
+          'organizationManager',
           'configManager',
           'aTemplateManager',
           MEMORY_LIST_SESSION_ID,
@@ -500,7 +501,12 @@ const App: React.FC = () => {
       )}
 
       {sessionId && (sessionId.includes("organizationManager")) && (
-        <OrganizationManager socketPort={socketPort} sessionId={sessionId} />
+        <OrganizationPage
+          key={sessionId}
+          socketPort={socketPort}
+          sessionId={sessionId}
+          onClose={closeDetachedWorkspace}
+        />
       )}
 
       {sessionId && (sessionId.includes("mainDashboard")) && (
