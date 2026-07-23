@@ -69,6 +69,11 @@ import {
   type PendingLocatorApply,
 } from './scanner/PageScannerLocator';
 import { useScannerController } from './scanner/useScannerController';
+import type {
+  MemoryListItem,
+  MemoryListItemIcon,
+  MemoryListSnapshot,
+} from './MemoryList';
 import {
   PRE_SCAN_CLEAR_GRID_OPERATION,
   PRE_SCAN_PAGE_OPERATION,
@@ -140,6 +145,34 @@ const groupByTagName = (data: ElementDTO[]) => {
 };
 
 const isElementActive = (element: ElementDTO): boolean => element.active !== false;
+
+const scannerMemoryElementKey = (element: ElementDTO): string =>
+  `${element.xPath || ''}||${element.tagName || ''}||${element.typeElement || ''}||${element.attributeType || ''}||${element.someText || ''}`;
+
+const scannerMemoryIcon = (element: ElementDTO): MemoryListItemIcon => {
+  const tag = groupTagFor(element);
+  if (tag === 'input') return 'input';
+  if (tag === 'button') return 'click';
+  if (tag === 'a' || tag === 'link') return 'link';
+  return 'output';
+};
+
+const scannerMemoryItem = (element: ElementDTO): MemoryListItem => {
+  const label = String(
+    (element as any).clientNamed
+    || (element as any).definedName
+    || element.someText
+    || element.tagName
+    || 'Web element',
+  ).trim();
+  return {
+    key: scannerMemoryElementKey(element),
+    label,
+    detail: element.xPath || `${element.tagName || 'element'} #${element.id}`,
+    icon: scannerMemoryIcon(element),
+    active: isElementActive(element),
+  };
+};
 
 const normalizeBlockOptions = (blocks: CreateBlockOption[]): CreateBlockOption[] => {
   const byBlockId = new Map<number, CreateBlockOption>();
@@ -373,8 +406,11 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
   const [elementsSupportReqData, setElementsSupportReqData] = useState<SupportRequestData | null>(null);
   const clickedSupportElementRef = useRef<ElementDTO | null>(null);
   const [memoryElements, setMemoryElements] = useState<ElementDTO[]>([]);
-  const [memoryPanelOpen, setMemoryPanelOpen] = useState<boolean>(false);
-  const [memoryPanelPos, setMemoryPanelPos] = useState<{ x: number; y: number }>({ x: 80, y: 120 });
+  const memoryListOpenRequestedRef = useRef(false);
+  const memoryListOpenedRef = useRef(false);
+  const memoryListOpenPendingRequestRef = useRef<string | null>(null);
+  const memoryListOwnerEpochRef = useRef('');
+  const [memoryListOpenVersion, setMemoryListOpenVersion] = useState(0);
 
   const [locatorPanelOpen, setLocatorPanelOpen] = useState<boolean>(false);
   const [locatorPanelPos, setLocatorPanelPos] = useState<{ x: number; y: number }>({ x: 120, y: 150 });
@@ -412,8 +448,15 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
   const pageScannerProfileSocketRef = useRef<WebSocket | null>(null);
   const pendingPageScannerProfileRequestsRef = useRef<Map<string, PendingPageScannerProfileRequest>>(new Map());
 
-  const memoryElementKey = (element: ElementDTO) =>
-    `${element.xPath || ''}||${element.tagName || ''}||${element.typeElement || ''}||${element.attributeType || ''}||${element.someText || ''}`;
+  const memoryElementKey = scannerMemoryElementKey;
+
+  const requestMemoryListOpen = () => {
+    memoryListOpenRequestedRef.current = true;
+    if (memoryListOpenPendingRequestRef.current) return;
+    memoryListOpenedRef.current = false;
+    memoryListOwnerEpochRef.current = '';
+    setMemoryListOpenVersion(version => version + 1);
+  };
 
   const clearPendingPageScannerRequests = () => {
     pendingPageScannerRequestsRef.current.forEach((pending) => clearTimeout(pending.timeout));
@@ -631,7 +674,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
     setMemoryElements((prev) =>
       prev.some((item) => memoryElementKey(item) === key) ? prev : [...prev, element]
     );
-    setMemoryPanelOpen(true);
+    requestMemoryListOpen();
   };
 
   const handleAddElementBlockToMemory = (elements: ElementDTO[]) => {
@@ -647,13 +690,72 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
       });
       return next;
     });
-    setMemoryPanelOpen(true);
+    requestMemoryListOpen();
   };
 
-  const handleRemoveElementFromMemory = (element: ElementDTO) => {
-    const key = memoryElementKey(element);
-    setMemoryElements((prev) => prev.filter((item) => memoryElementKey(item) !== key));
-  };
+  useEffect(() => {
+    if (!memoryListOpenRequestedRef.current && !memoryListOpenedRef.current) return;
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN || !botJobId || botJobId <= 0) return;
+    if (memoryListOpenRequestedRef.current && memoryListOpenPendingRequestRef.current) return;
+
+    const activeItems = memoryElements.filter(isElementActive);
+    const busy = memoryApplyBusy || createBlockBusy;
+    const snapshot: MemoryListSnapshot = {
+      ownerEpoch: memoryListOwnerEpochRef.current,
+      sourceKind: 'PAGE_SCANNER',
+      homeBankingId,
+      botJobId,
+      botJobName: botJobName || '',
+      items: memoryElements.map(scannerMemoryItem),
+      blocks: memoryBlockOptions,
+      targetBlockId: memoryTargetBlockId,
+      emptyMessage: 'Click "+" on a web element to add it here.',
+      status: busy ? 'Applying Memory List changes...' : 'Memory List ready',
+      busy,
+      canApply: memoryTargetBlockId !== null
+        && activeItems.length > 0
+        && !busy
+        && memoryBlockOptions.some(block => block.blockId === memoryTargetBlockId),
+    };
+    const operation = memoryListOpenRequestedRef.current ? 'memoryList.open' : 'memoryList.sync';
+    const requestId = `memory-list-${Date.now()}-${operation === 'memoryList.open' ? 'open' : 'sync'}`;
+
+    try {
+      webSocket.send(JSON.stringify({
+        type: operation,
+        sessionId,
+        homeBankingId,
+        botJobId,
+        body: JSON.stringify({
+          requestId,
+          homeBankingId,
+          botJobId,
+          ownerEpoch: memoryListOwnerEpochRef.current,
+          snapshot,
+        }),
+      }));
+      if (operation === 'memoryList.open') {
+        memoryListOpenPendingRequestRef.current = requestId;
+      }
+    } catch (memoryListError) {
+      if (operation === 'memoryList.open') {
+        memoryListOpenPendingRequestRef.current = null;
+      }
+      console.error('Could not synchronize Page Scanner Memory List:', memoryListError);
+    }
+  }, [
+    botJobId,
+    botJobName,
+    createBlockBusy,
+    homeBankingId,
+    memoryApplyBusy,
+    memoryBlockOptions,
+    memoryElements,
+    memoryListOpenVersion,
+    memoryTargetBlockId,
+    sessionId,
+    webSocket,
+  ]);
 
   const addGeneratedElementsToScannerGrid = (generatedElements: ElementDTO[]): ElementDTO[] => {
     const merged = mergeGeneratedLocatorElements(elementDTO, generatedElements);
@@ -692,26 +794,6 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
         ? { ...element, active: nextActive }
         : element
     ));
-  };
-
-  const startMemoryPanelDrag = (e: React.MouseEvent) => {
-    e.preventDefault();
-    const startX = e.clientX;
-    const startY = e.clientY;
-    const startLeft = memoryPanelPos.x;
-    const startTop = memoryPanelPos.y;
-    const onMove = (moveEvent: MouseEvent) => {
-      setMemoryPanelPos({
-        x: Math.max(0, startLeft + moveEvent.clientX - startX),
-        y: Math.max(0, startTop + moveEvent.clientY - startY),
-      });
-    };
-    const onUp = () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
   };
 
   const startLocatorPanelDrag = (e: React.MouseEvent) => {
@@ -934,15 +1016,18 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
       return updated;
     });
   };
-  const handleApplyMemory = () => {
+  const handleApplyMemory = (targetBlockIdOverride?: number | null) => {
     const activeMemoryElements = memoryElements.filter(isElementActive);
-    if (memoryTargetBlockId === null || activeMemoryElements.length === 0 || memoryApplyBusy) return;
+    const targetBlockId = targetBlockIdOverride === undefined
+      ? memoryTargetBlockId
+      : targetBlockIdOverride;
+    if (targetBlockId === null || activeMemoryElements.length === 0 || memoryApplyBusy) return;
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
       console.warn('WebSocket is not connected. Cannot apply scanner memory list.');
       return;
     }
 
-    const targetBlock = memoryBlockOptions.find((block) => block.blockId === memoryTargetBlockId);
+    const targetBlock = memoryBlockOptions.find((block) => block.blockId === targetBlockId);
     if (!targetBlock) return;
 
     const elementKeys = activeMemoryElements.map(memoryElementKey);
@@ -1217,6 +1302,78 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
         const bodyData = tryParse(parsedMessage.body);
 
         switch (parsedMessage.operationId) {
+          case 'memoryList.openResponse': {
+            if (String(bodyData?.requestId || '') !== memoryListOpenPendingRequestRef.current) break;
+            memoryListOpenPendingRequestRef.current = null;
+            const ownerEpoch = String(bodyData?.ownerEpoch || '');
+            if (bodyData?.ok === false || !ownerEpoch) {
+              memoryListOpenedRef.current = false;
+              memoryListOpenRequestedRef.current = false;
+              memoryListOwnerEpochRef.current = '';
+              setAlertMessageHeader('Memory List not opened');
+              setAlertMessageBody(String(
+                bodyData?.message || bodyData?.error || 'Memory List workspace could not be opened.',
+              ));
+            } else {
+              memoryListOwnerEpochRef.current = ownerEpoch;
+              memoryListOpenedRef.current = true;
+              memoryListOpenRequestedRef.current = false;
+              setMemoryListOpenVersion(version => version + 1);
+            }
+            break;
+          }
+          case 'memoryList.syncResponse': {
+            if (
+              bodyData?.ok === false
+              && String(bodyData?.ownerEpoch || '') === memoryListOwnerEpochRef.current
+            ) {
+              memoryListOpenedRef.current = false;
+              memoryListOwnerEpochRef.current = '';
+            }
+            break;
+          }
+          case 'memoryList.command': {
+            const command = String(bodyData?.command || bodyData?.action || '').toUpperCase();
+            const payload = bodyData?.payload && typeof bodyData.payload === 'object'
+              ? bodyData.payload
+              : bodyData;
+            if (Number(bodyData?.botJobId) !== Number(botJobId)) break;
+
+            if (command === 'REMOVE') {
+              const itemKey = String(payload?.itemKey ?? '');
+              setMemoryElements(previous =>
+                previous.filter(element => memoryElementKey(element) !== itemKey)
+              );
+            } else if (command === 'CLEAR') {
+              setMemoryElements([]);
+            } else if (command === 'SELECT_TARGET_BLOCK') {
+              const selectedBlockId = Number(payload?.blockId);
+              setMemoryTargetBlockId(
+                Number.isFinite(selectedBlockId) && selectedBlockId > 0 ? selectedBlockId : null,
+              );
+            } else if (command === 'APPLY') {
+              const requestedTargetBlockId = Number(payload?.targetBlockId);
+              handleApplyMemory(
+                Number.isFinite(requestedTargetBlockId) && requestedTargetBlockId > 0
+                  ? requestedTargetBlockId
+                  : null,
+              );
+            } else if (command === 'CREATE_BLOCK') {
+              const blockName = String(payload?.blockName || '').trim();
+              if (!blockName) break;
+              const rawPosition = payload?.position;
+              const position: CreateBlockPosition = rawPosition?.type === 'before'
+                ? {
+                  type: 'before',
+                  blockId: Number(rawPosition.blockId),
+                  blockOrderNumber: Number(rawPosition.blockOrderNumber),
+                  blockName: String(rawPosition.blockName || ''),
+                }
+                : { type: 'end' };
+              handleCreateNewBlock(blockName, position);
+            }
+            break;
+          }
           case 'pageScanner.workspaceRetarget': {
             const retarget = pageScannerWorkspaceRetarget(
               bodyData,
@@ -3025,97 +3182,6 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
         />
       )}
 
-      {memoryPanelOpen && (
-        <div
-          className={styles.memoryPanel}
-          style={{ left: memoryPanelPos.x, top: memoryPanelPos.y }}
-        >
-          <div className={styles.memoryPanelHeader} onMouseDown={startMemoryPanelDrag}>
-            <span className={styles.memoryPanelTitle}>
-              Memory List ({memoryElements.length})
-            </span>
-            <button
-              type="button"
-              className={styles.memoryPanelHeaderBtn}
-              title="Clear all"
-              onMouseDown={(e) => e.stopPropagation()}
-              onClick={() => setMemoryElements([])}
-            >
-              Del
-            </button>
-            <button
-              type="button"
-              className={styles.memoryPanelHeaderBtn}
-              title="Close"
-              onMouseDown={(e) => e.stopPropagation()}
-              onClick={() => setMemoryPanelOpen(false)}
-            >
-              x
-            </button>
-          </div>
-          <div className={styles.memoryPanelSelectRow}>
-            <span className={styles.memoryPanelSelectLabel}>Block:</span>
-            <select
-              className={styles.memoryPanelSelect}
-              value={memoryTargetBlockId ?? ''}
-              onChange={(e) => {
-                if (e.target.value === '__create__') {
-                  setCreateBlockOpen(true);
-                  return;
-                }
-                setMemoryTargetBlockId(e.target.value === '' ? null : Number(e.target.value));
-              }}
-            >
-              <option value="">Select target block...</option>
-              <option value="__create__">+ Create new block...</option>
-              {memoryBlockOptions.map((block) => (
-                <option key={block.blockId} value={block.blockId}>
-                  #{block.blockOrderNumber} {block.blockName}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className={styles.memoryPanelList}>
-            {memoryElements.length === 0 ? (
-              <div className={styles.memoryPanelEmpty}>
-                Click "+" on a web element to add it here
-              </div>
-            ) : (
-              memoryElements.map((element, i) => (
-                <div key={memoryElementKey(element)} className={styles.memoryPanelRow}>
-                  <span className={styles.memoryPanelOrder}>{i + 1}.</span>
-                  {getInstructionElement(element)}
-                  <button
-                    type="button"
-                    className={styles.memoryPanelRemove}
-                    title="Remove from memory list"
-                    onClick={() => handleRemoveElementFromMemory(element)}
-                  >
-                    x
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-          <div className={styles.memoryPanelFooter}>
-            <button
-              type="button"
-              className={styles.memoryApplyButton}
-              disabled={
-                memoryApplyBusy
-                ||
-                memoryTargetBlockId === null
-                || memoryElements.filter(isElementActive).length === 0
-                || !memoryBlockOptions.some((block) => block.blockId === memoryTargetBlockId)
-              }
-              onClick={handleApplyMemory}
-            >
-              {memoryApplyBusy ? 'Applying...' : 'Apply'}
-            </button>
-          </div>
-        </div>
-      )}
-
       {createBlockOpen && (
         <CreateNewBlock
           blocks={memoryBlockOptions}
@@ -3207,11 +3273,11 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
             >
               Clear Grid All
             </button>
-            {memoryElements.length > 0 && !memoryPanelOpen && (
+            {memoryElements.length > 0 && (
               <button
                 type="button"
                 className={styles.memoryToggleButton}
-                onClick={() => setMemoryPanelOpen(true)}
+                onClick={requestMemoryListOpen}
               >
                 Memory ({memoryElements.length})
               </button>

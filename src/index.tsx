@@ -20,6 +20,7 @@ import NewBotJobPage from './components/NewBotJobPage';
 import CloneJobPage from './components/CloneJobPage';
 import ConfigPage from './components/ConfigPage';
 import ATemplate from './components/ATemplate';
+import MemoryList, { MEMORY_LIST_SESSION_ID } from './components/MemoryList';
 import InfoPage from './components/InfoPage';
 import LicenseManager from './components/LicenseManager';
 import ActivationRequired from './components/ActivationRequired';
@@ -191,7 +192,15 @@ const App: React.FC = () => {
     const sourceBotJobId = search.get('sourceBotJobId');
     if (openWorkspace) {
       if (
-        !['newBotJobManager', 'cloneJobManager', 'configManager', 'aTemplateManager', 'aboutPanel', 'licenseManager']
+        ![
+          'newBotJobManager',
+          'cloneJobManager',
+          'configManager',
+          'aTemplateManager',
+          MEMORY_LIST_SESSION_ID,
+          'aboutPanel',
+          'licenseManager',
+        ]
           .includes(openWorkspace)
       ) {
         console.error('Rejected invalid detached workspace route.');
@@ -524,6 +533,14 @@ const App: React.FC = () => {
       )}
       {sessionId && sessionId.includes("aTemplateManager") && (
         <ATemplate
+          key={sessionId}
+          socketPort={socketPort}
+          sessionId={sessionId}
+          onClose={closeDetachedWorkspace}
+        />
+      )}
+      {sessionId === MEMORY_LIST_SESSION_ID && (
+        <MemoryList
           key={sessionId}
           socketPort={socketPort}
           sessionId={sessionId}

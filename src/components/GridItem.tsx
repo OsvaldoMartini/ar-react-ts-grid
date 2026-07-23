@@ -58,6 +58,11 @@ import { useInstructionDrag } from './useInstructionDrag';
 import { instructionDisplayLabel } from './instructionDisplay';
 import { buildLaterBlockOrderUpdates } from './instructionSplit';
 import { canStartCommandApply, resolveCommandApplyResponse } from './commandApplyResponse';
+import type {
+  MemoryListItem,
+  MemoryListItemIcon,
+  MemoryListSnapshot,
+} from './MemoryList';
 import {
   SCANNER_ELEMENT_PANE_SESSION_ID,
   SCANNER_TOOL_SESSION_ID,
@@ -146,6 +151,29 @@ const normalizeBlockOptions = (blocks: CreateBlockOption[]): CreateBlockOption[]
   return Array.from(byBlockId.values()).sort((a, b) => a.blockOrderNumber - b.blockOrderNumber);
 };
 
+const instructionMemoryIcon = (instruction: BlockLoopInstructionLoadDTO): MemoryListItemIcon => {
+  const action = String(instruction.actions || '').split(':')[0].trim().toUpperCase();
+  const tagName = String(instruction.tagName || '').toLowerCase();
+  if (action === 'I' || tagName === 'input' || tagName === 'textarea') return 'input';
+  if (action === 'C' || tagName === 'button') return 'click';
+  if (action === 'A' || tagName === 'a' || tagName === 'link') return 'link';
+  if (action === 'O' || tagName === 'label') return 'output';
+  if (action === 'H' || action === 'HOLD' || action === 'WAIT') return 'wait';
+  if (action === 'E' || action.includes('CSV') || action.includes('PDF')) return 'excel';
+  if (action === 'P') return 'screen';
+  return 'default';
+};
+
+const instructionMemoryItem = (
+  instruction: BlockLoopInstructionLoadDTO,
+): MemoryListItem => ({
+  key: String(instruction.id),
+  label: `(${instruction.id})${instructionDisplayLabel(instruction) || instruction.actions || 'Instruction'}`,
+  detail: `Block #${instruction.blockOrderNumber} ${instruction.blockName}`,
+  icon: instructionMemoryIcon(instruction),
+  active: instruction.instructionActive !== false,
+});
+
 
 const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketPort, sessionId, botJobIdInitial, botJobNameInitial, onSessionOpen, onDetachedClose }) => {
   // Using the custom WebSocket hook
@@ -227,11 +255,9 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     pendingScrollTopRef.current = null;
   }, [instructionsData]);
 
-  // Memory list: steps hand-picked via the row "+" button, kept in insertion order,
-  // shown in a floating (non-modal, draggable) panel.
+  // Memory list: steps hand-picked via the row "+" button, kept in insertion order.
+  // Presentation lives in the one detached Memory List workspace.
   const [memorySteps, setMemorySteps] = useState<BlockLoopInstructionLoadDTO[]>([]);
-  const [memoryPanelOpen, setMemoryPanelOpen] = useState<boolean>(false);
-  const [memoryPanelPos, setMemoryPanelPos] = useState<{ x: number; y: number }>({ x: 80, y: 120 });
   const [memoryTargetBlockId, setMemoryTargetBlockId] = useState<number | null>(null);
   const [memoryBlockOptions, setMemoryBlockOptions] = useState<CreateBlockOption[]>(
     blockOptionsFromInstructions(data)
@@ -248,13 +274,26 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
   });
   const [pendingMemoryMove, setPendingMemoryMove] = useState<{ requestId: string; ids: Set<number> } | null>(null);
   const [memoryMoveStatus, setMemoryMoveStatus] = useState('');
+  const memoryListOpenRequestedRef = useRef(false);
+  const memoryListOpenedRef = useRef(false);
+  const memoryListOpenPendingRequestRef = useRef<string | null>(null);
+  const memoryListOwnerEpochRef = useRef('');
+  const [memoryListOpenVersion, setMemoryListOpenVersion] = useState(0);
+
+  const requestMemoryListOpen = () => {
+    memoryListOpenRequestedRef.current = true;
+    if (memoryListOpenPendingRequestRef.current) return;
+    memoryListOpenedRef.current = false;
+    memoryListOwnerEpochRef.current = '';
+    setMemoryListOpenVersion(version => version + 1);
+  };
 
   const handleAddToMemory = (instruction: BlockLoopInstructionLoadDTO) => {
     if (!memoryCapabilities.get(instruction.id)?.canAdd) return;
     setMemorySteps((prev) =>
       prev.some((step) => step.id === instruction.id) ? prev : [...prev, instruction]
     );
-    setMemoryPanelOpen(true);
+    requestMemoryListOpen();
   };
 
   const handleAddBlockToMemory = (instructions: BlockLoopInstructionLoadDTO[]) => {
@@ -270,7 +309,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
       });
       return next;
     });
-    setMemoryPanelOpen(true);
+    requestMemoryListOpen();
   };
 
   const handleRemoveFromMemory = (id: number) => {
@@ -294,12 +333,78 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     }));
   }, [webSocket, connected, instructionsData, botJobId, homeBankingId, sessionId]);
 
+  useEffect(() => {
+    if (!memoryListOpenRequestedRef.current && !memoryListOpenedRef.current) return;
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN || !botJobId || botJobId <= 0) return;
+    if (memoryListOpenRequestedRef.current && memoryListOpenPendingRequestRef.current) return;
+
+    const snapshot: MemoryListSnapshot = {
+      ownerEpoch: memoryListOwnerEpochRef.current,
+      sourceKind: 'BOT_JOB',
+      homeBankingId,
+      botJobId,
+      botJobName: botJobName || '',
+      items: memorySteps.map(instructionMemoryItem),
+      blocks: memoryBlockOptions,
+      targetBlockId: memoryTargetBlockId,
+      emptyMessage: 'Click "+" on a step to add it here.',
+      status: memoryMoveStatus || (connected ? 'Memory List ready' : 'Memory List disconnected'),
+      busy: pendingMemoryMove !== null,
+      canApply: memoryTargetBlockId !== null
+        && memorySteps.length > 0
+        && pendingMemoryMove === null
+        && memoryBlockOptions.some(block => block.blockId === memoryTargetBlockId),
+    };
+    const operation = memoryListOpenRequestedRef.current ? 'memoryList.open' : 'memoryList.sync';
+    const requestId = `memory-list-${Date.now()}-${operation === 'memoryList.open' ? 'open' : 'sync'}`;
+
+    try {
+      webSocket.send(JSON.stringify({
+        type: operation,
+        sessionId,
+        homeBankingId,
+        botJobId,
+        body: JSON.stringify({
+          requestId,
+          homeBankingId,
+          botJobId,
+          ownerEpoch: memoryListOwnerEpochRef.current,
+          snapshot,
+        }),
+      }));
+      if (operation === 'memoryList.open') {
+        memoryListOpenPendingRequestRef.current = requestId;
+      }
+    } catch (memoryListError) {
+      if (operation === 'memoryList.open') {
+        memoryListOpenPendingRequestRef.current = null;
+      }
+      console.error('Could not synchronize detached Memory List:', memoryListError);
+    }
+  }, [
+    botJobId,
+    botJobName,
+    connected,
+    homeBankingId,
+    memoryBlockOptions,
+    memoryListOpenVersion,
+    memoryMoveStatus,
+    memorySteps,
+    memoryTargetBlockId,
+    pendingMemoryMove,
+    sessionId,
+    webSocket,
+  ]);
+
   // Apply: move the memorized steps (in insertion order) to the end of the
   // selected block, then persist exactly like a drag & drop move (ROW_MOVE).
-  const handleApplyMemory = () => {
-    if (memoryTargetBlockId === null || memorySteps.length === 0) return;
+  const handleApplyMemory = (targetBlockIdOverride?: number | null) => {
+    const targetBlockId = targetBlockIdOverride === undefined
+      ? memoryTargetBlockId
+      : targetBlockIdOverride;
+    if (targetBlockId === null || memorySteps.length === 0) return;
 
-    const targetBlockOption = memoryBlockOptions.find((block) => block.blockId === memoryTargetBlockId);
+    const targetBlockOption = memoryBlockOptions.find((block) => block.blockId === targetBlockId);
     if (!targetBlockOption) return;
 
     const movable = memorySteps.filter(step => memoryCapabilities.get(step.id)?.canAdd);
@@ -401,22 +506,6 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
       console.log('Error sending BLOCK_CREATE message:', err);
       return;
     }
-  };
-
-  const startMemoryPanelDrag = (e: React.MouseEvent) => {
-    e.preventDefault();
-    const startX = e.clientX;
-    const startY = e.clientY;
-    const orig = memoryPanelPos;
-    const onMove = (ev: MouseEvent) => {
-      setMemoryPanelPos({ x: orig.x + (ev.clientX - startX), y: orig.y + (ev.clientY - startY) });
-    };
-    const onUp = () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
   };
 
   const toggleBlockCollapsed = (blockId: number) => {
@@ -679,7 +768,74 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
         }
 
 
-        if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "componentSave.applyResponse") {
+        if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "memoryList.openResponse") {
+          const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
+          if (String(bodyData?.requestId || '') !== memoryListOpenPendingRequestRef.current) return;
+          memoryListOpenPendingRequestRef.current = null;
+          const ownerEpoch = String(bodyData?.ownerEpoch || '');
+          if (bodyData?.ok === false || !ownerEpoch) {
+            memoryListOpenedRef.current = false;
+            memoryListOpenRequestedRef.current = false;
+            memoryListOwnerEpochRef.current = '';
+            setMemoryMoveStatus(String(
+              bodyData?.message || bodyData?.error || 'Memory List workspace could not be opened.',
+            ));
+          } else {
+            memoryListOwnerEpochRef.current = ownerEpoch;
+            memoryListOpenedRef.current = true;
+            memoryListOpenRequestedRef.current = false;
+            setMemoryListOpenVersion(version => version + 1);
+          }
+        } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "memoryList.syncResponse") {
+          const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
+          if (
+            bodyData?.ok === false
+            && String(bodyData?.ownerEpoch || '') === memoryListOwnerEpochRef.current
+          ) {
+            memoryListOpenedRef.current = false;
+            memoryListOwnerEpochRef.current = '';
+          }
+        } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "memoryList.command") {
+          const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
+          const command = String(bodyData?.command || bodyData?.action || '').toUpperCase();
+          const payload = bodyData?.payload && typeof bodyData.payload === 'object'
+            ? bodyData.payload
+            : bodyData;
+          if (Number(bodyData?.botJobId) !== Number(botJobId)) return;
+
+          if (command === 'REMOVE') {
+            const itemKey = String(payload?.itemKey ?? '');
+            const instructionId = Number(itemKey);
+            if (Number.isFinite(instructionId)) handleRemoveFromMemory(instructionId);
+          } else if (command === 'CLEAR') {
+            setMemorySteps([]);
+          } else if (command === 'SELECT_TARGET_BLOCK') {
+            const selectedBlockId = Number(payload?.blockId);
+            setMemoryTargetBlockId(
+              Number.isFinite(selectedBlockId) && selectedBlockId > 0 ? selectedBlockId : null,
+            );
+          } else if (command === 'APPLY') {
+            const requestedTargetBlockId = Number(payload?.targetBlockId);
+            handleApplyMemory(
+              Number.isFinite(requestedTargetBlockId) && requestedTargetBlockId > 0
+                ? requestedTargetBlockId
+                : null,
+            );
+          } else if (command === 'CREATE_BLOCK') {
+            const blockName = String(payload?.blockName || '').trim();
+            if (!blockName) return;
+            const rawPosition = payload?.position;
+            const position: CreateBlockPosition = rawPosition?.type === 'before'
+              ? {
+                type: 'before',
+                blockId: Number(rawPosition.blockId),
+                blockOrderNumber: Number(rawPosition.blockOrderNumber),
+                blockName: String(rawPosition.blockName || ''),
+              }
+              : { type: 'end' };
+            handleCreateNewBlock(blockName, position);
+          }
+        } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "componentSave.applyResponse") {
           const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
           setAlertImage(bodyData?.ok === false ? warningRedImage : constructionImage);
           setAlertClass('construction-image'); setErrorFlag(bodyData?.ok === false);
@@ -3061,109 +3217,16 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
             </button>
           )}
         </div>
-        {memorySteps.length > 0 && !memoryPanelOpen && (
+        {memorySteps.length > 0 && (
           <button
             type="button"
             className={styles.memoryToggleButton}
-            onClick={() => setMemoryPanelOpen(true)}
+            onClick={requestMemoryListOpen}
           >
             Memory ({memorySteps.length})
           </button>
         )}
       </div>
-      {memoryPanelOpen && (
-        <div
-          className={styles.memoryPanel}
-          style={{ left: memoryPanelPos.x, top: memoryPanelPos.y }}
-        >
-          <div className={styles.memoryPanelHeader} onMouseDown={startMemoryPanelDrag}>
-            <span className={styles.memoryPanelTitle}>
-              Memory List ({memorySteps.length})
-            </span>
-            <button
-              type="button"
-              className={styles.memoryPanelHeaderBtn}
-              title="Clear all"
-              onMouseDown={(e) => e.stopPropagation()}
-              onClick={() => setMemorySteps([])}
-            >
-              🗑
-            </button>
-            <button
-              type="button"
-              className={styles.memoryPanelHeaderBtn}
-              title="Close"
-              onMouseDown={(e) => e.stopPropagation()}
-              onClick={() => setMemoryPanelOpen(false)}
-            >
-              ✕
-            </button>
-          </div>
-          <div className={styles.memoryPanelSelectRow}>
-            <span className={styles.memoryPanelSelectLabel}>Block:</span>
-            <select
-              className={styles.memoryPanelSelect}
-              value={memoryTargetBlockId ?? ''}
-              onChange={(e) => {
-                if (e.target.value === '__create__') {
-                  // Not a target: opens the Create-new-block dialog. The controlled
-                  // value snaps the select back to the current selection.
-                  setCreateBlockOpen(true);
-                  return;
-                }
-                setMemoryTargetBlockId(e.target.value === '' ? null : Number(e.target.value));
-              }}
-            >
-              <option value="">Select target block…</option>
-              <option value="__create__">➕ Create new block…</option>
-              {memoryBlockOptions
-                .map((block) => (
-                  <option key={block.blockId} value={block.blockId}>
-                    #{block.blockOrderNumber} {block.blockName}
-                  </option>
-                ))}
-            </select>
-          </div>
-          <div className={styles.memoryPanelList}>
-            {memorySteps.length === 0 ? (
-              <div className={styles.memoryPanelEmpty}>
-                Click “+” on a step to add it here
-              </div>
-            ) : (
-              memorySteps.map((step, i) => (
-                <div key={step.id} className={styles.memoryPanelRow}>
-                  <span className={styles.memoryPanelOrder}>{i + 1}.</span>
-                  {getInstructionTypeElement(step)}
-                  <button
-                    type="button"
-                    className={styles.memoryPanelRemove}
-                    title="Remove from memory list"
-                    onClick={() => handleRemoveFromMemory(step.id)}
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-          <div className={styles.memoryPanelFooter}>
-            {memoryMoveStatus && <span>{memoryMoveStatus}</span>}
-            <button
-              type="button"
-              className={styles.memoryApplyButton}
-              disabled={
-                memoryTargetBlockId === null
-                || memorySteps.length === 0
-                || pendingMemoryMove !== null
-                || !memoryBlockOptions.some((block) => block.blockId === memoryTargetBlockId)
-              }
-              onClick={handleApplyMemory}
-            >
-              {pendingMemoryMove ? 'Applying...' : 'Apply'}
-            </button>
-          </div>
-        </div>
-      )}
       {createBlockOpen && (
         <CreateNewBlock
           blocks={memoryBlockOptions}
