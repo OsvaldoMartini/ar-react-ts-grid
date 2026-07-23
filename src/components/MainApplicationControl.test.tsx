@@ -29,6 +29,7 @@ test.each([
   '?desktopShell=1&openBotJob=20&botJobWindowSession=botJobWindow-1',
   '?desktopShell=1&openOcr=config&ocrSession=ocrConfig-1',
   '?desktopShell=1&openPageScanner=preScan&pageScannerSession=pageScanner-1',
+  '?desktopShell=1&openWorkspace=aTemplateManager',
 ])('does not classify a detached workspace as the main application window: %s', search => {
   expect(isMainApplicationWindow(search)).toBe(false);
 });

@@ -43,7 +43,8 @@ type OrganizationRow = {
 interface TemplateFormProps {
   socketPort: number;
   sessionId: string;
-  showApplicationExit?: boolean;
+  showCloseAction?: boolean;
+  onClose?: () => void;
 }
 
 const EMPTY_CONFIG: ConfigData = {
@@ -120,10 +121,14 @@ function backendDateKey(date: string): string {
   return date.replace(/-/g, '_');
 }
 
-const TemplateForm: React.FC<TemplateFormProps> = ({ socketPort, sessionId, showApplicationExit = false }) => {
+const TemplateForm: React.FC<TemplateFormProps> = ({
+  socketPort,
+  sessionId,
+  showCloseAction = false,
+  onClose,
+}) => {
   const { webSocket, connected, messages, error } = useWebSocket(socketPort, sessionId);
   const processedMessageCountRef = useRef(0);
-  const shutdownRequestedRef = useRef(false);
   const [config, setConfig] = useState<ConfigData>(EMPTY_CONFIG);
   const [options, setOptions] = useState<Options>(EMPTY_OPTIONS);
   const [organizations, setOrganizations] = useState<OrganizationRow[]>([]);
@@ -154,31 +159,6 @@ const TemplateForm: React.FC<TemplateFormProps> = ({ socketPort, sessionId, show
     },
     [sessionId, webSocket],
   );
-
-  const requestApplicationShutdown = useCallback(() => {
-    if (shutdownRequestedRef.current) return;
-    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
-      setStatus({ level: 'warn', text: 'Socket is not connected yet' });
-      return;
-    }
-
-    shutdownRequestedRef.current = true;
-    try {
-      webSocket.send(JSON.stringify({
-        type: 'mainDashboard.exit',
-        sessionId,
-        body: JSON.stringify({ reason: 'EXIT_BUTTON' }),
-      }));
-    } catch (shutdownError) {
-      shutdownRequestedRef.current = false;
-      setStatus({
-        level: 'error',
-        text: shutdownError instanceof Error
-          ? shutdownError.message
-          : 'The application shutdown request could not be sent',
-      });
-    }
-  }, [sessionId, webSocket]);
 
   const bootstrap = useCallback(() => {
     send('config.bootstrap');
@@ -323,9 +303,9 @@ const TemplateForm: React.FC<TemplateFormProps> = ({ socketPort, sessionId, show
           </div>
           <div className={styles.topBarRight}>
             <div className={`${styles.status} ${statusClass}`}>{status.text}</div>
-            {showApplicationExit && (
-              <button type="button" className={styles.exitButton} onClick={requestApplicationShutdown}>
-                Exit
+            {showCloseAction && (
+              <button type="button" className={styles.closeButton} onClick={onClose}>
+                Close
               </button>
             )}
           </div>

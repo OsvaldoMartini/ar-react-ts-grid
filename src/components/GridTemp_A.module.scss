@@ -1,0 +1,202 @@
+.panel {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #b9cdd6;
+  border-radius: 8px;
+  background: #ffffff;
+  overflow: hidden;
+  color: #1f2937;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.panelHeader {
+  flex: 0 0 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px;
+  border-bottom: 1px solid #d9d9d9;
+  background: #f2f7f9;
+}
+
+.panelTitle {
+  min-width: 0;
+  color: #0b5394;
+  font-size: 0.88rem;
+  font-weight: bold;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.badge {
+  flex: 0 0 auto;
+  border: 1px solid #9fb7c3;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #0b5394;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.viewport {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  max-width: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: #9fb7c3 #eef4f7;
+  background: #ffffff;
+}
+
+.viewport::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.viewport::-webkit-scrollbar-track {
+  background: #eef4f7;
+}
+
+.viewport::-webkit-scrollbar-thumb {
+  border: 2px solid #eef4f7;
+  border-radius: 999px;
+  background: #9fb7c3;
+}
+
+.viewport::-webkit-scrollbar-thumb:hover {
+  background: #7894a2;
+}
+
+.grid {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  font-size: 12px;
+}
+
+.grid th,
+.grid td {
+  min-width: 0;
+  padding: 6px 8px;
+  border-bottom: 1px solid #e0e7eb;
+  background-clip: padding-box;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.grid th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #eaf3f8;
+  color: #0b5394;
+  font-weight: bold;
+}
+
+.grid tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.sortableHeader {
+  padding: 0 !important;
+}
+
+.sortButton {
+  width: 100%;
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 6px 8px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: bold;
+  text-align: inherit;
+  cursor: pointer;
+}
+
+.sortButton:hover {
+  background: #dcebf4;
+}
+
+.sortButton:focus-visible {
+  outline: 2px solid #1d6fa5;
+  outline-offset: -2px;
+}
+
+.headerLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sortIndicator {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+}
+
+.idleSortIcon {
+  opacity: 0.35;
+}
+
+.interactiveRow {
+  cursor: pointer;
+}
+
+.interactiveRow:hover td {
+  background: #f4f9fc;
+}
+
+.selectedRow td {
+  background: #dcecf5 !important;
+}
+
+.actionsCell {
+  overflow: visible !important;
+}
+
+.emptyCell {
+  height: 120px;
+  color: #667085;
+  text-align: center !important;
+}
+
+@media (max-width: 720px) {
+  .panelHeader {
+    padding: 6px 8px;
+  }
+
+  .grid th,
+  .grid td {
+    padding: 7px 8px;
+  }
+
+  .sortableHeader {
+    padding: 0 !important;
+  }
+
+  .sortButton {
+    padding: 7px 8px;
+  }
+}

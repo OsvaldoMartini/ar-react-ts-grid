@@ -10,6 +10,7 @@ const DETACHED_WINDOW_PARAMETERS = [
   'ocrSession',
   'openPageScanner',
   'pageScannerSession',
+  'openWorkspace',
 ] as const;
 
 export const isMainApplicationWindow = (search: string): boolean => {

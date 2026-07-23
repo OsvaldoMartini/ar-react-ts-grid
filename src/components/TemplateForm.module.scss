@@ -64,7 +64,7 @@
 .statusWarn { background: #fef3c7; color: #92400e; }
 .statusError { background: #fee2e2; color: #991b1b; }
 
-.exitButton {
+.closeButton {
   flex: 0 0 auto;
   min-height: 28px;
   padding: 5px 10px;
@@ -78,7 +78,7 @@
   cursor: pointer;
 }
 
-.exitButton:hover {
+.closeButton:hover {
   background: #ffebee;
 }
 

@@ -160,6 +160,11 @@ export const useWebSocket = (socketPort: number, sessionId: string) => {
           } catch {
             // The backend may already have closed the transport.
           }
+          try {
+            window.close();
+          } catch (closeError) {
+            console.error('Could not close the AR Web application window:', closeError);
+          }
           return;
         }
         setMessages((previous) => [...previous, event.data]);

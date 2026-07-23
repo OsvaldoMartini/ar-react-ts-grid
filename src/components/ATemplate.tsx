@@ -9,10 +9,15 @@ type Props = {
   onClose?: () => void;
 };
 
-const ATemplate: React.FC<Props> = ({ socketPort, sessionId }) => (
+const ATemplate: React.FC<Props> = ({ socketPort, sessionId, onClose }) => (
   <DetachedPageShell title="TEMP" testId="atemplate-page" onClose={undefined} showCloseButton={false}>
     <div className={styles.frame}>
-      <TemplateForm socketPort={socketPort} sessionId={sessionId} showApplicationExit />
+      <TemplateForm
+        socketPort={socketPort}
+        sessionId={sessionId}
+        showCloseAction
+        onClose={onClose}
+      />
     </div>
   </DetachedPageShell>
 );
