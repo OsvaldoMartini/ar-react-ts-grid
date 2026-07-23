@@ -153,6 +153,12 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose 
           setLocalStatus(body?.ok === false
             ? String(body?.message || body?.error || 'The Memory List action was refused.')
             : '');
+        } else if (operationId === 'memoryList.focus') {
+          try {
+            window.focus();
+          } catch {
+            // Native window focus is best-effort and may be refused by the window manager.
+          }
         }
       } catch (messageError) {
         console.error('Could not read Memory List message:', messageError);
