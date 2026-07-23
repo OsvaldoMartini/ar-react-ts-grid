@@ -1,6 +1,7 @@
 import React from 'react';
 import QuestionsCard from '../QuestionsCard';
 import BotJobDetailsHeader from './BotJobDetailsHeader';
+import BotJobDetailsPageTitle from './BotJobDetailsPageTitle';
 import BotJobMetadataPanel from './BotJobMetadataPanel';
 import type { BotJobDetailsControllerState } from './useBotJobDetailsController';
 import type { BotJobWorkspaceSurface } from './BotJobDetails.types';
@@ -31,6 +32,16 @@ const BotJobDetailsChrome: React.FC<BotJobDetailsChromeProps> = ({
   const workspaceBusy = operationBusy || executionActive;
   return (
     <div className={styles.chrome}>
+      {fallbackSurface === 'botJob' && (
+        <BotJobDetailsPageTitle
+          botJobId={state?.botJobId ?? fallbackBotJobId}
+          botJobName={state?.name ?? fallbackBotJobName}
+          connected={connected}
+          status={controller.status}
+          statusTone={controller.statusTone}
+          onClose={() => controller.sendAction('CLOSE')}
+        />
+      )}
       <BotJobDetailsHeader
         botJobId={state?.botJobId ?? fallbackBotJobId}
         botJobName={state?.name ?? fallbackBotJobName}
