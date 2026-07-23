@@ -2,9 +2,14 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import NewBotJobPage from './NewBotJobPage';
 
-jest.mock('./NewBotJobManager', () => {
-  return function MockNewBotJobManager() {
-    return <div data-testid="new-bot-job-manager">new bot job manager</div>;
+jest.mock('./useWebSocket', () => {
+  return {
+    useWebSocket: () => ({
+      webSocket: null,
+      connected: false,
+      messages: [],
+      error: null,
+    }),
   };
 });
 
@@ -15,10 +20,13 @@ jest.mock('./workspace/DesktopWorkspaceShell', () => {
 });
 
 describe('NewBotJobPage', () => {
-  it('renders the manager inside the detached shell', () => {
+  it('renders the TEMP-pattern form and Organization selection inside the detached shell', () => {
     render(<NewBotJobPage socketPort={59772} sessionId="newBotJobManager" />);
 
-    expect(screen.getByText('new bot job manager')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'New Bot Job' })).toBeInTheDocument();
+    expect(screen.getByTestId('new-bot-job-organizations-grid')).toBeInTheDocument();
+    expect(screen.queryByTestId('new-bot-job-environments-grid')).not.toBeInTheDocument();
+    expect(screen.getByText('Select an Organization, then select one of its Environments.')).toBeInTheDocument();
     expect(screen.getByTestId('desktop-workspace-shell')).toBeInTheDocument();
   });
 });
