@@ -18,6 +18,8 @@ type Props = {
   socketPort: number;
   sessionId: string;
   onWorkspaceRetarget: (target: OcrWorkspaceRetarget) => void;
+  onClose?: () => void;
+  onWorkspaceNotice?: (message: string) => void;
 };
 
 type WorkspaceContext = {
@@ -49,7 +51,13 @@ const parseJson = (value: unknown) => {
 
 const messageError = (body: any, fallback: string) => String(body?.error || body?.message || fallback);
 
-const OCRConfigWorkspace: React.FC<Props> = ({ socketPort, sessionId, onWorkspaceRetarget }) => {
+const OCRConfigWorkspace: React.FC<Props> = ({
+  socketPort,
+  sessionId,
+  onWorkspaceRetarget,
+  onClose,
+  onWorkspaceNotice,
+}) => {
   const { webSocket, connected, messages, error: socketError } = useWebSocket(socketPort, sessionId);
   const processedMessageCountRef = useRef(0);
   const bootstrappedSocketRef = useRef<WebSocket | null>(null);
@@ -219,7 +227,20 @@ const OCRConfigWorkspace: React.FC<Props> = ({ socketPort, sessionId, onWorkspac
 
           case 'ocrWorkspace.openResponse':
             setBusy(false);
-            setError(body?.ok === false ? messageError(body, 'OCR Results could not be opened.') : '');
+            if (body?.ok === false) {
+              setError(messageError(body, 'OCR Results could not be opened.'));
+            } else if (
+              body?.alreadyOpen === true
+              || body?.reused === true
+              || body?.focusOnly === true
+              || (typeof body?.message === 'string' && /already open/i.test(body.message))
+            ) {
+              const notice = String(body?.message || 'OCR Results workspace already open.');
+              setError(notice);
+              onWorkspaceNotice?.(notice);
+            } else {
+              setError('');
+            }
             break;
 
           case 'license.requiredResponse':
@@ -293,7 +314,7 @@ const OCRConfigWorkspace: React.FC<Props> = ({ socketPort, sessionId, onWorkspac
         sendCommand('ocrConfig.cleanupPreview', { homeBankingId: context.homeBankingId });
       }}
       onTest={openResults}
-      onClose={() => window.close()}
+      onClose={onClose ?? (() => void 0)}
     />
   );
 };

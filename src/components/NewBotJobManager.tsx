@@ -155,10 +155,12 @@ const NewBotJobManager: React.FC<NewBotJobManagerProps> = ({ socketPort, session
   return (
     <main className={styles.shell}>
       <section className={styles.window}>
-        <header className={styles.topBar}>
+        <header className={styles.topBar} data-floating-workspace-drag-handle>
           <div className={styles.titleBlock}>
-            <h1 className={styles.title}>New Bot Job</h1>
-            <p className={styles.subtitle}>Create an automation job from an Organization Environment</p>
+            <div className={styles.titleText}>
+              <h1 className={styles.title}>New Bot Job</h1>
+              <p className={styles.subtitle}>Create an automation job from an Organization Environment</p>
+            </div>
           </div>
           <div className={`${styles.status} ${statusClass}`}>{status.text}</div>
         </header>

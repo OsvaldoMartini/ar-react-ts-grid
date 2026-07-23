@@ -160,7 +160,6 @@ export const useWebSocket = (socketPort: number, sessionId: string) => {
           } catch {
             // The backend may already have closed the transport.
           }
-          window.close();
           return;
         }
         setMessages((previous) => [...previous, event.data]);

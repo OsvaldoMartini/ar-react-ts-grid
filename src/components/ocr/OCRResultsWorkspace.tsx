@@ -13,6 +13,8 @@ type Props = {
   socketPort: number;
   sessionId: string;
   onWorkspaceRetarget: (target: OcrWorkspaceRetarget) => void;
+  onClose?: () => void;
+  onWorkspaceNotice?: (message: string) => void;
 };
 
 type WorkspaceContext = {
@@ -47,7 +49,13 @@ const parseJson = (value: unknown) => {
 
 const responseError = (body: any, fallback: string) => String(body?.error || body?.message || fallback);
 
-const OCRResultsWorkspace: React.FC<Props> = ({ socketPort, sessionId, onWorkspaceRetarget }) => {
+const OCRResultsWorkspace: React.FC<Props> = ({
+  socketPort,
+  sessionId,
+  onWorkspaceRetarget,
+  onClose,
+  onWorkspaceNotice,
+}) => {
   const { webSocket, connected, messages, error: socketError } = useWebSocket(socketPort, sessionId);
   const processedMessageCountRef = useRef(0);
   const bootstrappedSocketRef = useRef<WebSocket | null>(null);
@@ -124,6 +132,16 @@ const OCRResultsWorkspace: React.FC<Props> = ({ socketPort, sessionId, onWorkspa
               setError(responseError(body, 'OCR Results workspace could not be opened.'));
               break;
             }
+            if (
+              body?.alreadyOpen === true
+              || body?.reused === true
+              || body?.focusOnly === true
+              || (typeof body?.message === 'string' && /already open/i.test(body.message))
+            ) {
+              const notice = String(body?.message || 'OCR Results workspace already open.');
+              setError(notice);
+              onWorkspaceNotice?.(notice);
+            }
             const homeBankingId = Number(body.homeBankingId ?? envelope.homeBankingId ?? -1);
             if (!Number.isFinite(homeBankingId) || homeBankingId <= 0) {
               setBusy(false);
@@ -169,7 +187,7 @@ const OCRResultsWorkspace: React.FC<Props> = ({ socketPort, sessionId, onWorkspa
           case 'ocrWorkspace.applySuggestionsResponse':
             setBusy(false);
             if (body?.ok && body?.published) {
-              window.close();
+              onClose?.();
             } else {
               setError(responseError(body, 'OCR suggestions could not be applied.'));
             }
@@ -188,7 +206,7 @@ const OCRResultsWorkspace: React.FC<Props> = ({ socketPort, sessionId, onWorkspa
       }
     }
     processedMessageCountRef.current = messages.length;
-  }, [messages, onWorkspaceRetarget, sendCommand, sessionId]);
+  }, [messages, onClose, onWorkspaceRetarget, sendCommand, sessionId]);
 
   const displayResult = result || emptyResult(
     error || socketError || (busy ? 'Loading OCR result...' : 'No OCR result available.'),
@@ -203,7 +221,7 @@ const OCRResultsWorkspace: React.FC<Props> = ({ socketPort, sessionId, onWorkspa
         setError('');
         sendCommand('ocrWorkspace.applySuggestions', { suggestions });
       }}
-      onClose={() => window.close()}
+      onClose={onClose ?? (() => void 0)}
     />
   );
 };

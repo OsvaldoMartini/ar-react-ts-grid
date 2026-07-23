@@ -12,7 +12,7 @@ const ActivationRequired: React.FC<Props> = ({ socketPort, sessionId }) => {
   return <main className={styles.page}>
   <header><ShieldAlert size={24}/><div><h1>Activation required</h1><p>A valid license is required before protected AR Web features can open.</p></div></header>
   <LicenseManager socketPort={socketPort} sessionId={sessionId} onActivated={openApplication}/>
-  <button className={styles.exit} onClick={() => window.close()}><LogOut size={16}/>Exit application</button>
+  <button className={styles.exit} onClick={openApplication}><LogOut size={16}/>Back to main dashboard</button>
 </main>;
 };
 export default ActivationRequired;

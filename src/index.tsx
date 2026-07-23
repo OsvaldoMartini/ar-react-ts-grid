@@ -15,21 +15,22 @@ import ApiTestToolAINew from './components/ApiTestToolAINew';
 import OrganizationManager from './components/OrganizationManager';
 import MainDashboard from './components/MainDashboard';
 import MainApplicationControl, { isMainApplicationWindow } from './components/MainApplicationControl';
-import NewBotJobManager from './components/NewBotJobManager';
-import CloneJobManager from './components/CloneJobManager';
-import ConfigManager from './components/ConfigManager';
-import LicenseManager from './components/LicenseManager';
-import AboutPanel from './components/AboutPanel';
 import DesktopWorkspaceShell from './components/workspace/DesktopWorkspaceShell';
+import NewBotJobPage from './components/NewBotJobPage';
+import CloneJobPage from './components/CloneJobPage';
+import ConfigPage from './components/ConfigPage';
+import ATemplate from './components/ATemplate';
+import InfoPage from './components/InfoPage';
+import LicenseManager from './components/LicenseManager';
 import ActivationRequired from './components/ActivationRequired';
-import OCRConfigWorkspace from './components/ocr/OCRConfigWorkspace';
-import OCRResultsWorkspace from './components/ocr/OCRResultsWorkspace';
+import OCRConfigDetachedWorkspace from './components/ocr/OCRConfigDetachedWorkspace';
+import OCRResultsDetachedWorkspace from './components/ocr/OCRResultsDetachedWorkspace';
 import {
   ocrWorkspaceRetargetDisposition,
   ocrWorkspaceTargetUrl,
   type OcrWorkspaceRetarget,
 } from './components/ocr/OCRWorkspace.contract';
-import PageScannerWorkspace from './components/scanner/PageScannerWorkspace';
+import PageScannerDetachedWorkspace from './components/scanner/PageScannerDetachedWorkspace';
 import BotJobWindowControl from './components/bot-job-details/BotJobWindowControl';
 import {
   botJobWindowTargetUrl,
@@ -78,6 +79,16 @@ const App: React.FC = () => {
     setAlertMessageHeader('');
     setAlertMessageBody('');
   };
+
+  const showWorkspaceNotice = useCallback((message: string) => {
+    setErrorFlag(false);
+    setAlertImage(constructionImage);
+    setAlertClass('construction-image');
+    setAlertMessageHeader('Workspace');
+    setAlertMessageBody(message);
+    setAlertMessageFooter('');
+    setAlertDismissed(false);
+  }, []);
 
   // Every navigation button used to work by Java calling window.receiveDataFromJava directly into
   // an embedded JCEF browser. That bridge is gone; navigation now arrives as a "react.session.open"
@@ -176,6 +187,25 @@ const App: React.FC = () => {
   // initial job plus a persistent control-session identity used for every later retarget.
   useEffect(() => {
     const search = new URLSearchParams(window.location.search);
+    const openWorkspace = search.get('openWorkspace');
+    const sourceBotJobId = search.get('sourceBotJobId');
+    if (openWorkspace) {
+      if (
+        !['newBotJobManager', 'cloneJobManager', 'configManager', 'aTemplateManager', 'aboutPanel', 'licenseManager']
+          .includes(openWorkspace)
+      ) {
+        console.error('Rejected invalid detached workspace route.');
+        return;
+      }
+      const parsedSourceBotJobId = sourceBotJobId ? Number(sourceBotJobId) : -9999;
+      onSessionOpen(
+        openWorkspace,
+        Number(window.location.port),
+        Number.isSafeInteger(parsedSourceBotJobId) && parsedSourceBotJobId > 0 ? parsedSourceBotJobId : undefined,
+      );
+      return;
+    }
+
     const openPageScanner = search.get('openPageScanner');
     const pageScannerSession = search.get('pageScannerSession');
     if (openPageScanner || pageScannerSession) {
@@ -223,6 +253,14 @@ const App: React.FC = () => {
     onSessionOpen('botJobTasks', Number(window.location.port), parsedBotJobId);
   }, [onSessionOpen]);
 
+  const closeDetachedWorkspace = useCallback(() => {
+    try {
+      window.close();
+    } catch (error) {
+      console.error('Could not close detached workspace window:', error);
+    }
+  }, []);
+
   // Bootstrap over WebSocket: the shell opens a short-lived handshake connection under its own
   // session id ("mainDashboardBootstrap", never a real target session) and waits for the initial
   // "react.session.open" reply to learn which session/port to start on. It closes right after so
@@ -236,6 +274,7 @@ const App: React.FC = () => {
       || search.has('ocrSession')
       || search.has('openPageScanner')
       || search.has('pageScannerSession')
+      || search.has('openWorkspace')
     ) return;
     const ws = new WebSocket(`ws://${window.location.hostname}:${window.location.port}/websocket?sessionId=mainDashboardBootstrap`);
 
@@ -366,7 +405,7 @@ const App: React.FC = () => {
       )}
       {sessionId && (sessionId.includes("botJobTasks")) && (
         <DesktopWorkspaceShell ariaLabel="Bot Job Details" testId="bot-job-details-workspace">
-          <GridItem key={`${botJobWorkspaceKey}:details`} homeBankingIdInitial={homeBanking} data={instructionsData} socketPort={socketPort} sessionId={sessionId} botJobIdInitial={botJobId} botJobNameInitial={botJobName} onSessionOpen={onSessionOpen} />
+          <GridItem key={`${botJobWorkspaceKey}:details`} homeBankingIdInitial={homeBanking} data={instructionsData} socketPort={socketPort} sessionId={sessionId} botJobIdInitial={botJobId} botJobNameInitial={botJobName} onSessionOpen={onSessionOpen} onDetachedClose={closeDetachedWorkspace} />
         </DesktopWorkspaceShell>
       )}
       {sessionId && (sessionId.includes("componentTasks")) && (
@@ -379,38 +418,68 @@ const App: React.FC = () => {
         && sessionId.includes(SCANNER_GRID_SESSION_ID)
         && !sessionId.includes(PRE_SCANNER_GRID_SESSION_ID) && (
         <DesktopWorkspaceShell ariaLabel="Page Scanner Grid" testId="page-scanner-workspace">
-          <GridItemScann homeBankingIdInitial={homeBanking} dataDTO={elementDTO} socketPort={socketPort} sessionId={sessionId} botJobIdInitial={botJobId} botJobNameInitial={botJobName} onSessionOpen={onSessionOpen} />
+          <GridItemScann
+            homeBankingIdInitial={homeBanking}
+            dataDTO={elementDTO}
+            socketPort={socketPort}
+            sessionId={sessionId}
+            botJobIdInitial={botJobId}
+            botJobNameInitial={botJobName}
+            onSessionOpen={onSessionOpen}
+            onDetachedClose={closeDetachedWorkspace}
+            onWorkspaceNotice={showWorkspaceNotice}
+          />
         </DesktopWorkspaceShell>
       )}
       {sessionId && (sessionId.includes(PRE_SCANNER_GRID_SESSION_ID)) && (
         <DesktopWorkspaceShell ariaLabel="Page Scanner Grid" testId="pre-scan-workspace">
-          <GridItemScann mode="preScan" homeBankingIdInitial={homeBanking} dataDTO={elementDTO} socketPort={socketPort} sessionId={sessionId} botJobIdInitial={botJobId} botJobNameInitial={botJobName} onSessionOpen={onSessionOpen} />
+          <GridItemScann
+            mode="preScan"
+            homeBankingIdInitial={homeBanking}
+            dataDTO={elementDTO}
+            socketPort={socketPort}
+            sessionId={sessionId}
+            botJobIdInitial={botJobId}
+            botJobNameInitial={botJobName}
+            onSessionOpen={onSessionOpen}
+            onDetachedClose={closeDetachedWorkspace}
+            onWorkspaceNotice={showWorkspaceNotice}
+          />
         </DesktopWorkspaceShell>
       )}
       {isPageScannerWorkspaceSession(sessionId) && (
-        <DesktopWorkspaceShell ariaLabel="Page Scanner" testId="detached-page-scanner-workspace">
-          <PageScannerWorkspace key={sessionId} homeBankingIdInitial={homeBanking} dataDTO={elementDTO} socketPort={socketPort} sessionId={sessionId} botJobIdInitial={botJobId} botJobNameInitial={botJobName} onSessionOpen={onSessionOpen} />
-        </DesktopWorkspaceShell>
+        <PageScannerDetachedWorkspace
+          key={sessionId}
+          homeBankingIdInitial={homeBanking}
+          dataDTO={elementDTO}
+          socketPort={socketPort}
+          sessionId={sessionId}
+          botJobIdInitial={botJobId}
+          botJobNameInitial={botJobName}
+          onSessionOpen={onSessionOpen}
+          onDetachedClose={closeDetachedWorkspace}
+          onWorkspaceNotice={showWorkspaceNotice}
+        />
       )}
       {isOcrConfigWorkspaceSession(sessionId) && (
-        <DesktopWorkspaceShell ariaLabel="OCR configuration" testId="ocr-config-window">
-          <OCRConfigWorkspace
-            key={sessionId}
-            socketPort={socketPort}
-            sessionId={sessionId}
-            onWorkspaceRetarget={onOcrWorkspaceRetarget}
-          />
-        </DesktopWorkspaceShell>
+        <OCRConfigDetachedWorkspace
+          key={sessionId}
+          socketPort={socketPort}
+          sessionId={sessionId}
+          onWorkspaceRetarget={onOcrWorkspaceRetarget}
+          onClose={closeDetachedWorkspace}
+          onWorkspaceNotice={showWorkspaceNotice}
+        />
       )}
       {isOcrResultsWorkspaceSession(sessionId) && (
-        <DesktopWorkspaceShell ariaLabel="OCR test results" testId="ocr-results-window">
-          <OCRResultsWorkspace
-            key={sessionId}
-            socketPort={socketPort}
-            sessionId={sessionId}
-            onWorkspaceRetarget={onOcrWorkspaceRetarget}
-          />
-        </DesktopWorkspaceShell>
+        <OCRResultsDetachedWorkspace
+          key={sessionId}
+          socketPort={socketPort}
+          sessionId={sessionId}
+          onWorkspaceRetarget={onOcrWorkspaceRetarget}
+          onClose={closeDetachedWorkspace}
+          onWorkspaceNotice={showWorkspaceNotice}
+        />
       )}
       {sessionId && (sessionId.includes("mobileScannerGrid")) && (
         <GridItemScannMobile homeBankingIdInitial={homeBanking} dataDTO={elementDTO} socketPort={socketPort} sessionId={sessionId} botJobIdInitial={botJobId} botJobNameInitial={botJobName} />
@@ -425,21 +494,55 @@ const App: React.FC = () => {
       )}
 
       {sessionId && (sessionId.includes("newBotJobManager")) && (
-        <NewBotJobManager socketPort={socketPort} sessionId={sessionId} onSessionOpen={onSessionOpen} />
+        <NewBotJobPage
+          key={sessionId}
+          socketPort={socketPort}
+          sessionId={sessionId}
+          onSessionOpen={onSessionOpen}
+          onClose={closeDetachedWorkspace}
+        />
       )}
 
       {sessionId && sessionId.includes("cloneJobManager") && (
-        <CloneJobManager socketPort={socketPort} sessionId={sessionId} sourceBotJobId={botJobId} onSessionOpen={onSessionOpen} />
+        <CloneJobPage
+          key={sessionId}
+          socketPort={socketPort}
+          sessionId={sessionId}
+          sourceBotJobId={botJobId}
+          onSessionOpen={onSessionOpen}
+          onClose={closeDetachedWorkspace}
+        />
       )}
 
       {sessionId && (sessionId.includes("configManager")) && (
-        <ConfigManager socketPort={socketPort} sessionId={sessionId} />
+        <ConfigPage
+          key={sessionId}
+          socketPort={socketPort}
+          sessionId={sessionId}
+          onClose={closeDetachedWorkspace}
+        />
+      )}
+      {sessionId && sessionId.includes("aTemplateManager") && (
+        <ATemplate
+          key={sessionId}
+          socketPort={socketPort}
+          sessionId={sessionId}
+          onClose={closeDetachedWorkspace}
+        />
       )}
       {sessionId && sessionId.includes("licenseManager") && (
-        <LicenseManager socketPort={socketPort} sessionId={sessionId} />
+        <DesktopWorkspaceShell key={sessionId} ariaLabel="License Manager" testId="license-manager-workspace">
+          <LicenseManager socketPort={socketPort} sessionId={sessionId} />
+        </DesktopWorkspaceShell>
       )}
       {sessionId && sessionId.includes("aboutPanel") && (
-        <AboutPanel socketPort={socketPort} sessionId={sessionId} onSessionOpen={onSessionOpen} />
+        <InfoPage
+          key={sessionId}
+          socketPort={socketPort}
+          sessionId={sessionId}
+          onSessionOpen={onSessionOpen}
+          onClose={closeDetachedWorkspace}
+        />
       )}
       {sessionId && sessionId.includes("activationRequired") && (
         <ActivationRequired socketPort={socketPort} sessionId={sessionId} />

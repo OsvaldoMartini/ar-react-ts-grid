@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Settings2 } from 'lucide-react';
 import { ComplexMessage, ElementDTO } from './instructionsMockData';
 import crossImage from '../assets/cross.png';
@@ -105,6 +105,8 @@ export interface GridItemScannProps {
   sessionId: string;
   mode?: 'scanner' | 'preScan';
   onSessionOpen: (targetSession: string, port: number, botJobId?: number) => void;
+  onDetachedClose?: () => void;
+  onWorkspaceNotice?: (message: string) => void;
 }
 
 // Canonical group buckets. The scanner's DECIDED category (typeElement) wins over
@@ -193,7 +195,18 @@ type PendingPageScannerCreateBlock = {
 
 const PAGE_SCANNER_RESPONSE_TIMEOUT_MS = 12000;
 
-const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, botJobIdInitial, botJobNameInitial, dataDTO, socketPort, sessionId, mode = 'scanner', onSessionOpen }) => {
+const GridItemScann: React.FC<GridItemScannProps> = ({
+  homeBankingIdInitial,
+  botJobIdInitial,
+  botJobNameInitial,
+  dataDTO,
+  socketPort,
+  sessionId,
+  mode = 'scanner',
+  onSessionOpen,
+  onDetachedClose,
+  onWorkspaceNotice,
+}) => {
   // Using the custom WebSocket hook
   const { webSocket, connected, reconnectAttempts, messages, error } = useWebSocket(socketPort, sessionId);
 
@@ -249,6 +262,14 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
   const scannerController = useScannerController({
     webSocket, connected, messages, sessionId, homeBankingId, botJobId, enabled: !isPreScanMode,
   });
+
+  const returnToMainDashboard = useCallback(() => {
+    if (onDetachedClose) {
+      onDetachedClose();
+      return;
+    }
+    onSessionOpen('mainDashboard', socketPort);
+  }, [onDetachedClose, onSessionOpen, socketPort]);
 
   useEffect(() => {
     if (!botJobHeader.state) return;
@@ -495,7 +516,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
     setPreScanStatus((current) => ({ ...current, status: 'failed', message }));
     setPageScannerClosing(true);
     if (pageScannerCloseTimerRef.current) clearTimeout(pageScannerCloseTimerRef.current);
-    pageScannerCloseTimerRef.current = setTimeout(() => window.close(), 1400);
+    pageScannerCloseTimerRef.current = setTimeout(() => returnToMainDashboard(), 1400);
   };
 
   useEffect(() => {
@@ -585,13 +606,13 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
         }));
         pageScannerCloseRequestRef.current = requestId;
         setPageScannerClosing(true);
-        pageScannerCloseTimerRef.current = setTimeout(() => window.close(), 1500);
+        pageScannerCloseTimerRef.current = setTimeout(() => returnToMainDashboard(), 1500);
         return;
       } catch (closeError) {
         console.error('Could not notify the backend that Page Scanner closed:', closeError);
       }
     }
-    window.close();
+    returnToMainDashboard();
   };
 
   useEffect(() => () => {
@@ -1212,6 +1233,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
               } catch {
                 // Native focus is best-effort and may be refused by the window manager.
               }
+              onWorkspaceNotice?.('Page Scanner workspace already open.');
               break;
             }
 
@@ -1658,7 +1680,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
               clearTimeout(pageScannerCloseTimerRef.current);
               pageScannerCloseTimerRef.current = null;
             }
-            window.close();
+            returnToMainDashboard();
             break;
           }
 
@@ -2708,7 +2730,10 @@ const GridItemScann: React.FC<GridItemScannProps> = ({ homeBankingIdInitial, bot
           controller={{
             ...botJobHeader,
             sendAction: (action: Parameters<typeof botJobHeader.sendAction>[0]) => {
-              if (action === 'CLOSE') window.close();
+              if (action === 'CLOSE') {
+                returnToMainDashboard();
+                return;
+              }
               botJobHeader.sendAction(action);
             },
           }}

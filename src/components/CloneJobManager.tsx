@@ -2,7 +2,13 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import styles from './CloneJobManager.module.scss';
 import { useWebSocket } from './useWebSocket';
 
-interface Props { socketPort: number; sessionId: string; sourceBotJobId: number; onSessionOpen?: (targetSession: string, port: number, botJobId?: number) => void; }
+interface Props {
+  socketPort: number;
+  sessionId: string;
+  sourceBotJobId: number;
+  onSessionOpen?: (targetSession: string, port: number, botJobId?: number) => void;
+  onClose?: () => void;
+}
 interface Source { id: number; name: string; description?: string; homeBankingId: number; homeUrlId: number; organizationName?: string; environmentName?: string; environmentUrl?: string; }
 interface Environment { id: number; homeBankingId: number; orgName: string; name?: string; url: string; }
 
@@ -11,7 +17,7 @@ const decode = (raw: string) => {
   return { operationId: outer.operationId || outer.type, body: typeof outer.body === 'string' ? JSON.parse(outer.body) : outer.body ?? outer };
 };
 
-const CloneJobManager: React.FC<Props> = ({ socketPort, sessionId, sourceBotJobId, onSessionOpen }) => {
+const CloneJobManager: React.FC<Props> = ({ socketPort, sessionId, sourceBotJobId, onSessionOpen, onClose }) => {
   const { webSocket, connected, messages, error } = useWebSocket(socketPort, sessionId);
   const cursor = useRef(0);
   const [source, setSource] = useState<Source | null>(null);
@@ -68,7 +74,15 @@ const CloneJobManager: React.FC<Props> = ({ socketPort, sessionId, sourceBotJobI
   const statusClass = status.level === 'error' ? styles.statusError : status.level === 'ok' ? styles.statusOk : styles.statusWarn;
 
   return <main className={styles.shell}><section className={styles.window}>
-    <header className={styles.topBar}><div><h1>Clone Job</h1><p>Create a complete copy in an Organization Environment</p></div><div className={`${styles.status} ${statusClass}`}>{status.text}</div></header>
+    <header className={styles.topBar} data-floating-workspace-drag-handle>
+      <div>
+        <h1>Clone Job</h1>
+        <p>Create a complete copy in an Organization Environment</p>
+      </div>
+      <div className={styles.topBarRight}>
+        <div className={`${styles.status} ${statusClass}`}>{status.text}</div>
+      </div>
+    </header>
     <section className={styles.content}>
       <div className={styles.source}><span>Source</span><strong>{source ? `(${source.id}) ${source.name}` : '-'}</strong><span>Organization</span><strong>{source?.organizationName || '-'}</strong></div>
       <div className={styles.formGrid}>
@@ -78,7 +92,12 @@ const CloneJobManager: React.FC<Props> = ({ socketPort, sessionId, sourceBotJobI
         <label className={styles.full}>Target URL<input value={url} onChange={event => { setUrl(event.target.value); setEnvironmentId(''); }} /></label>
       </div>
     </section>
-    <footer className={styles.footer}><button onClick={() => send('cloneJob.openOrganizations')}>Organizations / Environments</button><button onClick={() => send('cloneJob.environments', { sourceBotJobId })}>Refresh Environments</button><button onClick={() => send('cloneJob.cancel')}>Cancel</button><button className={styles.primary} disabled={saving || !source || !name.trim() || !url.trim()} onClick={clone}>{saving ? 'Cloning...' : 'Clone Bot Job'}</button></footer>
+    <footer className={styles.footer}>
+      <button onClick={() => send('cloneJob.openOrganizations')}>Organizations / Environments</button>
+      <button onClick={() => send('cloneJob.environments', { sourceBotJobId })}>Refresh Environments</button>
+      <button onClick={() => send('cloneJob.cancel')}>Cancel</button>
+      <button className={styles.primary} disabled={saving || !source || !name.trim() || !url.trim()} onClick={clone}>{saving ? 'Cloning...' : 'Clone Bot Job'}</button>
+    </footer>
   </section></main>;
 };
 

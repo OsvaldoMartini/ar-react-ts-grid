@@ -73,6 +73,7 @@ interface GridItemProps {
   botJobIdInitial: number;
   botJobNameInitial: string;
   onSessionOpen: (targetSession: string, port: number, botJobId?: number) => void;
+  onDetachedClose?: () => void;
 }
 type BlockDeleteCapability = { canDelete: boolean; reason: string; instructionCount: number; deleteRows: { id: number; name: string; action: string; order: number }[] };
 
@@ -146,7 +147,7 @@ const normalizeBlockOptions = (blocks: CreateBlockOption[]): CreateBlockOption[]
 };
 
 
-const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketPort, sessionId, botJobIdInitial, botJobNameInitial, onSessionOpen }) => {
+const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketPort, sessionId, botJobIdInitial, botJobNameInitial, onSessionOpen, onDetachedClose }) => {
   // Using the custom WebSocket hook
   const { webSocket, connected, reconnectAttempts, messages, error } = useWebSocket(socketPort, sessionId);
 
@@ -940,7 +941,15 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
             ? JSON.parse(parsedMessage.body)
             : parsedMessage.body;
           if (bodyData?.targetSession === 'mainDashboard') {
-            window.close();
+            if (onDetachedClose) {
+              onDetachedClose();
+            } else {
+              try {
+                window.close();
+              } catch (closeError) {
+                console.error('Could not close detached Bot Job window:', closeError);
+              }
+            }
           } else if (typeof bodyData?.targetSession === 'string' && typeof bodyData?.port === 'number') {
             onSessionOpen(bodyData.targetSession, bodyData.port, bodyData.botJobId);
           }
@@ -950,7 +959,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
         console.error("Error parsing WebSocket message:", error);
       }
     });
-  }, [messages, onSessionOpen, pendingMemoryMove, pendingDragPreview, sessionId]);
+  }, [messages, onDetachedClose, onSessionOpen, pendingMemoryMove, pendingDragPreview, sessionId, socketPort]);
 
 
   useEffect(() => {
@@ -2994,13 +3003,16 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
         controller={{
           ...botJobHeader,
           sendAction: (action: Parameters<typeof botJobHeader.sendAction>[0]) => {
-            // Close leaves immediately, client-side: this workspace owns its Chromium app window,
-            // so "going back" means closing this window, not
-            // switching its own view to "mainDashboard" -- that would try to open a second
-            // dashboard session and collide with the actual dashboard tab. The action is still
-            // sent below so the backend does its normal CLOSE-side cleanup.
             if (action === 'CLOSE') {
-              window.close();
+              if (onDetachedClose) {
+                onDetachedClose();
+              } else {
+                try {
+                  window.close();
+                } catch (closeError) {
+                  console.error('Could not close detached Bot Job window:', closeError);
+                }
+              }
             }
             botJobHeader.sendAction(action);
           },
