@@ -13,9 +13,8 @@ test('shows detached Page Scanner identity and closes only through its callback'
     />,
   );
 
-  expect(screen.getByText('Page Scanner')).toBeInTheDocument();
-  expect(screen.getByRole('heading', { name: 'Payments' })).toBeInTheDocument();
-  expect(screen.getByText('Bot Job ID 42')).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Page Scanner' })).toBeInTheDocument();
+  expect(screen.getByText('Payments - Bot Job ID 42')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Close' }));
   expect(onClose).toHaveBeenCalledTimes(1);
 });

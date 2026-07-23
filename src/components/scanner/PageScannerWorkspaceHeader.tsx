@@ -1,8 +1,5 @@
 import React from 'react';
-import WorkspaceHeader, { type WorkspaceHeaderAction } from '../workspace/WorkspaceHeader';
 import styles from './PageScannerWorkspaceHeader.module.scss';
-
-type PageScannerHeaderAction = 'CLOSE_PAGE_SCANNER';
 
 interface PageScannerWorkspaceHeaderProps {
   botJobId: number | null;
@@ -27,39 +24,41 @@ const PageScannerWorkspaceHeader: React.FC<PageScannerWorkspaceHeaderProps> = ({
   closing = false,
   onClose,
 }) => {
-  const actions: WorkspaceHeaderAction<PageScannerHeaderAction>[] = [
-    {
-      id: 'CLOSE_PAGE_SCANNER',
-      label: closing ? 'Closing...' : 'Close',
-      title: 'Close only this Page Scanner window',
-      tone: 'danger',
-      disabled: closing,
-    },
-  ];
   const resolvedStatus = error
     || status
     || (connected
       ? 'Page Scanner ready'
       : `Reconnecting${reconnectAttempts ? ` (${reconnectAttempts})` : ''}`);
-  const resolvedTone = error ? 'error' : connected ? statusTone : 'warning';
-  const subtitle = botJobId && botJobId > 0
-    ? `Bot Job ID ${botJobId}`
-    : 'Waiting for Bot Job details';
+  const statusClass = error || statusTone === 'error'
+    ? styles.statusError
+    : !connected || statusTone === 'warning'
+      ? styles.statusWarn
+      : styles.statusOk;
+  const subtitle = botJobName
+    ? `${botJobName}${botJobId && botJobId > 0 ? ` - Bot Job ID ${botJobId}` : ''}`
+    : 'Scan web elements for the current Bot Job';
 
   return (
-    <div className={styles.wrapper}>
-      <WorkspaceHeader
-        eyebrow="Page Scanner"
-        title={botJobName || 'AR Web Factory'}
-        subtitle={subtitle}
-        connected={connected}
-        status={resolvedStatus}
-        statusTone={resolvedTone}
-        actions={actions}
-        onAction={onClose}
-        compact
-      />
-    </div>
+    <header className={styles.topBar} data-floating-workspace-drag-handle>
+      <div className={styles.titleBlock}>
+        <h1 className={styles.title}>Page Scanner</h1>
+        <p className={styles.subtitle} title={subtitle}>{subtitle}</p>
+      </div>
+      <div className={styles.topBarRight} data-floating-drag-ignore="true">
+        <div className={`${styles.status} ${statusClass}`} role="status">
+          {resolvedStatus}
+        </div>
+        <button
+          type="button"
+          className={styles.closeButton}
+          title="Close only this Page Scanner window"
+          disabled={closing}
+          onClick={onClose}
+        >
+          {closing ? 'Closing...' : 'Close'}
+        </button>
+      </div>
+    </header>
   );
 };
 
