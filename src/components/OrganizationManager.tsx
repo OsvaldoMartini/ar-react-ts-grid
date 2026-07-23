@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import PagesOpenButton from './PagesOpenButton';
 import styles from './OrganizationManager.module.scss';
 import { useWebSocket } from './useWebSocket';
 import OrganizationAdvancedFields from './organization/OrganizationAdvancedFields';
@@ -286,6 +287,12 @@ const OrganizationManager: React.FC<OrganizationManagerProps> = ({
             <div className={`${styles.status} ${statusClass}`} role="status">
               {error ? error : status.text}
             </div>
+            <PagesOpenButton
+              webSocket={webSocket}
+              connected={connected}
+              messages={messages}
+              sessionId={sessionId}
+            />
             {showCloseAction && (
               <button
                 type="button"
