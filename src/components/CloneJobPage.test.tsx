@@ -2,9 +2,14 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import CloneJobPage from './CloneJobPage';
 
-jest.mock('./CloneJobManager', () => {
-  return function MockCloneJobManager() {
-    return <div data-testid="clone-job-manager">clone job manager</div>;
+jest.mock('./useWebSocket', () => {
+  return {
+    useWebSocket: () => ({
+      webSocket: null,
+      connected: false,
+      messages: [],
+      error: null,
+    }),
   };
 });
 
@@ -15,10 +20,13 @@ jest.mock('./workspace/DesktopWorkspaceShell', () => {
 });
 
 describe('CloneJobPage', () => {
-  it('renders the manager inside the detached shell', () => {
+  it('renders the TEMP-pattern clone form inside the detached shell', () => {
     render(<CloneJobPage socketPort={59772} sessionId="cloneJobManager" sourceBotJobId={7} />);
 
-    expect(screen.getByText('clone job manager')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Clone Job' })).toBeInTheDocument();
+    expect(screen.getByTestId('clone-job-organizations-grid')).toBeInTheDocument();
+    expect(screen.queryByTestId('clone-job-environments-grid')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Clone Bot Job' })).toBeDisabled();
     expect(screen.getByTestId('desktop-workspace-shell')).toBeInTheDocument();
   });
 });
