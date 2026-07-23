@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { CheckCheck, ScanSearch, X } from 'lucide-react';
+import { CheckCheck } from 'lucide-react';
 import styles from './OCRTestResultsPanel.module.scss';
 
 export type OCRTestRow = {
@@ -23,9 +23,19 @@ type Props = {
   result: OCRTestResult;
   onAccept: (suggestions: Array<{ xPath: string; clientNamed: string }>) => void;
   onClose: () => void;
+  busy?: boolean;
+  error?: string;
+  headerAction?: React.ReactNode;
 };
 
-const OCRTestResultsPanel: React.FC<Props> = ({ result, onAccept, onClose }) => {
+const OCRTestResultsPanel: React.FC<Props> = ({
+  result,
+  onAccept,
+  onClose,
+  busy = false,
+  error = '',
+  headerAction,
+}) => {
   const [approved, setApproved] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<OCRTestRow | null>(result.rows[0] || null);
   const all = approved.size === result.rows.length;
@@ -42,6 +52,13 @@ const OCRTestResultsPanel: React.FC<Props> = ({ result, onAccept, onClose }) => 
     next.has(path) ? next.delete(path) : next.add(path);
     return next;
   });
+  const statusText = error
+    || (busy ? 'Loading OCR Results...' : 'OCR Results loaded');
+  const statusClass = error
+    ? styles.statusError
+    : busy
+      ? styles.statusWarn
+      : styles.statusOk;
 
   return (
     <section
@@ -50,24 +67,31 @@ const OCRTestResultsPanel: React.FC<Props> = ({ result, onAccept, onClose }) => 
       data-testid="ocr-results-workspace"
     >
       <header
-        className={styles.header}
+        className={styles.topBar}
         data-testid="ocr-results-header"
+        data-floating-workspace-drag-handle
       >
-        <div className={styles.heading}>
-          <ScanSearch size={20} aria-hidden="true" />
-          <span>
-            <strong>OCR test results</strong>
-            <small>{result.source} · {result.wordCount} words · {approved.size}/{result.rows.length} approved</small>
-          </span>
+        <div className={styles.titleBlock}>
+          <h1 className={styles.title}>OCR Results</h1>
+          <p className={styles.subtitle}>
+            {result.source} · {result.wordCount} words · {approved.size}/{result.rows.length} approved
+          </p>
         </div>
-        <button
-          type="button"
-          title="Close OCR test results"
-          aria-label="Close OCR test results"
-          onClick={onClose}
-        >
-          <X size={18} aria-hidden="true" />
-        </button>
+        <div className={styles.topBarRight} data-floating-drag-ignore="true">
+          <div className={`${styles.status} ${statusClass}`} role="status">
+            {statusText}
+          </div>
+          {headerAction}
+          <button
+            type="button"
+            className={styles.closeButton}
+            title="Close only this OCR Results window"
+            aria-label="Close OCR test results"
+            onClick={onClose}
+          >
+            Close
+          </button>
+        </div>
       </header>
 
       <div className={styles.summary}>

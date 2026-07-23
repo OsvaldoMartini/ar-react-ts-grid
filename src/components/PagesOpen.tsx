@@ -2,22 +2,17 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AppWindow, RefreshCw } from 'lucide-react';
 import DetachedPageShell from './DetachedPageShell';
 import QuestionsCard from './QuestionsCard';
+import {
+  normalizeOpenPages,
+  pagesOpenTextValue,
+  parsePagesOpenMessage,
+  type OpenPageEntry,
+} from './pagesOpen.contract';
 import { useWebSocket } from './useWebSocket';
 import styles from './PagesOpen.module.scss';
 
 export const PAGES_OPEN_SESSION_ID = 'pagesOpenManager';
-
-export interface OpenPageEntry {
-  pageId: string;
-  title: string;
-  kind: string;
-  sessionId?: string;
-  detail?: string;
-  botJobName?: string;
-  openedAt?: string;
-  main: boolean;
-  closeable: boolean;
-}
+export type { OpenPageEntry } from './pagesOpen.contract';
 
 interface PagesOpenProps {
   socketPort: number;
@@ -25,89 +20,8 @@ interface PagesOpenProps {
   onClose?: () => void;
 }
 
-const parseMessage = (raw: string): { operationId?: string; body: any } => {
-  const outer = JSON.parse(raw);
-  return {
-    operationId: outer.operationId || outer.type,
-    body: typeof outer.body === 'string' ? JSON.parse(outer.body) : outer.body ?? outer,
-  };
-};
-
-const textValue = (...candidates: unknown[]): string => {
-  const value = candidates.find(candidate => typeof candidate === 'string' && candidate.trim());
-  return typeof value === 'string' ? value.trim() : '';
-};
-
-const normalizePage = (candidate: any, index: number): OpenPageEntry | null => {
-  if (!candidate || typeof candidate !== 'object') return null;
-
-  const sessionId = textValue(candidate.sessionId, candidate.session);
-  const pageId = textValue(
-    candidate.pageId,
-    candidate.pageKey,
-    candidate.workspaceId,
-    candidate.id,
-    sessionId,
-  );
-  if (!pageId) return null;
-
-  const kind = textValue(
-    candidate.kind,
-    candidate.pageKind,
-    candidate.workspaceKind,
-    candidate.type,
-    'WORKSPACE',
-  );
-  const title = textValue(
-    candidate.title,
-    candidate.displayName,
-    candidate.name,
-    candidate.label,
-    `Page ${index + 1}`,
-  );
-  const normalizedKind = kind.toUpperCase().replace(/[\s-]+/g, '_');
-  const explicitMain = typeof candidate.main === 'boolean'
-    ? candidate.main
-    : typeof candidate.isMain === 'boolean'
-      ? candidate.isMain
-      : null;
-  const main = explicitMain ?? (
-    normalizedKind === 'MAIN'
-    || normalizedKind === 'MAIN_DASHBOARD'
-    || sessionId === 'mainApplicationControl'
-  );
-
-  return {
-    pageId,
-    title,
-    kind,
-    sessionId: sessionId || undefined,
-    detail: textValue(candidate.detail, candidate.description) || undefined,
-    botJobName: textValue(candidate.botJobName) || undefined,
-    openedAt: textValue(candidate.openedAt, candidate.opened) || undefined,
-    main,
-    closeable: candidate.closeable !== false && candidate.canClose !== false,
-  };
-};
-
-const normalizePages = (body: any): OpenPageEntry[] => {
-  const candidates = Array.isArray(body)
-    ? body
-    : Array.isArray(body?.pages)
-    ? body.pages
-    : Array.isArray(body?.items)
-      ? body.items
-      : Array.isArray(body?.workspaces)
-        ? body.workspaces
-        : [];
-
-  return candidates
-    .map(normalizePage)
-    .filter((page: OpenPageEntry | null): page is OpenPageEntry => page !== null);
-};
-
 const responseMessage = (body: any, fallback: string): string =>
-  textValue(
+  pagesOpenTextValue(
     body?.message,
     body?.error?.errorMessage,
     body?.error?.errorHeader,
@@ -158,9 +72,9 @@ const PagesOpen: React.FC<PagesOpenProps> = ({ socketPort, sessionId, onClose })
 
     pendingMessages.forEach((raw) => {
       try {
-        const { operationId, body } = parseMessage(raw);
+        const { operationId, body } = parsePagesOpenMessage(raw);
         if (operationId === 'pagesOpen.snapshot' || operationId === 'pagesOpen.bootstrapResponse') {
-          const nextPages = normalizePages(body);
+          const nextPages = normalizeOpenPages(body);
           setPages(nextPages);
           setPendingPageId('');
           setStatus(responseMessage(
@@ -168,6 +82,12 @@ const PagesOpen: React.FC<PagesOpenProps> = ({ socketPort, sessionId, onClose })
             `${nextPages.length} page${nextPages.length === 1 ? '' : 's'} open`,
           ));
           setStatusTone(body?.ok === false ? 'error' : 'ok');
+        } else if (operationId === 'pagesOpen.focus') {
+          try {
+            window.focus();
+          } catch {
+            // Native focus is best-effort and may be refused by the window manager.
+          }
         } else if (
           operationId === 'pagesOpen.closeResponse'
           || operationId === 'pagesOpen.closePageResponse'

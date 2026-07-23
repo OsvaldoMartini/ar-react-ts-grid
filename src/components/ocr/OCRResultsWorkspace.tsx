@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { OCRParameter } from '../OCRConfigPanel';
 import OCRTestResultsPanel, { type OCRTestResult } from '../OCRTestResultsPanel';
+import PagesOpenButton from '../PagesOpenButton';
 import { OCR_RESULTS_WORKSPACE_KIND } from '../scanner/Scanner.sessions';
 import { useWebSocket } from '../useWebSocket';
 import {
@@ -215,6 +216,8 @@ const OCRResultsWorkspace: React.FC<Props> = ({
   return (
     <OCRTestResultsPanel
       result={displayResult}
+      busy={busy}
+      error={error || socketError || ''}
       onAccept={suggestions => {
         if (busy || !context) return;
         setBusy(true);
@@ -222,6 +225,14 @@ const OCRResultsWorkspace: React.FC<Props> = ({
         sendCommand('ocrWorkspace.applySuggestions', { suggestions });
       }}
       onClose={onClose ?? (() => void 0)}
+      headerAction={(
+        <PagesOpenButton
+          webSocket={webSocket}
+          connected={connected}
+          messages={messages}
+          sessionId={sessionId}
+        />
+      )}
     />
   );
 };

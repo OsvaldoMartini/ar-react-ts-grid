@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { FileKey2, Info, RefreshCw } from 'lucide-react';
 import DetachedPageShell from './DetachedPageShell';
+import PagesOpenButton from './PagesOpenButton';
 import { useWebSocket } from './useWebSocket';
 import styles from './InfoPage.module.scss';
 
@@ -164,6 +165,12 @@ const InfoPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
               <div className={`${styles.status} ${statusClass}`} role="status">
                 {status.text}
               </div>
+              <PagesOpenButton
+                webSocket={webSocket}
+                connected={connected}
+                messages={messages}
+                sessionId={sessionId}
+              />
               <button
                 type="button"
                 className={styles.closeButton}

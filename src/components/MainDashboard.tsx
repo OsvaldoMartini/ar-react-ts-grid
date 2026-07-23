@@ -3,6 +3,7 @@ import { AppWindow, ChevronDown, FlaskConical, GripHorizontal, ShieldCheck, User
 import AutoTestWorkspace, { AutomationTestCatalog } from './auto-test/AutoTestWorkspace';
 import FloatingWorkspaceFrame from './workspace/FloatingWorkspaceFrame';
 import GridTempA, { GridTempAColumn } from './GridTemp_A';
+import PagesOpenButton from './PagesOpenButton';
 import styles from './MainDashboard.module.scss';
 import { useWebSocket } from './useWebSocket';
 
@@ -424,6 +425,12 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, on
           </div>
           <div className={styles.topBarRight} data-floating-drag-ignore>
             <div className={`${styles.status} ${statusClass}`}>{status.text}</div>
+            <PagesOpenButton
+              webSocket={webSocket}
+              connected={connected}
+              messages={messages}
+              sessionId={sessionId}
+            />
             <div className={styles.userMenu} ref={userMenuRef}>
               <button
                 type="button"

@@ -2890,6 +2890,9 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
                 ? 'warning'
                 : 'neutral'}
           closing={pageScannerClosing}
+          webSocket={webSocket}
+          messages={messages}
+          sessionId={sessionId}
           onClose={closeDetachedPageScanner}
         />
       ) : isPreScanMode ? (

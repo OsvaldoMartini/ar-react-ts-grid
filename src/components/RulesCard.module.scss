@@ -1,0 +1,217 @@
+@keyframes rules-card-appear {
+  0% {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.96);
+  }
+  10%,
+  85% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(0) scale(0.98);
+  }
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.55rem;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  animation: rules-card-appear 2.4s ease-in-out forwards;
+  pointer-events: none;
+  user-select: none;
+}
+
+.green {
+  background: rgba(34, 197, 94, 0.18);
+  color: #22c55e;
+  text-shadow: 0 0 6px rgba(34, 197, 94, 0.65);
+  box-shadow:
+    0 0 8px rgba(34, 197, 94, 0.55),
+    0 0 18px rgba(34, 197, 94, 0.35);
+}
+
+.red {
+  background: rgba(239, 68, 68, 0.18);
+  color: #ef4444;
+  text-shadow: 0 0 6px rgba(239, 68, 68, 0.65);
+  box-shadow:
+    0 0 8px rgba(239, 68, 68, 0.55),
+    0 0 18px rgba(239, 68, 68, 0.35);
+}
+
+.orange {
+  background: rgba(255, 136, 0, 0.18);
+  color: #ff8800;
+  text-shadow: 0 0 6px rgba(255, 136, 0, 0.65);
+  box-shadow:
+    0 0 8px rgba(255, 136, 0, 0.55),
+    0 0 18px rgba(255, 136, 0, 0.35);
+}
+
+.blue {
+  background: rgba(64, 200, 255, 0.18);
+  color: #40c8ff;
+  text-shadow: 0 0 6px rgba(64, 200, 255, 0.65);
+  box-shadow:
+    0 0 8px rgba(64, 200, 255, 0.55),
+    0 0 18px rgba(64, 200, 255, 0.35);
+}
+
+.noGlow {
+  text-shadow: none;
+  box-shadow: none;
+}
+
+.withBorder.green {
+  border-color: rgba(34, 197, 94, 0.55);
+}
+
+.withBorder.red {
+  border-color: rgba(239, 68, 68, 0.55);
+}
+
+.withBorder.orange {
+  border-color: rgba(255, 136, 0, 0.55);
+}
+
+.withBorder.blue {
+  border-color: rgba(64, 200, 255, 0.55);
+}
+
+.static {
+  animation: none;
+  opacity: 1;
+  transform: none;
+}
+
+@keyframes rules-card-glow-green {
+  0%,
+  100% {
+    box-shadow: 0 0 6px rgba(34, 197, 94, 0.4), 0 0 12px rgba(34, 197, 94, 0.22);
+  }
+  50% {
+    box-shadow: 0 0 10px rgba(34, 197, 94, 0.7), 0 0 22px rgba(34, 197, 94, 0.42);
+  }
+}
+
+@keyframes rules-card-glow-red {
+  0%,
+  100% {
+    box-shadow: 0 0 6px rgba(239, 68, 68, 0.4), 0 0 12px rgba(239, 68, 68, 0.22);
+  }
+  50% {
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.7), 0 0 22px rgba(239, 68, 68, 0.42);
+  }
+}
+
+@keyframes rules-card-glow-orange {
+  0%,
+  100% {
+    box-shadow: 0 0 6px rgba(255, 136, 0, 0.4), 0 0 12px rgba(255, 136, 0, 0.22);
+  }
+  50% {
+    box-shadow: 0 0 10px rgba(255, 136, 0, 0.7), 0 0 22px rgba(255, 136, 0, 0.42);
+  }
+}
+
+@keyframes rules-card-glow-blue {
+  0%,
+  100% {
+    box-shadow: 0 0 6px rgba(64, 200, 255, 0.4), 0 0 12px rgba(64, 200, 255, 0.22);
+  }
+  50% {
+    box-shadow: 0 0 10px rgba(64, 200, 255, 0.7), 0 0 22px rgba(64, 200, 255, 0.42);
+  }
+}
+
+.pulse.green {
+  animation: rules-card-glow-green 2.4s ease-in-out infinite;
+}
+
+.pulse.red {
+  animation: rules-card-glow-red 2.4s ease-in-out infinite;
+}
+
+.pulse.orange {
+  animation: rules-card-glow-orange 2.4s ease-in-out infinite;
+}
+
+.pulse.blue {
+  animation: rules-card-glow-blue 2.4s ease-in-out infinite;
+}
+
+.interactive {
+  appearance: none;
+  background-clip: padding-box;
+  pointer-events: auto;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    filter: brightness(1.12);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+
+  &:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.72;
+  }
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 12px;
+  min-width: 12px;
+  height: 12px;
+  max-width: none;
+
+  > svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+}
+
+.label {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+}
+
+.label strong,
+.rules {
+  font-weight: 800;
+}
+
+.rules {
+  text-transform: none;
+}
+
+@media (max-width: 767px) {
+  .icon {
+    width: 12px;
+    min-width: 12px;
+    height: 12px;
+  }
+}

@@ -16,6 +16,7 @@ const ConfigPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => (
         socketPort={socketPort}
         sessionId={sessionId}
         showCloseAction
+        showPagesOpenAction
         onClose={onClose}
       />
     </div>

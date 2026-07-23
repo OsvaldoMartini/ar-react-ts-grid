@@ -3156,6 +3156,9 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
         fallbackBotJobName={botJobName}
         fallbackSurface="botJob"
         connected={connected}
+        webSocket={webSocket}
+        messages={messages}
+        sessionId={sessionId}
         controller={{
           ...botJobHeader,
           sendAction: (action: Parameters<typeof botJobHeader.sendAction>[0]) => {

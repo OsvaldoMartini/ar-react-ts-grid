@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ConfirmationDialog from './ConfirmationDialog';
 import DetachedPageShell from './DetachedPageShell';
 import GridTempA, { GridTempAColumn } from './GridTemp_A';
+import PagesOpenButton from './PagesOpenButton';
 import styles from './CloneJobPage.module.scss';
 import { useWebSocket } from './useWebSocket';
 
@@ -638,6 +639,12 @@ const CloneJobPage: React.FC<Props> = ({
                 <div className={`${styles.status} ${statusClass}`} role="status">
                   {status.text}
                 </div>
+                <PagesOpenButton
+                  webSocket={webSocket}
+                  connected={connected}
+                  messages={messages}
+                  sessionId={sessionId}
+                />
                 <button
                   type="button"
                   className={styles.closeButton}

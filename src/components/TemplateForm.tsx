@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ConfirmationDialog from './ConfirmationDialog';
 import GridTempA, { GridTempAColumn } from './GridTemp_A';
+import PagesOpenButton from './PagesOpenButton';
 import PathSelectionPanel, { PathSelectionMode } from './PathSelectionPanel';
 import QuestionsCard from './QuestionsCard';
 import styles from './TemplateForm.module.scss';
@@ -119,6 +120,7 @@ interface TemplateFormProps {
   socketPort: number;
   sessionId: string;
   showCloseAction?: boolean;
+  showPagesOpenAction?: boolean;
   onClose?: () => void;
 }
 
@@ -200,6 +202,7 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
   socketPort,
   sessionId,
   showCloseAction = false,
+  showPagesOpenAction = false,
   onClose,
 }) => {
   const { webSocket, connected, messages, error } = useWebSocket(socketPort, sessionId);
@@ -645,6 +648,14 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
           </div>
           <div className={styles.topBarRight}>
             <div className={`${styles.status} ${statusClass}`}>{status.text}</div>
+            {showPagesOpenAction && (
+              <PagesOpenButton
+                webSocket={webSocket}
+                connected={connected}
+                messages={messages}
+                sessionId={sessionId}
+              />
+            )}
             {showCloseAction && (
               <button type="button" className={styles.closeButton} onClick={onClose}>
                 Close

@@ -1,4 +1,5 @@
 import React from 'react';
+import PagesOpenButton from '../PagesOpenButton';
 import type { BotJobWorkspaceStatusTone } from './BotJobDetails.types';
 import styles from './BotJobDetailsPageTitle.module.scss';
 
@@ -8,6 +9,9 @@ interface BotJobDetailsPageTitleProps {
   connected: boolean;
   status?: string;
   statusTone?: BotJobWorkspaceStatusTone;
+  webSocket?: WebSocket | null;
+  messages?: readonly string[];
+  sessionId?: string;
   onClose: () => void;
 }
 
@@ -17,6 +21,9 @@ const BotJobDetailsPageTitle: React.FC<BotJobDetailsPageTitleProps> = ({
   connected,
   status,
   statusTone = 'neutral',
+  webSocket = null,
+  messages = [],
+  sessionId = '',
   onClose,
 }) => {
   const statusClass = statusTone === 'error'
@@ -40,6 +47,14 @@ const BotJobDetailsPageTitle: React.FC<BotJobDetailsPageTitleProps> = ({
         <div className={`${styles.status} ${statusClass}`} role="status">
           {statusText}
         </div>
+        {sessionId && (
+          <PagesOpenButton
+            webSocket={webSocket}
+            connected={connected}
+            messages={messages}
+            sessionId={sessionId}
+          />
+        )}
         <button
           type="button"
           className={styles.closeButton}

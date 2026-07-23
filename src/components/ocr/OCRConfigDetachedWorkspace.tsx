@@ -12,7 +12,12 @@ type Props = {
 };
 
 const OCRConfigDetachedWorkspace: React.FC<Props> = (props) => (
-  <DetachedPageShell title="OCR Config" testId="ocr-config-window" onClose={props.onClose}>
+  <DetachedPageShell
+    title="OCR Config"
+    testId="ocr-config-window"
+    onClose={undefined}
+    showCloseButton={false}
+  >
     <OCRConfigWorkspace {...props} />
   </DetachedPageShell>
 );

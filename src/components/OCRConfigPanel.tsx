@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Eraser, Play, Save, Settings2, Trash2, X } from 'lucide-react';
+import { Eraser, Play, Save, Trash2 } from 'lucide-react';
 import styles from './OCRConfigPanel.module.scss';
 
 export type OCRProfile = {
@@ -46,6 +46,7 @@ type Props = {
   onCleanup: () => void;
   onTest: (parameters: OCRParameter[]) => void;
   onClose: () => void;
+  headerAction?: React.ReactNode;
 };
 
 const OCRConfigPanel: React.FC<Props> = ({
@@ -58,6 +59,7 @@ const OCRConfigPanel: React.FC<Props> = ({
   onCleanup,
   onTest,
   onClose,
+  headerAction,
 }) => {
   const active = data.profiles.find(profile => profile.id === data.activeProfileId);
   const [name, setName] = useState(active?.name || '');
@@ -98,6 +100,13 @@ const OCRConfigPanel: React.FC<Props> = ({
       asNew,
     });
   };
+  const statusText = error
+    || (busy ? 'Loading OCR Configuration...' : 'OCR Configuration loaded');
+  const statusClass = error
+    ? styles.statusError
+    : busy
+      ? styles.statusWarn
+      : styles.statusOk;
 
   return (
     <section
@@ -106,24 +115,29 @@ const OCRConfigPanel: React.FC<Props> = ({
       data-testid="ocr-config-workspace"
     >
       <header
-        className={styles.header}
+        className={styles.topBar}
         data-testid="ocr-config-header"
+        data-floating-workspace-drag-handle
       >
-        <div className={styles.heading}>
-          <Settings2 size={20} aria-hidden="true" />
-          <span>
-            <strong>OCR configuration</strong>
-            <small>Profile and recognition controls</small>
-          </span>
+        <div className={styles.titleBlock}>
+          <h1 className={styles.title}>OCR Configuration</h1>
+          <p className={styles.subtitle}>Profile and recognition controls</p>
         </div>
-        <button
-          type="button"
-          title="Close OCR configuration"
-          aria-label="Close OCR configuration"
-          onClick={onClose}
-        >
-          <X size={18} aria-hidden="true" />
-        </button>
+        <div className={styles.topBarRight} data-floating-drag-ignore="true">
+          <div className={`${styles.status} ${statusClass}`} role="status">
+            {statusText}
+          </div>
+          {headerAction}
+          <button
+            type="button"
+            className={styles.closeButton}
+            title="Close only this OCR Configuration window"
+            aria-label="Close OCR configuration"
+            onClick={onClose}
+          >
+            Close
+          </button>
+        </div>
       </header>
 
       <div className={styles.layout}>

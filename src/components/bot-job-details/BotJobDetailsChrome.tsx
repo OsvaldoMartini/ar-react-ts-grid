@@ -12,6 +12,9 @@ interface BotJobDetailsChromeProps {
   fallbackBotJobName: string | null;
   fallbackSurface: BotJobWorkspaceSurface;
   connected: boolean;
+  webSocket?: WebSocket | null;
+  messages?: readonly string[];
+  sessionId?: string;
   controller: BotJobDetailsControllerState;
 }
 
@@ -20,6 +23,9 @@ const BotJobDetailsChrome: React.FC<BotJobDetailsChromeProps> = ({
   fallbackBotJobName,
   fallbackSurface,
   connected,
+  webSocket,
+  messages,
+  sessionId,
   controller,
 }) => {
   const state = controller.state;
@@ -39,6 +45,9 @@ const BotJobDetailsChrome: React.FC<BotJobDetailsChromeProps> = ({
           connected={connected}
           status={controller.status}
           statusTone={controller.statusTone}
+          webSocket={webSocket}
+          messages={messages}
+          sessionId={sessionId}
           onClose={() => controller.sendAction('CLOSE')}
         />
       )}

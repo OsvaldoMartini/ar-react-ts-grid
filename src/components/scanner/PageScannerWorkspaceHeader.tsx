@@ -1,4 +1,5 @@
 import React from 'react';
+import PagesOpenButton from '../PagesOpenButton';
 import styles from './PageScannerWorkspaceHeader.module.scss';
 
 interface PageScannerWorkspaceHeaderProps {
@@ -10,6 +11,9 @@ interface PageScannerWorkspaceHeaderProps {
   status?: string;
   statusTone?: 'neutral' | 'success' | 'warning' | 'error';
   closing?: boolean;
+  webSocket?: WebSocket | null;
+  messages?: readonly string[];
+  sessionId?: string;
   onClose: () => void;
 }
 
@@ -22,6 +26,9 @@ const PageScannerWorkspaceHeader: React.FC<PageScannerWorkspaceHeaderProps> = ({
   status,
   statusTone = 'neutral',
   closing = false,
+  webSocket = null,
+  messages = [],
+  sessionId = '',
   onClose,
 }) => {
   const resolvedStatus = error
@@ -48,6 +55,14 @@ const PageScannerWorkspaceHeader: React.FC<PageScannerWorkspaceHeaderProps> = ({
         <div className={`${styles.status} ${statusClass}`} role="status">
           {resolvedStatus}
         </div>
+        {sessionId && (
+          <PagesOpenButton
+            webSocket={webSocket}
+            connected={connected}
+            messages={messages}
+            sessionId={sessionId}
+          />
+        )}
         <button
           type="button"
           className={styles.closeButton}

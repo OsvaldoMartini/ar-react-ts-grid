@@ -3,6 +3,7 @@ import OCRConfigPanel, {
   type OCRConfigData,
   type OCRParameter,
 } from '../OCRConfigPanel';
+import PagesOpenButton from '../PagesOpenButton';
 import {
   OCR_CONFIG_WORKSPACE_KIND,
   OCR_RESULTS_WORKSPACE_KIND,
@@ -315,6 +316,14 @@ const OCRConfigWorkspace: React.FC<Props> = ({
       }}
       onTest={openResults}
       onClose={onClose ?? (() => void 0)}
+      headerAction={(
+        <PagesOpenButton
+          webSocket={webSocket}
+          connected={connected}
+          messages={messages}
+          sessionId={sessionId}
+        />
+      )}
     />
   );
 };
