@@ -36,6 +36,7 @@ const PagesOpen: React.FC<PagesOpenProps> = ({ socketPort, sessionId, onClose })
   const [status, setStatus] = useState('Waiting for open pages');
   const [statusTone, setStatusTone] = useState<'ok' | 'warn' | 'error'>('warn');
   const [pendingPageId, setPendingPageId] = useState('');
+  const [pendingFocusPageId, setPendingFocusPageId] = useState('');
   const [mainCloseCandidate, setMainCloseCandidate] = useState<OpenPageEntry | null>(null);
 
   const send = useCallback((type: string, body: unknown = {}) => {
@@ -88,6 +89,13 @@ const PagesOpen: React.FC<PagesOpenProps> = ({ socketPort, sessionId, onClose })
           } catch {
             // Native focus is best-effort and may be refused by the window manager.
           }
+        } else if (operationId === 'pagesOpen.focusPageResponse') {
+          setPendingFocusPageId('');
+          setStatus(responseMessage(
+            body,
+            body?.ok === false ? 'The page could not be focused.' : 'Page brought to front.',
+          ));
+          setStatusTone(body?.ok === false ? 'error' : 'ok');
         } else if (
           operationId === 'pagesOpen.closeResponse'
           || operationId === 'pagesOpen.closePageResponse'
@@ -102,6 +110,7 @@ const PagesOpen: React.FC<PagesOpenProps> = ({ socketPort, sessionId, onClose })
       } catch (messageError) {
         console.error('Could not read Pages Open message:', messageError);
         setPendingPageId('');
+        setPendingFocusPageId('');
         setStatus('The Pages Open response could not be read.');
         setStatusTone('error');
       }
@@ -113,6 +122,19 @@ const PagesOpen: React.FC<PagesOpenProps> = ({ socketPort, sessionId, onClose })
     setStatus(error);
     setStatusTone('error');
   }, [error]);
+
+  const requestFocus = useCallback((page: OpenPageEntry) => {
+    if (pendingFocusPageId || pendingPageId) return;
+    if (send('pagesOpen.focusPage', {
+      pageId: page.pageId,
+      sessionId: page.sessionId,
+      kind: page.kind,
+    })) {
+      setPendingFocusPageId(page.pageId);
+      setStatus(`Bringing ${page.title} to front...`);
+      setStatusTone('warn');
+    }
+  }, [pendingFocusPageId, pendingPageId, send]);
 
   const requestClose = useCallback((page: OpenPageEntry) => {
     if (!page.closeable || pendingPageId) return;
@@ -211,24 +233,34 @@ const PagesOpen: React.FC<PagesOpenProps> = ({ socketPort, sessionId, onClose })
                   || page.sessionId
                   || page.kind;
                 const closing = pendingPageId === page.pageId;
+                const focusing = pendingFocusPageId === page.pageId;
                 return (
                   <article className={styles.item} key={page.pageId}>
-                    <span className={styles.order}>{index + 1}.</span>
-                    <span className={styles.pageIcon}>
-                      <AppWindow size={19} aria-hidden="true" />
-                    </span>
-                    <span className={styles.itemText}>
-                      <strong title={page.title}>{page.title}</strong>
-                      <small title={detail}>{detail}</small>
-                    </span>
-                    {page.main && <span className={styles.mainBadge}>Main</span>}
-                    <span className={styles.kindBadge}>{page.kind}</span>
+                    <button
+                      type="button"
+                      className={styles.focusButton}
+                      title={`Bring ${page.title} to front`}
+                      aria-label={`Bring ${page.title} to front`}
+                      disabled={Boolean(pendingPageId || pendingFocusPageId)}
+                      onClick={() => requestFocus(page)}
+                    >
+                      <span className={styles.order}>{index + 1}.</span>
+                      <span className={`${styles.pageIcon} ${focusing ? styles.focusing : ''}`}>
+                        <AppWindow size={19} aria-hidden="true" />
+                      </span>
+                      <span className={styles.itemText}>
+                        <strong title={page.title}>{page.title}</strong>
+                        <small title={detail}>{detail}</small>
+                      </span>
+                      {page.main && <span className={styles.mainBadge}>Main</span>}
+                      <span className={styles.kindBadge}>{page.kind}</span>
+                    </button>
                     <button
                       type="button"
                       className={styles.removeButton}
                       title={page.main ? 'Close the entire AR Web application' : `Close ${page.title}`}
                       aria-label={page.main ? 'Close the entire AR Web application' : `Close ${page.title}`}
-                      disabled={!page.closeable || Boolean(pendingPageId)}
+                      disabled={!page.closeable || Boolean(pendingPageId || pendingFocusPageId)}
                       onClick={() => requestClose(page)}
                     >
                       {closing ? '...' : 'X'}

@@ -3,9 +3,10 @@
 .detached .header { position:sticky; top:0; z-index:2; background:#1d4f91; }
 .header { height:52px; padding:0 14px; display:flex; align-items:center; justify-content:space-between; background:#075985; color:#fff; }
 .header>div:first-child,.headerActions,.status,.pending { display:flex; align-items:center; gap:10px; }
-.header span,.status span,.pending span { display:grid; gap:2px; }
-.header small,.status small,.pending small { font-size:12px; opacity:.78; }
-.headerActions button { width:32px; height:32px; display:grid; place-items:center; border:0; background:transparent; color:#fff; cursor:pointer; }
+.header>div:first-child>span,.status span,.pending span { display:grid; gap:2px; }
+.header>div:first-child small,.status small,.pending small { font-size:12px; opacity:.78; }
+.headerActions>button { width:32px; height:32px; display:grid; place-items:center; border:0; background:transparent; color:#fff; cursor:pointer; }
+.pagesControl { display:inline-flex; align-items:center; }
 .headerActions .detachedClose { width:auto; min-width:52px; height:28px; padding:4px 10px; border:1px solid #c62828; border-radius:3px; background:#fff; color:#c62828; font-size:12px; font-weight:700; }
 .headerActions .detachedClose:hover { background:#ffebee; }
 .status { margin:14px; padding:12px; border-left:4px solid; background:#f8fafc; }

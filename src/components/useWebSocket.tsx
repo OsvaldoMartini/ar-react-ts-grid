@@ -7,6 +7,32 @@ const PING_INTERVAL_MS = 15000;
 
 type ApplicationControlOperation = 'application.shutdown' | 'application.workspaceClose';
 
+const workspaceFocusRequested = (
+  rawMessage: unknown,
+  currentSessionId: string,
+): boolean => {
+  if (typeof rawMessage !== 'string') return false;
+  try {
+    const envelope = JSON.parse(rawMessage);
+    const operationId = envelope?.operationId || envelope?.type;
+    if (operationId !== 'application.workspaceFocus') return false;
+
+    const body = typeof envelope?.body === 'string'
+      ? JSON.parse(envelope.body)
+      : envelope?.body;
+    const targetSessionId = typeof body?.targetSessionId === 'string'
+      ? body.targetSessionId
+      : typeof body?.targetSession === 'string'
+        ? body.targetSession
+        : typeof body?.sessionId === 'string'
+          ? body.sessionId
+          : '';
+    return !targetSessionId || targetSessionId === currentSessionId;
+  } catch {
+    return false;
+  }
+};
+
 const applicationControlOperation = (
   rawMessage: unknown,
   currentSessionId: string,
@@ -165,6 +191,14 @@ export const useWebSocket = (socketPort: number, sessionId: string) => {
 
       socket.onmessage = (event) => {
         if (disposedRef.current || socketRef.current !== socket) return;
+        if (workspaceFocusRequested(event.data, sessionId)) {
+          try {
+            window.focus();
+          } catch (focusError) {
+            console.error('Could not focus the AR Web workspace window:', focusError);
+          }
+          return;
+        }
         const controlOperation = applicationControlOperation(event.data, sessionId);
         if (controlOperation) {
           disposedRef.current = true;

@@ -157,13 +157,44 @@
 .item {
   min-height: 48px;
   margin-bottom: 6px;
-  padding: 7px 8px;
+  padding: 0 8px 0 0;
   border: 1px solid #cad7e5;
   border-radius: 6px;
   background: #ffffff;
   display: flex;
   align-items: center;
+  gap: 4px;
+}
+
+.focusButton {
+  min-width: 0;
+  min-height: 46px;
+  padding: 7px 4px 7px 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  display: flex;
+  align-items: center;
+  flex: 1;
   gap: 8px;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.focusButton:hover:not(:disabled) {
+  background: #f0f7ff;
+}
+
+.focusButton:focus-visible {
+  outline: 2px solid #1d6fb8;
+  outline-offset: -2px;
+}
+
+.focusButton:disabled {
+  cursor: default;
+  opacity: 0.72;
 }
 
 .order {
@@ -183,6 +214,20 @@
   color: #15518d;
   display: grid;
   place-items: center;
+}
+
+@keyframes page-focus-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 rgba(29, 111, 184, 0);
+  }
+  50% {
+    box-shadow: 0 0 12px rgba(29, 111, 184, 0.65);
+  }
+}
+
+.focusing {
+  animation: page-focus-pulse 0.8s ease-in-out infinite;
 }
 
 .itemText {

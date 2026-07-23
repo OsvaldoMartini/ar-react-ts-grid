@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CheckCircle2, FileKey2, FolderOpen, RefreshCw, ShieldAlert, X } from 'lucide-react';
+import PagesOpenButton from './PagesOpenButton';
 import { useWebSocket } from './useWebSocket';
 import { LICENSE_AGREEMENT_V1, LICENSE_AGREEMENT_VERSION } from './licenseAgreement';
 import styles from './LicenseManager.module.scss';
@@ -93,6 +94,16 @@ const LicenseManager: React.FC<Props> = ({ socketPort, sessionId, onClose, onAct
       <div><FileKey2 size={18}/><span><strong>License</strong><small>AR Web authorization</small></span></div>
       <div className={styles.headerActions} data-floating-drag-ignore="true">
         <button title="Refresh license status" onClick={refresh} disabled={!connected}><RefreshCw size={16}/></button>
+        {detached && (
+          <div className={styles.pagesControl}>
+            <PagesOpenButton
+              webSocket={webSocket}
+              connected={connected}
+              messages={messages}
+              sessionId={sessionId}
+            />
+          </div>
+        )}
         {onClose && (
           <button
             className={detached ? styles.detachedClose : undefined}
