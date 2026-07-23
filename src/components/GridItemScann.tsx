@@ -1507,17 +1507,31 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
           }
 
           case 'pageScanner.errorResponse': {
-            const locatorRequestId = typeof bodyData?.requestId === 'string'
+            const responseRequestId = typeof bodyData?.requestId === 'string'
               ? bodyData.requestId
               : '';
-            if (locatorRequestId && locatorRequestId === locatorRequestRef.current) {
+            if (
+              responseRequestId
+              && responseRequestId === memoryListOpenPendingRequestRef.current
+            ) {
+              memoryListOpenPendingRequestRef.current = null;
+              memoryListOpenedRef.current = false;
+              memoryListOpenRequestedRef.current = false;
+              memoryListOwnerEpochRef.current = '';
+              setAlertMessageHeader('Memory List not opened');
+              setAlertMessageBody(String(
+                bodyData?.message || bodyData?.error || 'Memory List workspace could not be opened.',
+              ));
+              break;
+            }
+            if (responseRequestId && responseRequestId === locatorRequestRef.current) {
               clearLocatorGenerateRequest();
               setLocatorError(String(
                 bodyData?.message || bodyData?.error || 'Locator generation failed.',
               ));
               break;
             }
-            if (locatorRequestId && locatorRequestId === locatorApplyRef.current?.requestId) {
+            if (responseRequestId && responseRequestId === locatorApplyRef.current?.requestId) {
               clearLocatorApplyRequest();
               setLocatorError(String(
                 bodyData?.message || bodyData?.error || 'The XPath was not applied.',

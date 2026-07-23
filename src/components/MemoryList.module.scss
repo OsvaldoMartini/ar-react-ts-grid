@@ -308,3 +308,121 @@
     justify-self: end;
   }
 }
+
+@media (max-width: 360px), (max-height: 260px) {
+  .topBar {
+    min-height: 34px;
+    align-items: center;
+    flex-direction: row;
+    gap: 4px;
+    padding: 3px 5px;
+  }
+
+  .title {
+    font-size: 0.82rem;
+    white-space: nowrap;
+  }
+
+  .subtitle {
+    display: none;
+  }
+
+  .topBarRight {
+    width: auto;
+    flex: 1;
+    gap: 4px;
+  }
+
+  .status {
+    max-width: none;
+    min-width: 0;
+    flex: 1;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-size: 0.58rem;
+  }
+
+  .closeButton {
+    min-height: 24px;
+    padding: 2px 6px;
+    font-size: 10px;
+  }
+
+  .targetRow {
+    grid-template-columns: max-content minmax(0, 1fr) max-content;
+    gap: 4px;
+    padding: 3px 5px;
+  }
+
+  .targetRow label {
+    font-size: 0.64rem;
+  }
+
+  .targetRow select {
+    height: 26px;
+    padding: 0 4px;
+    font-size: 0.65rem;
+  }
+
+  .count {
+    display: none;
+  }
+
+  .clearButton,
+  .applyButton {
+    min-height: 26px;
+    padding: 2px 7px;
+    font-size: 0.64rem;
+  }
+
+  .list {
+    gap: 3px;
+    padding: 4px 5px;
+  }
+
+  .item {
+    gap: 3px;
+    padding: 3px 4px;
+  }
+
+  .order {
+    min-width: 17px;
+    font-size: 0.65rem;
+  }
+
+  .itemIcon {
+    width: 16px;
+    height: 16px;
+  }
+
+  .itemText strong {
+    font-size: 0.68rem;
+  }
+
+  .itemText small,
+  .inactiveBadge {
+    display: none;
+  }
+
+  .removeButton {
+    width: 20px;
+    height: 20px;
+    font-size: 0.67rem;
+  }
+
+  .empty {
+    padding: 6px;
+    font-size: 0.68rem;
+  }
+
+  .footer {
+    min-height: 32px;
+    gap: 6px;
+    padding: 3px 5px;
+    font-size: 0.62rem;
+  }
+
+  .applyButton {
+    min-width: 62px;
+  }
+}

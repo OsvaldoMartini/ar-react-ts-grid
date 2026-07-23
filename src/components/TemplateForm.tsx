@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import ConfirmationDialog from './ConfirmationDialog';
 import GridTempA, { GridTempAColumn } from './GridTemp_A';
+import PathSelectionPanel, { PathSelectionMode } from './PathSelectionPanel';
 import QuestionsCard from './QuestionsCard';
 import styles from './TemplateForm.module.scss';
 import { useWebSocket } from './useWebSocket';
@@ -53,6 +55,21 @@ type BrowserReplacement = {
   activeBrowser: string;
   requestedBrowser: string;
   warning: string;
+};
+
+type PathPickerState = {
+  purpose: 'config' | 'backup' | 'restore';
+  field?: keyof ConfigData;
+  title: string;
+  subtitle: string;
+  label: string;
+  mode: PathSelectionMode;
+  value: string;
+};
+
+type PendingPathRequest = {
+  requestId: string;
+  purpose: PathPickerState['purpose'];
 };
 
 const ORGANIZATION_COLUMNS: readonly GridTempAColumn<OrganizationRow>[] = [
@@ -203,9 +220,15 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
   const [restoreConfirmOpen, setRestoreConfirmOpen] = useState(false);
   const [backupConfirmOpen, setBackupConfirmOpen] = useState(false);
   const [backupResult, setBackupResult] = useState<ResultDialog | null>(null);
+  const [restoreResult, setRestoreResult] = useState<ResultDialog | null>(null);
   const [browserReplacement, setBrowserReplacement] = useState<BrowserReplacement | null>(null);
   const [browserResult, setBrowserResult] = useState<ResultDialog | null>(null);
   const [reloadResult, setReloadResult] = useState<ResultDialog | null>(null);
+  const [pathPicker, setPathPicker] = useState<PathPickerState | null>(null);
+  const pathPickerRef = useRef<PathPickerState | null>(null);
+  const pendingPathRequestRef = useRef<PendingPathRequest | null>(null);
+  const [backupFolder, setBackupFolder] = useState('');
+  const [restoreFolder, setRestoreFolder] = useState('');
   const [status, setStatus] = useState<{ level: StatusLevel; text: string }>({
     level: 'warn',
     text: 'Waiting for backend data',
@@ -233,6 +256,10 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
   }, [send]);
 
   useEffect(() => {
+    pathPickerRef.current = pathPicker;
+  }, [pathPicker]);
+
+  useEffect(() => {
     if (connected) {
       bootstrap();
     }
@@ -240,9 +267,21 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
 
   useEffect(() => {
     if (error) {
+      if (pendingPathRequestRef.current) {
+        pendingPathRequestRef.current = null;
+        setBusyAction(current => current === 'path-picker' ? '' : current);
+      }
       setStatus({ level: 'error', text: error });
     }
   }, [error]);
+
+  useEffect(() => {
+    if (!connected && pendingPathRequestRef.current) {
+      pendingPathRequestRef.current = null;
+      setBusyAction(current => current === 'path-picker' ? '' : current);
+      setStatus({ level: 'warn', text: 'Path selection stopped because the socket disconnected' });
+    }
+  }, [connected]);
 
   useEffect(() => {
     if (processedMessageCountRef.current > messages.length) {
@@ -258,9 +297,23 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
           applyPayload(body);
           setStatus({ level: ok ? 'ok' : 'error', text: responseMessage(body, 'Configuration loaded') });
         } else if (operationId === 'config.pathResponse') {
-          setBusyAction('');
+          const pendingPathRequest = pendingPathRequestRef.current;
+          const responseRequestId = String(body?.requestId || '');
+          if (!pendingPathRequest || responseRequestId !== pendingPathRequest.requestId) {
+            continue;
+          }
+          pendingPathRequestRef.current = null;
+          setBusyAction(current => current === 'path-picker' ? '' : current);
+          const activePicker = pathPickerRef.current;
+          const responsePurpose = String(body?.purpose || '');
           if (ok && !body.cancelled && body.field && body.path) {
-            setConfig(prev => ({ ...prev, [body.field]: body.path }));
+            if (
+              activePicker
+              && activePicker.purpose === pendingPathRequest.purpose
+              && responsePurpose === pendingPathRequest.purpose
+            ) {
+              setPathPicker(current => current ? { ...current, value: String(body.path) } : current);
+            }
           }
           setStatus({
             level: !ok ? 'error' : body.cancelled ? 'warn' : 'ok',
@@ -360,7 +413,7 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
             level: ok ? (workspaceCloseWarning ? 'warn' : 'ok') : 'error',
             text: workspaceCloseWarning || message,
           });
-          setReloadResult({
+          setRestoreResult({
             header: ok
               ? (workspaceCloseWarning ? 'Database Restored With Warning' : 'Database Restored')
               : 'Database Restore Failed',
@@ -418,10 +471,72 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
   };
 
   const choosePath = (field: keyof ConfigData, mode: 'file' | 'directory') => {
-    setBusyAction(`path:${String(field)}`);
-    if (!send('config.choosePath', { field, mode, currentPath: config[field] })) {
+    const definition = [...PATH_FIELDS, ...ADVANCED_PATH_FIELDS].find(item => item.key === field);
+    setPathPicker({
+      purpose: 'config',
+      field,
+      title: definition?.label || 'Select Path',
+      subtitle: mode === 'file' ? 'Select a configuration file' : 'Select a configuration folder',
+      label: mode === 'file' ? 'File path' : 'Folder path',
+      mode,
+      value: config[field] || '',
+    });
+  };
+
+  const browsePath = (currentPath: string) => {
+    const picker = pathPickerRef.current;
+    if (!picker || pendingPathRequestRef.current) return;
+    const requestId = `${sessionId || 'temp'}-path-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    pendingPathRequestRef.current = { requestId, purpose: picker.purpose };
+    setBusyAction('path-picker');
+    if (!send('config.choosePath', {
+      field: picker.field || 'pathDb',
+      mode: picker.mode,
+      currentPath,
+      purpose: picker.purpose,
+      requestId,
+    })) {
+      pendingPathRequestRef.current = null;
       setBusyAction('');
     }
+  };
+
+  const applySelectedPath = (selectedPath: string) => {
+    const picker = pathPickerRef.current;
+    if (!picker || pendingPathRequestRef.current) return;
+    if (picker.purpose === 'config' && picker.field) {
+      update(picker.field, selectedPath);
+      setStatus({ level: 'ok', text: `${picker.title} selected` });
+    } else if (picker.purpose === 'backup') {
+      setBackupFolder(selectedPath);
+      setBackupConfirmOpen(true);
+    } else if (picker.purpose === 'restore') {
+      setRestoreFolder(selectedPath);
+      setRestoreConfirmOpen(true);
+    }
+    setPathPicker(null);
+  };
+
+  const openBackupPathPicker = () => {
+    setPathPicker({
+      purpose: 'backup',
+      title: 'Database backup',
+      subtitle: 'Choose where the backup files will be written',
+      label: 'Destination folder',
+      mode: 'directory',
+      value: backupFolder || config.pathDb || '',
+    });
+  };
+
+  const openRestorePathPicker = () => {
+    setPathPicker({
+      purpose: 'restore',
+      title: 'Database restore',
+      subtitle: `Choose the folder containing the ${restoreDate} backup`,
+      label: 'Backup source folder',
+      mode: 'directory',
+      value: restoreFolder || config.pathDb || '',
+    });
   };
 
   const saveConfig = () => {
@@ -437,6 +552,7 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
     setBusyAction('backup');
     if (!send('config.backup', {
       databaseType: config.databaseType,
+      destinationFolder: backupFolder,
       initialPath: config.pathDb,
     })) {
       setBusyAction('');
@@ -472,7 +588,7 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
       setStatus({ level: 'warn', text: 'Please select a restore date' });
       return;
     }
-    setRestoreConfirmOpen(true);
+    openRestorePathPicker();
   };
 
   const restore = () => {
@@ -481,6 +597,7 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
     if (!send('config.restore', {
       databaseType: config.databaseType,
       date: backendDateKey(restoreDate.trim()),
+      sourceFolder: restoreFolder,
       initialPath: config.pathDb,
     })) {
       setBusyAction('');
@@ -554,7 +671,7 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
             </select>
           </label>
           <button type="button" onClick={() => setReloadConfirmOpen(true)} disabled={!!busyAction}>Reload Configs</button>
-          <button type="button" onClick={() => setBackupConfirmOpen(true)} disabled={!!busyAction}>Backup DB</button>
+          <button type="button" onClick={openBackupPathPicker} disabled={!!busyAction}>Backup DB</button>
           <button type="button" onClick={requestRestore} disabled={!!busyAction}>Restore DB</button>
           <label className={styles.toolbarField}>
             Date Restore
@@ -657,6 +774,23 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
         </div>
       )}
 
+      {pathPicker && (
+        <PathSelectionPanel
+          title={pathPicker.title}
+          subtitle={pathPicker.subtitle}
+          label={pathPicker.label}
+          mode={pathPicker.mode}
+          value={pathPicker.value}
+          browsing={busyAction === 'path-picker'}
+          onChange={value => setPathPicker(current => current ? { ...current, value } : current)}
+          onBrowse={browsePath}
+          onApply={applySelectedPath}
+          onClose={() => {
+            if (busyAction !== 'path-picker') setPathPicker(null);
+          }}
+        />
+      )}
+
       {promptSaveConfirmOpen && (
         <QuestionsCard
           mode="confirm"
@@ -709,15 +843,13 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
       )}
 
       {backupConfirmOpen && (
-        <QuestionsCard
-          mode="confirm"
-          header="Backup Database"
-          body={`Create a backup of the ${config.databaseType || 'current'} database now?`}
-          extraMsg="After confirmation, choose the destination folder in Explorer. The selector opens at the configured database path."
-          okLabel="Choose Folder"
-          cancelLabel="Cancel"
+        <ConfirmationDialog
+          title="Backup Database"
+          message={`Create a backup of the ${config.databaseType || 'current'} database in this folder?\n${backupFolder}`}
+          detail="The selected database will be exported only after you confirm."
+          confirmLabel="Create Backup"
           onCancel={() => setBackupConfirmOpen(false)}
-          onSubmit={backup}
+          onConfirm={backup}
         />
       )}
 
@@ -738,29 +870,40 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
       )}
 
       {restoreConfirmOpen && (
-        <QuestionsCard
-          mode="confirm"
-          header="Restore Database"
-          body={`Restore the ${config.databaseType || 'current'} database from ${restoreDate}?`}
-          extraMsg="This replaces current data. After a successful restore, every other open page will close. The Main Dashboard and this TEMP page will remain open."
-          okLabel="Restore"
-          cancelLabel="Cancel"
+        <ConfirmationDialog
+          title="Restore Database"
+          message={`Restore the ${config.databaseType || 'current'} database from ${restoreDate}?\n${restoreFolder}`}
+          detail="This replaces current data. After a successful restore, every other open page will close. The Main Dashboard and this TEMP page will remain open."
+          confirmLabel="Restore"
           destructive
           onCancel={() => setRestoreConfirmOpen(false)}
-          onSubmit={restore}
+          onConfirm={restore}
         />
       )}
 
       {backupResult && (
-        <QuestionsCard
-          mode="alert"
-          header={backupResult.header}
-          body={backupResult.body}
-          extraMsg={backupResult.extraMsg}
+        <ConfirmationDialog
+          alert
+          title={backupResult.header}
+          message={backupResult.body}
+          detail={backupResult.extraMsg}
           error={backupResult.error}
-          okLabel="Close"
+          confirmLabel="Close"
           onCancel={() => setBackupResult(null)}
-          onSubmit={() => setBackupResult(null)}
+          onConfirm={() => setBackupResult(null)}
+        />
+      )}
+
+      {restoreResult && (
+        <ConfirmationDialog
+          alert
+          title={restoreResult.header}
+          message={restoreResult.body}
+          detail={restoreResult.extraMsg}
+          error={restoreResult.error}
+          confirmLabel="Close"
+          onCancel={() => setRestoreResult(null)}
+          onConfirm={() => setRestoreResult(null)}
         />
       )}
 
