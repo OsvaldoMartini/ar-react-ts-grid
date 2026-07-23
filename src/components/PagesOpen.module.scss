@@ -1,0 +1,298 @@
+.shell {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  background: #f4f7fb;
+  color: #1f2937;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.window {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  background: #1d4f91;
+  color: #ffffff;
+}
+
+.titleBlock {
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.subtitle {
+  margin: 2px 0 0;
+  overflow: hidden;
+  color: #d9e8ff;
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topBarRight {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.status {
+  max-width: min(42vw, 520px);
+  overflow: hidden;
+  padding: 5px 9px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.statusOk {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.statusWarn {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.statusError {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.closeButton,
+.refreshButton {
+  flex: 0 0 auto;
+  min-height: 28px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.closeButton {
+  padding: 5px 10px;
+  border: 1px solid #c62828;
+  background: #ffffff;
+  color: #c62828;
+  white-space: nowrap;
+}
+
+.closeButton:hover {
+  background: #ffebee;
+}
+
+.refreshButton {
+  width: 30px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+}
+
+.refreshButton:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.refreshButton:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.summaryRow {
+  min-height: 44px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #d9e2ef;
+  background: #ffffff;
+  color: #0b5394;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.summaryRow strong {
+  min-width: 28px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #e8f1fb;
+  color: #15518d;
+  font-size: 0.72rem;
+  text-align: center;
+}
+
+.list {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  padding: 8px;
+  background: #eef3f8;
+}
+
+.item {
+  min-height: 48px;
+  margin-bottom: 6px;
+  padding: 7px 8px;
+  border: 1px solid #cad7e5;
+  border-radius: 6px;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.order {
+  min-width: 24px;
+  color: #0b5394;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-align: right;
+}
+
+.pageIcon {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  border-radius: 5px;
+  background: #e8f1fb;
+  color: #15518d;
+  display: grid;
+  place-items: center;
+}
+
+.itemText {
+  min-width: 0;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.itemText strong,
+.itemText small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.itemText strong {
+  color: #1f2937;
+  font-size: 0.8rem;
+}
+
+.itemText small {
+  color: #607d8b;
+  font-size: 0.67rem;
+}
+
+.mainBadge,
+.kindBadge {
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.mainBadge {
+  border: 1px solid #a7d2b2;
+  background: #e9f7ed;
+  color: #1b6b38;
+}
+
+.kindBadge {
+  max-width: 150px;
+  overflow: hidden;
+  background: #eceff1;
+  color: #546e7a;
+  text-overflow: ellipsis;
+}
+
+.removeButton {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #aa0000;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.removeButton:hover:not(:disabled) {
+  background: #ffebee;
+}
+
+.removeButton:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.empty {
+  height: 100%;
+  min-height: 180px;
+  color: #607d8b;
+  display: grid;
+  place-items: center;
+  font-size: 0.82rem;
+  font-style: italic;
+  text-align: center;
+}
+
+.footer {
+  min-height: 48px;
+  padding: 8px 12px;
+  border-top: 1px solid #d9e2ef;
+  background: #ffffff;
+  color: #607d8b;
+  display: flex;
+  align-items: center;
+  font-size: 0.72rem;
+}
+
+@media (max-width: 640px) {
+  .topBar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .topBarRight {
+    width: 100%;
+  }
+
+  .status {
+    max-width: none;
+    flex: 1;
+  }
+
+  .kindBadge {
+    display: none;
+  }
+}

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import QuestionsCard from './QuestionsCard';
 import styles from './ConfigManager.module.scss';
 import { useWebSocket } from './useWebSocket';
 
@@ -132,6 +133,14 @@ const ConfigManager: React.FC<ConfigManagerProps> = ({ socketPort, sessionId }) 
   const [promptOpen, setPromptOpen] = useState(false);
   const [promptText, setPromptText] = useState('');
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [reloadConfirmOpen, setReloadConfirmOpen] = useState(false);
+  const [restoreConfirmOpen, setRestoreConfirmOpen] = useState(false);
+  const [reloadResult, setReloadResult] = useState<{
+    header: string;
+    body: string;
+    error: boolean;
+    extraMsg: string;
+  } | null>(null);
   const [status, setStatus] = useState<{ level: StatusLevel; text: string }>({
     level: 'warn',
     text: 'Waiting for backend data',
@@ -189,11 +198,53 @@ const ConfigManager: React.FC<ConfigManagerProps> = ({ socketPort, sessionId }) 
           setBusyAction('');
           setErrors(body.errors || {});
           applyPayload(body);
-          setStatus({ level: ok ? 'ok' : 'error', text: responseMessage(body, 'Configuration saved') });
+          const message = responseMessage(body, 'Configuration saved');
+          const workspaceCloseWarning = typeof body?.workspaceCloseWarning === 'string'
+            ? body.workspaceCloseWarning.trim()
+            : '';
+          setStatus({
+            level: ok ? (workspaceCloseWarning ? 'warn' : 'ok') : 'error',
+            text: workspaceCloseWarning || message,
+          });
+          setReloadResult({
+            header: ok
+              ? (workspaceCloseWarning ? 'Database Reloaded With Warning' : 'Database Reloaded')
+              : 'Database Reload Failed',
+            body: message,
+            error: !ok,
+            extraMsg: !ok
+              ? 'The reload did not complete. Review the error and try again.'
+              : workspaceCloseWarning
+                ? `The Main Dashboard was refreshed, but some pages could not be closed: ${workspaceCloseWarning}`
+                : 'The Main Dashboard Bot Jobs were refreshed in real time and stale pages were closed.',
+          });
         } else if (operationId === 'config.backupResponse') {
           setBusyAction('');
           setStatus({ level: ok ? 'ok' : 'error', text: responseMessage(body, 'Backup completed') });
-        } else if (operationId === 'config.restoreResponse' || operationId === 'config.deleteResponse') {
+        } else if (operationId === 'config.restoreResponse') {
+          setBusyAction('');
+          applyPayload(body);
+          const message = responseMessage(body, 'Database restore completed');
+          const workspaceCloseWarning = typeof body?.workspaceCloseWarning === 'string'
+            ? body.workspaceCloseWarning.trim()
+            : '';
+          setStatus({
+            level: ok ? (workspaceCloseWarning ? 'warn' : 'ok') : 'error',
+            text: workspaceCloseWarning || message,
+          });
+          setReloadResult({
+            header: ok
+              ? (workspaceCloseWarning ? 'Database Restored With Warning' : 'Database Restored')
+              : 'Database Restore Failed',
+            body: message,
+            error: !ok,
+            extraMsg: !ok
+              ? 'The restore did not complete. Review the error and try again.'
+              : workspaceCloseWarning
+                ? `The Main Dashboard was refreshed, but some pages could not be closed: ${workspaceCloseWarning}`
+                : 'The Main Dashboard Bot Jobs were refreshed in real time and stale pages were closed.',
+          });
+        } else if (operationId === 'config.deleteResponse') {
           setBusyAction('');
           applyPayload(body);
           setStatus({ level: ok ? 'ok' : 'error', text: responseMessage(body, 'Database operation completed') });
@@ -244,6 +295,7 @@ const ConfigManager: React.FC<ConfigManagerProps> = ({ socketPort, sessionId }) 
   };
 
   const saveConfig = () => {
+    setReloadConfirmOpen(false);
     setBusyAction('save');
     send('config.save', { config });
   };
@@ -254,12 +306,16 @@ const ConfigManager: React.FC<ConfigManagerProps> = ({ socketPort, sessionId }) 
     send('config.backup', { databaseType: config.databaseType });
   };
 
-  const restore = () => {
+  const requestRestore = () => {
     if (!restoreDate.trim()) {
       setStatus({ level: 'warn', text: 'Please select a restore date' });
       return;
     }
-    if (!window.confirm(`Restore database from ${restoreDate}? This will replace current data.`)) return;
+    setRestoreConfirmOpen(true);
+  };
+
+  const restore = () => {
+    setRestoreConfirmOpen(false);
     setBusyAction('restore');
     send('config.restore', { databaseType: config.databaseType, date: backendDateKey(restoreDate.trim()) });
   };
@@ -310,9 +366,9 @@ const ConfigManager: React.FC<ConfigManagerProps> = ({ socketPort, sessionId }) 
               {options.databaseTypes.map(item => <option key={item} value={item}>{item}</option>)}
             </select>
           </label>
-          <button type="button" onClick={saveConfig} disabled={!!busyAction}>Reload Configs</button>
+          <button type="button" onClick={() => setReloadConfirmOpen(true)} disabled={!!busyAction}>Reload Configs</button>
           <button type="button" onClick={backup} disabled={!!busyAction}>Backup DB</button>
-          <button type="button" onClick={restore} disabled={!!busyAction}>Restore DB</button>
+          <button type="button" onClick={requestRestore} disabled={!!busyAction}>Restore DB</button>
           <label className={styles.toolbarField}>
             Date Restore
             <input type="date" value={restoreDate} onChange={event => setRestoreDate(event.target.value)} />
@@ -437,6 +493,46 @@ const ConfigManager: React.FC<ConfigManagerProps> = ({ socketPort, sessionId }) 
             </footer>
           </section>
         </div>
+      )}
+
+      {reloadConfirmOpen && (
+        <QuestionsCard
+          mode="confirm"
+          header="Reload Database"
+          body={`Reload the ${config.databaseType || 'current'} database using the configured connection?`}
+          extraMsg="After a successful reload, other open pages will close and the Main Dashboard Bot Jobs will refresh in real time."
+          okLabel="Reload"
+          cancelLabel="Cancel"
+          onCancel={() => setReloadConfirmOpen(false)}
+          onSubmit={saveConfig}
+        />
+      )}
+
+      {restoreConfirmOpen && (
+        <QuestionsCard
+          mode="confirm"
+          header="Restore Database"
+          body={`Restore the ${config.databaseType || 'current'} database from ${restoreDate}?`}
+          extraMsg="This replaces current data. After a successful restore, other open pages will close and the Main Dashboard will refresh in real time."
+          okLabel="Restore"
+          cancelLabel="Cancel"
+          destructive
+          onCancel={() => setRestoreConfirmOpen(false)}
+          onSubmit={restore}
+        />
+      )}
+
+      {reloadResult && (
+        <QuestionsCard
+          mode="alert"
+          header={reloadResult.header}
+          body={reloadResult.body}
+          extraMsg={reloadResult.extraMsg}
+          error={reloadResult.error}
+          okLabel="Close"
+          onCancel={() => setReloadResult(null)}
+          onSubmit={() => setReloadResult(null)}
+        />
       )}
     </main>
   );

@@ -5,13 +5,34 @@ const RECONNECT_DELAY_MS = 2000;
 const MAX_RECONNECT_DELAY_MS = 10000;
 const PING_INTERVAL_MS = 15000;
 
-const isApplicationShutdownMessage = (rawMessage: unknown): boolean => {
-  if (typeof rawMessage !== 'string') return false;
+type ApplicationControlOperation = 'application.shutdown' | 'application.workspaceClose';
+
+const applicationControlOperation = (
+  rawMessage: unknown,
+  currentSessionId: string,
+): ApplicationControlOperation | null => {
+  if (typeof rawMessage !== 'string') return null;
   try {
     const envelope = JSON.parse(rawMessage);
-    return envelope?.operationId === 'application.shutdown';
+    const operationId = envelope?.operationId || envelope?.type;
+    if (operationId === 'application.shutdown') return operationId;
+    if (operationId !== 'application.workspaceClose') return null;
+
+    const body = typeof envelope?.body === 'string'
+      ? JSON.parse(envelope.body)
+      : envelope?.body;
+    const targetSessionId = typeof body?.targetSessionId === 'string'
+      ? body.targetSessionId
+      : typeof body?.targetSession === 'string'
+        ? body.targetSession
+        : typeof body?.sessionId === 'string'
+          ? body.sessionId
+          : '';
+    return targetSessionId && targetSessionId !== currentSessionId
+      ? null
+      : operationId;
   } catch {
-    return false;
+    return null;
   }
 };
 
@@ -144,7 +165,8 @@ export const useWebSocket = (socketPort: number, sessionId: string) => {
 
       socket.onmessage = (event) => {
         if (disposedRef.current || socketRef.current !== socket) return;
-        if (isApplicationShutdownMessage(event.data)) {
+        const controlOperation = applicationControlOperation(event.data, sessionId);
+        if (controlOperation) {
           disposedRef.current = true;
           clearReconnectTimeout();
           stopPing();
@@ -156,14 +178,24 @@ export const useWebSocket = (socketPort: number, sessionId: string) => {
           setConnected(false);
           setWebSocket(null);
           try {
-            socket.close(1000, 'Application shutdown');
+            socket.close(
+              1000,
+              controlOperation === 'application.shutdown'
+                ? 'Application shutdown'
+                : 'Workspace closed',
+            );
           } catch {
             // The backend may already have closed the transport.
           }
           try {
             window.close();
           } catch (closeError) {
-            console.error('Could not close the AR Web application window:', closeError);
+            console.error(
+              controlOperation === 'application.shutdown'
+                ? 'Could not close the AR Web application window:'
+                : 'Could not close the AR Web workspace window:',
+              closeError,
+            );
           }
           return;
         }

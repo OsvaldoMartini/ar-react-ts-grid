@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, FlaskConical, GripHorizontal, ShieldCheck, User } from 'lucide-react';
+import { AppWindow, ChevronDown, FlaskConical, GripHorizontal, ShieldCheck, User } from 'lucide-react';
 import AutoTestWorkspace, { AutomationTestCatalog } from './auto-test/AutoTestWorkspace';
 import FloatingWorkspaceFrame from './workspace/FloatingWorkspaceFrame';
 import GridTempA, { GridTempAColumn } from './GridTemp_A';
@@ -7,6 +7,7 @@ import styles from './MainDashboard.module.scss';
 import { useWebSocket } from './useWebSocket';
 
 type StatusLevel = 'ok' | 'warn' | 'error';
+const AUTO_TEST_INLINE_PAGE_ID = 'autoTest';
 
 interface MainDashboardProps {
   socketPort: number;
@@ -157,6 +158,7 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, on
   const { webSocket, connected, messages, error } = useWebSocket(socketPort, sessionId);
   const processedMessageCountRef = useRef(0);
   const shutdownRequestedRef = useRef(false);
+  const reportedAutoTestStateRef = useRef<boolean | null>(null);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
   const [botJobs, setBotJobs] = useState<BotJobRow[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -236,6 +238,24 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, on
   }, [connected, refresh, send]);
 
   useEffect(() => {
+    if (!connected) {
+      reportedAutoTestStateRef.current = null;
+      return;
+    }
+    if (reportedAutoTestStateRef.current === autoTestOpen) return;
+
+    reportedAutoTestStateRef.current = autoTestOpen;
+    send('pagesOpen.inlineState', {
+      pageId: AUTO_TEST_INLINE_PAGE_ID,
+      pageKey: AUTO_TEST_INLINE_PAGE_ID,
+      title: 'Auto Test',
+      kind: 'INLINE',
+      open: autoTestOpen,
+      isOpen: autoTestOpen,
+    });
+  }, [autoTestOpen, connected, send]);
+
+  useEffect(() => {
     if (!userMenuOpen) return;
     const closeOutside = (event: MouseEvent) => {
       if (!userMenuRef.current?.contains(event.target as Node)) setUserMenuOpen(false);
@@ -302,6 +322,16 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, on
             setTestCatalog(body as AutomationTestCatalog);
             setTestCatalogError('');
           }
+        } else if (operationId === 'pagesOpen.openResponse') {
+          setStatus({
+            level: body?.ok === false ? 'error' : 'ok',
+            text: responseMessage(body, 'Pages Open workspace opened'),
+          });
+        } else if (operationId === 'pagesOpen.inlineClose') {
+          const targetSessionId = String(body?.sessionId || body?.targetSessionId || '');
+          if (!targetSessionId || targetSessionId === sessionId) {
+            setAutoTestOpen(false);
+          }
         } else if (operationId === 'react.session.open') {
           onSessionOpen?.(body.targetSession, body.port, body.botJobId);
         }
@@ -309,12 +339,17 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, on
         console.warn('MainDashboard ignored socket message', err, raw);
       }
     }
-  }, [messages, onSessionOpen]);
+  }, [messages, onSessionOpen, sessionId]);
 
   const openAutoTest = () => {
     setUserMenuOpen(false);
     setAutoTestOpen(true);
     if (!testCatalog) loadTestCatalog();
+  };
+
+  const openPagesOpen = () => {
+    setUserMenuOpen(false);
+    send('pagesOpen.open');
   };
 
   const licensedUser = licenseProfile?.owner || licenseProfile?.licensedUser || 'Licensed user';
@@ -424,6 +459,13 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, on
                     <span>
                       <strong>Auto Test</strong>
                       <small>Browse every automation test</small>
+                    </span>
+                  </button>
+                  <button type="button" role="menuitem" className={styles.autoTestMenuItem} onClick={openPagesOpen}>
+                    <AppWindow size={19} aria-hidden="true" />
+                    <span>
+                      <strong>Pages Open</strong>
+                      <small>View and close every open page</small>
                     </span>
                   </button>
                 </div>

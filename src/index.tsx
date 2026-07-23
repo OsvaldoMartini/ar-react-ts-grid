@@ -21,6 +21,7 @@ import CloneJobPage from './components/CloneJobPage';
 import ConfigPage from './components/ConfigPage';
 import ATemplate from './components/ATemplate';
 import MemoryList, { MEMORY_LIST_SESSION_ID } from './components/MemoryList';
+import PagesOpen, { PAGES_OPEN_SESSION_ID } from './components/PagesOpen';
 import InfoPage from './components/InfoPage';
 import LicenseManager from './components/LicenseManager';
 import ActivationRequired from './components/ActivationRequired';
@@ -198,6 +199,7 @@ const App: React.FC = () => {
           'configManager',
           'aTemplateManager',
           MEMORY_LIST_SESSION_ID,
+          PAGES_OPEN_SESSION_ID,
           'aboutPanel',
           'licenseManager',
         ]
@@ -541,6 +543,14 @@ const App: React.FC = () => {
       )}
       {sessionId === MEMORY_LIST_SESSION_ID && (
         <MemoryList
+          key={sessionId}
+          socketPort={socketPort}
+          sessionId={sessionId}
+          onClose={closeDetachedWorkspace}
+        />
+      )}
+      {sessionId === PAGES_OPEN_SESSION_ID && (
+        <PagesOpen
           key={sessionId}
           socketPort={socketPort}
           sessionId={sessionId}
