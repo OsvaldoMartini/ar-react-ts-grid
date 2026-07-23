@@ -42,6 +42,19 @@ type OrganizationRow = {
   url: string | null;
 };
 
+type ResultDialog = {
+  header: string;
+  body: string;
+  error: boolean;
+  extraMsg: string;
+};
+
+type BrowserReplacement = {
+  activeBrowser: string;
+  requestedBrowser: string;
+  warning: string;
+};
+
 const ORGANIZATION_COLUMNS: readonly GridTempAColumn<OrganizationRow>[] = [
   {
     id: 'id',
@@ -183,15 +196,16 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [promptOpen, setPromptOpen] = useState(false);
   const [promptText, setPromptText] = useState('');
+  const [promptSaveConfirmOpen, setPromptSaveConfirmOpen] = useState(false);
+  const [promptMissingTokens, setPromptMissingTokens] = useState<string[]>([]);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [reloadConfirmOpen, setReloadConfirmOpen] = useState(false);
   const [restoreConfirmOpen, setRestoreConfirmOpen] = useState(false);
-  const [reloadResult, setReloadResult] = useState<{
-    header: string;
-    body: string;
-    error: boolean;
-    extraMsg: string;
-  } | null>(null);
+  const [backupConfirmOpen, setBackupConfirmOpen] = useState(false);
+  const [backupResult, setBackupResult] = useState<ResultDialog | null>(null);
+  const [browserReplacement, setBrowserReplacement] = useState<BrowserReplacement | null>(null);
+  const [browserResult, setBrowserResult] = useState<ResultDialog | null>(null);
+  const [reloadResult, setReloadResult] = useState<ResultDialog | null>(null);
   const [status, setStatus] = useState<{ level: StatusLevel; text: string }>({
     level: 'warn',
     text: 'Waiting for backend data',
@@ -203,12 +217,13 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
   }, [config.databaseType]);
 
   const send = useCallback(
-    (type: string, body: unknown = {}) => {
+    (type: string, body: unknown = {}): boolean => {
       if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
         setStatus({ level: 'warn', text: 'Socket is not connected yet' });
-        return;
+        return false;
       }
       webSocket.send(JSON.stringify({ type, sessionId, body: JSON.stringify(body) }));
+      return true;
     },
     [sessionId, webSocket],
   );
@@ -230,6 +245,9 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
   }, [error]);
 
   useEffect(() => {
+    if (processedMessageCountRef.current > messages.length) {
+      processedMessageCountRef.current = 0;
+    }
     const nextMessages = messages.slice(processedMessageCountRef.current);
     processedMessageCountRef.current = messages.length;
     for (const raw of nextMessages) {
@@ -241,10 +259,13 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
           setStatus({ level: ok ? 'ok' : 'error', text: responseMessage(body, 'Configuration loaded') });
         } else if (operationId === 'config.pathResponse') {
           setBusyAction('');
-          if (!body.cancelled && body.field && body.path) {
+          if (ok && !body.cancelled && body.field && body.path) {
             setConfig(prev => ({ ...prev, [body.field]: body.path }));
           }
-          setStatus({ level: body.cancelled ? 'warn' : 'ok', text: responseMessage(body, 'Path selected') });
+          setStatus({
+            level: !ok ? 'error' : body.cancelled ? 'warn' : 'ok',
+            text: responseMessage(body, 'Path selected'),
+          });
         } else if (operationId === 'config.saveResponse') {
           setBusyAction('');
           setErrors(body.errors || {});
@@ -271,7 +292,63 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
           });
         } else if (operationId === 'config.backupResponse') {
           setBusyAction('');
-          setStatus({ level: ok ? 'ok' : 'error', text: responseMessage(body, 'Backup completed') });
+          const cancelled = body?.cancelled === true;
+          const message = responseMessage(body, cancelled ? 'Database backup cancelled' : 'Backup completed');
+          setStatus({ level: !ok ? 'error' : cancelled ? 'warn' : 'ok', text: message });
+          setBackupResult({
+            header: !ok
+              ? 'Database Backup Failed'
+              : cancelled
+                ? 'Database Backup Cancelled'
+                : 'Database Backup Completed',
+            body: message,
+            error: !ok,
+            extraMsg: !ok
+              ? 'The database was not backed up. Review the error and try again.'
+              : cancelled
+                ? 'No files were written.'
+                : `Backup file: ${body?.path || body?.folder || 'the selected destination'}`,
+          });
+        } else if (
+          operationId === 'config.browserResponse'
+          || operationId === 'config.browser.updateResponse'
+        ) {
+          setBusyAction('');
+          const message = responseMessage(body, 'Browser configuration update completed');
+          if (body?.confirmationRequired === true) {
+            setBrowserReplacement({
+              activeBrowser: String(body?.activeBrowser || 'current'),
+              requestedBrowser: String(body?.requestedBrowser || ''),
+              warning: String(
+                body?.warning
+                || 'Continuing closes the current shared Playwright browser.',
+              ),
+            });
+            setStatus({ level: 'warn', text: message });
+          } else {
+            applyPayload(body);
+            setStatus({ level: ok ? 'ok' : 'error', text: message });
+            setBrowserResult({
+              header: ok ? 'Browser Configuration Updated' : 'Browser Update Failed',
+              body: message,
+              error: !ok,
+              extraMsg: ok
+                ? `${body?.browserClosed === true
+                  ? 'The previous shared Playwright browser was closed. '
+                  : ''}Config file: ${body?.configFile || 'active AR Web configuration'}`
+                : body?.rollbackFailed === true
+                  ? 'The previous selection could not be restored automatically. Review the active config file before continuing.'
+                  : 'The current browser configuration was kept.',
+            });
+          }
+        } else if (operationId === 'config.browserUpdated') {
+          if (ok) {
+            applyPayload(body);
+            setStatus({
+              level: 'ok',
+              text: responseMessage(body, 'Browser configuration updated in real time'),
+            });
+          }
         } else if (operationId === 'config.restoreResponse') {
           setBusyAction('');
           applyPayload(body);
@@ -342,19 +419,52 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
 
   const choosePath = (field: keyof ConfigData, mode: 'file' | 'directory') => {
     setBusyAction(`path:${String(field)}`);
-    send('config.choosePath', { field, mode });
+    if (!send('config.choosePath', { field, mode, currentPath: config[field] })) {
+      setBusyAction('');
+    }
   };
 
   const saveConfig = () => {
     setReloadConfirmOpen(false);
     setBusyAction('save');
-    send('config.save', { config });
+    if (!send('config.save', { config })) {
+      setBusyAction('');
+    }
   };
 
   const backup = () => {
-    if (!window.confirm('Execute database backup now?')) return;
+    setBackupConfirmOpen(false);
     setBusyAction('backup');
-    send('config.backup', { databaseType: config.databaseType });
+    if (!send('config.backup', {
+      databaseType: config.databaseType,
+      initialPath: config.pathDb,
+    })) {
+      setBusyAction('');
+    }
+  };
+
+  const requestBrowserUpdate = (requestedBrowser: string) => {
+    if (!requestedBrowser || requestedBrowser === config.browser) return;
+    setBusyAction('browser');
+    if (!send('config.browser.update', {
+      browser: requestedBrowser,
+      confirmReplace: false,
+    })) {
+      setBusyAction('');
+    }
+  };
+
+  const confirmBrowserReplacement = () => {
+    const requestedBrowser = browserReplacement?.requestedBrowser || '';
+    setBrowserReplacement(null);
+    if (!requestedBrowser) return;
+    setBusyAction('browser');
+    if (!send('config.browser.update', {
+      browser: requestedBrowser,
+      confirmReplace: true,
+    })) {
+      setBusyAction('');
+    }
   };
 
   const requestRestore = () => {
@@ -368,7 +478,13 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
   const restore = () => {
     setRestoreConfirmOpen(false);
     setBusyAction('restore');
-    send('config.restore', { databaseType: config.databaseType, date: backendDateKey(restoreDate.trim()) });
+    if (!send('config.restore', {
+      databaseType: config.databaseType,
+      date: backendDateKey(restoreDate.trim()),
+      initialPath: config.pathDb,
+    })) {
+      setBusyAction('');
+    }
   };
 
   const deleteAll = () => {
@@ -382,13 +498,22 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
     send('config.loadGenFlowPrompt');
   };
 
+  const submitPrompt = () => {
+    setPromptSaveConfirmOpen(false);
+    setBusyAction('prompt');
+    if (!send('config.saveGenFlowPrompt', { content: promptText })) {
+      setBusyAction('');
+    }
+  };
+
   const savePrompt = () => {
     const missing = REQUIRED_PROMPT_TOKENS.filter(token => !promptText.includes(token));
-    if (missing.length > 0 && !window.confirm(`Missing placeholders: ${missing.join(', ')}. Save anyway?`)) {
+    if (missing.length > 0) {
+      setPromptMissingTokens(missing);
+      setPromptSaveConfirmOpen(true);
       return;
     }
-    setBusyAction('prompt');
-    send('config.saveGenFlowPrompt', { content: promptText });
+    submitPrompt();
   };
 
   const statusClass = status.level === 'error' ? styles.statusError : status.level === 'ok' ? styles.statusOk : styles.statusWarn;
@@ -414,7 +539,11 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
         <section className={styles.toolbar}>
           <label className={styles.toolbarField}>
             Browser
-            <select value={config.browser} onChange={event => update('browser', event.target.value)}>
+            <select
+              value={config.browser}
+              disabled={!!busyAction}
+              onChange={event => requestBrowserUpdate(event.target.value)}
+            >
               {options.browsers.map(item => <option key={item} value={item}>{item}</option>)}
             </select>
           </label>
@@ -425,7 +554,7 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
             </select>
           </label>
           <button type="button" onClick={() => setReloadConfirmOpen(true)} disabled={!!busyAction}>Reload Configs</button>
-          <button type="button" onClick={backup} disabled={!!busyAction}>Backup DB</button>
+          <button type="button" onClick={() => setBackupConfirmOpen(true)} disabled={!!busyAction}>Backup DB</button>
           <button type="button" onClick={requestRestore} disabled={!!busyAction}>Restore DB</button>
           <label className={styles.toolbarField}>
             Date Restore
@@ -528,6 +657,19 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
         </div>
       )}
 
+      {promptSaveConfirmOpen && (
+        <QuestionsCard
+          mode="confirm"
+          header="Save Prompt With Missing Placeholders?"
+          body={`Missing placeholders: ${promptMissingTokens.join(', ')}`}
+          extraMsg="The generated flow may be incomplete without these placeholders."
+          okLabel="Save Anyway"
+          cancelLabel="Review Prompt"
+          onCancel={() => setPromptSaveConfirmOpen(false)}
+          onSubmit={submitPrompt}
+        />
+      )}
+
       {deleteConfirmOpen && (
         <div className={styles.modalShade} role="presentation" onMouseDown={() => setDeleteConfirmOpen(false)}>
           <section
@@ -566,6 +708,35 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
         />
       )}
 
+      {backupConfirmOpen && (
+        <QuestionsCard
+          mode="confirm"
+          header="Backup Database"
+          body={`Create a backup of the ${config.databaseType || 'current'} database now?`}
+          extraMsg="After confirmation, choose the destination folder in Explorer. The selector opens at the configured database path."
+          okLabel="Choose Folder"
+          cancelLabel="Cancel"
+          onCancel={() => setBackupConfirmOpen(false)}
+          onSubmit={backup}
+        />
+      )}
+
+      {browserReplacement && (
+        <QuestionsCard
+          mode="confirm"
+          header="Replace Shared Playwright Browser"
+          body={`${browserReplacement.activeBrowser === 'unknown'
+            ? 'An existing browser'
+            : browserReplacement.activeBrowser} is running. Change to ${browserReplacement.requestedBrowser}?`}
+          extraMsg={browserReplacement.warning}
+          okLabel="Close and Change"
+          cancelLabel="Keep Current"
+          destructive
+          onCancel={() => setBrowserReplacement(null)}
+          onSubmit={confirmBrowserReplacement}
+        />
+      )}
+
       {restoreConfirmOpen && (
         <QuestionsCard
           mode="confirm"
@@ -577,6 +748,32 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
           destructive
           onCancel={() => setRestoreConfirmOpen(false)}
           onSubmit={restore}
+        />
+      )}
+
+      {backupResult && (
+        <QuestionsCard
+          mode="alert"
+          header={backupResult.header}
+          body={backupResult.body}
+          extraMsg={backupResult.extraMsg}
+          error={backupResult.error}
+          okLabel="Close"
+          onCancel={() => setBackupResult(null)}
+          onSubmit={() => setBackupResult(null)}
+        />
+      )}
+
+      {browserResult && (
+        <QuestionsCard
+          mode="alert"
+          header={browserResult.header}
+          body={browserResult.body}
+          extraMsg={browserResult.extraMsg}
+          error={browserResult.error}
+          okLabel="Close"
+          onCancel={() => setBrowserResult(null)}
+          onSubmit={() => setBrowserResult(null)}
         />
       )}
 

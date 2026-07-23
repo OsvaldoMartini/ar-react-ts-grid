@@ -396,7 +396,10 @@ const App: React.FC = () => {
       {isMainApplicationWindow(window.location.search)
         && Number.isInteger(mainApplicationControlPort)
         && mainApplicationControlPort > 0 && (
-        <MainApplicationControl socketPort={mainApplicationControlPort} />
+        <MainApplicationControl
+          socketPort={mainApplicationControlPort}
+          onSessionOpen={onSessionOpen}
+        />
       )}
       <BotJobWindowControl
         socketPort={socketPort}
