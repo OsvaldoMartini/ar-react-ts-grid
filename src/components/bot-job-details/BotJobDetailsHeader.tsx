@@ -75,7 +75,6 @@ const BotJobDetailsHeader: React.FC<BotJobDetailsHeaderProps> = ({
         disabled: pending || unavailable || !canShowComponents,
       },
       { id: 'SHOW_PRE_SCAN', label: 'Pre Scan', tone: 'success', active: activeSurface === 'preScan', disabled: pending || unavailable || !canUsePreScan || activeSurface === 'preScan' },
-      { id: 'CLOSE', label: 'Close', tone: 'danger', disabled: false },
     ];
   }, [activeSurface, botJobId, busy, canShowComponents, canUsePreScan, canUseWorkspaceActions, connected, pendingAction]);
 
@@ -143,7 +142,6 @@ const BotJobDetailsHeader: React.FC<BotJobDetailsHeaderProps> = ({
         onAction={onAction}
         compact={compact}
         className={styles.keepButtonsOnTop}
-        extraActionsBeforeId="CLOSE"
         extraActions={onToolbarAction && (
           <BotJobDataActions
             state={jobState}

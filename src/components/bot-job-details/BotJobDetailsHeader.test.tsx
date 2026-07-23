@@ -26,7 +26,7 @@ test('marks the current surface and dispatches React-owned workspace navigation'
   expect(onAction).toHaveBeenCalledWith('SHOW_COMPONENTS');
 });
 
-test('keeps Close available while other workspace actions are pending', () => {
+test('leaves Close ownership to the Bot Job Details page title', () => {
   render(
     <BotJobDetailsHeader
       botJobId={5}
@@ -38,10 +38,8 @@ test('keeps Close available while other workspace actions are pending', () => {
     />,
   );
 
-  screen.getAllByRole('button').forEach((button) => {
-    if (button.textContent === 'Close') expect(button).toBeEnabled();
-    else expect(button).toBeDisabled();
-  });
+  screen.getAllByRole('button').forEach((button) => expect(button).toBeDisabled());
+  expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Refreshing…' })).toBeInTheDocument();
 });
 
