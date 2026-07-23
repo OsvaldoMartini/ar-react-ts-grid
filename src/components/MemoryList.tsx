@@ -1,4 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  DragDropContext,
+  Draggable,
+  Droppable,
+  type DropResult,
+} from 'react-beautiful-dnd';
 import clickImage from '../assets/click.png';
 import excelImage from '../assets/excel.png';
 import inputImage from '../assets/input_field.png';
@@ -7,48 +13,18 @@ import outPutImage from '../assets/output1.png';
 import screenImage from '../assets/screen.png';
 import waitImage from '../assets/wait.png';
 import CreateNewBlock, {
-  type CreateBlockOption,
   type CreateBlockPosition,
 } from './CreateNewBlock';
 import DetachedPageShell from './DetachedPageShell';
+import type {
+  MemoryListItemIcon,
+  MemoryListSnapshot,
+} from './memoryList.contract';
+import PagesOpenButton from './PagesOpenButton';
 import { useWebSocket } from './useWebSocket';
 import styles from './MemoryList.module.scss';
 
 export const MEMORY_LIST_SESSION_ID = 'memoryListManager';
-
-export type MemoryListSourceKind = 'BOT_JOB' | 'PAGE_SCANNER';
-export type MemoryListItemIcon =
-  | 'click'
-  | 'excel'
-  | 'input'
-  | 'link'
-  | 'output'
-  | 'screen'
-  | 'wait'
-  | 'default';
-
-export interface MemoryListItem {
-  key: string;
-  label: string;
-  detail?: string;
-  icon?: MemoryListItemIcon;
-  active?: boolean;
-}
-
-export interface MemoryListSnapshot {
-  ownerEpoch: string;
-  sourceKind: MemoryListSourceKind;
-  homeBankingId: number;
-  botJobId: number;
-  botJobName: string;
-  items: MemoryListItem[];
-  blocks: CreateBlockOption[];
-  targetBlockId: number | null;
-  emptyMessage: string;
-  status?: string;
-  busy?: boolean;
-  canApply?: boolean;
-}
 
 interface MemoryListProps {
   socketPort: number;
@@ -61,6 +37,7 @@ type MemoryListCommand =
   | { action: 'REMOVE'; itemKey: string }
   | { action: 'CLEAR' }
   | { action: 'APPLY'; targetBlockId: number | null }
+  | { action: 'REORDER'; orderedItemKeys: string[] }
   | { action: 'CREATE_BLOCK'; blockName: string; position: CreateBlockPosition };
 
 const EMPTY_SNAPSHOT: MemoryListSnapshot = {
@@ -186,9 +163,35 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose 
     setCreateBlockOpen(false);
   };
 
-  const sourceLabel = snapshot.sourceKind === 'PAGE_SCANNER'
-    ? 'Page Scanner elements'
-    : 'Bot Job instructions';
+  const handleDragEnd = useCallback((result: DropResult) => {
+    if (!result.destination || snapshot.busy) return;
+
+    const sourceIndex = snapshot.items.findIndex(item => item.key === result.draggableId);
+    const destinationIndex = result.destination.index;
+    if (
+      sourceIndex < 0
+      || destinationIndex < 0
+      || destinationIndex >= snapshot.items.length
+      || sourceIndex === destinationIndex
+    ) {
+      return;
+    }
+
+    const nextItems = [...snapshot.items];
+    const [movedItem] = nextItems.splice(sourceIndex, 1);
+    nextItems.splice(destinationIndex, 0, movedItem);
+    setSnapshot(current => ({ ...current, items: nextItems }));
+    sendCommand({
+      action: 'REORDER',
+      orderedItemKeys: nextItems.map(item => item.key),
+    });
+  }, [sendCommand, snapshot.busy, snapshot.items]);
+
+  const sourceLabel = snapshot.sourceKind === 'MIXED'
+    ? 'Bot Job instructions + Page Scanner elements'
+    : snapshot.sourceKind === 'PAGE_SCANNER'
+      ? 'Page Scanner elements'
+      : 'Bot Job instructions';
   const statusText = localStatus
     || snapshot.status
     || (connected ? 'Memory List ready' : 'Connecting to Memory List...');
@@ -224,6 +227,12 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose 
               <div className={`${styles.status} ${statusClass}`} role="status">
                 {statusText}
               </div>
+              <PagesOpenButton
+                webSocket={webSocket}
+                connected={connected}
+                messages={messages}
+                sessionId={sessionId}
+              />
               <button type="button" className={styles.closeButton} onClick={onClose}>
                 Close
               </button>
@@ -257,39 +266,75 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose 
             </button>
           </div>
 
-          <section className={styles.list} aria-label="Memory List items">
-            {snapshot.items.length === 0 ? (
-              <div className={styles.empty}>{snapshot.emptyMessage}</div>
-            ) : (
-              snapshot.items.map((item, index) => {
-                const icon = item.icon ? ITEM_ICONS[item.icon] : undefined;
-                return (
-                  <article
-                    key={item.key}
-                    className={`${styles.item} ${item.active === false ? styles.inactiveItem : ''}`}
-                  >
-                    <span className={styles.order}>{index + 1}.</span>
-                    {icon && <img src={icon} alt="" className={styles.itemIcon} />}
-                    <span className={styles.itemText}>
-                      <strong title={item.label}>{item.label}</strong>
-                      {item.detail && <small title={item.detail}>{item.detail}</small>}
-                    </span>
-                    {item.active === false && <span className={styles.inactiveBadge}>Inactive</span>}
-                    <button
-                      type="button"
-                      className={styles.removeButton}
-                      title="Remove from memory list"
-                      aria-label={`Remove ${item.label} from memory list`}
-                      disabled={snapshot.busy}
-                      onClick={() => sendCommand({ action: 'REMOVE', itemKey: item.key })}
-                    >
-                      X
-                    </button>
-                  </article>
-                );
-              })
-            )}
-          </section>
+          <DragDropContext onDragEnd={handleDragEnd}>
+            <Droppable droppableId="memory-list-items">
+              {provided => (
+                <section
+                  ref={provided.innerRef}
+                  {...provided.droppableProps}
+                  className={styles.list}
+                  aria-label="Memory List items"
+                >
+                  {snapshot.items.length === 0 ? (
+                    <div className={styles.empty}>{snapshot.emptyMessage}</div>
+                  ) : (
+                    snapshot.items.map((item, index) => {
+                      const icon = item.icon ? ITEM_ICONS[item.icon] : undefined;
+                      return (
+                        <Draggable
+                          key={item.key}
+                          draggableId={item.key}
+                          index={index}
+                          isDragDisabled={snapshot.busy}
+                        >
+                          {(dragProvided, dragState) => (
+                            <article
+                              ref={dragProvided.innerRef}
+                              {...dragProvided.draggableProps}
+                              className={[
+                                styles.item,
+                                item.active === false ? styles.inactiveItem : '',
+                                dragState.isDragging ? styles.draggingItem : '',
+                              ].filter(Boolean).join(' ')}
+                            >
+                              <button
+                                type="button"
+                                className={styles.dragHandle}
+                                title="Drag to reorder; arrow keys also move while dragging"
+                                aria-label={`Reorder ${item.label}`}
+                                disabled={snapshot.busy}
+                                {...dragProvided.dragHandleProps}
+                              >
+                                ≡
+                              </button>
+                              <span className={styles.order}>{index + 1}.</span>
+                              {icon && <img src={icon} alt="" className={styles.itemIcon} />}
+                              <span className={styles.itemText}>
+                                <strong title={item.label}>{item.label}</strong>
+                                {item.detail && <small title={item.detail}>{item.detail}</small>}
+                              </span>
+                              {item.active === false && <span className={styles.inactiveBadge}>Inactive</span>}
+                              <button
+                                type="button"
+                                className={styles.removeButton}
+                                title="Remove from memory list"
+                                aria-label={`Remove ${item.label} from memory list`}
+                                disabled={snapshot.busy}
+                                onClick={() => sendCommand({ action: 'REMOVE', itemKey: item.key })}
+                              >
+                                X
+                              </button>
+                            </article>
+                          )}
+                        </Draggable>
+                      );
+                    })
+                  )}
+                  {provided.placeholder}
+                </section>
+              )}
+            </Droppable>
+          </DragDropContext>
 
           <footer className={styles.footer}>
             <span>{snapshot.items.length} item{snapshot.items.length === 1 ? '' : 's'}</span>

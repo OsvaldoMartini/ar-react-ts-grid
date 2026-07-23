@@ -177,8 +177,41 @@
   background: #e0f7fa;
 }
 
+.draggingItem {
+  border-color: #1d6fb8;
+  box-shadow: 0 8px 20px rgba(18, 61, 107, 0.22);
+}
+
 .inactiveItem {
   opacity: 0.7;
+}
+
+.dragHandle {
+  width: 24px;
+  height: 26px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #0b5394;
+  cursor: grab;
+  font-size: 1.08rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.dragHandle:hover:not(:disabled) {
+  background: #c8edf2;
+}
+
+.dragHandle:active {
+  cursor: grabbing;
+}
+
+.dragHandle:focus-visible {
+  outline: 2px solid #1d6fb8;
+  outline-offset: -2px;
 }
 
 .order {
@@ -278,6 +311,7 @@
 
 .clearButton:disabled,
 .applyButton:disabled,
+.dragHandle:disabled,
 .removeButton:disabled,
 .targetRow select:disabled {
   cursor: default;
@@ -388,6 +422,12 @@
   .order {
     min-width: 17px;
     font-size: 0.65rem;
+  }
+
+  .dragHandle {
+    width: 18px;
+    height: 20px;
+    font-size: 0.85rem;
   }
 
   .itemIcon {

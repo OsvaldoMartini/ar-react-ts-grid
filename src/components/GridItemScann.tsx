@@ -73,7 +73,7 @@ import type {
   MemoryListItem,
   MemoryListItemIcon,
   MemoryListSnapshot,
-} from './MemoryList';
+} from './memoryList.contract';
 import {
   PRE_SCAN_CLEAR_GRID_OPERATION,
   PRE_SCAN_PAGE_OPERATION,
@@ -158,6 +158,7 @@ const scannerMemoryIcon = (element: ElementDTO): MemoryListItemIcon => {
 };
 
 const scannerMemoryItem = (element: ElementDTO): MemoryListItem => {
+  const sourceItemKey = scannerMemoryElementKey(element);
   const label = String(
     (element as any).clientNamed
     || (element as any).definedName
@@ -166,11 +167,14 @@ const scannerMemoryItem = (element: ElementDTO): MemoryListItem => {
     || 'Web element',
   ).trim();
   return {
-    key: scannerMemoryElementKey(element),
+    key: `PAGE_SCANNER:${sourceItemKey}`,
+    sourceKind: 'PAGE_SCANNER',
+    sourceItemKey,
     label,
     detail: element.xPath || `${element.tagName || 'element'} #${element.id}`,
     icon: scannerMemoryIcon(element),
     active: isElementActive(element),
+    payload: { elementDTO: element },
   };
 };
 
@@ -1016,8 +1020,22 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
       return updated;
     });
   };
-  const handleApplyMemory = (targetBlockIdOverride?: number | null) => {
-    const activeMemoryElements = memoryElements.filter(isElementActive);
+  const handleApplyMemory = (
+    targetBlockIdOverride?: number | null,
+    sourceItemKeys?: string[],
+  ) => {
+    const memoryElementBySourceKey = new Map(
+      memoryElements.map(element => [memoryElementKey(element), element] as const),
+    );
+    const requestedElements = sourceItemKeys === undefined
+      ? memoryElements
+      : sourceItemKeys
+        .map((itemKey) => {
+          const rawKey = String(itemKey).replace(/^PAGE_SCANNER:/, '');
+          return memoryElementBySourceKey.get(rawKey);
+        })
+        .filter((element): element is ElementDTO => Boolean(element));
+    const activeMemoryElements = requestedElements.filter(isElementActive);
     const targetBlockId = targetBlockIdOverride === undefined
       ? memoryTargetBlockId
       : targetBlockIdOverride;
@@ -1340,7 +1358,12 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
             if (Number(bodyData?.botJobId) !== Number(botJobId)) break;
 
             if (command === 'REMOVE') {
-              const itemKey = String(payload?.itemKey ?? '');
+              const itemKey = String(
+                payload?.sourceItemKey
+                ?? payload?.item?.sourceItemKey
+                ?? payload?.itemKey
+                ?? '',
+              ).replace(/^PAGE_SCANNER:/, '');
               setMemoryElements(previous =>
                 previous.filter(element => memoryElementKey(element) !== itemKey)
               );
@@ -1353,11 +1376,18 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
               );
             } else if (command === 'APPLY') {
               const requestedTargetBlockId = Number(payload?.targetBlockId);
+              const requestedSourceItemKeys = Array.isArray(payload?.sourceItemKeys)
+                ? payload.sourceItemKeys.map((itemKey: unknown) => String(itemKey))
+                : undefined;
               handleApplyMemory(
                 Number.isFinite(requestedTargetBlockId) && requestedTargetBlockId > 0
                   ? requestedTargetBlockId
                   : null,
+                requestedSourceItemKeys,
               );
+            } else if (command === 'REORDER') {
+              // The aggregate Memory List owns the mixed-source display order.
+              // Producers apply the ordered sourceItemKeys routed with APPLY.
             } else if (command === 'CREATE_BLOCK') {
               const blockName = String(payload?.blockName || '').trim();
               if (!blockName) break;

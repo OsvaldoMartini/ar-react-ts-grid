@@ -62,7 +62,7 @@ import type {
   MemoryListItem,
   MemoryListItemIcon,
   MemoryListSnapshot,
-} from './MemoryList';
+} from './memoryList.contract';
 import {
   SCANNER_ELEMENT_PANE_SESSION_ID,
   SCANNER_TOOL_SESSION_ID,
@@ -167,11 +167,14 @@ const instructionMemoryIcon = (instruction: BlockLoopInstructionLoadDTO): Memory
 const instructionMemoryItem = (
   instruction: BlockLoopInstructionLoadDTO,
 ): MemoryListItem => ({
-  key: String(instruction.id),
+  key: `BOT_JOB:${instruction.id}`,
+  sourceKind: 'BOT_JOB',
+  sourceItemKey: String(instruction.id),
   label: `(${instruction.id})${instructionDisplayLabel(instruction) || instruction.actions || 'Instruction'}`,
   detail: `Block #${instruction.blockOrderNumber} ${instruction.blockName}`,
   icon: instructionMemoryIcon(instruction),
   active: instruction.instructionActive !== false,
+  payload: { instructionId: instruction.id },
 });
 
 
@@ -398,7 +401,10 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
   // Apply: move the memorized steps (in insertion order) to the end of the
   // selected block, then persist exactly like a drag & drop move (ROW_MOVE).
-  const handleApplyMemory = (targetBlockIdOverride?: number | null) => {
+  const handleApplyMemory = (
+    targetBlockIdOverride?: number | null,
+    sourceItemKeys?: string[],
+  ) => {
     const targetBlockId = targetBlockIdOverride === undefined
       ? memoryTargetBlockId
       : targetBlockIdOverride;
@@ -407,7 +413,18 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     const targetBlockOption = memoryBlockOptions.find((block) => block.blockId === targetBlockId);
     if (!targetBlockOption) return;
 
-    const movable = memorySteps.filter(step => memoryCapabilities.get(step.id)?.canAdd);
+    const memoryStepBySourceKey = new Map(
+      memorySteps.map(step => [String(step.id), step] as const),
+    );
+    const requestedSteps = sourceItemKeys === undefined
+      ? memorySteps
+      : sourceItemKeys
+        .map((itemKey) => {
+          const rawKey = String(itemKey).replace(/^BOT_JOB:/, '');
+          return memoryStepBySourceKey.get(rawKey);
+        })
+        .filter((step): step is BlockLoopInstructionLoadDTO => Boolean(step));
+    const movable = requestedSteps.filter(step => memoryCapabilities.get(step.id)?.canAdd);
     if (movable.length === 0) return;
     const movableIds = new Set(movable.map((step) => step.id));
 
@@ -804,8 +821,13 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
           if (Number(bodyData?.botJobId) !== Number(botJobId)) return;
 
           if (command === 'REMOVE') {
-            const itemKey = String(payload?.itemKey ?? '');
-            const instructionId = Number(itemKey);
+            const sourceItemKey = String(
+              payload?.sourceItemKey
+              ?? payload?.item?.sourceItemKey
+              ?? payload?.itemKey
+              ?? '',
+            ).replace(/^BOT_JOB:/, '');
+            const instructionId = Number(sourceItemKey);
             if (Number.isFinite(instructionId)) handleRemoveFromMemory(instructionId);
           } else if (command === 'CLEAR') {
             setMemorySteps([]);
@@ -816,11 +838,18 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
             );
           } else if (command === 'APPLY') {
             const requestedTargetBlockId = Number(payload?.targetBlockId);
+            const requestedSourceItemKeys = Array.isArray(payload?.sourceItemKeys)
+              ? payload.sourceItemKeys.map((itemKey: unknown) => String(itemKey))
+              : undefined;
             handleApplyMemory(
               Number.isFinite(requestedTargetBlockId) && requestedTargetBlockId > 0
                 ? requestedTargetBlockId
                 : null,
+              requestedSourceItemKeys,
             );
+          } else if (command === 'REORDER') {
+            // The aggregate Memory List owns the mixed-source display order.
+            // Producers apply the ordered sourceItemKeys routed with APPLY.
           } else if (command === 'CREATE_BLOCK') {
             const blockName = String(payload?.blockName || '').trim();
             if (!blockName) return;

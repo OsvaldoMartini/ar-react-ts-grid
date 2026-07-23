@@ -252,6 +252,7 @@ const PagesOpen: React.FC<PagesOpenProps> = ({ socketPort, sessionId, onClose })
                         <strong title={page.title}>{page.title}</strong>
                         <small title={detail}>{detail}</small>
                       </span>
+                      <span className={styles.focusHint}>Click to bring to front</span>
                       {page.main && <span className={styles.mainBadge}>Main</span>}
                       <span className={styles.kindBadge}>{page.kind}</span>
                     </button>

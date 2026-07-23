@@ -255,6 +255,14 @@
   font-size: 0.67rem;
 }
 
+.focusHint {
+  flex: 0 0 auto;
+  color: #15518d;
+  font-size: 0.65rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .mainBadge,
 .kindBadge {
   padding: 2px 6px;
@@ -339,5 +347,9 @@
 
   .kindBadge {
     display: none;
+  }
+
+  .focusHint {
+    font-size: 0.6rem;
   }
 }
