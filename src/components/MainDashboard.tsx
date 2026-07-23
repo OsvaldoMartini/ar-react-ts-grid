@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, FlaskConical, GripHorizontal, ShieldCheck, User } from 'lucide-react';
+import { ChevronDown, FlaskConical, GripHorizontal, ShieldCheck, User } from 'lucide-react';
 import AutoTestWorkspace, { AutomationTestCatalog } from './auto-test/AutoTestWorkspace';
 import FloatingWorkspaceFrame from './workspace/FloatingWorkspaceFrame';
+import GridTempA, { GridTempAColumn } from './GridTemp_A';
 import styles from './MainDashboard.module.scss';
 import { useWebSocket } from './useWebSocket';
 
@@ -28,13 +29,6 @@ interface BotJobRow {
   launchable?: boolean;
 }
 
-type SortKey = 'id' | 'name' | 'description' | 'organization' | 'environment' | 'type' | 'status' | 'blocks';
-
-interface SortState {
-  key: SortKey;
-  dir: 1 | -1;
-}
-
 interface LicenseProfile {
   active?: boolean;
   status?: string;
@@ -44,37 +38,91 @@ interface LicenseProfile {
   licensedUser?: string;
 }
 
-const SORT_COLUMNS: { key: SortKey; label: string }[] = [
-  { key: 'id', label: 'ID' },
-  { key: 'name', label: 'Name' },
-  { key: 'description', label: 'Description' },
-  { key: 'organization', label: 'Organization' },
-  { key: 'environment', label: 'Environment' },
-  { key: 'type', label: 'Type' },
-  { key: 'status', label: 'Status' },
-  { key: 'blocks', label: 'Blocks' },
+const BOT_JOB_COLUMNS: readonly GridTempAColumn<BotJobRow>[] = [
+  {
+    id: 'id',
+    header: 'ID',
+    width: 58,
+    renderCell: row => row.id,
+    sortValue: row => row.id,
+    title: row => String(row.id),
+    headerTitle: 'Click to sort',
+  },
+  {
+    id: 'name',
+    header: 'Name',
+    width: 190,
+    renderCell: row => row.name,
+    sortValue: row => row.name || '',
+    searchValue: row => row.name || '',
+    title: row => row.name,
+    headerTitle: 'Click to sort',
+  },
+  {
+    id: 'description',
+    header: 'Description',
+    width: 280,
+    renderCell: row => row.description || '',
+    sortValue: row => row.description || '',
+    searchValue: row => row.description || '',
+    title: row => row.description || '',
+    headerTitle: 'Click to sort',
+  },
+  {
+    id: 'organization',
+    header: 'Organization',
+    width: 150,
+    renderCell: row => row.organizationName || '',
+    sortValue: row => row.organizationName || '',
+    searchValue: row => row.organizationName || '',
+    title: row => row.organizationName || '',
+    headerTitle: 'Click to sort',
+  },
+  {
+    id: 'environment',
+    header: 'Environment',
+    width: 150,
+    renderCell: row => row.environmentName || row.environmentUrl || '',
+    sortValue: row => row.environmentName || row.environmentUrl || '',
+    searchValue: row => [row.environmentName, row.environmentUrl],
+    title: row => row.environmentName || row.environmentUrl || '',
+    headerTitle: 'Click to sort',
+  },
+  {
+    id: 'type',
+    header: 'Type',
+    width: 92,
+    renderCell: row => row.priority || '',
+    sortValue: row => row.priority || '',
+    searchValue: row => row.priority || '',
+    title: row => row.priority || '',
+    headerTitle: 'Click to sort',
+  },
+  {
+    id: 'status',
+    header: 'Status',
+    width: 82,
+    renderCell: row => (
+      <span className={row.active ? styles.activePill : styles.inactivePill}>
+        {row.active ? 'Active' : 'Inactive'}
+      </span>
+    ),
+    sortValue: row => row.active ? 0 : 1,
+    searchValue: row => row.active ? 'Active' : 'Inactive',
+    searchMode: 'exact',
+    headerTitle: 'Click to sort',
+  },
+  {
+    id: 'blocks',
+    header: 'Blocks',
+    width: 62,
+    alignment: 'right',
+    renderCell: row => row.blockCount || 0,
+    sortValue: row => row.blockCount || 0,
+    title: row => String(row.blockCount || 0),
+    headerTitle: 'Click to sort',
+  },
 ];
-
-function sortValue(row: BotJobRow, key: SortKey): string | number {
-  switch (key) {
-    case 'id':
-      return row.id;
-    case 'name':
-      return row.name || '';
-    case 'description':
-      return row.description || '';
-    case 'organization':
-      return row.organizationName || '';
-    case 'environment':
-      return row.environmentName || row.environmentUrl || '';
-    case 'type':
-      return row.priority || '';
-    case 'status':
-      return row.active ? 0 : 1;
-    case 'blocks':
-      return row.blockCount || 0;
-  }
-}
 
 function parseMessage(raw: string): { operationId?: string; body: any } {
   const outer = JSON.parse(raw);
@@ -111,8 +159,6 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, on
   const shutdownRequestedRef = useRef(false);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
   const [botJobs, setBotJobs] = useState<BotJobRow[]>([]);
-  const [findText, setFindText] = useState('');
-  const [sort, setSort] = useState<SortState | null>({ key: 'id', dir: 1 });
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<BotJobRow | null>(null);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -130,34 +176,6 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, on
     () => botJobs.find(row => row.id === selectedId) || null,
     [botJobs, selectedId],
   );
-
-  const filteredBotJobs = useMemo(() => {
-    const query = findText.trim().toLowerCase();
-    if (!query) return botJobs;
-    return botJobs.filter(row =>
-      row.name.toLowerCase().includes(query) ||
-      (row.organizationName || '').toLowerCase().includes(query)
-    );
-  }, [botJobs, findText]);
-
-  const sortedBotJobs = useMemo(() => {
-    if (!sort) return filteredBotJobs;
-    const { key, dir } = sort;
-    return [...filteredBotJobs].sort((a, b) => {
-      const va = sortValue(a, key);
-      const vb = sortValue(b, key);
-      if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
-      return String(va).localeCompare(String(vb), undefined, { sensitivity: 'base', numeric: true }) * dir;
-    });
-  }, [filteredBotJobs, sort]);
-
-  const toggleSort = (key: SortKey) => {
-    setSort(prev => {
-      if (!prev || prev.key !== key) return { key, dir: 1 };
-      if (prev.dir === 1) return { key, dir: -1 };
-      return null;
-    });
-  };
 
   const send = useCallback(
     (type: string, body: unknown = {}) => {
@@ -445,108 +463,49 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, on
           <button type="button" className={styles.commandBtn} onClick={refresh}>
             Refresh
           </button>
-          <div className={styles.findControl}>
-            <label htmlFor="main-dashboard-find">Find:</label>
-            <div className={styles.findInputWrap}>
-              <input
-                id="main-dashboard-find"
-                type="text"
-                value={findText}
-                placeholder="Bot Job or Organization"
-                onChange={event => setFindText(event.target.value)}
-              />
-              {findText && (
-                <button type="button" title="Clear Find" onClick={() => setFindText('')}>
-                  X
-                </button>
-              )}
-            </div>
-          </div>
         </div>
 
-        <section className={styles.gridPanel}>
-          <div className={styles.panelHeader}>
-            <span className={styles.panelTitle}>Bot Jobs</span>
-            <span className={styles.badge}>
-              {findText.trim() ? `${filteredBotJobs.length} / ${botJobs.length}` : botJobs.length}
-            </span>
-          </div>
-          <div className={styles.gridWrap}>
-            <table className={styles.grid}>
-              <thead>
-                <tr>
-                  {SORT_COLUMNS.map(column => (
-                    <th
-                      key={column.key}
-                      className={styles.sortableTh}
-                      title="Click to sort"
-                      onClick={() => toggleSort(column.key)}
-                    >
-                      {column.label}
-                      <span className={styles.sortIndicator}>
-                        {sort?.key === column.key ? (
-                          sort.dir === 1 ? (
-                            <ArrowUp size={18} aria-hidden="true" />
-                          ) : (
-                            <ArrowDown size={18} aria-hidden="true" />
-                          )
-                        ) : (
-                          <ArrowUpDown size={18} aria-hidden="true" style={{ opacity: 0.35 }} />
-                        )}
-                      </span>
-                    </th>
-                  ))}
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredBotJobs.length === 0 ? (
-                  <tr>
-                    <td className={styles.emptyCell} colSpan={9}>
-                      {botJobs.length === 0 ? 'No Bot Jobs loaded' : 'No Bot Jobs match Find'}
-                    </td>
-                  </tr>
-                ) : (
-                  sortedBotJobs.map(row => (
-                    <tr
-                      key={row.id}
-                      className={selectedId === row.id ? styles.selectedRow : undefined}
-                      onClick={() => setSelectedId(row.id)}
-                      onDoubleClick={() => openBotJob(row.id)}
-                    >
-                      <td title={String(row.id)}>{row.id}</td>
-                      <td title={row.name}>{row.name}</td>
-                      <td title={row.description || ''}>{row.description || ''}</td>
-                      <td title={row.organizationName || ''}>{row.organizationName || ''}</td>
-                      <td title={row.environmentName || row.environmentUrl || ''}>{row.environmentName || row.environmentUrl || ''}</td>
-                      <td title={row.priority || ''}>{row.priority || ''}</td>
-                      <td>
-                        <span className={row.active ? styles.activePill : styles.inactivePill}>
-                          {row.active ? 'Active' : 'Inactive'}
-                        </span>
-                      </td>
-                      <td title={String(row.blockCount || 0)}>{row.blockCount || 0}</td>
-                      <td>
-                        <button
-                          type="button"
-                          className={styles.rowDeleteBtn}
-                          title="Delete Bot Job"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setSelectedId(row.id);
-                            setConfirmDelete(row);
-                          }}
-                        >
-                          X
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
+        <GridTempA
+          title="Bot Jobs"
+          rows={botJobs}
+          columns={BOT_JOB_COLUMNS}
+          rowKey={row => row.id}
+          actions={{
+            header: 'Actions',
+            width: 76,
+            alignment: 'center',
+            render: row => (
+              <button
+                type="button"
+                className={styles.rowDeleteBtn}
+                title="Delete Bot Job"
+                onClick={() => {
+                  setSelectedId(row.id);
+                  setConfirmDelete(row);
+                }}
+              >
+                X
+              </button>
+            ),
+          }}
+          emptyMessage="No Bot Jobs loaded"
+          find={{
+            inputId: 'main-dashboard-find',
+            label: 'Find:',
+            placeholder: 'Name, Description, Organization, Environment, Type or Status',
+            clearTitle: 'Clear Find',
+            noMatchesMessage: 'No Bot Jobs match Find',
+          }}
+          className={styles.gridPanel}
+          minTableWidth={1060}
+          maxViewportHeight="none"
+          selectedRowKey={selectedId}
+          initialSort={{ columnId: 'id', direction: 'asc' }}
+          onRowClick={row => setSelectedId(row.id)}
+          onRowDoubleClick={row => openBotJob(row.id)}
+          ariaLabel="Bot Jobs"
+          testId="main-dashboard-bot-jobs-grid"
+        />
 
         {confirmDelete && (
           <div className={styles.confirmBackdrop}>

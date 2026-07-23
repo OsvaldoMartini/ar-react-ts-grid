@@ -17,6 +17,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 7px 10px;
   border-bottom: 1px solid #d9d9d9;
@@ -24,6 +25,7 @@
 }
 
 .panelTitle {
+  flex: 0 1 auto;
   min-width: 0;
   color: #0b5394;
   font-size: 0.88rem;
@@ -31,6 +33,76 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.headerControls {
+  flex: 1 1 320px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.findControl {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+}
+
+.findControl label {
+  flex: 0 0 auto;
+  color: #0b5394;
+  font-size: 12px;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.findInputWrap {
+  position: relative;
+  width: clamp(180px, 30vw, 360px);
+  min-width: 0;
+}
+
+.findInputWrap input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 28px;
+  border: 1px solid #9fb7c3;
+  border-radius: 3px;
+  background: #ffffff;
+  color: #1f2933;
+  padding: 4px 30px 4px 7px;
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.findInputWrap input:focus {
+  outline: 2px solid rgba(11, 83, 148, 0.18);
+  border-color: #0b5394;
+}
+
+.findInputWrap button {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: #667085;
+  font-size: 11px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.findInputWrap button:hover {
+  background: #ffebee;
+  color: #c62828;
 }
 
 .badge {
@@ -184,7 +256,21 @@
 
 @media (max-width: 720px) {
   .panelHeader {
+    align-items: flex-start;
     padding: 6px 8px;
+  }
+
+  .headerControls {
+    flex-basis: 100%;
+  }
+
+  .findControl {
+    flex: 1 1 auto;
+  }
+
+  .findInputWrap {
+    flex: 1 1 auto;
+    width: auto;
   }
 
   .grid th,

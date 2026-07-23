@@ -236,53 +236,6 @@
   overflow: hidden;
 }
 
-.orgHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 10px;
-  border-bottom: 1px solid #d6dfeb;
-}
-
-.orgHeader h2 {
-  margin: 0;
-  font-size: 0.85rem;
-  color: #15518d;
-}
-
-.orgHeader span {
-  font-size: 0.72rem;
-  font-weight: 800;
-  color: #15518d;
-}
-
-.orgGrid {
-  display: grid;
-  grid-template-columns: 72px minmax(150px, 1fr) 110px minmax(220px, 2fr);
-  align-content: start;
-  overflow: auto;
-  min-width: 620px;
-}
-
-.orgGrid > div {
-  min-width: 0;
-  padding: 6px 8px;
-  border-bottom: 1px solid #edf2f7;
-  font-size: 0.74rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.orgHead {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  background: #f8fbff;
-  color: #334155;
-  font-weight: 800;
-}
-
 .modalShade {
   position: fixed;
   inset: 0;

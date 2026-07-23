@@ -4,6 +4,9 @@ import styles from './GridTemp_A.module.scss';
 
 export type GridTempAAlignment = 'left' | 'center' | 'right';
 export type GridTempASortDirection = 'asc' | 'desc';
+export type GridTempASearchMode = 'contains' | 'exact';
+export type GridTempASearchPrimitive = string | number | boolean | null | undefined;
+export type GridTempASearchValue = GridTempASearchPrimitive | readonly GridTempASearchPrimitive[];
 
 export interface GridTempASort {
   columnId: string;
@@ -15,6 +18,8 @@ export interface GridTempAColumn<TRow> {
   header: React.ReactNode;
   renderCell: (row: TRow, rowIndex: number) => React.ReactNode;
   sortValue?: (row: TRow) => string | number | boolean | null | undefined;
+  searchValue?: (row: TRow) => GridTempASearchValue;
+  searchMode?: GridTempASearchMode;
   title?: (row: TRow) => string | undefined;
   headerTitle?: string;
   width?: React.CSSProperties['width'];
@@ -28,6 +33,17 @@ export interface GridTempAActions<TRow> {
   width?: React.CSSProperties['width'];
   alignment?: GridTempAAlignment;
   className?: string;
+}
+
+export interface GridTempAFind {
+  value?: string;
+  initialValue?: string;
+  onChange?: (value: string) => void;
+  inputId?: string;
+  label?: string;
+  placeholder?: string;
+  clearTitle?: string;
+  noMatchesMessage?: React.ReactNode;
 }
 
 export interface GridTempAProps<TRow> {
@@ -47,6 +63,7 @@ export interface GridTempAProps<TRow> {
   initialSort?: GridTempASort | null;
   sort?: GridTempASort | null;
   onSortChange?: (sort: GridTempASort | null) => void;
+  find?: GridTempAFind;
   onRowClick?: (row: TRow, rowIndex: number) => void;
   onRowDoubleClick?: (row: TRow, rowIndex: number) => void;
   rowClassName?: (row: TRow, rowIndex: number) => string | undefined;
@@ -77,6 +94,15 @@ const compareValues = (
 const joinClasses = (...classNames: Array<string | false | null | undefined>): string =>
   classNames.filter(Boolean).join(' ');
 
+const normalizeSearchValue = (
+  value: GridTempASearchPrimitive,
+): string => value == null ? '' : String(value).toLocaleLowerCase();
+
+const normalizeSearchValues = (value: GridTempASearchValue): string[] =>
+  (Array.isArray(value) ? value : [value])
+    .map(normalizeSearchValue)
+    .filter(Boolean);
+
 function GridTemp_A<TRow>({
   title,
   rows,
@@ -94,18 +120,50 @@ function GridTemp_A<TRow>({
   initialSort = null,
   sort,
   onSortChange,
+  find,
   onRowClick,
   onRowDoubleClick,
   rowClassName,
 }: GridTempAProps<TRow>): React.ReactElement {
   const [internalSort, setInternalSort] = useState<GridTempASort | null>(initialSort);
+  const [internalFindValue, setInternalFindValue] = useState(find?.initialValue || '');
   const currentSort = sort === undefined ? internalSort : sort;
+  const currentFindValue = find?.value === undefined ? internalFindValue : find.value;
+  const normalizedFindTerms = useMemo(
+    () => find
+      ? currentFindValue.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean)
+      : [],
+    [currentFindValue, find],
+  );
+  const findIsActive = normalizedFindTerms.length > 0;
 
-  const visibleRows = useMemo(() => {
+  const filteredRows = useMemo(() => {
     const indexedRows: Array<IndexedRow<TRow>> = rows.map((row, originalIndex) => ({
       row,
       originalIndex,
     }));
+    if (!findIsActive) return indexedRows;
+
+    return indexedRows.filter(({ row }) => {
+      const searchableColumns = columns
+        .filter(column => column.searchValue)
+        .map(column => ({
+          mode: column.searchMode || 'contains',
+          values: normalizeSearchValues(column.searchValue?.(row)),
+        }));
+
+      return normalizedFindTerms.every(term =>
+        searchableColumns.some(column =>
+          column.values.some(value =>
+            column.mode === 'exact' ? value === term : value.includes(term),
+          ),
+        ),
+      );
+    });
+  }, [columns, findIsActive, normalizedFindTerms, rows]);
+
+  const visibleRows = useMemo(() => {
+    const indexedRows = [...filteredRows];
     if (!currentSort) return indexedRows;
 
     const column = columns.find(candidate => candidate.id === currentSort.columnId);
@@ -118,7 +176,7 @@ function GridTemp_A<TRow>({
         ? left.originalIndex - right.originalIndex
         : comparison * direction;
     });
-  }, [columns, currentSort, rows]);
+  }, [columns, currentSort, filteredRows]);
 
   const updateSort = (column: GridTempAColumn<TRow>) => {
     if (!column.sortValue) return;
@@ -138,6 +196,18 @@ function GridTemp_A<TRow>({
 
   const interactiveRows = Boolean(onRowClick || onRowDoubleClick);
   const totalColumnCount = columns.length + (actions ? 1 : 0);
+  const resolvedFindInputId = find?.inputId || `${testId}-find`;
+  const displayedCount = count ?? (
+    findIsActive ? `${filteredRows.length} / ${rows.length}` : rows.length
+  );
+  const displayedEmptyMessage = findIsActive && rows.length > 0
+    ? find?.noMatchesMessage || 'No records match Find'
+    : emptyMessage;
+
+  const updateFindValue = (nextValue: string) => {
+    if (find?.value === undefined) setInternalFindValue(nextValue);
+    find?.onChange?.(nextValue);
+  };
 
   return (
     <section
@@ -147,9 +217,37 @@ function GridTemp_A<TRow>({
     >
       <header className={styles.panelHeader}>
         <span className={styles.panelTitle}>{title}</span>
-        <span className={styles.badge} data-testid={`${testId}-count`}>
-          {count ?? rows.length}
-        </span>
+        <div className={styles.headerControls}>
+          {find && (
+            <div className={styles.findControl}>
+              <label htmlFor={resolvedFindInputId}>{find.label || 'Find:'}</label>
+              <div className={styles.findInputWrap}>
+                <input
+                  id={resolvedFindInputId}
+                  type="text"
+                  value={currentFindValue}
+                  placeholder={find.placeholder || 'Search grid columns'}
+                  autoComplete="off"
+                  onChange={event => updateFindValue(event.target.value)}
+                  data-testid={`${testId}-find`}
+                />
+                {currentFindValue && (
+                  <button
+                    type="button"
+                    title={find.clearTitle || 'Clear Find'}
+                    aria-label={find.clearTitle || 'Clear Find'}
+                    onClick={() => updateFindValue('')}
+                  >
+                    X
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+          <span className={styles.badge} data-testid={`${testId}-count`}>
+            {displayedCount}
+          </span>
+        </div>
       </header>
 
       <div
@@ -226,7 +324,7 @@ function GridTemp_A<TRow>({
             {visibleRows.length === 0 ? (
               <tr>
                 <td className={styles.emptyCell} colSpan={totalColumnCount}>
-                  {emptyMessage}
+                  {displayedEmptyMessage}
                 </td>
               </tr>
             ) : (

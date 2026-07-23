@@ -209,12 +209,26 @@ test('navigates every safe dashboard control and the Auto Test workspace without
     await page.getByRole('button', { name: command, exact: true }).click();
   }
 
-  const findInput = page.getByRole('textbox', { name: 'Find:' });
-  await findInput.fill('Secondary');
-  await expect(page.getByRole('row', { name: /Secondary Mobile/ })).toBeVisible();
-  await expect(page.getByRole('row', { name: /Primary Checkout/ })).toHaveCount(0);
+  const botJobsGrid = page.getByTestId('main-dashboard-bot-jobs-grid');
+  const findInput = botJobsGrid.getByRole('textbox', { name: 'Find:' });
+  await expect(findInput).toHaveAttribute('id', 'main-dashboard-find');
+  for (const [query, expectedRow, hiddenRow] of [
+    ['Secondary', /Secondary Mobile/, /Primary Checkout/],
+    ['Mobile handoff', /Secondary Mobile/, /Primary Checkout/],
+    ['AllinWeb Lab', /Secondary Mobile/, /Primary Checkout/],
+    ['STAGE', /Secondary Mobile/, /Primary Checkout/],
+    ['MOBILE', /Secondary Mobile/, /Primary Checkout/],
+    ['Inactive', /Secondary Mobile/, /Primary Checkout/],
+    ['Active', /Primary Checkout/, /Secondary Mobile/],
+  ] as const) {
+    await findInput.fill(query);
+    await expect(botJobsGrid.getByRole('row', { name: expectedRow })).toBeVisible();
+    await expect(botJobsGrid.getByRole('row', { name: hiddenRow })).toHaveCount(0);
+    await expect(botJobsGrid.getByTestId('main-dashboard-bot-jobs-grid-count')).toHaveText('1 / 2');
+  }
   await page.getByTitle('Clear Find').click();
-  await expect(page.getByRole('row', { name: /Primary Checkout/ })).toBeVisible();
+  await expect(botJobsGrid.getByRole('row', { name: /Primary Checkout/ })).toBeVisible();
+  await expect(botJobsGrid.getByRole('row', { name: /Secondary Mobile/ })).toBeVisible();
 
   for (const column of ['ID', 'Name', 'Description', 'Organization', 'Environment', 'Type', 'Status', 'Blocks']) {
     await page.getByRole('columnheader', { name: new RegExp(`^${column}`) }).click();

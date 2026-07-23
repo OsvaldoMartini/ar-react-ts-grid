@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import GridTempA, { GridTempAColumn } from './GridTemp_A';
 import styles from './TemplateForm.module.scss';
 import { useWebSocket } from './useWebSocket';
 
@@ -39,6 +40,49 @@ type OrganizationRow = {
   activeJobs: number;
   url: string | null;
 };
+
+const ORGANIZATION_COLUMNS: readonly GridTempAColumn<OrganizationRow>[] = [
+  {
+    id: 'id',
+    header: 'ID',
+    width: 72,
+    renderCell: row => row.id,
+    sortValue: row => row.id,
+    searchValue: row => row.id,
+    title: row => String(row.id),
+    headerTitle: 'Click to sort',
+  },
+  {
+    id: 'organization',
+    header: 'Organization',
+    width: 170,
+    renderCell: row => row.name,
+    sortValue: row => row.name || '',
+    searchValue: row => row.name || '',
+    title: row => row.name,
+    headerTitle: 'Click to sort',
+  },
+  {
+    id: 'activeJobs',
+    header: 'Active Jobs',
+    width: 110,
+    renderCell: row => row.activeJobs ?? 0,
+    sortValue: row => row.activeJobs ?? 0,
+    searchValue: row => row.activeJobs ?? 0,
+    title: row => String(row.activeJobs ?? 0),
+    headerTitle: 'Click to sort',
+  },
+  {
+    id: 'url',
+    header: 'URL Baseline',
+    width: 268,
+    renderCell: row => row.url || '-',
+    sortValue: row => row.url || '',
+    searchValue: row => row.url || '',
+    title: row => row.url || '',
+    headerTitle: 'Click to sort',
+  },
+];
 
 interface TemplateFormProps {
   socketPort: number;
@@ -388,26 +432,26 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
             )}
           </section>
 
-          <section className={styles.orgSection}>
-            <div className={styles.orgHeader}>
-              <h2>Organizations</h2>
-              <span>{organizations.length}</span>
-            </div>
-            <div className={styles.orgGrid}>
-              <div className={styles.orgHead}>ID</div>
-              <div className={styles.orgHead}>Organization</div>
-              <div className={styles.orgHead}>Active Jobs</div>
-              <div className={styles.orgHead}>URL Baseline</div>
-              {organizations.map(row => (
-                <React.Fragment key={row.id}>
-                  <div>{row.id}</div>
-                  <div title={row.name}>{row.name}</div>
-                  <div>{row.activeJobs ?? 0}</div>
-                  <div title={row.url || ''}>{row.url || '-'}</div>
-                </React.Fragment>
-              ))}
-            </div>
-          </section>
+          <GridTempA
+            title="Organizations"
+            rows={organizations}
+            columns={ORGANIZATION_COLUMNS}
+            rowKey={row => row.id}
+            emptyMessage="No organizations loaded"
+            find={{
+              inputId: 'template-organizations-find',
+              label: 'Find:',
+              placeholder: 'ID, Organization, Active Jobs or URL Baseline',
+              clearTitle: 'Clear Find',
+              noMatchesMessage: 'No organizations match Find',
+            }}
+            className={styles.orgSection}
+            minTableWidth={620}
+            maxViewportHeight="min(42dvh, 360px)"
+            initialSort={{ columnId: 'id', direction: 'asc' }}
+            ariaLabel="TEMP Organizations"
+            testId="template-organizations-grid"
+          />
         </div>
       </section>
 
