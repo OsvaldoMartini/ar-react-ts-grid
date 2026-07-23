@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import ConfirmationDialog from './ConfirmationDialog';
 import DetachedPageShell from './DetachedPageShell';
 import GridTempA, { GridTempAColumn } from './GridTemp_A';
 import styles from './NewBotJobPage.module.scss';
@@ -13,6 +14,13 @@ type Props = {
 
 type StatusLevel = 'ok' | 'warn' | 'error';
 type AppType = 'Web App' | 'Android' | 'iOS' | 'Rest Api';
+type OperationFeedback = {
+  id: number;
+  title: string;
+  message: string;
+  detail?: string;
+  error: boolean;
+};
 
 type OrganizationRow = {
   id: number;
@@ -124,6 +132,23 @@ function responseMessage(body: any, fallback: string): string {
   );
 }
 
+function operationMessage(body: any, fallback: string): string {
+  return typeof body?.message === 'string' && body.message.trim()
+    ? body.message
+    : fallback;
+}
+
+function operationErrorDetail(body: any): string | undefined {
+  const detail = (
+    body?.error?.errorMessage
+    || body?.error?.errorHeader
+    || body?.error?.errorTitle
+  );
+  return typeof detail === 'string' && detail.trim() && detail !== body?.message
+    ? detail
+    : undefined;
+}
+
 const NewBotJobPage: React.FC<Props> = ({
   socketPort,
   sessionId,
@@ -132,6 +157,7 @@ const NewBotJobPage: React.FC<Props> = ({
 }) => {
   const { webSocket, connected, messages, error } = useWebSocket(socketPort, sessionId);
   const processedMessageCountRef = useRef(0);
+  const feedbackIdRef = useRef(0);
   const [appTypes, setAppTypes] = useState<AppType[]>(DEFAULT_APP_TYPES);
   const [appType, setAppType] = useState<AppType>('Web App');
   const [organizations, setOrganizations] = useState<OrganizationRow[]>([]);
@@ -141,10 +167,31 @@ const NewBotJobPage: React.FC<Props> = ({
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
+  const [operationFeedback, setOperationFeedback] = useState<OperationFeedback | null>(null);
   const [status, setStatus] = useState<{ level: StatusLevel; text: string }>({
     level: 'warn',
     text: 'Waiting for backend data',
   });
+
+  const dismissOperationFeedback = useCallback(() => {
+    setOperationFeedback(null);
+  }, []);
+
+  const showOperationFeedback = useCallback((
+    title: string,
+    message: string,
+    detail: string | undefined,
+    isError: boolean,
+  ) => {
+    feedbackIdRef.current += 1;
+    setOperationFeedback({
+      id: feedbackIdRef.current,
+      title,
+      message,
+      detail,
+      error: isError,
+    });
+  }, []);
 
   const selectedOrganization = useMemo(
     () => organizations.find(row => row.id === selectedOrganizationId) || null,
@@ -212,15 +259,32 @@ const NewBotJobPage: React.FC<Props> = ({
   }, [bootstrap, connected]);
 
   useEffect(() => {
-    if (!connected) setSaving(false);
-  }, [connected]);
+    if (!connected && saving) {
+      setSaving(false);
+      showOperationFeedback(
+        'Create Bot Job Failed',
+        'The connection closed before the Bot Job could be created.',
+        'Reconnect and try again.',
+        true,
+      );
+    }
+  }, [connected, saving, showOperationFeedback]);
 
   useEffect(() => {
     if (error) {
+      const operationWasSaving = saving;
       setSaving(false);
       setStatus({ level: 'error', text: error });
+      if (operationWasSaving) {
+        showOperationFeedback(
+          'Create Bot Job Failed',
+          'The Bot Job could not be created.',
+          error,
+          true,
+        );
+      }
     }
-  }, [error]);
+  }, [error, saving, showOperationFeedback]);
 
   useEffect(() => {
     if (processedMessageCountRef.current > messages.length) {
@@ -249,11 +313,26 @@ const NewBotJobPage: React.FC<Props> = ({
           if (Array.isArray(body.organizations) || Array.isArray(body.environments)) {
             applyWorkspaceData(body);
           }
+          const failed = body.ok === false;
+          const message = operationMessage(
+            body,
+            failed ? 'The Bot Job could not be created.' : 'Bot Job created',
+          );
           setStatus({
-            level: body.ok === false ? 'error' : 'ok',
+            level: failed ? 'error' : 'ok',
             text: responseMessage(body, 'Bot Job created'),
           });
-          if (body.ok !== false) {
+          showOperationFeedback(
+            failed ? 'Create Bot Job Failed' : 'Bot Job Created',
+            message,
+            failed
+              ? operationErrorDetail(body) || 'No Bot Job was created.'
+              : body?.botJob?.id
+                ? `Bot Job ID ${body.botJob.id} is now available.`
+                : 'The Bot Job is now available.',
+            failed,
+          );
+          if (!failed) {
             setName('');
             setDescription('');
           }
@@ -277,7 +356,7 @@ const NewBotJobPage: React.FC<Props> = ({
         console.warn('NewBotJobPage ignored socket message', messageError, raw);
       }
     }
-  }, [applyWorkspaceData, messages, onSessionOpen]);
+  }, [applyWorkspaceData, messages, onSessionOpen, showOperationFeedback]);
 
   useEffect(() => {
     if (!environmentKey) return;
@@ -316,15 +395,21 @@ const NewBotJobPage: React.FC<Props> = ({
   const createBotJob = () => {
     const trimmedName = name.trim();
     if (!trimmedName) {
-      setStatus({ level: 'warn', text: 'Bot Job name cannot be empty' });
+      const message = 'Bot Job name cannot be empty';
+      setStatus({ level: 'warn', text: message });
+      showOperationFeedback('Create Bot Job Failed', message, undefined, true);
       return;
     }
     if (!selectedOrganization) {
-      setStatus({ level: 'warn', text: 'Select an Organization' });
+      const message = 'Select an Organization';
+      setStatus({ level: 'warn', text: message });
+      showOperationFeedback('Create Bot Job Failed', message, undefined, true);
       return;
     }
     if (!selectedEnvironment) {
-      setStatus({ level: 'warn', text: 'Select a valid Organization Environment' });
+      const message = 'Select a valid Organization Environment';
+      setStatus({ level: 'warn', text: message });
+      showOperationFeedback('Create Bot Job Failed', message, undefined, true);
       return;
     }
     setSaving(true);
@@ -337,6 +422,12 @@ const NewBotJobPage: React.FC<Props> = ({
       openAfterCreate: true,
     })) {
       setSaving(false);
+      showOperationFeedback(
+        'Create Bot Job Failed',
+        'The Bot Job could not be created because the backend is not connected.',
+        'Reconnect and try again.',
+        true,
+      );
     }
   };
 
@@ -534,6 +625,21 @@ const NewBotJobPage: React.FC<Props> = ({
             </div>
           </section>
         </main>
+        {operationFeedback && (
+          <ConfirmationDialog
+            key={operationFeedback.id}
+            alert
+            title={operationFeedback.title}
+            message={operationFeedback.message}
+            detail={operationFeedback.detail}
+            error={operationFeedback.error}
+            confirmLabel="Close"
+            showHeaderClose
+            autoDismissMs={3000}
+            onCancel={dismissOperationFeedback}
+            onConfirm={dismissOperationFeedback}
+          />
+        )}
       </div>
     </DetachedPageShell>
   );

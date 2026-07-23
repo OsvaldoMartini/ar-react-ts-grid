@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import styles from './ConfirmationDialog.module.scss';
 
 type Props = {
@@ -10,6 +10,8 @@ type Props = {
   destructive?: boolean;
   error?: boolean;
   alert?: boolean;
+  showHeaderClose?: boolean;
+  autoDismissMs?: number;
   onConfirm: () => void;
   onCancel: () => void;
 };
@@ -23,19 +25,31 @@ const ConfirmationDialog: React.FC<Props> = ({
   destructive = false,
   error = false,
   alert = false,
+  showHeaderClose = false,
+  autoDismissMs,
   onConfirm,
   onCancel,
 }) => {
+  const dismiss = useCallback(() => {
+    if (alert) onConfirm();
+    else onCancel();
+  }, [alert, onCancel, onConfirm]);
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       event.preventDefault();
-      if (alert) onConfirm();
-      else onCancel();
+      dismiss();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [alert, onCancel, onConfirm]);
+  }, [dismiss]);
+
+  useEffect(() => {
+    if (!alert || !autoDismissMs || autoDismissMs <= 0) return undefined;
+    const timer = window.setTimeout(dismiss, autoDismissMs);
+    return () => window.clearTimeout(timer);
+  }, [alert, autoDismissMs, dismiss]);
 
   return (
     <div className={styles.backdrop} role="presentation">
@@ -45,7 +59,20 @@ const ConfirmationDialog: React.FC<Props> = ({
         aria-modal="true"
         aria-labelledby="confirmation-dialog-title"
       >
-        <div id="confirmation-dialog-title" className={styles.header}>{title}</div>
+        <div className={styles.header}>
+          <span id="confirmation-dialog-title">{title}</span>
+          {showHeaderClose && (
+            <button
+              type="button"
+              className={styles.headerCloseButton}
+              aria-label="Close"
+              title="Close"
+              onClick={dismiss}
+            >
+              ×
+            </button>
+          )}
+        </div>
         <div className={styles.body}>
           <p>{message}</p>
           {detail && (

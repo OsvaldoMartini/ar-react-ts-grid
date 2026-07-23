@@ -28,11 +28,44 @@
 
 .header {
   flex: 0 0 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   padding: 9px 12px;
   background: #0b5394;
   color: #ffffff;
   font-size: 0.9rem;
   font-weight: 700;
+}
+
+.header span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.headerCloseButton {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 4px;
+  background: transparent;
+  color: #ffffff;
+  padding: 0;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.headerCloseButton:hover,
+.headerCloseButton:focus-visible {
+  background: rgba(255, 255, 255, 0.16);
+  outline: none;
 }
 
 .body {

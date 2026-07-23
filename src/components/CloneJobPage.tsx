@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import ConfirmationDialog from './ConfirmationDialog';
 import DetachedPageShell from './DetachedPageShell';
 import GridTempA, { GridTempAColumn } from './GridTemp_A';
 import styles from './CloneJobPage.module.scss';
@@ -14,6 +15,13 @@ type Props = {
 
 type StatusLevel = 'ok' | 'warn' | 'error';
 type AppType = 'Web App' | 'Android' | 'iOS' | 'Rest Api';
+type OperationFeedback = {
+  id: number;
+  title: string;
+  message: string;
+  detail?: string;
+  error: boolean;
+};
 
 type SourceBotJob = {
   id: number;
@@ -137,6 +145,23 @@ function responseMessage(body: any, fallback: string): string {
   );
 }
 
+function operationMessage(body: any, fallback: string): string {
+  return typeof body?.message === 'string' && body.message.trim()
+    ? body.message
+    : fallback;
+}
+
+function operationErrorDetail(body: any): string | undefined {
+  const detail = (
+    body?.error?.errorMessage
+    || body?.error?.errorHeader
+    || body?.error?.errorTitle
+  );
+  return typeof detail === 'string' && detail.trim() && detail !== body?.message
+    ? detail
+    : undefined;
+}
+
 const CloneJobPage: React.FC<Props> = ({
   socketPort,
   sessionId,
@@ -146,7 +171,9 @@ const CloneJobPage: React.FC<Props> = ({
 }) => {
   const { webSocket, connected, messages, error } = useWebSocket(socketPort, sessionId);
   const processedMessageCountRef = useRef(0);
+  const feedbackIdRef = useRef(0);
   const activeSourceIdRef = useRef(sourceBotJobId);
+  const pendingCloneSourceIdRef = useRef<number | null>(null);
   const sourceRef = useRef<SourceBotJob | null>(null);
   const selectedOrganizationIdRef = useRef<number | null>(null);
   const environmentKeyRef = useRef('');
@@ -163,10 +190,31 @@ const CloneJobPage: React.FC<Props> = ({
   const [description, setDescription] = useState('');
   const [targetUrl, setTargetUrl] = useState('');
   const [saving, setSaving] = useState(false);
+  const [operationFeedback, setOperationFeedback] = useState<OperationFeedback | null>(null);
   const [status, setStatus] = useState<{ level: StatusLevel; text: string }>({
     level: 'warn',
     text: 'Waiting for backend data',
   });
+
+  const dismissOperationFeedback = useCallback(() => {
+    setOperationFeedback(null);
+  }, []);
+
+  const showOperationFeedback = useCallback((
+    title: string,
+    message: string,
+    detail: string | undefined,
+    isError: boolean,
+  ) => {
+    feedbackIdRef.current += 1;
+    setOperationFeedback({
+      id: feedbackIdRef.current,
+      title,
+      message,
+      detail,
+      error: isError,
+    });
+  }, []);
 
   const selectedOrganization = useMemo(
     () => organizations.find(row => row.id === selectedOrganizationId) || null,
@@ -212,7 +260,9 @@ const CloneJobPage: React.FC<Props> = ({
     setDescription('');
     setTargetUrl('');
     customTargetUrlRef.current = false;
+    pendingCloneSourceIdRef.current = null;
     setSaving(false);
+    setOperationFeedback(null);
     setStatus({ level: 'warn', text: 'Loading the selected source Bot Job' });
   }, []);
 
@@ -233,15 +283,34 @@ const CloneJobPage: React.FC<Props> = ({
   }, [activeSourceBotJobId, connected, send]);
 
   useEffect(() => {
-    if (!connected) setSaving(false);
-  }, [connected]);
+    if (!connected && saving) {
+      pendingCloneSourceIdRef.current = null;
+      setSaving(false);
+      showOperationFeedback(
+        'Clone Bot Job Failed',
+        'The connection closed before the Bot Job could be cloned.',
+        'Reconnect and try again.',
+        true,
+      );
+    }
+  }, [connected, saving, showOperationFeedback]);
 
   useEffect(() => {
     if (error) {
+      const operationWasSaving = saving;
+      pendingCloneSourceIdRef.current = null;
       setSaving(false);
       setStatus({ level: 'error', text: error });
+      if (operationWasSaving) {
+        showOperationFeedback(
+          'Clone Bot Job Failed',
+          'The Bot Job could not be cloned.',
+          error,
+          true,
+        );
+      }
     }
-  }, [error]);
+  }, [error, saving, showOperationFeedback]);
 
   useEffect(() => {
     if (processedMessageCountRef.current > messages.length) {
@@ -376,11 +445,34 @@ const CloneJobPage: React.FC<Props> = ({
             text: responseMessage(body, 'Clone destinations refreshed'),
           });
         } else if (operationId === 'cloneJob.cloneResponse') {
+          const requestSourceId = pendingCloneSourceIdRef.current;
+          pendingCloneSourceIdRef.current = null;
           setSaving(false);
+          if (
+            requestSourceId === null
+            || requestSourceId !== activeSourceIdRef.current
+          ) {
+            continue;
+          }
+          const failed = body.ok === false;
+          const message = operationMessage(
+            body,
+            failed ? 'The Bot Job could not be cloned.' : 'Bot Job cloned successfully',
+          );
           setStatus({
-            level: body.ok === false ? 'error' : 'ok',
+            level: failed ? 'error' : 'ok',
             text: responseMessage(body, 'Clone completed'),
           });
+          showOperationFeedback(
+            failed ? 'Clone Bot Job Failed' : 'Bot Job Cloned',
+            message,
+            failed
+              ? operationErrorDetail(body) || 'No Bot Job was cloned.'
+              : body?.clonedBotJobId
+                ? `Bot Job ID ${body.clonedBotJobId} is now available.`
+                : 'The cloned Bot Job is now available.',
+            failed,
+          );
         } else if (operationId === 'cloneJob.actionResponse') {
           setStatus({
             level: body.ok === false ? 'error' : 'ok',
@@ -407,7 +499,7 @@ const CloneJobPage: React.FC<Props> = ({
         console.warn('CloneJobPage ignored socket message', messageError, raw);
       }
     }
-  }, [messages, onSessionOpen, resetForSource, send]);
+  }, [messages, onSessionOpen, resetForSource, send, showOperationFeedback]);
 
   useEffect(() => {
     selectedOrganizationIdRef.current = selectedOrganizationId;
@@ -467,22 +559,31 @@ const CloneJobPage: React.FC<Props> = ({
     const trimmedName = name.trim();
     const trimmedUrl = targetUrl.trim();
     if (!source) {
-      setStatus({ level: 'warn', text: 'Source Bot Job is not loaded' });
+      const message = 'Source Bot Job is not loaded';
+      setStatus({ level: 'warn', text: message });
+      showOperationFeedback('Clone Bot Job Failed', message, undefined, true);
       return;
     }
     if (!trimmedName) {
-      setStatus({ level: 'warn', text: 'New Bot Job name is required' });
+      const message = 'New Bot Job name is required';
+      setStatus({ level: 'warn', text: message });
+      showOperationFeedback('Clone Bot Job Failed', message, undefined, true);
       return;
     }
     if (!selectedOrganization) {
-      setStatus({ level: 'warn', text: 'Select a target Organization' });
+      const message = 'Select a target Organization';
+      setStatus({ level: 'warn', text: message });
+      showOperationFeedback('Clone Bot Job Failed', message, undefined, true);
       return;
     }
     if (!trimmedUrl) {
-      setStatus({ level: 'warn', text: 'Select an Environment or enter a target URL' });
+      const message = 'Select an Environment or enter a target URL';
+      setStatus({ level: 'warn', text: message });
+      showOperationFeedback('Clone Bot Job Failed', message, undefined, true);
       return;
     }
 
+    pendingCloneSourceIdRef.current = source.id;
     setSaving(true);
     if (!send('cloneJob.create', {
       sourceBotJobId: source.id,
@@ -495,7 +596,14 @@ const CloneJobPage: React.FC<Props> = ({
       createExcelDataFile: true,
       openAfterClone: false,
     })) {
+      pendingCloneSourceIdRef.current = null;
       setSaving(false);
+      showOperationFeedback(
+        'Clone Bot Job Failed',
+        'The Bot Job could not be cloned because the backend is not connected.',
+        'Reconnect and try again.',
+        true,
+      );
     }
   };
 
@@ -747,6 +855,21 @@ const CloneJobPage: React.FC<Props> = ({
             </div>
           </section>
         </main>
+        {operationFeedback && (
+          <ConfirmationDialog
+            key={operationFeedback.id}
+            alert
+            title={operationFeedback.title}
+            message={operationFeedback.message}
+            detail={operationFeedback.detail}
+            error={operationFeedback.error}
+            confirmLabel="Close"
+            showHeaderClose
+            autoDismissMs={3000}
+            onCancel={dismissOperationFeedback}
+            onConfirm={dismissOperationFeedback}
+          />
+        )}
       </div>
     </DetachedPageShell>
   );
