@@ -1,0 +1,29 @@
+// The ≡ drag handle for an instruction row in the Bot Job Details grid.
+// Extracted from Griditem.module.scss `.dragHandle` -> `.handle`, styles preserved exactly.
+
+.handle {
+  width: 28px;
+  height: 32px;
+  align-self: stretch;
+  border: 0;
+  border-right: 1px solid #c6d9dd;
+  background: rgba(255, 255, 255, 0.45);
+  color: #52666d;
+  font-size: 18px;
+  line-height: 1;
+  cursor: grab;
+}
+
+.handle:active {
+  cursor: grabbing;
+}
+
+.handle:hover:not(:disabled) {
+  background: #fff;
+  color: #075a75;
+}
+
+.handle:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}

@@ -58,6 +58,7 @@ import BlockStatusToggle from './bot-job-details/grid/BlockStatusToggle';
 import BlockCollapseToggle from './bot-job-details/grid/BlockCollapseToggle';
 import InlineNameEditor from './bot-job-details/grid/InlineNameEditor';
 import CommandEditorButton from './bot-job-details/grid/CommandEditorButton';
+import InstructionDragHandle from './bot-job-details/grid/InstructionDragHandle';
 import ExecutionStateOverlay from './bot-job-details/grid/ExecutionStateOverlay';
 import { instructionDisplayLabel } from './instructionDisplay';
 import { buildLaterBlockOrderUpdates } from './instructionSplit';
@@ -3476,23 +3477,14 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                                         }`}
                                     // data-executing={instruction.id === executionId}
                                     >
-                                      <button
-                                        type="button"
-                                        className={styles.dragHandle}
-                                        {...provided.dragHandleProps}
+                                      <InstructionDragHandle
+                                        dragHandleProps={provided.dragHandleProps}
                                         disabled={findText.trim().length > 0 || !memoryCapabilities.get(instruction.id)?.canMove}
                                         title={findText.trim().length > 0 ? 'Clear Find before moving instructions' : memoryCapabilities.get(instruction.id)?.reason || 'Move instruction; Alt+Arrow keys move one position'}
-                                        aria-label={`Move instruction ${instruction.instructionOrderNumber}`}
-                                        onKeyUp={(event) => {
-                                          if (event.altKey && event.key === 'ArrowUp') {
-                                            event.preventDefault();
-                                            handleMoveRowUp(instruction.id);
-                                          } else if (event.altKey && event.key === 'ArrowDown') {
-                                            event.preventDefault();
-                                            handleMoveRowDown(instruction.id);
-                                          }
-                                        }}
-                                      >≡</button>
+                                        ariaLabel={`Move instruction ${instruction.instructionOrderNumber}`}
+                                        onMoveUp={() => handleMoveRowUp(instruction.id)}
+                                        onMoveDown={() => handleMoveRowDown(instruction.id)}
+                                      />
                                       {instruction.id === executionId && (
                                         <ExecutionStateOverlay state={executionState} />
                                       )}
