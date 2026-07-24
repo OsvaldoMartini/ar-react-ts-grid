@@ -31,15 +31,25 @@ export type CommandDraft = {
   graphRevision: string;
 };
 
-type Props = {
+export type CommandEditorContext = {
+  sessionId: string;
+  targetSessionId: string;
+  homeBankingId: number;
+  botJobId: number | null;
+  botJobName: string | null;
+  bindingEpoch?: string | number;
+};
+
+export type InstructionCommandPanelProps = {
   instruction: CommandPanelInstruction;
   onClose: () => void;
   onSplit?: (graphRevision: string) => void;
   onInsertElseIf?: (graphRevision: string) => void;
   onApplyCommand: (draft: CommandDraft) => void;
   messages: string[];
-  context: { sessionId: string; targetSessionId: string; homeBankingId: number; botJobId: number | null; botJobName: string | null };
+  context: CommandEditorContext;
   onSocketCommand: (type: string, body: Record<string, unknown>) => void;
+  variant?: 'floating' | 'page';
 };
 
 type VariableRow = { id?: number; type: string; name: string; value: string; instructionId?: number; localFormat?: string; delimiter?: string; usedVars?: string };
@@ -51,9 +61,11 @@ type SplitPreviewRow = { id: number; order: number; name: string; action: string
 type SplitPreview = { graphRevision: string; retainedRows: SplitPreviewRow[]; movedRows: SplitPreviewRow[]; retainedCount: number; movedCount: number };
 const supportsTag = (command: CommandDefinition, tagName: string) => !command.allowedTags?.length || command.allowedTags.includes(tagName);
 
-const InstructionCommandPanel: React.FC<Props> = (props) => {
+const InstructionCommandPanel: React.FC<InstructionCommandPanelProps> = (props) => {
   const { instruction } = props;
+  const pageVariant = props.variant === 'page';
   const panelRef = useRef<HTMLDivElement>(null);
+  const processedMessagesRef = useRef(Math.max(0, props.messages.length - 1));
   const [view, setView] = useState<'actions' | 'command' | 'variables'>('actions');
   const [pos, setPos] = useState({ x: Math.max(16, window.innerWidth - 520), y: 90 });
   const [mode, setMode] = useState<'before' | 'after' | 'edit'>('after');
@@ -109,10 +121,11 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
   };
 
   useEffect(() => {
+    if (pageVariant) return;
     const onResize = () => setPos((current) => clamp(current));
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
-  }, []);
+  }, [pageVariant]);
 
   useEffect(() => {
     requestCommandBootstrap();
@@ -128,53 +141,60 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
   }, [view, instruction.id]);
 
   useEffect(() => {
-    if (!props.messages.length) return;
-    try {
-      const envelope = JSON.parse(props.messages[props.messages.length - 1]);
-      const operationId = String(envelope.operationId || '');
-      const body = typeof envelope.body === 'string' ? JSON.parse(envelope.body) : envelope.body;
-      if (operationId === 'commandEditor.bootstrapResponse') {
-        if (Array.isArray(body?.variables)) setVariables(body.variables.filter((row: VariableRow & { error?: string }) => !row.error));
-        if (Array.isArray(body?.webFields)) {
-          const loadedWebFields = body.webFields as WebFieldRow[];
-          setWebFields(loadedWebFields);
-          setSelectedWebFieldId(current => {
-            const sameBlock = loadedWebFields.filter(row => row.blockId === instruction.blockId);
-            if (current && sameBlock.some(row => row.id === current)) return current;
-            if (instruction.parentId && sameBlock.some(row => row.id === instruction.parentId)) return instruction.parentId;
-            return sameBlock.some(row => row.id === instruction.id) ? instruction.id : undefined;
-          });
-        }
-        if (Array.isArray(body?.blocks)) setBlocks(body.blocks);
-        if (Array.isArray(body?.commands)) setCommands(body.commands);
-        if (body?.draft) setStoredDraft(body.draft);
-        if (typeof body?.graphRevision === 'string') setGraphRevision(body.graphRevision);
-        setCanInsertElseIf(body?.rowCapabilities?.canInsertElseIf === true);
-        setCanSplit(body?.rowCapabilities?.canSplit === true);
-        return;
-      }
-      if (operationId === 'instructionGraph.previewSplitResponse') {
-        if (body?.ok && Array.isArray(body?.retainedRows) && Array.isArray(body?.movedRows)) {
-          setSplitPreview(body as SplitPreview);
-          setSplitStatus('');
-        } else {
-          setSplitPreview(null);
-          setSplitStatus(body?.error || 'Split preview was refused.');
-        }
-        return;
-      }
-      if (operationId.startsWith('variableEditor.')) {
-        if (Array.isArray(body?.variables)) setVariables(body.variables);
-        setVariableStatus(body?.ok ? (body.message || '') : (body?.error || 'Variable operation failed.'));
-        if (body?.ok && ['variableEditor.saveResponse', 'variableEditor.deleteResponse'].includes(operationId)) {
-          if (operationId === 'variableEditor.deleteResponse') setDeleteCandidate(null);
-          setGraphRevision('');
-          requestCommandBootstrap();
-        }
-      }
-    } catch (_) {
-      // Other socket messages are handled by the owning grid.
+    if (processedMessagesRef.current > props.messages.length) {
+      processedMessagesRef.current = 0;
     }
+    const pendingMessages = props.messages.slice(processedMessagesRef.current);
+    processedMessagesRef.current = props.messages.length;
+
+    pendingMessages.forEach((message) => {
+      try {
+        const envelope = JSON.parse(message);
+        const operationId = String(envelope.operationId || '');
+        const body = typeof envelope.body === 'string' ? JSON.parse(envelope.body) : envelope.body;
+        if (operationId === 'commandEditor.bootstrapResponse') {
+          if (Array.isArray(body?.variables)) setVariables(body.variables.filter((row: VariableRow & { error?: string }) => !row.error));
+          if (Array.isArray(body?.webFields)) {
+            const loadedWebFields = body.webFields as WebFieldRow[];
+            setWebFields(loadedWebFields);
+            setSelectedWebFieldId(current => {
+              const sameBlock = loadedWebFields.filter(row => row.blockId === instruction.blockId);
+              if (current && sameBlock.some(row => row.id === current)) return current;
+              if (instruction.parentId && sameBlock.some(row => row.id === instruction.parentId)) return instruction.parentId;
+              return sameBlock.some(row => row.id === instruction.id) ? instruction.id : undefined;
+            });
+          }
+          if (Array.isArray(body?.blocks)) setBlocks(body.blocks);
+          if (Array.isArray(body?.commands)) setCommands(body.commands);
+          if (body?.draft) setStoredDraft(body.draft);
+          if (typeof body?.graphRevision === 'string') setGraphRevision(body.graphRevision);
+          setCanInsertElseIf(body?.rowCapabilities?.canInsertElseIf === true);
+          setCanSplit(body?.rowCapabilities?.canSplit === true);
+          return;
+        }
+        if (operationId === 'instructionGraph.previewSplitResponse') {
+          if (body?.ok && Array.isArray(body?.retainedRows) && Array.isArray(body?.movedRows)) {
+            setSplitPreview(body as SplitPreview);
+            setSplitStatus('');
+          } else {
+            setSplitPreview(null);
+            setSplitStatus(body?.error || 'Split preview was refused.');
+          }
+          return;
+        }
+        if (operationId.startsWith('variableEditor.')) {
+          if (Array.isArray(body?.variables)) setVariables(body.variables);
+          setVariableStatus(body?.ok ? (body.message || '') : (body?.error || 'Variable operation failed.'));
+          if (body?.ok && ['variableEditor.saveResponse', 'variableEditor.deleteResponse'].includes(operationId)) {
+            if (operationId === 'variableEditor.deleteResponse') setDeleteCandidate(null);
+            setGraphRevision('');
+            requestCommandBootstrap();
+          }
+        }
+      } catch (_) {
+        // Other socket messages are handled by the owning grid.
+      }
+    });
   }, [props.messages]);
 
   const selectedLabel = useMemo(
@@ -266,14 +286,18 @@ const InstructionCommandPanel: React.FC<Props> = (props) => {
   };
 
   return (
-    <div ref={panelRef} className={styles.panel} style={{ left: pos.x, top: pos.y }}>
-      <header className={styles.header} onMouseDown={startDrag}>
+    <div
+      ref={panelRef}
+      className={`${styles.panel} ${pageVariant ? styles.pagePanel : ''}`}
+      style={pageVariant ? undefined : { left: pos.x, top: pos.y }}
+    >
+      {!pageVariant && <header className={styles.header} onMouseDown={startDrag}>
         <div>
           <strong>Instruction commands</strong>
           <span>#{instruction.instructionOrderNumber} {instructionDisplayLabel(instruction)}</span>
         </div>
         <button type="button" className={styles.iconButton} onClick={props.onClose} title="Close">×</button>
-      </header>
+      </header>}
 
       <nav className={styles.tabs}>
         <button className={view === 'actions' ? styles.activeTab : ''} onClick={() => setView('actions')}>Actions</button>

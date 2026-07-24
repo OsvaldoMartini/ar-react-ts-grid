@@ -48,7 +48,6 @@ import ArrowLeft from '../assets/ArrowLeft.png';
 import AlertModal from './AlertModal';
 import CompForce from './CompForce';
 import CreateNewBlock, { CreateBlockOption, CreateBlockPosition } from './CreateNewBlock';
-import InstructionCommandPanel, { CommandDraft } from './InstructionCommandPanel';
 import ExcelExportPanel, { ExcelExportContext } from './ExcelExportPanel';
 import SaveComponentPanel, { SaveComponentContext } from './SaveComponentPanel';
 import BotJobDetailsChrome from './bot-job-details/BotJobDetailsChrome';
@@ -57,7 +56,6 @@ import { useWebSocket } from './useWebSocket';
 import { useInstructionDrag } from './useInstructionDrag';
 import { instructionDisplayLabel } from './instructionDisplay';
 import { buildLaterBlockOrderUpdates } from './instructionSplit';
-import { canStartCommandApply, resolveCommandApplyResponse } from './commandApplyResponse';
 import type {
   MemoryListItem,
   MemoryListItemIcon,
@@ -244,13 +242,9 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
   const [choosingExcelExportDirectory, setChoosingExcelExportDirectory] = useState(false);
   const pendingExcelExportDirectoryRequestRef = useRef<string | null>(null);
   const pendingSplitRequestRef = useRef<string | null>(null);
-  const pendingCommandApplyRequestRef = useRef<string | null>(null);
+  const pendingCommandEditorOpenRequestRef = useRef<string | null>(null);
   const processedMessagesRef = useRef(0);
   const [saveComponentContext, setSaveComponentContext] = useState<SaveComponentContext | null>(null);
-
-  useEffect(() => {
-    if (!connected) pendingCommandApplyRequestRef.current = null;
-  }, [connected]);
 
   useLayoutEffect(() => {
     if (pendingScrollTopRef.current === null || !gridScrollRef.current) return;
@@ -895,27 +889,25 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
             setAlertMessageBody(bodyData?.error || 'The export configuration could not be saved.');
             setAlertMessageFooter('Review the path and filename, then try again.');
           }
-        } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "commandEditor.applyResponse") {
+        } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "commandEditor.workspaceOpenResponse") {
           const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
-          const resolution = resolveCommandApplyResponse(pendingCommandApplyRequestRef.current, bodyData);
-          if (resolution.kind === 'ignore') return;
-          pendingCommandApplyRequestRef.current = null;
-          if (resolution.kind === 'failure') {
+          const responseRequestId = String(bodyData?.requestId || '');
+          if (
+            !pendingCommandEditorOpenRequestRef.current
+            || !responseRequestId
+            || responseRequestId !== pendingCommandEditorOpenRequestRef.current
+          ) {
+            return;
+          }
+          pendingCommandEditorOpenRequestRef.current = null;
+          if (bodyData?.ok === false) {
             setAlertImage(warningRedImage);
             setAlertClass('construction-image');
-            setAlertMessageHeader('Command Not Saved');
-            setAlertMessageBody(resolution.error);
-            setAlertMessageFooter('Review the command fields and try again.');
+            setAlertMessageHeader('Command Editor Not Opened');
+            setAlertMessageBody(bodyData?.error || 'The Command Editor workspace could not be opened.');
+            setAlertMessageFooter('Refresh Bot Job Details and try again.');
             setErrorFlag(true);
             setAlertOnConfirm(undefined);
-          } else {
-            const authoritativeInstructions = resolution.instructions as BlockLoopInstructionLoadDTO[];
-            if (authoritativeInstructions.length > 0) {
-              pendingScrollTopRef.current = gridScrollRef.current?.scrollTop ?? null;
-              setInstructionsData(authoritativeInstructions);
-              setIsDataReordered(false);
-            }
-            setOpenDropdown(null);
           }
         } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "license.statusChanged") {
           const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
@@ -1588,31 +1580,53 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     }
   };
 
-  const handleToggleDropdown = (instructionId: number) => {
-    setOpenDropdown(openDropdown === instructionId ? null : instructionId);
+  const handleOpenCommandEditor = (instruction: BlockLoopInstructionLoadDTO) => {
+    const instructionId = Number(instruction.id);
+    const currentBotJobId = Number(botJobId);
+    if (
+      !webSocket
+      || !connected
+      || webSocket.readyState !== WebSocket.OPEN
+      || !Number.isSafeInteger(instructionId)
+      || instructionId <= 0
+      || !Number.isSafeInteger(currentBotJobId)
+      || currentBotJobId <= 0
+    ) {
+      setAlertImage(warningRedImage);
+      setAlertClass('construction-image');
+      setAlertMessageHeader('Command Editor Not Opened');
+      setAlertMessageBody('Bot Job Details is not ready to open this instruction.');
+      setAlertMessageFooter('Wait for the grid to finish loading and try again.');
+      setErrorFlag(true);
+      setAlertOnConfirm(undefined);
+      return;
+    }
 
-    // Use a small delay to allow the dropdown to be rendered before calculating position
-    setTimeout(() => {
-      const dropdown = document.getElementById(`dropdown-${instructionId}`);
-      if (dropdown) {
-        const rect = dropdown.getBoundingClientRect();
-        const windowHeight = window.innerHeight;
-
-        // Calculate space above and below the clicked element
-        const spaceAbove = rect.top;
-        const spaceBelow = windowHeight - rect.bottom;
-
-        // Approximate dropdown height
-        const dropdownHeight = dropdown.offsetHeight;
-
-        // Check if we have enough space above or below
-        if (spaceBelow < dropdownHeight && spaceAbove >= dropdownHeight) {
-          setDropdownPosition('above'); // Render above if not enough space below
-        } else {
-          setDropdownPosition('below'); // Render below if enough space
-        }
-      }
-    }, 0); // Delay just enough to let the dropdown render
+    const requestId = `${Date.now()}-command-editor-${instructionId}`;
+    pendingCommandEditorOpenRequestRef.current = requestId;
+    try {
+      webSocket.send(JSON.stringify({
+        type: 'commandEditor.workspaceOpen',
+        sessionId,
+        homeBankingId,
+        body: JSON.stringify({
+          requestId,
+          targetSessionId: 'botJobTasks',
+          homeBankingId,
+          botJobId: currentBotJobId,
+          instructionId,
+        }),
+      }));
+    } catch (openError) {
+      pendingCommandEditorOpenRequestRef.current = null;
+      setAlertImage(warningRedImage);
+      setAlertClass('construction-image');
+      setAlertMessageHeader('Command Editor Not Opened');
+      setAlertMessageBody('The Command Editor request could not be sent.');
+      setAlertMessageFooter('Check the backend connection and try again.');
+      setErrorFlag(true);
+      setAlertOnConfirm(undefined);
+    }
   };
 
 
@@ -3100,35 +3114,6 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     );
   };
 
-  const applyCommandFromPanel = (instruction: BlockLoopInstructionLoadDTO, draft: CommandDraft) => {
-    if (!webSocket || !connected || !canStartCommandApply(pendingCommandApplyRequestRef.current)) return;
-    const requestId = `${Date.now()}-${instruction.id}`;
-    const payload = {
-      ...draft,
-      requestId,
-      targetSessionId: 'botJobTasks',
-      homeBankingId,
-      botJobId,
-      botJobName,
-      blockId: instruction.blockId,
-      blockName: instruction.blockName,
-      blockOrderNumber: instruction.blockOrderNumber,
-      instructionId: instruction.id,
-      instructionName: instruction.name,
-      instructionOrderNumber: instruction.instructionOrderNumber,
-      variableId: draft.variableId,
-      parentId: draft.parentId,
-      parentBlockId: draft.parentBlockId,
-    };
-    pendingCommandApplyRequestRef.current = requestId;
-    webSocket.send(JSON.stringify({
-      type: 'commandEditor.apply',
-      sessionId,
-      homeBankingId,
-      body: JSON.stringify(payload),
-    }));
-  };
-
   const submitExcelExport = (draft: { directory: string; filename: string; fileType: '.xlsx' | '.csv'; delimiter: ',' | '|'; clear?: boolean }) => {
     if (!excelExportContext || !webSocket || !connected || !botJobId) return;
     webSocket.send(JSON.stringify({
@@ -3457,7 +3442,8 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                                   src={edit2Image}
                                   alt=""
                                   className={styles.editButton}
-                                  onClick={() => setOpenDropdown(Number(excelGotoInstruction.id))}
+                                  title="Open Command Editor"
+                                  onClick={() => handleOpenCommandEditor(excelGotoInstruction)}
                                 />
                                 <img
                                   src={crossImage}
@@ -3467,16 +3453,6 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                                   style={{ opacity: memoryCapabilities.get(Number(excelGotoInstruction.id))?.canDelete ? 1 : 0.35 }}
                                   onClick={() => handleRemoveInstruction(Number(excelGotoInstruction.id))}
                                 />
-                                {openDropdown === excelGotoInstruction.id && (
-                                  <InstructionCommandPanel
-                                    instruction={excelGotoInstruction}
-                                    onClose={() => setOpenDropdown(null)}
-                                    onApplyCommand={(draft) => applyCommandFromPanel(excelGotoInstruction, draft)}
-                                    messages={messages}
-                                    context={{ sessionId, targetSessionId: 'botJobTasks', homeBankingId, botJobId, botJobName }}
-                                    onSocketCommand={(type, body) => webSocket?.send(JSON.stringify({ type, sessionId, homeBankingId, body: JSON.stringify(body) }))}
-                                  />
-                                )}
                               </div>
                             )}
                           <img
@@ -3700,43 +3676,10 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                                         <img
                                           src={menuDownImage}
                                           className={styles.dropdownArrow}
-                                          alt=""
-                                          onClick={() =>
-                                            handleToggleDropdown(instruction.id)
-                                          }
+                                          alt="Open Command Editor"
+                                          title="Open Command Editor"
+                                          onClick={() => handleOpenCommandEditor(instruction)}
                                         />
-
-                                        {openDropdown === instruction.id && (
-                                          <InstructionCommandPanel
-                                            instruction={instruction}
-                                            onClose={() => setOpenDropdown(null)}
-                                            onSplit={(graphRevision) => handleSplitComponent(instruction.id, groupedData, instructionsData, isLastInstruction, graphRevision)}
-                                            onInsertElseIf={(graphRevision) => {
-                                              webSocket?.send(JSON.stringify({
-                                                type: 'commandEditor.insertElseIf',
-                                                sessionId,
-                                                homeBankingId,
-                                                body: JSON.stringify({
-                                                  requestId: `${Date.now()}-elseif-${instruction.id}`,
-                                                  targetSessionId: 'botJobTasks',
-                                                  homeBankingId,
-                                                  botJobId,
-                                                  botJobName,
-                                                  blockId: instruction.blockId,
-                                                  blockName: instruction.blockName,
-                                                  blockOrderNumber: instruction.blockOrderNumber,
-                                                  instructionId: instruction.id,
-                                                  graphRevision,
-                                                }),
-                                              }));
-                                              setOpenDropdown(null);
-                                            }}
-                                            onApplyCommand={(draft) => applyCommandFromPanel(instruction, draft)}
-                                            messages={messages}
-                                            context={{ sessionId, targetSessionId: 'botJobTasks', homeBankingId, botJobId, botJobName }}
-                                            onSocketCommand={(type, body) => webSocket?.send(JSON.stringify({ type, sessionId, homeBankingId, body: JSON.stringify(body) }))}
-                                          />
-                                        )}
                                       </div>
                                     </div>
                                   )}

@@ -1,4 +1,6 @@
 .panel { position: fixed; z-index: 10020; width: min(480px, calc(100vw - 16px)); max-height: calc(100vh - 16px); display: flex; flex-direction: column; background: #f5f6f7; border: 1px solid #7f8b94; border-radius: 5px; box-shadow: 0 12px 32px rgba(0,0,0,.34); overflow: hidden; color: #1e2930; }
+.pagePanel { position: relative; inset: auto; z-index: auto; width: 100%; height: 100%; max-height: none; border: 0; border-radius: 0; box-shadow: none; }
+.pagePanel .body { flex: 1 1 auto; min-height: 0; }
 .header { min-height: 46px; display: flex; align-items: center; gap: 10px; padding: 7px 9px 7px 12px; background: #fff; border-bottom: 1px solid #d6dadd; cursor: move; user-select: none; }
 .header > div { min-width: 0; flex: 1; display: flex; flex-direction: column; }
 .header strong { font-size: 13px; }
@@ -74,4 +76,4 @@
 .footer button { min-width: 76px; border: 1px solid #aeb8be; border-radius: 3px; background: #fff; padding: 5px 12px; cursor: pointer; }
 .footer .primary { border-color: #075a75; background: #0b6b8a; color: #fff; font-weight: 700; }
 .footer button:disabled { opacity: .5; cursor: not-allowed; }
-@media (max-width: 560px) { .panel { left: 8px !important; top: 8px !important; } .actionGrid, .form, .variablesWorkspace, .splitColumns { grid-template-columns: 1fr; } .splitColumns > div + div { border-left: 0; border-top: 1px solid #d9dee1; } .form label, .preview { grid-column: 1; } .variableList { max-height: 140px; overflow: auto; border-right: 0; border-bottom: 1px solid #d1d7db; padding: 0 0 8px; } }
+@media (max-width: 560px) { .panel:not(.pagePanel) { left: 8px !important; top: 8px !important; } .actionGrid, .form, .variablesWorkspace, .splitColumns { grid-template-columns: 1fr; } .splitColumns > div + div { border-left: 0; border-top: 1px solid #d9dee1; } .form label, .preview { grid-column: 1; } .variableList { max-height: 140px; overflow: auto; border-right: 0; border-bottom: 1px solid #d1d7db; padding: 0 0 8px; } }
