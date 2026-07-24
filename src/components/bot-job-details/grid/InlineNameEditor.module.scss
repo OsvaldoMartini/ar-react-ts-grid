@@ -1,0 +1,28 @@
+// Shared inline name editor (input + save) used for both block names and
+// instruction names in the Bot Job Details grid. Styles preserved exactly:
+// .editContainer -> .container, .editTextbox -> .input, and the effective
+// .saveButton cascade (shared button group + its padding override) -> .save.
+// (.saveButton stays in Griditem.module.scss because a non-editor save still uses it.)
+
+.container {
+  display: inline-flex; // Make input and image inline
+  align-items: center; // Vertically center the items
+  gap: 5px; // Space between the text box and save button
+}
+
+.input {
+  flex: 1; // Make the input take the available space
+  width: 10%;
+}
+
+.save {
+  height: 22px;
+  background-color: transparent;
+  padding: 0 2px 0 6px; // .saveButton override of the shared group's padding: 0
+  cursor: pointer;
+  transition: transform 0.3s ease; // Smooth scaling on hover
+
+  &:hover {
+    transform: scale(1.4); // Slightly increase size on hover
+  }
+}

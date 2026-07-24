@@ -57,6 +57,7 @@ import { useInstructionDrag } from './useInstructionDrag';
 import FindBar from './bot-job-details/grid/FindBar';
 import BlockStatusToggle from './bot-job-details/grid/BlockStatusToggle';
 import BlockCollapseToggle from './bot-job-details/grid/BlockCollapseToggle';
+import InlineNameEditor from './bot-job-details/grid/InlineNameEditor';
 import ExecutionStateOverlay from './bot-job-details/grid/ExecutionStateOverlay';
 import { instructionDisplayLabel } from './instructionDisplay';
 import { buildLaterBlockOrderUpdates } from './instructionSplit';
@@ -3311,37 +3312,12 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                           #{blockData.instructions[0].blockOrderNumber}
                         </span>
                         {editingBlockId === Number(blockGroupIndex) ? (
-                          <div className={styles.editContainer}>
-                            <input
-                              type="text"
-                              value={blockName}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  handleSaveBlockName(Number(blockData.instructions[0].blockId)); // Trigger save when "Enter" is pressed
-                                }
-                              }}
-                              onChange={(e) => {
-                                console.log(e.target.value);
-                                setBlockName(e.target.value);
-                              }}
-                              ref={blockRef} // Associate the ref with the input element
-                              className={styles.editTextbox}
-                            />
-                            {/* <span className={styles.blockOrderNumber}>
-                          (Id:   {blockData.instructions[0].blockId})
-                        </span> */}
-                            <img
-                              src={saveImage}
-                              alt="save"
-                              className={styles.saveButton}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  handleSaveBlockName(Number(blockData.instructions[0].blockId));
-                                }
-                              }}
-                              onClick={() => handleSaveBlockName(Number(blockData.instructions[0].blockId))}
-                            />
-                          </div>
+                          <InlineNameEditor
+                            value={blockName}
+                            onChange={setBlockName}
+                            onSave={() => handleSaveBlockName(Number(blockData.instructions[0].blockId))}
+                            inputRef={blockRef}
+                          />
                         ) : (
                           <span className={styles.blockName}>
                             {renderHighlighted(blockData.blockName ?? "", findText)}
@@ -3521,31 +3497,12 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                                         <ExecutionStateOverlay state={executionState} />
                                       )}
                                       {editingInstructionId === instruction.id ? (
-                                        <div className={styles.editContainer}>
-                                          <input
-                                            type="text"
-                                            value={instructionName}
-                                            onKeyDown={(e) => {
-                                              if (e.key === 'Enter') {
-                                                handleSaveInstruction(instruction.id); // Trigger save when "Enter" is pressed
-                                              }
-                                            }}
-                                            onChange={(e) => {
-                                              console.log(e.target.value);
-                                              setInstructionName(e.target.value);
-                                            }}
-                                            ref={instructionRef} // Associate the ref with the input element
-                                            className={styles.editTextbox}
-                                          />
-                                          <img
-                                            src={saveImage}
-                                            alt="save"
-                                            className={styles.saveButton}
-                                            onClick={() =>
-                                              handleSaveInstruction(instruction.id)
-                                            } // Save instruction logic
-                                          />
-                                        </div>
+                                        <InlineNameEditor
+                                          value={instructionName}
+                                          onChange={setInstructionName}
+                                          onSave={() => handleSaveInstruction(instruction.id)}
+                                          inputRef={instructionRef}
+                                        />
                                       ) : (
                                         <span className={styles.instructionLine}>
                                           {/* <span>({instruction.id})</span> */}

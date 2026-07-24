@@ -226,17 +226,6 @@
 //   height: 20px;
 // }
 
-.editContainer {
-  display: inline-flex;  /* Make input and image inline */
-  align-items: center;   /* Vertically center the items */
-  gap: 5px;              /* Add space between the text box and save button */
-}
-
-.editTextbox {
-  flex: 1; /* Make the input take the available space */
-  width: 10%;
-}
-
 .socketPort {
   font-size: 7px;
   display: inline-block;
