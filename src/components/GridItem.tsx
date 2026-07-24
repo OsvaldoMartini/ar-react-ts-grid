@@ -54,6 +54,7 @@ import BotJobDetailsChrome from './bot-job-details/BotJobDetailsChrome';
 import { useBotJobDetailsController } from './bot-job-details/useBotJobDetailsController';
 import { useWebSocket } from './useWebSocket';
 import { useInstructionDrag } from './useInstructionDrag';
+import FindBar from './bot-job-details/grid/FindBar';
 import { instructionDisplayLabel } from './instructionDisplay';
 import { buildLaterBlockOrderUpdates } from './instructionSplit';
 import type {
@@ -3213,27 +3214,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
         />
       )}
       <div className={styles.gridFindRow}>
-        <span className={styles.gridFindLabel}>Find:</span>
-        <div className={styles.gridFindInputWrap}>
-          <input
-            className={styles.gridFindInput}
-            type="text"
-            value={findText}
-            onChange={(e) => setFindText(e.target.value)}
-            placeholder="Type to find…"
-          />
-          {findText.length > 0 && (
-            <button
-              type="button"
-              className={styles.gridFindClear}
-              aria-label="Clear find"
-              title="Clear find"
-              onClick={() => setFindText('')}
-            >
-              X
-            </button>
-          )}
-        </div>
+        <FindBar value={findText} onChange={setFindText} />
         {memorySteps.length > 0 && (
           <button
             type="button"

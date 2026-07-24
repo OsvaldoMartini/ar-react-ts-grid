@@ -1,0 +1,70 @@
+// Find bar for the Bot Job Details instruction grid.
+// Extracted from GridItem.module.scss with styles preserved exactly:
+// .gridFindLabel -> .label, .gridFindInputWrap -> .inputWrap,
+// .gridFindInput (+ @extend .toolbarInput, inlined) -> .input, .gridFindClear -> .clear.
+// The .gridFindRow wrapper stays in GridItem (it also holds the Memory button).
+
+.label {
+  font-size: 12px;
+  font-weight: bold;
+  color: #0b5394;
+  white-space: nowrap;
+}
+
+.inputWrap {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  display: flex;
+}
+
+// = .toolbarInput (inlined) + the .gridFindInput overrides.
+.input {
+  width: 100%; // overrides toolbarInput width: 250px
+  padding: 6px 10px; // from toolbarInput
+  padding-right: 26px; // .gridFindInput override (room for the clear button)
+  border: 1px solid #c0c0c0;
+  border-radius: 5px;
+  font-size: 12px;
+  color: #0b5394;
+  background-color: #f5f8fa;
+  outline: none;
+  transition: border-color 0.2s ease;
+  flex: 1; // takes all remaining free space
+  min-width: 0; // prevents flex overflow issues
+}
+
+.input:focus {
+  border-color: #0b5394;
+}
+
+.input:disabled {
+  background-color: #eeeeee;
+  color: #7a7a7a;
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+.clear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid #9aa0a6;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #444444;
+  font-size: 11px;
+  font-weight: bold;
+  line-height: 16px;
+  cursor: pointer;
+}
+
+.clear:hover {
+  background: #e3f2fd;
+  border-color: #1976d2;
+  color: #0b5394;
+}
