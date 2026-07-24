@@ -1,10 +1,4 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  DragDropContext,
-  Draggable,
-  Droppable,
-  type DropResult,
-} from 'react-beautiful-dnd';
 import clickImage from '../assets/click.png';
 import excelImage from '../assets/excel.png';
 import inputImage from '../assets/input_field.png';
@@ -204,46 +198,101 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose,
     setCreateBlockOpen(false);
   };
 
-  const handleDragEnd = useCallback((result: DropResult) => {
-    // [MemoryList][drag] runtime monitor — visible in the jar's DevTools console.
-    // Tells you exactly where a drag stops: no destination, busy list, index math,
-    // the REORDER send, and (in the message handler) the backend ok/fail response.
-    console.log('[MemoryList][drag] dragEnd', {
-      draggableId: result.draggableId,
-      source: result.source?.index,
-      destination: result.destination?.index,
+  // Native HTML5 drag & drop — no react-beautiful-dnd. rbd depends on
+  // requestAnimationFrame, which the browser pauses for hidden/occluded tabs, so
+  // its drag silently died there. Plain draggable rows work in any tab state and
+  // are trivially observable. dragIndexRef is the row being carried; overIndex is
+  // the row it is hovering, used only for the drop-target highlight.
+  const dragIndexRef = useRef<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
+
+  // Pure reorder core: move the row at `from` to `to`, optimistically update the
+  // snapshot, and send REORDER. Every step logs to [MemoryList][drag]. Also exposed
+  // as window.__mlReorder(from, to) so the whole pipeline can be triggered/verified
+  // without a physical drag (e.g. in an occluded tab or an automated test).
+  const reorderByIndex = useCallback((from: number, to: number) => {
+    const items = snapshot.items;
+    console.log(`[MemoryList][drag] REORDER requested ${from} -> ${to}`, {
+      itemCount: items.length,
       busy: snapshot.busy,
-      itemCount: snapshot.items.length,
-      ownerEpoch: snapshot.ownerEpoch,
+      order: items.map(item => item.key),
     });
-    if (!result.destination || snapshot.busy) {
-      console.warn('[MemoryList][drag] aborted before reorder', {
-        hasDestination: Boolean(result.destination),
-        busy: snapshot.busy,
-      });
-      return;
+    if (snapshot.busy) {
+      console.warn('[MemoryList][drag] blocked: list is busy');
+      return false;
     }
-
-    const sourceIndex = snapshot.items.findIndex(item => item.key === result.draggableId);
-    const destinationIndex = result.destination.index;
     if (
-      sourceIndex < 0
-      || destinationIndex < 0
-      || destinationIndex >= snapshot.items.length
-      || sourceIndex === destinationIndex
+      from < 0 || to < 0
+      || from >= items.length || to >= items.length
+      || from === to
     ) {
-      console.warn('[MemoryList][drag] no-op reorder', { sourceIndex, destinationIndex });
-      return;
+      console.warn('[MemoryList][drag] no-op reorder (same slot or out of range)', { from, to });
+      return false;
     }
-
-    const nextItems = [...snapshot.items];
-    const [movedItem] = nextItems.splice(sourceIndex, 1);
-    nextItems.splice(destinationIndex, 0, movedItem);
+    const previousOrder = items.map(item => item.key);
+    const nextItems = [...items];
+    const [movedItem] = nextItems.splice(from, 1);
+    nextItems.splice(to, 0, movedItem);
     setSnapshot(current => ({ ...current, items: nextItems }));
     const orderedItemKeys = nextItems.map(item => item.key);
-    console.log('[MemoryList][drag] sending REORDER', { sourceIndex, destinationIndex, orderedItemKeys });
+    console.log(
+      `[MemoryList][drag] REORDERED "${movedItem.label}" ${from} -> ${to}; sending REORDER command`,
+      { previousOrder, orderedItemKeys },
+    );
     sendCommand({ action: 'REORDER', orderedItemKeys });
-  }, [sendCommand, snapshot.busy, snapshot.items, snapshot.ownerEpoch]);
+    return true;
+  }, [sendCommand, snapshot.busy, snapshot.items]);
+
+  // Diagnostic hook: window.__mlReorder(from, to) reorders without a physical drag.
+  useEffect(() => {
+    (window as any).__mlReorder = reorderByIndex;
+    return () => {
+      if ((window as any).__mlReorder === reorderByIndex) delete (window as any).__mlReorder;
+    };
+  }, [reorderByIndex]);
+
+  const handleRowDragStart = useCallback((index: number, event: React.DragEvent) => {
+    if (snapshot.busy) {
+      event.preventDefault();
+      return;
+    }
+    dragIndexRef.current = index;
+    setOverIndex(index);
+    try {
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', String(index)); // Firefox needs a payload
+    } catch {
+      // Some environments restrict dataTransfer; the ref still carries the index.
+    }
+    const label = snapshot.items[index]?.label ?? index;
+    console.log(`[MemoryList][drag] GRABBED "${label}" at index ${index}`);
+  }, [snapshot.busy, snapshot.items]);
+
+  const handleRowDragOver = useCallback((index: number, event: React.DragEvent) => {
+    event.preventDefault(); // required to allow a drop
+    event.dataTransfer.dropEffect = 'move';
+    if (overIndex !== index) {
+      setOverIndex(index);
+      console.log(`[MemoryList][drag] MOVE over index ${index}`);
+    }
+  }, [overIndex]);
+
+  const handleRowDrop = useCallback((index: number, event: React.DragEvent) => {
+    event.preventDefault();
+    const from = dragIndexRef.current;
+    console.log(`[MemoryList][drag] DROP on index ${index} (carrying ${from})`);
+    if (from !== null) reorderByIndex(from, index);
+    dragIndexRef.current = null;
+    setOverIndex(null);
+  }, [reorderByIndex]);
+
+  const handleRowDragEnd = useCallback(() => {
+    if (dragIndexRef.current !== null) {
+      console.log('[MemoryList][drag] RELEASED without a valid drop target — no reorder');
+    }
+    dragIndexRef.current = null;
+    setOverIndex(null);
+  }, []);
 
   const sourceLabel = snapshot.sourceKind === 'MIXED'
     ? 'Bot Job instructions + Page Scanner elements'
@@ -324,75 +373,61 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose,
             </button>
           </div>
 
-          <DragDropContext onDragEnd={handleDragEnd}>
-            <Droppable droppableId="memory-list-items">
-              {provided => (
-                <section
-                  ref={provided.innerRef}
-                  {...provided.droppableProps}
-                  className={styles.list}
-                  aria-label="Memory List items"
-                >
-                  {snapshot.items.length === 0 ? (
-                    <div className={styles.empty}>{snapshot.emptyMessage}</div>
-                  ) : (
-                    snapshot.items.map((item, index) => {
-                      const icon = item.icon ? ITEM_ICONS[item.icon] : undefined;
-                      return (
-                        <Draggable
-                          key={item.key}
-                          draggableId={item.key}
-                          index={index}
-                          isDragDisabled={snapshot.busy}
-                        >
-                          {(dragProvided, dragState) => (
-                            <article
-                              ref={dragProvided.innerRef}
-                              {...dragProvided.draggableProps}
-                              className={[
-                                styles.item,
-                                item.active === false ? styles.inactiveItem : '',
-                                dragState.isDragging ? styles.draggingItem : '',
-                              ].filter(Boolean).join(' ')}
-                            >
-                              <button
-                                type="button"
-                                className={styles.dragHandle}
-                                title="Drag to reorder; arrow keys also move while dragging"
-                                aria-label={`Reorder ${item.label}`}
-                                disabled={snapshot.busy}
-                                {...dragProvided.dragHandleProps}
-                              >
-                                ≡
-                              </button>
-                              <span className={styles.order}>{index + 1}.</span>
-                              {icon && <img src={icon} alt="" className={styles.itemIcon} />}
-                              <span className={styles.itemText}>
-                                <strong title={item.label}>{item.label}</strong>
-                                {item.detail && <small title={item.detail}>{item.detail}</small>}
-                              </span>
-                              {item.active === false && <span className={styles.inactiveBadge}>Inactive</span>}
-                              <button
-                                type="button"
-                                className={styles.removeButton}
-                                title="Remove from memory list"
-                                aria-label={`Remove ${item.label} from memory list`}
-                                disabled={snapshot.busy}
-                                onClick={() => sendCommand({ action: 'REMOVE', itemKey: item.key })}
-                              >
-                                X
-                              </button>
-                            </article>
-                          )}
-                        </Draggable>
-                      );
-                    })
-                  )}
-                  {provided.placeholder}
-                </section>
-              )}
-            </Droppable>
-          </DragDropContext>
+          <section
+            className={styles.list}
+            aria-label="Memory List items"
+            onDragEnd={handleRowDragEnd}
+          >
+            {snapshot.items.length === 0 ? (
+              <div className={styles.empty}>{snapshot.emptyMessage}</div>
+            ) : (
+              snapshot.items.map((item, index) => {
+                const icon = item.icon ? ITEM_ICONS[item.icon] : undefined;
+                return (
+                  <article
+                    key={item.key}
+                    data-memory-item-key={item.key}
+                    draggable={!snapshot.busy}
+                    onDragStart={event => handleRowDragStart(index, event)}
+                    onDragOver={event => handleRowDragOver(index, event)}
+                    onDrop={event => handleRowDrop(index, event)}
+                    className={[
+                      styles.item,
+                      item.active === false ? styles.inactiveItem : '',
+                      overIndex === index ? styles.draggingItem : '',
+                    ].filter(Boolean).join(' ')}
+                  >
+                    <button
+                      type="button"
+                      className={styles.dragHandle}
+                      title="Drag to reorder"
+                      aria-label={`Reorder ${item.label}`}
+                      disabled={snapshot.busy}
+                    >
+                      ≡
+                    </button>
+                    <span className={styles.order}>{index + 1}.</span>
+                    {icon && <img src={icon} alt="" className={styles.itemIcon} />}
+                    <span className={styles.itemText}>
+                      <strong title={item.label}>{item.label}</strong>
+                      {item.detail && <small title={item.detail}>{item.detail}</small>}
+                    </span>
+                    {item.active === false && <span className={styles.inactiveBadge}>Inactive</span>}
+                    <button
+                      type="button"
+                      className={styles.removeButton}
+                      title="Remove from memory list"
+                      aria-label={`Remove ${item.label} from memory list`}
+                      disabled={snapshot.busy}
+                      onClick={() => sendCommand({ action: 'REMOVE', itemKey: item.key })}
+                    >
+                      X
+                    </button>
+                  </article>
+                );
+              })
+            )}
+          </section>
 
           <footer className={styles.footer}>
             <span>{snapshot.items.length} item{snapshot.items.length === 1 ? '' : 's'}</span>
