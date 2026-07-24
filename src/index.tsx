@@ -397,13 +397,22 @@ const App: React.FC = () => {
   const mainApplicationControlPort = socketPort > 0 ? socketPort : Number(window.location.port);
 
   // Frontend-only drag & drop test bench (no backend): open with `npm start` at
-  // http://localhost:3000/?memoryDragDemo=1 . Kept inside StrictMode so the drag
-  // is exercised under the same conditions as production.
+  // http://localhost:3000/?memoryDragDemo=1 . Rendered OUTSIDE React.StrictMode so
+  // react-beautiful-dnd registers immediately — matching the production jar, where
+  // StrictMode does not double-invoke effects.
   if (new URLSearchParams(window.location.search).has('memoryDragDemo')) {
+    return <MemoryDragDemo />;
+  }
+
+  // The REAL Memory List component, seeded with synthetic rows and no backend, for
+  // fast drag & drop diagnostics: http://localhost:3000/?memoryListDemo=1
+  if (new URLSearchParams(window.location.search).has('memoryListDemo')) {
     return (
-      <React.StrictMode>
-        <MemoryDragDemo />
-      </React.StrictMode>
+      <MemoryList
+        socketPort={Number(window.location.port) || 0}
+        sessionId={MEMORY_LIST_SESSION_ID}
+        demoMode
+      />
     );
   }
 

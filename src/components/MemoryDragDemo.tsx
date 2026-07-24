@@ -1,10 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   DragDropContext,
   Draggable,
   Droppable,
   type DropResult,
-  type DroppableProps,
 } from 'react-beautiful-dnd';
 
 /**
@@ -27,25 +26,6 @@ const INITIAL_ROWS: DemoRow[] = Array.from({ length: 10 }, (_, index) => ({
   label: `Memory item ${index + 1}`,
   detail: `synthetic instruction #${index + 1}`,
 }));
-
-// --- StrictMode-safe Droppable ---------------------------------------------
-// react-beautiful-dnd@13 does not register its droppable under React 18
-// StrictMode (dev double-invoke), so drag silently dies in `npm start`.
-// Delaying one animation frame before mounting the real Droppable fixes it.
-const StrictModeDroppable: React.FC<DroppableProps> = ({ children, ...props }) => {
-  const [enabled, setEnabled] = useState(false);
-  useEffect(() => {
-    const raf = requestAnimationFrame(() => setEnabled(true));
-    return () => {
-      cancelAnimationFrame(raf);
-      setEnabled(false);
-    };
-  }, []);
-  if (!enabled) {
-    return null;
-  }
-  return <Droppable {...props}>{children}</Droppable>;
-};
 
 const MemoryDragDemo: React.FC = () => {
   const [rows, setRows] = useState<DemoRow[]>(INITIAL_ROWS);
@@ -76,7 +56,7 @@ const MemoryDragDemo: React.FC = () => {
         <p style={styles.status}>{lastMove}</p>
 
         <DragDropContext onDragEnd={handleDragEnd}>
-          <StrictModeDroppable droppableId="memory-demo">
+          <Droppable droppableId="memory-demo">
             {(dropProvided) => (
               <div
                 ref={dropProvided.innerRef}
@@ -115,7 +95,7 @@ const MemoryDragDemo: React.FC = () => {
                 {dropProvided.placeholder}
               </div>
             )}
-          </StrictModeDroppable>
+          </Droppable>
         </DragDropContext>
 
         <p style={styles.hint}>

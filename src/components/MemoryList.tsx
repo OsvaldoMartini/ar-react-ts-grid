@@ -4,7 +4,6 @@ import {
   Draggable,
   Droppable,
   type DropResult,
-  type DroppableProps,
 } from 'react-beautiful-dnd';
 import clickImage from '../assets/click.png';
 import excelImage from '../assets/excel.png';
@@ -27,28 +26,16 @@ import styles from './MemoryList.module.scss';
 
 export const MEMORY_LIST_SESSION_ID = 'memoryListManager';
 
-// react-beautiful-dnd@13 does not register its droppable under React 18
-// StrictMode (dev double-invoke), so the reorder drag silently dies. Delaying
-// one animation frame before mounting the real Droppable restores it.
-const StrictModeDroppable: React.FC<DroppableProps> = ({ children, ...props }) => {
-  const [enabled, setEnabled] = useState(false);
-  useEffect(() => {
-    const raf = requestAnimationFrame(() => setEnabled(true));
-    return () => {
-      cancelAnimationFrame(raf);
-      setEnabled(false);
-    };
-  }, []);
-  if (!enabled) {
-    return null;
-  }
-  return <Droppable {...props}>{children}</Droppable>;
-};
-
 interface MemoryListProps {
   socketPort: number;
   sessionId: string;
   onClose?: () => void;
+  /**
+   * Synthetic offline mode: seed the real Memory List with fake rows and keep all
+   * commands local so drag & drop can be exercised without the Java backend.
+   * Reached via ?memoryListDemo=1 in `npm start`.
+   */
+  demoMode?: boolean;
 }
 
 type MemoryListCommand =
@@ -74,6 +61,36 @@ const EMPTY_SNAPSHOT: MemoryListSnapshot = {
   canApply: false,
 };
 
+// Synthetic 10-row snapshot for offline drag & drop testing (demoMode / ?memoryListDemo=1).
+const DEMO_SNAPSHOT: MemoryListSnapshot = {
+  ...EMPTY_SNAPSHOT,
+  ownerEpoch: 'demo-epoch',
+  sourceKind: 'MIXED',
+  homeBankingId: 1,
+  botJobId: 999,
+  botJobName: 'Synthetic Demo Job',
+  items: Array.from({ length: 10 }, (_, index) => {
+    const n = index + 1;
+    const fromScanner = n % 2 === 0;
+    return {
+      key: `${fromScanner ? 'PAGE_SCANNER' : 'BOT_JOB'}:${n}`,
+      sourceKind: fromScanner ? 'PAGE_SCANNER' : 'BOT_JOB',
+      sourceItemKey: String(n),
+      label: `Memory item ${n}`,
+      detail: fromScanner ? `scanned element #${n}` : `instruction #${n}`,
+      icon: (['click', 'input', 'link', 'output', 'screen', 'wait', 'excel'] as MemoryListItemIcon[])[index % 7],
+      active: true,
+    };
+  }),
+  blocks: [
+    { blockId: 1, blockName: 'Block A', blockOrderNumber: 1 },
+    { blockId: 2, blockName: 'Block B', blockOrderNumber: 2 },
+  ],
+  targetBlockId: 1,
+  status: 'Synthetic Memory List (offline demo — no backend)',
+  canApply: true,
+};
+
 const ITEM_ICONS: Partial<Record<MemoryListItemIcon, string>> = {
   click: clickImage,
   excel: excelImage,
@@ -91,14 +108,19 @@ function parseMessage(raw: string): { operationId?: string; body: any } {
   return { operationId, body };
 }
 
-const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose }) => {
+const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose, demoMode = false }) => {
   const { webSocket, connected, messages, error } = useWebSocket(socketPort, sessionId);
   const processedMessageCountRef = useRef(0);
-  const [snapshot, setSnapshot] = useState<MemoryListSnapshot>(EMPTY_SNAPSHOT);
+  const [snapshot, setSnapshot] = useState<MemoryListSnapshot>(demoMode ? DEMO_SNAPSHOT : EMPTY_SNAPSHOT);
   const [createBlockOpen, setCreateBlockOpen] = useState(false);
   const [localStatus, setLocalStatus] = useState('');
 
   const send = useCallback((type: string, body: unknown = {}) => {
+    // Offline demo keeps every command local; the optimistic state update is the result.
+    if (demoMode) {
+      console.log('[MemoryList][drag] demoMode local command', { type, body });
+      return true;
+    }
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
       setLocalStatus('Memory List is not connected.');
       return false;
@@ -110,7 +132,7 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose 
       body: JSON.stringify(body),
     }));
     return true;
-  }, [sessionId, snapshot.homeBankingId, webSocket]);
+  }, [demoMode, sessionId, snapshot.homeBankingId, webSocket]);
 
   const sendCommand = useCallback((command: MemoryListCommand) => {
     if (!snapshot.ownerEpoch) {
@@ -123,8 +145,8 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose 
   }, [send, snapshot.ownerEpoch]);
 
   useEffect(() => {
-    if (connected) send('memoryList.bootstrap');
-  }, [connected, send]);
+    if (!demoMode && connected) send('memoryList.bootstrap');
+  }, [connected, demoMode, send]);
 
   useEffect(() => {
     if (processedMessageCountRef.current > messages.length) {
@@ -183,7 +205,24 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose 
   };
 
   const handleDragEnd = useCallback((result: DropResult) => {
-    if (!result.destination || snapshot.busy) return;
+    // [MemoryList][drag] runtime monitor — visible in the jar's DevTools console.
+    // Tells you exactly where a drag stops: no destination, busy list, index math,
+    // the REORDER send, and (in the message handler) the backend ok/fail response.
+    console.log('[MemoryList][drag] dragEnd', {
+      draggableId: result.draggableId,
+      source: result.source?.index,
+      destination: result.destination?.index,
+      busy: snapshot.busy,
+      itemCount: snapshot.items.length,
+      ownerEpoch: snapshot.ownerEpoch,
+    });
+    if (!result.destination || snapshot.busy) {
+      console.warn('[MemoryList][drag] aborted before reorder', {
+        hasDestination: Boolean(result.destination),
+        busy: snapshot.busy,
+      });
+      return;
+    }
 
     const sourceIndex = snapshot.items.findIndex(item => item.key === result.draggableId);
     const destinationIndex = result.destination.index;
@@ -193,6 +232,7 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose 
       || destinationIndex >= snapshot.items.length
       || sourceIndex === destinationIndex
     ) {
+      console.warn('[MemoryList][drag] no-op reorder', { sourceIndex, destinationIndex });
       return;
     }
 
@@ -200,11 +240,10 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose 
     const [movedItem] = nextItems.splice(sourceIndex, 1);
     nextItems.splice(destinationIndex, 0, movedItem);
     setSnapshot(current => ({ ...current, items: nextItems }));
-    sendCommand({
-      action: 'REORDER',
-      orderedItemKeys: nextItems.map(item => item.key),
-    });
-  }, [sendCommand, snapshot.busy, snapshot.items]);
+    const orderedItemKeys = nextItems.map(item => item.key);
+    console.log('[MemoryList][drag] sending REORDER', { sourceIndex, destinationIndex, orderedItemKeys });
+    sendCommand({ action: 'REORDER', orderedItemKeys });
+  }, [sendCommand, snapshot.busy, snapshot.items, snapshot.ownerEpoch]);
 
   const sourceLabel = snapshot.sourceKind === 'MIXED'
     ? 'Bot Job instructions + Page Scanner elements'
@@ -286,7 +325,7 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose 
           </div>
 
           <DragDropContext onDragEnd={handleDragEnd}>
-            <StrictModeDroppable droppableId="memory-list-items">
+            <Droppable droppableId="memory-list-items">
               {provided => (
                 <section
                   ref={provided.innerRef}
@@ -352,7 +391,7 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose 
                   {provided.placeholder}
                 </section>
               )}
-            </StrictModeDroppable>
+            </Droppable>
           </DragDropContext>
 
           <footer className={styles.footer}>
