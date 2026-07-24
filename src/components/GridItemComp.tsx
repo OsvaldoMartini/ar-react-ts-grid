@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { BotJobData, ComplexMessage, ComponentsInstructionsDTO, ElementDTO, UpdatedBlock } from './instructionsMockData';
-import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd'; // Import from react-beautiful-dnd
 import setValueImage from '../assets/setValueBtn3.png';
 import getValueImage from '../assets/getValueBtn3.png';
 import checkImage from '../assets/check4.png';
@@ -406,6 +405,59 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
         destinationIndex: result.destination.index,
       }),
     }));
+  };
+
+  // ── Native HTML5 drag & drop (replaces react-beautiful-dnd) ────────────────
+  // Same mechanism as GridItem: on drop we synthesize the exact rbd result shape
+  // and call the unchanged onDragEnd() (backend preview-move round-trip intact).
+  const dragSourceRef = useRef<{ droppableId: string; index: number; instructionId: number } | null>(null);
+
+  const commitInstructionDrag = useCallback((destinationDroppableId: string, destinationIndex: number) => {
+    const source = dragSourceRef.current;
+    dragSourceRef.current = null;
+    if (!source) return;
+    onDragEnd({
+      draggableId: String(source.instructionId),
+      source: { droppableId: source.droppableId, index: source.index },
+      destination: { droppableId: destinationDroppableId, index: destinationIndex },
+    });
+  }, [onDragEnd]);
+
+  const handleRowDragStart = (droppableId: string, index: number, instruction: ComponentsInstructionsDTO) =>
+    (event: React.DragEvent) => {
+      if (findText.trim().length > 0 || !moveCapabilities.get(instruction.id)?.canMove) {
+        event.preventDefault();
+        return;
+      }
+      dragSourceRef.current = { droppableId, index, instructionId: instruction.id };
+      setActiveDraggedInstructionId(instruction.id);
+      try {
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', String(instruction.id));
+      } catch {
+        // dataTransfer may be restricted; the ref still carries the source.
+      }
+    };
+
+  const handleGridDragOver = (event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleRowDrop = (droppableId: string, index: number) => (event: React.DragEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    commitInstructionDrag(droppableId, index);
+  };
+
+  const handleListDrop = (droppableId: string, count: number) => (event: React.DragEvent) => {
+    event.preventDefault();
+    commitInstructionDrag(droppableId, count);
+  };
+
+  const handleRowDragEnd = () => {
+    dragSourceRef.current = null;
+    setActiveDraggedInstructionId(null);
   };
 
   // Memoized function to handle outside clicks on the dropdown
@@ -2670,8 +2722,6 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       </div>
       <div ref={gridScrollRef} className={styles.gridScroll}>
         <div className={styles.gridContent}>
-          <DragDropContext onDragStart={(start) => setActiveDraggedInstructionId(Number(start.draggableId))} onDragEnd={(result) => { setActiveDraggedInstructionId(null); onDragEnd(result); }} // Define the onDragEnd handler to update the state when the dragging stops
-          >
             {
               Object.keys(groupedData).length === 0 ? (
                 // Render default block if groupedData is empty
@@ -2868,17 +2918,12 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
 
                         </div>
                       </div>
-                      <Droppable
-                        droppableId={blockGroupIndex}
-                        key={blockData.instructions[0].blockId}
-                        isDropDisabled={activeDraggedInstructionId !== null && !moveCapabilities.get(activeDraggedInstructionId)?.allowedBlockIds.includes(Number(blockData.instructions[0].blockId))}
+                      <div
+                        data-droppable-id={blockGroupIndex}
+                        className={`${styles.instructionsList} ${activeDraggedInstructionId === null ? '' : moveCapabilities.get(activeDraggedInstructionId)?.allowedBlockIds.includes(Number(blockData.instructions[0].blockId)) ? styles.validDropZone : styles.invalidDropZone}`}
+                        onDragOver={handleGridDragOver}
+                        onDrop={handleListDrop(blockGroupIndex, blockData.instructions.length)}
                       >
-                        {(provided) => (
-                          <div
-                            className={`${styles.instructionsList} ${activeDraggedInstructionId === null ? '' : moveCapabilities.get(activeDraggedInstructionId)?.allowedBlockIds.includes(Number(blockData.instructions[0].blockId)) ? styles.validDropZone : styles.invalidDropZone}`}
-                            ref={provided.innerRef}
-                            {...provided.droppableProps}
-                          >
                             {blockData.instructions.map((instruction, index) => {
                               if (instruction.actions === "EXCEL GOTO") return null;
 
@@ -2900,27 +2945,22 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                                 Number(blockGroupIndex) === Object.keys(groupedData).length; // Check if this is the last block
 
                               return (
-                                <Draggable
-                                  key={instruction.id}
-                                  draggableId={instruction.id.toString()}
-                                  index={index}
-                                  isDragDisabled={findText.trim().length > 0 || !moveCapabilities.get(instruction.id)?.canMove}
-                                >
-                                  {(provided) => (
                                     <div
-                                      ref={provided.innerRef}
-                                      {...provided.draggableProps}
+                                      key={instruction.id}
+                                      draggable={!(findText.trim().length > 0 || !moveCapabilities.get(instruction.id)?.canMove)}
+                                      onDragStart={handleRowDragStart(blockGroupIndex, index, instruction)}
+                                      onDragOver={handleGridDragOver}
+                                      onDrop={handleRowDrop(blockGroupIndex, index)}
+                                      onDragEnd={handleRowDragEnd}
                                       className={`${styles.instructionItem} ${openDropdown === instruction.id ? styles.dropdownOpen : ''
                                         } ${instruction.actions === 'IF' || instruction.actions === 'ELSEIF' || instruction.actions === 'ELSE' || instruction.actions === 'ENDIF'
                                           ? styles.lightYellowBackground
                                           : ''
                                         }`}
-                                    // data-executing={instruction.id === executionId}
                                     >
                                       <button
                                         type="button"
                                         className={styles.dragHandle}
-                                        {...provided.dragHandleProps}
                                         disabled={findText.trim().length > 0 || !moveCapabilities.get(instruction.id)?.canMove}
                                         title={findText.trim().length > 0 ? 'Clear Find before moving instructions' : moveCapabilities.get(instruction.id)?.reason || 'Move instruction; Alt+Arrow keys move one position'}
                                         aria-label={`Move instruction ${instruction.instructionOrderNumber}`}
@@ -3066,18 +3106,12 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                                         )}
                                       </div>
                                     </div>
-                                  )}
-                                </Draggable>
                               );
                             })}
-                            {provided.placeholder}
-                          </div>
-                        )}
-                      </Droppable>
+                      </div>
                     </div >
                   ))
               )}
-          </DragDropContext >
         </div >
       </div >
     </div >

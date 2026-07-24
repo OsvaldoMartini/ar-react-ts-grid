@@ -25,34 +25,6 @@ jest.mock('./bot-job-details/useBotJobDetailsController', () => ({
 jest.mock('./bot-job-details/BotJobDetailsChrome', () => () => null);
 jest.mock('./bot-job-details/ComponentWorkspaceHeader', () => () => null);
 
-jest.mock('react-beautiful-dnd', () => {
-  const ReactModule = jest.requireActual('react');
-  return {
-    DragDropContext: ({ children, onDragEnd }: { children: React.ReactNode; onDragEnd: (result: unknown) => void }) =>
-      ReactModule.createElement(
-        ReactModule.Fragment,
-        null,
-        ReactModule.createElement(
-          'button',
-          {
-            type: 'button',
-            onClick: () => onDragEnd({
-              draggableId: '101',
-              source: { droppableId: '10', index: 0 },
-              destination: { droppableId: '10', index: 1 },
-            }),
-          },
-          'Finish mocked drag',
-        ),
-        children,
-      ),
-    Droppable: ({ children }: { children: (provided: unknown) => React.ReactNode }) =>
-      children({ innerRef: jest.fn(), droppableProps: {}, placeholder: null }),
-    Draggable: ({ children }: { children: (provided: unknown) => React.ReactNode }) =>
-      children({ innerRef: jest.fn(), draggableProps: {}, dragHandleProps: {} }),
-  };
-});
-
 const row: BlockLoopInstructionLoadDTO = {
   homeBankingId: 2,
   tagName: 'button',
@@ -104,7 +76,12 @@ const unrelatedResponse = (sessionId: string) => JSON.stringify({
 
 const expectQueuedCapabilityEnablesDrag = async (sessionId: string) => {
   await waitFor(() => expect(screen.getByLabelText('Move instruction 1')).toBeEnabled());
-  fireEvent.click(screen.getByRole('button', { name: 'Finish mocked drag' }));
+
+  // Native HTML5 drag: grab row 1 (instruction 101) and drop it on row 2 (index 1).
+  const sourceRow = screen.getByLabelText('Move instruction 1').closest('[draggable]');
+  const destinationRow = screen.getByLabelText('Move instruction 2').closest('[draggable]');
+  fireEvent.dragStart(sourceRow as Element);
+  fireEvent.drop(destinationRow as Element);
 
   await waitFor(() => {
     const preview = mockSend.mock.calls

@@ -1,15 +1,7 @@
 import React from 'react';
-import type { DraggableProvidedDragHandleProps } from 'react-beautiful-dnd';
 import styles from './InstructionDragHandle.module.scss';
 
 export interface InstructionDragHandleProps {
-  /**
-   * The current drag library's handle props, spread onto the button. Today this
-   * is react-beautiful-dnd's `provided.dragHandleProps`; Phase 7 (native drag)
-   * will change what the parent passes here without touching this component's
-   * keyboard-move behavior.
-   */
-  dragHandleProps?: DraggableProvidedDragHandleProps | null;
   disabled?: boolean;
   title?: string;
   ariaLabel?: string;
@@ -18,12 +10,11 @@ export interface InstructionDragHandleProps {
 }
 
 /**
- * The ≡ handle for an instruction row: drag grip plus Alt+Arrow keyboard moves.
- * Extracted verbatim from GridItem. Presentational; move logic stays in GridItem
- * and is invoked through onMoveUp/onMoveDown.
+ * The ≡ handle for an instruction row: a visual drag grip plus Alt+Arrow keyboard
+ * moves. The row itself is the native drag source (Phase 7), so this handle no
+ * longer carries drag-library props. Move logic stays in GridItem via onMoveUp/Down.
  */
 const InstructionDragHandle: React.FC<InstructionDragHandleProps> = ({
-  dragHandleProps,
   disabled = false,
   title,
   ariaLabel,
@@ -33,7 +24,6 @@ const InstructionDragHandle: React.FC<InstructionDragHandleProps> = ({
   <button
     type="button"
     className={styles.handle}
-    {...(dragHandleProps ?? {})}
     disabled={disabled}
     title={title}
     aria-label={ariaLabel}

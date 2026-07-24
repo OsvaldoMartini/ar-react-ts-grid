@@ -1,21 +1,14 @@
-import React, { useState } from 'react';
-import {
-  DragDropContext,
-  Draggable,
-  Droppable,
-  type DropResult,
-} from 'react-beautiful-dnd';
+import React, { useRef, useState } from 'react';
 
 /**
  * Standalone, backend-free drag & drop proof for the Memory List row UI.
  *
  * Open it with `npm start` at:  http://localhost:3000/?memoryDragDemo=1
  *
- * Why this exists: MemoryList.tsx already has full react-beautiful-dnd wiring,
- * but its rows come from the Java WebSocket snapshot, so there is nothing to
- * drag without the backend. This file seeds 10 synthetic rows and keeps the
- * reorder entirely in local React state so the drag interaction can be tested
- * in isolation before any deploy.
+ * Uses native HTML5 drag (no react-beautiful-dnd) — the same approach the real
+ * MemoryList and instruction grid now use. Seeds 10 synthetic rows and keeps the
+ * reorder entirely in local React state so the interaction can be tested in
+ * isolation before any deploy.
  */
 
 // --- 10 synthetic rows ------------------------------------------------------
@@ -30,21 +23,18 @@ const INITIAL_ROWS: DemoRow[] = Array.from({ length: 10 }, (_, index) => ({
 const MemoryDragDemo: React.FC = () => {
   const [rows, setRows] = useState<DemoRow[]>(INITIAL_ROWS);
   const [lastMove, setLastMove] = useState<string>('Drag a row up or down.');
+  const dragIndexRef = useRef<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
 
-  const handleDragEnd = (result: DropResult) => {
-    if (!result.destination) {
-      return;
-    }
-    const sourceIndex = result.source.index;
-    const destinationIndex = result.destination.index;
-    if (sourceIndex === destinationIndex) {
+  const reorder = (from: number, to: number) => {
+    if (from < 0 || to < 0 || from === to) {
       return;
     }
     setRows((current) => {
       const next = [...current];
-      const [moved] = next.splice(sourceIndex, 1);
-      next.splice(destinationIndex, 0, moved);
-      setLastMove(`Moved "${moved.label}" from position ${sourceIndex + 1} to ${destinationIndex + 1}.`);
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      setLastMove(`Moved "${moved.label}" from position ${from + 1} to ${to + 1}.`);
       return next;
     });
   };
@@ -55,52 +45,52 @@ const MemoryDragDemo: React.FC = () => {
         <h1 style={styles.title}>Memory List — Drag &amp; Drop demo</h1>
         <p style={styles.status}>{lastMove}</p>
 
-        <DragDropContext onDragEnd={handleDragEnd}>
-          <Droppable droppableId="memory-demo">
-            {(dropProvided) => (
-              <div
-                ref={dropProvided.innerRef}
-                {...dropProvided.droppableProps}
-                style={styles.list}
-              >
-                {rows.map((row, index) => (
-                  <Draggable key={row.key} draggableId={row.key} index={index}>
-                    {(dragProvided, dragState) => (
-                      <div
-                        ref={dragProvided.innerRef}
-                        {...dragProvided.draggableProps}
-                        style={{
-                          ...styles.row,
-                          ...(dragState.isDragging ? styles.rowDragging : null),
-                          ...dragProvided.draggableProps.style,
-                        }}
-                      >
-                        <span
-                          {...dragProvided.dragHandleProps}
-                          style={styles.handle}
-                          title="Drag to reorder"
-                          aria-label={`Reorder ${row.label}`}
-                        >
-                          &#8801;
-                        </span>
-                        <span style={styles.order}>{index + 1}.</span>
-                        <span style={styles.text}>
-                          <strong>{row.label}</strong>
-                          <small style={styles.detail}>{row.detail}</small>
-                        </span>
-                      </div>
-                    )}
-                  </Draggable>
-                ))}
-                {dropProvided.placeholder}
-              </div>
-            )}
-          </Droppable>
-        </DragDropContext>
+        <div style={styles.list}>
+          {rows.map((row, index) => (
+            <div
+              key={row.key}
+              draggable
+              onDragStart={() => {
+                dragIndexRef.current = index;
+                setOverIndex(index);
+              }}
+              onDragOver={(event) => {
+                event.preventDefault();
+                if (overIndex !== index) {
+                  setOverIndex(index);
+                }
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                if (dragIndexRef.current !== null) {
+                  reorder(dragIndexRef.current, index);
+                }
+                dragIndexRef.current = null;
+                setOverIndex(null);
+              }}
+              onDragEnd={() => {
+                dragIndexRef.current = null;
+                setOverIndex(null);
+              }}
+              style={{
+                ...styles.row,
+                ...(overIndex === index ? styles.rowDragging : null),
+              }}
+            >
+              <span style={styles.handle} title="Drag to reorder" aria-label={`Reorder ${row.label}`}>
+                &#8801;
+              </span>
+              <span style={styles.order}>{index + 1}.</span>
+              <span style={styles.text}>
+                <strong>{row.label}</strong>
+                <small style={styles.detail}>{row.detail}</small>
+              </span>
+            </div>
+          ))}
+        </div>
 
         <p style={styles.hint}>
-          Grab the &#8801; handle (or the row) and drag up/down. Order updates in local state only —
-          no backend involved.
+          Grab a row and drag up/down. Order updates in local state only — no backend involved.
         </p>
       </div>
     </div>
