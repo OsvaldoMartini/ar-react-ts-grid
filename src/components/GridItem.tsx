@@ -39,8 +39,6 @@ import forbiddenImage from '../assets/forbidden.png';
 import warningRedImage from '../assets/warning_red.png';
 import brickImage from '../assets/brick.png';
 import hiddenImage from '../assets/hidden-black.png';
-import activeImage from '../assets/active3.png';
-import inactiveImage from '../assets/inactive2.png';
 import ArrowLeft from '../assets/ArrowLeft.png';
 
 
@@ -59,6 +57,7 @@ import BlockCollapseToggle from './bot-job-details/grid/BlockCollapseToggle';
 import InlineNameEditor from './bot-job-details/grid/InlineNameEditor';
 import CommandEditorButton from './bot-job-details/grid/CommandEditorButton';
 import InstructionDragHandle from './bot-job-details/grid/InstructionDragHandle';
+import MemoryAddButton from './bot-job-details/grid/MemoryAddButton';
 import ExecutionStateOverlay from './bot-job-details/grid/ExecutionStateOverlay';
 import { instructionDisplayLabel } from './instructionDisplay';
 import { buildLaterBlockOrderUpdates } from './instructionSplit';
@@ -3330,18 +3329,14 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                           ({blockData.instructions.length})
                           {/* {mockData ? "-Moock Data" : ""} */}
                         </span>
-                        <button
-                          type="button"
-                          className={styles.memoryAddButton}
+                        <MemoryAddButton
                           disabled={!blockData.instructions.some(instruction => memoryCapabilities.get(instruction.id)?.canAdd)}
                           title="Add eligible steps in this block to memory list"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleAddBlockToMemory(blockData.instructions);
                           }}
-                        >
-                          +
-                        </button>
+                        />
                         {/* Show the export file or "No Export File" */}
                         <span className={styles.blockExportFile}>
                           {renderExportFile(String(blockData.exportFile))}
@@ -3498,34 +3493,21 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                                       ) : (
                                         <span className={styles.instructionLine}>
                                           {/* <span>({instruction.id})</span> */}
-                                          {instruction.instructionActive ? (
-                                            <img src={activeImage}
-                                              alt="Active"
-                                              className={styles.activeButton}
-                                              onClick={() =>
-                                                handleInstructionStatus(instruction.id, blockData.instructions)
-                                              } />
-                                          ) : (
-                                            <img src={inactiveImage}
-                                              alt="Inactive"
-                                              className={styles.inactiveButton}
-                                              onClick={() =>
-                                                handleInstructionStatus(instruction.id, blockData.instructions)
-                                              } />
-                                          )}
+                                          <BlockStatusToggle
+                                            active={instruction.instructionActive}
+                                            onToggle={() =>
+                                              handleInstructionStatus(instruction.id, blockData.instructions)
+                                            }
+                                          />
                                           {getInstructionTypeElement(instruction)}
-                                          <button
-                                            type="button"
-                                            className={styles.memoryAddButton}
+                                          <MemoryAddButton
                                             disabled={!memoryCapabilities.get(instruction.id)?.canAdd}
                                             title={memoryCapabilities.get(instruction.id)?.reason || 'Add step to memory list'}
                                             onClick={(e) => {
                                               e.stopPropagation();
                                               handleAddToMemory(instruction);
                                             }}
-                                          >
-                                            +
-                                          </button>
+                                          />
                                           {instruction.refreshLoop && (
                                             <img
                                               src={refreshLoopImage}
