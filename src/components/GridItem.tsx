@@ -6,10 +6,7 @@ import editImage from '../assets/edit.png';
 import edit2Image from '../assets/edit2.png';
 import upImage from '../assets/up.png';
 import downImage from '../assets/down.png';
-import rollBackImage from '../assets/rollback4.png';
 import binImage from '../assets/bin.png';
-import saveImage from "../assets/save.png";
-import excelImage from "../assets/excel.png";
 import excelGotoImage from "../assets/excel_goto2.png";
 import clickTestImage from "../assets/clickTest2.png";
 import constructionImage from '../assets/construction.png';
@@ -29,13 +26,10 @@ import { useBotJobDetailsController } from './bot-job-details/useBotJobDetailsCo
 import { useWebSocket } from './useWebSocket';
 import { useInstructionDrag } from './useInstructionDrag';
 import FindBar from './bot-job-details/grid/FindBar';
-import BlockStatusToggle from './bot-job-details/grid/BlockStatusToggle';
-import BlockCollapseToggle from './bot-job-details/grid/BlockCollapseToggle';
-import InlineNameEditor from './bot-job-details/grid/InlineNameEditor';
-import MemoryAddButton from './bot-job-details/grid/MemoryAddButton';
 import DeleteButton from './bot-job-details/grid/DeleteButton';
 import InstructionRow from './bot-job-details/grid/InstructionRow';
 import InstructionList from './bot-job-details/grid/InstructionList';
+import BlockHeader from './bot-job-details/grid/BlockHeader';
 import { instructionDisplayLabel } from './instructionDisplay';
 import { buildLaterBlockOrderUpdates } from './instructionSplit';
 import type {
@@ -3080,125 +3074,59 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                   .map(([blockGroupIndex, blockData], index) => (
                     <div key={blockGroupIndex} className={styles.block}>
                       {/* Block header with garbage, up, and down buttons */}
-                      <div className={styles.blockHeader}>
-                        <BlockStatusToggle
-                          active={blockData.instructions[0].blockActive}
-                          onToggle={() =>
-                            handleBlockStatus(blockData.instructions[0].blockId)
-                          }
-                        />
-                        <BlockCollapseToggle
-                          collapsed={collapsedBlocks.has(Number(blockData.instructions[0].blockId))}
-                          onToggle={() => toggleBlockCollapsed(Number(blockData.instructions[0].blockId))}
-                        />
-                        <span className={styles.blockOrderNumber}>
-                          #{blockData.instructions[0].blockOrderNumber}
-                        </span>
-                        {editingBlockId === Number(blockGroupIndex) ? (
-                          <InlineNameEditor
-                            value={blockName}
-                            onChange={setBlockName}
-                            onSave={() => handleSaveBlockName(Number(blockData.instructions[0].blockId))}
-                            inputRef={blockRef}
-                          />
-                        ) : (
-                          <span className={styles.blockName}>
-                            {renderHighlighted(blockData.blockName ?? "", findText)}
-                          </span>
-                          //<span className={styles.blockName}>{blockData.blockName} (Id:   {blockData.instructions[0].blockId})</span>
-                        )}
-
-                        <span className={styles.blockCount}>
-                          ({blockData.instructions.length})
-                          {/* {mockData ? "-Moock Data" : ""} */}
-                        </span>
-                        <MemoryAddButton
-                          disabled={!blockData.instructions.some(instruction => memoryCapabilities.get(instruction.id)?.canAdd)}
-                          title="Add eligible steps in this block to memory list"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleAddBlockToMemory(blockData.instructions);
-                          }}
-                        />
-                        {/* Show the export file or "No Export File" */}
-                        <span className={styles.blockExportFile}>
-                          {renderExportFile(String(blockData.exportFile))}
-                        </span>
-                        <div className={styles.moveButtons}>
-                          {index === 0 && (
+                      <BlockHeader
+                        blockActive={blockData.instructions[0].blockActive}
+                        blockOrderNumber={blockData.instructions[0].blockOrderNumber}
+                        blockName={blockData.blockName ?? ""}
+                        instructionCount={blockData.instructions.length}
+                        collapsed={collapsedBlocks.has(Number(blockData.instructions[0].blockId))}
+                        isEditing={editingBlockId === Number(blockGroupIndex)}
+                        editingName={blockName}
+                        nameInputRef={blockRef}
+                        findText={findText}
+                        canAddToMemory={blockData.instructions.some(instruction => memoryCapabilities.get(instruction.id)?.canAdd)}
+                        isFirstBlock={index === 0}
+                        blockDeleteTitle={blockDeleteCapabilities.get(Number(blockData.instructions[0].blockId))?.reason}
+                        blockDeleteDimmed={!blockDeleteCapabilities.get(Number(blockData.instructions[0].blockId))?.canDelete}
+                        renderHighlighted={renderHighlighted}
+                        exportFileNode={renderExportFile(String(blockData.exportFile))}
+                        excelGotoNode={excelGotoInstruction &&
+                          blockData.instructions[0].blockOrderNumber === excelGotoInstruction.blockOrderNumber ? (
+                          <div className={styles.excelGotoContainer}>
                             <img
-                              src={rollBackImage}
+                              src={excelGotoImage}
                               alt=""
-                              className={styles.rollbackButton}
-                              onClick={() => handleRollbackBlock(Number(blockData.instructions[0].blockId))}
+                              className={styles.excelgotoImage}
+                              title="This block contains the Excel GOTO instruction"
                             />
-                          )}
-                          {excelGotoInstruction &&
-                            blockData.instructions[0].blockOrderNumber === excelGotoInstruction.blockOrderNumber && (
-                              <div className={styles.excelGotoContainer}>
-                                <img
-                                  src={excelGotoImage}
-                                  alt=""
-                                  className={styles.excelgotoImage}
-                                  title="This block contains the Excel GOTO instruction"
-                                />
-                                <span className={styles.excelgotoText}>Row to Return</span>
-                                <img
-                                  src={edit2Image}
-                                  alt=""
-                                  className={styles.editButton}
-                                  title="Open Command Editor"
-                                  onClick={() => handleOpenCommandEditor(excelGotoInstruction)}
-                                />
-                                <DeleteButton
-                                  title={memoryCapabilities.get(Number(excelGotoInstruction.id))?.deleteReason || 'Delete instruction'}
-                                  dimmed={!memoryCapabilities.get(Number(excelGotoInstruction.id))?.canDelete}
-                                  onClick={() => handleRemoveInstruction(Number(excelGotoInstruction.id))}
-                                />
-                              </div>
-                            )}
-                          <img
-                            src={upImage}
-                            alt=""
-                            className={styles.moveButton}
-                            onClick={() => handleMoveBlockUp(Number(blockData.instructions[0].blockId))}
-                          />
-                          <img
-                            src={downImage}
-                            alt=""
-                            className={styles.moveButton}
-                            onClick={() => handleMoveBlockDown(Number(blockData.instructions[0].blockId))}
-                          />
-                          {/* Edit Block Name Button */}
-                          <img
-                            src={editImage}
-                            alt="edit"
-                            className={styles.editButton}
-                            onClick={() => handleEditBlock(Number(blockData.instructions[0].blockId), blockData.blockName)} // Edit block logic
-                          />
-                          {/* Edit Block Name Button */}
-                          <img
-                            src={excelImage}
-                            alt="excel"
-                            className={styles.excelButton}
-                            onClick={() => handleExcelFileBlockName(Number(blockData.instructions[0].blockId), blockData.blockName, Number(blockData.instructions[0].blockOrderNumber), blockData.exportFile)} // Edit block logic
-                          />
-                          <img
-                            src={saveImage}
-                            alt="save"
-                            className={styles.saveButton}
-                            onClick={() => handleCreateComponent(Number(blockData.instructions[0].blockId))}
-                          />
-                          {/* {index !== 0 && ( */}
-                          <DeleteButton
-                            title={blockDeleteCapabilities.get(Number(blockData.instructions[0].blockId))?.reason || 'Delete block'}
-                            dimmed={!blockDeleteCapabilities.get(Number(blockData.instructions[0].blockId))?.canDelete}
-                            onClick={() => handleRemoveBlock(Number(blockData.instructions[0].blockId))}
-                          />
-                          {/* )} */}
-
-                        </div>
-                      </div>
+                            <span className={styles.excelgotoText}>Row to Return</span>
+                            <img
+                              src={edit2Image}
+                              alt=""
+                              className={styles.editButton}
+                              title="Open Command Editor"
+                              onClick={() => handleOpenCommandEditor(excelGotoInstruction)}
+                            />
+                            <DeleteButton
+                              title={memoryCapabilities.get(Number(excelGotoInstruction.id))?.deleteReason || 'Delete instruction'}
+                              dimmed={!memoryCapabilities.get(Number(excelGotoInstruction.id))?.canDelete}
+                              onClick={() => handleRemoveInstruction(Number(excelGotoInstruction.id))}
+                            />
+                          </div>
+                        ) : null}
+                        onToggleStatus={() => handleBlockStatus(blockData.instructions[0].blockId)}
+                        onToggleCollapse={() => toggleBlockCollapsed(Number(blockData.instructions[0].blockId))}
+                        onChangeName={setBlockName}
+                        onSaveName={() => handleSaveBlockName(Number(blockData.instructions[0].blockId))}
+                        onAddToMemory={(e) => { e.stopPropagation(); handleAddBlockToMemory(blockData.instructions); }}
+                        onRollback={() => handleRollbackBlock(Number(blockData.instructions[0].blockId))}
+                        onMoveUp={() => handleMoveBlockUp(Number(blockData.instructions[0].blockId))}
+                        onMoveDown={() => handleMoveBlockDown(Number(blockData.instructions[0].blockId))}
+                        onEditName={() => handleEditBlock(Number(blockData.instructions[0].blockId), blockData.blockName)}
+                        onExcelFile={() => handleExcelFileBlockName(Number(blockData.instructions[0].blockId), blockData.blockName, Number(blockData.instructions[0].blockOrderNumber), blockData.exportFile)}
+                        onCreateComponent={() => handleCreateComponent(Number(blockData.instructions[0].blockId))}
+                        onDeleteBlock={() => handleRemoveBlock(Number(blockData.instructions[0].blockId))}
+                      />
                       {!collapsedBlocks.has(Number(blockData.instructions[0].blockId)) && (
                       <InstructionList
                         droppableId={blockGroupIndex}
