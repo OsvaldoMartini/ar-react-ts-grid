@@ -26,4 +26,18 @@ describe('FindBar', () => {
     fireEvent.click(clear);
     expect(onChange).toHaveBeenCalledWith('');
   });
+
+  it('shows the memory count and requests the detached list', () => {
+    const onOpenMemory = jest.fn();
+    render(
+      <FindBar
+        value=""
+        onChange={() => {}}
+        memoryCount={3}
+        onOpenMemory={onOpenMemory}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Memory (3)' }));
+    expect(onOpenMemory).toHaveBeenCalledTimes(1);
+  });
 });

@@ -1,0 +1,14 @@
+// Block-header status icon. These declarations intentionally mirror the
+// original Griditem.module.scss button group while instruction rows still use it.
+
+.button {
+  height: 22px;
+  background-color: transparent;
+  padding: 0;
+  cursor: pointer;
+  transition: transform 0.3s ease;
+
+  &:hover {
+    transform: scale(1.4);
+  }
+}

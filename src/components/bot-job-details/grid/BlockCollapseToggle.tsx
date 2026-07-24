@@ -31,7 +31,7 @@ const CollapseToggleIcon: React.FC<{ collapsed: boolean }> = ({ collapsed }) => 
 const BlockCollapseToggle: React.FC<BlockCollapseToggleProps> = ({ collapsed, onToggle }) => (
   <button
     type="button"
-    className={styles.badge}
+    className={`${styles.badge} ${collapsed ? 'is-collapsed' : ''}`.trim()}
     title={collapsed ? 'Expand block' : 'Collapse block'}
     onClick={onToggle}
   >

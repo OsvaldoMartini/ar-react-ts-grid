@@ -6,21 +6,24 @@ export interface FindBarProps {
   onChange: (value: string) => void;
   label?: string;
   placeholder?: string;
+  memoryCount?: number;
+  onOpenMemory?: () => void;
 }
 
 /**
  * Find/search input for the Bot Job Details instruction grid.
  *
- * Extracted verbatim from GridItem's find row (label + input + clear). It is
- * purely presentational: the `findText` state stays in GridItem and is passed
- * in, so behavior is unchanged. The surrounding `.gridFindRow` (which also holds
- * the Memory button) remains in GridItem.
+ * Extracted from GridItem's find row (label, input, clear, and the optional
+ * Memory-list reopen action). State and behavior remain owned by GridItem.
+ * The surrounding sticky `.gridFindRow` layout remains in GridItem.
  */
 const FindBar: React.FC<FindBarProps> = ({
   value,
   onChange,
   label = 'Find:',
   placeholder = 'Type to find…',
+  memoryCount = 0,
+  onOpenMemory,
 }) => (
   <>
     <span className={styles.label}>{label}</span>
@@ -44,6 +47,15 @@ const FindBar: React.FC<FindBarProps> = ({
         </button>
       )}
     </div>
+    {memoryCount > 0 && onOpenMemory && (
+      <button
+        type="button"
+        className={styles.memory}
+        onClick={onOpenMemory}
+      >
+        Memory ({memoryCount})
+      </button>
+    )}
   </>
 );
 

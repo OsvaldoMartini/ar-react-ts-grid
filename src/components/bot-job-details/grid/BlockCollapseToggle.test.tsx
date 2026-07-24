@@ -13,6 +13,7 @@ describe('BlockCollapseToggle', () => {
   it('labels itself "Expand block" and shows the vertical bar when collapsed', () => {
     const { container } = render(<BlockCollapseToggle collapsed onToggle={() => {}} />);
     expect(screen.getByTitle('Expand block')).toBeInTheDocument();
+    expect(screen.getByTitle('Expand block')).toHaveClass('is-collapsed');
     // collapsed => the plus sign has two <path> segments (horizontal + vertical).
     expect(container.querySelectorAll('path')).toHaveLength(2);
   });

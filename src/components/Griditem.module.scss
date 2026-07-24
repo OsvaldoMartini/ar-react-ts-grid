@@ -462,32 +462,8 @@
     box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2); /* Stronger shadow on hover */
   }
 
-  .executionBackground {
-    position: absolute;
-    inset: 0;
-    z-index: 0;
-    border-radius: 6px;
-    pointer-events: none;
-    animation: pulseBg 2s infinite;
-  }
-
-  // Color variants
-  .executionBackground.green {
-    background-color: #4caf50;
-    box-shadow: 0 0 10px #4caf50;
-  }
-
-  .executionBackground.red {
-    background-color: #f44336;
-    box-shadow: 0 0 10px #f44336;
-  }
-
-  .executionBackground.yellow {
-    background-color: #ffeb3b;
-    box-shadow: 0 0 10px #ffeb3b;
-  }
-    // Everything else above background
-    > *:not(.executionBackground) {
+    // Everything else above the extracted execution-state background.
+    > *:not([data-execution-overlay='true']) {
       position: relative;
       z-index: 100;
     }
@@ -1339,19 +1315,6 @@
   opacity: 1;
   background-color: #cc0000;
   color: #ffffff;
-}
-
-/* Reopen button in the Find row (visible when the panel is closed but not empty) */
-.memoryToggleButton {
-  background-color: #c3d3d9;
-  color: #0b5394;
-  border: none;
-  border-radius: 4px;
-  padding: 3px 10px;
-  font-size: 12px;
-  font-weight: bold;
-  white-space: nowrap;
-  cursor: pointer;
 }
 
 /* Floating, draggable, non-modal panel */

@@ -55,7 +55,9 @@ import { useBotJobDetailsController } from './bot-job-details/useBotJobDetailsCo
 import { useWebSocket } from './useWebSocket';
 import { useInstructionDrag } from './useInstructionDrag';
 import FindBar from './bot-job-details/grid/FindBar';
+import BlockStatusToggle from './bot-job-details/grid/BlockStatusToggle';
 import BlockCollapseToggle from './bot-job-details/grid/BlockCollapseToggle';
+import ExecutionStateOverlay from './bot-job-details/grid/ExecutionStateOverlay';
 import { instructionDisplayLabel } from './instructionDisplay';
 import { buildLaterBlockOrderUpdates } from './instructionSplit';
 import type {
@@ -3198,16 +3200,12 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
         />
       )}
       <div className={styles.gridFindRow}>
-        <FindBar value={findText} onChange={setFindText} />
-        {memorySteps.length > 0 && (
-          <button
-            type="button"
-            className={styles.memoryToggleButton}
-            onClick={requestMemoryListOpen}
-          >
-            Memory ({memorySteps.length})
-          </button>
-        )}
+        <FindBar
+          value={findText}
+          onChange={setFindText}
+          memoryCount={memorySteps.length}
+          onOpenMemory={requestMemoryListOpen}
+        />
       </div>
       {createBlockOpen && (
         <CreateNewBlock
@@ -3299,21 +3297,12 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                     <div key={blockGroupIndex} className={styles.block}>
                       {/* Block header with garbage, up, and down buttons */}
                       <div className={styles.blockHeader}>
-                        {blockData.instructions[0].blockActive ? (
-                          <img src={activeImage}
-                            alt="Active"
-                            className={styles.activeButton}
-                            onClick={() =>
-                              handleBlockStatus(blockData.instructions[0].blockId)
-                            } />
-                        ) : (
-                          <img src={inactiveImage}
-                            alt="Inactive"
-                            className={styles.inactiveButton}
-                            onClick={() =>
-                              handleBlockStatus(blockData.instructions[0].blockId)
-                            } />
-                        )}
+                        <BlockStatusToggle
+                          active={blockData.instructions[0].blockActive}
+                          onToggle={() =>
+                            handleBlockStatus(blockData.instructions[0].blockId)
+                          }
+                        />
                         <BlockCollapseToggle
                           collapsed={collapsedBlocks.has(Number(blockData.instructions[0].blockId))}
                           onToggle={() => toggleBlockCollapsed(Number(blockData.instructions[0].blockId))}
@@ -3529,7 +3518,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                                         }}
                                       >≡</button>
                                       {instruction.id === executionId && (
-                                        <div className={`${styles.executionBackground} ${(styles as Record<string,string>)[executionState?.toLowerCase() ?? ''] ?? ''}`} />
+                                        <ExecutionStateOverlay state={executionState} />
                                       )}
                                       {editingInstructionId === instruction.id ? (
                                         <div className={styles.editContainer}>
