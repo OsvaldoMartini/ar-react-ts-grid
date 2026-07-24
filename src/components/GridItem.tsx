@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { BlockLoopInstructionLoadDTO, BotJobData, ComplexMessage, ElementDTO, UpdatedBlock } from './instructionsMockData';
-import { DragDropContext } from 'react-beautiful-dnd'; // Import from react-beautiful-dnd
 
 import editImage from '../assets/edit.png';
 import edit2Image from '../assets/edit2.png';
@@ -710,6 +709,98 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
       }),
     }));
   };
+
+  // ── Native HTML5 drag & drop (Phase 7; replaces react-beautiful-dnd) ────────
+  // Only the drag *mechanism* changed: on drop we synthesize the exact same
+  // result shape rbd produced and call onDragEnd() above unchanged (so the
+  // backend preview-move round-trip is untouched). [Grid][drag] logs + the
+  // window.__gridReorder hook make the pipeline observable/testable like Memory List.
+  const dragSourceRef = useRef<{ droppableId: string; index: number; instructionId: number } | null>(null);
+
+  const commitInstructionDrag = useCallback((destinationDroppableId: string, destinationIndex: number) => {
+    const source = dragSourceRef.current;
+    dragSourceRef.current = null;
+    if (!source) return;
+    const result = {
+      draggableId: String(source.instructionId),
+      source: { droppableId: source.droppableId, index: source.index },
+      destination: { droppableId: destinationDroppableId, index: destinationIndex },
+    };
+    console.log('[Grid][drag] DROP -> synthesizing reorder result', result);
+    onDragEnd(result);
+  }, [onDragEnd]);
+
+  const handleRowDragStart = (droppableId: string, index: number, instruction: BlockLoopInstructionLoadDTO) =>
+    (event: React.DragEvent) => {
+      if (findText.trim().length > 0 || !memoryCapabilities.get(instruction.id)?.canMove) {
+        event.preventDefault();
+        return;
+      }
+      dragSourceRef.current = { droppableId, index, instructionId: instruction.id };
+      setActiveDraggedInstructionId(instruction.id);
+      try {
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', String(instruction.id));
+      } catch {
+        // dataTransfer may be restricted; the ref still carries the source.
+      }
+      console.log(`[Grid][drag] GRABBED instruction ${instruction.id} (block ${droppableId}, index ${index})`);
+    };
+
+  const handleGridDragOver = (event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleRowDrop = (droppableId: string, index: number) => (event: React.DragEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    commitInstructionDrag(droppableId, index);
+  };
+
+  const handleListDrop = (droppableId: string, count: number) => (event: React.DragEvent) => {
+    event.preventDefault();
+    commitInstructionDrag(droppableId, count); // dropped on empty space -> append
+  };
+
+  const handleRowDragEnd = () => {
+    if (dragSourceRef.current) {
+      console.log('[Grid][drag] RELEASED with no valid drop target — no reorder');
+    }
+    dragSourceRef.current = null;
+    setActiveDraggedInstructionId(null);
+  };
+
+  useEffect(() => {
+    (window as any).__gridReorder = (
+      instructionId: number,
+      destinationDroppableId: string,
+      destinationIndex: number,
+    ) => {
+      let sourceDroppableId = '';
+      let sourceIndex = -1;
+      for (const [key, block] of Object.entries(groupedData)) {
+        const idx = block.instructions.findIndex(instruction => instruction.id === instructionId);
+        if (idx >= 0) {
+          sourceDroppableId = key;
+          sourceIndex = idx;
+          break;
+        }
+      }
+      if (sourceIndex < 0) {
+        console.warn('[Grid][drag] __gridReorder: instruction not found', instructionId);
+        return;
+      }
+      onDragEnd({
+        draggableId: String(instructionId),
+        source: { droppableId: sourceDroppableId, index: sourceIndex },
+        destination: { droppableId: destinationDroppableId, index: destinationIndex },
+      });
+    };
+    return () => {
+      delete (window as any).__gridReorder;
+    };
+  }, [groupedData, onDragEnd]);
 
   // Memoized function to handle outside clicks on the dropdown
   const handleClickOutside = useCallback((event: MouseEvent) => {
@@ -2994,8 +3085,6 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
       )}
       <div ref={gridScrollRef} className={styles.gridScroll}>
         <div className={styles.gridContent}>
-          <DragDropContext onDragStart={(start) => setActiveDraggedInstructionId(Number(start.draggableId))} onDragEnd={(result) => { setActiveDraggedInstructionId(null); onDragEnd(result); }} // Define the onDragEnd handler to update the state when the dragging stops
-          >
             {
               Object.keys(groupedData).length === 0 ? (
                 // Render default block if groupedData is empty
@@ -3130,18 +3219,20 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                       {!collapsedBlocks.has(Number(blockData.instructions[0].blockId)) && (
                       <InstructionList
                         droppableId={blockGroupIndex}
-                        droppableKey={blockData.instructions[0].blockId}
                         instructions={blockData.instructions}
                         blockName={blockData.blockName ?? ""}
                         findText={findText}
-                        dropDisabled={activeDraggedInstructionId !== null && !memoryCapabilities.get(activeDraggedInstructionId)?.allowedBlockIds.includes(Number(blockData.instructions[0].blockId))}
                         dropZone={activeDraggedInstructionId === null ? 'none' : (memoryCapabilities.get(activeDraggedInstructionId)?.allowedBlockIds.includes(Number(blockData.instructions[0].blockId)) ? 'valid' : 'invalid')}
                         instructionMatchesFind={instructionMatchesFind}
-                        isRowDragDisabled={(instruction) => findText.trim().length > 0 || !memoryCapabilities.get(instruction.id)?.canMove}
-                        renderRow={(instruction, _index, provided) => (
+                        onListDragOver={handleGridDragOver}
+                        onListDrop={handleListDrop(blockGroupIndex, blockData.instructions.length)}
+                        renderRow={(instruction, index) => (
                           <InstructionRow
-                            provided={provided}
                             instruction={instruction}
+                            onRowDragStart={handleRowDragStart(blockGroupIndex, index, instruction)}
+                            onRowDragOver={handleGridDragOver}
+                            onRowDrop={handleRowDrop(blockGroupIndex, index)}
+                            onRowDragEnd={handleRowDragEnd}
                             capability={memoryCapabilities.get(instruction.id)}
                             findText={findText}
                             dropdownOpen={openDropdown === instruction.id}
@@ -3171,7 +3262,6 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                     </div >
                   ))
               )}
-          </DragDropContext >
         </div >
       </div>
     </div >

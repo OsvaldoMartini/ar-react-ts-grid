@@ -1,6 +1,5 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { DragDropContext } from 'react-beautiful-dnd';
 import InstructionList from './InstructionList';
 import type { BlockLoopInstructionLoadDTO } from '../../instructionsMockData';
 
@@ -12,31 +11,19 @@ const renderList = (
   props: Partial<React.ComponentProps<typeof InstructionList>> = {},
 ) =>
   render(
-    <DragDropContext onDragEnd={() => {}}>
-      <InstructionList
-        droppableId="1"
-        droppableKey={1}
-        instructions={instructions}
-        blockName="Block A"
-        findText=""
-        dropDisabled={false}
-        dropZone="none"
-        instructionMatchesFind={(instruction, query) =>
-          (instruction.name ?? '').toLowerCase().includes(query)}
-        isRowDragDisabled={() => false}
-        renderRow={(instruction, _index, provided) => (
-          <div
-            ref={provided.innerRef}
-            {...provided.draggableProps}
-            {...provided.dragHandleProps}
-            data-testid={`row-${instruction.id}`}
-          >
-            {instruction.name}
-          </div>
-        )}
-        {...props}
-      />
-    </DragDropContext>,
+    <InstructionList
+      droppableId="1"
+      instructions={instructions}
+      blockName="Block A"
+      findText=""
+      dropZone="none"
+      instructionMatchesFind={(instruction, query) =>
+        (instruction.name ?? '').toLowerCase().includes(query)}
+      onListDragOver={() => {}}
+      onListDrop={() => {}}
+      renderRow={(instruction) => <div data-testid={`row-${instruction.id}`}>{instruction.name}</div>}
+      {...props}
+    />,
   );
 
 describe('InstructionList', () => {

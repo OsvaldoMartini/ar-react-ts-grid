@@ -1,14 +1,7 @@
 import React, { createRef } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import type { DraggableProvided } from 'react-beautiful-dnd';
 import InstructionRow from './InstructionRow';
 import type { BlockLoopInstructionLoadDTO } from '../../instructionsMockData';
-
-const provided = {
-  innerRef: () => {},
-  draggableProps: {} as DraggableProvided['draggableProps'],
-  dragHandleProps: {} as DraggableProvided['dragHandleProps'],
-} as DraggableProvided;
 
 const instruction = {
   id: 7,
@@ -22,10 +15,13 @@ const instruction = {
 } as unknown as BlockLoopInstructionLoadDTO;
 
 const baseProps = {
-  provided,
   instruction,
   capability: { canMove: true, canAdd: true, canDelete: true },
   findText: '',
+  onRowDragStart: () => {},
+  onRowDragOver: () => {},
+  onRowDrop: () => {},
+  onRowDragEnd: () => {},
   dropdownOpen: false,
   isExecuting: false,
   isEditing: false,

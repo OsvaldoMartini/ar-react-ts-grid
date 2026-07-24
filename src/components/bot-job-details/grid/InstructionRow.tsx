@@ -1,5 +1,4 @@
 import React from 'react';
-import type { DraggableProvided } from 'react-beautiful-dnd';
 import { BlockLoopInstructionLoadDTO } from '../../instructionsMockData';
 import refreshLoopImage from '../../../assets/refresh-loop.png';
 import refreshOnlyImage from '../../../assets/refresh-only.png';
@@ -27,10 +26,16 @@ export interface InstructionRowCapability {
 }
 
 export interface InstructionRowProps {
-  provided: DraggableProvided;
   instruction: BlockLoopInstructionLoadDTO;
   capability?: InstructionRowCapability;
   findText: string;
+  // Native HTML5 drag (replaces react-beautiful-dnd; Memory List uses the same
+  // pattern). The whole row is the drag source and a drop target; GridItem owns
+  // the drag state and synthesizes the reorder result.
+  onRowDragStart: (event: React.DragEvent) => void;
+  onRowDragOver: (event: React.DragEvent) => void;
+  onRowDrop: (event: React.DragEvent) => void;
+  onRowDragEnd: (event: React.DragEvent) => void;
   dropdownOpen: boolean;
   isExecuting: boolean;
   executionState?: string;
@@ -65,10 +70,13 @@ const CONDITIONAL_ACTIONS = ['IF', 'ELSEIF', 'ELSE', 'ENDIF'];
  * native drag props without changing this layout.
  */
 const InstructionRow: React.FC<InstructionRowProps> = ({
-  provided,
   instruction,
   capability,
   findText,
+  onRowDragStart,
+  onRowDragOver,
+  onRowDrop,
+  onRowDragEnd,
   dropdownOpen,
   isExecuting,
   executionState,
@@ -99,14 +107,16 @@ const InstructionRow: React.FC<InstructionRowProps> = ({
 
   return (
     <div
-      ref={provided.innerRef}
-      {...provided.draggableProps}
+      draggable={!dragDisabled}
+      onDragStart={onRowDragStart}
+      onDragOver={onRowDragOver}
+      onDrop={onRowDrop}
+      onDragEnd={onRowDragEnd}
       className={`${styles.instructionItem} ${dropdownOpen ? styles.dropdownOpen : ''} ${
         isConditional ? styles.lightYellowBackground : ''
       }`}
     >
       <InstructionDragHandle
-        dragHandleProps={provided.dragHandleProps}
         disabled={dragDisabled}
         title={dragTitle}
         ariaLabel={`Move instruction ${instruction.instructionOrderNumber}`}
