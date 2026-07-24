@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import DetachedPageShell from './DetachedPageShell';
 import InstructionCommandPanel, {
+  commandEditorSnapshotFromPayload,
   type CommandDraft,
+  type CommandEditorSnapshot,
   type CommandPanelInstruction,
 } from './InstructionCommandPanel';
 import PagesOpenButton from './PagesOpenButton';
@@ -14,6 +16,7 @@ type CommandEditorTarget = {
   bindingEpoch: string;
   targetSessionId: string;
   workspaceEpoch: number;
+  selectionRevision: number;
   homeBankingId: number;
   botJobId: number;
   botJobName: string;
@@ -24,6 +27,8 @@ type Status = {
   level: 'ok' | 'warn' | 'error';
   text: string;
 };
+
+type WorkspaceState = 'loading' | 'ready' | 'empty' | 'error';
 
 type Props = {
   socketPort: number;
@@ -78,6 +83,7 @@ const parseTarget = (body: any): CommandEditorTarget | null => {
     homeBankingId,
     botJobId,
     workspaceEpoch,
+    selectionRevision: Number(candidate?.selectionRevision) || 0,
     botJobName: String(candidate?.botJobName || ''),
     instruction: {
       id: Number(instruction.id),
@@ -100,20 +106,21 @@ const CommandEditorPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) 
   const { webSocket, connected, reconnectAttempts, messages, error } =
     useWebSocket(socketPort, sessionId);
   const processedMessagesRef = useRef(0);
+  const pendingBootstrapRequestRef = useRef<string | null>(null);
+  const pendingSelectRequestRef = useRef<string | null>(null);
   const pendingApplyRequestRef = useRef<string | null>(null);
   const pendingElseIfRequestRef = useRef<string | null>(null);
   const targetRef = useRef<CommandEditorTarget | null>(null);
   const [target, setTarget] = useState<CommandEditorTarget | null>(null);
+  const [snapshot, setSnapshot] = useState<CommandEditorSnapshot | null>(null);
+  const [workspaceState, setWorkspaceState] = useState<WorkspaceState>('loading');
+  const [selectionPending, setSelectionPending] = useState(false);
   const [panelMessages, setPanelMessages] = useState<string[]>([]);
   const [panelEpoch, setPanelEpoch] = useState(0);
   const [status, setStatus] = useState<Status>({
     level: 'warn',
     text: 'Waiting for an instruction',
   });
-
-  useEffect(() => {
-    targetRef.current = target;
-  }, [target]);
 
   const send = useCallback((
     type: string,
@@ -133,16 +140,72 @@ const CommandEditorPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) 
     return true;
   }, [sessionId, webSocket]);
 
+  const requestWorkspaceBootstrap = useCallback((current?: CommandEditorTarget | null) => {
+    const requestId = `${Date.now()}-command-editor-bootstrap`;
+    pendingBootstrapRequestRef.current = requestId;
+    setWorkspaceState('loading');
+    const sent = send('commandEditor.workspaceBootstrap', {
+      requestId,
+      ...(current?.bindingEpoch ? { bindingEpoch: current.bindingEpoch } : {}),
+      ...(current?.selectionRevision
+        ? { selectionRevision: current.selectionRevision }
+        : {}),
+    }, current?.homeBankingId);
+    if (!sent) {
+      pendingBootstrapRequestRef.current = null;
+      setWorkspaceState('error');
+    }
+  }, [send]);
+
   useEffect(() => {
     if (!connected) return;
-    send('commandEditor.workspaceBootstrap', {
-      requestId: `${Date.now()}-command-editor-bootstrap`,
-    });
-  }, [connected, send]);
+    // A reconnected manager transport receives a new backend binding epoch. Bootstrap without the
+    // previous epoch so the server can return the new authoritative binding and full snapshot.
+    requestWorkspaceBootstrap();
+  }, [connected, requestWorkspaceBootstrap]);
 
   const resetPanel = useCallback(() => {
     setPanelMessages([]);
     setPanelEpoch(current => current + 1);
+  }, []);
+
+  const acceptWorkspaceSnapshot = useCallback((
+    body: any,
+    nextTarget: CommandEditorTarget,
+  ) => {
+    const nextSnapshot = commandEditorSnapshotFromPayload(body);
+    if (
+      !nextSnapshot
+      || nextSnapshot.selectedInstructionId !== nextTarget.instruction.id
+      || nextSnapshot.selectedBlockId !== nextTarget.instruction.blockId
+      || (
+        nextSnapshot.selectionRevision != null
+        && nextSnapshot.selectionRevision !== nextTarget.selectionRevision
+      )
+    ) {
+      return false;
+    }
+
+    // Set the ref before mounting the target-dependent panel. Socket commands fired by child
+    // effects in this render must observe the same binding as the rendered snapshot.
+    targetRef.current = nextTarget;
+    setTarget(nextTarget);
+    setSnapshot(nextSnapshot);
+    setPanelMessages([]);
+    setPanelEpoch(current => current + 1);
+    setSelectionPending(false);
+    setWorkspaceState(
+      nextSnapshot.blocks.length === 0
+      || nextSnapshot.instructions.length === 0
+      || nextSnapshot.commands.length === 0
+        ? 'empty'
+        : 'ready',
+    );
+    setStatus({
+      level: 'ok',
+      text: String(body?.message || 'Command Editor loaded'),
+    });
+    return true;
   }, []);
 
   useEffect(() => {
@@ -155,31 +218,108 @@ const CommandEditorPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) 
     pendingMessages.forEach((raw) => {
       try {
         const { operationId, body } = parseEnvelope(raw);
-        if (
-          operationId === 'commandEditor.workspaceBootstrapResponse'
-          || operationId === 'commandEditor.workspaceTarget'
-        ) {
-          const nextTarget = parseTarget(body);
-          if (!nextTarget) {
-            pendingApplyRequestRef.current = null;
-            pendingElseIfRequestRef.current = null;
-            setTarget(null);
-            setPanelMessages([]);
+        if ([
+          'commandEditor.workspaceBootstrapResponse',
+          'commandEditor.workspaceTarget',
+          'commandEditor.selectResponse',
+          'commandEditor.snapshot',
+        ].includes(operationId)) {
+          const responseRequestId = String(body?.requestId || '');
+          if (
+            operationId === 'commandEditor.workspaceBootstrapResponse'
+            && (
+              !pendingBootstrapRequestRef.current
+              || responseRequestId !== pendingBootstrapRequestRef.current
+            )
+          ) {
+            return;
+          }
+          if (
+            operationId === 'commandEditor.selectResponse'
+            && (
+              !pendingSelectRequestRef.current
+              || responseRequestId !== pendingSelectRequestRef.current
+            )
+          ) {
+            return;
+          }
+          if (body?.ok === false) {
+            if (operationId === 'commandEditor.selectResponse') {
+              pendingSelectRequestRef.current = null;
+              setSelectionPending(false);
+            } else {
+              if (operationId === 'commandEditor.workspaceBootstrapResponse') {
+                pendingBootstrapRequestRef.current = null;
+              }
+              setWorkspaceState('error');
+            }
             setStatus({
               level: 'error',
               text: String(body?.error || body?.message || 'The Command Editor target is unavailable.'),
             });
             return;
           }
+
+          const nextTarget = parseTarget(body);
+          if (!nextTarget) {
+            pendingBootstrapRequestRef.current = null;
+            pendingSelectRequestRef.current = null;
+            pendingApplyRequestRef.current = null;
+            pendingElseIfRequestRef.current = null;
+            targetRef.current = null;
+            setTarget(null);
+            setSnapshot(null);
+            setPanelMessages([]);
+            setSelectionPending(false);
+            setWorkspaceState('error');
+            setStatus({
+              level: 'error',
+              text: String(body?.error || body?.message || 'The Command Editor target is unavailable.'),
+            });
+            return;
+          }
+
+          const currentTarget = targetRef.current;
+          if (
+            operationId === 'commandEditor.snapshot'
+            && currentTarget
+            && nextTarget.bindingEpoch !== currentTarget.bindingEpoch
+          ) {
+            return;
+          }
+          if (!acceptWorkspaceSnapshot(body, nextTarget)) {
+            // Older workspaceTarget payloads carried only the target. Preserve compatibility while
+            // keeping the full snapshot response as the one atomic hydration boundary.
+            if (operationId === 'commandEditor.workspaceTarget') {
+              targetRef.current = nextTarget;
+              setTarget(nextTarget);
+              setSnapshot(null);
+              setWorkspaceState('loading');
+              requestWorkspaceBootstrap(nextTarget);
+              return;
+            }
+            pendingBootstrapRequestRef.current = null;
+            pendingSelectRequestRef.current = null;
+            setSelectionPending(false);
+            setWorkspaceState('error');
+            setStatus({
+              level: 'error',
+              text: 'The Command Editor response did not contain a complete workspace snapshot.',
+            });
+            return;
+          }
+          if (operationId === 'commandEditor.workspaceBootstrapResponse') {
+            pendingBootstrapRequestRef.current = null;
+          }
+          if (operationId === 'commandEditor.selectResponse') {
+            pendingSelectRequestRef.current = null;
+          }
+          if (operationId === 'commandEditor.workspaceTarget') {
+            pendingBootstrapRequestRef.current = null;
+            pendingSelectRequestRef.current = null;
+          }
           pendingApplyRequestRef.current = null;
           pendingElseIfRequestRef.current = null;
-          setTarget(nextTarget);
-          setPanelMessages([]);
-          setPanelEpoch(current => current + 1);
-          setStatus({
-            level: 'ok',
-            text: String(body?.message || 'Command Editor loaded'),
-          });
           return;
         }
 
@@ -187,6 +327,9 @@ const CommandEditorPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) 
           operationId === 'commandEditor.errorResponse'
           || operationId === 'license.requiredResponse'
         ) {
+          const bootstrapWasPending = pendingBootstrapRequestRef.current != null;
+          pendingBootstrapRequestRef.current = null;
+          pendingSelectRequestRef.current = null;
           setStatus({
             level: 'error',
             text: String(
@@ -196,6 +339,8 @@ const CommandEditorPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) 
               || 'The Command Editor operation was refused.',
             ),
           });
+          setSelectionPending(false);
+          if (bootstrapWasPending || !snapshot) setWorkspaceState('error');
           return;
         }
 
@@ -224,10 +369,7 @@ const CommandEditorPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) 
               text: String(body?.message || 'Command saved'),
             });
             resetPanel();
-            send('commandEditor.workspaceBootstrap', {
-              requestId: `${Date.now()}-command-editor-refresh`,
-              bindingEpoch: currentTarget.bindingEpoch,
-            }, currentTarget.homeBankingId);
+            requestWorkspaceBootstrap(currentTarget);
           }
           return;
         }
@@ -257,10 +399,7 @@ const CommandEditorPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) 
               text: String(body?.message || 'ELSEIF inserted'),
             });
             resetPanel();
-            send('commandEditor.workspaceBootstrap', {
-              requestId: `${Date.now()}-command-editor-refresh`,
-              bindingEpoch: currentTarget.bindingEpoch,
-            }, currentTarget.homeBankingId);
+            requestWorkspaceBootstrap(currentTarget);
           }
           return;
         }
@@ -293,10 +432,19 @@ const CommandEditorPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) 
         });
       }
     });
-  }, [messages, resetPanel, send]);
+  }, [
+    acceptWorkspaceSnapshot,
+    messages,
+    requestWorkspaceBootstrap,
+    resetPanel,
+    snapshot,
+  ]);
 
   useEffect(() => {
-    if (error) setStatus({ level: 'error', text: error });
+    if (error) {
+      setWorkspaceState('error');
+      setStatus({ level: 'error', text: error });
+    }
   }, [error]);
 
   const applyCommand = useCallback((draft: CommandDraft) => {
@@ -308,6 +456,7 @@ const CommandEditorPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) 
       ...draft,
       requestId,
       bindingEpoch: current.bindingEpoch,
+      selectionRevision: current.selectionRevision,
     }, current.homeBankingId);
     if (sent) {
       setStatus({ level: 'warn', text: 'Saving command...' });
@@ -325,6 +474,7 @@ const CommandEditorPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) 
     send(type, {
       ...body,
       bindingEpoch: current.bindingEpoch,
+      selectionRevision: current.selectionRevision,
     }, current.homeBankingId);
   }, [send]);
 
@@ -336,11 +486,46 @@ const CommandEditorPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) 
     if (send('commandEditor.insertElseIf', {
       requestId,
       bindingEpoch: current.bindingEpoch,
+      selectionRevision: current.selectionRevision,
       graphRevision,
     }, current.homeBankingId)) {
       setStatus({ level: 'warn', text: 'Inserting ELSEIF...' });
     } else {
       pendingElseIfRequestRef.current = null;
+    }
+  }, [send]);
+
+  const selectInstruction = useCallback((blockId: number, instructionId: number) => {
+    const current = targetRef.current;
+    if (
+      !current
+      || pendingSelectRequestRef.current
+      || !Number.isSafeInteger(blockId)
+      || blockId <= 0
+      || !Number.isSafeInteger(instructionId)
+      || instructionId <= 0
+      || (
+        current.instruction.blockId === blockId
+        && current.instruction.id === instructionId
+      )
+    ) {
+      return;
+    }
+
+    const requestId = `${Date.now()}-${blockId}-${instructionId}-command-editor-select`;
+    pendingSelectRequestRef.current = requestId;
+    setSelectionPending(true);
+    setStatus({ level: 'warn', text: 'Loading selected instruction...' });
+    const sent = send('commandEditor.select', {
+      requestId,
+      bindingEpoch: current.bindingEpoch,
+      selectionRevision: current.selectionRevision,
+      selectedBlockId: blockId,
+      selectedInstructionId: instructionId,
+    }, current.homeBankingId);
+    if (!sent) {
+      pendingSelectRequestRef.current = null;
+      setSelectionPending(false);
     }
   }, [send]);
 
@@ -391,7 +576,38 @@ const CommandEditorPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) 
           </header>
 
           <section className={styles.content}>
-            {!target ? (
+            {workspaceState === 'loading' ? (
+              <div className={styles.workspaceFeedback} role="status">
+                <strong>Loading Command Editor...</strong>
+                <span>Blocks, instructions, Web Fields, commands, and variables are loading together.</span>
+              </div>
+            ) : workspaceState === 'error' ? (
+              <div className={styles.workspaceFeedback} role="alert">
+                <strong>Command Editor could not load</strong>
+                <span>{status.text}</span>
+                <button
+                  type="button"
+                  className={styles.retryButton}
+                  disabled={!connected}
+                  onClick={() => requestWorkspaceBootstrap(targetRef.current)}
+                >
+                  Retry
+                </button>
+              </div>
+            ) : workspaceState === 'empty' ? (
+              <div className={styles.workspaceFeedback} role="status">
+                <strong>No editable Command Editor data is available</strong>
+                <span>The selected Bot Job has no complete Block, Instruction, or command catalogue.</span>
+                <button
+                  type="button"
+                  className={styles.retryButton}
+                  disabled={!connected}
+                  onClick={() => requestWorkspaceBootstrap(targetRef.current)}
+                >
+                  Refresh
+                </button>
+              </div>
+            ) : !target || !snapshot ? (
               <div className={styles.empty}>
                 Select the blue arrow beside an instruction in Bot Job Details.
               </div>
@@ -404,6 +620,9 @@ const CommandEditorPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) 
                 onInsertElseIf={insertElseIf}
                 onApplyCommand={applyCommand}
                 messages={panelMessages}
+                initialSnapshot={snapshot}
+                selectionPending={selectionPending}
+                onSelectInstruction={selectInstruction}
                 context={{
                   sessionId,
                   targetSessionId: target.targetSessionId,
@@ -411,6 +630,7 @@ const CommandEditorPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) 
                   botJobId: target.botJobId,
                   botJobName: target.botJobName,
                   bindingEpoch: target.bindingEpoch,
+                  selectionRevision: target.selectionRevision,
                 }}
                 onSocketCommand={sendPanelCommand}
               />

@@ -124,6 +124,48 @@
   text-align: center;
 }
 
+.workspaceFeedback {
+  box-sizing: border-box;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+  padding: 24px;
+  color: #44535c;
+  text-align: center;
+}
+
+.workspaceFeedback strong {
+  color: #273740;
+  font-size: 14px;
+}
+
+.workspaceFeedback span {
+  max-width: 560px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.retryButton {
+  min-width: 92px;
+  min-height: 30px;
+  margin-top: 4px;
+  border: 1px solid #075a75;
+  border-radius: 3px;
+  background: #0b6b8a;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.retryButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 @media (max-width: 640px) {
   .topBar {
     align-items: flex-start;

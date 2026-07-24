@@ -38,6 +38,64 @@ export type CommandEditorContext = {
   botJobId: number | null;
   botJobName: string | null;
   bindingEpoch?: string | number;
+  selectionRevision?: number;
+};
+
+export type CommandEditorVariableRow = {
+  id?: number;
+  type: string;
+  name: string;
+  value: string;
+  instructionId?: number;
+  localFormat?: string;
+  delimiter?: string;
+  usedVars?: string;
+};
+
+export type CommandEditorWebFieldRow = {
+  id: number;
+  name: string;
+  actions: string;
+  tagName?: string;
+  blockId: number;
+  blockName?: string;
+};
+
+export type CommandEditorBlockRow = {
+  id: number;
+  name: string;
+  blockOrderNumber?: number;
+};
+
+export type CommandEditorCommandDefinition = {
+  code: string;
+  label: string;
+  target: string;
+  fields: string[];
+  allowedTags?: string[];
+  allowedVariableTypes?: string[];
+  insertAllowed?: boolean;
+  editAllowed?: boolean;
+  disabledReason?: string;
+};
+
+export type CommandEditorStoredDraft = Omit<CommandDraft, 'mode'> & { warnings?: string[] };
+
+export type CommandEditorSnapshot = {
+  selectedBlockId: number;
+  selectedInstructionId: number;
+  selectionRevision?: number;
+  graphRevision: string;
+  variables: CommandEditorVariableRow[];
+  webFields: CommandEditorWebFieldRow[];
+  blocks: CommandEditorBlockRow[];
+  instructions: CommandPanelInstruction[];
+  commands: CommandEditorCommandDefinition[];
+  draft?: CommandEditorStoredDraft | null;
+  rowCapabilities?: {
+    canInsertElseIf?: boolean;
+    canSplit?: boolean;
+  };
 };
 
 export type InstructionCommandPanelProps = {
@@ -50,20 +108,99 @@ export type InstructionCommandPanelProps = {
   context: CommandEditorContext;
   onSocketCommand: (type: string, body: Record<string, unknown>) => void;
   variant?: 'floating' | 'page';
+  initialSnapshot?: CommandEditorSnapshot;
+  selectionPending?: boolean;
+  onSelectInstruction?: (blockId: number, instructionId: number) => void;
 };
 
-type VariableRow = { id?: number; type: string; name: string; value: string; instructionId?: number; localFormat?: string; delimiter?: string; usedVars?: string };
-type WebFieldRow = { id: number; name: string; actions: string; tagName?: string; blockId: number; blockName?: string };
-type BlockRow = { id: number; name: string; blockOrderNumber?: number };
-type CommandDefinition = { code: string; label: string; target: string; fields: string[]; allowedTags?: string[]; allowedVariableTypes?: string[]; insertAllowed?: boolean; editAllowed?: boolean; disabledReason?: string };
-type StoredCommandDraft = Omit<CommandDraft, 'mode'> & { warnings?: string[] };
+type VariableRow = CommandEditorVariableRow;
+type WebFieldRow = CommandEditorWebFieldRow;
+type BlockRow = CommandEditorBlockRow;
+type CommandDefinition = CommandEditorCommandDefinition;
+type StoredCommandDraft = CommandEditorStoredDraft;
 type SplitPreviewRow = { id: number; order: number; name: string; action: string; parentId?: number | null };
 type SplitPreview = { graphRevision: string; retainedRows: SplitPreviewRow[]; movedRows: SplitPreviewRow[]; retainedCount: number; movedCount: number };
 const supportsTag = (command: CommandDefinition, tagName: string) => !command.allowedTags?.length || command.allowedTags.includes(tagName);
 
+const normalizeInstruction = (row: any): CommandPanelInstruction | null => {
+  const id = Number(row?.id);
+  const blockId = Number(row?.blockId);
+  if (!Number.isSafeInteger(id) || id <= 0 || !Number.isSafeInteger(blockId) || blockId <= 0) {
+    return null;
+  }
+  return {
+    id,
+    name: String(row?.name || ''),
+    actions: String(row?.actions || ''),
+    operation: row?.operation == null ? null : String(row.operation),
+    blockId,
+    blockName: String(row?.blockName || ''),
+    blockOrderNumber: Number(row?.blockOrderNumber) || 1,
+    instructionOrderNumber: Number(row?.instructionOrderNumber) || 1,
+    variableId: row?.variableId == null ? null : Number(row.variableId),
+    parentId: row?.parentId == null ? null : Number(row.parentId),
+    parentBlockId: row?.parentBlockId == null ? null : Number(row.parentBlockId),
+    onHoldSeconds: row?.onHoldSeconds == null ? null : Number(row.onHoldSeconds),
+  };
+};
+
+export const commandEditorSnapshotFromPayload = (payload: any): CommandEditorSnapshot | null => {
+  const body = payload?.snapshot && typeof payload.snapshot === 'object'
+    ? { ...payload, ...payload.snapshot }
+    : payload;
+  if (
+    body?.ok === false
+    || !Array.isArray(body?.variables)
+    || !Array.isArray(body?.webFields)
+    || !Array.isArray(body?.blocks)
+    || !Array.isArray(body?.instructions)
+    || !Array.isArray(body?.commands)
+    || typeof body?.graphRevision !== 'string'
+  ) {
+    return null;
+  }
+
+  const instructions: CommandPanelInstruction[] = (body.instructions as any[])
+    .map((row: any) => normalizeInstruction(row))
+    .filter((row: CommandPanelInstruction | null): row is CommandPanelInstruction => row != null);
+  const selectedInstructionId = Number(
+    body?.selectedInstructionId ?? body?.instruction?.id,
+  );
+  const selectedBlockId = Number(
+    body?.selectedBlockId ?? body?.instruction?.blockId,
+  );
+  if (
+    !Number.isSafeInteger(selectedInstructionId)
+    || selectedInstructionId <= 0
+    || !Number.isSafeInteger(selectedBlockId)
+    || selectedBlockId <= 0
+    || !instructions.some(row =>
+      row.id === selectedInstructionId && row.blockId === selectedBlockId)
+  ) {
+    return null;
+  }
+
+  return {
+    selectedBlockId,
+    selectedInstructionId,
+    selectionRevision: Number.isSafeInteger(Number(body?.selectionRevision))
+      ? Number(body.selectionRevision)
+      : undefined,
+    graphRevision: body.graphRevision,
+    variables: body.variables,
+    webFields: body.webFields,
+    blocks: body.blocks,
+    instructions,
+    commands: body.commands,
+    draft: body?.draft ?? null,
+    rowCapabilities: body?.rowCapabilities || {},
+  };
+};
+
 const InstructionCommandPanel: React.FC<InstructionCommandPanelProps> = (props) => {
   const { instruction } = props;
   const pageVariant = props.variant === 'page';
+  const initialSnapshot = props.initialSnapshot;
   const panelRef = useRef<HTMLDivElement>(null);
   const processedMessagesRef = useRef(Math.max(0, props.messages.length - 1));
   const [view, setView] = useState<'actions' | 'command' | 'variables'>('actions');
@@ -75,20 +212,38 @@ const InstructionCommandPanel: React.FC<InstructionCommandPanelProps> = (props) 
   const [operator, setOperator] = useState('=');
   const [interval, setIntervalValue] = useState(1);
   const [count, setCount] = useState(1);
-  const [variables, setVariables] = useState<VariableRow[]>([]);
-  const [webFields, setWebFields] = useState<WebFieldRow[]>([]);
-  const [blocks, setBlocks] = useState<BlockRow[]>([]);
-  const [commands, setCommands] = useState<CommandDefinition[]>([]);
-  const [selectedWebFieldId, setSelectedWebFieldId] = useState<number | undefined>(instruction.parentId || undefined);
-  const [selectedVariableId, setSelectedVariableId] = useState<number | undefined>(instruction.variableId || undefined);
-  const [selectedBlockId, setSelectedBlockId] = useState<number | undefined>(instruction.parentBlockId || undefined);
+  const [variables, setVariables] = useState<VariableRow[]>(() => initialSnapshot?.variables || []);
+  const [webFields, setWebFields] = useState<WebFieldRow[]>(() => initialSnapshot?.webFields || []);
+  const [blocks, setBlocks] = useState<BlockRow[]>(() => initialSnapshot?.blocks || []);
+  const [instructions, setInstructions] = useState<CommandPanelInstruction[]>(
+    () => initialSnapshot?.instructions || [instruction],
+  );
+  const [commands, setCommands] = useState<CommandDefinition[]>(() => initialSnapshot?.commands || []);
+  const [workspaceBlockId, setWorkspaceBlockId] = useState(
+    () => initialSnapshot?.selectedBlockId || instruction.blockId,
+  );
+  const [selectedWebFieldId, setSelectedWebFieldId] = useState<number | undefined>(
+    () => initialSnapshot?.draft?.parentId ?? instruction.parentId ?? undefined,
+  );
+  const [selectedVariableId, setSelectedVariableId] = useState<number | undefined>(
+    () => initialSnapshot?.draft?.variableId ?? instruction.variableId ?? undefined,
+  );
+  const [selectedBlockId, setSelectedBlockId] = useState<number | undefined>(
+    () => initialSnapshot?.draft?.parentBlockId ?? instruction.parentBlockId ?? undefined,
+  );
   const [variable, setVariable] = useState<VariableRow>({ type: '$String', name: '', value: '$EMPTY' });
   const [variableStatus, setVariableStatus] = useState('');
   const [deleteCandidate, setDeleteCandidate] = useState<VariableRow | null>(null);
-  const [storedDraft, setStoredDraft] = useState<StoredCommandDraft | null>(null);
-  const [graphRevision, setGraphRevision] = useState('');
-  const [canInsertElseIf, setCanInsertElseIf] = useState(false);
-  const [canSplit, setCanSplit] = useState(false);
+  const [storedDraft, setStoredDraft] = useState<StoredCommandDraft | null>(
+    () => initialSnapshot?.draft || null,
+  );
+  const [graphRevision, setGraphRevision] = useState(initialSnapshot?.graphRevision || '');
+  const [canInsertElseIf, setCanInsertElseIf] = useState(
+    initialSnapshot?.rowCapabilities?.canInsertElseIf === true,
+  );
+  const [canSplit, setCanSplit] = useState(
+    initialSnapshot?.rowCapabilities?.canSplit === true,
+  );
   const [splitPreview, setSplitPreview] = useState<SplitPreview | null>(null);
   const [splitStatus, setSplitStatus] = useState('');
 
@@ -111,6 +266,33 @@ const InstructionCommandPanel: React.FC<InstructionCommandPanelProps> = (props) 
     blockId: instruction.blockId,
   });
 
+  const hydrateSnapshot = (snapshot: CommandEditorSnapshot) => {
+    const nextDraft = snapshot.draft || null;
+    setVariables(snapshot.variables);
+    setWebFields(snapshot.webFields);
+    setBlocks(snapshot.blocks);
+    setInstructions(snapshot.instructions);
+    setCommands(snapshot.commands);
+    setWorkspaceBlockId(snapshot.selectedBlockId);
+    setStoredDraft(nextDraft);
+    setGraphRevision(snapshot.graphRevision);
+    setCanInsertElseIf(snapshot.rowCapabilities?.canInsertElseIf === true);
+    setCanSplit(snapshot.rowCapabilities?.canSplit === true);
+    setSelectedWebFieldId(current => {
+      const sameBlock = snapshot.webFields.filter(row => row.blockId === snapshot.selectedBlockId);
+      if (nextDraft?.parentId && sameBlock.some(row => row.id === nextDraft.parentId)) {
+        return nextDraft.parentId;
+      }
+      if (current && sameBlock.some(row => row.id === current)) return current;
+      if (instruction.parentId && sameBlock.some(row => row.id === instruction.parentId)) {
+        return instruction.parentId;
+      }
+      return sameBlock.some(row => row.id === instruction.id) ? instruction.id : undefined;
+    });
+    setSelectedVariableId(nextDraft?.variableId ?? instruction.variableId ?? undefined);
+    setSelectedBlockId(nextDraft?.parentBlockId ?? instruction.parentBlockId ?? undefined);
+  };
+
   const clamp = (next: { x: number; y: number }) => {
     const width = panelRef.current?.offsetWidth || 480;
     const height = panelRef.current?.offsetHeight || 520;
@@ -128,8 +310,14 @@ const InstructionCommandPanel: React.FC<InstructionCommandPanelProps> = (props) 
   }, [pageVariant]);
 
   useEffect(() => {
+    if (pageVariant) return;
     requestCommandBootstrap();
-  }, [instruction.id]);
+  }, [instruction.id, pageVariant]);
+
+  useEffect(() => {
+    if (!initialSnapshot) return;
+    hydrateSnapshot(initialSnapshot);
+  }, [initialSnapshot, instruction.id]);
 
   useEffect(() => {
     if (view !== 'variables') return;
@@ -152,21 +340,40 @@ const InstructionCommandPanel: React.FC<InstructionCommandPanelProps> = (props) 
         const envelope = JSON.parse(message);
         const operationId = String(envelope.operationId || '');
         const body = typeof envelope.body === 'string' ? JSON.parse(envelope.body) : envelope.body;
-        if (operationId === 'commandEditor.bootstrapResponse') {
+        if ([
+          'commandEditor.bootstrapResponse',
+          'commandEditor.workspaceBootstrapResponse',
+          'commandEditor.workspaceTarget',
+          'commandEditor.selectResponse',
+          'commandEditor.snapshot',
+        ].includes(operationId)) {
+          const snapshot = commandEditorSnapshotFromPayload(body);
+          if (snapshot) {
+            hydrateSnapshot(snapshot);
+            return;
+          }
+          if (operationId !== 'commandEditor.bootstrapResponse') return;
           if (Array.isArray(body?.variables)) setVariables(body.variables.filter((row: VariableRow & { error?: string }) => !row.error));
           if (Array.isArray(body?.webFields)) {
             const loadedWebFields = body.webFields as WebFieldRow[];
             setWebFields(loadedWebFields);
             setSelectedWebFieldId(current => {
               const sameBlock = loadedWebFields.filter(row => row.blockId === instruction.blockId);
+              if (body?.draft?.parentId && sameBlock.some(row => row.id === Number(body.draft.parentId))) {
+                return Number(body.draft.parentId);
+              }
               if (current && sameBlock.some(row => row.id === current)) return current;
-              if (instruction.parentId && sameBlock.some(row => row.id === instruction.parentId)) return instruction.parentId;
+              if (instruction.parentId && sameBlock.some(row => row.id === instruction.parentId)) {
+                return instruction.parentId;
+              }
               return sameBlock.some(row => row.id === instruction.id) ? instruction.id : undefined;
             });
           }
           if (Array.isArray(body?.blocks)) setBlocks(body.blocks);
           if (Array.isArray(body?.commands)) setCommands(body.commands);
-          if (body?.draft) setStoredDraft(body.draft);
+          setStoredDraft(body?.draft || null);
+          setSelectedVariableId(body?.draft?.variableId ?? instruction.variableId ?? undefined);
+          setSelectedBlockId(body?.draft?.parentBlockId ?? instruction.parentBlockId ?? undefined);
           if (typeof body?.graphRevision === 'string') setGraphRevision(body.graphRevision);
           setCanInsertElseIf(body?.rowCapabilities?.canInsertElseIf === true);
           setCanSplit(body?.rowCapabilities?.canSplit === true);
@@ -196,6 +403,30 @@ const InstructionCommandPanel: React.FC<InstructionCommandPanelProps> = (props) 
       }
     });
   }, [props.messages]);
+
+  const selectableBlocks = useMemo(
+    () => [...blocks].sort((left, right) =>
+      (left.blockOrderNumber || Number.MAX_SAFE_INTEGER)
+      - (right.blockOrderNumber || Number.MAX_SAFE_INTEGER)
+      || left.id - right.id),
+    [blocks],
+  );
+  const workspaceInstructions = useMemo(
+    () => instructions
+      .filter(row => row.blockId === workspaceBlockId)
+      .sort((left, right) =>
+        left.instructionOrderNumber - right.instructionOrderNumber || left.id - right.id),
+    [instructions, workspaceBlockId],
+  );
+  const selectWorkspaceBlock = (blockId: number) => {
+    if (!Number.isSafeInteger(blockId) || blockId <= 0) return;
+    const firstInstruction = instructions
+      .filter(row => row.blockId === blockId)
+      .sort((left, right) =>
+        left.instructionOrderNumber - right.instructionOrderNumber || left.id - right.id)[0];
+    if (!firstInstruction) return;
+    props.onSelectInstruction?.(blockId, firstInstruction.id);
+  };
 
   const selectedLabel = useMemo(
     () => commands.find(command => command.code === action)?.label || action,
@@ -298,6 +529,55 @@ const InstructionCommandPanel: React.FC<InstructionCommandPanelProps> = (props) 
         </div>
         <button type="button" className={styles.iconButton} onClick={props.onClose} title="Close">×</button>
       </header>}
+
+      {pageVariant && (
+        <section className={styles.selectionBar} aria-label="Command Editor selection">
+          <label>
+            Block
+            <select
+              aria-label="Command Editor Block"
+              value={workspaceBlockId}
+              disabled={props.selectionPending}
+              onChange={(event) => selectWorkspaceBlock(Number(event.target.value))}
+            >
+              {selectableBlocks.map(block => {
+                const instructionCount = instructions.filter(row => row.blockId === block.id).length;
+                return (
+                  <option key={block.id} value={block.id} disabled={instructionCount === 0}>
+                    #{block.blockOrderNumber || ''} {block.name}
+                    {instructionCount === 0 ? ' (empty)' : ''}
+                  </option>
+                );
+              })}
+            </select>
+          </label>
+          <label>
+            Instruction
+            <select
+              aria-label="Command Editor Instruction"
+              value={instruction.id}
+              disabled={props.selectionPending || workspaceInstructions.length === 0}
+              onChange={(event) => {
+                const instructionId = Number(event.target.value);
+                if (Number.isSafeInteger(instructionId) && instructionId > 0) {
+                  props.onSelectInstruction?.(workspaceBlockId, instructionId);
+                }
+              }}
+            >
+              {workspaceInstructions.map(row => (
+                <option key={row.id} value={row.id}>
+                  #{row.instructionOrderNumber} {instructionDisplayLabel(row)} [{row.actions || 'Web Field'}]
+                </option>
+              ))}
+            </select>
+          </label>
+          <span className={styles.selectionStatus} role="status">
+            {props.selectionPending
+              ? 'Loading selection...'
+              : `${instructions.length} instruction${instructions.length === 1 ? '' : 's'} loaded`}
+          </span>
+        </section>
+      )}
 
       <nav className={styles.tabs}>
         <button className={view === 'actions' ? styles.activeTab : ''} onClick={() => setView('actions')}>Actions</button>

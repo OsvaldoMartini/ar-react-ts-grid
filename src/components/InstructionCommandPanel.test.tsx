@@ -47,6 +47,91 @@ test('renders codec warnings and filters variables from backend metadata', () =>
   expect(onSocketCommand).toHaveBeenCalledWith('commandEditor.bootstrap', expect.objectContaining({ instructionId: 10 }));
 });
 
+test('hydrates the detached page atomically without requesting a second command bootstrap', () => {
+  const onSocketCommand = jest.fn();
+  render(<InstructionCommandPanel
+    variant="page"
+    instruction={instruction}
+    initialSnapshot={{
+      selectedBlockId: 5,
+      selectedInstructionId: 10,
+      selectionRevision: 3,
+      graphRevision: 'workspace-revision-3',
+      blocks: [
+        { id: 5, name: 'Login', blockOrderNumber: 1 },
+        { id: 6, name: 'Accounts', blockOrderNumber: 2 },
+      ],
+      instructions: [
+        instruction,
+        {
+          id: 11,
+          name: 'Continue',
+          actions: 'C',
+          blockId: 5,
+          blockName: 'Login',
+          blockOrderNumber: 1,
+          instructionOrderNumber: 2,
+        },
+        {
+          id: 20,
+          name: 'Balance',
+          actions: 'GET',
+          blockId: 6,
+          blockName: 'Accounts',
+          blockOrderNumber: 2,
+          instructionOrderNumber: 1,
+        },
+      ],
+      commands: [{
+        code: 'H',
+        label: 'Wait',
+        target: 'none',
+        fields: ['hold'],
+        insertAllowed: true,
+        editAllowed: true,
+      }],
+      webFields: [{
+        id: 10,
+        name: 'Account',
+        actions: 'INPUT',
+        tagName: 'input',
+        blockId: 5,
+        blockName: 'Login',
+      }],
+      variables: [{
+        id: 20,
+        type: '$String',
+        name: 'account',
+        value: 'ready',
+        instructionId: 10,
+      }],
+      draft: null,
+      rowCapabilities: { canInsertElseIf: false, canSplit: false },
+    }}
+    onClose={jest.fn()}
+    onApplyCommand={jest.fn()}
+    messages={[]}
+    context={{
+      sessionId: 'commandEditorManager',
+      targetSessionId: 'botJobTasks',
+      homeBankingId: 2,
+      botJobId: 19,
+      botJobName: 'Banca Stato',
+      bindingEpoch: 'binding-3',
+    }}
+    onSocketCommand={onSocketCommand}
+  />);
+
+  expect(screen.getByLabelText('Command Editor Block')).toHaveValue('5');
+  expect(screen.getByLabelText('Command Editor Instruction')).toHaveValue('10');
+  expect(screen.getByText('3 instructions loaded')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /Add command before/ })).toBeEnabled();
+  expect(onSocketCommand).not.toHaveBeenCalledWith(
+    'commandEditor.bootstrap',
+    expect.anything(),
+  );
+});
+
 test('creates variables in component context and protects used variables from deletion', () => {
   const onSocketCommand = jest.fn();
   render(<InstructionCommandPanel

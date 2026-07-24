@@ -7,6 +7,12 @@
 .header span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #5b6870; font-size: 11px; }
 .iconButton { width: 28px; height: 28px; border: 0; background: transparent; font-size: 20px; color: #45525a; cursor: pointer; }
 .iconButton:hover { color: #b42318; }
+.selectionBar { display: grid; grid-template-columns: minmax(180px, .8fr) minmax(260px, 1.4fr) auto; align-items: end; gap: 10px; padding: 10px 12px; border-bottom: 1px solid #cbd2d7; background: #f8fafb; }
+.selectionBar label { min-width: 0; display: flex; flex-direction: column; gap: 4px; color: #35434b; font-size: 11px; font-weight: 700; }
+.selectionBar select { box-sizing: border-box; width: 100%; min-height: 31px; border: 1px solid #aeb8be; border-radius: 3px; background: #fff; padding: 5px 7px; color: #172126; font-size: 12px; }
+.selectionBar select:focus { outline: 2px solid rgba(11,107,138,.2); border-color: #0b6b8a; }
+.selectionBar select:disabled { opacity: .65; cursor: wait; }
+.selectionStatus { align-self: center; color: #5b6870; font-size: 11px; white-space: nowrap; }
 .tabs { display: flex; background: #e8ecef; border-bottom: 1px solid #cbd2d7; padding: 0 10px; }
 .tabs button { min-height: 34px; padding: 0 13px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: #4b5961; font-size: 12px; cursor: pointer; }
 .tabs .activeTab { border-bottom-color: #0b6b8a; color: #073f52; font-weight: 700; background: #f5f6f7; }
@@ -76,4 +82,5 @@
 .footer button { min-width: 76px; border: 1px solid #aeb8be; border-radius: 3px; background: #fff; padding: 5px 12px; cursor: pointer; }
 .footer .primary { border-color: #075a75; background: #0b6b8a; color: #fff; font-weight: 700; }
 .footer button:disabled { opacity: .5; cursor: not-allowed; }
+@media (max-width: 720px) { .selectionBar { grid-template-columns: 1fr; align-items: stretch; } .selectionStatus { align-self: auto; } }
 @media (max-width: 560px) { .panel:not(.pagePanel) { left: 8px !important; top: 8px !important; } .actionGrid, .form, .variablesWorkspace, .splitColumns { grid-template-columns: 1fr; } .splitColumns > div + div { border-left: 0; border-top: 1px solid #d9dee1; } .form label, .preview { grid-column: 1; } .variableList { max-height: 140px; overflow: auto; border-right: 0; border-bottom: 1px solid #d1d7db; padding: 0 0 8px; } }
