@@ -29,6 +29,7 @@ import DeleteButton from './bot-job-details/grid/DeleteButton';
 import InstructionRow from './bot-job-details/grid/InstructionRow';
 import InstructionList from './bot-job-details/grid/InstructionList';
 import BlockHeader from './bot-job-details/grid/BlockHeader';
+import BlockCard from './bot-job-details/grid/BlockCard';
 import { instructionDisplayLabel } from './instructionDisplay';
 import { buildLaterBlockOrderUpdates } from './instructionSplit';
 import type {
@@ -770,6 +771,79 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     dragSourceRef.current = null;
     setActiveDraggedInstructionId(null);
   };
+
+  // ── Native block reorder (drag whole blocks) ───────────────────────────────
+  // Drag from a block header; drop on another block. Reassigns every block's
+  // blockOrderNumber and sends BLOCK_MOVE with the full new order (same message
+  // the up/down buttons use, extended to a full list). window.__blockReorder
+  // exposes the same pipeline for testing.
+  const dragBlockRef = useRef<{ index: number; blockId: number } | null>(null);
+
+  const commitBlockReorder = useCallback((fromIndex: number, toIndex: number) => {
+    if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return;
+    const blocks = Object.values(groupedData)
+      .sort((a, b) => a.instructions[0].blockOrderNumber - b.instructions[0].blockOrderNumber);
+    if (fromIndex >= blocks.length || toIndex >= blocks.length) return;
+    const reordered = [...blocks];
+    const [moved] = reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, moved);
+    const updatedBlocks = reordered.map((block, i) => ({
+      blockId: block.instructions[0].blockId,
+      botJobId: block.instructions[0].botJobId,
+      blockOrderNumber: i + 1,
+      blockName: block.instructions[0].blockName,
+    }));
+    const orderByBlockId = new Map(updatedBlocks.map(block => [block.blockId, block.blockOrderNumber]));
+    const updatedData = instructionsData.map(instruction => ({
+      ...instruction,
+      blockOrderNumber: orderByBlockId.get(instruction.blockId) ?? instruction.blockOrderNumber,
+    }));
+    setInstructionsData(updatedData);
+    setIsDataReordered(false);
+    console.log('[Block][drag] reorder', { from: fromIndex, to: toIndex, updatedBlocks });
+    if (webSocket && connected) {
+      webSocket.send(JSON.stringify({
+        type: 'BLOCK_MOVE',
+        botJobId,
+        botJobName,
+        homeBankingId,
+        sessionId: 'botJobTasks',
+        updatedBlocks,
+      }));
+    }
+  }, [groupedData, instructionsData, webSocket, connected, botJobId, botJobName, homeBankingId]);
+
+  const handleBlockDragStart = (index: number, blockId: number) => (event: React.DragEvent) => {
+    dragBlockRef.current = { index, blockId };
+    try {
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', `block-${blockId}`);
+    } catch {
+      // dataTransfer may be restricted; the ref still carries the source.
+    }
+    console.log(`[Block][drag] GRABBED block ${blockId} at index ${index}`);
+  };
+
+  const handleBlockDrop = (index: number) => (event: React.DragEvent) => {
+    if (!dragBlockRef.current) return; // an instruction drag — let InstructionList handle it
+    event.preventDefault();
+    event.stopPropagation();
+    const source = dragBlockRef.current;
+    dragBlockRef.current = null;
+    commitBlockReorder(source.index, index);
+  };
+
+  const handleBlockDragEnd = () => {
+    dragBlockRef.current = null;
+  };
+
+  useEffect(() => {
+    (window as any).__blockReorder = (fromIndex: number, toIndex: number) =>
+      commitBlockReorder(fromIndex, toIndex);
+    return () => {
+      delete (window as any).__blockReorder;
+    };
+  }, [commitBlockReorder]);
 
   useEffect(() => {
     (window as any).__gridReorder = (
@@ -3161,9 +3235,15 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                       bBlockData.instructions[0].blockOrderNumber
                   )
                   .map(([blockGroupIndex, blockData], index) => (
-                    <div key={blockGroupIndex} className={styles.block}>
-                      {/* Block header with garbage, up, and down buttons */}
-                      <BlockHeader
+                    <BlockCard
+                      key={blockGroupIndex}
+                      blockDraggable={findText.trim().length === 0}
+                      onBlockDragStart={handleBlockDragStart(index, Number(blockData.instructions[0].blockId))}
+                      onBlockDragOver={handleGridDragOver}
+                      onBlockDrop={handleBlockDrop(index)}
+                      onBlockDragEnd={handleBlockDragEnd}
+                      collapsed={collapsedBlocks.has(Number(blockData.instructions[0].blockId))}
+                      header={<BlockHeader
                         blockActive={blockData.instructions[0].blockActive}
                         blockOrderNumber={blockData.instructions[0].blockOrderNumber}
                         blockName={blockData.blockName ?? ""}
@@ -3215,9 +3295,8 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                         onExcelFile={() => handleExcelFileBlockName(Number(blockData.instructions[0].blockId), blockData.blockName, Number(blockData.instructions[0].blockOrderNumber), blockData.exportFile)}
                         onCreateComponent={() => handleCreateComponent(Number(blockData.instructions[0].blockId))}
                         onDeleteBlock={() => handleRemoveBlock(Number(blockData.instructions[0].blockId))}
-                      />
-                      {!collapsedBlocks.has(Number(blockData.instructions[0].blockId)) && (
-                      <InstructionList
+                      />}
+                      list={<InstructionList
                         droppableId={blockGroupIndex}
                         instructions={blockData.instructions}
                         blockName={blockData.blockName ?? ""}
@@ -3257,9 +3336,8 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                             onOpenCommandEditor={() => handleOpenCommandEditor(instruction)}
                           />
                         )}
-                      />
-                      )}
-                    </div >
+                      />}
+                    />
                   ))
               )}
         </div >
