@@ -13,7 +13,6 @@ import downImage from '../assets/down.png';
 import rollBackImage from '../assets/rollback4.png';
 import binImage from '../assets/bin.png';
 import closeBrowserImage from '../assets/close-browser.png';
-import menuDownImage from '../assets/menu-down.png';
 import saveImage from "../assets/save.png";
 import excelImage from "../assets/excel.png";
 import screenImage from "../assets/screen.png";
@@ -58,6 +57,7 @@ import FindBar from './bot-job-details/grid/FindBar';
 import BlockStatusToggle from './bot-job-details/grid/BlockStatusToggle';
 import BlockCollapseToggle from './bot-job-details/grid/BlockCollapseToggle';
 import InlineNameEditor from './bot-job-details/grid/InlineNameEditor';
+import CommandEditorButton from './bot-job-details/grid/CommandEditorButton';
 import ExecutionStateOverlay from './bot-job-details/grid/ExecutionStateOverlay';
 import { instructionDisplayLabel } from './instructionDisplay';
 import { buildLaterBlockOrderUpdates } from './instructionSplit';
@@ -3578,16 +3578,10 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                                           />
                                         </div>
                                       </div>
-                                      {/* New column for dropdown menu */}
-                                      <div className={styles.dropdownColumn}>
-                                        <img
-                                          src={menuDownImage}
-                                          className={styles.dropdownArrow}
-                                          alt="Open Command Editor"
-                                          title="Open Command Editor"
-                                          onClick={() => handleOpenCommandEditor(instruction)}
-                                        />
-                                      </div>
+                                      {/* Open the Command Editor for this instruction */}
+                                      <CommandEditorButton
+                                        onClick={() => handleOpenCommandEditor(instruction)}
+                                      />
                                     </div>
                                   )}
                                 </Draggable>

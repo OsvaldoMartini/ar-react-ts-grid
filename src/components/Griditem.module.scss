@@ -966,22 +966,6 @@
 }
 
 /* Dropdown arrow styling */
-.dropdownColumn {
-  position: relative;
-  margin-right: 8px;
-}
-
-.dropdownArrow {
-  cursor: pointer;
-  width: 22px;
-  height: 22px;
-  transition: transform 0.3s ease; /* Smooth scaling on hover */
-
-  &:hover {
-    transform: scale(1.4); /* Slightly increase size on hover */
-  }
-}
-
 /* Dropdown menu styling */
 .dropdownMenu {
   position: absolute;
