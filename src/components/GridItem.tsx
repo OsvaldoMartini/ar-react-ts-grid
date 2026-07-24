@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { BlockLoopInstructionLoadDTO, BotJobData, ComplexMessage, ElementDTO, UpdatedBlock } from './instructionsMockData';
-import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd'; // Import from react-beautiful-dnd
+import { DragDropContext } from 'react-beautiful-dnd'; // Import from react-beautiful-dnd
 
 import editImage from '../assets/edit.png';
 import edit2Image from '../assets/edit2.png';
@@ -35,6 +35,7 @@ import InlineNameEditor from './bot-job-details/grid/InlineNameEditor';
 import MemoryAddButton from './bot-job-details/grid/MemoryAddButton';
 import DeleteButton from './bot-job-details/grid/DeleteButton';
 import InstructionRow from './bot-job-details/grid/InstructionRow';
+import InstructionList from './bot-job-details/grid/InstructionList';
 import { instructionDisplayLabel } from './instructionDisplay';
 import { buildLaterBlockOrderUpdates } from './instructionSplit';
 import type {
@@ -3199,79 +3200,45 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                         </div>
                       </div>
                       {!collapsedBlocks.has(Number(blockData.instructions[0].blockId)) && (
-                      <Droppable
+                      <InstructionList
                         droppableId={blockGroupIndex}
-                        key={blockData.instructions[0].blockId}
-                        isDropDisabled={activeDraggedInstructionId !== null && !memoryCapabilities.get(activeDraggedInstructionId)?.allowedBlockIds.includes(Number(blockData.instructions[0].blockId))}
-                      >
-                        {(provided) => (
-                          <div
-                            className={`${styles.instructionsList} ${activeDraggedInstructionId === null ? '' : memoryCapabilities.get(activeDraggedInstructionId)?.allowedBlockIds.includes(Number(blockData.instructions[0].blockId)) ? styles.validDropZone : styles.invalidDropZone}`}
-                            ref={provided.innerRef}
-                            {...provided.droppableProps}
-                          >
-                            {blockData.instructions.map((instruction, index) => {
-                              if (instruction.actions === "EXCEL GOTO") return null;
-
-                              // Row-level find: inside a kept block, hide rows that don't
-                              // match — unless the block itself matched by name (then the
-                              // whole block stays visible).
-                              const findQuery = findText.trim().toLowerCase();
-                              if (
-                                findQuery &&
-                                !(blockData.blockName ?? "").toLowerCase().includes(findQuery) &&
-                                !instructionMatchesFind(instruction, findQuery)
-                              ) {
-                                return null;
-                              }
-
-                              const isLastInstruction =
-                                index === blockData.instructions.length - 1;
-                              const isLastBlock =
-                                Number(blockGroupIndex) === Object.keys(groupedData).length; // Check if this is the last block
-
-                              return (
-                                <Draggable
-                                  key={instruction.id}
-                                  draggableId={instruction.id.toString()}
-                                  index={index}
-                                  isDragDisabled={findText.trim().length > 0 || !memoryCapabilities.get(instruction.id)?.canMove}
-                                >
-                                  {(provided) => (
-                                    <InstructionRow
-                                      provided={provided}
-                                      instruction={instruction}
-                                      capability={memoryCapabilities.get(instruction.id)}
-                                      findText={findText}
-                                      dropdownOpen={openDropdown === instruction.id}
-                                      isExecuting={instruction.id === executionId}
-                                      executionState={executionState}
-                                      isEditing={editingInstructionId === instruction.id}
-                                      instructionName={instructionName}
-                                      nameInputRef={instructionRef}
-                                      renderHighlighted={renderHighlighted}
-                                      operations={renderOperations(instruction, instructionsData)}
-                                      deviceOptionsRow={renderDeviceOptionsRow(instruction)}
-                                      editButton={renderEditButton(instruction.actions, editImage, instruction)}
-                                      moveButtons={renderMoveButtons(instruction.id)}
-                                      testClick={renderTestClick(instruction.actions, instruction)}
-                                      onChangeName={setInstructionName}
-                                      onSaveName={() => handleSaveInstruction(instruction.id)}
-                                      onMoveUp={() => handleMoveRowUp(instruction.id)}
-                                      onMoveDown={() => handleMoveRowDown(instruction.id)}
-                                      onToggleStatus={() => handleInstructionStatus(instruction.id, blockData.instructions)}
-                                      onAddToMemory={(e) => { e.stopPropagation(); handleAddToMemory(instruction); }}
-                                      onRemove={() => handleRemoveInstruction(instruction.id)}
-                                      onOpenCommandEditor={() => handleOpenCommandEditor(instruction)}
-                                    />
-                                  )}
-                                </Draggable>
-                              );
-                            })}
-                            {provided.placeholder}
-                          </div>
+                        droppableKey={blockData.instructions[0].blockId}
+                        instructions={blockData.instructions}
+                        blockName={blockData.blockName ?? ""}
+                        findText={findText}
+                        dropDisabled={activeDraggedInstructionId !== null && !memoryCapabilities.get(activeDraggedInstructionId)?.allowedBlockIds.includes(Number(blockData.instructions[0].blockId))}
+                        dropZone={activeDraggedInstructionId === null ? 'none' : (memoryCapabilities.get(activeDraggedInstructionId)?.allowedBlockIds.includes(Number(blockData.instructions[0].blockId)) ? 'valid' : 'invalid')}
+                        instructionMatchesFind={instructionMatchesFind}
+                        isRowDragDisabled={(instruction) => findText.trim().length > 0 || !memoryCapabilities.get(instruction.id)?.canMove}
+                        renderRow={(instruction, _index, provided) => (
+                          <InstructionRow
+                            provided={provided}
+                            instruction={instruction}
+                            capability={memoryCapabilities.get(instruction.id)}
+                            findText={findText}
+                            dropdownOpen={openDropdown === instruction.id}
+                            isExecuting={instruction.id === executionId}
+                            executionState={executionState}
+                            isEditing={editingInstructionId === instruction.id}
+                            instructionName={instructionName}
+                            nameInputRef={instructionRef}
+                            renderHighlighted={renderHighlighted}
+                            operations={renderOperations(instruction, instructionsData)}
+                            deviceOptionsRow={renderDeviceOptionsRow(instruction)}
+                            editButton={renderEditButton(instruction.actions, editImage, instruction)}
+                            moveButtons={renderMoveButtons(instruction.id)}
+                            testClick={renderTestClick(instruction.actions, instruction)}
+                            onChangeName={setInstructionName}
+                            onSaveName={() => handleSaveInstruction(instruction.id)}
+                            onMoveUp={() => handleMoveRowUp(instruction.id)}
+                            onMoveDown={() => handleMoveRowDown(instruction.id)}
+                            onToggleStatus={() => handleInstructionStatus(instruction.id, blockData.instructions)}
+                            onAddToMemory={(e) => { e.stopPropagation(); handleAddToMemory(instruction); }}
+                            onRemove={() => handleRemoveInstruction(instruction.id)}
+                            onOpenCommandEditor={() => handleOpenCommandEditor(instruction)}
+                          />
                         )}
-                      </Droppable>
+                      />
                       )}
                     </div >
                   ))
