@@ -4,6 +4,7 @@ import {
   Draggable,
   Droppable,
   type DropResult,
+  type DroppableProps,
 } from 'react-beautiful-dnd';
 import clickImage from '../assets/click.png';
 import excelImage from '../assets/excel.png';
@@ -25,6 +26,24 @@ import { useWebSocket } from './useWebSocket';
 import styles from './MemoryList.module.scss';
 
 export const MEMORY_LIST_SESSION_ID = 'memoryListManager';
+
+// react-beautiful-dnd@13 does not register its droppable under React 18
+// StrictMode (dev double-invoke), so the reorder drag silently dies. Delaying
+// one animation frame before mounting the real Droppable restores it.
+const StrictModeDroppable: React.FC<DroppableProps> = ({ children, ...props }) => {
+  const [enabled, setEnabled] = useState(false);
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setEnabled(true));
+    return () => {
+      cancelAnimationFrame(raf);
+      setEnabled(false);
+    };
+  }, []);
+  if (!enabled) {
+    return null;
+  }
+  return <Droppable {...props}>{children}</Droppable>;
+};
 
 interface MemoryListProps {
   socketPort: number;
@@ -267,7 +286,7 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose 
           </div>
 
           <DragDropContext onDragEnd={handleDragEnd}>
-            <Droppable droppableId="memory-list-items">
+            <StrictModeDroppable droppableId="memory-list-items">
               {provided => (
                 <section
                   ref={provided.innerRef}
@@ -333,7 +352,7 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose 
                   {provided.placeholder}
                 </section>
               )}
-            </Droppable>
+            </StrictModeDroppable>
           </DragDropContext>
 
           <footer className={styles.footer}>
