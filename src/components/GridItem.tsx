@@ -11,8 +11,6 @@ import binImage from '../assets/bin.png';
 import saveImage from "../assets/save.png";
 import excelImage from "../assets/excel.png";
 import excelGotoImage from "../assets/excel_goto2.png";
-import refreshOnlyImage from "../assets/refresh-only.png";
-import refreshLoopImage from "../assets/refresh-loop.png";
 import clickTestImage from "../assets/clickTest2.png";
 import constructionImage from '../assets/construction.png';
 import forbiddenImage from '../assets/forbidden.png';
@@ -34,12 +32,9 @@ import FindBar from './bot-job-details/grid/FindBar';
 import BlockStatusToggle from './bot-job-details/grid/BlockStatusToggle';
 import BlockCollapseToggle from './bot-job-details/grid/BlockCollapseToggle';
 import InlineNameEditor from './bot-job-details/grid/InlineNameEditor';
-import CommandEditorButton from './bot-job-details/grid/CommandEditorButton';
-import InstructionDragHandle from './bot-job-details/grid/InstructionDragHandle';
 import MemoryAddButton from './bot-job-details/grid/MemoryAddButton';
 import DeleteButton from './bot-job-details/grid/DeleteButton';
-import InstructionTypeBadge from './bot-job-details/grid/InstructionTypeBadge';
-import ExecutionStateOverlay from './bot-job-details/grid/ExecutionStateOverlay';
+import InstructionRow from './bot-job-details/grid/InstructionRow';
 import { instructionDisplayLabel } from './instructionDisplay';
 import { buildLaterBlockOrderUpdates } from './instructionSplit';
 import type {
@@ -3243,100 +3238,32 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                                   isDragDisabled={findText.trim().length > 0 || !memoryCapabilities.get(instruction.id)?.canMove}
                                 >
                                   {(provided) => (
-                                    <div
-                                      ref={provided.innerRef}
-                                      {...provided.draggableProps}
-                                      className={`${styles.instructionItem} ${openDropdown === instruction.id ? styles.dropdownOpen : ''
-                                        } ${instruction.actions === 'IF' || instruction.actions === 'ELSEIF' || instruction.actions === 'ELSE' || instruction.actions === 'ENDIF'
-                                          ? styles.lightYellowBackground
-                                          : ''
-                                        }`}
-                                    // data-executing={instruction.id === executionId}
-                                    >
-                                      <InstructionDragHandle
-                                        dragHandleProps={provided.dragHandleProps}
-                                        disabled={findText.trim().length > 0 || !memoryCapabilities.get(instruction.id)?.canMove}
-                                        title={findText.trim().length > 0 ? 'Clear Find before moving instructions' : memoryCapabilities.get(instruction.id)?.reason || 'Move instruction; Alt+Arrow keys move one position'}
-                                        ariaLabel={`Move instruction ${instruction.instructionOrderNumber}`}
-                                        onMoveUp={() => handleMoveRowUp(instruction.id)}
-                                        onMoveDown={() => handleMoveRowDown(instruction.id)}
-                                      />
-                                      {instruction.id === executionId && (
-                                        <ExecutionStateOverlay state={executionState} />
-                                      )}
-                                      {editingInstructionId === instruction.id ? (
-                                        <InlineNameEditor
-                                          value={instructionName}
-                                          onChange={setInstructionName}
-                                          onSave={() => handleSaveInstruction(instruction.id)}
-                                          inputRef={instructionRef}
-                                        />
-                                      ) : (
-                                        <span className={styles.instructionLine}>
-                                          {/* <span>({instruction.id})</span> */}
-                                          <BlockStatusToggle
-                                            active={instruction.instructionActive}
-                                            onToggle={() =>
-                                              handleInstructionStatus(instruction.id, blockData.instructions)
-                                            }
-                                          />
-                                          <InstructionTypeBadge
-                                            instruction={instruction}
-                                            findText={findText}
-                                            renderHighlighted={renderHighlighted}
-                                          />
-                                          <MemoryAddButton
-                                            disabled={!memoryCapabilities.get(instruction.id)?.canAdd}
-                                            title={memoryCapabilities.get(instruction.id)?.reason || 'Add step to memory list'}
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleAddToMemory(instruction);
-                                            }}
-                                          />
-                                          {instruction.refreshLoop && (
-                                            <img
-                                              src={refreshLoopImage}
-                                              alt="refresh"
-                                              className={styles.refreshImage}
-                                            />
-                                          )}
-                                          {instruction.loopOnly && (
-                                            <img
-                                              src={refreshOnlyImage}
-                                              alt="refresh"
-                                              className={styles.refreshImage}
-                                            />
-                                          )}
-
-                                        </span>
-
-
-                                      )}
-                                      {renderOperations(instruction, instructionsData)}
-                                      <div className={styles.optionsColumn}>
-                                        {renderDeviceOptionsRow(
-                                          instruction
-                                        )}
-                                        <div className={styles.moveButtons}>
-                                          {renderEditButton(
-                                            instruction.actions,
-                                            editImage,
-                                            instruction
-                                          )}
-                                          {renderMoveButtons(instruction.id)}
-                                          {renderTestClick(instruction.actions, instruction)}
-                                          <DeleteButton
-                                            title={memoryCapabilities.get(instruction.id)?.deleteReason || 'Delete instruction'}
-                                            dimmed={!memoryCapabilities.get(instruction.id)?.canDelete}
-                                            onClick={() => handleRemoveInstruction(instruction.id)}
-                                          />
-                                        </div>
-                                      </div>
-                                      {/* Open the Command Editor for this instruction */}
-                                      <CommandEditorButton
-                                        onClick={() => handleOpenCommandEditor(instruction)}
-                                      />
-                                    </div>
+                                    <InstructionRow
+                                      provided={provided}
+                                      instruction={instruction}
+                                      capability={memoryCapabilities.get(instruction.id)}
+                                      findText={findText}
+                                      dropdownOpen={openDropdown === instruction.id}
+                                      isExecuting={instruction.id === executionId}
+                                      executionState={executionState}
+                                      isEditing={editingInstructionId === instruction.id}
+                                      instructionName={instructionName}
+                                      nameInputRef={instructionRef}
+                                      renderHighlighted={renderHighlighted}
+                                      operations={renderOperations(instruction, instructionsData)}
+                                      deviceOptionsRow={renderDeviceOptionsRow(instruction)}
+                                      editButton={renderEditButton(instruction.actions, editImage, instruction)}
+                                      moveButtons={renderMoveButtons(instruction.id)}
+                                      testClick={renderTestClick(instruction.actions, instruction)}
+                                      onChangeName={setInstructionName}
+                                      onSaveName={() => handleSaveInstruction(instruction.id)}
+                                      onMoveUp={() => handleMoveRowUp(instruction.id)}
+                                      onMoveDown={() => handleMoveRowDown(instruction.id)}
+                                      onToggleStatus={() => handleInstructionStatus(instruction.id, blockData.instructions)}
+                                      onAddToMemory={(e) => { e.stopPropagation(); handleAddToMemory(instruction); }}
+                                      onRemove={() => handleRemoveInstruction(instruction.id)}
+                                      onOpenCommandEditor={() => handleOpenCommandEditor(instruction)}
+                                    />
                                   )}
                                 </Draggable>
                               );
