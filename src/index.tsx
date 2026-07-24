@@ -21,6 +21,7 @@ import CloneJobPage from './components/CloneJobPage';
 import ConfigPage from './components/ConfigPage';
 import ATemplate from './components/ATemplate';
 import MemoryList, { MEMORY_LIST_SESSION_ID } from './components/MemoryList';
+import MemoryDragDemo from './components/MemoryDragDemo';
 import PagesOpen, { PAGES_OPEN_SESSION_ID } from './components/PagesOpen';
 import CommandEditorPage, { COMMAND_EDITOR_SESSION_ID } from './components/CommandEditorPage';
 import InfoPage, { INFO_PAGE_SESSION_ID } from './components/InfoPage';
@@ -394,6 +395,17 @@ const App: React.FC = () => {
     ? `${botJobWindowSession}:${botJobId}:${botJobWorkspaceEpoch}`
     : `bot-job:${botJobId}:${botJobWorkspaceEpoch}`;
   const mainApplicationControlPort = socketPort > 0 ? socketPort : Number(window.location.port);
+
+  // Frontend-only drag & drop test bench (no backend): open with `npm start` at
+  // http://localhost:3000/?memoryDragDemo=1 . Kept inside StrictMode so the drag
+  // is exercised under the same conditions as production.
+  if (new URLSearchParams(window.location.search).has('memoryDragDemo')) {
+    return (
+      <React.StrictMode>
+        <MemoryDragDemo />
+      </React.StrictMode>
+    );
+  }
 
   return (
     <React.StrictMode>
