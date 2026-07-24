@@ -76,17 +76,17 @@ const PagesOpenButton: React.FC<PagesOpenButtonProps> = ({
 
   const available = connected && summaryReady;
   const event = useMemo(() => ({
-    color: available ? 'green' as const : 'red' as const,
+    color: 'orange' as const,
     rules: `Pages (${pageCount})`,
     ts: pageCount,
-  }), [available, pageCount]);
+  }), [pageCount]);
 
   return (
     <RulesCard
       event={event}
       animate={false}
-      pulse={available && pageCount > 0}
-      glow={available && pageCount > 0}
+      pulse
+      glow
       border={!available || pageCount === 0}
       iconNode={<AppWindow aria-hidden="true" />}
       onClick={() => send('pagesOpen.open')}
