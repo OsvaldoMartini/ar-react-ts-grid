@@ -55,6 +55,7 @@ import { useBotJobDetailsController } from './bot-job-details/useBotJobDetailsCo
 import { useWebSocket } from './useWebSocket';
 import { useInstructionDrag } from './useInstructionDrag';
 import FindBar from './bot-job-details/grid/FindBar';
+import BlockCollapseToggle from './bot-job-details/grid/BlockCollapseToggle';
 import { instructionDisplayLabel } from './instructionDisplay';
 import { buildLaterBlockOrderUpdates } from './instructionSplit';
 import type {
@@ -528,23 +529,6 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
       return next;
     });
   };
-
-  const CollapseToggleIcon: React.FC<{ collapsed: boolean }> = ({ collapsed }) => (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="10"
-      height="10"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M5 12h14" />
-      {collapsed && <path d="M12 5v14" />}
-    </svg>
-  );
 
   type ActionFlag = "E" | "S";
 
@@ -3330,14 +3314,10 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                               handleBlockStatus(blockData.instructions[0].blockId)
                             } />
                         )}
-                        <button
-                          type="button"
-                          className={`${styles.blockCollapseBadge} ${collapsedBlocks.has(Number(blockData.instructions[0].blockId)) ? 'is-collapsed' : ''}`}
-                          title={collapsedBlocks.has(Number(blockData.instructions[0].blockId)) ? "Expand block" : "Collapse block"}
-                          onClick={() => toggleBlockCollapsed(Number(blockData.instructions[0].blockId))}
-                        >
-                          <CollapseToggleIcon collapsed={collapsedBlocks.has(Number(blockData.instructions[0].blockId))} />
-                        </button>
+                        <BlockCollapseToggle
+                          collapsed={collapsedBlocks.has(Number(blockData.instructions[0].blockId))}
+                          onToggle={() => toggleBlockCollapsed(Number(blockData.instructions[0].blockId))}
+                        />
                         <span className={styles.blockOrderNumber}>
                           #{blockData.instructions[0].blockOrderNumber}
                         </span>
