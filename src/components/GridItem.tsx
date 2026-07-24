@@ -5,7 +5,6 @@ import setValueImage from '../assets/setValueBtn3.png';
 import getValueImage from '../assets/getValueBtn3.png';
 import checkImage from '../assets/check4.png';
 
-import crossImage from '../assets/cross.png';
 import editImage from '../assets/edit.png';
 import edit2Image from '../assets/edit2.png';
 import upImage from '../assets/up.png';
@@ -58,6 +57,7 @@ import InlineNameEditor from './bot-job-details/grid/InlineNameEditor';
 import CommandEditorButton from './bot-job-details/grid/CommandEditorButton';
 import InstructionDragHandle from './bot-job-details/grid/InstructionDragHandle';
 import MemoryAddButton from './bot-job-details/grid/MemoryAddButton';
+import DeleteButton from './bot-job-details/grid/DeleteButton';
 import ExecutionStateOverlay from './bot-job-details/grid/ExecutionStateOverlay';
 import { instructionDisplayLabel } from './instructionDisplay';
 import { buildLaterBlockOrderUpdates } from './instructionSplit';
@@ -3367,12 +3367,9 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                                   title="Open Command Editor"
                                   onClick={() => handleOpenCommandEditor(excelGotoInstruction)}
                                 />
-                                <img
-                                  src={crossImage}
-                                  alt=""
-                                  className={styles.crossButton}
+                                <DeleteButton
                                   title={memoryCapabilities.get(Number(excelGotoInstruction.id))?.deleteReason || 'Delete instruction'}
-                                  style={{ opacity: memoryCapabilities.get(Number(excelGotoInstruction.id))?.canDelete ? 1 : 0.35 }}
+                                  dimmed={!memoryCapabilities.get(Number(excelGotoInstruction.id))?.canDelete}
                                   onClick={() => handleRemoveInstruction(Number(excelGotoInstruction.id))}
                                 />
                               </div>
@@ -3410,12 +3407,9 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                             onClick={() => handleCreateComponent(Number(blockData.instructions[0].blockId))}
                           />
                           {/* {index !== 0 && ( */}
-                          <img
-                            src={crossImage}
-                            alt=""
-                            className={styles.crossButton}
+                          <DeleteButton
                             title={blockDeleteCapabilities.get(Number(blockData.instructions[0].blockId))?.reason || 'Delete block'}
-                            style={{ opacity: blockDeleteCapabilities.get(Number(blockData.instructions[0].blockId))?.canDelete ? 1 : 0.35 }}
+                            dimmed={!blockDeleteCapabilities.get(Number(blockData.instructions[0].blockId))?.canDelete}
                             onClick={() => handleRemoveBlock(Number(blockData.instructions[0].blockId))}
                           />
                           {/* )} */}
@@ -3540,15 +3534,10 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
                                           )}
                                           {renderMoveButtons(instruction.id)}
                                           {renderTestClick(instruction.actions, instruction)}
-                                          <img
-                                            src={crossImage}
-                                            alt=""
-                                            className={styles.crossButton}
+                                          <DeleteButton
                                             title={memoryCapabilities.get(instruction.id)?.deleteReason || 'Delete instruction'}
-                                            style={{ opacity: memoryCapabilities.get(instruction.id)?.canDelete ? 1 : 0.35 }}
-                                            onClick={() =>
-                                              handleRemoveInstruction(instruction.id)
-                                            }
+                                            dimmed={!memoryCapabilities.get(instruction.id)?.canDelete}
+                                            onClick={() => handleRemoveInstruction(instruction.id)}
                                           />
                                         </div>
                                       </div>
