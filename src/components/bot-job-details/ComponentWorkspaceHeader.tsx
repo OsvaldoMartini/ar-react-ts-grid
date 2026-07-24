@@ -1,48 +1,77 @@
 import React from 'react';
-import WorkspaceHeader, { type WorkspaceHeaderAction } from '../workspace/WorkspaceHeader';
-import type { BotJobWorkspaceAction, BotJobWorkspaceStatusTone } from './BotJobDetails.types';
+import PagesOpenButton from '../PagesOpenButton';
+import type { BotJobWorkspaceStatusTone } from './BotJobDetails.types';
 import styles from './ComponentWorkspaceHeader.module.scss';
 
 interface ComponentWorkspaceHeaderProps {
+  botJobId: number | null;
   botJobName: string | null;
   connected: boolean;
-  pendingAction?: BotJobWorkspaceAction | null;
+  reconnectAttempts?: number;
+  error?: string | null;
   status?: string;
   statusTone?: BotJobWorkspaceStatusTone;
-  onHide: () => void;
-  canUseWorkspaceActions?: boolean;
+  webSocket?: WebSocket | null;
+  messages?: readonly string[];
+  sessionId?: string;
+  onClose: () => void;
 }
 
 const ComponentWorkspaceHeader: React.FC<ComponentWorkspaceHeaderProps> = ({
+  botJobId,
   botJobName,
   connected,
-  pendingAction = null,
-  status = 'Ready',
+  reconnectAttempts = 0,
+  error,
+  status,
   statusTone = 'neutral',
-  onHide,
-  canUseWorkspaceActions = true,
+  webSocket = null,
+  messages = [],
+  sessionId = '',
+  onClose,
 }) => {
-  const actions: WorkspaceHeaderAction<'HIDE_COMPONENTS'>[] = [{
-    id: 'HIDE_COMPONENTS',
-    label: pendingAction === 'HIDE_COMPONENTS' ? 'Hiding…' : 'Hide Components',
-    tone: 'primary',
-    disabled: !connected || pendingAction !== null || !canUseWorkspaceActions,
-  }];
+  const resolvedStatus = error
+    || status
+    || (connected
+      ? 'Components loaded'
+      : `Reconnecting${reconnectAttempts ? ` (${reconnectAttempts})` : ''}`);
+  const statusClass = error || statusTone === 'error'
+    ? styles.statusError
+    : !connected || statusTone === 'warning'
+      ? styles.statusWarn
+      : styles.statusOk;
+  const subtitle = botJobName
+    ? `${botJobName}${botJobId && botJobId > 0 ? ` - Bot Job ID ${botJobId}` : ''}`
+    : 'Reusable instructions for the current Bot Job';
 
   return (
-    <div className={styles.wrapper}>
-      <WorkspaceHeader
-        eyebrow="Reusable Library"
-        title="Components"
-        subtitle={botJobName ? `For ${botJobName}` : 'Shared instructions'}
-        connected={connected}
-        status={status}
-        statusTone={statusTone}
-        actions={actions}
-        onAction={onHide}
-        compact
-      />
-    </div>
+    <header className={styles.topBar} data-floating-workspace-drag-handle>
+      <div className={styles.titleBlock}>
+        <h1 className={styles.title}>Components</h1>
+        <p className={styles.subtitle} title={subtitle}>{subtitle}</p>
+      </div>
+      <div className={styles.topBarRight} data-floating-drag-ignore="true">
+        <div className={`${styles.status} ${statusClass}`} role="status">
+          {resolvedStatus}
+        </div>
+        {sessionId && (
+          <PagesOpenButton
+            webSocket={webSocket}
+            connected={connected}
+            messages={messages}
+            sessionId={sessionId}
+          />
+        )}
+        <button
+          type="button"
+          className={styles.closeButton}
+          title="Close only this Components window"
+          onClick={onClose}
+        >
+          Close
+        </button>
+      </div>
+    </header>
   );
 };
 

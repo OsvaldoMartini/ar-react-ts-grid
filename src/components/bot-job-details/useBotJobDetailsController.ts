@@ -323,12 +323,13 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
         clearTimer(actionTimeoutRef);
         pendingActionRef.current = null;
         setPendingAction(null);
-        const opensDetachedPageScanner = pending.action === 'SHOW_PRE_SCAN';
-        if (body.state && !opensDetachedPageScanner) {
+        const opensDetachedWorkspace = pending.action === 'SHOW_PRE_SCAN'
+          || pending.action === 'SHOW_COMPONENTS';
+        if (body.state && !opensDetachedWorkspace) {
           setState((current) => reduceBotJobDetailsState(current, body.state));
         }
         const activeSurface = body.activeSurface;
-        if (body.ok !== false && !opensDetachedPageScanner && isWorkspaceSurface(activeSurface)) {
+        if (body.ok !== false && !opensDetachedWorkspace && isWorkspaceSurface(activeSurface)) {
           setState((current) => current ? {
             ...current,
             activeSurface,

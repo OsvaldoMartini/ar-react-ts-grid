@@ -2,30 +2,37 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import ComponentWorkspaceHeader from './ComponentWorkspaceHeader';
 
-test('exposes only the component-specific hide action', () => {
-  const onHide = jest.fn();
+test('renders the detached Components title and closes only its page', () => {
+  const onClose = jest.fn();
   render(
     <ComponentWorkspaceHeader
+      botJobId={5}
       botJobName="Saldo Banca Stato"
       connected
-      onHide={onHide}
+      status="Components loaded"
+      onClose={onClose}
     />,
   );
 
+  expect(screen.getByRole('heading', { name: 'Components' })).toBeInTheDocument();
+  expect(screen.getByText('Saldo Banca Stato - Bot Job ID 5')).toBeInTheDocument();
+  expect(screen.getByRole('status')).toHaveTextContent('Components loaded');
   expect(screen.queryByRole('button', { name: 'Refresh' })).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Hide Components' }));
-  expect(onHide).toHaveBeenCalledTimes(1);
+  expect(screen.queryByRole('button', { name: 'Hide Components' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+  expect(onClose).toHaveBeenCalledTimes(1);
 });
 
-test('disables the compact hide action when workspace capability is revoked', () => {
+test('shows reconnecting status while the detached Components page is disconnected', () => {
   render(
     <ComponentWorkspaceHeader
+      botJobId={5}
       botJobName="Saldo Banca Stato"
-      connected
-      canUseWorkspaceActions={false}
-      onHide={jest.fn()}
+      connected={false}
+      reconnectAttempts={2}
+      onClose={jest.fn()}
     />,
   );
 
-  expect(screen.getByRole('button', { name: 'Hide Components' })).toBeDisabled();
+  expect(screen.getByRole('status')).toHaveTextContent('Reconnecting (2)');
 });

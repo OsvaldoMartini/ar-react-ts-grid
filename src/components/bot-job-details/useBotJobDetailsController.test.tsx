@@ -96,9 +96,10 @@ test('applies bootstrap state only after request correlation and sends the draft
 
 test('requires matching action and a successful known surface before updating workspace state', async () => {
   const send = jest.fn();
+  const onSurfaceOpen = jest.fn();
   const socket = { readyState: WebSocket.OPEN, send } as unknown as WebSocket;
-  const view = render(<Harness socket={socket} messages={[]} />);
-  let messages = await completeBootstrap(view, socket, send);
+  const view = render(<Harness socket={socket} messages={[]} onSurfaceOpen={onSurfaceOpen} />);
+  let messages = await completeBootstrap(view, socket, send, onSurfaceOpen);
   fireEvent.click(screen.getByRole('button', { name: 'Show components' }));
   const actionRequest = sentBody(send, 1);
 
@@ -106,14 +107,14 @@ test('requires matching action and a successful known surface before updating wo
     ok: true, botJobId: 42, requestId: actionRequest.requestId, action: 'REFRESH', activeSurface: 'components',
     state: { ...state, revision: 6, name: 'Wrong action state' },
   })];
-  view.rerender(<Harness socket={socket} messages={messages} />);
+  view.rerender(<Harness socket={socket} messages={messages} onSurfaceOpen={onSurfaceOpen} />);
   expect(screen.getByTestId('job-name')).toHaveTextContent('Payments');
 
   messages = [...messages, response('botJobDetails.actionResponse', {
     ok: false, botJobId: 42, requestId: actionRequest.requestId,
     activeSurface: 'unknown', message: 'Components unavailable',
   })];
-  view.rerender(<Harness socket={socket} messages={messages} />);
+  view.rerender(<Harness socket={socket} messages={messages} onSurfaceOpen={onSurfaceOpen} />);
   await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('Components unavailable'));
   expect(screen.getByTestId('surface')).toHaveTextContent('botJob');
 
@@ -123,8 +124,10 @@ test('requires matching action and a successful known surface before updating wo
     ok: true, botJobId: 42, requestId: successRequest.requestId, action: 'SHOW_COMPONENTS',
     activeSurface: 'components', componentsVisible: true,
   })];
-  view.rerender(<Harness socket={socket} messages={messages} />);
-  await waitFor(() => expect(screen.getByTestId('surface')).toHaveTextContent('components'));
+  view.rerender(<Harness socket={socket} messages={messages} onSurfaceOpen={onSurfaceOpen} />);
+  await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('Action accepted'));
+  expect(screen.getByTestId('surface')).toHaveTextContent('botJob');
+  expect(onSurfaceOpen).not.toHaveBeenCalled();
 });
 
 test('opens a detached Page Scanner without navigating the Bot Job surface', async () => {

@@ -8,7 +8,7 @@ import GridItem from './components/GridItem';
 import { BlockLoopInstructionLoadDTO, BotJobData, ComplexMessage, ElementDTO } from './components/instructionsMockData';
 import AlertModal from './components/AlertModal';
 import constructionImage from './assets/construction.png';
-import GridItemComp from './components/GridItemComp';
+import ComponentsPage from './components/ComponentsPage';
 import GridItemScannMobile from './components/GridItemScannMobile';
 import ApiTestToolAI from './components/ApiTestToolAI';
 import ApiTestToolAINew from './components/ApiTestToolAINew';
@@ -199,6 +199,7 @@ const App: React.FC = () => {
           'organizationManager',
           'configManager',
           'aTemplateManager',
+          'componentTasks',
           MEMORY_LIST_SESSION_ID,
           PAGES_OPEN_SESSION_ID,
           INFO_PAGE_SESSION_ID,
@@ -423,10 +424,18 @@ const App: React.FC = () => {
           <GridItem key={`${botJobWorkspaceKey}:details`} homeBankingIdInitial={homeBanking} data={instructionsData} socketPort={socketPort} sessionId={sessionId} botJobIdInitial={botJobId} botJobNameInitial={botJobName} onSessionOpen={onSessionOpen} onDetachedClose={closeDetachedWorkspace} />
         </DesktopWorkspaceShell>
       )}
-      {sessionId && (sessionId.includes("componentTasks")) && (
-        <DesktopWorkspaceShell ariaLabel="Bot Job Components" testId="bot-job-components-workspace">
-          <GridItemComp key={`${botJobWorkspaceKey}:components`} homeBankingIdInitial={homeBanking} dataComp={componentsData} socketPort={socketPort} sessionId={sessionId} botJobIdInitial={botJobId} botJobNameInitial={botJobName} onSessionOpen={onSessionOpen} />
-        </DesktopWorkspaceShell>
+      {sessionId === "componentTasks" && (
+        <ComponentsPage
+          key={`${botJobWorkspaceKey}:components`}
+          homeBankingIdInitial={homeBanking}
+          dataComp={componentsData}
+          socketPort={socketPort}
+          sessionId={sessionId}
+          botJobIdInitial={botJobId}
+          botJobNameInitial={botJobName}
+          onSessionOpen={onSessionOpen}
+          onClose={closeDetachedWorkspace}
+        />
       )}
       {/* Guard against scanner/pre-scan double-mounting. */}
       {sessionId

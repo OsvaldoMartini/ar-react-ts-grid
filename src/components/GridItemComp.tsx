@@ -59,7 +59,7 @@ import {
 import styles from './Griditem.module.scss';
 
 
-interface GridItemCompProps {
+export interface GridItemCompProps {
   homeBankingIdInitial: number;
   dataComp: ComponentsInstructionsDTO[];
   socketPort: number;
@@ -67,6 +67,7 @@ interface GridItemCompProps {
   botJobIdInitial: number;
   botJobNameInitial: string;
   onSessionOpen: (targetSession: string, port: number, botJobId?: number) => void;
+  onDetachedClose?: () => void;
 }
 type BlockDeleteCapability = { canDelete: boolean; reason: string; instructionCount: number; deleteRows: { id: number; name: string; action: string; order: number }[] };
 
@@ -117,7 +118,7 @@ const reassignInstructionOrderNumbersByBlock = (instructions: ComponentsInstruct
   return updatedInstructions;
 };
 
-const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataComp, socketPort, sessionId, botJobIdInitial, botJobNameInitial, onSessionOpen }) => {
+const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataComp, socketPort, sessionId, botJobIdInitial, botJobNameInitial, onSessionOpen, onDetachedClose }) => {
   // Using the custom WebSocket hook
   const { webSocket, connected, reconnectAttempts, messages, error } = useWebSocket(socketPort, sessionId);
 
@@ -2614,13 +2615,27 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
   return (
     <div className={styles.gridContainer}>
       <ComponentWorkspaceHeader
+        botJobId={botJobHeader.state?.botJobId ?? botJobId}
         botJobName={botJobHeader.state?.name ?? botJobName}
         connected={connected}
-        pendingAction={botJobHeader.pendingAction}
+        reconnectAttempts={reconnectAttempts}
+        error={error}
         status={botJobHeader.status}
         statusTone={botJobHeader.statusTone}
-        canUseWorkspaceActions={botJobHeader.state?.capabilities.canUseWorkspaceActions === true}
-        onHide={() => botJobHeader.sendAction('HIDE_COMPONENTS')}
+        webSocket={webSocket}
+        messages={messages}
+        sessionId={sessionId}
+        onClose={() => {
+          if (onDetachedClose) {
+            onDetachedClose();
+            return;
+          }
+          try {
+            window.close();
+          } catch (closeError) {
+            console.error('Could not close detached Components window:', closeError);
+          }
+        }}
       />
       {excelExportContext && <ExcelExportPanel
         context={excelExportContext}
