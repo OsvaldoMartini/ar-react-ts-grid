@@ -38,6 +38,8 @@ import { useInstructionMemory } from './bot-job-details/grid/hooks/useInstructio
 import { useExcelExport } from './bot-job-details/grid/hooks/useExcelExport';
 import { useBlockReorder } from './bot-job-details/grid/hooks/useBlockReorder';
 import { useGridData } from './bot-job-details/grid/hooks/useGridData';
+import { useInstructionGrid } from './bot-job-details/grid/hooks/useInstructionGrid';
+import type { UseInstructionGridProps } from './bot-job-details/grid/types/instructionGrid.types';
 import {
   blockOptionsFromInstructions,
   normalizeBlockOptions,
@@ -57,16 +59,6 @@ import {
 import styles from './Griditem.module.scss';
 
 
-interface GridItemProps {
-  homeBankingIdInitial: number;
-  data: BlockLoopInstructionLoadDTO[];
-  socketPort: number;
-  sessionId: string;
-  botJobIdInitial: number;
-  botJobNameInitial: string;
-  onSessionOpen: (targetSession: string, port: number, botJobId?: number) => void;
-  onDetachedClose?: () => void;
-}
 // Helper function to reorder items in an array based on drag-and-drop actions
 const reorder = (list: any[], startIndex: number, endIndex: number) => {
   const result = Array.from(list);
@@ -76,93 +68,38 @@ const reorder = (list: any[], startIndex: number, endIndex: number) => {
 };
 
 // Function to group data by blockId and sort instructions within each block
-const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketPort, sessionId, botJobIdInitial, botJobNameInitial, onSessionOpen, onDetachedClose }) => {
-  // Using the custom WebSocket hook
-  const { webSocket, connected, reconnectAttempts, messages, error } = useWebSocket(socketPort, sessionId);
-
-  const gridScrollRef = useRef<HTMLDivElement>(null);
-  // const [homeBanking, setHomeBanking] = useState<number>(homeBankingId);
-  // const [botJobId, setBotJobId] = useState<number>(botJobId);
-  // const [botJobName, setBotJobName] = useState<string>(botJobName);
-
-  // Use state to manage the instructions data
-  const [homeBankingId, setHomeBankingId] = useState<number>(homeBankingIdInitial);
-  const [botJobId, setBotJobId] = useState<number | null>(botJobIdInitial);
-  const [blockId, setBlockId] = useState<number | null>(-1);
-  const [botJobName, setBotJobName] = useState<string | null>(botJobNameInitial);
-  const botJobHeader = useBotJobDetailsController({
-    webSocket, connected, messages, sessionId, homeBankingId, botJobId,
-    onSurfaceOpen: (targetSession, nextBotJobId) => onSessionOpen(targetSession, socketPort, nextBotJobId),
+const GridItem: React.FC<UseInstructionGridProps> = ({ homeBankingIdInitial, data, socketPort, sessionId, botJobIdInitial, botJobNameInitial, onSessionOpen, onDetachedClose }) => {
+  // Phase 6, step 10 — hook composition + non-render wiring now lives in the
+  // composition-root hook useInstructionGrid. GridItem stays purely presentational,
+  // destructuring the same names its render helpers / JSX / dead code already use.
+  const grid = useInstructionGrid({
+    homeBankingIdInitial, data, socketPort, sessionId,
+    botJobIdInitial, botJobNameInitial, onSessionOpen, onDetachedClose,
   });
 
-  useEffect(() => {
-    if (!botJobHeader.state) return;
-    setBotJobId(botJobHeader.state.botJobId);
-    setBotJobName(botJobHeader.state.name);
-    setHomeBankingId(botJobHeader.state.homeBankingId);
-  }, [botJobHeader.state]);
-
-  const instructionRef = useRef<HTMLInputElement>(null);
-  const blockRef = useRef<HTMLInputElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const [openDropdown, setOpenDropdown] = useState<number | null>(null);
-  const [mockData, setMockData] = useState<boolean>(false);
-
   const {
+    webSocket, connected, messages,
+    homeBankingId, botJobId, botJobName,
+    gridScrollRef, instructionRef, blockRef, dropdownRef,
+    openDropdown,
+    saveComponentContext, setSaveComponentContext,
+    botJobHeader,
     errorFlag, setErrorFlag,
-    alertImage, setAlertImage,
-    alertClass, setAlertClass,
+    alertImage, alertClass,
     alertMessageHeader, setAlertMessageHeader,
     alertMessageBody, setAlertMessageBody,
     alertMessageFooter, setAlertMessageFooter,
-    alertDismissed, setAlertDismissed,
-    pendingDeleteBlockId, setPendingDeleteBlockId,
-    alertOnConfirm, setAlertOnConfirm,
-    handleClose,
-  } = useGridAlerts();
-
-  const { executionId, setExecutionId, executionState, setExecutionState } = useExecutionState();
-  const { findText, setFindText, renderHighlighted } = useInstructionFind();
-  const { collapsedBlocks, toggleBlockCollapsed } = useBlockCollapse();
-  const {
-    excelExportContext, setExcelExportContext,
-    excelExportDirectory, setExcelExportDirectory,
-    choosingExcelExportDirectory, setChoosingExcelExportDirectory,
-    pendingExcelExportDirectoryRequestRef,
+    alertOnConfirm, handleClose,
+    executionId, executionState,
+    findText, setFindText, renderHighlighted,
+    collapsedBlocks, toggleBlockCollapsed,
+    excelExportContext, excelExportDirectory, choosingExcelExportDirectory,
     handleExcelFileBlockName, submitExcelExport, chooseExcelExportDirectory, closeExcelExport,
-  } = useExcelExport({
-    webSocket, connected, sessionId, homeBankingId, botJobId, botJobName,
-    alerts: {
-      setAlertImage, setAlertClass, setErrorFlag,
-      setAlertMessageHeader, setAlertMessageBody, setAlertMessageFooter,
-    },
-  });
-  const [saveComponentContext, setSaveComponentContext] = useState<SaveComponentContext | null>(null);
-
-  // Memory list: steps hand-picked via the row "+" button, kept in insertion order.
-  // Presentation lives in the one detached Memory List workspace.
-  const {
-    memorySteps, setMemorySteps,
-    memoryTargetBlockId, setMemoryTargetBlockId,
-    memoryBlockOptions, setMemoryBlockOptions,
-    createBlockOpen, setCreateBlockOpen,
-    memoryCapabilities, setMemoryCapabilities,
-    pendingMemoryMove, setPendingMemoryMove,
-    memoryMoveStatus, setMemoryMoveStatus,
-    memoryListOpenVersion, setMemoryListOpenVersion,
-    memoryListOpenRequestedRef, memoryListOpenedRef,
-    memoryListOpenPendingRequestRef, memoryListOwnerEpochRef,
-    requestMemoryListOpen,
-    handleAddToMemory, handleAddBlockToMemory, handleRemoveFromMemory,
-  } = useInstructionMemory(data);
-  // Phase 6, step 9 — the grid DATA LAYER (core grid state, drag state, refs, the
-  // WebSocket-driven effects, and every mutation/drag handler) lives in useGridData.
-  // GridItem feeds it the identity state, alert/execution/find/memory/excel surfaces,
-  // and renders the handlers it returns. Extracted verbatim; no behavior change.
-  const {
+    memorySteps, memoryBlockOptions, createBlockOpen, setCreateBlockOpen,
+    memoryCapabilities, requestMemoryListOpen,
+    handleAddToMemory, handleAddBlockToMemory,
     instructionsData, setInstructionsData,
     groupedData,
-    setIsDataReordered,
     excelGotoInstruction,
     dropdownPosition,
     editingInstructionId, instructionName, setInstructionName,
@@ -191,35 +128,9 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     handleRowDragStart,
     handleRowDrop,
     handleRowDragEnd,
-  } = useGridData({
-    data, sessionId, socketPort, onSessionOpen, onDetachedClose,
-    webSocket, connected, messages,
-    homeBankingId, botJobId, botJobName,
-    setHomeBankingId, setBotJobId, setBotJobName, setBlockId,
-    gridScrollRef, setOpenDropdown,
-    saveComponentContext, setSaveComponentContext,
-    setErrorFlag, setAlertImage, setAlertClass,
-    setAlertMessageHeader, setAlertMessageBody, setAlertMessageFooter, setAlertOnConfirm, handleClose,
-    setExecutionId, setExecutionState,
-    findText,
-    memorySteps, memoryTargetBlockId, memoryBlockOptions, memoryCapabilities,
-    pendingMemoryMove, memoryMoveStatus, memoryListOpenVersion,
-    setMemorySteps, setMemoryTargetBlockId, setMemoryBlockOptions, setMemoryCapabilities,
-    setPendingMemoryMove, setMemoryMoveStatus, setMemoryListOpenVersion, setCreateBlockOpen,
-    handleRemoveFromMemory,
-    memoryListOpenRequestedRef, memoryListOpenedRef, memoryListOpenPendingRequestRef, memoryListOwnerEpochRef,
-    pendingExcelExportDirectoryRequestRef, setChoosingExcelExportDirectory, setExcelExportDirectory,
-  });
-
-  // Whole-block reordering (drag + up/down buttons) lives in useBlockReorder.
-  const {
-    dragBlockRef, commitBlockReorder,
     handleBlockDragStart, handleBlockDrop, handleBlockDragEnd,
-    sortedBlockIndex, handleMoveBlockUp, handleMoveBlockDown,
-  } = useBlockReorder({
-    groupedData, instructionsData, setInstructionsData, setIsDataReordered,
-    webSocket, connected, botJobId, botJobName, homeBankingId,
-  });
+    handleMoveBlockUp, handleMoveBlockDown,
+  } = grid;
 
   type ActionFlag = "E" | "S";
 
@@ -327,56 +238,6 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
   // Native block reorder (drag whole blocks + up/down buttons) now lives in
   // useBlockReorder (destructured above), including the window.__blockReorder hook.
-
-  // Memoized function to handle outside clicks on the dropdown
-  const handleClickOutside = useCallback((event: MouseEvent) => {
-    if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-      setOpenDropdown(null); // Close the dropdown if clicked outside
-    }
-  }, [dropdownRef]);
-
-
-  useEffect(() => {
-    //console.log("UseEffect -> editingInstructionId");
-    if (editingInstructionId && instructionRef.current) {
-      instructionRef.current.focus();
-    }
-  }, [editingInstructionId]);
-
-  useEffect(() => {
-    //console.log("UseEffect -> editingBlockId");
-    if (editingBlockId && blockRef.current) {
-      blockRef.current.focus();
-    }
-  }, [editingBlockId]);
-
-  // Add the event listener to detect clicks outside the dropdown
-  useEffect(() => {
-    //console.log("UseEffect -> handleClickOutside");
-    document.addEventListener('mousedown', handleClickOutside);
-
-    // Cleanup the event listener on component unmount
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [handleClickOutside]);
-
-  // Close the dropdown when clicking outside
-  useEffect(() => {
-    //console.log("UseEffect -> openDropdown");
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setOpenDropdown(null); // Close the dropdown if clicked outside
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-
-    // Cleanup the event listener on component unmount
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [openDropdown]);
 
   const closeAlert = () => {
     setAlertMessageHeader(null);
