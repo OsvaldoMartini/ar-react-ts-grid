@@ -42,6 +42,10 @@ import {
   normalizeBlockOptions,
   instructionMemoryItem,
 } from './bot-job-details/grid/domain/memoryOptions';
+import {
+  groupByBlock,
+  reassignInstructionOrderNumbersByBlock,
+} from './bot-job-details/grid/domain/grouping';
 import { instructionDisplayLabel } from './instructionDisplay';
 import { buildLaterBlockOrderUpdates } from './instructionSplit';
 import type { MemoryListSnapshot } from './memoryList.contract';
@@ -73,44 +77,6 @@ const reorder = (list: any[], startIndex: number, endIndex: number) => {
 };
 
 // Function to group data by blockId and sort instructions within each block
-const groupByBlock = (data: BlockLoopInstructionLoadDTO[]) => {
-  const blocks = data.reduce((result, item) => {
-    const { blockId, blockName, exportFile } = item;
-    if (!result[blockId]) {
-      result[blockId] = { blockName, instructions: [], exportFile: exportFile || "No Excel Export File" };  // Set exportFile
-    }
-    result[blockId].instructions.push(item);
-    return result;
-  }, {} as Record<number, { blockName: string; exportFile?: string; instructions: BlockLoopInstructionLoadDTO[] }>);
-
-  // Sort each block's instructions by instructionOrderNumber
-  Object.values(blocks).forEach(block => {
-    block.instructions.sort((a, b) => a.instructionOrderNumber - b.instructionOrderNumber);
-  });
-
-
-  return blocks;
-};
-
-
-// Helper function to reassign instructionOrderNumber starting from 1 within each block
-const reassignInstructionOrderNumbersByBlock = (instructions: BlockLoopInstructionLoadDTO[]) => {
-  // Group instructions by blockId
-  const grouped = groupByBlock(instructions);
-
-  // Iterate over each block and reassign instructionOrderNumbers
-  const updatedInstructions: BlockLoopInstructionLoadDTO[] = [];
-  Object.entries(grouped).forEach(([blockId, blockData]) => {
-    const reassignedInstructions = blockData.instructions.map((instruction, index) => ({
-      ...instruction,
-      instructionOrderNumber: index + 1, // Reassign starting from 1 within each block
-    }));
-    updatedInstructions.push(...reassignedInstructions);
-  });
-
-  return updatedInstructions;
-};
-
 const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketPort, sessionId, botJobIdInitial, botJobNameInitial, onSessionOpen, onDetachedClose }) => {
   // Using the custom WebSocket hook
   const { webSocket, connected, reconnectAttempts, messages, error } = useWebSocket(socketPort, sessionId);
