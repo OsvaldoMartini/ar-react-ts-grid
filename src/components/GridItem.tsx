@@ -18,7 +18,7 @@ import ArrowLeft from '../assets/ArrowLeft.png';
 import AlertModal from './AlertModal';
 import CompForce from './CompForce';
 import CreateNewBlock, { CreateBlockPosition } from './CreateNewBlock';
-import ExcelExportPanel, { ExcelExportContext } from './ExcelExportPanel';
+import ExcelExportPanel from './ExcelExportPanel';
 import SaveComponentPanel, { SaveComponentContext } from './SaveComponentPanel';
 import BotJobDetailsChrome from './bot-job-details/BotJobDetailsChrome';
 import { useBotJobDetailsController } from './bot-job-details/useBotJobDetailsController';
@@ -35,6 +35,7 @@ import { useBlockCollapse } from './bot-job-details/grid/hooks/useBlockCollapse'
 import { useGridAlerts } from './bot-job-details/grid/hooks/useGridAlerts';
 import { useExecutionState } from './bot-job-details/grid/hooks/useExecutionState';
 import { useInstructionMemory } from './bot-job-details/grid/hooks/useInstructionMemory';
+import { useExcelExport } from './bot-job-details/grid/hooks/useExcelExport';
 import {
   blockOptionsFromInstructions,
   normalizeBlockOptions,
@@ -172,10 +173,19 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
   const { executionId, setExecutionId, executionState, setExecutionState } = useExecutionState();
   const { findText, setFindText, renderHighlighted } = useInstructionFind();
   const { collapsedBlocks, toggleBlockCollapsed } = useBlockCollapse();
-  const [excelExportContext, setExcelExportContext] = useState<ExcelExportContext | null>(null);
-  const [excelExportDirectory, setExcelExportDirectory] = useState<string | undefined>(undefined);
-  const [choosingExcelExportDirectory, setChoosingExcelExportDirectory] = useState(false);
-  const pendingExcelExportDirectoryRequestRef = useRef<string | null>(null);
+  const {
+    excelExportContext, setExcelExportContext,
+    excelExportDirectory, setExcelExportDirectory,
+    choosingExcelExportDirectory, setChoosingExcelExportDirectory,
+    pendingExcelExportDirectoryRequestRef,
+    handleExcelFileBlockName, submitExcelExport, chooseExcelExportDirectory, closeExcelExport,
+  } = useExcelExport({
+    webSocket, connected, sessionId, homeBankingId, botJobId, botJobName,
+    alerts: {
+      setAlertImage, setAlertClass, setErrorFlag,
+      setAlertMessageHeader, setAlertMessageBody, setAlertMessageFooter,
+    },
+  });
   const pendingSplitRequestRef = useRef<string | null>(null);
   const pendingCommandEditorOpenRequestRef = useRef<string | null>(null);
   const processedMessagesRef = useRef(0);
@@ -1489,14 +1499,6 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
   };
 
 
-  const handleExcelFileBlockName = (blockId: number, blockName: string, blockOrderNumber: number, exportFile?: string) => {
-    pendingExcelExportDirectoryRequestRef.current = null;
-    setChoosingExcelExportDirectory(false);
-    setExcelExportDirectory(undefined);
-    setExcelExportContext({ blockId, blockName, blockOrderNumber, exportFile });
-  };
-
-
   const correctBlockOrderNumbers = (data: any[]) => {
     console.log("Correcting blockOrderNumbers");
 
@@ -2796,44 +2798,6 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
         <span style={{ color: "#FFA500" }}>({delimiterName})</span>
       </span>
     );
-  };
-
-  const submitExcelExport = (draft: { directory: string; filename: string; fileType: '.xlsx' | '.csv'; delimiter: ',' | '|'; clear?: boolean }) => {
-    if (!excelExportContext || !webSocket || !connected || !botJobId) return;
-    webSocket.send(JSON.stringify({
-      type: draft.clear ? 'excelExport.clear' : 'excelExport.save', sessionId, homeBankingId,
-      body: JSON.stringify({ ...excelExportContext, ...draft, requestId: `${Date.now()}-excel-${excelExportContext.blockId}`,
-        sessionId, botJobId, botJobName, homeBankingId }),
-    }));
-    setExcelExportContext(null);
-  };
-
-  const chooseExcelExportDirectory = (directory: string) => {
-    if (!excelExportContext || !webSocket || !connected || !botJobId || choosingExcelExportDirectory) return;
-    const requestId = `${Date.now()}-excel-directory-${excelExportContext.blockId}`;
-    pendingExcelExportDirectoryRequestRef.current = requestId;
-    setChoosingExcelExportDirectory(true);
-    try {
-      webSocket.send(JSON.stringify({
-        type: 'excelExport.chooseDirectory', sessionId, homeBankingId,
-        body: JSON.stringify({ ...excelExportContext, directory, requestId,
-          sessionId, botJobId, botJobName, homeBankingId }),
-      }));
-    } catch (error) {
-      pendingExcelExportDirectoryRequestRef.current = null;
-      setChoosingExcelExportDirectory(false);
-      setAlertImage(warningRedImage); setAlertClass('construction-image'); setErrorFlag(true);
-      setAlertMessageHeader('Excel Export Folder Not Selected');
-      setAlertMessageBody('The backend connection could not open the destination folder selector.');
-      setAlertMessageFooter('Check the connection and try Browse again.');
-    }
-  };
-
-  const closeExcelExport = () => {
-    pendingExcelExportDirectoryRequestRef.current = null;
-    setChoosingExcelExportDirectory(false);
-    setExcelExportDirectory(undefined);
-    setExcelExportContext(null);
   };
 
   const submitSaveComponent = (name: string, description: string) => {
