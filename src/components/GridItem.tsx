@@ -17,7 +17,7 @@ import ArrowLeft from '../assets/ArrowLeft.png';
 
 import AlertModal from './AlertModal';
 import CompForce from './CompForce';
-import CreateNewBlock, { CreateBlockOption, CreateBlockPosition } from './CreateNewBlock';
+import CreateNewBlock, { CreateBlockPosition } from './CreateNewBlock';
 import ExcelExportPanel, { ExcelExportContext } from './ExcelExportPanel';
 import SaveComponentPanel, { SaveComponentContext } from './SaveComponentPanel';
 import BotJobDetailsChrome from './bot-job-details/BotJobDetailsChrome';
@@ -34,13 +34,15 @@ import { useInstructionFind, instructionMatchesFind } from './bot-job-details/gr
 import { useBlockCollapse } from './bot-job-details/grid/hooks/useBlockCollapse';
 import { useGridAlerts } from './bot-job-details/grid/hooks/useGridAlerts';
 import { useExecutionState } from './bot-job-details/grid/hooks/useExecutionState';
+import { useInstructionMemory } from './bot-job-details/grid/hooks/useInstructionMemory';
+import {
+  blockOptionsFromInstructions,
+  normalizeBlockOptions,
+  instructionMemoryItem,
+} from './bot-job-details/grid/domain/memoryOptions';
 import { instructionDisplayLabel } from './instructionDisplay';
 import { buildLaterBlockOrderUpdates } from './instructionSplit';
-import type {
-  MemoryListItem,
-  MemoryListItemIcon,
-  MemoryListSnapshot,
-} from './memoryList.contract';
+import type { MemoryListSnapshot } from './memoryList.contract';
 import {
   SCANNER_ELEMENT_PANE_SESSION_ID,
   SCANNER_TOOL_SESSION_ID,
@@ -106,55 +108,6 @@ const reassignInstructionOrderNumbersByBlock = (instructions: BlockLoopInstructi
 
   return updatedInstructions;
 };
-
-const blockOptionsFromInstructions = (instructions: BlockLoopInstructionLoadDTO[]): CreateBlockOption[] => {
-  const byBlockId = new Map<number, CreateBlockOption>();
-  instructions.forEach((instruction) => {
-    if (!byBlockId.has(instruction.blockId)) {
-      byBlockId.set(instruction.blockId, {
-        blockId: instruction.blockId,
-        blockOrderNumber: instruction.blockOrderNumber,
-        blockName: instruction.blockName,
-      });
-    }
-  });
-  return Array.from(byBlockId.values()).sort((a, b) => a.blockOrderNumber - b.blockOrderNumber);
-};
-
-const normalizeBlockOptions = (blocks: CreateBlockOption[]): CreateBlockOption[] => {
-  const byBlockId = new Map<number, CreateBlockOption>();
-  blocks.forEach((block) => {
-    if (block.blockId > 0) byBlockId.set(block.blockId, block);
-  });
-  return Array.from(byBlockId.values()).sort((a, b) => a.blockOrderNumber - b.blockOrderNumber);
-};
-
-const instructionMemoryIcon = (instruction: BlockLoopInstructionLoadDTO): MemoryListItemIcon => {
-  const action = String(instruction.actions || '').split(':')[0].trim().toUpperCase();
-  const tagName = String(instruction.tagName || '').toLowerCase();
-  if (action === 'I' || tagName === 'input' || tagName === 'textarea') return 'input';
-  if (action === 'C' || tagName === 'button') return 'click';
-  if (action === 'A' || tagName === 'a' || tagName === 'link') return 'link';
-  if (action === 'O' || tagName === 'label') return 'output';
-  if (action === 'H' || action === 'HOLD' || action === 'WAIT') return 'wait';
-  if (action === 'E' || action.includes('CSV') || action.includes('PDF')) return 'excel';
-  if (action === 'P') return 'screen';
-  return 'default';
-};
-
-const instructionMemoryItem = (
-  instruction: BlockLoopInstructionLoadDTO,
-): MemoryListItem => ({
-  key: `BOT_JOB:${instruction.id}`,
-  sourceKind: 'BOT_JOB',
-  sourceItemKey: String(instruction.id),
-  label: `(${instruction.id})${instructionDisplayLabel(instruction) || instruction.actions || 'Instruction'}`,
-  detail: `Block #${instruction.blockOrderNumber} ${instruction.blockName}`,
-  icon: instructionMemoryIcon(instruction),
-  active: instruction.instructionActive !== false,
-  payload: { instructionId: instruction.id },
-});
-
 
 const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketPort, sessionId, botJobIdInitial, botJobNameInitial, onSessionOpen, onDetachedClose }) => {
   // Using the custom WebSocket hook
@@ -236,13 +189,20 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
   // Memory list: steps hand-picked via the row "+" button, kept in insertion order.
   // Presentation lives in the one detached Memory List workspace.
-  const [memorySteps, setMemorySteps] = useState<BlockLoopInstructionLoadDTO[]>([]);
-  const [memoryTargetBlockId, setMemoryTargetBlockId] = useState<number | null>(null);
-  const [memoryBlockOptions, setMemoryBlockOptions] = useState<CreateBlockOption[]>(
-    blockOptionsFromInstructions(data)
-  );
-  const [createBlockOpen, setCreateBlockOpen] = useState<boolean>(false);
-  const [memoryCapabilities, setMemoryCapabilities] = useState<Map<number, { canAdd: boolean; canMove: boolean; canDelete: boolean; deleteCount: number; reason: string; deleteReason: string; allowedBlockIds: number[]; deleteRows: { id: number; name: string; action: string; order: number }[] }>>(new Map());
+  const {
+    memorySteps, setMemorySteps,
+    memoryTargetBlockId, setMemoryTargetBlockId,
+    memoryBlockOptions, setMemoryBlockOptions,
+    createBlockOpen, setCreateBlockOpen,
+    memoryCapabilities, setMemoryCapabilities,
+    pendingMemoryMove, setPendingMemoryMove,
+    memoryMoveStatus, setMemoryMoveStatus,
+    memoryListOpenVersion, setMemoryListOpenVersion,
+    memoryListOpenRequestedRef, memoryListOpenedRef,
+    memoryListOpenPendingRequestRef, memoryListOwnerEpochRef,
+    requestMemoryListOpen,
+    handleAddToMemory, handleAddBlockToMemory, handleRemoveFromMemory,
+  } = useInstructionMemory(data);
   const [activeDraggedInstructionId, setActiveDraggedInstructionId] = useState<number | null>(null);
   const [pendingDragPreview, setPendingDragPreview] = useState<{ requestId: string; result: any } | null>(null);
   const [blockDeleteCapabilities, setBlockDeleteCapabilities] = useState<Map<number, BlockDeleteCapability>>(new Map());
@@ -251,49 +211,8 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     webSocket, connected, graphRevision: moveGraphRevision, botJobId, botJobName,
     homeBankingId, targetSessionId: 'botJobTasks',
   });
-  const [pendingMemoryMove, setPendingMemoryMove] = useState<{ requestId: string; ids: Set<number> } | null>(null);
-  const [memoryMoveStatus, setMemoryMoveStatus] = useState('');
-  const memoryListOpenRequestedRef = useRef(false);
-  const memoryListOpenedRef = useRef(false);
-  const memoryListOpenPendingRequestRef = useRef<string | null>(null);
-  const memoryListOwnerEpochRef = useRef('');
-  const [memoryListOpenVersion, setMemoryListOpenVersion] = useState(0);
-
-  const requestMemoryListOpen = () => {
-    memoryListOpenRequestedRef.current = true;
-    if (memoryListOpenPendingRequestRef.current) return;
-    memoryListOpenedRef.current = false;
-    memoryListOwnerEpochRef.current = '';
-    setMemoryListOpenVersion(version => version + 1);
-  };
-
-  const handleAddToMemory = (instruction: BlockLoopInstructionLoadDTO) => {
-    if (!memoryCapabilities.get(instruction.id)?.canAdd) return;
-    setMemorySteps((prev) =>
-      prev.some((step) => step.id === instruction.id) ? prev : [...prev, instruction]
-    );
-    requestMemoryListOpen();
-  };
-
-  const handleAddBlockToMemory = (instructions: BlockLoopInstructionLoadDTO[]) => {
-    const eligible = instructions.filter(instruction => memoryCapabilities.get(instruction.id)?.canAdd);
-    setMemorySteps((prev) => {
-      const seen = new Set(prev.map((step) => step.id));
-      const next = [...prev];
-      eligible.forEach((instruction) => {
-        if (!seen.has(instruction.id)) {
-          seen.add(instruction.id);
-          next.push(instruction);
-        }
-      });
-      return next;
-    });
-    requestMemoryListOpen();
-  };
-
-  const handleRemoveFromMemory = (id: number) => {
-    setMemorySteps((prev) => prev.filter((step) => step.id !== id));
-  };
+  // Memory-List state, refs and add/remove handlers now live in useInstructionMemory
+  // (destructured above). The WS effects + handleApplyMemory below consume them.
 
   useEffect(() => {
     setMemoryBlockOptions((prev) => normalizeBlockOptions([
