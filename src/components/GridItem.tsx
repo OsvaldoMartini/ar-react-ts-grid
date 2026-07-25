@@ -36,6 +36,7 @@ import { useGridAlerts } from './bot-job-details/grid/hooks/useGridAlerts';
 import { useExecutionState } from './bot-job-details/grid/hooks/useExecutionState';
 import { useInstructionMemory } from './bot-job-details/grid/hooks/useInstructionMemory';
 import { useExcelExport } from './bot-job-details/grid/hooks/useExcelExport';
+import { useBlockReorder } from './bot-job-details/grid/hooks/useBlockReorder';
 import {
   blockOptionsFromInstructions,
   normalizeBlockOptions,
@@ -223,6 +224,16 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
   });
   // Memory-List state, refs and add/remove handlers now live in useInstructionMemory
   // (destructured above). The WS effects + handleApplyMemory below consume them.
+
+  // Whole-block reordering (drag + up/down buttons) lives in useBlockReorder.
+  const {
+    dragBlockRef, commitBlockReorder,
+    handleBlockDragStart, handleBlockDrop, handleBlockDragEnd,
+    sortedBlockIndex, handleMoveBlockUp, handleMoveBlockDown,
+  } = useBlockReorder({
+    groupedData, instructionsData, setInstructionsData, setIsDataReordered,
+    webSocket, connected, botJobId, botJobName, homeBankingId,
+  });
 
   useEffect(() => {
     setMemoryBlockOptions((prev) => normalizeBlockOptions([
@@ -698,78 +709,8 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     setActiveDraggedInstructionId(null);
   };
 
-  // ── Native block reorder (drag whole blocks) ───────────────────────────────
-  // Drag from a block header; drop on another block. Reassigns every block's
-  // blockOrderNumber and sends BLOCK_MOVE with the full new order (same message
-  // the up/down buttons use, extended to a full list). window.__blockReorder
-  // exposes the same pipeline for testing.
-  const dragBlockRef = useRef<{ index: number; blockId: number } | null>(null);
-
-  const commitBlockReorder = useCallback((fromIndex: number, toIndex: number) => {
-    if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return;
-    const blocks = Object.values(groupedData)
-      .sort((a, b) => a.instructions[0].blockOrderNumber - b.instructions[0].blockOrderNumber);
-    if (fromIndex >= blocks.length || toIndex >= blocks.length) return;
-    const reordered = [...blocks];
-    const [moved] = reordered.splice(fromIndex, 1);
-    reordered.splice(toIndex, 0, moved);
-    const updatedBlocks = reordered.map((block, i) => ({
-      blockId: block.instructions[0].blockId,
-      botJobId: block.instructions[0].botJobId,
-      blockOrderNumber: i + 1,
-      blockName: block.instructions[0].blockName,
-    }));
-    const orderByBlockId = new Map(updatedBlocks.map(block => [block.blockId, block.blockOrderNumber]));
-    const updatedData = instructionsData.map(instruction => ({
-      ...instruction,
-      blockOrderNumber: orderByBlockId.get(instruction.blockId) ?? instruction.blockOrderNumber,
-    }));
-    setInstructionsData(updatedData);
-    setIsDataReordered(false);
-    console.log('[Block][drag] reorder', { from: fromIndex, to: toIndex, updatedBlocks });
-    if (webSocket && connected) {
-      webSocket.send(JSON.stringify({
-        type: 'BLOCK_MOVE',
-        botJobId,
-        botJobName,
-        homeBankingId,
-        sessionId: 'botJobTasks',
-        updatedBlocks,
-      }));
-    }
-  }, [groupedData, instructionsData, webSocket, connected, botJobId, botJobName, homeBankingId]);
-
-  const handleBlockDragStart = (index: number, blockId: number) => (event: React.DragEvent) => {
-    dragBlockRef.current = { index, blockId };
-    try {
-      event.dataTransfer.effectAllowed = 'move';
-      event.dataTransfer.setData('text/plain', `block-${blockId}`);
-    } catch {
-      // dataTransfer may be restricted; the ref still carries the source.
-    }
-    console.log(`[Block][drag] GRABBED block ${blockId} at index ${index}`);
-  };
-
-  const handleBlockDrop = (index: number) => (event: React.DragEvent) => {
-    if (!dragBlockRef.current) return; // an instruction drag — let InstructionList handle it
-    event.preventDefault();
-    event.stopPropagation();
-    const source = dragBlockRef.current;
-    dragBlockRef.current = null;
-    commitBlockReorder(source.index, index);
-  };
-
-  const handleBlockDragEnd = () => {
-    dragBlockRef.current = null;
-  };
-
-  useEffect(() => {
-    (window as any).__blockReorder = (fromIndex: number, toIndex: number) =>
-      commitBlockReorder(fromIndex, toIndex);
-    return () => {
-      delete (window as any).__blockReorder;
-    };
-  }, [commitBlockReorder]);
+  // Native block reorder (drag whole blocks + up/down buttons) now lives in
+  // useBlockReorder (destructured above), including the window.__blockReorder hook.
 
   useEffect(() => {
     (window as any).__gridReorder = (
@@ -1542,17 +1483,6 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
   // Function to move a block up by swapping blockOrderNumbers
   // ONE code path for every block reorder (up/down buttons AND drag & drop):
-  // commitBlockReorder rewrites every block's blockOrderNumber and sends a single
-  // BLOCK_MOVE with the full ordered list — never a 2-block swap.
-  const sortedBlockIndex = (blockId: number) =>
-    Object.values(groupedData)
-      .sort((a, b) => a.instructions[0].blockOrderNumber - b.instructions[0].blockOrderNumber)
-      .findIndex(block => Number(block.instructions[0].blockId) === Number(blockId));
-
-  const handleMoveBlockUp = (blockId: number) => {
-    const index = sortedBlockIndex(blockId);
-    if (index > 0) commitBlockReorder(index, index - 1);
-  };
 
   const handleOpenCommandEditor = (instruction: BlockLoopInstructionLoadDTO) => {
     const instructionId = Number(instruction.id);
@@ -2033,12 +1963,6 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
 
   // Function to move a block down by swapping blockOrderNumbers
-  const handleMoveBlockDown = (blockId: number) => {
-    const index = sortedBlockIndex(blockId);
-    if (index >= 0 && index < Object.keys(groupedData).length - 1) {
-      commitBlockReorder(index, index + 1);
-    }
-  };
 
 
 
