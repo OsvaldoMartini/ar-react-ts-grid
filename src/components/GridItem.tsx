@@ -30,6 +30,7 @@ import InstructionRow from './bot-job-details/grid/InstructionRow';
 import InstructionList from './bot-job-details/grid/InstructionList';
 import BlockHeader from './bot-job-details/grid/BlockHeader';
 import BlockCard from './bot-job-details/grid/BlockCard';
+import { useInstructionFind, instructionMatchesFind } from './bot-job-details/grid/hooks/useInstructionFind';
 import { instructionDisplayLabel } from './instructionDisplay';
 import { buildLaterBlockOrderUpdates } from './instructionSplit';
 import type {
@@ -211,7 +212,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
 
   const [executionId, setExecutionId] = useState<number>(0);
   const [executionState, setExecutionState] = useState<string>();
-  const [findText, setFindText] = useState<string>('');
+  const { findText, setFindText, renderHighlighted } = useInstructionFind();
   const [collapsedBlocks, setCollapsedBlocks] = useState<Set<number>>(new Set());
   const [excelExportContext, setExcelExportContext] = useState<ExcelExportContext | null>(null);
   const [excelExportDirectory, setExcelExportDirectory] = useState<string | undefined>(undefined);
@@ -2858,35 +2859,6 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
   // Same rule everywhere: match the label the grid displays (clientNamed wins
   // over the canonical backend name), but keep matching `name` too so searching
   // by the backend key still works.
-  const instructionMatchesFind = (ins: BlockLoopInstructionLoadDTO, q: string): boolean => {
-    const shownLabel = instructionDisplayLabel(ins);
-    return (shownLabel ?? "").toLowerCase().includes(q)
-      || (ins.name ?? "").toLowerCase().includes(q);
-  };
-
-  const renderHighlighted = (text: string, query: string) => {
-    const q = query.trim();
-    if (!q) return text;
-
-    const lowerText = text.toLowerCase();
-    const lowerQ = q.toLowerCase();
-    const idx = lowerText.indexOf(lowerQ);
-
-    if (idx === -1) return text;
-
-    const before = text.slice(0, idx);
-    const match = text.slice(idx, idx + q.length);
-    const after = text.slice(idx + q.length);
-
-    return (
-      <>
-        {before}
-        <mark className={styles.findHighlight}>{match}</mark>
-        {after}
-      </>
-    );
-  };
-
   const renderExportFile = (input: string) => {
     const lastChar = input.slice(-1);
     const path = input.slice(0, -2); // remove ":," or ":|" from the end
