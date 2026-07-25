@@ -31,6 +31,7 @@ import InstructionList from './bot-job-details/grid/InstructionList';
 import BlockHeader from './bot-job-details/grid/BlockHeader';
 import BlockCard from './bot-job-details/grid/BlockCard';
 import { useInstructionFind, instructionMatchesFind } from './bot-job-details/grid/hooks/useInstructionFind';
+import { useBlockCollapse } from './bot-job-details/grid/hooks/useBlockCollapse';
 import { instructionDisplayLabel } from './instructionDisplay';
 import { buildLaterBlockOrderUpdates } from './instructionSplit';
 import type {
@@ -213,7 +214,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
   const [executionId, setExecutionId] = useState<number>(0);
   const [executionState, setExecutionState] = useState<string>();
   const { findText, setFindText, renderHighlighted } = useInstructionFind();
-  const [collapsedBlocks, setCollapsedBlocks] = useState<Set<number>>(new Set());
+  const { collapsedBlocks, toggleBlockCollapsed } = useBlockCollapse();
   const [excelExportContext, setExcelExportContext] = useState<ExcelExportContext | null>(null);
   const [excelExportDirectory, setExcelExportDirectory] = useState<string | undefined>(undefined);
   const [choosingExcelExportDirectory, setChoosingExcelExportDirectory] = useState(false);
@@ -494,15 +495,6 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
       console.log('Error sending BLOCK_CREATE message:', err);
       return;
     }
-  };
-
-  const toggleBlockCollapsed = (blockId: number) => {
-    setCollapsedBlocks((prev) => {
-      const next = new Set(prev);
-      if (next.has(blockId)) next.delete(blockId);
-      else next.add(blockId);
-      return next;
-    });
   };
 
   type ActionFlag = "E" | "S";
