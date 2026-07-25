@@ -33,6 +33,7 @@ import BlockCard from './bot-job-details/grid/BlockCard';
 import { useInstructionFind, instructionMatchesFind } from './bot-job-details/grid/hooks/useInstructionFind';
 import { useBlockCollapse } from './bot-job-details/grid/hooks/useBlockCollapse';
 import { useGridAlerts } from './bot-job-details/grid/hooks/useGridAlerts';
+import { useExecutionState } from './bot-job-details/grid/hooks/useExecutionState';
 import { instructionDisplayLabel } from './instructionDisplay';
 import { buildLaterBlockOrderUpdates } from './instructionSplit';
 import type {
@@ -215,8 +216,7 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
     handleClose,
   } = useGridAlerts();
 
-  const [executionId, setExecutionId] = useState<number>(0);
-  const [executionState, setExecutionState] = useState<string>();
+  const { executionId, setExecutionId, executionState, setExecutionState } = useExecutionState();
   const { findText, setFindText, renderHighlighted } = useInstructionFind();
   const { collapsedBlocks, toggleBlockCollapsed } = useBlockCollapse();
   const [excelExportContext, setExcelExportContext] = useState<ExcelExportContext | null>(null);
