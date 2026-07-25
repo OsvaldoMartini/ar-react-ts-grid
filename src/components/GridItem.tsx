@@ -32,6 +32,7 @@ import BlockHeader from './bot-job-details/grid/BlockHeader';
 import BlockCard from './bot-job-details/grid/BlockCard';
 import { useInstructionFind, instructionMatchesFind } from './bot-job-details/grid/hooks/useInstructionFind';
 import { useBlockCollapse } from './bot-job-details/grid/hooks/useBlockCollapse';
+import { useGridAlerts } from './bot-job-details/grid/hooks/useGridAlerts';
 import { instructionDisplayLabel } from './instructionDisplay';
 import { buildLaterBlockOrderUpdates } from './instructionSplit';
 import type {
@@ -201,15 +202,18 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
   const [editingBlockId, setEditingBlockId] = useState<number | null>(null);
   const [blockName, setBlockName] = useState<string>('');
 
-  const [errorFlag, setErrorFlag] = useState<boolean>(false)
-  const [alertImage, setAlertImage] = useState(constructionImage);
-  const [alertClass, setAlertClass] = useState('construction-image')
-  const [alertMessageHeader, setAlertMessageHeader] = useState<string | null>(null);
-  const [alertMessageBody, setAlertMessageBody] = useState<string | ComplexMessage[]>([]);
-  const [alertMessageFooter, setAlertMessageFooter] = useState<string | null>(null);
-  const [alertDismissed, setAlertDismissed] = useState(false);
-  const [pendingDeleteBlockId, setPendingDeleteBlockId] = useState<number | null>(null);
-  const [alertOnConfirm, setAlertOnConfirm] = useState<(() => void) | undefined>(undefined);
+  const {
+    errorFlag, setErrorFlag,
+    alertImage, setAlertImage,
+    alertClass, setAlertClass,
+    alertMessageHeader, setAlertMessageHeader,
+    alertMessageBody, setAlertMessageBody,
+    alertMessageFooter, setAlertMessageFooter,
+    alertDismissed, setAlertDismissed,
+    pendingDeleteBlockId, setPendingDeleteBlockId,
+    alertOnConfirm, setAlertOnConfirm,
+    handleClose,
+  } = useGridAlerts();
 
   const [executionId, setExecutionId] = useState<number>(0);
   const [executionState, setExecutionState] = useState<string>();
@@ -1351,15 +1355,6 @@ const GridItem: React.FC<GridItemProps> = ({ homeBankingIdInitial, data, socketP
   const handleEditBlock = (blockId: number, currentBlockName: string) => {
     setEditingBlockId(blockId);
     setBlockName(currentBlockName);
-  };
-
-  const handleClose = () => {
-    setAlertDismissed(true); // Trigger re-execution of the effect
-    setErrorFlag(false); // Reset error flag
-    setAlertMessageHeader('');
-    setAlertMessageBody('');
-    setPendingDeleteBlockId(null);
-    setAlertOnConfirm(undefined);
   };
 
   const handleSaveBlockName = (blockId: number) => {
