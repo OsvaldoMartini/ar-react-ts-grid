@@ -27,14 +27,6 @@ import type { UseInstructionGridProps } from './bot-job-details/grid/types/instr
 import styles from './Griditem.module.scss';
 
 
-// Helper function to reorder items in an array based on drag-and-drop actions
-const reorder = (list: any[], startIndex: number, endIndex: number) => {
-  const result = Array.from(list);
-  const [removed] = result.splice(startIndex, 1);
-  result.splice(endIndex, 0, removed);
-  return result;
-};
-
 // Function to group data by blockId and sort instructions within each block
 const GridItem: React.FC<UseInstructionGridProps> = ({ homeBankingIdInitial, data, socketPort, sessionId, botJobIdInitial, botJobNameInitial, onSessionOpen, onDetachedClose }) => {
   // Phase 6, step 10 — hook composition + non-render wiring now lives in the
@@ -47,16 +39,16 @@ const GridItem: React.FC<UseInstructionGridProps> = ({ homeBankingIdInitial, dat
 
   const {
     webSocket, connected, messages,
-    homeBankingId, botJobId, botJobName,
+    botJobId, botJobName,
     gridScrollRef, instructionRef, blockRef, dropdownRef,
     openDropdown,
     saveComponentContext, setSaveComponentContext,
     botJobHeader,
-    errorFlag, setErrorFlag,
+    errorFlag,
     alertImage, alertClass,
-    alertMessageHeader, setAlertMessageHeader,
-    alertMessageBody, setAlertMessageBody,
-    alertMessageFooter, setAlertMessageFooter,
+    alertMessageHeader,
+    alertMessageBody,
+    alertMessageFooter,
     alertOnConfirm, handleClose,
     executionId, executionState,
     findText, setFindText, renderHighlighted,
@@ -66,7 +58,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({ homeBankingIdInitial, dat
     memorySteps, memoryBlockOptions, createBlockOpen, setCreateBlockOpen,
     memoryCapabilities, requestMemoryListOpen,
     handleAddToMemory, handleAddBlockToMemory,
-    instructionsData, setInstructionsData,
+    instructionsData,
     groupedData,
     excelGotoInstruction,
     dropdownPosition,
@@ -100,208 +92,13 @@ const GridItem: React.FC<UseInstructionGridProps> = ({ homeBankingIdInitial, dat
     handleMoveBlockUp, handleMoveBlockDown,
   } = grid;
 
-  type ActionFlag = "E" | "S";
-
-  const parseActions = (actions?: string | null) =>
-    (actions ?? "")
-      .split(":")
-      .map(t => t.trim())
-      .filter(Boolean);
-
-  const buildActions = (tokens: string[]) => tokens.join(":");
-
-  const isFlag = (t: string) => {
-    const u = t.toUpperCase();
-    return u === "E" || u === "S";
-  };
-
-  function updateInputActionName(actions: string, newName: string) {
-    if (!actions || !actions.startsWith("I")) return actions;
-
-    // Only apply to inputs:
-    // "I" or "I:..." (covers "I:" too)
-    if (actions !== "I" && !actions.startsWith("I:")) return actions;
-
-    const parts = actions
-      .split(":")
-      .map(p => p.trim())
-      .filter(p => p.length > 0);
-
-    // Ensure base is exactly "I"
-    const base = "I";
-
-    // Collect flags from everything except base and the tail-name if present
-    // We treat any non-flag token after I as "name" candidate, but we ultimately set it to newName.
-    const middle = parts.slice(1);
-    const flags = middle.filter(isFlag);
-
-    // Stable order (S then E)
-    const normalizedFlags: string[] = [];
-    if (flags.includes("S")) normalizedFlags.push("S");
-    if (flags.includes("E")) normalizedFlags.push("E");
-
-    // Always: I[:S][:E]:newName  (so the LAST token is always the name)
-    return [base, ...normalizedFlags, newName].join(":");
-  }
-
-  // choose a consistent flag order (CHANGE if you prefer S before E)
-  const FLAG_ORDER: ActionFlag[] = ["E", "S"];
-
-  const toggleActionFlag = (
-    actions: string | null | undefined,
-    flag: ActionFlag,
-    origName?: string
-  ) => {
-    const tokens = parseActions(actions);
-    const upper = tokens.map(t => t.toUpperCase());
-
-    // Special case: I:... (inputs)
-    if (upper[0] === "I") {
-      let name = tokens[tokens.length - 1] ?? "";
-
-      // If last token is a flag, then there is no name yet
-      if (isFlag(name.toUpperCase())) {
-        name = origName ?? "";
-      }
-
-      // If origName provided and different → enforce it
-      if (origName && name !== origName) {
-        name = origName;
-      }
-
-      // Extract base + flags (exclude last token)
-      const head = tokens.slice(0, tokens.length - 1);
-      const headUpper = head.map(t => t.toUpperCase());
-
-      const base = "I";
-      const existingFlags = headUpper.filter(isFlag) as ActionFlag[];
-
-      const has = existingFlags.includes(flag);
-      const nextFlags = has
-        ? existingFlags.filter(f => f !== flag)
-        : [...existingFlags, flag];
-
-      // Stable order
-      const orderedFlags = FLAG_ORDER.filter(f => nextFlags.includes(f));
-
-      return buildActions([base, ...orderedFlags, name]);
-    }
-
-    // Default (non-I)
-    const flagUpper = flag.toUpperCase();
-    const idx = upper.indexOf(flagUpper);
-
-    if (idx >= 0) {
-      const out = tokens.slice(0, idx).concat(tokens.slice(idx + 1));
-      return buildActions(out);
-    }
-
-    return buildActions([...tokens, flag]);
-  };
-
-  const hasActionFlag = (actions: string | null | undefined, flag: ActionFlag) => {
-    const tokens = parseActions(actions).map(t => t.toUpperCase());
-    return tokens.includes(flag);
-  };
-
   // Native block reorder (drag whole blocks + up/down buttons) now lives in
   // useBlockReorder (destructured above), including the window.__blockReorder hook.
-
-  const closeAlert = () => {
-    setAlertMessageHeader(null);
-    setErrorFlag(false);
-    setAlertMessageBody([]);
-    setAlertMessageFooter(null);
-  };
-
-  const isBetweenCondition = (
-    currentOrderNumber: number,
-    instructions: BlockLoopInstructionLoadDTO[]
-  ): { isBetween: boolean; parentId: number | null } => {
-    let ifFound = false;
-    let parentId: number | null = null;
-
-    for (const instr of instructions) {
-      if (instr.actions === "IF") {
-        ifFound = true;
-        parentId = instr.parentId !== undefined ? instr.parentId : null; // Convert undefined to null
-      }
-      if (instr.instructionOrderNumber === currentOrderNumber && ifFound) {
-        return { isBetween: true, parentId }; // Return the result and the parentId
-      }
-      if (instr.actions === "ENDIF" && ifFound) {
-        ifFound = false; // Reset once ENDIF is encountered
-        parentId = null; // Reset parentId
-      }
-    }
-    return { isBetween: false, parentId: null }; // Return false if not between IF and ENDIF
-  };
-
-
-
-  const isBetweenIfAndElse = (currentOrderNumber: number, instructions: BlockLoopInstructionLoadDTO[]) => {
-    let ifFound = false;
-
-    for (const instr of instructions) {
-      if (instr.actions === "IF") {
-        ifFound = true;
-      }
-      if (instr.instructionOrderNumber === currentOrderNumber && ifFound) {
-        return true; // The instruction is between IF and ENDIF
-      }
-      if (instr.actions === "ELSE" && ifFound) {
-        ifFound = false; // Reset once ENDIF is encountered
-      }
-    }
-    return false;
-  }
-
-  const getInstructionsBetweenIfAndEndIf = (currentOrderNumber: number, instructions: any[]): (number | null)[] => {
-    let ifFound = false;
-    let firstInstructionId: number | null = null;
-    let lastInstructionId: number | null = null;
-
-    for (const instr of instructions) {
-      if (instr.actions === "IF") {
-        ifFound = true; // Mark the start of the block
-      }
-
-      if (ifFound) {
-        // Track the first instruction inside the IF block
-        if (firstInstructionId === null) {
-          firstInstructionId = instr.instructionId;
-        }
-
-        lastInstructionId = instr.instructionId; // Keep updating the lastInstructionId
-
-        if (instr.instructionOrderNumber === currentOrderNumber) {
-          return [firstInstructionId, lastInstructionId]; // Return once currentOrderNumber is found
-        }
-      }
-
-      if (instr.actions === "ENDIF" && ifFound) {
-        return [firstInstructionId, lastInstructionId]; // Return once ENDIF is encountered
-      }
-    }
-
-    return [null, null]; // No instructions found between IF and ENDIF
-  };
-
-
 
   // Data-layer handlers (moves, delete/rollback) now live in useGridData.
 
 
 
-
-
-  const editableSpecialOperations = (actionType: string) => {
-    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "PAUSE", "REFRESH", "LOOP", "REFRESH_LOOP", "NEXT_ENTER", "SWIPE_UP", "SWIPE_DOWN", "EXCEL GOTO", "NEXT ROW", "CSV CHECK", "PDF CHECK"].includes(actionType)) {
-      return true;
-    } else {
-      return false;
-    }
-  }
 
 
   const allSpecialOperations = (actionType: string) => {
@@ -328,34 +125,6 @@ const GridItem: React.FC<UseInstructionGridProps> = ({ homeBankingIdInitial, dat
     );
   };
 
-
-  const updateInstructionActions = (instructionId: number, flag: ActionFlag) => {
-    const instruction = instructionsData.find(x => x.id === instructionId);
-    if (!instruction) return;
-
-    const newActions = toggleActionFlag(instruction.actions, flag, instruction.name);
-
-    // ✅ side-effect OUTSIDE setState
-    if (webSocket && connected) {
-      const message = {
-        type: "ACTIONS_UPDATE",
-        botJobId: instruction.botJobId,
-        blockId: instruction.blockId,
-        botJobName,
-        instructionId,
-        parentId: instruction.parentId,
-        actions: newActions,
-        homeBankingId,
-        sessionId: "botJobTasks",
-      };
-      webSocket.send(JSON.stringify(message));
-    }
-
-    // ✅ pure state update
-    setInstructionsData(prev =>
-      prev.map(x => (x.id === instructionId ? { ...x, actions: newActions } : x))
-    );
-  };
 
   const renderDeviceOptionsRow = (instruction: BlockLoopInstructionLoadDTO) => {
     if (allSpecialOperations(instruction.actions)) {
@@ -559,7 +328,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({ homeBankingIdInitial, dat
 
     // Handle operation for other actions (SET, GET)
     if (validActions.includes(instruction.actions) && instruction.operation) {
-      const [left, right] = instruction.operation.split(":");
+      const [, right] = instruction.operation.split(":");
 
       // Retrieve parentValue from allInstructions
       const parentInstruction = allInstructions.find((item) => item.id === instruction.parentId);
