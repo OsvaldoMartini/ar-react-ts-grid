@@ -1,61 +1,29 @@
-import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
-import { BlockLoopInstructionLoadDTO, BotJobData, ComplexMessage, ElementDTO, UpdatedBlock } from './instructionsMockData';
+import React from 'react';
+import { BlockLoopInstructionLoadDTO } from './instructionsMockData';
 
 import editImage from '../assets/edit.png';
 import edit2Image from '../assets/edit2.png';
 import upImage from '../assets/up.png';
 import downImage from '../assets/down.png';
-import binImage from '../assets/bin.png';
 import excelGotoImage from "../assets/excel_goto2.png";
 import clickTestImage from "../assets/clickTest2.png";
-import constructionImage from '../assets/construction.png';
-import forbiddenImage from '../assets/forbidden.png';
-import warningRedImage from '../assets/warning_red.png';
-import brickImage from '../assets/brick.png';
-import ArrowLeft from '../assets/ArrowLeft.png';
 
 
 import AlertModal from './AlertModal';
 import CompForce from './CompForce';
-import CreateNewBlock, { CreateBlockPosition } from './CreateNewBlock';
+import CreateNewBlock from './CreateNewBlock';
 import ExcelExportPanel from './ExcelExportPanel';
-import SaveComponentPanel, { SaveComponentContext } from './SaveComponentPanel';
+import SaveComponentPanel from './SaveComponentPanel';
 import BotJobDetailsChrome from './bot-job-details/BotJobDetailsChrome';
-import { useBotJobDetailsController } from './bot-job-details/useBotJobDetailsController';
-import { useWebSocket } from './useWebSocket';
-import { useInstructionDrag } from './useInstructionDrag';
 import FindBar from './bot-job-details/grid/FindBar';
 import DeleteButton from './bot-job-details/grid/DeleteButton';
 import InstructionRow from './bot-job-details/grid/InstructionRow';
 import InstructionList from './bot-job-details/grid/InstructionList';
 import BlockHeader from './bot-job-details/grid/BlockHeader';
 import BlockCard from './bot-job-details/grid/BlockCard';
-import { useInstructionFind, instructionMatchesFind } from './bot-job-details/grid/hooks/useInstructionFind';
-import { useBlockCollapse } from './bot-job-details/grid/hooks/useBlockCollapse';
-import { useGridAlerts } from './bot-job-details/grid/hooks/useGridAlerts';
-import { useExecutionState } from './bot-job-details/grid/hooks/useExecutionState';
-import { useInstructionMemory } from './bot-job-details/grid/hooks/useInstructionMemory';
-import { useExcelExport } from './bot-job-details/grid/hooks/useExcelExport';
-import { useBlockReorder } from './bot-job-details/grid/hooks/useBlockReorder';
-import { useGridData } from './bot-job-details/grid/hooks/useGridData';
+import { instructionMatchesFind } from './bot-job-details/grid/hooks/useInstructionFind';
 import { useInstructionGrid } from './bot-job-details/grid/hooks/useInstructionGrid';
 import type { UseInstructionGridProps } from './bot-job-details/grid/types/instructionGrid.types';
-import {
-  blockOptionsFromInstructions,
-  normalizeBlockOptions,
-  instructionMemoryItem,
-} from './bot-job-details/grid/domain/memoryOptions';
-import {
-  groupByBlock,
-  reassignInstructionOrderNumbersByBlock,
-} from './bot-job-details/grid/domain/grouping';
-import { instructionDisplayLabel } from './instructionDisplay';
-import { buildLaterBlockOrderUpdates } from './instructionSplit';
-import type { MemoryListSnapshot } from './memoryList.contract';
-import {
-  SCANNER_ELEMENT_PANE_SESSION_ID,
-  SCANNER_TOOL_SESSION_ID,
-} from './scanner/Scanner.sessions';
 import styles from './Griditem.module.scss';
 
 
