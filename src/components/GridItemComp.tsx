@@ -50,6 +50,7 @@ import { useBotJobDetailsController } from './bot-job-details/useBotJobDetailsCo
 import { useWebSocket } from './useWebSocket';
 import { useInstructionDrag } from './useInstructionDrag';
 import { useExcelExport } from './bot-job-details/grid/hooks/useExcelExport';
+import { useGridAlerts } from './bot-job-details/grid/hooks/useGridAlerts';
 import { instructionDisplayLabel } from './instructionDisplay';
 import { canStartCommandApply, resolveCommandApplyResponse } from './commandApplyResponse';
 import {
@@ -162,14 +163,18 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
   const [editingBlockId, setEditingBlockId] = useState<number | null>(null);
   const [blockName, setBlockName] = useState<string>('');
 
-  const [errorFlag, setErrorFlag] = useState<boolean>(false)
-  const [alertImage, setAlertImage] = useState(constructionImage);
-  const [alertClass, setAlertClass] = useState('construction-image')
-  const [alertMessageHeader, setAlertMessageHeader] = useState<string | null>(null);
-  const [alertMessageBody, setAlertMessageBody] = useState<string | ComplexMessage[]>([]);
-  const [alertMessageFooter, setAlertMessageFooter] = useState<string | null>(null);
-  const [alertDismissed, setAlertDismissed] = useState(false);
-  const [alertOnConfirm, setAlertOnConfirm] = useState<(() => void) | undefined>(undefined);
+  // Alert / confirmation modal state — shared with the Bot Job grid (pure UI, no
+  // session/table coupling). Step 12: adopt useGridAlerts, drop the duplicate.
+  const {
+    errorFlag, setErrorFlag,
+    alertImage, setAlertImage,
+    alertClass, setAlertClass,
+    alertMessageHeader, setAlertMessageHeader,
+    alertMessageBody, setAlertMessageBody,
+    alertMessageFooter, setAlertMessageFooter,
+    alertOnConfirm, setAlertOnConfirm,
+    handleClose,
+  } = useGridAlerts();
   const [findText, setFindText] = useState<string>('');
   const [moveCapabilities, setMoveCapabilities] = useState<Map<number, { canMove: boolean; canDelete: boolean; deleteCount: number; reason: string; deleteReason: string; allowedBlockIds: number[]; deleteRows: { id: number; name: string; action: string; order: number }[] }>>(new Map());
   const [activeDraggedInstructionId, setActiveDraggedInstructionId] = useState<number | null>(null);
@@ -787,14 +792,6 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
   const handleEditBlock = (blockId: number, currentBlockName: string) => {
     setEditingBlockId(blockId);
     setBlockName(currentBlockName);
-  };
-
-  const handleClose = () => {
-    setAlertDismissed(true); // Trigger re-execution of the effect
-    setErrorFlag(false); // Reset error flag
-    setAlertMessageHeader('');
-    setAlertMessageBody('');
-    setAlertOnConfirm(undefined);
   };
 
   const handleSaveBlockName = (blockId: number) => {
