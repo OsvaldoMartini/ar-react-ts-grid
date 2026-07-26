@@ -307,11 +307,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     ) {
       return;
     }
-    if (!webSocket || !connected || !moveGraphRevision) {
-      console.warn('[CompDrag] onDragEnd bailed', { connected, hasSocket: !!webSocket, moveGraphRevision, moveCapabilitiesSize: moveCapabilities.size });
-      return;
-    }
-    console.log('[CompDrag] onDragEnd -> previewMove', { instructionId: Number(result.draggableId), destBlock: Number(result.destination.droppableId), destIndex: result.destination.index });
+    if (!webSocket || !connected || !moveGraphRevision) return;
     const requestId = `${Date.now()}-componentTasks-move-preview`;
     setPendingDragPreview({ requestId, result });
     webSocket.send(JSON.stringify({
@@ -549,13 +545,6 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
           }
           setBlockDeleteCapabilities(nextBlocks);
           setMoveGraphRevision(typeof bodyData?.graphRevision === 'string' ? bodyData.graphRevision : '');
-          console.log('[CompDrag] memoryCapabilitiesResponse', {
-            ok: bodyData?.ok,
-            error: bodyData?.error,
-            capabilities: Array.isArray(bodyData?.capabilities) ? bodyData.capabilities.length : 'n/a',
-            canMoveTrue: Array.isArray(bodyData?.capabilities) ? bodyData.capabilities.filter((c: { canMove?: boolean }) => c.canMove).length : 'n/a',
-            graphRevision: bodyData?.graphRevision,
-          });
         } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "componentsUpdate") {
 
           pendingScrollTopRef.current = gridScrollRef.current?.scrollTop ?? null;
@@ -601,17 +590,12 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
   }, [messages, pendingDragPreview]);
 
   useEffect(() => {
+    // Send the move-capabilities request as soon as rows load — like the Bot Job grid
+    // (useGridData). The Components workspace is bank-agnostic and legitimately runs with
+    // homeBankingId = 0, so do NOT guard on homeBankingId > 0 (that would permanently
+    // suppress the request → empty moveCapabilities/moveGraphRevision → instruction up/down
+    // and drag dead). The backend scopes by targetSessionId: 'componentTasks'.
     if (!webSocket || !connected || componentsData.length === 0) return;
-    // Drag depends on this round-trip populating moveCapabilities + moveGraphRevision.
-    // The backend scopes component capabilities by homeBankingId; requesting with a
-    // stale/invalid homeBankingId returns EMPTY capabilities (no graphRevision) => nothing
-    // draggable + onDragEnd bails. Guard so we only ask once we have a valid owner, and the
-    // dep array re-fires when homeBankingId resolves.
-    if (!homeBankingId || homeBankingId <= 0) {
-      console.warn('[CompDrag] memoryCapabilities skipped — invalid homeBankingId', { homeBankingId, botJobId, rows: componentsData.length });
-      return;
-    }
-    console.log('[CompDrag] send memoryCapabilities', { homeBankingId, botJobId, rows: componentsData.length });
     webSocket.send(JSON.stringify({
       type: 'instructionEditor.memoryCapabilities',
       sessionId,
