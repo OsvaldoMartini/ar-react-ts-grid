@@ -168,6 +168,7 @@ export function useInstructionGrid({
   } = useBlockReorder({
     groupedData, instructionsData, setInstructionsData, setIsDataReordered,
     webSocket, connected, botJobId, botJobName, homeBankingId,
+    targetSessionId: 'botJobTasks',
   });
 
   // Native block reorder (drag whole blocks + up/down buttons) now lives in

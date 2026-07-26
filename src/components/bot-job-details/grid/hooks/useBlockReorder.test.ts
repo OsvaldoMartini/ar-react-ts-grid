@@ -23,6 +23,7 @@ const makeDeps = (over: Partial<UseBlockReorderDeps> = {}): UseBlockReorderDeps 
   botJobId: 99,
   botJobName: 'Job',
   homeBankingId: 1,
+  targetSessionId: 'botJobTasks',
   ...over,
 });
 
@@ -47,7 +48,20 @@ describe('useBlockReorder', () => {
     expect(msg.type).toBe('BLOCK_MOVE');
     expect(msg.updatedBlocks.map((b: any) => b.blockId)).toEqual([20, 30, 10]);
     expect(msg.updatedBlocks.map((b: any) => b.blockOrderNumber)).toEqual([1, 2, 3]);
+    expect(msg.sessionId).toBe('botJobTasks'); // default target
     expect(setInstructionsData).toHaveBeenCalledTimes(1);
+  });
+
+  it('routes BLOCK_MOVE to the componentTasks session when targeted (Component grid)', () => {
+    const send = jest.fn();
+    const { result } = renderHook(() =>
+      useBlockReorder(makeDeps({ webSocket: { send } as unknown as WebSocket, connected: true, targetSessionId: 'componentTasks' })),
+    );
+    result.current.commitBlockReorder(0, 2);
+    const msg = JSON.parse(send.mock.calls[0][0]);
+    expect(msg.type).toBe('BLOCK_MOVE');
+    expect(msg.sessionId).toBe('componentTasks'); // backend picks component_block / home_banking_id
+    expect(msg.updatedBlocks.map((b: any) => b.blockOrderNumber)).toEqual([1, 2, 3]);
   });
 
   it('commitBlockReorder is a no-op for equal / out-of-range indices', () => {

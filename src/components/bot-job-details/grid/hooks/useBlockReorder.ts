@@ -20,6 +20,13 @@ export interface UseBlockReorderDeps {
   botJobId: number | null;
   botJobName: string | null;
   homeBankingId: number;
+  /**
+   * Which workspace the BLOCK_MOVE targets. The backend derives the block table +
+   * WHERE key from this: 'botJobTasks' → block/bot_job_id, 'componentTasks' →
+   * component_block/home_banking_id. So this is the ONLY thing that varies between
+   * the Bot Job and Component grids for block reorder.
+   */
+  targetSessionId: 'botJobTasks' | 'componentTasks';
 }
 
 export interface UseBlockReorder {
@@ -37,12 +44,13 @@ export interface UseBlockReorder {
 }
 
 /**
- * Phase 6, step 7 — whole-block reordering for the Bot Job Details grid: drag a
- * block header onto another (native HTML5 drag) or use the up/down buttons. Both
- * paths funnel through `commitBlockReorder`, which renumbers every block's
- * blockOrderNumber 1..N and sends ONE BLOCK_MOVE with the full ordered list (never
- * a 2-block swap). Extracted verbatim from GridItem, including the window.__blockReorder
- * diagnostic hook the drag regression drives. No behavior change.
+ * Phase 6, step 7 — whole-block reordering, SHARED by the Bot Job (`botJobTasks`) and
+ * Component (`componentTasks`) grids: drag a block header onto another (native HTML5
+ * drag) or use the up/down buttons. Both paths funnel through `commitBlockReorder`,
+ * which renumbers every block's blockOrderNumber 1..N and sends ONE BLOCK_MOVE with
+ * the full ordered list (never a 2-block swap). The caller passes `targetSessionId`;
+ * the backend derives the table (block/component_block) + WHERE key from it. Includes
+ * the window.__blockReorder diagnostic hook the drag regression drives.
  *
  * The instruction-drag path (onDragEnd / applyDragMove) is intentionally left in
  * GridItem — it mutates core grid data through the WS response and co-extracts with
@@ -51,7 +59,7 @@ export interface UseBlockReorder {
 export function useBlockReorder(deps: UseBlockReorderDeps): UseBlockReorder {
   const {
     groupedData, instructionsData, setInstructionsData, setIsDataReordered,
-    webSocket, connected, botJobId, botJobName, homeBankingId,
+    webSocket, connected, botJobId, botJobName, homeBankingId, targetSessionId,
   } = deps;
 
   const dragBlockRef = useRef<{ index: number; blockId: number } | null>(null);
@@ -84,11 +92,11 @@ export function useBlockReorder(deps: UseBlockReorderDeps): UseBlockReorder {
         botJobId,
         botJobName,
         homeBankingId,
-        sessionId: 'botJobTasks',
+        sessionId: targetSessionId,
         updatedBlocks,
       }));
     }
-  }, [groupedData, instructionsData, setInstructionsData, setIsDataReordered, webSocket, connected, botJobId, botJobName, homeBankingId]);
+  }, [groupedData, instructionsData, setInstructionsData, setIsDataReordered, webSocket, connected, botJobId, botJobName, homeBankingId, targetSessionId]);
 
   const handleBlockDragStart = (index: number, blockId: number) => (event: React.DragEvent) => {
     dragBlockRef.current = { index, blockId };
