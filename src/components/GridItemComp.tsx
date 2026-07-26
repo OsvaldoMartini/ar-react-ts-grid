@@ -51,6 +51,7 @@ import { useWebSocket } from './useWebSocket';
 import { useInstructionDrag } from './useInstructionDrag';
 import { useExcelExport } from './bot-job-details/grid/hooks/useExcelExport';
 import { useGridAlerts } from './bot-job-details/grid/hooks/useGridAlerts';
+import { useInstructionFind } from './bot-job-details/grid/hooks/useInstructionFind';
 import { instructionDisplayLabel } from './instructionDisplay';
 import { canStartCommandApply, resolveCommandApplyResponse } from './commandApplyResponse';
 import {
@@ -175,7 +176,10 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     alertOnConfirm, setAlertOnConfirm,
     handleClose,
   } = useGridAlerts();
-  const [findText, setFindText] = useState<string>('');
+  // "Find" state — shared with the Bot Job grid. findText + the (string-typed,
+  // same-SCSS) renderHighlighted come from useInstructionFind; instructionMatchesFind
+  // stays local below (it's ComponentsInstructionsDTO-typed).
+  const { findText, setFindText, renderHighlighted } = useInstructionFind();
   const [moveCapabilities, setMoveCapabilities] = useState<Map<number, { canMove: boolean; canDelete: boolean; deleteCount: number; reason: string; deleteReason: string; allowedBlockIds: number[]; deleteRows: { id: number; name: string; action: string; order: number }[] }>>(new Map());
   const [activeDraggedInstructionId, setActiveDraggedInstructionId] = useState<number | null>(null);
   const [pendingDragPreview, setPendingDragPreview] = useState<{ requestId: string; result: any } | null>(null);
@@ -2540,29 +2544,6 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     const shownLabel = instructionDisplayLabel(ins);
     return (shownLabel ?? "").toLowerCase().includes(q)
       || (ins.name ?? "").toLowerCase().includes(q);
-  };
-
-  const renderHighlighted = (text: string, query: string) => {
-    const q = query.trim();
-    if (!q) return text;
-
-    const lowerText = text.toLowerCase();
-    const lowerQ = q.toLowerCase();
-    const idx = lowerText.indexOf(lowerQ);
-
-    if (idx === -1) return text;
-
-    const before = text.slice(0, idx);
-    const match = text.slice(idx, idx + q.length);
-    const after = text.slice(idx + q.length);
-
-    return (
-      <>
-        {before}
-        <mark className={styles.findHighlight}>{match}</mark>
-        {after}
-      </>
-    );
   };
 
   const renderExportFile = (input: string) => {
