@@ -1,19 +1,31 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { BlockLoopInstructionLoadDTO } from '../../../instructionsMockData';
 
+/**
+ * Minimal instruction shape block reorder needs. Both grids' DTOs satisfy it
+ * (BlockLoopInstructionLoadDTO for the Bot Job grid, ComponentsInstructionsDTO for
+ * the Component grid) — the hook is generic over it so it can be shared.
+ */
+export interface BlockReorderInstruction {
+  blockId: number;
+  blockOrderNumber: number;
+  botJobId: number;
+  blockName: string;
+}
+
 /** The grid's block → instructions grouping (keyed by blockId). */
-export type GroupedData = {
+export type GroupedData<T extends BlockReorderInstruction = BlockLoopInstructionLoadDTO> = {
   [blockId: number]: {
     blockName: string;
     exportFile?: string;
-    instructions: BlockLoopInstructionLoadDTO[];
+    instructions: T[];
   };
 };
 
-export interface UseBlockReorderDeps {
-  groupedData: GroupedData;
-  instructionsData: BlockLoopInstructionLoadDTO[];
-  setInstructionsData: React.Dispatch<React.SetStateAction<BlockLoopInstructionLoadDTO[]>>;
+export interface UseBlockReorderDeps<T extends BlockReorderInstruction = BlockLoopInstructionLoadDTO> {
+  groupedData: GroupedData<T>;
+  instructionsData: T[];
+  setInstructionsData: React.Dispatch<React.SetStateAction<T[]>>;
   setIsDataReordered: React.Dispatch<React.SetStateAction<boolean>>;
   webSocket: WebSocket | null;
   connected: boolean;
@@ -56,7 +68,9 @@ export interface UseBlockReorder {
  * GridItem — it mutates core grid data through the WS response and co-extracts with
  * the data layer.
  */
-export function useBlockReorder(deps: UseBlockReorderDeps): UseBlockReorder {
+export function useBlockReorder<T extends BlockReorderInstruction = BlockLoopInstructionLoadDTO>(
+  deps: UseBlockReorderDeps<T>,
+): UseBlockReorder {
   const {
     groupedData, instructionsData, setInstructionsData, setIsDataReordered,
     webSocket, connected, botJobId, botJobName, homeBankingId, targetSessionId,

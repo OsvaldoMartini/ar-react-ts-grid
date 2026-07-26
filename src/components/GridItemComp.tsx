@@ -50,6 +50,7 @@ import { useInstructionDrag } from './useInstructionDrag';
 import { useExcelExport } from './bot-job-details/grid/hooks/useExcelExport';
 import { useGridAlerts } from './bot-job-details/grid/hooks/useGridAlerts';
 import { useInstructionFind } from './bot-job-details/grid/hooks/useInstructionFind';
+import { useBlockReorder } from './bot-job-details/grid/hooks/useBlockReorder';
 import { instructionDisplayLabel } from './instructionDisplay';
 import { canStartCommandApply, resolveCommandApplyResponse } from './commandApplyResponse';
 import {
@@ -142,6 +143,19 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
   const [openDropdown, setOpenDropdown] = useState<number | null>(null);
   const [groupedData, setGroupedData] = useState<{ [blockId: number]: { blockName: string; exportFile?: string; instructions: ComponentsInstructionsDTO[] } }>({});
   const [isDataReordered, setIsDataReordered] = useState<boolean>(false);
+
+  // Whole-block reorder (up/down buttons) — shared with the Bot Job grid via the
+  // generic useBlockReorder, routed to the Component workspace. It renumbers every
+  // block 1..N and sends ONE full-ordered BLOCK_MOVE (backend derives component_block
+  // / home_banking_id from targetSessionId), replacing the old 2-block swap.
+  const { handleMoveBlockUp, handleMoveBlockDown } = useBlockReorder({
+    groupedData,
+    instructionsData: componentsData,
+    setInstructionsData: setComponentsData,
+    setIsDataReordered,
+    webSocket, connected, botJobId, botJobName, homeBankingId,
+    targetSessionId: 'componentTasks',
+  });
 
   // const [client, setClient] = useState<Client | null>(null);
   // const [connected, setConnected] = useState(false);
@@ -973,78 +987,6 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
 
 
   // Function to move a block up by swapping blockOrderNumbers
-  const handleMoveBlockUp = (blockId: number) => {
-    console.log("handleMoveBlockUp");
-    const updatedData = [...componentsData];
-
-    // Find all instructions that belong to the current block
-    const currentBlockInstructions = updatedData.filter(instruction => instruction.blockId === blockId);
-    if (currentBlockInstructions.length === 0) return;
-
-    const currentBlockOrderNumber = currentBlockInstructions[0].blockOrderNumber;
-
-    // Find the closest block with a smaller blockOrderNumber
-    const previousBlockInstructions = updatedData
-      .filter(instruction => instruction.blockOrderNumber < currentBlockOrderNumber)
-      .sort((a, b) => b.blockOrderNumber - a.blockOrderNumber)[0]; // Get the closest previous block
-
-    if (!previousBlockInstructions) return;
-
-    const botJobId = previousBlockInstructions.botJobId;
-
-    const previousBlockOrderNumber = previousBlockInstructions.blockOrderNumber;
-
-    // Prepare the list of BlockOrderDetailDTO for updated blocks
-    const updatedBlocks = [
-      {
-        blockId: blockId,
-        botJobId: currentBlockInstructions[0].botJobId,
-        blockOrderNumber: previousBlockOrderNumber,
-        blockName: currentBlockInstructions[0].blockName,
-      },
-      {
-        blockId: previousBlockInstructions.blockId,
-        botJobId: previousBlockInstructions.botJobId,
-        blockOrderNumber: currentBlockOrderNumber,
-        blockName: previousBlockInstructions.blockName,
-      },
-    ];
-
-    // Update the blockOrderNumber for both current and previous blocks
-    updatedData.forEach(instruction => {
-      if (instruction.blockOrderNumber === currentBlockOrderNumber) {
-        // Move current block up by assigning the previous block's order number
-        instruction.blockOrderNumber = previousBlockOrderNumber;
-      } else if (instruction.blockOrderNumber === previousBlockOrderNumber) {
-        // Move previous block down by assigning the current block's order number
-        instruction.blockOrderNumber = currentBlockOrderNumber;
-      }
-    });
-
-    setComponentsData([...updatedData]); // Make sure to use a copy
-    setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
-
-    // Send WebSocket message with the block swap details
-    if (webSocket && connected) {
-      const message = {
-        type: 'BLOCK_MOVE',
-        botJobId: botJobId,
-        botJobName: botJobName,
-        homeBankingId: homeBankingId,
-        sessionId: `componentTasks`, //-${botJobId}`,
-        updatedBlocks: updatedBlocks,
-      };
-
-      try {
-        webSocket.send(JSON.stringify(message));
-
-        console.log('Sent block move message:', message);
-      } catch (error) {
-        console.log('Error sending WebSocket message:', error);
-      }
-    }
-  };
-
   const handleToggleDropdown = (instructionId: number) => {
     setOpenDropdown(openDropdown === instructionId ? null : instructionId);
 
@@ -1071,81 +1013,6 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
       }
     }, 0); // Delay just enough to let the dropdown render
   };
-
-
-  // Function to move a block down by swapping blockOrderNumbers
-  const handleMoveBlockDown = (blockId: number) => {
-    const updatedData = [...componentsData];
-
-    // Find all instructions that belong to the current block
-    const currentBlockInstructions = updatedData.filter(
-      (instruction) => instruction.blockId === blockId
-    );
-    if (currentBlockInstructions.length === 0) return;
-
-    const currentBlockOrderNumber = currentBlockInstructions[0].blockOrderNumber;
-
-    // Find the closest block with a larger blockOrderNumber
-    const nextBlockInstructions = updatedData
-      .filter((instruction) => instruction.blockOrderNumber > currentBlockOrderNumber)
-      .sort((a, b) => a.blockOrderNumber - b.blockOrderNumber)[0]; // Get the closest next block
-
-    if (!nextBlockInstructions) return;
-
-    const nextBlockOrderNumber = nextBlockInstructions.blockOrderNumber;
-
-    // Prepare the list of BlockOrderDetailDTO for updated blocks
-    const updatedBlocks = [
-      {
-        blockId: blockId,
-        botJobId: currentBlockInstructions[0].botJobId,
-        blockOrderNumber: nextBlockOrderNumber,
-        blockName: currentBlockInstructions[0].blockName,
-      },
-      {
-        blockId: nextBlockInstructions.blockId,
-        botJobId: nextBlockInstructions.botJobId,
-        blockOrderNumber: currentBlockOrderNumber,
-        blockName: nextBlockInstructions.blockName,
-      },
-    ];
-
-    // Update the blockOrderNumber for both current and next blocks in the local data
-    updatedData.forEach((instruction) => {
-      if (instruction.blockOrderNumber === currentBlockOrderNumber) {
-        // Move current block down by assigning the next block's order number
-        instruction.blockOrderNumber = nextBlockOrderNumber;
-      } else if (instruction.blockOrderNumber === nextBlockOrderNumber) {
-        // Move next block up by assigning the current block's order number
-        instruction.blockOrderNumber = currentBlockOrderNumber;
-      }
-    });
-
-    setComponentsData([...updatedData]); // Update the state
-    setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
-
-    // Send WebSocket message with the updated blocks list
-    if (webSocket && connected) {
-      const message = {
-        type: 'BLOCK_MOVE',
-        botJobId: botJobId,
-        botJobName: botJobName,
-        homeBankingId: homeBankingId,
-        sessionId: `componentTasks`, //-${botJobId}`,
-        updatedBlocks: updatedBlocks,
-      };
-
-      try {
-        webSocket.send(
-          JSON.stringify(message));
-
-        console.log('Sent block move message:', message);
-      } catch (error) {
-        console.log('Error sending WebSocket message:', error);
-      }
-    }
-  };
-
 
 
   // Function to move an instruction down considering blockOrderNumber
