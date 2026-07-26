@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
-import { BotJobData, ComplexMessage, ComponentsInstructionsDTO, ElementDTO, UpdatedBlock } from './instructionsMockData';
+import { ComponentsInstructionsDTO, ElementDTO, UpdatedBlock } from './instructionsMockData';
 import setValueImage from '../assets/setValueBtn3.png';
 import getValueImage from '../assets/getValueBtn3.png';
 import checkImage from '../assets/check4.png';
@@ -10,7 +10,6 @@ import edit2Image from '../assets/edit2.png';
 import upImage from '../assets/up.png';
 import downImage from '../assets/down.png';
 import rollBackImage from '../assets/rollback4.png';
-import binImage from '../assets/bin.png';
 import closeBrowserImage from '../assets/close-browser.png';
 import menuDownImage from '../assets/menu-down.png';
 import saveImage from "../assets/save.png";
@@ -34,7 +33,6 @@ import outPutImage from "../assets/output1.png";
 import constructionImage from '../assets/construction.png';
 import forbiddenImage from '../assets/forbidden.png';
 import warningRedImage from '../assets/warning_red.png';
-import brickImage from '../assets/brick.png';
 import hiddenImage from '../assets/hidden-black.png';
 import activeImage from '../assets/active3.png';
 import inactiveImage from '../assets/inactive2.png';
@@ -72,14 +70,6 @@ export interface GridItemCompProps {
   onDetachedClose?: () => void;
 }
 type BlockDeleteCapability = { canDelete: boolean; reason: string; instructionCount: number; deleteRows: { id: number; name: string; action: string; order: number }[] };
-
-// Helper function to reorder items in an array based on drag-and-drop actions
-const reorder = (list: any[], startIndex: number, endIndex: number) => {
-  const result = Array.from(list);
-  const [removed] = result.splice(startIndex, 1);
-  result.splice(endIndex, 0, removed);
-  return result;
-};
 
 // Function to group data by blockId and sort instructions within each block
 const groupByBlock = (data: ComponentsInstructionsDTO[]) => {
@@ -132,7 +122,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
   // Use state to manage the instructions data
   const [homeBankingId, setHomeBankingId] = useState<number>(homeBankingIdInitial);
   const [botJobId, setBotJobId] = useState<number | null>(botJobIdInitial);
-  const [blockId, setBlockId] = useState<number | null>(-1);
+  const [, setBlockId] = useState<number | null>(-1);
   const [botJobName, setBotJobName] = useState<string | null>(botJobNameInitial);
   const botJobHeader = useBotJobDetailsController({
     webSocket, connected, messages, sessionId, homeBankingId, botJobId,
@@ -150,14 +140,13 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
   const blockRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [openDropdown, setOpenDropdown] = useState<number | null>(null);
-  const [mockData, setMockData] = useState<boolean>(false);
   const [groupedData, setGroupedData] = useState<{ [blockId: number]: { blockName: string; exportFile?: string; instructions: ComponentsInstructionsDTO[] } }>({});
   const [isDataReordered, setIsDataReordered] = useState<boolean>(false);
 
   // const [client, setClient] = useState<Client | null>(null);
   // const [connected, setConnected] = useState(false);
   // const [lastMessages, setLastMessages] = useState<any[]>([]);
-  const [dropdownPosition, setDropdownPosition] = useState('below'); // Default to 'below'
+  const [, setDropdownPosition] = useState('below'); // Default to 'below'
   const [updatedBlocks, setUpdatedBlocks] = useState<UpdatedBlock[]>([]);
   const [editingInstructionId, setEditingInstructionId] = useState<number | null>(null);
   const [instructionName, setInstructionName] = useState<string>('');
@@ -188,7 +177,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
   // Excel Export panel — shared with the Bot Job grid (routes on this grid's own
   // sessionId prop = 'componentTasks'). Step 12: adopt useExcelExport, drop the duplicate.
   const {
-    excelExportContext, setExcelExportContext,
+    excelExportContext,
     excelExportDirectory, setExcelExportDirectory,
     choosingExcelExportDirectory, setChoosingExcelExportDirectory,
     pendingExcelExportDirectoryRequestRef,
@@ -220,110 +209,6 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
   //  const [executionId, setExecutionId] = useState<number>(0);
   //  const [executionState, setExecutionState] = useState<string>();
 
-
-  type ActionFlag = "E" | "S";
-
-  const parseActions = (actions?: string | null) =>
-    (actions ?? "")
-      .split(":")
-      .map(t => t.trim())
-      .filter(Boolean);
-
-  const buildActions = (tokens: string[]) => tokens.join(":");
-
-  const isFlag = (t: string) => {
-    const u = t.toUpperCase();
-    return u === "E" || u === "S";
-  };
-
-  function updateInputActionName(actions: string, newName: string) {
-    if (!actions || !actions.startsWith("I")) return actions;
-
-    // Only apply to inputs:
-    // "I" or "I:..." (covers "I:" too)
-    if (actions !== "I" && !actions.startsWith("I:")) return actions;
-
-    const parts = actions
-      .split(":")
-      .map(p => p.trim())
-      .filter(p => p.length > 0);
-
-    // Ensure base is exactly "I"
-    const base = "I";
-
-    // Collect flags from everything except base and the tail-name if present
-    // We treat any non-flag token after I as "name" candidate, but we ultimately set it to newName.
-    const middle = parts.slice(1);
-    const flags = middle.filter(isFlag);
-
-    // Stable order (S then E)
-    const normalizedFlags: string[] = [];
-    if (flags.includes("S")) normalizedFlags.push("S");
-    if (flags.includes("E")) normalizedFlags.push("E");
-
-    // Always: I[:S][:E]:newName  (so the LAST token is always the name)
-    return [base, ...normalizedFlags, newName].join(":");
-  }
-
-  // choose a consistent flag order (CHANGE if you prefer S before E)
-  const FLAG_ORDER: ActionFlag[] = ["E", "S"];
-
-  const toggleActionFlag = (
-    actions: string | null | undefined,
-    flag: ActionFlag,
-    origName?: string
-  ) => {
-    const tokens = parseActions(actions);
-    const upper = tokens.map(t => t.toUpperCase());
-
-    // Special case: I:... (inputs)
-    if (upper[0] === "I") {
-      let name = tokens[tokens.length - 1] ?? "";
-
-      // If last token is a flag, then there is no name yet
-      if (isFlag(name.toUpperCase())) {
-        name = origName ?? "";
-      }
-
-      // If origName provided and different → enforce it
-      if (origName && name !== origName) {
-        name = origName;
-      }
-
-      // Extract base + flags (exclude last token)
-      const head = tokens.slice(0, tokens.length - 1);
-      const headUpper = head.map(t => t.toUpperCase());
-
-      const base = "I";
-      const existingFlags = headUpper.filter(isFlag) as ActionFlag[];
-
-      const has = existingFlags.includes(flag);
-      const nextFlags = has
-        ? existingFlags.filter(f => f !== flag)
-        : [...existingFlags, flag];
-
-      // Stable order
-      const orderedFlags = FLAG_ORDER.filter(f => nextFlags.includes(f));
-
-      return buildActions([base, ...orderedFlags, name]);
-    }
-
-    // Default (non-I)
-    const flagUpper = flag.toUpperCase();
-    const idx = upper.indexOf(flagUpper);
-
-    if (idx >= 0) {
-      const out = tokens.slice(0, idx).concat(tokens.slice(idx + 1));
-      return buildActions(out);
-    }
-
-    return buildActions([...tokens, flag]);
-  };
-
-  const hasActionFlag = (actions: string | null | undefined, flag: ActionFlag) => {
-    const tokens = parseActions(actions).map(t => t.toUpperCase());
-    return tokens.includes(flag);
-  };
 
   // Drag-and-drop event handler
   const applyDragMove = (result: any, previewRows: { id: number }[]) => {
@@ -1188,406 +1073,6 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
   };
 
 
-  const closeAlert = () => {
-    setAlertMessageHeader(null);
-    setErrorFlag(false);
-    setAlertMessageBody([]);
-    setAlertMessageFooter(null);
-  };
-
-  const isBetweenCondition = (
-    currentOrderNumber: number,
-    instructions: ComponentsInstructionsDTO[]
-  ): { isBetween: boolean; parentId: number | null } => {
-    let ifFound = false;
-    let parentId: number | null = null;
-
-    for (const instr of instructions) {
-      if (instr.actions === "IF") {
-        ifFound = true;
-        parentId = instr.parentId !== undefined ? instr.parentId : null; // Convert undefined to null
-      }
-      if (instr.instructionOrderNumber === currentOrderNumber && ifFound) {
-        return { isBetween: true, parentId }; // Return the result and the parentId
-      }
-      if (instr.actions === "ENDIF" && ifFound) {
-        ifFound = false; // Reset once ENDIF is encountered
-        parentId = null; // Reset parentId
-      }
-    }
-    return { isBetween: false, parentId: null }; // Return false if not between IF and ENDIF
-  };
-
-
-
-  const getInstructionsLoops = (blockId: number,
-    instructions: ComponentsInstructionsDTO[]
-  ): any[] => {
-    // Use getLoopsWithParents to get matching instructions
-    const matchingInstructions = getLoopsWithParents(blockId, instructions);
-
-    // Flatten all children into a single list with parent information
-    const allLoopBoundaries = matchingInstructions.flatMap(({ parentId, parentName, parentOrderNumber, parentRefreshLoop, parentloopOnly, children }) =>
-      children.map((child) => ({
-        parentId,
-        parentName,
-        parentOrderNumber,
-        parentRefreshLoop,
-        parentloopOnly,
-        childId: child.id,
-        childAction: child.action,
-        childOrderNumber: instructions.find((instr) => instr.id === child.id)?.instructionOrderNumber || -1,
-      }))
-    );
-
-    // // Initialize the results array
-    // const matchingResults: ComponentsInstructionsDTO[] = [];
-
-    // for (const { parentId, childOrderNumber } of allLoopBoundaries) {
-    //   // Get the parent's instructionOrderNumber
-    //   const parentInstruction = instructions.find((instr) => instr.id === parentId);
-    //   if (!parentInstruction) continue;
-
-    //   const parentOrderNumber = parentInstruction.instructionOrderNumber;
-
-    //   // If the current order number is within the range, collect the matching instructions
-    //   if (
-    //     parentOrderNumber <= currentOrderNumber &&
-    //     currentOrderNumber <= childOrderNumber
-    //   ) {
-    //     // Add the parent instruction
-    //     matchingResults.push(parentInstruction);
-
-    //     // Add the child instructions
-    //     const childInstruction = instructions.find(
-    //       (instr) => instr.instructionOrderNumber === childOrderNumber
-    //     );
-    //     if (childInstruction) {
-    //       matchingResults.push(childInstruction);
-    //     }
-    //   }
-    // }
-
-    return allLoopBoundaries; // Return all matching instructions
-  };
-
-
-
-  const getLoopsWithParents = (blockId: number,
-    instructions: ComponentsInstructionsDTO[]
-  ) => {
-    // Find all instructions where `refreshLoop` or `loopOnly` is true
-    const parentInstructions = instructions.filter(
-      (instr) => instr.blockId === blockId && (instr.refreshLoop || instr.loopOnly)
-    );
-
-    // Find associated "REFRESH_LOOP" or "LOOP" instructions and map them to their parent
-    const loopInstructions = parentInstructions.map((parent) => {
-      // Find child instructions with `REFRESH_LOOP` or `LOOP` whose parentId matches the parent's id
-      const children = instructions.filter(
-        (instr) =>
-          (instr.actions === "REFRESH_LOOP" ||
-            instr.actions === "LOOP") &&
-          instr.parentId === parent.id
-      );
-
-      return {
-        parentId: parent.id,
-        parentName: parent.name,
-        parentOrderNumber: parent.instructionOrderNumber,
-        parentRefreshLoop: parent.refreshLoop,
-        parentloopOnly: parent.loopOnly,
-        parentBlockId: parent.blockId,
-        children: children.map((child) => ({
-          id: child.id,
-          name: child.name,
-          action: child.actions,
-        })),
-      };
-    });
-
-    return loopInstructions;
-  };
-
-
-  const isBetweenIfAndElse = (currentOrderNumber: number, instructions: ComponentsInstructionsDTO[]) => {
-    let ifFound = false;
-
-    for (const instr of instructions) {
-      if (instr.actions === "IF") {
-        ifFound = true;
-      }
-      if (instr.instructionOrderNumber === currentOrderNumber && ifFound) {
-        return true; // The instruction is between IF and ENDIF
-      }
-      if (instr.actions === "ELSE" && ifFound) {
-        ifFound = false; // Reset once ENDIF is encountered
-      }
-    }
-    return false;
-  }
-
-  const getInstructionsBetweenIfAndEndIf = (currentOrderNumber: number, instructions: any[]): (number | null)[] => {
-    let ifFound = false;
-    let firstInstructionId: number | null = null;
-    let lastInstructionId: number | null = null;
-
-    for (const instr of instructions) {
-      if (instr.actions === "IF") {
-        ifFound = true; // Mark the start of the block
-      }
-
-      if (ifFound) {
-        // Track the first instruction inside the IF block
-        if (firstInstructionId === null) {
-          firstInstructionId = instr.instructionId;
-        }
-
-        lastInstructionId = instr.instructionId; // Keep updating the lastInstructionId
-
-        if (instr.instructionOrderNumber === currentOrderNumber) {
-          return [firstInstructionId, lastInstructionId]; // Return once currentOrderNumber is found
-        }
-      }
-
-      if (instr.actions === "ENDIF" && ifFound) {
-        return [firstInstructionId, lastInstructionId]; // Return once ENDIF is encountered
-      }
-    }
-
-    return [null, null]; // No instructions found between IF and ENDIF
-  };
-
-
-
-  const handleSplitComponent = (
-    instructionId: number,
-    groupedData: { [blockId: string]: { blockName: string; instructions: ComponentsInstructionsDTO[] } },
-    setGroupedData: (data: { [blockId: string]: { blockName: string; instructions: ComponentsInstructionsDTO[] } }) => void,
-    componentsData: ComponentsInstructionsDTO[],
-    isLastInstruction: boolean
-  ) => {
-
-    // Find the block and instruction related to the instructionId
-    const blockToSplit = Object.values(groupedData).find((blockData) =>
-      blockData.instructions.some((instruction) => instruction.id === instructionId)
-    );
-
-    if (!blockToSplit) return;
-
-    // If splitting at the last instruction, adjust instructionId to the previous instruction
-    const adjustedInstructionId = isLastInstruction
-      ? blockToSplit.instructions[blockToSplit.instructions.length - 2]?.id
-      : instructionId;
-
-    if (!adjustedInstructionId) {
-      console.log("Cannot determine the instruction to split at");
-      return;
-    }
-
-    // Find the selected instruction and its index in the block
-    const selectedInstructionIndex = blockToSplit.instructions.findIndex(
-      (instruction) => instruction.id === adjustedInstructionId
-    );
-
-    if (selectedInstructionIndex === -1) return;
-
-    // Get the block order and blockId
-    const blockOrderNumber = blockToSplit.instructions[0].blockOrderNumber;
-    const blockId = blockToSplit.instructions[0].blockId;
-
-
-
-
-    // Find all subsequent instructions in the same block
-    const subsequentInstructions = blockToSplit.instructions.slice(selectedInstructionIndex + 1);
-
-    if (subsequentInstructions.length === 0) {
-      console.log("No instructions to split");
-      return;
-    }
-
-
-    // Find the current instruction
-    const currentInstruction = componentsData.find((instruction) => instruction.id === instructionId);
-
-    const betweenLoops = getInstructionsLoops(blockId, componentsData);
-
-    if (betweenLoops.length > 0) {
-
-      // Map to track parentName and its corresponding actions
-      const parentActionsMap: { [key: string]: { parentId: number, actions: string[] } } = {};
-
-      // Loop through betweenLoops
-      betweenLoops.forEach(({ parentOrderNumber, childOrderNumber, parentName, childAction, parentId }) => {
-        // Check if currentInstruction's order number is between parent and child order numbers
-        if (currentInstruction!.instructionOrderNumber >= parentOrderNumber && currentInstruction!.instructionOrderNumber <= childOrderNumber) {
-          // If the parentName is not already in the map, add it with the parentId and childAction
-          if (!parentActionsMap[parentName]) {
-            parentActionsMap[parentName] = { parentId, actions: [childAction] };
-          } else {
-            // If it's already there, add the childAction to the list if not already included
-            if (!parentActionsMap[parentName].actions.includes(childAction)) {
-              parentActionsMap[parentName].actions.push(childAction);
-            }
-          }
-        }
-      });
-
-      // Construct the final output array
-      const results: ComplexMessage[] = [];
-
-      for (const [parentName, { parentId, actions }] of Object.entries(parentActionsMap)) {
-        const actionsString = actions.join(',');
-
-        // Push the formatted data into the results array as a ConnectionInfo object
-        results.push({
-          parentNameWithId: `(${parentId})${parentName}`,
-          connectionLabel: "Connected to:",
-          actions: actionsString,
-        });
-      }
-
-      if (results.length > 0) {
-        setAlertImage(forbiddenImage);
-        setAlertClass('construction-image');
-        setAlertMessageHeader(
-          `Error Split Component`
-        );
-        setErrorFlag(true);
-        setAlertMessageBody(
-          results
-        );
-        setAlertMessageFooter(
-          `Split Component is not allowed!"`
-        );
-        return;
-      }
-
-    }
-
-
-    // Create a new block with subsequent instructions, preserving the crescent order
-    // Find the maximum blockId from the entire componentsData
-    const maxBlockId = Math.max(...componentsData.map(instruction => instruction.blockId));
-    const newBlockId = maxBlockId + 1; // Generate a unique block ID
-
-    const newBlockOrderNumber = blockOrderNumber + 1; // Increment the current block's order number by 1
-    // Assuming that all instructions in blockToSplit have the same botJobId
-    const botJobId = blockToSplit.instructions[0]?.botJobId || null; // Retrieve botJobId from the first instruction
-
-    const newBlock = {
-      blockName: `${blockToSplit.blockName}`, // Same name as the current block
-      blockOrderNumber: newBlockOrderNumber, // Assign the new block order number
-      botJobId: botJobId, // Preserve the botJobId in the new instructions
-      instructions: subsequentInstructions.map((instruction, index) => ({
-        ...instruction,
-        blockId: newBlockId, // Assign new block ID to the instructions
-        blockOrderNumber: newBlockOrderNumber, // Assign new block order number to the instructions
-        instructionOrderNumber: index + 1 // Reassign instructionOrderNumber starting from 1 within the new block
-      })),
-    };
-
-    // Update the block data to remove these instructions from the original block, preserving the crescent order
-    const updatedBlock = {
-      ...blockToSplit,
-      instructions: blockToSplit.instructions.slice(0, selectedInstructionIndex + 1).map((instruction, index) => ({
-        ...instruction,
-        instructionOrderNumber: index + 1, // Preserve original crescent order for remaining instructions in current block
-      })),
-    };
-
-    // Prepare blockOrderNumber updates for blocks after the current one
-    const updatedBlocks = Object.entries(groupedData).reduce((acc, [key, blockData]) => {
-      if (blockData.instructions[0].blockOrderNumber > blockOrderNumber) {
-        // Increment the block order number for blocks after the current one
-        acc[key] = {
-          ...blockData,
-          instructions: blockData.instructions.map((instruction) => ({
-            ...instruction,
-            blockOrderNumber: instruction.blockOrderNumber + 1,
-          })),
-        };
-      } else {
-        acc[key] = blockData;
-      }
-      return acc;
-    }, {} as { [blockId: string]: { blockName: string; instructions: ComponentsInstructionsDTO[] } });
-
-    // Add the new block to the updated data
-    updatedBlocks[newBlockId] = newBlock;
-    updatedBlocks[blockId] = updatedBlock;
-
-    // Call setComponentsData and setIsDataReordered BEFORE updating groupedData
-    const updatedInstructions = Object.values(updatedBlocks).flatMap(block => block.instructions);
-    setComponentsData([...reassignInstructionOrderNumbersByBlock(updatedInstructions)]);
-    setIsDataReordered(false); // Trigger reorder logic
-
-    // Set the updated grouped data (or pass it to your state management)
-    setGroupedData(updatedBlocks);
-
-    console.log("Split component created with new block:", newBlock);
-
-    // Send WebSocket message with block split details, including newBlock
-    if (webSocket && connected) {
-      const blockSplitDetails = {
-        originalBlock: {
-          blockId: blockId,
-          botJobId: botJobId,
-          blockOrderNumber: blockOrderNumber,
-          updatedInstructions: updatedBlock.instructions.map(instruction => ({
-            instructionId: instruction.id,
-            blockId: instruction.blockId,
-            blockOrderNumber: blockOrderNumber,
-            instructionOrderNumber: instruction.instructionOrderNumber
-          })),
-        },
-        newBlock: {
-          botJobId: botJobId,
-          blockId: newBlockId,
-          blockName: newBlock.blockName,
-          blockOrderNumber: newBlock.blockOrderNumber,
-          active: true,
-          instructions: newBlock.instructions.map(instruction => ({
-            instructionId: instruction.id,
-            blockId: instruction.blockId,
-            blockOrderNumber: newBlock.blockOrderNumber,
-            instructionOrderNumber: instruction.instructionOrderNumber
-          })),
-        },
-        updatedBlocks: Object.values(updatedBlocks)
-          .filter(block => block.instructions.length > 0
-            && block.instructions[0].blockOrderNumber > blockOrderNumber
-            && block.instructions[0].blockId !== newBlockId // Exclude the newBlock
-          )
-          .map(block => ({
-            blockId: block.instructions[0].blockId,
-            botJobId: botJobId,
-            blockName: block.blockName,
-            blockOrderNumber: block.instructions[0].blockOrderNumber
-          }))
-      };
-
-      const message = {
-        type: 'BLOCKS_SPLITTER',
-        botJobId: botJobId,
-        botJobName: botJobName,
-        homeBankingId: homeBankingId,
-        sessionId: `componentTasks`, //-${botJobId}`,
-        details: blockSplitDetails,
-      };
-
-      webSocket.send(
-        JSON.stringify(message),
-      );
-
-      console.log('Sent block split message:', message);
-    }
-
-    setOpenDropdown(null);
-  };
-
-
   // Function to move a block down by swapping blockOrderNumbers
   const handleMoveBlockDown = (blockId: number) => {
     const updatedData = [...componentsData];
@@ -1782,7 +1267,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
 
     if (!instructionToRemove) return;
 
-    const { botJobId, botJobName, blockId, actions, parentId, id } = instructionToRemove;
+    const { botJobId, botJobName, blockId, actions, parentId } = instructionToRemove;
 
     // Send WebSocket message if connected
     if (webSocket && connected) {
@@ -2135,15 +1620,6 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
 
 
 
-  const editableSpecialOperations = (actionType: string) => {
-    if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "PAUSE", "REFRESH", "LOOP", "REFRESH_LOOP", "EXCEL GOTO", "NEXT ROW", "CSV CHECK", "PDF CHECK"].includes(actionType)) {
-      return true;
-    } else {
-      return false;
-    }
-  }
-
-
   const allSpecialOperations = (actionType: string) => {
     if (["SET", "GET", "CK", "Q", "E", "P", "H", "GOTO", "IF", "ELSEIF", "ELSE", "ENDIF", "PAUSE", "REFRESH", "LOOP", "REFRESH_LOOP", "EXCEL GOTO", "NEXT ROW", "CSV CHECK", "PDF CHECK"].includes(actionType)) {
       return true;
@@ -2168,34 +1644,6 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     );
   };
 
-
-  const updateInstructionActions = (instructionId: number, flag: ActionFlag) => {
-    const instruction = componentsData.find(x => x.id === instructionId);
-    if (!instruction) return;
-
-    const newActions = toggleActionFlag(instruction.actions, flag, instruction.name);
-
-    // ✅ side-effect OUTSIDE setState
-    if (webSocket && connected) {
-      const message = {
-        type: "ACTIONS_UPDATE",
-        botJobId: instruction.botJobId,
-        blockId: instruction.blockId,
-        botJobName,
-        instructionId,
-        parentId: instruction.parentId,
-        actions: newActions,
-        homeBankingId,
-        sessionId: "componentTasks", // or `botJobTasks-${botJobId}`
-      };
-      webSocket.send(JSON.stringify(message));
-    }
-
-    // ✅ pure state update
-    setComponentsData(prev =>
-      prev.map(x => (x.id === instructionId ? { ...x, actions: newActions } : x))
-    );
-  };
 
   // ── force_coordinates flag toggles (F / E / T / N / S) ─────────────────────
   // UI lives in CompForce. This handler persists the change: WebSocket push to
@@ -2491,7 +1939,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
 
     // Handle operation for other actions (SET, GET)
     if (validActions.includes(instruction.actions) && instruction.operation) {
-      const [left, right] = instruction.operation.split(":");
+      const [, right] = instruction.operation.split(":");
 
       // Retrieve parentValue from allInstructions
       const parentInstruction = allInstructions.find((item) => item.id === instruction.parentId);
@@ -2882,11 +2330,6 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
                               ) {
                                 return null;
                               }
-
-                              const isLastInstruction =
-                                index === blockData.instructions.length - 1;
-                              const isLastBlock =
-                                Number(blockGroupIndex) === Object.keys(groupedData).length; // Check if this is the last block
 
                               return (
                                     <div
