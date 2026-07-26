@@ -240,6 +240,10 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     const capability = moveCapabilities.get(instructionId);
     const destinationId = destinationBlockId;
     if (!capability?.canMove || !capability.allowedBlockIds.includes(destinationId)) {
+      console.warn('[CompGrid] applyDragMove REFUSED', {
+        instructionId, destinationId,
+        canMove: capability?.canMove, allowed: capability?.allowedBlockIds, reason: capability?.reason,
+      });
       setAlertImage(forbiddenImage);
       setAlertClass('construction-image');
       setAlertMessageHeader('Drag & Drop not Allowed');
@@ -295,6 +299,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     setGroupedData(updatedGroupedData);
     setComponentsData(updatedInstructionsData);
     setIsDataReordered(false);
+    console.log('[CompGrid] ROW_MOVE ->', { moved: movedInstructions.length, from: sourceBlockId, to: destinationBlockId, deleteBlockId });
     submitInstructionMove(updatedInstructionsData, deleteBlockId, 'drag');
   };
 
@@ -307,8 +312,21 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     ) {
       return;
     }
-    if (!webSocket || !connected || !moveGraphRevision) return;
+    if (!webSocket || !connected || !moveGraphRevision) {
+      // [CompGrid] permanent move/drag trace — filter the console for "[CompGrid]"
+      console.warn('[CompGrid] move BLOCKED at onDragEnd', {
+        hasSocket: !!webSocket, connected, moveGraphRevision,
+        capabilities: moveCapabilities.size,
+      });
+      return;
+    }
     const requestId = `${Date.now()}-componentTasks-move-preview`;
+    console.log('[CompGrid] previewMove ->', {
+      instructionId: Number(result.draggableId),
+      from: `${result.source?.droppableId}#${result.source?.index}`,
+      to: `${result.destination.droppableId}#${result.destination.index}`,
+      requestId,
+    });
     setPendingDragPreview({ requestId, result });
     webSocket.send(JSON.stringify({
       type: 'instructionGraph.previewMove',
@@ -470,6 +488,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
             const pendingResult = pendingDragPreview.result;
             const groupRows = Array.isArray(bodyData?.groupRows) ? bodyData.groupRows : [];
             setPendingDragPreview(null);
+            console.log('[CompGrid] previewMove <-', { ok: bodyData?.ok, error: bodyData?.error, groupRows: groupRows.length });
             if (bodyData?.ok === false || groupRows.length === 0) {
               setAlertImage(forbiddenImage);
               setAlertClass('construction-image');
@@ -519,6 +538,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
           }
         } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "instructionEditor.rowMoveResponse") {
           const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
+          console.log('[CompGrid] ROW_MOVE <-', { ok: bodyData?.ok, error: bodyData?.error || bodyData?.errorHeader });
           if (bodyData?.ok === false) {
             setAlertImage(warningRedImage);
             setAlertClass('construction-image');
@@ -545,6 +565,14 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
           }
           setBlockDeleteCapabilities(nextBlocks);
           setMoveGraphRevision(typeof bodyData?.graphRevision === 'string' ? bodyData.graphRevision : '');
+          // [CompGrid] capabilities are the master gate for row up/down + drag.
+          console.log('[CompGrid] capabilities <-', {
+            ok: bodyData?.ok,
+            error: bodyData?.error,
+            rows: next.size,
+            canMove: Array.from(next.values()).filter(c => c.canMove).length,
+            graphRevision: typeof bodyData?.graphRevision === 'string' ? bodyData.graphRevision : '(EMPTY!)',
+          });
         } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "componentsUpdate") {
 
           pendingScrollTopRef.current = gridScrollRef.current?.scrollTop ?? null;
@@ -1030,6 +1058,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     const sourceIndex = blockInstructions.findIndex(row => row.id === instructionId);
     const destinationIndex = sourceIndex + (1);
     if (sourceIndex < 0 || destinationIndex < 0 || destinationIndex >= blockInstructions.length) return;
+    console.log('[CompGrid] row DOWN clicked', { instructionId, blockId: instruction.blockId, sourceIndex, destinationIndex });
     onDragEnd({
       draggableId: String(instructionId),
       source: { droppableId: String(instruction.blockId), index: sourceIndex },
@@ -1046,6 +1075,7 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     const sourceIndex = blockInstructions.findIndex(row => row.id === instructionId);
     const destinationIndex = sourceIndex + (-1);
     if (sourceIndex < 0 || destinationIndex < 0 || destinationIndex >= blockInstructions.length) return;
+    console.log('[CompGrid] row UP clicked', { instructionId, blockId: instruction.blockId, sourceIndex, destinationIndex });
     onDragEnd({
       draggableId: String(instructionId),
       source: { droppableId: String(instruction.blockId), index: sourceIndex },
