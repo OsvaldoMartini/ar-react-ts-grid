@@ -56,6 +56,29 @@ const snapshotMessage = (sourceKind: 'BOT_JOB' | 'COMPONENT') => JSON.stringify(
   }),
 });
 
+const commandResponseMessage = (body: Record<string, unknown>) => JSON.stringify({
+  operationId: 'memoryList.commandResponse',
+  sessionId: 'memoryListManager',
+  body: JSON.stringify(body),
+});
+
+const memoryCommands = () => mockSend.mock.calls
+  .map(([raw]) => JSON.parse(raw))
+  .filter(message => message.type === 'memoryList.command')
+  .map(message => JSON.parse(message.body));
+
+const openCreateAndApply = async () => {
+  fireEvent.change(
+    await screen.findByLabelText('Block:'),
+    { target: { value: '__create__' } },
+  );
+  const nameInput = await screen.findByPlaceholderText('e.g. Login Flow');
+  fireEvent.change(nameInput, { target: { value: 'Verified Target' } });
+  const submit = screen.getByRole('button', { name: 'Create & Apply' });
+  fireEvent.click(submit);
+  return { nameInput, submit };
+};
+
 beforeEach(() => {
   mockSend.mockClear();
   mockMessages = [];
@@ -75,11 +98,9 @@ test.each(['BOT_JOB', 'COMPONENT'] as const)(
       fireEvent.click(apply);
       fireEvent.click(apply);
 
-      const commands = mockSend.mock.calls
-        .map(([raw]) => JSON.parse(raw))
-        .filter(message => message.type === 'memoryList.command');
+      const commands = memoryCommands();
       expect(commands).toHaveLength(1);
-      const body = JSON.parse(commands[0].body);
+      const body = commands[0];
       expect(body.action).toBe('APPLY');
       expect(body.ownerEpoch).toBe('memory-owner-1');
       expect(body.requestId).toMatch(/^memory-list-\d+-\d+-apply$/);
@@ -91,12 +112,145 @@ test.each(['BOT_JOB', 'COMPONENT'] as const)(
       expect(screen.getByText(/still waiting for backend confirmation/i)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Applying...' })).toBeDisabled();
       fireEvent.click(screen.getByRole('button', { name: 'Applying...' }));
-      expect(mockSend.mock.calls
-        .map(([raw]) => JSON.parse(raw))
-        .filter(message => message.type === 'memoryList.command'))
-        .toHaveLength(1);
+      expect(memoryCommands()).toHaveLength(1);
     } finally {
       jest.useRealTimers();
     }
   },
 );
+
+test('sends one correlated create-and-apply command and keeps the dialog pending', async () => {
+  mockMessages = [snapshotMessage('BOT_JOB')];
+  render(<MemoryList socketPort={7357} sessionId="memoryListManager" />);
+
+  const { nameInput } = await openCreateAndApply();
+  fireEvent.click(screen.getByRole('button', { name: 'Creating and applying...' }));
+
+  const commands = memoryCommands();
+  expect(commands).toHaveLength(1);
+  expect(commands[0]).toMatchObject({
+    action: 'CREATE_BLOCK_AND_APPLY',
+    blockName: 'Verified Target',
+    position: { type: 'end' },
+    ownerEpoch: 'memory-owner-1',
+  });
+  expect(commands[0].requestId)
+    .toMatch(/^memory-list-\d+-\d+-create_block_and_apply$/);
+  expect(nameInput).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Creating and applying...' })).toBeDisabled();
+  expect(screen.getByText('Login')).toBeInTheDocument();
+  expect(commands.some(command => command.action === 'CREATE_BLOCK')).toBe(false);
+  expect(commands.some(command => command.action === 'APPLY')).toBe(false);
+});
+
+test('closes the create dialog and shows final success after a correlated committed response', async () => {
+  mockMessages = [snapshotMessage('COMPONENT')];
+  const { rerender } = render(
+    <MemoryList socketPort={7357} sessionId="memoryListManager" />,
+  );
+
+  await openCreateAndApply();
+  const [{ requestId }] = memoryCommands();
+  mockMessages = [
+    ...mockMessages,
+    commandResponseMessage({
+      ok: true,
+      committed: true,
+      synchronized: true,
+      requestId,
+      createdBlockId: 81,
+      createdBlockName: 'Verified Target',
+      appliedCount: 1,
+      message: 'Target block created and Memory List applied.',
+    }),
+  ];
+  rerender(<MemoryList socketPort={7357} sessionId="memoryListManager" />);
+
+  const alert = await screen.findByRole('alertdialog');
+  expect(alert).toHaveTextContent('Block Created and Instructions Applied');
+  expect(alert).toHaveTextContent('Target block created and Memory List applied.');
+  expect(alert).toHaveTextContent('1 Memory List item was applied to "Verified Target" (ID 81).');
+  expect(screen.queryByPlaceholderText('e.g. Login Flow')).not.toBeInTheDocument();
+});
+
+test('keeps the dialog and rows available when create-and-apply fails', async () => {
+  mockMessages = [snapshotMessage('BOT_JOB')];
+  const { rerender } = render(
+    <MemoryList socketPort={7357} sessionId="memoryListManager" />,
+  );
+
+  await openCreateAndApply();
+  const [{ requestId }] = memoryCommands();
+  mockMessages = [
+    ...mockMessages,
+    commandResponseMessage({
+      ok: false,
+      committed: false,
+      requestId,
+      message: 'The new block could not be verified.',
+    }),
+  ];
+  rerender(<MemoryList socketPort={7357} sessionId="memoryListManager" />);
+
+  const alert = await screen.findByRole('alertdialog');
+  expect(alert).toHaveTextContent('Create and Apply Failed');
+  expect(alert).toHaveTextContent('The new block could not be verified.');
+  expect(screen.getByPlaceholderText('e.g. Login Flow')).toHaveValue('Verified Target');
+  expect(screen.getByRole('button', { name: 'Create & Apply' })).toBeEnabled();
+  expect(screen.getByText('Login')).toBeInTheDocument();
+});
+
+test('ignores a stale create-and-apply response and remains locked for the active request', async () => {
+  mockMessages = [snapshotMessage('BOT_JOB')];
+  const { rerender } = render(
+    <MemoryList socketPort={7357} sessionId="memoryListManager" />,
+  );
+
+  await openCreateAndApply();
+  mockMessages = [
+    ...mockMessages,
+    commandResponseMessage({
+      ok: true,
+      committed: true,
+      synchronized: true,
+      requestId: 'stale-request',
+      createdBlockId: 81,
+      appliedCount: 1,
+    }),
+  ];
+  rerender(<MemoryList socketPort={7357} sessionId="memoryListManager" />);
+
+  expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+  expect(screen.getByPlaceholderText('e.g. Login Flow')).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Creating and applying...' })).toBeDisabled();
+});
+
+test('reports a committed unsynchronized result as success with a refresh warning', async () => {
+  mockMessages = [snapshotMessage('BOT_JOB')];
+  const { rerender } = render(
+    <MemoryList socketPort={7357} sessionId="memoryListManager" />,
+  );
+
+  await openCreateAndApply();
+  const [{ requestId }] = memoryCommands();
+  mockMessages = [
+    ...mockMessages,
+    commandResponseMessage({
+      ok: true,
+      committed: true,
+      synchronized: false,
+      requestId,
+      createdBlockId: 82,
+      createdBlockName: 'Verified Target',
+      appliedCount: 2,
+      message: 'Instructions committed; Bot Job Details refresh is pending.',
+    }),
+  ];
+  rerender(<MemoryList socketPort={7357} sessionId="memoryListManager" />);
+
+  const alert = await screen.findByRole('alertdialog');
+  expect(alert).toHaveTextContent('Instructions Applied - Refresh Pending');
+  expect(alert).toHaveTextContent('2 Memory List items were applied to "Verified Target" (ID 82).');
+  expect(alert).toHaveTextContent('Bot Job Details is still waiting for its authoritative refresh.');
+  expect(screen.queryByPlaceholderText('e.g. Login Flow')).not.toBeInTheDocument();
+});

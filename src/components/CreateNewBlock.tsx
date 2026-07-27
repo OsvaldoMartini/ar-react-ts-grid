@@ -19,6 +19,9 @@ interface CreateNewBlockProps {
   onClose: () => void;
   pending?: boolean;
   submitting?: boolean;
+  submitLabel?: string;
+  submittingLabel?: string;
+  retryLabel?: string;
 }
 
 // Floating (non-modal, draggable) "Create new block" dialog — same layout as
@@ -29,6 +32,9 @@ const CreateNewBlock: React.FC<CreateNewBlockProps> = ({
   onClose,
   pending = false,
   submitting = false,
+  submitLabel = 'Create',
+  submittingLabel = 'Creating...',
+  retryLabel = 'Retry',
 }) => {
   const [blockName, setBlockName] = useState<string>('');
   const [positionValue, setPositionValue] = useState<string>('end'); // 'end' | blockId
@@ -136,7 +142,7 @@ const CreateNewBlock: React.FC<CreateNewBlockProps> = ({
           disabled={!blockName.trim() || submitting}
           onClick={handleCreate}
         >
-          {submitting ? 'Creating...' : pending ? 'Retry' : 'Create'}
+          {submitting ? submittingLabel : pending ? retryLabel : submitLabel}
         </button>
       </div>
     </div>

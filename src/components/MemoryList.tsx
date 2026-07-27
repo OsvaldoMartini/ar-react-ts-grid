@@ -9,6 +9,7 @@ import waitImage from '../assets/wait.png';
 import CreateNewBlock, {
   type CreateBlockPosition,
 } from './CreateNewBlock';
+import ConfirmationDialog from './ConfirmationDialog';
 import DetachedPageShell from './DetachedPageShell';
 import {
   memoryListRequiresTargetBlock,
@@ -39,7 +40,25 @@ type MemoryListCommand =
   | { action: 'CLEAR' }
   | { action: 'APPLY'; targetBlockId: number | null }
   | { action: 'REORDER'; orderedItemKeys: string[] }
-  | { action: 'CREATE_BLOCK'; blockName: string; position: CreateBlockPosition };
+  | {
+      action: 'CREATE_BLOCK_AND_APPLY';
+      blockName: string;
+      position: CreateBlockPosition;
+    };
+
+type OperationFeedback = {
+  id: number;
+  title: string;
+  message: string;
+  detail?: string;
+  error: boolean;
+};
+
+type PendingMemoryListCommand = {
+  requestId: string;
+  action: MemoryListCommand['action'];
+  blockName?: string;
+};
 
 const EMPTY_SNAPSHOT: MemoryListSnapshot = {
   ownerEpoch: '',
@@ -103,19 +122,71 @@ function parseMessage(raw: string): { operationId?: string; body: any } {
   return { operationId, body };
 }
 
+function createAndApplyFeedback(
+  body: any,
+  pending: PendingMemoryListCommand,
+): Omit<OperationFeedback, 'id'> {
+  const committed = body?.ok !== false && body?.committed === true;
+  const synchronized = body?.synchronized !== false;
+  const responseMessage = String(
+    body?.message
+    || body?.error
+    || (committed
+      ? 'The block was created and the Memory List instructions were applied.'
+      : 'The block and instructions could not be applied.'),
+  );
+
+  if (!committed) {
+    const blockWasCreated = body?.blockCreated === true
+      || Number(body?.createdBlockId) > 0;
+    return {
+      title: 'Create and Apply Failed',
+      message: responseMessage,
+      detail: blockWasCreated
+        ? 'The backend reported that the block was created, but the instructions were not fully applied. Refresh before retrying.'
+        : 'The Memory List rows remain available. Review the message and try again.',
+      error: true,
+    };
+  }
+
+  const createdBlockId = Number(body?.createdBlockId);
+  const createdBlockName = String(body?.createdBlockName || pending.blockName || '').trim();
+  const blockLabel = createdBlockName
+    ? `"${createdBlockName}"${createdBlockId > 0 ? ` (ID ${createdBlockId})` : ''}`
+    : createdBlockId > 0
+      ? `block ID ${createdBlockId}`
+      : 'the new block';
+  const appliedCount = Number(body?.appliedCount);
+  const hasAppliedCount = Number.isFinite(appliedCount) && appliedCount >= 0;
+  const appliedLabel = hasAppliedCount
+    ? `${appliedCount} Memory List item${appliedCount === 1 ? '' : 's'}`
+    : 'The Memory List items';
+  const appliedVerb = appliedCount === 1 ? 'was' : 'were';
+
+  return {
+    title: synchronized
+      ? 'Block Created and Instructions Applied'
+      : 'Instructions Applied - Refresh Pending',
+    message: responseMessage,
+    detail: synchronized
+      ? `${appliedLabel} ${appliedVerb} applied to ${blockLabel}.`
+      : `${appliedLabel} ${appliedVerb} applied to ${blockLabel}. The database operation succeeded, but Bot Job Details is still waiting for its authoritative refresh.`,
+    error: false,
+  };
+}
+
 const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose, demoMode = false }) => {
   const { webSocket, connected, messages, error } = useWebSocket(socketPort, sessionId);
   const processedMessageCountRef = useRef(0);
   const commandSequenceRef = useRef(0);
-  const pendingCommandRef = useRef<{
-    requestId: string;
-    action: MemoryListCommand['action'];
-  } | null>(null);
+  const feedbackSequenceRef = useRef(0);
+  const pendingCommandRef = useRef<PendingMemoryListCommand | null>(null);
   const commandTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [snapshot, setSnapshot] = useState<MemoryListSnapshot>(demoMode ? DEMO_SNAPSHOT : EMPTY_SNAPSHOT);
   const [createBlockOpen, setCreateBlockOpen] = useState(false);
   const [localStatus, setLocalStatus] = useState('');
   const [pendingAction, setPendingAction] = useState<MemoryListCommand['action'] | null>(null);
+  const [operationFeedback, setOperationFeedback] = useState<OperationFeedback | null>(null);
 
   const send = useCallback((type: string, body: unknown = {}) => {
     // Offline demo keeps every command local; the optimistic state update is the result.
@@ -168,9 +239,17 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose,
       return true;
     }
 
-    pendingCommandRef.current = { requestId, action: command.action };
+    pendingCommandRef.current = {
+      requestId,
+      action: command.action,
+      blockName: 'blockName' in command ? command.blockName : undefined,
+    };
     setPendingAction(command.action);
-    setLocalStatus(command.action === 'APPLY' ? 'Applying...' : `${command.action.replaceAll('_', ' ')}...`);
+    setLocalStatus(command.action === 'APPLY'
+      ? 'Applying...'
+      : command.action === 'CREATE_BLOCK_AND_APPLY'
+        ? 'Creating block and applying instructions...'
+        : `${command.action.replaceAll('_', ' ')}...`);
     commandTimeoutRef.current = setTimeout(() => {
       if (pendingCommandRef.current?.requestId !== requestId) return;
       commandTimeoutRef.current = null;
@@ -209,9 +288,23 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose,
           const pending = pendingCommandRef.current;
           if (!pending || String(body?.requestId || '') !== pending.requestId) return;
           clearPendingCommand();
-          setLocalStatus(body?.ok === false
-            ? String(body?.message || body?.error || 'The Memory List action was refused.')
-            : '');
+          if (pending.action === 'CREATE_BLOCK_AND_APPLY') {
+            const feedback = createAndApplyFeedback(body, pending);
+            feedbackSequenceRef.current += 1;
+            setOperationFeedback({
+              id: feedbackSequenceRef.current,
+              ...feedback,
+            });
+            const committed = body?.ok !== false && body?.committed === true;
+            if (committed) setCreateBlockOpen(false);
+            setLocalStatus(committed
+              ? ''
+              : String(body?.message || body?.error || 'The Memory List action was refused.'));
+          } else {
+            setLocalStatus(body?.ok === false
+              ? String(body?.message || body?.error || 'The Memory List action was refused.')
+              : '');
+          }
         } else if (operationId === 'memoryList.focus') {
           try {
             window.focus();
@@ -250,7 +343,8 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose,
   };
 
   const handleCreateBlock = (blockName: string, position: CreateBlockPosition) => {
-    if (sendCommand({ action: 'CREATE_BLOCK', blockName, position })) {
+    setOperationFeedback(null);
+    if (sendCommand({ action: 'CREATE_BLOCK_AND_APPLY', blockName, position }) && demoMode) {
       setCreateBlockOpen(false);
     }
   };
@@ -512,7 +606,24 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose,
             blocks={snapshot.blocks}
             onCreate={handleCreateBlock}
             onClose={() => setCreateBlockOpen(false)}
+            pending={pendingAction === 'CREATE_BLOCK_AND_APPLY'}
             submitting={uiBusy}
+            submitLabel="Create & Apply"
+            submittingLabel="Creating and applying..."
+          />
+        )}
+        {operationFeedback && (
+          <ConfirmationDialog
+            key={operationFeedback.id}
+            alert
+            title={operationFeedback.title}
+            message={operationFeedback.message}
+            detail={operationFeedback.detail}
+            error={operationFeedback.error}
+            confirmLabel="Close"
+            showHeaderClose
+            onCancel={() => setOperationFeedback(null)}
+            onConfirm={() => setOperationFeedback(null)}
           />
         )}
       </main>
