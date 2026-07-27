@@ -46,7 +46,7 @@ import ExcelExportPanel from './ExcelExportPanel';
 import ComponentWorkspaceHeader from './bot-job-details/ComponentWorkspaceHeader';
 import { useBotJobDetailsController } from './bot-job-details/useBotJobDetailsController';
 import { useWebSocket } from './useWebSocket';
-import { useInstructionDrag } from './useInstructionDrag';
+import { useComponentInstructionDrag } from './useComponentInstructionDrag';
 import { useExcelExport } from './bot-job-details/grid/hooks/useExcelExport';
 import { useGridAlerts } from './bot-job-details/grid/hooks/useGridAlerts';
 import { useInstructionFind } from './bot-job-details/grid/hooks/useInstructionFind';
@@ -215,9 +215,11 @@ const GridItemComp: React.FC<GridItemCompProps> = ({ homeBankingIdInitial, dataC
     gridScrollRef.current.scrollTop = pendingScrollTopRef.current;
     pendingScrollTopRef.current = null;
   }, [componentsData]);
-  const submitInstructionMove = useInstructionDrag({
+  // Dedicated Components row-move submitter (COMPONENT_ROW_MOVE) — fully separated
+  // from the Bot Job grid's ROW_MOVE pipeline, FE to backend.
+  const submitInstructionMove = useComponentInstructionDrag({
     webSocket, connected, graphRevision: moveGraphRevision, botJobId, botJobName,
-    homeBankingId, targetSessionId: 'componentTasks',
+    homeBankingId,
   });
 
   //  const [executionId, setExecutionId] = useState<number>(0);
