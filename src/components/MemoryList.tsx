@@ -106,9 +106,16 @@ function parseMessage(raw: string): { operationId?: string; body: any } {
 const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose, demoMode = false }) => {
   const { webSocket, connected, messages, error } = useWebSocket(socketPort, sessionId);
   const processedMessageCountRef = useRef(0);
+  const commandSequenceRef = useRef(0);
+  const pendingCommandRef = useRef<{
+    requestId: string;
+    action: MemoryListCommand['action'];
+  } | null>(null);
+  const commandTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [snapshot, setSnapshot] = useState<MemoryListSnapshot>(demoMode ? DEMO_SNAPSHOT : EMPTY_SNAPSHOT);
   const [createBlockOpen, setCreateBlockOpen] = useState(false);
   const [localStatus, setLocalStatus] = useState('');
+  const [pendingAction, setPendingAction] = useState<MemoryListCommand['action'] | null>(null);
 
   const send = useCallback((type: string, body: unknown = {}) => {
     // Offline demo keeps every command local; the optimistic state update is the result.
@@ -129,15 +136,51 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose,
     return true;
   }, [demoMode, sessionId, snapshot.homeBankingId, webSocket]);
 
-  const sendCommand = useCallback((command: MemoryListCommand) => {
+  const clearPendingCommand = useCallback(() => {
+    if (commandTimeoutRef.current) {
+      clearTimeout(commandTimeoutRef.current);
+      commandTimeoutRef.current = null;
+    }
+    pendingCommandRef.current = null;
+    setPendingAction(null);
+  }, []);
+
+  const sendCommand = useCallback((command: MemoryListCommand): boolean => {
     if (!snapshot.ownerEpoch) {
       setLocalStatus('Memory List data is not ready.');
-      return;
+      return false;
     }
-    if (send('memoryList.command', { ...command, ownerEpoch: snapshot.ownerEpoch })) {
-      setLocalStatus(command.action === 'APPLY' ? 'Applying...' : '');
+    if (pendingCommandRef.current) {
+      setLocalStatus(`${pendingCommandRef.current.action.replaceAll('_', ' ')} is still in progress.`);
+      return false;
     }
-  }, [send, snapshot.ownerEpoch]);
+
+    const requestId = `memory-list-${Date.now()}-${++commandSequenceRef.current}-${command.action.toLowerCase()}`;
+    const sent = send('memoryList.command', {
+      ...command,
+      requestId,
+      ownerEpoch: snapshot.ownerEpoch,
+    });
+    if (!sent) return false;
+
+    if (demoMode) {
+      setLocalStatus('');
+      return true;
+    }
+
+    pendingCommandRef.current = { requestId, action: command.action };
+    setPendingAction(command.action);
+    setLocalStatus(command.action === 'APPLY' ? 'Applying...' : `${command.action.replaceAll('_', ' ')}...`);
+    commandTimeoutRef.current = setTimeout(() => {
+      if (pendingCommandRef.current?.requestId !== requestId) return;
+      commandTimeoutRef.current = null;
+      setLocalStatus(
+        `${command.action.replaceAll('_', ' ')} is still waiting for backend confirmation. `
+        + 'Reopen the Memory List before retrying if the connection was lost.',
+      );
+    }, 15000);
+    return true;
+  }, [demoMode, send, snapshot.ownerEpoch]);
 
   useEffect(() => {
     if (!demoMode && connected) send('memoryList.bootstrap');
@@ -161,8 +204,11 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose,
             blocks: Array.isArray(body?.blocks) ? body.blocks : [],
             targetBlockId: Number(body?.targetBlockId) > 0 ? Number(body.targetBlockId) : null,
           });
-          setLocalStatus('');
+          if (!pendingCommandRef.current) setLocalStatus('');
         } else if (operationId === 'memoryList.commandResponse') {
+          const pending = pendingCommandRef.current;
+          if (!pending || String(body?.requestId || '') !== pending.requestId) return;
+          clearPendingCommand();
           setLocalStatus(body?.ok === false
             ? String(body?.message || body?.error || 'The Memory List action was refused.')
             : '');
@@ -178,11 +224,20 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose,
         setLocalStatus('The Memory List response could not be read.');
       }
     });
-  }, [messages]);
+  }, [clearPendingCommand, messages]);
 
   useEffect(() => {
-    if (error) setLocalStatus(error);
+    if (!error) return;
+    setLocalStatus(pendingCommandRef.current
+      ? `${error} The current action remains locked until backend confirmation or this Memory List is reopened.`
+      : error);
   }, [error]);
+
+  useEffect(() => () => {
+    if (commandTimeoutRef.current) clearTimeout(commandTimeoutRef.current);
+    commandTimeoutRef.current = null;
+    pendingCommandRef.current = null;
+  }, []);
 
   const handleTargetChange = (value: string) => {
     if (value === '__create__') {
@@ -195,8 +250,9 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose,
   };
 
   const handleCreateBlock = (blockName: string, position: CreateBlockPosition) => {
-    sendCommand({ action: 'CREATE_BLOCK', blockName, position });
-    setCreateBlockOpen(false);
+    if (sendCommand({ action: 'CREATE_BLOCK', blockName, position })) {
+      setCreateBlockOpen(false);
+    }
   };
 
   // Native HTML5 drag & drop — no react-beautiful-dnd. rbd depends on
@@ -218,7 +274,7 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose,
       busy: snapshot.busy,
       order: items.map(item => item.key),
     });
-    if (snapshot.busy) {
+    if (snapshot.busy || pendingCommandRef.current) {
       console.warn('[MemoryList][drag] blocked: list is busy');
       return false;
     }
@@ -311,7 +367,9 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose,
       ? styles.statusWarn
       : styles.statusOk;
   const targetBlockRequired = memoryListRequiresTargetBlock(snapshot.items);
-  const applyDisabled = snapshot.busy
+  const commandPending = pendingAction !== null;
+  const uiBusy = snapshot.busy || commandPending;
+  const applyDisabled = uiBusy
     || snapshot.canApply === false
     || (targetBlockRequired && snapshot.targetBlockId === null)
     || snapshot.items.length === 0;
@@ -356,7 +414,7 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose,
               id="memory-list-target-block"
               value={snapshot.targetBlockId ?? ''}
               onChange={event => handleTargetChange(event.target.value)}
-              disabled={snapshot.busy}
+              disabled={uiBusy}
             >
               <option value="">Select target block...</option>
               <option value="__create__">+ Create new block...</option>
@@ -370,7 +428,7 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose,
             <button
               type="button"
               className={styles.clearButton}
-              disabled={snapshot.items.length === 0 || snapshot.busy}
+              disabled={snapshot.items.length === 0 || uiBusy}
               onClick={() => sendCommand({ action: 'CLEAR' })}
             >
               Clear all
@@ -391,7 +449,7 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose,
                   <article
                     key={item.key}
                     data-memory-item-key={item.key}
-                    draggable={!snapshot.busy}
+                    draggable={!uiBusy}
                     onDragStart={event => handleRowDragStart(index, event)}
                     onDragOver={event => handleRowDragOver(index, event)}
                     onDrop={event => handleRowDrop(index, event)}
@@ -406,7 +464,7 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose,
                       className={styles.dragHandle}
                       title="Drag to reorder"
                       aria-label={`Reorder ${item.label}`}
-                      disabled={snapshot.busy}
+                      disabled={uiBusy}
                     >
                       ≡
                     </button>
@@ -422,7 +480,7 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose,
                       className={styles.removeButton}
                       title="Remove from memory list"
                       aria-label={`Remove ${item.label} from memory list`}
-                      disabled={snapshot.busy}
+                      disabled={uiBusy}
                       onClick={() => sendCommand({ action: 'REMOVE', itemKey: item.key })}
                     >
                       X
@@ -444,7 +502,7 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose,
                 targetBlockId: snapshot.targetBlockId,
               })}
             >
-              {snapshot.busy ? 'Applying...' : 'Apply'}
+              {pendingAction === 'APPLY' ? 'Applying...' : 'Apply'}
             </button>
           </footer>
         </section>
@@ -454,7 +512,7 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose,
             blocks={snapshot.blocks}
             onCreate={handleCreateBlock}
             onClose={() => setCreateBlockOpen(false)}
-            submitting={snapshot.busy}
+            submitting={uiBusy}
           />
         )}
       </main>

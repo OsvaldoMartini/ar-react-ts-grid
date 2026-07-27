@@ -7,7 +7,6 @@ import upImage from '../assets/up.png';
 import downImage from '../assets/down.png';
 import excelGotoImage from "../assets/excel_goto2.png";
 import clickTestImage from "../assets/clickTest2.png";
-import arrowLeftImage from '../assets/ArrowLeft.png';
 
 
 import AlertModal from './AlertModal';
@@ -71,7 +70,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
     handleExcelFileBlockName, submitExcelExport, chooseExcelExportDirectory, closeExcelExport,
     memoryItemCount, memoryBlockOptions, createBlockOpen, setCreateBlockOpen,
     memoryCapabilities, requestMemoryListOpen,
-    handleAddToMemory, handleAddBlockToMemory, handleStageComponentBlock,
+    handleAddToMemory, handleAddBlockToMemory,
     instructionsData,
     workspaceBlocks,
     groupedData,
@@ -662,26 +661,6 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                         nameInputRef={blockRef}
                         findText={findText}
                         canAddToMemory={blockData.instructions.some(instruction => memoryCapabilities.get(instruction.id)?.canAdd)}
-                        componentMemoryAction={componentWorkspace ? (
-                          <img
-                            src={arrowLeftImage}
-                            alt="Stage whole component block in memory"
-                            className={styles.arrowLeftButton}
-                            title={moveGraphRevision
-                              ? 'Add this whole component block to Memory List'
-                              : 'Waiting for the authoritative component revision'}
-                            aria-disabled={!moveGraphRevision}
-                            style={{
-                              opacity: moveGraphRevision ? 1 : 0.4,
-                              cursor: moveGraphRevision ? 'pointer' : 'not-allowed',
-                            }}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              if (!moveGraphRevision) return;
-                              handleStageComponentBlock(blockData.instructions, moveGraphRevision);
-                            }}
-                          />
-                        ) : null}
                         showCreateComponent={!componentWorkspace}
                         isFirstBlock={authoritativeIndex === 0 && Boolean(moveGraphRevision)}
                         blockDeleteTitle={blockDeleteCapabilities.get(Number(blockData.instructions[0].blockId))?.reason}

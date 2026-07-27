@@ -328,7 +328,7 @@ export function useGridData(deps: UseGridDataDeps) {
       blocks: componentWorkspace ? [] : memoryBlockOptions,
       targetBlockId: componentWorkspace ? null : memoryTargetBlockId,
       emptyMessage: componentWorkspace
-        ? 'Click "+" on a component instruction or the blue arrow on a block.'
+        ? 'Click "+" on a component instruction or block.'
         : 'Click "+" on a step to add it here.',
       status: memoryMoveStatus || (connected ? 'Memory List ready' : 'Memory List disconnected'),
       busy: componentWorkspace ? false : pendingMemoryMove !== null,

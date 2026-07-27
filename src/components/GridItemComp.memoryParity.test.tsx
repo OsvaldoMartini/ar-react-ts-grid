@@ -131,6 +131,7 @@ beforeEach(() => {
 test('row plus stages a typed COMPONENT instruction and exposes no component target blocks', async () => {
   const view = render(<GridItemComp {...props} />);
   await authorizeGrid(view);
+  expect(screen.queryByAltText('Stage whole component block in memory')).not.toBeInTheDocument();
   fireEvent.click(screen.getAllByTitle('Add step to memory list')[0]);
 
   await waitFor(() => {
@@ -148,28 +149,6 @@ test('row plus stages a typed COMPONENT instruction and exposes no component tar
         },
       })],
     }));
-  });
-  expect(mockSend.mock.calls.map(([payload]) => JSON.parse(payload).type))
-    .not.toContain('COMPONENT_INJECT');
-});
-
-test('blue arrow stages the whole component block instead of injecting it', async () => {
-  const view = render(<GridItemComp {...props} />);
-  await authorizeGrid(view);
-  fireEvent.click(screen.getByAltText('Stage whole component block in memory'));
-
-  await waitFor(() => {
-    expect(latestMemorySnapshot().items).toEqual([
-      expect.objectContaining({
-        key: 'COMPONENT:BLOCK:2:44',
-        sourceItemKey: 'BLOCK:2:44',
-        payload: {
-          kind: 'BLOCK',
-          componentBlockId: 44,
-          sourceRevision: 'component-revision-1',
-        },
-      }),
-    ]);
   });
   expect(mockSend.mock.calls.map(([payload]) => JSON.parse(payload).type))
     .not.toContain('COMPONENT_INJECT');

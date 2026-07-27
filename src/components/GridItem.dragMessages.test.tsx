@@ -1,5 +1,5 @@
 import React from 'react';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import GridItem from './GridItem';
 import GridItemComp from './GridItemComp';
 import { BlockLoopInstructionLoadDTO, ComponentsInstructionsDTO } from './instructionsMockData';
@@ -204,4 +204,77 @@ test('an authoritative empty block never triggers the legacy automatic BLOCK_ORD
     emptyBlockTitle.compareDocumentPosition(populatedBlockTitle)
       & Node.DOCUMENT_POSITION_FOLLOWING,
   ).toBeTruthy();
+});
+
+test('Memory Apply structured refresh places the row in its new block without manual Refresh', async () => {
+  const props = {
+    homeBankingIdInitial: 2,
+    data: [row],
+    socketPort: 52101,
+    sessionId: 'botJobTasks',
+    botJobIdInitial: 5,
+    botJobNameInitial: 'Drag regression',
+    onSessionOpen: jest.fn(),
+  };
+  const view = render(<GridItem {...props} />);
+  const blocks = [
+    {
+      blockId: 10,
+      blockOrderNumber: 1,
+      blockName: 'Main',
+      blockActive: true,
+      blockWait: 0,
+    },
+    {
+      blockId: 135,
+      blockOrderNumber: 2,
+      blockName: 'TEST',
+      blockActive: true,
+      blockWait: 0,
+    },
+  ];
+  const update = (instructions: BlockLoopInstructionLoadDTO[], requestId: string) => JSON.stringify({
+    sessionId: 'botJobTasks',
+    homeBankingId: 2,
+    operationId: 'updateInstructions',
+    body: JSON.stringify({
+      instructions,
+      blocks,
+      botJobId: 5,
+      botJobName: 'Drag regression',
+      homeBankingId: 2,
+      memoryListRequestId: requestId,
+    }),
+  });
+
+  mockMessages = [update([row], 'memory-create-1')];
+  view.rerender(<GridItem {...props} />);
+  await waitFor(() => {
+    expect(screen.getByText('TEST')).toBeInTheDocument();
+    expect(screen.getByText('No instructions in this block')).toBeInTheDocument();
+  });
+
+  const movedRow = {
+    ...row,
+    blockId: 135,
+    blockOrderNumber: 2,
+    blockName: 'TEST',
+    instructionOrderNumber: 1,
+  };
+  mockMessages = [
+    update([row], 'memory-create-1'),
+    update([movedRow], 'memory-apply-1'),
+  ];
+  view.rerender(<GridItem {...props} />);
+
+  await waitFor(() => {
+    const testTitle = screen.getByText('TEST');
+    const testCard = testTitle.parentElement?.parentElement?.parentElement;
+    expect(testCard).not.toBeNull();
+    expect(within(testCard as HTMLElement).getByText('(101)Continue')).toBeInTheDocument();
+    expect(within(testCard as HTMLElement).queryByText('No instructions in this block')).not.toBeInTheDocument();
+  });
+  expect(mockSend.mock.calls
+    .map(([payload]) => JSON.parse(payload).type))
+    .not.toContain('BLOCK_ORDER');
 });

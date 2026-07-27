@@ -121,7 +121,7 @@ export function useInstructionGrid({
     memoryListOpenRequestedRef, memoryListOpenedRef,
     memoryListOpenPendingRequestRef, memoryListOwnerEpochRef,
     requestMemoryListOpen,
-    handleAddToMemory, handleAddBlockToMemory, handleStageComponentBlock,
+    handleAddToMemory, handleAddBlockToMemory,
     handleRemoveFromMemory, handleRemoveComponentMemoryItem,
   } = useInstructionMemory(data, workspacePolicy);
   // Phase 6, step 9 — the grid DATA LAYER (core grid state, drag state, refs, the
@@ -282,7 +282,7 @@ export function useInstructionGrid({
     // useInstructionMemory
     memorySteps, memoryItemCount, memoryBlockOptions, createBlockOpen, setCreateBlockOpen,
     memoryCapabilities, requestMemoryListOpen,
-    handleAddToMemory, handleAddBlockToMemory, handleStageComponentBlock,
+    handleAddToMemory, handleAddBlockToMemory,
     // useGridData
     instructionsData, setInstructionsData,
     workspaceBlocks,

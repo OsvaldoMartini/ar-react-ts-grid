@@ -1,8 +1,5 @@
 import type { BlockLoopInstructionLoadDTO } from '../../../instructionsMockData';
-import {
-  componentBlockMemoryItem,
-  componentInstructionMemoryItem,
-} from './memoryOptions';
+import { componentInstructionMemoryItem } from './memoryOptions';
 
 const instruction: BlockLoopInstructionLoadDTO = {
   homeBankingId: 2,
@@ -33,21 +30,6 @@ test('component instruction memory item uses a collision-safe key and authoritat
         componentInstructionId: 101,
         componentBlockId: 44,
         sourceRevision: 'revision-7',
-      },
-    }),
-  );
-});
-
-test('whole component block memory item is distinct from its instruction items', () => {
-  expect(componentBlockMemoryItem([instruction], 'revision-8')).toEqual(
-    expect.objectContaining({
-      key: 'COMPONENT:BLOCK:2:44',
-      sourceKind: 'COMPONENT',
-      sourceItemKey: 'BLOCK:2:44',
-      payload: {
-        kind: 'BLOCK',
-        componentBlockId: 44,
-        sourceRevision: 'revision-8',
       },
     }),
   );

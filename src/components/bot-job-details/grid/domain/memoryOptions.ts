@@ -96,26 +96,3 @@ export const componentInstructionMemoryItem = (
     },
   };
 };
-
-export const componentBlockMemoryItem = (
-  instructions: BlockLoopInstructionLoadDTO[],
-  sourceRevision: string,
-): MemoryListItem<ComponentMemoryListPayload> | null => {
-  const first = instructions[0];
-  if (!first) return null;
-  const sourceItemKey = `BLOCK:${first.homeBankingId}:${first.blockId}`;
-  return {
-    key: `COMPONENT:${sourceItemKey}`,
-    sourceKind: 'COMPONENT',
-    sourceItemKey,
-    label: first.blockName || `Component block ${first.blockId}`,
-    detail: `Whole component block (${instructions.length} instruction${instructions.length === 1 ? '' : 's'})`,
-    icon: 'default',
-    active: first.blockActive !== false,
-    payload: {
-      kind: 'BLOCK',
-      componentBlockId: first.blockId,
-      sourceRevision,
-    },
-  };
-};

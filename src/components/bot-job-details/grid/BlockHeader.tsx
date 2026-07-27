@@ -26,7 +26,6 @@ export interface BlockHeaderProps {
   nameInputRef: React.RefObject<HTMLInputElement>;
   findText: string;
   canAddToMemory: boolean;
-  componentMemoryAction?: React.ReactNode;
   showCreateComponent?: boolean;
   isFirstBlock: boolean;
   blockDeleteTitle?: string;
@@ -67,7 +66,6 @@ const BlockHeader: React.FC<BlockHeaderProps> = ({
   nameInputRef,
   findText,
   canAddToMemory,
-  componentMemoryAction,
   showCreateComponent = true,
   isFirstBlock,
   blockDeleteTitle,
@@ -108,7 +106,6 @@ const BlockHeader: React.FC<BlockHeaderProps> = ({
       title="Add eligible steps in this block to memory list"
       onClick={onAddToMemory}
     />
-    {componentMemoryAction}
     <span className={styles.blockExportFile}>{exportFileNode}</span>
     <div className={styles.moveButtons}>
       {isFirstBlock && (
