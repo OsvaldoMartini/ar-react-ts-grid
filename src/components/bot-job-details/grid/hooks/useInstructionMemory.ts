@@ -7,6 +7,7 @@ import type {
 } from '../../../memoryList.contract';
 import {
   blockOptionsFromInstructions,
+  componentBlockMemoryItem,
   componentInstructionMemoryItem,
 } from '../domain/memoryOptions';
 import {
@@ -60,6 +61,11 @@ export interface UseInstructionMemory {
   handleAddToMemory: (instruction: BlockLoopInstructionLoadDTO, sourceRevision?: string) => void;
   /** Add every eligible instruction in a block to the Memory List. */
   handleAddBlockToMemory: (instructions: BlockLoopInstructionLoadDTO[], sourceRevision?: string) => void;
+  /** Stage one complete reusable component block without row-level filtering. */
+  handleStageComponentBlock: (
+    instructions: BlockLoopInstructionLoadDTO[],
+    sourceRevision: string,
+  ) => void;
   /** Remove one memorized step by instruction id. */
   handleRemoveFromMemory: (id: number) => void;
   handleRemoveComponentMemoryItem: (sourceItemKey: string) => void;
@@ -167,6 +173,17 @@ export function useInstructionMemory(
     requestMemoryListOpen();
   };
 
+  const handleStageComponentBlock = (
+    instructions: BlockLoopInstructionLoadDTO[],
+    sourceRevision: string,
+  ) => {
+    if (policy.kind !== 'COMPONENT' || !sourceRevision.trim()) return;
+    const item = componentBlockMemoryItem(instructions, sourceRevision);
+    if (!item) return;
+    addComponentItems([item]);
+    requestMemoryListOpen();
+  };
+
   const handleRemoveFromMemory = (id: number) => {
     setMemorySteps((prev) => prev.filter((step) => step.id !== id));
   };
@@ -204,6 +221,7 @@ export function useInstructionMemory(
     requestMemoryListOpen,
     handleAddToMemory,
     handleAddBlockToMemory,
+    handleStageComponentBlock,
     handleRemoveFromMemory,
     handleRemoveComponentMemoryItem,
   };

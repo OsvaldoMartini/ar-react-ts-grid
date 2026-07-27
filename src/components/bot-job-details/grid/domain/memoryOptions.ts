@@ -96,3 +96,34 @@ export const componentInstructionMemoryItem = (
     },
   };
 };
+
+/**
+ * Stage an entire reusable component block as one authoritative Memory List item.
+ *
+ * The backend reloads the component graph by id and revision, then transactionally
+ * remaps its instructions, variables, references, parents, and parent blocks.
+ * Keeping this as one item prevents row-level eligibility filtering from silently
+ * dropping dependent commands such as IF/ELSE/ENDIF, LOOP, GET, CK, and E.
+ */
+export const componentBlockMemoryItem = (
+  instructions: BlockLoopInstructionLoadDTO[],
+  sourceRevision: string,
+): MemoryListItem<ComponentMemoryListPayload> | null => {
+  const first = instructions[0];
+  if (!first) return null;
+  const sourceItemKey = `BLOCK:${first.homeBankingId}:${first.blockId}`;
+  return {
+    key: `COMPONENT:${sourceItemKey}`,
+    sourceKind: 'COMPONENT',
+    sourceItemKey,
+    label: first.blockName || `Component block ${first.blockId}`,
+    detail: `Whole component block (${instructions.length} instruction${instructions.length === 1 ? '' : 's'})`,
+    icon: 'default',
+    active: first.blockActive !== false,
+    payload: {
+      kind: 'BLOCK',
+      componentBlockId: first.blockId,
+      sourceRevision,
+    },
+  };
+};

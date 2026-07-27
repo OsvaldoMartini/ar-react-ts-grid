@@ -70,7 +70,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
     handleExcelFileBlockName, submitExcelExport, chooseExcelExportDirectory, closeExcelExport,
     memoryItemCount, memoryBlockOptions, createBlockOpen, setCreateBlockOpen,
     memoryCapabilities, requestMemoryListOpen,
-    handleAddToMemory, handleAddBlockToMemory,
+    handleAddToMemory, handleAddBlockToMemory, handleStageComponentBlock,
     instructionsData,
     workspaceBlocks,
     groupedData,
@@ -660,7 +660,13 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                         editingName={blockName}
                         nameInputRef={blockRef}
                         findText={findText}
-                        canAddToMemory={blockData.instructions.some(instruction => memoryCapabilities.get(instruction.id)?.canAdd)}
+                        canAddToMemory={
+                          componentWorkspace
+                            ? Boolean(moveGraphRevision)
+                            : blockData.instructions.some(
+                                instruction => memoryCapabilities.get(instruction.id)?.canAdd,
+                              )
+                        }
                         showCreateComponent={!componentWorkspace}
                         isFirstBlock={authoritativeIndex === 0 && Boolean(moveGraphRevision)}
                         blockDeleteTitle={blockDeleteCapabilities.get(Number(blockData.instructions[0].blockId))?.reason}
@@ -697,6 +703,11 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                         onSaveName={() => handleSaveBlockName(Number(blockData.instructions[0].blockId))}
                         onAddToMemory={(e) => {
                           e.stopPropagation();
+                          if (componentWorkspace) {
+                            if (!moveGraphRevision) return;
+                            handleStageComponentBlock(blockData.instructions, moveGraphRevision);
+                            return;
+                          }
                           handleAddBlockToMemory(blockData.instructions, moveGraphRevision);
                         }}
                         onRollback={() => handleRollbackBlock(Number(blockData.instructions[0].blockId))}
