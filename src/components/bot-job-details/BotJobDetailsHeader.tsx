@@ -74,6 +74,12 @@ const BotJobDetailsHeader: React.FC<BotJobDetailsHeaderProps> = ({
         active: activeSurface === 'components',
         disabled: pending || unavailable || !canShowComponents,
       },
+      {
+        id: 'SHOW_VARIABLES',
+        label: pendingAction === 'SHOW_VARIABLES' ? 'Opening Variables…' : 'Variables',
+        tone: 'primary',
+        disabled: pending || unavailable || !canUseWorkspaceActions,
+      },
       { id: 'SHOW_PRE_SCAN', label: 'Pre Scan', tone: 'success', active: activeSurface === 'preScan', disabled: pending || unavailable || !canUsePreScan || activeSurface === 'preScan' },
     ];
   }, [activeSurface, botJobId, busy, canShowComponents, canUsePreScan, canUseWorkspaceActions, connected, pendingAction]);

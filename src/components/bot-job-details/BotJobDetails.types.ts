@@ -4,6 +4,7 @@ export type BotJobWorkspaceAction =
   | 'REFRESH'
   | 'SHOW_BOT_JOB'
   | 'SHOW_COMPONENTS'
+  | 'SHOW_VARIABLES'
   | 'HIDE_COMPONENTS'
   | 'SHOW_PRE_SCAN'
   | 'OPEN_ORGANIZATIONS'

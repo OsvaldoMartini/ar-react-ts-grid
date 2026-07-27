@@ -324,7 +324,8 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
         pendingActionRef.current = null;
         setPendingAction(null);
         const opensDetachedWorkspace = pending.action === 'SHOW_PRE_SCAN'
-          || pending.action === 'SHOW_COMPONENTS';
+          || pending.action === 'SHOW_COMPONENTS'
+          || pending.action === 'SHOW_VARIABLES';
         if (body.state && !opensDetachedWorkspace) {
           setState((current) => reduceBotJobDetailsState(current, body.state));
         }

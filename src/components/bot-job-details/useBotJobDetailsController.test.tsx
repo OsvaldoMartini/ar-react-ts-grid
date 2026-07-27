@@ -38,6 +38,7 @@ const Harness: React.FC<HarnessProps> = ({ socket, messages, botJobId = 42, onSu
     <span data-testid="pause-request">{controller.executionPause?.requestId || ''}</span>
     <button type="button" onClick={() => controller.saveMetadata({ expectedMetadataRevision: 3, name: 'Payments QA', description: 'Flow', homeUrlId: 8 })}>Save metadata</button>
     <button type="button" onClick={() => controller.sendAction('SHOW_COMPONENTS')}>Show components</button>
+    <button type="button" onClick={() => controller.sendAction('SHOW_VARIABLES')}>Show variables</button>
     <button type="button" onClick={() => controller.sendAction('SHOW_PRE_SCAN')}>Show pre scan</button>
     <button type="button" onClick={() => controller.sendToolbarAction('CHOOSE_TRANSFER_PATH')}>Choose transfer folder</button>
     <button type="button" onClick={() => controller.sendToolbarAction('OPEN_EXCEL')}>Open Excel</button>
@@ -128,6 +129,31 @@ test('requires matching action and a successful known surface before updating wo
   await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('Action accepted'));
   expect(screen.getByTestId('surface')).toHaveTextContent('botJob');
   expect(onSurfaceOpen).not.toHaveBeenCalled();
+});
+
+test('opens Variables as a detached action without replacing Bot Job Details state', async () => {
+  const send = jest.fn();
+  const socket = { readyState: WebSocket.OPEN, send } as unknown as WebSocket;
+  const view = render(<Harness socket={socket} messages={[]} />);
+  let messages = await completeBootstrap(view, socket, send);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Show variables' }));
+  const actionRequest = sentBody(send, 1);
+  expect(actionRequest.action).toBe('SHOW_VARIABLES');
+
+  messages = [...messages, response('botJobDetails.actionResponse', {
+    ok: true,
+    botJobId: 42,
+    requestId: actionRequest.requestId,
+    action: 'SHOW_VARIABLES',
+    message: 'Variables opened',
+    state: { ...state, name: 'Must not replace the active Bot Job state' },
+  })];
+  view.rerender(<Harness socket={socket} messages={messages} />);
+
+  await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('Variables opened'));
+  expect(screen.getByTestId('job-name')).toHaveTextContent('Payments');
+  expect(screen.getByTestId('job-name')).not.toHaveTextContent('Must not replace');
 });
 
 test('opens a detached Page Scanner without navigating the Bot Job surface', async () => {
