@@ -1311,10 +1311,6 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
       try {
         const parsedMessage = JSON.parse(msg);
 
-        if (typeof parsedMessage.homeBankingId === "number") {
-          setHomeBankingId(parsedMessage.homeBankingId);
-        }
-
         if (!acceptedSessions.has(parsedMessage.sessionId)) continue;
 
         const bodyData = tryParse(parsedMessage.body);

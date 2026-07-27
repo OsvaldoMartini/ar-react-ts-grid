@@ -156,3 +156,52 @@ test('Component grid consumes a capability response even when a later frame is q
 
   await expectQueuedCapabilityEnablesDrag('componentTasks');
 });
+
+test('an authoritative empty block never triggers the legacy automatic BLOCK_ORDER writer', async () => {
+  const props = {
+    homeBankingIdInitial: 2,
+    data: [
+      { ...row, blockOrderNumber: 2 },
+      { ...secondRow, blockOrderNumber: 2 },
+    ],
+    initialBlocks: [
+      {
+        blockId: 135,
+        blockOrderNumber: 1,
+        blockName: 'TEST',
+        blockActive: true,
+        blockWait: 0,
+      },
+      {
+        blockId: 10,
+        blockOrderNumber: 2,
+        blockName: 'Main',
+        blockActive: true,
+        blockWait: 0,
+      },
+    ],
+    socketPort: 52101,
+    sessionId: 'botJobTasks',
+    botJobIdInitial: 5,
+    botJobNameInitial: 'Drag regression',
+    onSessionOpen: jest.fn(),
+  };
+  render(<GridItem {...props} />);
+
+  await waitFor(() => expect(mockSend.mock.calls
+    .map(([payload]) => JSON.parse(payload).type))
+    .toContain('instructionEditor.memoryCapabilities'));
+  await new Promise(resolve => setTimeout(resolve, 0));
+
+  expect(mockSend.mock.calls
+    .map(([payload]) => JSON.parse(payload).type))
+    .not.toContain('BLOCK_ORDER');
+  expect(screen.getByText('TEST')).toBeInTheDocument();
+  expect(screen.getByText('No instructions in this block')).toBeInTheDocument();
+  const emptyBlockTitle = screen.getByText('TEST');
+  const populatedBlockTitle = screen.getByText('Main');
+  expect(
+    emptyBlockTitle.compareDocumentPosition(populatedBlockTitle)
+      & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+});

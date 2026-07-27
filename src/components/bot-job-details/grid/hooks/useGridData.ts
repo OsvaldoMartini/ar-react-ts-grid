@@ -3,7 +3,6 @@ import {
   BlockLoopInstructionLoadDTO,
   ComplexMessage,
   ElementDTO,
-  UpdatedBlock,
 } from '../../../instructionsMockData';
 import { CreateBlockOption, CreateBlockPosition } from '../../../CreateNewBlock';
 import { SaveComponentContext } from '../../../SaveComponentPanel';
@@ -41,10 +40,18 @@ import warningRedImage from '../../../../assets/warning_red.png';
 
 type BlockDeleteCapability = { canDelete: boolean; reason: string; instructionCount: number; deleteRows: { id: number; name: string; action: string; order: number }[] };
 
+export type GridActionNotice = {
+  title: string;
+  message: string;
+  action: string;
+};
+
 export interface UseGridDataDeps {
   // Props
   data: BlockLoopInstructionLoadDTO[];
   initialBlocks?: WorkspaceBlock[];
+  homeBankingIdInitial: number;
+  botJobIdInitial: number;
   sessionId: string;
   socketPort: number;
   onSessionOpen: (targetSession: string, port: number, botJobId?: number) => void;
@@ -126,7 +133,8 @@ export interface UseGridDataDeps {
  */
 export function useGridData(deps: UseGridDataDeps) {
   const {
-    data, initialBlocks, sessionId, socketPort, onSessionOpen, onDetachedClose, workspacePolicy,
+    data, initialBlocks, homeBankingIdInitial, botJobIdInitial,
+    sessionId, socketPort, onSessionOpen, onDetachedClose, workspacePolicy,
     webSocket, connected, messages,
     homeBankingId, botJobId, botJobName,
     setHomeBankingId, setBotJobId, setBotJobName, setBlockId,
@@ -166,7 +174,6 @@ export function useGridData(deps: UseGridDataDeps) {
   const [isDataReordered, setIsDataReordered] = useState<boolean>(false);
 
   const [dropdownPosition, setDropdownPosition] = useState('below'); // Default to 'below'
-  const [updatedBlocks, setUpdatedBlocks] = useState<UpdatedBlock[]>([]);
   const [editingInstructionId, setEditingInstructionId] = useState<number | null>(null);
   const [instructionName, setInstructionName] = useState<string>('');
   const [editingBlockId, setEditingBlockId] = useState<number | null>(null);
@@ -193,9 +200,13 @@ export function useGridData(deps: UseGridDataDeps) {
   const [pendingDragPreview, setPendingDragPreview] = useState<{ requestId: string; result: any } | null>(null);
   const [blockDeleteCapabilities, setBlockDeleteCapabilities] = useState<Map<number, BlockDeleteCapability>>(new Map());
   const [moveGraphRevision, setMoveGraphRevision] = useState('');
+  const [gridActionNotice, setGridActionNotice] = useState<GridActionNotice | null>(null);
+  const dismissGridActionNotice = useCallback(() => setGridActionNotice(null), []);
   const propIdentityRef = useRef(
-    `${workspaceKind}:${homeBankingId}:${botJobId ?? -1}`,
+    `${workspaceKind}:${homeBankingIdInitial}:${botJobIdInitial}`,
   );
+  const propHomeBankingIdRef = useRef(homeBankingIdInitial);
+  const propBotJobIdRef = useRef(botJobIdInitial);
   const initialBlocksSignature = (initialBlocks ?? [])
     .map(block => [
       block.blockId,
@@ -206,17 +217,36 @@ export function useGridData(deps: UseGridDataDeps) {
       block.exportFile ?? '',
     ].join(':'))
     .join('|');
+  const initialDataSignature = JSON.stringify(data);
   const initialBlocksSignatureRef = useRef(initialBlocksSignature);
+  const initialDataSignatureRef = useRef(initialDataSignature);
   useEffect(() => {
-    const nextIdentity = `${workspaceKind}:${homeBankingId}:${botJobId ?? -1}`;
+    // Only immutable input props can identify a parent-driven workspace replacement.
+    // Mutable socket/controller identity changes are normal during bootstrap and must not
+    // reset a live authoritative grid back to stale/empty initial props.
+    const nextIdentity = `${workspaceKind}:${homeBankingIdInitial}:${botJobIdInitial}`;
     const identityChanged = propIdentityRef.current !== nextIdentity;
     const initialBlockCatalogChanged =
       initialBlocksSignatureRef.current !== initialBlocksSignature;
-    if (!identityChanged
+    const initialDataChanged =
+      initialDataSignatureRef.current !== initialDataSignature;
+    if (!identityChanged && !initialBlockCatalogChanged && !initialDataChanged) return;
+    const bootstrapIdentityResolution = identityChanged
+      && (propHomeBankingIdRef.current <= 0 || propBotJobIdRef.current <= 0)
+      && homeBankingIdInitial > 0
+      && botJobIdInitial > 0
       && !initialBlockCatalogChanged
-      && (instructionsData.length > 0 || data.length === 0)) return;
+      && !initialDataChanged
+      && (homeBankingId <= 0 || homeBankingId === homeBankingIdInitial)
+      && (botJobId == null || botJobId <= 0 || botJobId === botJobIdInitial);
     propIdentityRef.current = nextIdentity;
+    propHomeBankingIdRef.current = homeBankingIdInitial;
+    propBotJobIdRef.current = botJobIdInitial;
     initialBlocksSignatureRef.current = initialBlocksSignature;
+    initialDataSignatureRef.current = initialDataSignature;
+    // A 0 -> valid route/bootstrap transition identifies the authoritative rows
+    // already received over the socket; empty unchanged props must not erase them.
+    if (bootstrapIdentityResolution) return;
     setInstructionsData(data);
     const authoritative = normalizeWorkspaceBlocks(initialBlocks ?? []);
     setWorkspaceBlocks(
@@ -230,7 +260,15 @@ export function useGridData(deps: UseGridDataDeps) {
     setIsDataReordered(data.length === 0);
   // Prop changes are the synchronization trigger; optimistic row edits must not retrigger it.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, initialBlocks, initialBlocksSignature, workspaceKind, homeBankingId, botJobId]);
+  }, [
+    data,
+    initialBlocks,
+    initialDataSignature,
+    initialBlocksSignature,
+    workspaceKind,
+    homeBankingIdInitial,
+    botJobIdInitial,
+  ]);
   const submitInstructionMove = useInstructionDrag({
     webSocket, connected, graphRevision: moveGraphRevision, botJobId, botJobName,
     homeBankingId, targetSessionId, moveType: rowMoveVerb,
@@ -246,7 +284,12 @@ export function useGridData(deps: UseGridDataDeps) {
 
   useEffect(() => {
     if (!webSocket || !connected
-      || (instructionsData.length === 0 && workspaceBlocks.length === 0)) return;
+      || (instructionsData.length === 0 && workspaceBlocks.length === 0)
+      || !Number.isSafeInteger(homeBankingId)
+      || homeBankingId <= 0
+      || botJobId == null
+      || !Number.isSafeInteger(Number(botJobId))
+      || Number(botJobId) <= 0) return;
     const requestId = `${Date.now()}-${targetSessionId}-capabilities-${++capabilityRequestCounterRef.current}`;
     pendingCapabilityRequestRef.current = {
       requestId,
@@ -690,11 +733,6 @@ export function useGridData(deps: UseGridDataDeps) {
 
       try {
         const parsedMessage = JSON.parse(message);
-        if (typeof parsedMessage.homeBankingId === "number") {
-          setHomeBankingId(parsedMessage.homeBankingId);
-        }
-
-
         if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "memoryList.openResponse") {
           const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
           if (String(bodyData?.requestId || '') !== memoryListOpenPendingRequestRef.current) return;
@@ -964,18 +1002,15 @@ export function useGridData(deps: UseGridDataDeps) {
             setMoveGraphRevision('');
             setMemoryCapabilities(new Map());
             setBlockDeleteCapabilities(new Map());
-            setAlertImage(warningRedImage);
-            setAlertClass('construction-image');
-            setAlertMessageHeader('Grid Actions Unavailable');
-            setAlertMessageBody(
-              bodyData?.error
+            setGridActionNotice({
+              title: 'Grid Actions Unavailable',
+              message: bodyData?.error
                 || 'The backend could not authorize the current instruction grid.',
-            );
-            setAlertMessageFooter('Refresh this workspace before changing rows or blocks.');
-            setErrorFlag(true);
-            setAlertOnConfirm(undefined);
+              action: 'The last valid rows remain visible. Refresh this workspace before changing rows or blocks.',
+            });
             return;
           }
+          setGridActionNotice(null);
           const next = new Map<number, { canAdd: boolean; canMove: boolean; canDelete: boolean; deleteCount: number; reason: string; deleteReason: string; allowedBlockIds: number[]; deleteRows: { id: number; name: string; action: string; order: number }[] }>();
           if (Array.isArray(bodyData?.capabilities)) {
             bodyData.capabilities.forEach((capability: { instructionId: number; canAddToMemory: boolean; canMove: boolean; canDelete: boolean; deleteCount?: number; reason?: string; deleteReason?: string; allowedBlockIds?: number[]; deleteRows?: { id: number; name: string; action: string; order: number }[] }) => {
@@ -1002,38 +1037,88 @@ export function useGridData(deps: UseGridDataDeps) {
           setMoveGraphRevision('');
           setMemoryCapabilities(new Map());
           setBlockDeleteCapabilities(new Map());
-          setAlertImage(warningRedImage);
-          setAlertClass('construction-image');
-          setAlertMessageHeader('Components Refresh Required');
-          setAlertMessageBody(
-            bodyData?.error
+          setGridActionNotice({
+            title: 'Components Refresh Required',
+            message: bodyData?.error
               || 'The change was saved, but the Components grid could not be refreshed.',
-          );
-          setAlertMessageFooter(
-            bodyData?.action
-              || 'Refresh Components before making another change.',
-          );
-          setErrorFlag(true);
-          setAlertOnConfirm(undefined);
+            action: bodyData?.action
+              || 'The last valid rows remain visible. Refresh Components before making another change.',
+          });
         } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === updateOperation) {
+          const bodyData = typeof parsedMessage.body === "string"
+            ? JSON.parse(parsedMessage.body)
+            : parsedMessage.body;
+
+          // Only an explicit instruction array is an authoritative grid snapshot. Error,
+          // focus, and partial response objects must never erase the last usable client view.
+          const hasInstructionSnapshot = Array.isArray(bodyData)
+            || (
+              bodyData !== null
+              && typeof bodyData === 'object'
+              && Array.isArray(bodyData.instructions)
+            );
+          const structuredComponentSnapshot = workspaceKind === 'COMPONENT'
+            && !Array.isArray(bodyData);
+          const snapshotExplicitlyFailed = !Array.isArray(bodyData)
+            && bodyData?.ok === false;
+          const snapshotHomeBankingId = Number(
+            bodyData?.homeBankingId ?? parsedMessage.homeBankingId,
+          );
+          const snapshotBotJobId = Number(bodyData?.botJobId);
+          const componentSnapshotIdentityValid = workspaceKind !== 'COMPONENT'
+            || (
+              Number.isSafeInteger(snapshotHomeBankingId)
+              && snapshotHomeBankingId > 0
+              && (!Number.isSafeInteger(homeBankingId)
+                || homeBankingId <= 0
+                || snapshotHomeBankingId === homeBankingId)
+              && (
+                Array.isArray(bodyData)
+                || (
+                  Number.isSafeInteger(snapshotBotJobId)
+                  && snapshotBotJobId > 0
+                  && (botJobId == null
+                    || Number(botJobId) <= 0
+                    || snapshotBotJobId === Number(botJobId))
+                )
+              )
+            );
+          const componentSnapshotShapeValid = !structuredComponentSnapshot
+            || Array.isArray(bodyData?.blocks);
+          if (
+            snapshotExplicitlyFailed
+            || !hasInstructionSnapshot
+            || !componentSnapshotIdentityValid
+            || !componentSnapshotShapeValid
+          ) {
+            pendingCapabilityRequestRef.current = null;
+            setMoveGraphRevision('');
+            setMemoryCapabilities(new Map());
+            setBlockDeleteCapabilities(new Map());
+            setGridActionNotice({
+              title: 'Grid Refresh Ignored',
+              message: bodyData?.error
+                || bodyData?.message
+                || 'The backend returned an incomplete or stale grid update.',
+              action: 'The last valid rows remain visible. Refresh this workspace to request a complete snapshot.',
+            });
+            return;
+          }
 
           pendingCapabilityRequestRef.current = null;
           setMoveGraphRevision('');
           setMemoryCapabilities(new Map());
           setBlockDeleteCapabilities(new Map());
           pendingScrollTopRef.current = gridScrollRef.current?.scrollTop ?? null;
+          setGridActionNotice(null);
+          if (workspaceKind === 'COMPONENT') {
+            setHomeBankingId(snapshotHomeBankingId);
+            if (!Array.isArray(bodyData)) setBotJobId(snapshotBotJobId);
+          }
 
-          const bodyData = typeof parsedMessage.body === "string"
-            ? JSON.parse(parsedMessage.body)
-            : parsedMessage.body;
-
-          // ... handle updateInstructions ...
-          // Ensure detailsData is always an array if possible
           const detailsData = Array.isArray(bodyData)
             ? bodyData
-            : Array.isArray(bodyData.instructions)
-              ? bodyData.instructions
-              : [];
+            : bodyData.instructions;
           const backendBlocks = !Array.isArray(bodyData) && Array.isArray(bodyData.blocks)
             ? bodyData.blocks
             : [];
@@ -1141,38 +1226,12 @@ export function useGridData(deps: UseGridDataDeps) {
   ]);
 
   useEffect(() => {
-    console.log("Update Blocks");
-
-    if (updatedBlocks.length > 0 && webSocket && connected) {
-      const message = {
-        type: 'BLOCK_ORDER',
-        botJobId: botJobId,
-        botJobName: botJobName,
-        homeBankingId: homeBankingId,
-        sessionId: targetSessionId,
-        updatedBlocks: updatedBlocks,
-      };
-
-      if (webSocket.readyState === WebSocket.OPEN) {
-        try {
-          webSocket.send(JSON.stringify(message));
-          console.log('Sent block order message:', message);
-        } catch (error) {
-          console.error('Error sending WebSocket message:', error);
-        }
-      }
-    }
-  }, [updatedBlocks]); // Remove unnecessary dependencies
-
-  useEffect(() => {
     console.log("Reassigning instruction order numbers");
     if (!isDataReordered && instructionsData.length > 0) {
 
 
       const reassignedData = reassignInstructionOrderNumbersByBlock([...instructionsData]);
-      const { updatedData, updatedBlocks: nextUpdatedBlocks } = workspaceKind === 'COMPONENT'
-        ? { updatedData: reassignedData, updatedBlocks: [] as UpdatedBlock[] }
-        : correctBlockOrderNumbers(reassignedData);
+      const updatedData = reassignedData;
 
       const gotoInstructionAfterReorder = updatedData.find(
         (instruction) => instruction.actions === 'EXCEL GOTO'
@@ -1181,10 +1240,6 @@ export function useGridData(deps: UseGridDataDeps) {
       setInstructionsData(updatedData);
       setExcelGotoInstruction(gotoInstructionAfterReorder || null);
       setGroupedData(groupByBlock(updatedData));
-
-      if (JSON.stringify(updatedBlocks) !== JSON.stringify(nextUpdatedBlocks)) {
-        setUpdatedBlocks(nextUpdatedBlocks);
-      }
 
       setIsDataReordered(true);
     }
@@ -1416,47 +1471,6 @@ export function useGridData(deps: UseGridDataDeps) {
       }
     }
   };
-
-
-  const correctBlockOrderNumbers = (data: any[]) => {
-    console.log("Correcting blockOrderNumbers");
-
-    const updatedData = [...data]; // Make a copy of the instructions data
-
-    // Create a map of blockId -> instructions to avoid nested loops
-    const blockMap = new Map<number, any[]>();
-
-    updatedData
-      .sort((a, b) => a.blockOrderNumber - b.blockOrderNumber) // Sort by blockOrderNumber
-      .forEach(instruction => {
-        if (!blockMap.has(instruction.blockId)) {
-          blockMap.set(instruction.blockId, []);
-        }
-        blockMap.get(instruction.blockId)?.push(instruction);
-      });
-
-    const updatedBlocks: UpdatedBlock[] = []; // To track blocks with changed blockOrderNumber
-
-    // Iterate over the block map
-    Array.from(blockMap.keys()).forEach((blockId, index) => {
-      const newOrderNumber = index + 1; // Start block order from 1
-
-      blockMap.get(blockId)?.forEach(instruction => {
-        if (instruction.blockOrderNumber !== newOrderNumber) {
-          updatedBlocks.push({
-            botJobId: instruction.botJobId || -1,
-            blockId: instruction.blockId,
-            blockName: instruction.blockName,
-            blockOrderNumber: newOrderNumber,
-          });
-        }
-        instruction.blockOrderNumber = newOrderNumber;
-      });
-    });
-
-    return { updatedData, updatedBlocks };
-  };
-
 
 
   // Function to move a block up by swapping blockOrderNumbers
@@ -2361,6 +2375,8 @@ export function useGridData(deps: UseGridDataDeps) {
     activeDraggedInstructionId,
     moveGraphRevision,
     blockDeleteCapabilities,
+    gridActionNotice,
+    dismissGridActionNotice,
     // mutation handlers
     handleCreateNewBlock,
     handleBlockStatus,

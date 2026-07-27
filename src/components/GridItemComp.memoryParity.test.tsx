@@ -456,3 +456,182 @@ test('authoritative refresh failure disables mutations and tells the user to ref
   )).toBeInTheDocument();
   expect(screen.getByLabelText('Move instruction 1')).toBeDisabled();
 });
+
+test('context-free WebSocket sentinels cannot poison the Components organization', async () => {
+  const view = render(<GridItemComp {...props} />);
+  await waitFor(() => expect(
+    mockSend.mock.calls
+      .map(([payload]) => JSON.parse(payload))
+      .some(message => message.type === 'instructionEditor.memoryCapabilities'),
+  ).toBe(true));
+
+  mockMessages = [JSON.stringify({
+    sessionId: 'componentTasks',
+    homeBankingId: -1,
+    operationId: 'license.statusChanged',
+    body: JSON.stringify({ active: true }),
+  })];
+  view.rerender(<GridItemComp {...props} />);
+
+  await new Promise(resolve => setTimeout(resolve, 0));
+  const capabilityRequests = mockSend.mock.calls
+    .map(([payload]) => JSON.parse(payload))
+    .filter(message => message.type === 'instructionEditor.memoryCapabilities');
+  expect(capabilityRequests.length).toBeGreaterThan(0);
+  capabilityRequests.forEach(request => {
+    expect(request.homeBankingId).toBe(2);
+    expect(JSON.parse(request.body).homeBankingId).toBe(2);
+  });
+  expect(screen.getByText(/\(101\)Continue/)).toBeInTheDocument();
+  expect(screen.getByText(/\(102\)Confirm/)).toBeInTheDocument();
+});
+
+test('a correlated capability refusal disables actions without hiding the last valid rows', async () => {
+  const view = render(<GridItemComp {...props} />);
+  await waitFor(() => expect(
+    mockSend.mock.calls
+      .map(([payload]) => JSON.parse(payload))
+      .some(message => message.type === 'instructionEditor.memoryCapabilities'),
+  ).toBe(true));
+  const request = [...mockSend.mock.calls]
+    .reverse()
+    .map(([payload]) => JSON.parse(payload))
+    .find(message => message.type === 'instructionEditor.memoryCapabilities');
+  const requestedBody = JSON.parse(request.body);
+  mockMessages = [JSON.stringify({
+    sessionId: 'componentTasks',
+    homeBankingId: 2,
+    operationId: 'instructionEditor.memoryCapabilitiesResponse',
+    body: JSON.stringify({
+      ok: false,
+      requestId: requestedBody.requestId,
+      targetSessionId: requestedBody.targetSessionId,
+      homeBankingId: requestedBody.homeBankingId,
+      botJobId: requestedBody.botJobId,
+      error: 'The Components organization is required.',
+    }),
+  })];
+  view.rerender(<GridItemComp {...props} />);
+
+  expect(await screen.findByText('Grid Actions Unavailable')).toBeInTheDocument();
+  expect(screen.getByText('The Components organization is required.')).toBeInTheDocument();
+  expect(screen.getByText(/\(101\)Continue/)).toBeInTheDocument();
+  expect(screen.getByText(/\(102\)Confirm/)).toBeInTheDocument();
+  expect(screen.getByLabelText('Move instruction 1')).toBeDisabled();
+  expect(screen.queryByText(/No components were created yet/)).not.toBeInTheDocument();
+});
+
+test('capabilities wait for an authoritative positive Components organization', async () => {
+  const loadingProps = { ...props, homeBankingIdInitial: 0 };
+  const view = render(<GridItemComp {...loadingProps} />);
+
+  await new Promise(resolve => setTimeout(resolve, 0));
+  expect(mockSend.mock.calls
+    .map(([payload]) => JSON.parse(payload).type))
+    .not.toContain('instructionEditor.memoryCapabilities');
+
+  view.rerender(<GridItemComp {...props} />);
+  await waitFor(() => {
+    const capability = mockSend.mock.calls
+      .map(([payload]) => JSON.parse(payload))
+      .find(message => message.type === 'instructionEditor.memoryCapabilities');
+    expect(capability).toEqual(expect.objectContaining({ homeBankingId: 2 }));
+  });
+});
+
+test('authoritative Components bootstrap hydrates an initially empty detached workspace without resetting it', async () => {
+  const loadingProps = {
+    ...props,
+    homeBankingIdInitial: 0,
+    dataComp: [] as ComponentsInstructionsDTO[],
+    blocksComp: [],
+  };
+  const view = render(<GridItemComp {...loadingProps} />);
+  expect(mockSend.mock.calls
+    .map(([payload]) => JSON.parse(payload).type))
+    .not.toContain('instructionEditor.memoryCapabilities');
+
+  mockMessages = [JSON.stringify({
+    sessionId: 'componentTasks',
+    homeBankingId: 2,
+    operationId: 'componentsUpdate',
+    body: JSON.stringify({
+      instructions: [first, second],
+      blocks: [{
+        blockId: 44,
+        blockOrderNumber: 1,
+        blockName: 'Reusable Login',
+        blockActive: true,
+        blockWait: 0,
+      }],
+      homeBankingId: 2,
+      botJobId: 5,
+      botJobName: 'Target Bot Job',
+    }),
+  })];
+  view.rerender(<GridItemComp {...loadingProps} />);
+
+  expect(await screen.findByText(/\(101\)Continue/)).toBeInTheDocument();
+  expect(screen.getByText(/\(102\)Confirm/)).toBeInTheDocument();
+  await waitFor(() => {
+    const capability = mockSend.mock.calls
+      .map(([payload]) => JSON.parse(payload))
+      .find(message => message.type === 'instructionEditor.memoryCapabilities');
+    expect(capability).toEqual(expect.objectContaining({ homeBankingId: 2 }));
+    expect(JSON.parse(capability.body).homeBankingId).toBe(2);
+  });
+
+  view.rerender(<GridItemComp
+    {...loadingProps}
+    homeBankingIdInitial={2}
+    botJobIdInitial={5}
+  />);
+  expect(screen.getByText(/\(101\)Continue/)).toBeInTheDocument();
+  expect(screen.getByText(/\(102\)Confirm/)).toBeInTheDocument();
+});
+
+test('failed or malformed Components updates preserve the last valid rows', async () => {
+  const view = render(<GridItemComp {...props} />);
+  await authorizeGrid(view);
+  mockMessages = [...mockMessages, JSON.stringify({
+    sessionId: 'componentTasks',
+    homeBankingId: 2,
+    operationId: 'componentsUpdate',
+    body: JSON.stringify({
+      ok: false,
+      error: 'The refreshed component snapshot is unavailable.',
+      instructions: [],
+      blocks: [],
+      homeBankingId: 2,
+      botJobId: 5,
+    }),
+  })];
+  view.rerender(<GridItemComp {...props} />);
+
+  expect(await screen.findByText('Grid Refresh Ignored')).toBeInTheDocument();
+  expect(screen.getByText('The refreshed component snapshot is unavailable.')).toBeInTheDocument();
+  expect(screen.getByText(/\(101\)Continue/)).toBeInTheDocument();
+  expect(screen.getByText(/\(102\)Confirm/)).toBeInTheDocument();
+  expect(screen.getByLabelText('Move instruction 1')).toBeDisabled();
+  expect(screen.queryByText(/No components were created yet/)).not.toBeInTheDocument();
+});
+
+test('an explicit authoritative empty Components snapshot may clear the grid', async () => {
+  const view = render(<GridItemComp {...props} />);
+  mockMessages = [JSON.stringify({
+    sessionId: 'componentTasks',
+    homeBankingId: 2,
+    operationId: 'componentsUpdate',
+    body: JSON.stringify({
+      instructions: [],
+      blocks: [],
+      homeBankingId: 2,
+      botJobId: 5,
+      botJobName: 'Target Bot Job',
+    }),
+  })];
+  view.rerender(<GridItemComp {...props} />);
+
+  expect(await screen.findByText(/No components were created yet/)).toBeInTheDocument();
+  expect(screen.queryByText(/\(101\)Continue/)).not.toBeInTheDocument();
+});

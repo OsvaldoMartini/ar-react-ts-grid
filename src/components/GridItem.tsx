@@ -82,6 +82,8 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
     activeDraggedInstructionId,
     moveGraphRevision,
     blockDeleteCapabilities,
+    gridActionNotice,
+    dismissGridActionNotice,
     handleCreateNewBlock,
     handleBlockStatus,
     handleSaveBlockName,
@@ -515,6 +517,24 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
           error={errorFlag}
         />
       )}
+      {gridActionNotice && (
+        <div className={styles.gridActionNotice} role="status">
+          <div className={styles.gridActionNoticeText}>
+            <strong>{gridActionNotice.title}</strong>
+            <span>{gridActionNotice.message}</span>
+            <small>{gridActionNotice.action}</small>
+          </div>
+          <button
+            type="button"
+            className={styles.gridActionNoticeDismiss}
+            title="Dismiss grid notice"
+            aria-label="Dismiss grid notice"
+            onClick={dismissGridActionNotice}
+          >
+            ×
+          </button>
+        </div>
+      )}
       <div className={styles.gridFindRow}>
         <FindBar
           value={findText}
@@ -592,7 +612,8 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
 
               ) : (
                 <>
-                {Object.entries(groupedData)
+                {[
+                  ...Object.entries(groupedData)
                   .filter(([, blockData]) => {
                     const q = findText.trim().toLowerCase();
                     if (!q) return true;
@@ -753,8 +774,8 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                       />}
                     />
                     );
-                  })}
-                {emptyWorkspaceBlocks.map((block) => {
+                  }),
+                  ...emptyWorkspaceBlocks.map((block) => {
                   const index = workspaceBlockIndex(block.blockId, block.blockOrderNumber - 1);
                   const capability = blockDeleteCapabilities.get(block.blockId);
                   return (
@@ -826,7 +847,11 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                       />}
                     />
                   );
-                })}
+                  }),
+                ].sort(
+                  (left, right) =>
+                    Number(left.props.displayOrder) - Number(right.props.displayOrder),
+                )}
                 </>
               )}
         </div >
