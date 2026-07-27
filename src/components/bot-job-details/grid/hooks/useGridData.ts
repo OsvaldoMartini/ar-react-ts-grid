@@ -2048,14 +2048,20 @@ export function useGridData(deps: UseGridDataDeps) {
     setAlertImage(warningRedImage);
     setAlertClass('construction-image');
     setAlertMessageHeader('Delete Block');
-    setAlertMessageBody(capability.deleteRows.length > 0
-      ? capability.deleteRows.map(row => ({
-          parentNameWithId: `#${row.order} (${row.id}) ${row.name}`,
-          connectionLabel: 'Action',
-          actions: row.action,
-        }))
-      : `Delete empty block "${blockDisplayName}"?`);
-    setAlertMessageFooter(`Delete "${blockDisplayName}" and ${capability.instructionCount} instruction(s). This action cannot be undone.`);
+    const instructionCount = Math.max(
+      capability.instructionCount,
+      capability.deleteRows.length,
+    );
+    setAlertMessageBody(instructionCount > 5
+      ? `All ${instructionCount} instructions/steps in "${blockDisplayName}" will be deleted.`
+      : capability.deleteRows.length > 0
+        ? capability.deleteRows.map(row => ({
+            parentNameWithId: `#${row.order} (${row.id}) ${row.name}`,
+            connectionLabel: 'Action',
+            actions: row.action,
+          }))
+        : `Delete empty block "${blockDisplayName}"?`);
+    setAlertMessageFooter(`Delete "${blockDisplayName}" and ${instructionCount} instruction(s). This action cannot be undone.`);
     setErrorFlag(true);
     setAlertOnConfirm(() => () => executeRemoveBlock(blockId));
     return;
