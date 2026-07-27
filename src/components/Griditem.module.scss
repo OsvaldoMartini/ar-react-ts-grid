@@ -40,6 +40,8 @@
 /* NEW: scrollable area for the grid/list */
 .gridContent {
   flex: 1;
+  display: flex;
+  flex-direction: column;
   overflow-y: auto;   /* only this part scrolls */
   padding-top: 4px;   /* small spacing below toolbar */
 }

@@ -7,6 +7,7 @@ import upImage from '../assets/up.png';
 import downImage from '../assets/down.png';
 import excelGotoImage from "../assets/excel_goto2.png";
 import clickTestImage from "../assets/clickTest2.png";
+import arrowLeftImage from '../assets/ArrowLeft.png';
 
 
 import AlertModal from './AlertModal';
@@ -15,6 +16,7 @@ import CreateNewBlock from './CreateNewBlock';
 import ExcelExportPanel from './ExcelExportPanel';
 import SaveComponentPanel from './SaveComponentPanel';
 import BotJobDetailsChrome from './bot-job-details/BotJobDetailsChrome';
+import ComponentWorkspaceHeader from './bot-job-details/ComponentWorkspaceHeader';
 import FindBar from './bot-job-details/grid/FindBar';
 import DeleteButton from './bot-job-details/grid/DeleteButton';
 import InstructionRow from './bot-job-details/grid/InstructionRow';
@@ -28,17 +30,29 @@ import styles from './Griditem.module.scss';
 
 
 // Function to group data by blockId and sort instructions within each block
-const GridItem: React.FC<UseInstructionGridProps> = ({ homeBankingIdInitial, data, socketPort, sessionId, botJobIdInitial, botJobNameInitial, onSessionOpen, onDetachedClose }) => {
+const GridItem: React.FC<UseInstructionGridProps> = ({
+  homeBankingIdInitial,
+  data,
+  initialBlocks,
+  socketPort,
+  sessionId,
+  botJobIdInitial,
+  botJobNameInitial,
+  onSessionOpen,
+  onDetachedClose,
+  workspaceMode,
+}) => {
   // Phase 6, step 10 — hook composition + non-render wiring now lives in the
   // composition-root hook useInstructionGrid. GridItem stays purely presentational,
   // destructuring the same names its render helpers / JSX / dead code already use.
   const grid = useInstructionGrid({
-    homeBankingIdInitial, data, socketPort, sessionId,
-    botJobIdInitial, botJobNameInitial, onSessionOpen, onDetachedClose,
+    homeBankingIdInitial, data, initialBlocks, socketPort, sessionId,
+    botJobIdInitial, botJobNameInitial, onSessionOpen, onDetachedClose, workspaceMode,
   });
 
   const {
-    webSocket, connected, messages,
+    webSocket, connected, reconnectAttempts, messages, error,
+    workspacePolicy,
     botJobId, botJobName,
     gridScrollRef, instructionRef, blockRef, dropdownRef,
     openDropdown,
@@ -55,16 +69,18 @@ const GridItem: React.FC<UseInstructionGridProps> = ({ homeBankingIdInitial, dat
     collapsedBlocks, toggleBlockCollapsed,
     excelExportContext, excelExportDirectory, choosingExcelExportDirectory,
     handleExcelFileBlockName, submitExcelExport, chooseExcelExportDirectory, closeExcelExport,
-    memorySteps, memoryBlockOptions, createBlockOpen, setCreateBlockOpen,
+    memoryItemCount, memoryBlockOptions, createBlockOpen, setCreateBlockOpen,
     memoryCapabilities, requestMemoryListOpen,
-    handleAddToMemory, handleAddBlockToMemory,
+    handleAddToMemory, handleAddBlockToMemory, handleStageComponentBlock,
     instructionsData,
+    workspaceBlocks,
     groupedData,
     excelGotoInstruction,
     dropdownPosition,
     editingInstructionId, instructionName, setInstructionName,
     editingBlockId, blockName, setBlockName,
     activeDraggedInstructionId,
+    moveGraphRevision,
     blockDeleteCapabilities,
     handleCreateNewBlock,
     handleBlockStatus,
@@ -91,6 +107,31 @@ const GridItem: React.FC<UseInstructionGridProps> = ({ homeBankingIdInitial, dat
     handleBlockDragStart, handleBlockDrop, handleBlockDragEnd,
     handleMoveBlockUp, handleMoveBlockDown,
   } = grid;
+  const componentWorkspace = workspacePolicy.kind === 'COMPONENT';
+  const createBlockOptions = componentWorkspace
+    ? workspaceBlocks.map(({ blockId, blockOrderNumber, blockName }) => ({
+        blockId, blockOrderNumber, blockName,
+      }))
+    : memoryBlockOptions;
+  const emptyWorkspaceBlocks = workspaceBlocks
+    .filter(block => !groupedData[block.blockId])
+    .filter(block => block.blockName.toLowerCase().includes(findText.trim().toLowerCase()));
+  const workspaceBlockIndex = (blockId: number, fallback: number) => {
+    const index = workspaceBlocks.findIndex(block => block.blockId === blockId);
+    return index >= 0 ? index : fallback;
+  };
+
+  const closeDetachedWorkspace = (workspaceName: string) => {
+    if (onDetachedClose) {
+      onDetachedClose();
+      return;
+    }
+    try {
+      window.close();
+    } catch (closeError) {
+      console.error(`Could not close detached ${workspaceName} window:`, closeError);
+    }
+  };
 
   // Native block reorder (drag whole blocks + up/down buttons) now lives in
   // useBlockReorder (destructured above), including the window.__blockReorder hook.
@@ -412,7 +453,23 @@ const GridItem: React.FC<UseInstructionGridProps> = ({ homeBankingIdInitial, dat
 
   return (
     <div className={styles.gridContainer}>
-      <BotJobDetailsChrome
+      {componentWorkspace ? (
+        <ComponentWorkspaceHeader
+          botJobId={botJobId}
+          botJobName={botJobName}
+          connected={connected}
+          reconnectAttempts={reconnectAttempts}
+          error={error}
+          status={botJobHeader.status}
+          statusTone={botJobHeader.statusTone}
+          webSocket={webSocket}
+          messages={messages}
+          sessionId={sessionId}
+          onRetry={botJobHeader.retryBootstrap}
+          onClose={() => closeDetachedWorkspace('Components')}
+        />
+      ) : (
+        <BotJobDetailsChrome
         fallbackBotJobId={botJobId}
         fallbackBotJobName={botJobName}
         fallbackSurface="botJob"
@@ -424,20 +481,13 @@ const GridItem: React.FC<UseInstructionGridProps> = ({ homeBankingIdInitial, dat
           ...botJobHeader,
           sendAction: (action: Parameters<typeof botJobHeader.sendAction>[0]) => {
             if (action === 'CLOSE') {
-              if (onDetachedClose) {
-                onDetachedClose();
-              } else {
-                try {
-                  window.close();
-                } catch (closeError) {
-                  console.error('Could not close detached Bot Job window:', closeError);
-                }
-              }
+              closeDetachedWorkspace('Bot Job');
             }
             botJobHeader.sendAction(action);
           },
         }}
-      />
+        />
+      )}
       {excelExportContext && <ExcelExportPanel
         context={excelExportContext}
         onSubmit={submitExcelExport}
@@ -446,7 +496,13 @@ const GridItem: React.FC<UseInstructionGridProps> = ({ homeBankingIdInitial, dat
         selectedDirectory={excelExportDirectory}
         choosingDirectory={choosingExcelExportDirectory}
       />}
-      {saveComponentContext && <SaveComponentPanel context={saveComponentContext} onSubmit={submitSaveComponent} onClose={() => setSaveComponentContext(null)}/>}
+      {!componentWorkspace && saveComponentContext && (
+        <SaveComponentPanel
+          context={saveComponentContext}
+          onSubmit={submitSaveComponent}
+          onClose={() => setSaveComponentContext(null)}
+        />
+      )}
       {alertMessageBody && alertMessageBody.length > 0 && (
         <AlertModal
           header={alertMessageHeader || ''}
@@ -463,13 +519,13 @@ const GridItem: React.FC<UseInstructionGridProps> = ({ homeBankingIdInitial, dat
         <FindBar
           value={findText}
           onChange={setFindText}
-          memoryCount={memorySteps.length}
+          memoryCount={memoryItemCount}
           onOpenMemory={requestMemoryListOpen}
         />
       </div>
       {createBlockOpen && (
         <CreateNewBlock
-          blocks={memoryBlockOptions}
+          blocks={createBlockOptions}
           onCreate={handleCreateNewBlock}
           onClose={() => setCreateBlockOpen(false)}
         />
@@ -477,7 +533,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({ homeBankingIdInitial, dat
       <div ref={gridScrollRef} className={styles.gridScroll}>
         <div className={styles.gridContent}>
             {
-              Object.keys(groupedData).length === 0 ? (
+              Object.keys(groupedData).length === 0 && emptyWorkspaceBlocks.length === 0 ? (
                 // Render default block if groupedData is empty
                 // <div className={styles.block}>
                 //   <div className={styles.blockHeader}>
@@ -511,7 +567,9 @@ const GridItem: React.FC<UseInstructionGridProps> = ({ homeBankingIdInitial, dat
                 <div className={styles.block}>
                   <div className={`${styles.blockHeader}`}>
                     <span className={styles.blockName}>{botJobName}</span>
-                    <span className={styles.blockOrderNumber}>(AR Web) No Blocks were created yet</span>
+                    <span className={styles.blockOrderNumber}>
+                      (AR Web) {workspacePolicy.emptyBlockLabel}
+                    </span>
                   </div>
                   <div className={styles.instructionsList}>
                     {/* Add an empty line */}
@@ -533,7 +591,8 @@ const GridItem: React.FC<UseInstructionGridProps> = ({ homeBankingIdInitial, dat
                 </div>
 
               ) : (
-                Object.entries(groupedData)
+                <>
+                {Object.entries(groupedData)
                   .filter(([, blockData]) => {
                     const q = findText.trim().toLowerCase();
                     if (!q) return true;
@@ -548,18 +607,29 @@ const GridItem: React.FC<UseInstructionGridProps> = ({ homeBankingIdInitial, dat
                   })
                   .sort(
                     ([, aBlockData], [, bBlockData]) =>
-                      aBlockData.instructions[0].blockOrderNumber -
-                      bBlockData.instructions[0].blockOrderNumber
+                      workspaceBlockIndex(
+                        aBlockData.instructions[0].blockId,
+                        aBlockData.instructions[0].blockOrderNumber - 1,
+                      ) -
+                      workspaceBlockIndex(
+                        bBlockData.instructions[0].blockId,
+                        bBlockData.instructions[0].blockOrderNumber - 1,
+                      )
                   )
-                  .map(([blockGroupIndex, blockData], index) => (
+                  .map(([blockGroupIndex, blockData], index) => {
+                    const blockId = Number(blockData.instructions[0].blockId);
+                    const authoritativeIndex = workspaceBlockIndex(blockId, index);
+                    const displayOrder = authoritativeIndex + 1;
+                    return (
                     <BlockCard
                       key={blockGroupIndex}
+                      displayOrder={displayOrder}
                       blockDraggable={findText.trim().length === 0}
-                      onBlockDragStart={handleBlockDragStart(index, Number(blockData.instructions[0].blockId))}
+                      onBlockDragStart={handleBlockDragStart(authoritativeIndex, blockId)}
                       onBlockDragOver={handleGridDragOver}
-                      onBlockDrop={handleBlockDrop(index)}
+                      onBlockDrop={handleBlockDrop(authoritativeIndex)}
                       onBlockDragEnd={handleBlockDragEnd}
-                      collapsed={collapsedBlocks.has(Number(blockData.instructions[0].blockId))}
+                      collapsed={collapsedBlocks.has(blockId)}
                       header={<BlockHeader
                         blockActive={blockData.instructions[0].blockActive}
                         blockOrderNumber={blockData.instructions[0].blockOrderNumber}
@@ -571,7 +641,28 @@ const GridItem: React.FC<UseInstructionGridProps> = ({ homeBankingIdInitial, dat
                         nameInputRef={blockRef}
                         findText={findText}
                         canAddToMemory={blockData.instructions.some(instruction => memoryCapabilities.get(instruction.id)?.canAdd)}
-                        isFirstBlock={index === 0}
+                        componentMemoryAction={componentWorkspace ? (
+                          <img
+                            src={arrowLeftImage}
+                            alt="Stage whole component block in memory"
+                            className={styles.arrowLeftButton}
+                            title={moveGraphRevision
+                              ? 'Add this whole component block to Memory List'
+                              : 'Waiting for the authoritative component revision'}
+                            aria-disabled={!moveGraphRevision}
+                            style={{
+                              opacity: moveGraphRevision ? 1 : 0.4,
+                              cursor: moveGraphRevision ? 'pointer' : 'not-allowed',
+                            }}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              if (!moveGraphRevision) return;
+                              handleStageComponentBlock(blockData.instructions, moveGraphRevision);
+                            }}
+                          />
+                        ) : null}
+                        showCreateComponent={!componentWorkspace}
+                        isFirstBlock={authoritativeIndex === 0 && Boolean(moveGraphRevision)}
                         blockDeleteTitle={blockDeleteCapabilities.get(Number(blockData.instructions[0].blockId))?.reason}
                         blockDeleteDimmed={!blockDeleteCapabilities.get(Number(blockData.instructions[0].blockId))?.canDelete}
                         renderHighlighted={renderHighlighted}
@@ -604,7 +695,10 @@ const GridItem: React.FC<UseInstructionGridProps> = ({ homeBankingIdInitial, dat
                         onToggleCollapse={() => toggleBlockCollapsed(Number(blockData.instructions[0].blockId))}
                         onChangeName={setBlockName}
                         onSaveName={() => handleSaveBlockName(Number(blockData.instructions[0].blockId))}
-                        onAddToMemory={(e) => { e.stopPropagation(); handleAddBlockToMemory(blockData.instructions); }}
+                        onAddToMemory={(e) => {
+                          e.stopPropagation();
+                          handleAddBlockToMemory(blockData.instructions, moveGraphRevision);
+                        }}
                         onRollback={() => handleRollbackBlock(Number(blockData.instructions[0].blockId))}
                         onMoveUp={() => handleMoveBlockUp(Number(blockData.instructions[0].blockId))}
                         onMoveDown={() => handleMoveBlockDown(Number(blockData.instructions[0].blockId))}
@@ -648,14 +742,92 @@ const GridItem: React.FC<UseInstructionGridProps> = ({ homeBankingIdInitial, dat
                             onMoveUp={() => handleMoveRowUp(instruction.id)}
                             onMoveDown={() => handleMoveRowDown(instruction.id)}
                             onToggleStatus={() => handleInstructionStatus(instruction.id, blockData.instructions)}
-                            onAddToMemory={(e) => { e.stopPropagation(); handleAddToMemory(instruction); }}
+                            onAddToMemory={(e) => {
+                              e.stopPropagation();
+                              handleAddToMemory(instruction, moveGraphRevision);
+                            }}
                             onRemove={() => handleRemoveInstruction(instruction.id)}
                             onOpenCommandEditor={() => handleOpenCommandEditor(instruction)}
                           />
                         )}
                       />}
                     />
-                  ))
+                    );
+                  })}
+                {emptyWorkspaceBlocks.map((block) => {
+                  const index = workspaceBlockIndex(block.blockId, block.blockOrderNumber - 1);
+                  const capability = blockDeleteCapabilities.get(block.blockId);
+                  return (
+                    <BlockCard
+                      key={`empty-${block.blockId}`}
+                      displayOrder={index + 1}
+                      blockDraggable={findText.trim().length === 0}
+                      onBlockDragStart={handleBlockDragStart(index, block.blockId)}
+                      onBlockDragOver={handleGridDragOver}
+                      onBlockDrop={handleBlockDrop(index)}
+                      onBlockDragEnd={handleBlockDragEnd}
+                      collapsed={collapsedBlocks.has(block.blockId)}
+                      header={<BlockHeader
+                        blockActive={block.blockActive}
+                        blockOrderNumber={block.blockOrderNumber}
+                        blockName={block.blockName}
+                        instructionCount={0}
+                        collapsed={collapsedBlocks.has(block.blockId)}
+                        isEditing={editingBlockId === block.blockId}
+                        editingName={blockName}
+                        nameInputRef={blockRef}
+                        findText={findText}
+                        canAddToMemory={false}
+                        showCreateComponent={!componentWorkspace}
+                        isFirstBlock={index === 0 && Boolean(moveGraphRevision)}
+                        blockDeleteTitle={capability?.reason}
+                        blockDeleteDimmed={!capability?.canDelete}
+                        renderHighlighted={renderHighlighted}
+                        exportFileNode={renderExportFile(block.exportFile || 'No Excel Export File')}
+                        onToggleStatus={() => handleBlockStatus(block.blockId)}
+                        onToggleCollapse={() => toggleBlockCollapsed(block.blockId)}
+                        onChangeName={setBlockName}
+                        onSaveName={() => handleSaveBlockName(block.blockId)}
+                        onAddToMemory={(event) => event.stopPropagation()}
+                        onRollback={() => handleRollbackBlock(block.blockId)}
+                        onMoveUp={() => handleMoveBlockUp(block.blockId)}
+                        onMoveDown={() => handleMoveBlockDown(block.blockId)}
+                        onEditName={() => handleEditBlock(block.blockId, block.blockName)}
+                        onExcelFile={() => handleExcelFileBlockName(
+                          block.blockId,
+                          block.blockName,
+                          block.blockOrderNumber,
+                          block.exportFile,
+                        )}
+                        onCreateComponent={() => handleCreateComponent(block.blockId)}
+                        onDeleteBlock={() => handleRemoveBlock(block.blockId)}
+                      />}
+                      list={<InstructionList
+                        droppableId={String(block.blockId)}
+                        instructions={[]}
+                        blockName={block.blockName}
+                        findText={findText}
+                        dropZone={activeDraggedInstructionId === null
+                          ? 'none'
+                          : memoryCapabilities
+                              .get(activeDraggedInstructionId)
+                              ?.allowedBlockIds.includes(block.blockId)
+                            ? 'valid'
+                            : 'invalid'}
+                        instructionMatchesFind={instructionMatchesFind}
+                        onListDragOver={handleGridDragOver}
+                        onListDrop={handleListDrop(String(block.blockId), 0)}
+                        renderRow={() => null}
+                        emptyContent={
+                          <div className={styles.noDataMessage}>
+                            No instructions in this block
+                          </div>
+                        }
+                      />}
+                    />
+                  );
+                })}
+                </>
               )}
         </div >
       </div>

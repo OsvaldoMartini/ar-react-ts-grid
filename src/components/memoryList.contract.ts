@@ -1,7 +1,7 @@
 import type { CreateBlockOption } from './CreateNewBlock';
 import type { ElementDTO } from './instructionsMockData';
 
-export type MemoryListSourceKind = 'BOT_JOB' | 'PAGE_SCANNER' | 'MIXED';
+export type MemoryListSourceKind = 'BOT_JOB' | 'PAGE_SCANNER' | 'COMPONENT' | 'MIXED';
 export type MemoryListItemSourceKind = Exclude<MemoryListSourceKind, 'MIXED'>;
 
 export type MemoryListItemIcon =
@@ -22,9 +22,27 @@ export interface PageScannerMemoryListPayload {
   elementDTO: ElementDTO;
 }
 
+export interface ComponentInstructionMemoryListPayload {
+  kind: 'INSTRUCTION';
+  componentInstructionId: number;
+  componentBlockId: number;
+  sourceRevision: string;
+}
+
+export interface ComponentBlockMemoryListPayload {
+  kind: 'BLOCK';
+  componentBlockId: number;
+  sourceRevision: string;
+}
+
+export type ComponentMemoryListPayload =
+  | ComponentInstructionMemoryListPayload
+  | ComponentBlockMemoryListPayload;
+
 export type MemoryListItemPayload =
   | BotJobMemoryListPayload
-  | PageScannerMemoryListPayload;
+  | PageScannerMemoryListPayload
+  | ComponentMemoryListPayload;
 
 export interface MemoryListItem<
   TPayload extends MemoryListItemPayload = MemoryListItemPayload,
@@ -61,3 +79,32 @@ export interface MemoryListSnapshot {
   busy?: boolean;
   canApply?: boolean;
 }
+
+/**
+ * Mirrors the Java aggregate Memory List rule. A whole reusable Component block
+ * creates its own Bot Job block, so neither that item nor individually selected
+ * rows already covered by the same block require a destination. Every other item
+ * must have a valid Bot Job target block.
+ */
+export const memoryListRequiresTargetBlock = (items: MemoryListItem[]): boolean => {
+  const selectedComponentBlocks = new Set(
+    items
+      .filter(item => item.sourceKind === 'COMPONENT')
+      .map(item => item.payload as ComponentMemoryListPayload | undefined)
+      .filter(
+        (payload): payload is ComponentBlockMemoryListPayload =>
+          payload?.kind === 'BLOCK' && payload.componentBlockId > 0,
+      )
+      .map(payload => payload.componentBlockId),
+  );
+
+  return items.some(item => {
+    if (item.sourceKind !== 'COMPONENT') return true;
+    const payload = item.payload as ComponentMemoryListPayload | undefined;
+    if (payload?.kind === 'BLOCK') return false;
+    if (payload?.kind === 'INSTRUCTION') {
+      return !selectedComponentBlocks.has(payload.componentBlockId);
+    }
+    return true;
+  });
+};

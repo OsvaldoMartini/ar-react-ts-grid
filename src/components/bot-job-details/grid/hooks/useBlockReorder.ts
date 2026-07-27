@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { BlockLoopInstructionLoadDTO } from '../../../instructionsMockData';
+import type { WorkspaceBlock } from '../domain/workspaceBlocks';
 
 /**
  * Minimal instruction shape block reorder needs. Both grids' DTOs satisfy it
@@ -27,6 +28,8 @@ export interface UseBlockReorderDeps<T extends BlockReorderInstruction = BlockLo
   instructionsData: T[];
   setInstructionsData: React.Dispatch<React.SetStateAction<T[]>>;
   setIsDataReordered: React.Dispatch<React.SetStateAction<boolean>>;
+  workspaceBlocks?: WorkspaceBlock[];
+  setWorkspaceBlocks?: React.Dispatch<React.SetStateAction<WorkspaceBlock[]>>;
   webSocket: WebSocket | null;
   connected: boolean;
   botJobId: number | null;
@@ -73,24 +76,45 @@ export function useBlockReorder<T extends BlockReorderInstruction = BlockLoopIns
 ): UseBlockReorder {
   const {
     groupedData, instructionsData, setInstructionsData, setIsDataReordered,
+    workspaceBlocks = [], setWorkspaceBlocks,
     webSocket, connected, botJobId, botJobName, homeBankingId, targetSessionId,
   } = deps;
 
   const dragBlockRef = useRef<{ index: number; blockId: number } | null>(null);
 
+  const orderedBlocks = useCallback((): WorkspaceBlock[] => {
+    if (workspaceBlocks.length > 0) {
+      return [...workspaceBlocks]
+        .sort((left, right) => left.blockOrderNumber - right.blockOrderNumber);
+    }
+    return Object.values(groupedData)
+      .filter(block => block.instructions.length > 0)
+      .map(block => {
+        const first = block.instructions[0];
+        return {
+          blockId: first.blockId,
+          blockOrderNumber: first.blockOrderNumber,
+          blockName: first.blockName,
+          blockActive: true,
+          blockWait: 0,
+          exportFile: block.exportFile,
+        };
+      })
+      .sort((left, right) => left.blockOrderNumber - right.blockOrderNumber);
+  }, [groupedData, workspaceBlocks]);
+
   const commitBlockReorder = useCallback((fromIndex: number, toIndex: number) => {
     if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return;
-    const blocks = Object.values(groupedData)
-      .sort((a, b) => a.instructions[0].blockOrderNumber - b.instructions[0].blockOrderNumber);
+    const blocks = orderedBlocks();
     if (fromIndex >= blocks.length || toIndex >= blocks.length) return;
     const reordered = [...blocks];
     const [moved] = reordered.splice(fromIndex, 1);
     reordered.splice(toIndex, 0, moved);
     const updatedBlocks = reordered.map((block, i) => ({
-      blockId: block.instructions[0].blockId,
-      botJobId: block.instructions[0].botJobId,
+      blockId: block.blockId,
+      botJobId,
       blockOrderNumber: i + 1,
-      blockName: block.instructions[0].blockName,
+      blockName: block.blockName,
     }));
     const orderByBlockId = new Map(updatedBlocks.map(block => [block.blockId, block.blockOrderNumber]));
     const updatedData = instructionsData.map(instruction => ({
@@ -98,6 +122,10 @@ export function useBlockReorder<T extends BlockReorderInstruction = BlockLoopIns
       blockOrderNumber: orderByBlockId.get(instruction.blockId) ?? instruction.blockOrderNumber,
     }));
     setInstructionsData(updatedData);
+    setWorkspaceBlocks?.(reordered.map((block, index) => ({
+      ...block,
+      blockOrderNumber: index + 1,
+    })));
     setIsDataReordered(false);
     console.log('[Block][drag] reorder', { from: fromIndex, to: toIndex, updatedBlocks });
     if (webSocket && connected) {
@@ -110,7 +138,9 @@ export function useBlockReorder<T extends BlockReorderInstruction = BlockLoopIns
         updatedBlocks,
       }));
     }
-  }, [groupedData, instructionsData, setInstructionsData, setIsDataReordered, webSocket, connected, botJobId, botJobName, homeBankingId, targetSessionId]);
+  }, [instructionsData, setInstructionsData, setIsDataReordered, setWorkspaceBlocks,
+    webSocket, connected, botJobId, botJobName, homeBankingId, targetSessionId,
+    orderedBlocks]);
 
   const handleBlockDragStart = (index: number, blockId: number) => (event: React.DragEvent) => {
     dragBlockRef.current = { index, blockId };
@@ -145,9 +175,7 @@ export function useBlockReorder<T extends BlockReorderInstruction = BlockLoopIns
   }, [commitBlockReorder]);
 
   const sortedBlockIndex = (blockId: number) =>
-    Object.values(groupedData)
-      .sort((a, b) => a.instructions[0].blockOrderNumber - b.instructions[0].blockOrderNumber)
-      .findIndex(block => Number(block.instructions[0].blockId) === Number(blockId));
+    orderedBlocks().findIndex(block => Number(block.blockId) === Number(blockId));
 
   const handleMoveBlockUp = (blockId: number) => {
     const index = sortedBlockIndex(blockId);
@@ -156,7 +184,7 @@ export function useBlockReorder<T extends BlockReorderInstruction = BlockLoopIns
 
   const handleMoveBlockDown = (blockId: number) => {
     const index = sortedBlockIndex(blockId);
-    if (index >= 0 && index < Object.keys(groupedData).length - 1) {
+    if (index >= 0 && index < orderedBlocks().length - 1) {
       commitBlockReorder(index, index + 1);
     }
   };

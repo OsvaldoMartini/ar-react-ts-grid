@@ -14,6 +14,7 @@ interface ComponentWorkspaceHeaderProps {
   webSocket?: WebSocket | null;
   messages?: readonly string[];
   sessionId?: string;
+  onRetry?: () => void;
   onClose: () => void;
 }
 
@@ -28,6 +29,7 @@ const ComponentWorkspaceHeader: React.FC<ComponentWorkspaceHeaderProps> = ({
   webSocket = null,
   messages = [],
   sessionId = '',
+  onRetry,
   onClose,
 }) => {
   const resolvedStatus = error
@@ -61,6 +63,16 @@ const ComponentWorkspaceHeader: React.FC<ComponentWorkspaceHeaderProps> = ({
             messages={messages}
             sessionId={sessionId}
           />
+        )}
+        {onRetry && (
+          <button
+            type="button"
+            className={styles.refreshButton}
+            title="Reload Components from the authoritative database"
+            onClick={onRetry}
+          >
+            Refresh
+          </button>
         )}
         <button
           type="button"

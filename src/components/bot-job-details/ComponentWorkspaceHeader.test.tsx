@@ -36,3 +36,21 @@ test('shows reconnecting status while the detached Components page is disconnect
 
   expect(screen.getByRole('status')).toHaveTextContent('Reconnecting (2)');
 });
+
+test('exposes authoritative refresh when the grid supplies a retry action', () => {
+  const onRetry = jest.fn();
+  render(
+    <ComponentWorkspaceHeader
+      botJobId={5}
+      botJobName="Saldo Banca Stato"
+      connected
+      status="Components refresh required"
+      statusTone="error"
+      onRetry={onRetry}
+      onClose={jest.fn()}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+  expect(onRetry).toHaveBeenCalledTimes(1);
+});

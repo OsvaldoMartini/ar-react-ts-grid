@@ -50,12 +50,23 @@ const secondRow: BlockLoopInstructionLoadDTO = {
   name: 'Confirm',
 };
 
-const capabilityResponse = (sessionId: string) => JSON.stringify({
+const capabilityResponse = (sessionId: string) => {
+  const request = [...mockSend.mock.calls]
+    .reverse()
+    .map(([payload]) => JSON.parse(payload))
+    .find(message => message.type === 'instructionEditor.memoryCapabilities');
+  if (!request) throw new Error('Capability request was not sent');
+  const requestedBody = JSON.parse(request.body);
+  return JSON.stringify({
   sessionId,
   homeBankingId: 2,
   operationId: 'instructionEditor.memoryCapabilitiesResponse',
   body: JSON.stringify({
     ok: true,
+    requestId: requestedBody.requestId,
+    targetSessionId: requestedBody.targetSessionId,
+    homeBankingId: requestedBody.homeBankingId,
+    botJobId: requestedBody.botJobId,
     graphRevision: 'revision-1',
     capabilities: [{
       instructionId: 101,
@@ -66,7 +77,8 @@ const capabilityResponse = (sessionId: string) => JSON.stringify({
     }],
     blockCapabilities: [],
   }),
-});
+  });
+};
 
 const unrelatedResponse = (sessionId: string) => JSON.stringify({
   sessionId,
@@ -114,6 +126,9 @@ test('Bot Job grid consumes a capability response even when a later frame is que
     onSessionOpen: jest.fn(),
   };
   const view = render(<GridItem {...props} />);
+  await waitFor(() => expect(mockSend.mock.calls
+    .map(([payload]) => JSON.parse(payload).type))
+    .toContain('instructionEditor.memoryCapabilities'));
 
   mockMessages = [capabilityResponse(props.sessionId), unrelatedResponse(props.sessionId)];
   view.rerender(<GridItem {...props} />);
@@ -132,6 +147,9 @@ test('Component grid consumes a capability response even when a later frame is q
     onSessionOpen: jest.fn(),
   };
   const view = render(<GridItemComp {...props} />);
+  await waitFor(() => expect(mockSend.mock.calls
+    .map(([payload]) => JSON.parse(payload).type))
+    .toContain('instructionEditor.memoryCapabilities'));
 
   mockMessages = [capabilityResponse(props.sessionId), unrelatedResponse(props.sessionId)];
   view.rerender(<GridItemComp {...props} />);

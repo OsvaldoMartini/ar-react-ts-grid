@@ -8,7 +8,7 @@ import excelImage from '../../../assets/excel.png';
 // Shares GridItem's block-header styling, including the descendant selectors
 // `.blockHeader .blockName` / `.blockHeader .blockCount` / `.blockHeader .moveButtons`,
 // so the design is preserved exactly with no duplication.
-import styles from '../../GridItem.module.scss';
+import styles from '../../Griditem.module.scss';
 import BlockStatusToggle from './BlockStatusToggle';
 import BlockCollapseToggle from './BlockCollapseToggle';
 import InlineNameEditor from './InlineNameEditor';
@@ -26,6 +26,8 @@ export interface BlockHeaderProps {
   nameInputRef: React.RefObject<HTMLInputElement>;
   findText: string;
   canAddToMemory: boolean;
+  componentMemoryAction?: React.ReactNode;
+  showCreateComponent?: boolean;
   isFirstBlock: boolean;
   blockDeleteTitle?: string;
   blockDeleteDimmed?: boolean;
@@ -65,6 +67,8 @@ const BlockHeader: React.FC<BlockHeaderProps> = ({
   nameInputRef,
   findText,
   canAddToMemory,
+  componentMemoryAction,
+  showCreateComponent = true,
   isFirstBlock,
   blockDeleteTitle,
   blockDeleteDimmed,
@@ -104,17 +108,26 @@ const BlockHeader: React.FC<BlockHeaderProps> = ({
       title="Add eligible steps in this block to memory list"
       onClick={onAddToMemory}
     />
+    {componentMemoryAction}
     <span className={styles.blockExportFile}>{exportFileNode}</span>
     <div className={styles.moveButtons}>
       {isFirstBlock && (
-        <img src={rollBackImage} alt="" className={styles.rollbackButton} onClick={onRollback} />
+        <img
+          src={rollBackImage}
+          alt="Rollback block"
+          title="Move every instruction into this first block"
+          className={styles.rollbackButton}
+          onClick={onRollback}
+        />
       )}
       {excelGotoNode}
       <img src={upImage} alt="" className={styles.moveButton} onClick={onMoveUp} />
       <img src={downImage} alt="" className={styles.moveButton} onClick={onMoveDown} />
       <img src={editImage} alt="edit" className={styles.editButton} onClick={onEditName} />
       <img src={excelImage} alt="excel" className={styles.excelButton} onClick={onExcelFile} />
-      <img src={saveImage} alt="save" className={styles.saveButton} onClick={onCreateComponent} />
+      {showCreateComponent && (
+        <img src={saveImage} alt="save" className={styles.saveButton} onClick={onCreateComponent} />
+      )}
       <DeleteButton
         title={blockDeleteTitle || 'Delete block'}
         dimmed={blockDeleteDimmed}

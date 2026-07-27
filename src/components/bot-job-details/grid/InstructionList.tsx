@@ -2,7 +2,7 @@ import React from 'react';
 import { BlockLoopInstructionLoadDTO } from '../../instructionsMockData';
 // Shares GridItem's list styling (`.instructionsList`, valid/invalid drop-zone
 // highlight) so the design is preserved exactly with no duplication.
-import styles from '../../GridItem.module.scss';
+import styles from '../../Griditem.module.scss';
 
 export type InstructionListDropZone = 'none' | 'valid' | 'invalid';
 
@@ -17,6 +17,7 @@ export interface InstructionListProps {
   onListDragOver: (event: React.DragEvent) => void;
   onListDrop: (event: React.DragEvent) => void;
   renderRow: (instruction: BlockLoopInstructionLoadDTO, index: number) => React.ReactNode;
+  emptyContent?: React.ReactNode;
 }
 
 /**
@@ -35,6 +36,7 @@ const InstructionList: React.FC<InstructionListProps> = ({
   onListDragOver,
   onListDrop,
   renderRow,
+  emptyContent,
 }) => (
   <div
     data-droppable-id={droppableId}
@@ -48,6 +50,7 @@ const InstructionList: React.FC<InstructionListProps> = ({
     onDragOver={onListDragOver}
     onDrop={onListDrop}
   >
+    {instructions.length === 0 ? emptyContent : null}
     {instructions.map((instruction, index) => {
       if (instruction.actions === 'EXCEL GOTO') return null;
 

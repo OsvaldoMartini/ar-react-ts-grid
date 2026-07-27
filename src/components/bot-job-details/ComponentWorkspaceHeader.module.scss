@@ -64,18 +64,31 @@
   color: #991b1b;
 }
 
+.refreshButton,
 .closeButton {
   min-height: 28px;
   flex: 0 0 auto;
   padding: 5px 10px;
-  border: 1px solid #c62828;
   border-radius: 3px;
   background: #ffffff;
-  color: #c62828;
   cursor: pointer;
   font-size: 12px;
   font-weight: 700;
   white-space: nowrap;
+}
+
+.refreshButton {
+  border: 1px solid #0b5394;
+  color: #0b5394;
+}
+
+.refreshButton:hover {
+  background: #eaf3ff;
+}
+
+.closeButton {
+  border: 1px solid #c62828;
+  color: #c62828;
 }
 
 .closeButton:hover {

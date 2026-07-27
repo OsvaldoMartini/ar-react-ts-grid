@@ -1,0 +1,458 @@
+import React from 'react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import GridItemComp from './GridItemComp';
+import type { ComponentsInstructionsDTO } from './instructionsMockData';
+
+const mockSend = jest.fn();
+const mockWebSocket = { send: mockSend, readyState: WebSocket.OPEN } as unknown as WebSocket;
+let mockMessages: string[] = [];
+
+jest.mock('./useWebSocket', () => ({
+  useWebSocket: () => ({
+    webSocket: mockWebSocket,
+    connected: true,
+    reconnectAttempts: 0,
+    messages: mockMessages,
+    error: null,
+  }),
+}));
+
+jest.mock('./bot-job-details/useBotJobDetailsController', () => ({
+  useBotJobDetailsController: () => ({
+    state: null,
+    status: 'Components loaded',
+    statusTone: 'success',
+    sendAction: jest.fn(),
+  }),
+}));
+
+jest.mock('./bot-job-details/BotJobDetailsChrome', () => () => null);
+jest.mock('./bot-job-details/ComponentWorkspaceHeader', () => () => null);
+
+const first: ComponentsInstructionsDTO = {
+  homeBankingId: 2,
+  tagName: 'button',
+  botJobId: 5,
+  botJobName: 'Target Bot Job',
+  id: 101,
+  instructionOrderNumber: 1,
+  name: 'Continue',
+  description: '',
+  blockId: 44,
+  blockOrderNumber: 1,
+  blockName: 'Reusable Login',
+  blockActive: true,
+  blockWait: 0,
+  actions: 'CLICK',
+  instructionActive: true,
+};
+
+const second: ComponentsInstructionsDTO = {
+  ...first,
+  id: 102,
+  instructionOrderNumber: 2,
+  name: 'Confirm',
+};
+
+const capabilityResponseForLastRequest = (
+  blockCapabilities: unknown[] = [],
+  allowedBlockIds: number[] = [44],
+) => {
+  const request = [...mockSend.mock.calls]
+    .reverse()
+    .map(([payload]) => JSON.parse(payload))
+    .find(message => message.type === 'instructionEditor.memoryCapabilities');
+  if (!request) throw new Error('Capability request was not sent');
+  const requestedBody = JSON.parse(request.body);
+  return JSON.stringify({
+    sessionId: 'componentTasks',
+    homeBankingId: 2,
+    operationId: 'instructionEditor.memoryCapabilitiesResponse',
+    body: JSON.stringify({
+      ok: true,
+      requestId: requestedBody.requestId,
+      targetSessionId: requestedBody.targetSessionId,
+      homeBankingId: requestedBody.homeBankingId,
+      botJobId: requestedBody.botJobId,
+      graphRevision: 'component-revision-1',
+      capabilities: [101, 102].map(instructionId => ({
+        instructionId,
+        canAddToMemory: true,
+        canMove: true,
+        canDelete: true,
+        allowedBlockIds,
+      })),
+      blockCapabilities,
+    }),
+  });
+};
+
+const authorizeGrid = async (
+  view: ReturnType<typeof render>,
+  renderProps = props,
+  blockCapabilities: unknown[] = [],
+  allowedBlockIds: number[] = [44],
+) => {
+  await waitFor(() => expect(
+    mockSend.mock.calls
+      .map(([payload]) => JSON.parse(payload))
+      .some(message => message.type === 'instructionEditor.memoryCapabilities'),
+  ).toBe(true));
+  mockMessages = [
+    capabilityResponseForLastRequest(blockCapabilities, allowedBlockIds),
+  ];
+  view.rerender(<GridItemComp {...renderProps} />);
+  await waitFor(() => expect(screen.getByLabelText('Move instruction 1')).toBeEnabled());
+};
+
+const props = {
+  homeBankingIdInitial: 2,
+  dataComp: [first, second],
+  socketPort: 52101,
+  sessionId: 'componentTasks',
+  botJobIdInitial: 5,
+  botJobNameInitial: 'Target Bot Job',
+  onSessionOpen: jest.fn(),
+};
+
+const latestMemorySnapshot = () => {
+  const opens = mockSend.mock.calls
+    .map(([payload]) => JSON.parse(payload))
+    .filter(message => message.type === 'memoryList.open');
+  const body = JSON.parse(opens[opens.length - 1].body);
+  return body.snapshot;
+};
+
+beforeEach(() => {
+  mockMessages = [];
+  mockSend.mockReset();
+});
+
+test('row plus stages a typed COMPONENT instruction and exposes no component target blocks', async () => {
+  const view = render(<GridItemComp {...props} />);
+  await authorizeGrid(view);
+  fireEvent.click(screen.getAllByTitle('Add step to memory list')[0]);
+
+  await waitFor(() => {
+    expect(latestMemorySnapshot()).toEqual(expect.objectContaining({
+      sourceKind: 'COMPONENT',
+      blocks: [],
+      items: [expect.objectContaining({
+        key: 'COMPONENT:INSTRUCTION:2:44:101',
+        sourceItemKey: 'INSTRUCTION:2:44:101',
+        payload: {
+          kind: 'INSTRUCTION',
+          componentInstructionId: 101,
+          componentBlockId: 44,
+          sourceRevision: 'component-revision-1',
+        },
+      })],
+    }));
+  });
+  expect(mockSend.mock.calls.map(([payload]) => JSON.parse(payload).type))
+    .not.toContain('COMPONENT_INJECT');
+});
+
+test('blue arrow stages the whole component block instead of injecting it', async () => {
+  const view = render(<GridItemComp {...props} />);
+  await authorizeGrid(view);
+  fireEvent.click(screen.getByAltText('Stage whole component block in memory'));
+
+  await waitFor(() => {
+    expect(latestMemorySnapshot().items).toEqual([
+      expect.objectContaining({
+        key: 'COMPONENT:BLOCK:2:44',
+        sourceItemKey: 'BLOCK:2:44',
+        payload: {
+          kind: 'BLOCK',
+          componentBlockId: 44,
+          sourceRevision: 'component-revision-1',
+        },
+      }),
+    ]);
+  });
+  expect(mockSend.mock.calls.map(([payload]) => JSON.parse(payload).type))
+    .not.toContain('COMPONENT_INJECT');
+});
+
+test('component row drag commits with COMPONENT_ROW_MOVE after authoritative preview', async () => {
+  const view = render(<GridItemComp {...props} />);
+  await authorizeGrid(view);
+  const capabilityResponse = mockMessages[0];
+  const source = screen.getByLabelText('Move instruction 1').closest('[draggable]');
+  const destination = screen.getByLabelText('Move instruction 2').closest('[draggable]');
+  fireEvent.dragStart(source as Element);
+  fireEvent.drop(destination as Element);
+
+  let previewRequestId = '';
+  await waitFor(() => {
+    const preview = mockSend.mock.calls
+      .map(([payload]) => JSON.parse(payload))
+      .find(message => message.type === 'instructionGraph.previewMove');
+    expect(preview).toBeDefined();
+    const previewBody = JSON.parse(preview.body);
+    expect(previewBody.targetSessionId).toBe('componentTasks');
+    previewRequestId = previewBody.requestId;
+  });
+
+  mockMessages = [
+    capabilityResponse,
+    JSON.stringify({
+      sessionId: 'componentTasks',
+      operationId: 'instructionGraph.previewMoveResponse',
+      body: JSON.stringify({
+        ok: true,
+        requestId: previewRequestId,
+        groupRows: [{ id: 101, order: 1, name: 'Continue', action: 'CLICK' }],
+      }),
+    }),
+  ];
+  view.rerender(<GridItemComp {...props} />);
+
+  await waitFor(() => {
+    const move = mockSend.mock.calls
+      .map(([payload]) => JSON.parse(payload))
+      .find(message => message.type === 'COMPONENT_ROW_MOVE');
+    expect(move).toEqual(expect.objectContaining({
+      sessionId: 'componentTasks',
+      graphRevision: 'component-revision-1',
+    }));
+  });
+  expect(mockSend.mock.calls.map(([payload]) => JSON.parse(payload).type))
+    .not.toContain('ROW_MOVE');
+});
+
+test('component row drag can target an authoritative empty component block', async () => {
+  const emptyBlockProps = {
+    ...props,
+    blocksComp: [
+      {
+        blockId: 44,
+        blockOrderNumber: 1,
+        blockName: 'Reusable Login',
+        blockActive: true,
+        blockWait: 0,
+      },
+      {
+        blockId: 55,
+        blockOrderNumber: 2,
+        blockName: 'Empty destination',
+        blockActive: true,
+        blockWait: 0,
+      },
+    ],
+  };
+  const view = render(<GridItemComp {...emptyBlockProps} />);
+  await authorizeGrid(view, emptyBlockProps, [], [44, 55]);
+  const capabilityResponse = mockMessages[0];
+  const source = screen.getByLabelText('Move instruction 1').closest('[draggable]');
+  const destination = screen
+    .getByText('No instructions in this block')
+    .closest('[data-droppable-id="55"]');
+
+  fireEvent.dragStart(source as Element);
+  fireEvent.drop(destination as Element);
+
+  let previewRequestId = '';
+  await waitFor(() => {
+    const preview = mockSend.mock.calls
+      .map(([payload]) => JSON.parse(payload))
+      .find(message => message.type === 'instructionGraph.previewMove');
+    const previewBody = JSON.parse(preview.body);
+    expect(previewBody.destinationBlockId).toBe(55);
+    expect(previewBody.destinationIndex).toBe(0);
+    previewRequestId = previewBody.requestId;
+  });
+
+  mockMessages = [
+    capabilityResponse,
+    JSON.stringify({
+      sessionId: 'componentTasks',
+      operationId: 'instructionGraph.previewMoveResponse',
+      body: JSON.stringify({
+        ok: true,
+        requestId: previewRequestId,
+        groupRows: [{ id: 101, order: 1, name: 'Continue', action: 'CLICK' }],
+      }),
+    }),
+  ];
+  view.rerender(<GridItemComp {...emptyBlockProps} />);
+
+  await waitFor(() => {
+    const move = mockSend.mock.calls
+      .map(([payload]) => JSON.parse(payload))
+      .find(message => message.type === 'COMPONENT_ROW_MOVE');
+    expect(move.updatedRows).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        instructionId: 101,
+        blockId: 55,
+        instructionOrderNumber: 1,
+      }),
+    ]));
+  });
+});
+
+test('stale capability responses cannot enable component mutations', async () => {
+  const view = render(<GridItemComp {...props} />);
+  await waitFor(() => expect(
+    mockSend.mock.calls
+      .map(([payload]) => JSON.parse(payload))
+      .some(message => message.type === 'instructionEditor.memoryCapabilities'),
+  ).toBe(true));
+  const validResponse = JSON.parse(capabilityResponseForLastRequest());
+  const staleBody = JSON.parse(validResponse.body);
+  staleBody.requestId = 'stale-request';
+  validResponse.body = JSON.stringify(staleBody);
+  mockMessages = [JSON.stringify(validResponse)];
+  view.rerender(<GridItemComp {...props} />);
+
+  fireEvent.click(screen.getAllByTitle('Add step to memory list')[0]);
+  await new Promise(resolve => setTimeout(resolve, 0));
+  expect(mockSend.mock.calls
+    .map(([payload]) => JSON.parse(payload).type))
+    .not.toContain('memoryList.open');
+});
+
+test('component rollback stays unavailable until an authoritative revision arrives', () => {
+  render(<GridItemComp {...props} />);
+
+  expect(screen.queryByAltText('Rollback block')).not.toBeInTheDocument();
+});
+
+test('an empty first component block can roll all instructions back into itself', async () => {
+  const emptyBlockProps = {
+    ...props,
+    dataComp: [
+      { ...first, blockOrderNumber: 2 },
+      { ...second, blockOrderNumber: 2 },
+    ],
+    blocksComp: [
+      {
+        blockId: 33,
+        blockOrderNumber: 1,
+        blockName: 'Empty destination',
+        blockActive: true,
+        blockWait: 0,
+      },
+      {
+        blockId: 44,
+        blockOrderNumber: 2,
+        blockName: 'Reusable Login',
+        blockActive: true,
+        blockWait: 0,
+      },
+    ],
+  };
+  const view = render(<GridItemComp {...emptyBlockProps} />);
+  await authorizeGrid(view, emptyBlockProps);
+
+  fireEvent.click(screen.getByAltText('Rollback block'));
+
+  const rollback = mockSend.mock.calls
+    .map(([payload]) => JSON.parse(payload))
+    .find(message => message.type === 'BLOCK_ROLLBACK');
+  expect(rollback).toEqual(expect.objectContaining({
+    sessionId: 'componentTasks',
+    blockId: 33,
+    botJobId: 5,
+    graphRevision: 'component-revision-1',
+  }));
+  expect(rollback.updatedRows).toEqual([
+    expect.objectContaining({ instructionId: 101, blockId: 33, instructionOrderNumber: 1 }),
+    expect.objectContaining({ instructionId: 102, blockId: 33, instructionOrderNumber: 2 }),
+  ]);
+  expect(rollback.updatedBlocks).toEqual([
+    expect.objectContaining({
+      blockId: 33,
+      homeBankId: 2,
+      botJobId: 5,
+      blockOrderNumber: 1,
+      blockName: 'Empty destination',
+      blockActive: true,
+      blockWait: 0,
+    }),
+    expect.objectContaining({
+      blockId: 44,
+      homeBankId: 2,
+      botJobId: 5,
+      blockOrderNumber: 2,
+      blockName: 'Reusable Login',
+      blockActive: true,
+      blockWait: 0,
+    }),
+  ]);
+});
+
+test('empty component block delete uses catalog metadata and component routing', async () => {
+  const emptyBlockProps = {
+    ...props,
+    dataComp: [
+      { ...first, blockOrderNumber: 2 },
+      { ...second, blockOrderNumber: 2 },
+    ],
+    blocksComp: [
+      {
+        blockId: 33,
+        blockOrderNumber: 1,
+        blockName: 'Empty destination',
+        blockActive: true,
+        blockWait: 0,
+      },
+      {
+        blockId: 44,
+        blockOrderNumber: 2,
+        blockName: 'Reusable Login',
+        blockActive: true,
+        blockWait: 0,
+      },
+    ],
+  };
+  const view = render(<GridItemComp {...emptyBlockProps} />);
+  await authorizeGrid(view, emptyBlockProps, [{
+    blockId: 33,
+    canDelete: true,
+    reason: 'Delete empty component block',
+    instructionCount: 0,
+    deleteRows: [],
+  }]);
+
+  fireEvent.click(screen.getByTitle('Delete empty component block'));
+  fireEvent.click(screen.getByText('Confirm'));
+
+  const deletion = mockSend.mock.calls
+    .map(([payload]) => JSON.parse(payload))
+    .find(message => message.type === 'DELETE_BLOCK');
+  expect(deletion).toEqual(expect.objectContaining({
+    sessionId: 'componentTasks',
+    blockId: 33,
+    botJobId: 5,
+    graphRevision: 'component-revision-1',
+    updatedBlocks: [{
+      blockId: 44,
+      botJobId: 5,
+      blockOrderNumber: 1,
+      blockName: 'Reusable Login',
+    }],
+  }));
+});
+
+test('authoritative refresh failure disables mutations and tells the user to refresh', async () => {
+  const view = render(<GridItemComp {...props} />);
+  mockMessages = [JSON.stringify({
+    sessionId: 'componentTasks',
+    operationId: 'instructionEditor.resyncRequired',
+    body: JSON.stringify({
+      ok: false,
+      resyncRequired: true,
+      error: 'The change was saved, but Components could not be refreshed.',
+      action: 'Refresh Components before making another change.',
+    }),
+  })];
+  view.rerender(<GridItemComp {...props} />);
+
+  expect(await screen.findByText('Components Refresh Required')).toBeInTheDocument();
+  expect(screen.getByText(
+    'The change was saved, but Components could not be refreshed.',
+  )).toBeInTheDocument();
+  expect(screen.getByLabelText('Move instruction 1')).toBeDisabled();
+});

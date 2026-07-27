@@ -7,7 +7,7 @@ import refreshOnlyImage from '../../../assets/refresh-only.png';
 // `.instructionItem .instructionDetails` from the helper nodes, etc.). Importing
 // the same CSS module keeps those scoped class names identical, so the design is
 // preserved exactly without duplicating the grid rules.
-import styles from '../../GridItem.module.scss';
+import styles from '../../Griditem.module.scss';
 import InstructionDragHandle from './InstructionDragHandle';
 import ExecutionStateOverlay from './ExecutionStateOverlay';
 import InlineNameEditor from './InlineNameEditor';

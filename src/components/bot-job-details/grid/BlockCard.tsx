@@ -1,8 +1,10 @@
 import React from 'react';
 // Shares GridItem's `.block` styling so the design is preserved exactly.
-import styles from '../../GridItem.module.scss';
+import styles from '../../Griditem.module.scss';
 
 export interface BlockCardProps {
+  /** Stable visual order from the authoritative block catalog (including empty blocks). */
+  displayOrder?: number;
   /** Whether this block header can initiate a block reorder drag. */
   blockDraggable: boolean;
   onBlockDragStart: (event: React.DragEvent) => void;
@@ -22,6 +24,7 @@ export interface BlockCardProps {
  * by the block drop handler (which only acts on an active block drag).
  */
 const BlockCard: React.FC<BlockCardProps> = ({
+  displayOrder,
   blockDraggable,
   onBlockDragStart,
   onBlockDragOver,
@@ -31,7 +34,12 @@ const BlockCard: React.FC<BlockCardProps> = ({
   header,
   list,
 }) => (
-  <div className={styles.block} onDragOver={onBlockDragOver} onDrop={onBlockDrop}>
+  <div
+    className={styles.block}
+    style={displayOrder == null ? undefined : { order: displayOrder }}
+    onDragOver={onBlockDragOver}
+    onDrop={onBlockDrop}
+  >
     <div
       draggable={blockDraggable}
       onDragStart={onBlockDragStart}

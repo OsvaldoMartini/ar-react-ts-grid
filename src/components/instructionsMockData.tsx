@@ -32,36 +32,12 @@ export interface BlockLoopInstructionLoadDTO {
 }
 
 
-export interface ComponentsInstructionsDTO {
-  homeBankingId: number;
-  tagName: string;
-  botJobId: number;
-  botJobName: string;
-  id: number;
-  instructionOrderNumber: number;
-  name: string;
-  description: string;
-  blockId: number;
-  blockOrderNumber: number;
-  blockName: string;
-  blockActive: boolean;
-  blockWait: number;
-  onHoldSeconds?: number | null;
-  actions: string;
-  instructionActive: boolean;
-  parentId?: number;
-  operation?: string;
-  preComponent?: boolean;
-  exportFile?: string;
-  refreshLoop?: boolean;
-  loopOnly?: boolean;
-  variableId?: number;
-  parentBlockId?: number;
-  forceCoordinates?: string | null; // F/E/T/N combinable, e.g. "FE"
-  // Roadmap 3 Phase 3d. Display-only override of `name`. Null = no override; UI shows `name`.
-  // Non-null = UI shows clientNamed; backend always uses `name` for matchers/locator/recovery.
-  clientNamed?: string | null;
-}
+/**
+ * Components and Bot Job Details render and mutate the same instruction shape.
+ * Keeping one canonical contract prevents component-only fields from silently
+ * disappearing when the shared grid gains a feature (for example defaultValue).
+ */
+export interface ComponentsInstructionsDTO extends BlockLoopInstructionLoadDTO {}
 
 export interface ElementDTO {
   id: number;

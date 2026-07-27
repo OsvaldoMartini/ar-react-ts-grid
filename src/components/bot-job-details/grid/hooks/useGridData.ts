@@ -17,6 +17,12 @@ import {
   groupByBlock,
   reassignInstructionOrderNumbersByBlock,
 } from '../domain/grouping';
+import {
+  normalizeWorkspaceBlocks,
+  mergeWorkspaceBlocks,
+  workspaceBlocksFromInstructions,
+  type WorkspaceBlock,
+} from '../domain/workspaceBlocks';
 import { buildLaterBlockOrderUpdates } from '../../../instructionSplit';
 import type { MemoryListSnapshot } from '../../../memoryList.contract';
 import {
@@ -24,6 +30,11 @@ import {
   SCANNER_TOOL_SESSION_ID,
 } from '../../../scanner/Scanner.sessions';
 import type { MemoryCapability, PendingMemoryMove } from './useInstructionMemory';
+import type {
+  ComponentMemoryListPayload,
+  MemoryListItem,
+} from '../../../memoryList.contract';
+import type { InstructionGridWorkspacePolicy } from '../instructionGrid.policy';
 import constructionImage from '../../../../assets/construction.png';
 import forbiddenImage from '../../../../assets/forbidden.png';
 import warningRedImage from '../../../../assets/warning_red.png';
@@ -33,10 +44,12 @@ type BlockDeleteCapability = { canDelete: boolean; reason: string; instructionCo
 export interface UseGridDataDeps {
   // Props
   data: BlockLoopInstructionLoadDTO[];
+  initialBlocks?: WorkspaceBlock[];
   sessionId: string;
   socketPort: number;
   onSessionOpen: (targetSession: string, port: number, botJobId?: number) => void;
   onDetachedClose?: () => void;
+  workspacePolicy: InstructionGridWorkspacePolicy;
   // useWebSocket
   webSocket: WebSocket | null;
   connected: boolean;
@@ -70,6 +83,7 @@ export interface UseGridDataDeps {
   findText: string;
   // useInstructionMemory surface
   memorySteps: BlockLoopInstructionLoadDTO[];
+  componentMemoryItems: MemoryListItem<ComponentMemoryListPayload>[];
   memoryTargetBlockId: number | null;
   memoryBlockOptions: CreateBlockOption[];
   memoryCapabilities: Map<number, MemoryCapability>;
@@ -77,6 +91,7 @@ export interface UseGridDataDeps {
   memoryMoveStatus: string;
   memoryListOpenVersion: number;
   setMemorySteps: React.Dispatch<React.SetStateAction<BlockLoopInstructionLoadDTO[]>>;
+  setComponentMemoryItems: React.Dispatch<React.SetStateAction<MemoryListItem<ComponentMemoryListPayload>[]>>;
   setMemoryTargetBlockId: React.Dispatch<React.SetStateAction<number | null>>;
   setMemoryBlockOptions: React.Dispatch<React.SetStateAction<CreateBlockOption[]>>;
   setMemoryCapabilities: React.Dispatch<React.SetStateAction<Map<number, MemoryCapability>>>;
@@ -85,6 +100,7 @@ export interface UseGridDataDeps {
   setMemoryListOpenVersion: React.Dispatch<React.SetStateAction<number>>;
   setCreateBlockOpen: React.Dispatch<React.SetStateAction<boolean>>;
   handleRemoveFromMemory: (id: number) => void;
+  handleRemoveComponentMemoryItem: (sourceItemKey: string) => void;
   memoryListOpenRequestedRef: React.MutableRefObject<boolean>;
   memoryListOpenedRef: React.MutableRefObject<boolean>;
   memoryListOpenPendingRequestRef: React.MutableRefObject<string | null>;
@@ -110,7 +126,7 @@ export interface UseGridDataDeps {
  */
 export function useGridData(deps: UseGridDataDeps) {
   const {
-    data, sessionId, socketPort, onSessionOpen, onDetachedClose,
+    data, initialBlocks, sessionId, socketPort, onSessionOpen, onDetachedClose, workspacePolicy,
     webSocket, connected, messages,
     homeBankingId, botJobId, botJobName,
     setHomeBankingId, setBotJobId, setBotJobName, setBlockId,
@@ -120,16 +136,29 @@ export function useGridData(deps: UseGridDataDeps) {
     setAlertMessageHeader, setAlertMessageBody, setAlertMessageFooter, setAlertOnConfirm, handleClose,
     setExecutionId, setExecutionState,
     findText,
-    memorySteps, memoryTargetBlockId, memoryBlockOptions, memoryCapabilities,
+    memorySteps, componentMemoryItems, memoryTargetBlockId, memoryBlockOptions, memoryCapabilities,
     pendingMemoryMove, memoryMoveStatus, memoryListOpenVersion,
-    setMemorySteps, setMemoryTargetBlockId, setMemoryBlockOptions, setMemoryCapabilities,
+    setMemorySteps, setComponentMemoryItems, setMemoryTargetBlockId, setMemoryBlockOptions, setMemoryCapabilities,
     setPendingMemoryMove, setMemoryMoveStatus, setMemoryListOpenVersion, setCreateBlockOpen,
-    handleRemoveFromMemory,
+    handleRemoveFromMemory, handleRemoveComponentMemoryItem,
     memoryListOpenRequestedRef, memoryListOpenedRef, memoryListOpenPendingRequestRef, memoryListOwnerEpochRef,
     pendingExcelExportDirectoryRequestRef, setChoosingExcelExportDirectory, setExcelExportDirectory,
   } = deps;
+  const {
+    kind: workspaceKind,
+    targetSessionId,
+    updateOperation,
+    rowMoveVerb,
+    commandEditorTargetSessionId,
+  } = workspacePolicy;
 
   const [instructionsData, setInstructionsData] = useState<BlockLoopInstructionLoadDTO[]>(data);
+  const [workspaceBlocks, setWorkspaceBlocks] = useState<WorkspaceBlock[]>(
+    () => {
+      const authoritative = normalizeWorkspaceBlocks(initialBlocks ?? []);
+      return authoritative.length > 0 ? authoritative : workspaceBlocksFromInstructions(data);
+    },
+  );
   const pendingScrollTopRef = useRef<number | null>(null);
   const [excelGotoInstruction, setExcelGotoInstruction] = useState<BlockLoopInstructionLoadDTO | null>(null);
 
@@ -146,6 +175,13 @@ export function useGridData(deps: UseGridDataDeps) {
   const pendingSplitRequestRef = useRef<string | null>(null);
   const pendingCommandEditorOpenRequestRef = useRef<string | null>(null);
   const processedMessagesRef = useRef(0);
+  const capabilityRequestCounterRef = useRef(0);
+  const pendingCapabilityRequestRef = useRef<{
+    requestId: string;
+    targetSessionId: string;
+    homeBankingId: number;
+    botJobId: number | null;
+  } | null>(null);
 
   useLayoutEffect(() => {
     if (pendingScrollTopRef.current === null || !gridScrollRef.current) return;
@@ -157,49 +193,108 @@ export function useGridData(deps: UseGridDataDeps) {
   const [pendingDragPreview, setPendingDragPreview] = useState<{ requestId: string; result: any } | null>(null);
   const [blockDeleteCapabilities, setBlockDeleteCapabilities] = useState<Map<number, BlockDeleteCapability>>(new Map());
   const [moveGraphRevision, setMoveGraphRevision] = useState('');
+  const propIdentityRef = useRef(
+    `${workspaceKind}:${homeBankingId}:${botJobId ?? -1}`,
+  );
+  const initialBlocksSignature = (initialBlocks ?? [])
+    .map(block => [
+      block.blockId,
+      block.blockOrderNumber,
+      block.blockName,
+      block.blockActive,
+      block.blockWait,
+      block.exportFile ?? '',
+    ].join(':'))
+    .join('|');
+  const initialBlocksSignatureRef = useRef(initialBlocksSignature);
+  useEffect(() => {
+    const nextIdentity = `${workspaceKind}:${homeBankingId}:${botJobId ?? -1}`;
+    const identityChanged = propIdentityRef.current !== nextIdentity;
+    const initialBlockCatalogChanged =
+      initialBlocksSignatureRef.current !== initialBlocksSignature;
+    if (!identityChanged
+      && !initialBlockCatalogChanged
+      && (instructionsData.length > 0 || data.length === 0)) return;
+    propIdentityRef.current = nextIdentity;
+    initialBlocksSignatureRef.current = initialBlocksSignature;
+    setInstructionsData(data);
+    const authoritative = normalizeWorkspaceBlocks(initialBlocks ?? []);
+    setWorkspaceBlocks(
+      authoritative.length > 0 ? authoritative : workspaceBlocksFromInstructions(data),
+    );
+    setGroupedData(groupByBlock(data));
+    setMoveGraphRevision('');
+    setMemoryCapabilities(new Map());
+    setBlockDeleteCapabilities(new Map());
+    pendingCapabilityRequestRef.current = null;
+    setIsDataReordered(data.length === 0);
+  // Prop changes are the synchronization trigger; optimistic row edits must not retrigger it.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, initialBlocks, initialBlocksSignature, workspaceKind, homeBankingId, botJobId]);
   const submitInstructionMove = useInstructionDrag({
     webSocket, connected, graphRevision: moveGraphRevision, botJobId, botJobName,
-    homeBankingId, targetSessionId: 'botJobTasks',
+    homeBankingId, targetSessionId, moveType: rowMoveVerb,
   });
 
   useEffect(() => {
+    if (workspaceKind === 'COMPONENT') return;
     setMemoryBlockOptions((prev) => normalizeBlockOptions([
       ...prev,
       ...blockOptionsFromInstructions(instructionsData),
     ]));
-  }, [instructionsData]);
+  }, [instructionsData, workspaceKind]);
 
   useEffect(() => {
-    if (!webSocket || !connected || instructionsData.length === 0) return;
+    if (!webSocket || !connected
+      || (instructionsData.length === 0 && workspaceBlocks.length === 0)) return;
+    const requestId = `${Date.now()}-${targetSessionId}-capabilities-${++capabilityRequestCounterRef.current}`;
+    pendingCapabilityRequestRef.current = {
+      requestId,
+      targetSessionId,
+      homeBankingId,
+      botJobId: botJobId == null ? null : Number(botJobId),
+    };
+    setMoveGraphRevision('');
+    setMemoryCapabilities(new Map());
+    setBlockDeleteCapabilities(new Map());
     webSocket.send(JSON.stringify({
       type: 'instructionEditor.memoryCapabilities',
       sessionId,
       homeBankingId,
-      body: JSON.stringify({ targetSessionId: 'botJobTasks', botJobId, homeBankingId }),
+      body: JSON.stringify({ requestId, targetSessionId, botJobId, homeBankingId }),
     }));
-  }, [webSocket, connected, instructionsData, botJobId, homeBankingId, sessionId]);
+  }, [webSocket, connected, instructionsData, workspaceBlocks, botJobId, homeBankingId,
+    sessionId, targetSessionId]);
 
   useEffect(() => {
     if (!memoryListOpenRequestedRef.current && !memoryListOpenedRef.current) return;
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN || !botJobId || botJobId <= 0) return;
     if (memoryListOpenRequestedRef.current && memoryListOpenPendingRequestRef.current) return;
 
+    const componentWorkspace = workspaceKind === 'COMPONENT';
     const snapshot: MemoryListSnapshot = {
       ownerEpoch: memoryListOwnerEpochRef.current,
-      sourceKind: 'BOT_JOB',
+      sourceKind: componentWorkspace ? 'COMPONENT' : 'BOT_JOB',
       homeBankingId,
       botJobId,
       botJobName: botJobName || '',
-      items: memorySteps.map(instructionMemoryItem),
-      blocks: memoryBlockOptions,
-      targetBlockId: memoryTargetBlockId,
-      emptyMessage: 'Click "+" on a step to add it here.',
+      items: componentWorkspace
+        ? componentMemoryItems
+        : memorySteps.map(instructionMemoryItem),
+      // Component blocks are reusable sources, never Bot Job destinations.
+      blocks: componentWorkspace ? [] : memoryBlockOptions,
+      targetBlockId: componentWorkspace ? null : memoryTargetBlockId,
+      emptyMessage: componentWorkspace
+        ? 'Click "+" on a component instruction or the blue arrow on a block.'
+        : 'Click "+" on a step to add it here.',
       status: memoryMoveStatus || (connected ? 'Memory List ready' : 'Memory List disconnected'),
-      busy: pendingMemoryMove !== null,
-      canApply: memoryTargetBlockId !== null
-        && memorySteps.length > 0
-        && pendingMemoryMove === null
-        && memoryBlockOptions.some(block => block.blockId === memoryTargetBlockId),
+      busy: componentWorkspace ? false : pendingMemoryMove !== null,
+      canApply: componentWorkspace
+        ? componentMemoryItems.length > 0
+        : memoryTargetBlockId !== null
+          && memorySteps.length > 0
+          && pendingMemoryMove === null
+          && memoryBlockOptions.some(block => block.blockId === memoryTargetBlockId),
     };
     const operation = memoryListOpenRequestedRef.current ? 'memoryList.open' : 'memoryList.sync';
     const requestId = `memory-list-${Date.now()}-${operation === 'memoryList.open' ? 'open' : 'sync'}`;
@@ -231,6 +326,7 @@ export function useGridData(deps: UseGridDataDeps) {
     botJobId,
     botJobName,
     connected,
+    componentMemoryItems,
     homeBankingId,
     memoryBlockOptions,
     memoryListOpenVersion,
@@ -240,6 +336,7 @@ export function useGridData(deps: UseGridDataDeps) {
     pendingMemoryMove,
     sessionId,
     webSocket,
+    workspaceKind,
   ]);
 
   // Apply: move the memorized steps (in insertion order) to the end of the
@@ -248,6 +345,9 @@ export function useGridData(deps: UseGridDataDeps) {
     targetBlockIdOverride?: number | null,
     sourceItemKeys?: string[],
   ) => {
+    // COMPONENT items are authoritatively and atomically applied by the central
+    // Java Memory service. Never reinterpret component ids as Bot Job row ids.
+    if (workspaceKind === 'COMPONENT') return;
     const targetBlockId = targetBlockIdOverride === undefined
       ? memoryTargetBlockId
       : targetBlockIdOverride;
@@ -340,14 +440,16 @@ export function useGridData(deps: UseGridDataDeps) {
   // Java backend owns block creation and mints the new blockId. It refreshes the
   // grid through the existing updateInstructions socket path after BLOCK_CREATE.
   const handleCreateNewBlock = (newBlockName: string, position: CreateBlockPosition) => {
-    const botJobId = instructionsData[0]?.botJobId ?? -1;
+    const targetBotJobId = botJobId ?? -1;
 
     const message = {
       type: 'BLOCK_CREATE',
-      botJobId,
+      requestId: `${Date.now()}-${targetSessionId}-block-create`,
+      graphRevision: moveGraphRevision,
+      botJobId: targetBotJobId,
       botJobName,
       homeBankingId: homeBankingId,
-      sessionId: `botJobTasks`,
+      sessionId: targetSessionId,
       blockName: newBlockName,
       insertPosition: position.type === 'end' ? 'END' : 'BEFORE',
       beforeBlockId: position.type === 'before' ? position.blockId : -1,
@@ -377,7 +479,16 @@ export function useGridData(deps: UseGridDataDeps) {
     const sourceBlockId = Number(source.droppableId);
     const destinationBlockId = Number(destination.droppableId);
     const sourceBlock = groupedData[sourceBlockId];
-    const destinationBlock = groupedData[destinationBlockId];
+    const destinationWorkspaceBlock =
+      workspaceBlocks.find(block => block.blockId === destinationBlockId);
+    const destinationBlock = groupedData[destinationBlockId]
+      ?? (destinationWorkspaceBlock
+        ? {
+            blockName: destinationWorkspaceBlock.blockName,
+            exportFile: destinationWorkspaceBlock.exportFile,
+            instructions: [] as BlockLoopInstructionLoadDTO[],
+          }
+        : undefined);
     if (!sourceBlock || !destinationBlock) return;
 
     const instructionId = Number(draggableId);
@@ -425,7 +536,9 @@ export function useGridData(deps: UseGridDataDeps) {
           ...instruction,
           blockId: destinationId,
           blockName: destinationBlock.blockName,
-          blockOrderNumber: destinationBlock.instructions[0]?.blockOrderNumber,
+          blockOrderNumber: destinationBlock.instructions[0]?.blockOrderNumber
+            ?? destinationWorkspaceBlock?.blockOrderNumber
+            ?? instruction.blockOrderNumber,
           instructionOrderNumber: index + 1,
         })),
       };
@@ -452,7 +565,7 @@ export function useGridData(deps: UseGridDataDeps) {
       return;
     }
     if (!webSocket || !connected || !moveGraphRevision) return;
-    const requestId = `${Date.now()}-botJobTasks-move-preview`;
+    const requestId = `${Date.now()}-${targetSessionId}-move-preview`;
     setPendingDragPreview({ requestId, result });
     webSocket.send(JSON.stringify({
       type: 'instructionGraph.previewMove',
@@ -460,7 +573,7 @@ export function useGridData(deps: UseGridDataDeps) {
       homeBankingId,
       body: JSON.stringify({
         requestId,
-        targetSessionId: 'botJobTasks',
+        targetSessionId,
         botJobId,
         homeBankingId,
         graphRevision: moveGraphRevision,
@@ -623,17 +736,25 @@ export function useGridData(deps: UseGridDataDeps) {
               ?? payload?.item?.sourceItemKey
               ?? payload?.itemKey
               ?? '',
-            ).replace(/^BOT_JOB:/, '');
-            const instructionId = Number(sourceItemKey);
-            if (Number.isFinite(instructionId)) handleRemoveFromMemory(instructionId);
+            );
+            if (workspaceKind === 'COMPONENT') {
+              handleRemoveComponentMemoryItem(sourceItemKey.replace(/^COMPONENT:/, ''));
+            } else {
+              const instructionId = Number(sourceItemKey.replace(/^BOT_JOB:/, ''));
+              if (Number.isFinite(instructionId)) handleRemoveFromMemory(instructionId);
+            }
           } else if (command === 'CLEAR') {
-            setMemorySteps([]);
+            if (workspaceKind === 'COMPONENT') setComponentMemoryItems([]);
+            else setMemorySteps([]);
           } else if (command === 'SELECT_TARGET_BLOCK') {
+            if (workspaceKind === 'COMPONENT') return;
             const selectedBlockId = Number(payload?.blockId);
             setMemoryTargetBlockId(
               Number.isFinite(selectedBlockId) && selectedBlockId > 0 ? selectedBlockId : null,
             );
           } else if (command === 'APPLY') {
+            // The aggregate Java Memory service owns COMPONENT validation/apply.
+            if (workspaceKind === 'COMPONENT') return;
             const requestedTargetBlockId = Number(payload?.targetBlockId);
             const requestedSourceItemKeys = Array.isArray(payload?.sourceItemKeys)
               ? payload.sourceItemKeys.map((itemKey: unknown) => String(itemKey))
@@ -648,6 +769,7 @@ export function useGridData(deps: UseGridDataDeps) {
             // The aggregate Memory List owns the mixed-source display order.
             // Producers apply the ordered sourceItemKeys routed with APPLY.
           } else if (command === 'CREATE_BLOCK') {
+            if (workspaceKind === 'COMPONENT') return;
             const blockName = String(payload?.blockName || '').trim();
             if (!blockName) return;
             const rawPosition = payload?.position;
@@ -775,7 +897,7 @@ export function useGridData(deps: UseGridDataDeps) {
               setInstructionsData(authoritativeInstructions);
               setIsDataReordered(false);
             }
-            if (Array.isArray(bodyData?.blocks)) {
+            if (workspaceKind !== 'COMPONENT' && Array.isArray(bodyData?.blocks)) {
               setMemoryBlockOptions(normalizeBlockOptions(bodyData.blocks.map((block: {
                 id?: number; blockId?: number; name?: string; blockName?: string; blockOrderNumber?: number;
               }) => ({
@@ -828,6 +950,32 @@ export function useGridData(deps: UseGridDataDeps) {
           }
         } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "instructionEditor.memoryCapabilitiesResponse") {
           const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
+          const pending = pendingCapabilityRequestRef.current;
+          const responseBotJobId = bodyData?.botJobId == null ? null : Number(bodyData.botJobId);
+          if (!pending
+            || bodyData?.requestId !== pending.requestId
+            || bodyData?.targetSessionId !== pending.targetSessionId
+            || Number(bodyData?.homeBankingId) !== pending.homeBankingId
+            || responseBotJobId !== pending.botJobId) {
+            return;
+          }
+          pendingCapabilityRequestRef.current = null;
+          if (bodyData?.ok === false) {
+            setMoveGraphRevision('');
+            setMemoryCapabilities(new Map());
+            setBlockDeleteCapabilities(new Map());
+            setAlertImage(warningRedImage);
+            setAlertClass('construction-image');
+            setAlertMessageHeader('Grid Actions Unavailable');
+            setAlertMessageBody(
+              bodyData?.error
+                || 'The backend could not authorize the current instruction grid.',
+            );
+            setAlertMessageFooter('Refresh this workspace before changing rows or blocks.');
+            setErrorFlag(true);
+            setAlertOnConfirm(undefined);
+            return;
+          }
           const next = new Map<number, { canAdd: boolean; canMove: boolean; canDelete: boolean; deleteCount: number; reason: string; deleteReason: string; allowedBlockIds: number[]; deleteRows: { id: number; name: string; action: string; order: number }[] }>();
           if (Array.isArray(bodyData?.capabilities)) {
             bodyData.capabilities.forEach((capability: { instructionId: number; canAddToMemory: boolean; canMove: boolean; canDelete: boolean; deleteCount?: number; reason?: string; deleteReason?: string; allowedBlockIds?: number[]; deleteRows?: { id: number; name: string; action: string; order: number }[] }) => {
@@ -843,8 +991,36 @@ export function useGridData(deps: UseGridDataDeps) {
           }
           setBlockDeleteCapabilities(nextBlocks);
           setMoveGraphRevision(typeof bodyData?.graphRevision === 'string' ? bodyData.graphRevision : '');
-        } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "updateInstructions") {
+        } else if (
+          sessionId === parsedMessage.sessionId
+          && parsedMessage.operationId === 'instructionEditor.resyncRequired'
+        ) {
+          const bodyData = typeof parsedMessage.body === 'string'
+            ? JSON.parse(parsedMessage.body)
+            : parsedMessage.body;
+          pendingCapabilityRequestRef.current = null;
+          setMoveGraphRevision('');
+          setMemoryCapabilities(new Map());
+          setBlockDeleteCapabilities(new Map());
+          setAlertImage(warningRedImage);
+          setAlertClass('construction-image');
+          setAlertMessageHeader('Components Refresh Required');
+          setAlertMessageBody(
+            bodyData?.error
+              || 'The change was saved, but the Components grid could not be refreshed.',
+          );
+          setAlertMessageFooter(
+            bodyData?.action
+              || 'Refresh Components before making another change.',
+          );
+          setErrorFlag(true);
+          setAlertOnConfirm(undefined);
+        } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === updateOperation) {
 
+          pendingCapabilityRequestRef.current = null;
+          setMoveGraphRevision('');
+          setMemoryCapabilities(new Map());
+          setBlockDeleteCapabilities(new Map());
           pendingScrollTopRef.current = gridScrollRef.current?.scrollTop ?? null;
 
           const bodyData = typeof parsedMessage.body === "string"
@@ -863,12 +1039,22 @@ export function useGridData(deps: UseGridDataDeps) {
             : [];
           const createdBlockId = !Array.isArray(bodyData) ? Number(bodyData.createdBlockId) : -1;
 
-          if (backendBlocks.length > 0) {
-            setMemoryBlockOptions(normalizeBlockOptions(backendBlocks));
+          if (!Array.isArray(bodyData)) {
+            const authoritativeBlocks = normalizeWorkspaceBlocks(backendBlocks);
+            setWorkspaceBlocks(authoritativeBlocks);
+            if (typeof bodyData.botJobId === 'number') {
+              setBotJobId(bodyData.botJobId);
+            }
+            if (typeof bodyData.botJobName === 'string') {
+              setBotJobName(bodyData.botJobName);
+            }
+            if (workspaceKind !== 'COMPONENT') {
+              setMemoryBlockOptions(normalizeBlockOptions(authoritativeBlocks));
+            }
           }
           if (createdBlockId > 0) {
-            setMemoryTargetBlockId(createdBlockId);
             setCreateBlockOpen(false);
+            if (workspaceKind !== 'COMPONENT') setMemoryTargetBlockId(createdBlockId);
           }
 
           // Check if detailsData is empty
@@ -877,8 +1063,12 @@ export function useGridData(deps: UseGridDataDeps) {
             setInstructionsData([]);
             setGroupedData({}); // Or set to your initial empty state
             setIsDataReordered(true); // Or false, depending on your logic
-            if (bodyData.botJobId !== undefined) setBotJobId(bodyData.botJobId);
-            if (bodyData.botJobName !== undefined) setBotJobName(bodyData.botJobName);
+            if (workspaceKind !== 'COMPONENT' && bodyData.botJobId !== undefined) {
+              setBotJobId(bodyData.botJobId);
+            }
+            if (workspaceKind !== 'COMPONENT' && bodyData.botJobName !== undefined) {
+              setBotJobName(bodyData.botJobName);
+            }
             if (bodyData.blockId !== undefined) setBlockId(bodyData.blockId);
           } else {
             // Otherwise, set elementDTO to detailsData
@@ -892,6 +1082,12 @@ export function useGridData(deps: UseGridDataDeps) {
             }
             setInstructionsData(detailsData);
             if (backendBlocks.length === 0) {
+              setWorkspaceBlocks(current => mergeWorkspaceBlocks(
+                current,
+                workspaceBlocksFromInstructions(detailsData),
+              ));
+            }
+            if (workspaceKind !== 'COMPONENT' && backendBlocks.length === 0) {
               setMemoryBlockOptions((prev) => normalizeBlockOptions([
                 ...prev,
                 ...blockOptionsFromInstructions(detailsData),
@@ -939,7 +1135,10 @@ export function useGridData(deps: UseGridDataDeps) {
         console.error("Error parsing WebSocket message:", error);
       }
     });
-  }, [messages, onDetachedClose, onSessionOpen, pendingMemoryMove, pendingDragPreview, sessionId, socketPort]);
+  }, [
+    messages, onDetachedClose, onSessionOpen, pendingMemoryMove, pendingDragPreview,
+    sessionId, socketPort, updateOperation, workspaceKind,
+  ]);
 
   useEffect(() => {
     console.log("Update Blocks");
@@ -950,7 +1149,7 @@ export function useGridData(deps: UseGridDataDeps) {
         botJobId: botJobId,
         botJobName: botJobName,
         homeBankingId: homeBankingId,
-        sessionId: `botJobTasks`, //-${botJobId}`,
+        sessionId: targetSessionId,
         updatedBlocks: updatedBlocks,
       };
 
@@ -971,7 +1170,9 @@ export function useGridData(deps: UseGridDataDeps) {
 
 
       const reassignedData = reassignInstructionOrderNumbersByBlock([...instructionsData]);
-      const { updatedData, updatedBlocks: nextUpdatedBlocks } = correctBlockOrderNumbers(reassignedData);
+      const { updatedData, updatedBlocks: nextUpdatedBlocks } = workspaceKind === 'COMPONENT'
+        ? { updatedData: reassignedData, updatedBlocks: [] as UpdatedBlock[] }
+        : correctBlockOrderNumbers(reassignedData);
 
       const gotoInstructionAfterReorder = updatedData.find(
         (instruction) => instruction.actions === 'EXCEL GOTO'
@@ -987,7 +1188,7 @@ export function useGridData(deps: UseGridDataDeps) {
 
       setIsDataReordered(true);
     }
-  }, [instructionsData, isDataReordered]);
+  }, [instructionsData, isDataReordered, workspaceKind]);
 
   // Start editing block name
   const handleEditBlock = (blockId: number, currentBlockName: string) => {
@@ -996,8 +1197,8 @@ export function useGridData(deps: UseGridDataDeps) {
   };
 
   const handleSaveBlockName = (blockId: number) => {
-    // Ensure instructionsData is available
-    if (!instructionsData || instructionsData.length === 0) {
+    const workspaceBlock = workspaceBlocks.find(block => block.blockId === blockId);
+    if ((!instructionsData || instructionsData.length === 0) && !workspaceBlock) {
       setAlertImage(warningRedImage);
       setAlertClass('construction-image');
       setAlertMessageHeader(
@@ -1031,6 +1232,9 @@ export function useGridData(deps: UseGridDataDeps) {
 
     // Update the instructionsData state
     setInstructionsData(updatedInstructions);
+    setWorkspaceBlocks(current => current.map(block =>
+      block.blockId === blockId ? { ...block, blockName } : block
+    ));
 
     // Recompute groupedData based on the updated instructionsData
     const updatedGroupedData = groupByBlock(updatedInstructions);
@@ -1048,7 +1252,7 @@ export function useGridData(deps: UseGridDataDeps) {
         blockId: blockId,
         blockName: blockName, // Send the updated block name
         homeBankingId: homeBankingId,
-        sessionId: `botJobTasks`, //-${botJobId}`,
+        sessionId: targetSessionId,
       };
 
       try {
@@ -1072,8 +1276,9 @@ export function useGridData(deps: UseGridDataDeps) {
   const handleBlockStatus = (blockId: number) => {
     // Find the botJobId and current blockActive status from the instructionsData for the given blockId
     const block = instructionsData.find(instruction => instruction.blockId === blockId);
+    const workspaceBlock = workspaceBlocks.find(candidate => candidate.blockId === blockId);
 
-    const currentBlockActive = block?.blockActive;
+    const currentBlockActive = block?.blockActive ?? workspaceBlock?.blockActive ?? true;
 
     // Check if botJobId is found, if not handle the error
     if (!botJobId) {
@@ -1102,6 +1307,11 @@ export function useGridData(deps: UseGridDataDeps) {
 
     // Update the instructionsData state
     setInstructionsData(updatedInstructions);
+    setWorkspaceBlocks(current => current.map(candidate =>
+      candidate.blockId === blockId
+        ? { ...candidate, blockActive: newBlockActive }
+        : candidate
+    ));
 
     // Recompute groupedData based on the updated instructionsData
     const updatedGroupedData = groupByBlock(updatedInstructions);
@@ -1118,7 +1328,7 @@ export function useGridData(deps: UseGridDataDeps) {
         botJobName: botJobName,
         blockId: blockId,
         homeBankingId: homeBankingId,
-        sessionId: `botJobTasks`, //-${botJobId}`,
+        sessionId: targetSessionId,
         blockActive: newBlockActive, // Send the toggled blockActive value
       };
 
@@ -1195,7 +1405,7 @@ export function useGridData(deps: UseGridDataDeps) {
         parentId: parentId,
         actions: actions,
         homeBankingId: homeBankingId,
-        sessionId: `botJobTasks`, //-${botJobId}`,
+        sessionId: targetSessionId,
       };
 
       try {
@@ -1283,7 +1493,7 @@ export function useGridData(deps: UseGridDataDeps) {
         homeBankingId,
         body: JSON.stringify({
           requestId,
-          targetSessionId: 'botJobTasks',
+          targetSessionId: commandEditorTargetSessionId,
           homeBankingId,
           botJobId: currentBotJobId,
           instructionId,
@@ -1302,6 +1512,9 @@ export function useGridData(deps: UseGridDataDeps) {
   };
 
   const handleCreateComponent = (blockGroupId: number) => {
+    // A reusable component cannot be saved as another component through the
+    // Bot Job-only componentSave protocol. The component UI also hides this.
+    if (workspaceKind === 'COMPONENT') return;
     // Access groupedData, setGroupedData, instructionsData, and preComponent from the component's scope
     const blockCompent = groupedData[blockGroupId]; // Get the block directly by its blockId
 
@@ -1631,7 +1844,7 @@ export function useGridData(deps: UseGridDataDeps) {
         botJobId: botJobId,
         botJobName: botJobName,
         homeBankingId: homeBankingId,
-        sessionId: `botJobTasks`, //-${botJobId}`,
+        sessionId: targetSessionId,
         details: blockSplitDetails,
       };
 
@@ -1707,7 +1920,9 @@ export function useGridData(deps: UseGridDataDeps) {
       attributeValue: "",
       attributeType: "",
       autoScroll: "",
-      autoEnter: ""
+      autoEnter: "",
+      defaultValue: instruction.defaultValue,
+      blockId: instruction.blockId,
     };
 
     sendWebSocketMessage(clickElement, action);
@@ -1728,7 +1943,10 @@ export function useGridData(deps: UseGridDataDeps) {
       homeBankingId: homeBankingId,
       botJobId: botJobId,
       sessionId: sessionDestine,
+      sourceSessionId: targetSessionId,
       operationId: "TEST_STEP",
+      instructionId: elementDTO.id,
+      blockId: elementDTO.blockId,
       elementDetails: [elementDTO],
     };
 
@@ -1785,7 +2003,7 @@ export function useGridData(deps: UseGridDataDeps) {
         botJobName,
         blockId,
         homeBankingId: homeBankingId,
-        sessionId: `botJobTasks`, //-${botJobId}`,
+        sessionId: targetSessionId,
       };
 
       webSocket.send(
@@ -1808,13 +2026,21 @@ export function useGridData(deps: UseGridDataDeps) {
 
     // Find the botJobId and blockOrderNumber associated with the blockId
     const blockInstruction = instructionsData.find(instruction => instruction.blockId === blockId);
-    const blockDisplayName = blockInstruction?.blockName || `Block ${blockId}`;
+    const blockDisplayName = blockInstruction?.blockName
+      ?? workspaceBlocks.find(block => block.blockId === blockId)?.blockName
+      ?? `Block ${blockId}`;
 
     // Show confirmation dialog using AlertModal
     setAlertImage(warningRedImage);
     setAlertClass('construction-image');
     setAlertMessageHeader('Delete Block');
-    setAlertMessageBody(capability.deleteRows.map(row => ({ parentNameWithId: `#${row.order} (${row.id}) ${row.name}`, connectionLabel: 'Action', actions: row.action })));
+    setAlertMessageBody(capability.deleteRows.length > 0
+      ? capability.deleteRows.map(row => ({
+          parentNameWithId: `#${row.order} (${row.id}) ${row.name}`,
+          connectionLabel: 'Action',
+          actions: row.action,
+        }))
+      : `Delete empty block "${blockDisplayName}"?`);
     setAlertMessageFooter(`Delete "${blockDisplayName}" and ${capability.instructionCount} instruction(s). This action cannot be undone.`);
     setErrorFlag(true);
     setAlertOnConfirm(() => () => executeRemoveBlock(blockId));
@@ -1826,10 +2052,12 @@ export function useGridData(deps: UseGridDataDeps) {
     handleClose();
 
     const blockInstruction = instructionsData.find(instruction => instruction.blockId === blockId);
-    const botJobId = blockInstruction ? blockInstruction.botJobId : null;
-    const removedBlockOrderNumber = blockInstruction ? blockInstruction.blockOrderNumber : null;
+    const workspaceBlock = workspaceBlocks.find(block => block.blockId === blockId);
+    const ownerBotJobId = blockInstruction?.botJobId ?? botJobId;
+    const removedBlockOrderNumber =
+      blockInstruction?.blockOrderNumber ?? workspaceBlock?.blockOrderNumber ?? null;
 
-    if (!botJobId || removedBlockOrderNumber === null) {
+    if (!ownerBotJobId || removedBlockOrderNumber === null) {
       setAlertImage(warningRedImage);
       setAlertClass('construction-image');
       setAlertMessageHeader(
@@ -1841,47 +2069,42 @@ export function useGridData(deps: UseGridDataDeps) {
     }
 
     // Remove the block from instructionsData
-    const updatedData = instructionsData.filter(instruction => instruction.blockId !== blockId);
-
-    // Update blockOrderNumber for blocks after the removed block
-    const blocksToUpdateSet = new Set<number>();
-    updatedData.forEach(instruction => {
-      if (instruction.blockOrderNumber > removedBlockOrderNumber) {
-        instruction.blockOrderNumber -= 1;
-        blocksToUpdateSet.add(instruction.blockId);
-      }
-    });
+    const nextWorkspaceBlocks = workspaceBlocks
+      .filter(block => block.blockId !== blockId)
+      .map(block => block.blockOrderNumber > removedBlockOrderNumber
+        ? { ...block, blockOrderNumber: block.blockOrderNumber - 1 }
+        : block);
+    const updatedData = instructionsData
+      .filter(instruction => instruction.blockId !== blockId)
+      .map(instruction => instruction.blockOrderNumber > removedBlockOrderNumber
+        ? { ...instruction, blockOrderNumber: instruction.blockOrderNumber - 1 }
+        : instruction);
 
     const reassignedData = reassignInstructionOrderNumbersByBlock(updatedData);
-    setInstructionsData([...reassignedData]);
+    setInstructionsData(reassignedData);
+    setWorkspaceBlocks(nextWorkspaceBlocks);
     setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
 
     // Prepare list of updated blocks
-    const blocksToUpdate = Array.from(blocksToUpdateSet).map(blockId => {
-      const instructionsInBlock = reassignedData.filter(instr => instr.blockId === blockId);
-      const blockOrderNumber = instructionsInBlock[0].blockOrderNumber; // Assuming all instructions in a block have the same blockOrderNumber
-      const blockName = instructionsInBlock[0].blockName; // Assuming blockName is consistent within the block
-
-      return {
-        blockId: blockId,
-        botJobId: botJobId,
-        blockOrderNumber: blockOrderNumber,
-        blockName: blockName,
-      };
-    });
+    const blocksToUpdate = nextWorkspaceBlocks.map(block => ({
+      blockId: block.blockId,
+      botJobId: ownerBotJobId,
+      blockOrderNumber: block.blockOrderNumber,
+      blockName: block.blockName,
+    }));
 
     // Send WebSocket message
     if (webSocket && connected) {
       const message = {
         type: 'DELETE_BLOCK',
-        requestId: `${Date.now()}-bot-block-delete-${blockId}`,
+        requestId: `${Date.now()}-${targetSessionId}-block-delete-${blockId}`,
         graphRevision: moveGraphRevision,
         blockId: blockId,
-        botJobId: botJobId,
+        botJobId: ownerBotJobId,
         botJobName: botJobName,
         updatedBlocks: blocksToUpdate, // Include the list of updated blocks
         homeBankingId: homeBankingId,
-        sessionId: `botJobTasks`, //-${botJobId}`,
+        sessionId: targetSessionId,
       };
 
       webSocket.send(
@@ -1893,12 +2116,25 @@ export function useGridData(deps: UseGridDataDeps) {
   };
 
   const handleRollbackBlock = (blockId: number) => {
+    if (!moveGraphRevision.trim()) {
+      setAlertImage(warningRedImage);
+      setAlertClass('construction-image');
+      setAlertMessageHeader('Grid Refresh Required');
+      setAlertMessageBody(
+        'Wait for the authoritative grid revision, then retry the rollback.',
+      );
+      setErrorFlag(true);
+      return;
+    }
+
     // Get the botJobId and blockName from the first instruction
     const firstInstruction = instructionsData.find(instr => instr.blockId === blockId);
-    const botJobId = firstInstruction ? firstInstruction.botJobId : null;
-    const firstBlockName = firstInstruction ? firstInstruction.blockName : 'Unknown Block'; // Default to 'Unknown Block' if not found
+    const workspaceBlock = workspaceBlocks.find(block => block.blockId === blockId);
+    const ownerBotJobId = firstInstruction?.botJobId ?? botJobId;
+    const firstBlockName =
+      firstInstruction?.blockName ?? workspaceBlock?.blockName ?? 'Unknown Block';
 
-    if (!botJobId) {
+    if (!ownerBotJobId) {
       setAlertImage(warningRedImage);
       setAlertClass('construction-image');
       setAlertMessageHeader(
@@ -1909,11 +2145,27 @@ export function useGridData(deps: UseGridDataDeps) {
       return; // Exit if no botJobId is found
     }
 
+    // Preserve the complete authoritative block catalog before applying the optimistic
+    // one-block view. The backend validates this snapshot inside the same transaction
+    // that performs the destructive rollback, so a newly-created/reordered empty block
+    // cannot be silently deleted by a stale browser request.
+    const expectedBlocks = workspaceBlocks.map(block => ({
+      blockId: block.blockId,
+      botJobId: ownerBotJobId,
+      homeBankId: homeBankingId,
+      blockOrderNumber: block.blockOrderNumber,
+      blockName: block.blockName,
+      blockActive: block.blockActive,
+      blockWait: block.blockWait,
+      exportFile: block.exportFile,
+    }));
+
     // Update all instructions to have blockId  and blockOrderNumber 1
     const updatedData = instructionsData.map(instruction => ({
       ...instruction,
       blockId: blockId,
       blockOrderNumber: 1,
+      blockName: firstBlockName,
     }));
 
     // Reassign instructionOrderNumbers sequentially starting from 1
@@ -1924,18 +2176,29 @@ export function useGridData(deps: UseGridDataDeps) {
 
     // Update the state
     setInstructionsData([...reassignedData]);
+    setWorkspaceBlocks([{
+      blockId,
+      blockOrderNumber: 1,
+      blockName: firstBlockName,
+      blockActive: workspaceBlock?.blockActive ?? firstInstruction?.blockActive ?? true,
+      blockWait: workspaceBlock?.blockWait ?? firstInstruction?.blockWait ?? 0,
+      exportFile: workspaceBlock?.exportFile ?? firstInstruction?.exportFile,
+    }]);
     setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
 
     // Send WebSocket message to inform about the rollback
     if (webSocket && connected) {
       const message = {
         type: 'BLOCK_ROLLBACK',
-        botJobId: botJobId,
+        requestId: `${Date.now()}-${targetSessionId}-block-rollback`,
+        graphRevision: moveGraphRevision,
+        botJobId: ownerBotJobId,
         blockId: blockId,
         botJobName: botJobName,
         blockName: firstBlockName, // Pass the block name here
         homeBankingId: homeBankingId,
-        sessionId: `botJobTasks`, //-${botJobId}`,
+        sessionId: targetSessionId,
+        updatedBlocks: expectedBlocks,
         updatedRows: reassignedData.map(instr => ({
           instructionId: instr.id,
           blockId: instr.blockId,
@@ -1972,7 +2235,7 @@ export function useGridData(deps: UseGridDataDeps) {
         parentId: instruction.parentId,
         forceCoordinates: nextForceCoordinates,
         homeBankingId,
-        sessionId: "botJobTasks",
+        sessionId: targetSessionId,
       };
       webSocket.send(JSON.stringify(message));
     }
@@ -2037,7 +2300,7 @@ export function useGridData(deps: UseGridDataDeps) {
         blockId,
         blockName,
         homeBankingId,
-        sessionId: `botJobTasks`, //-${botJobId}`,
+        sessionId: targetSessionId,
         instructionId,
         instructionOrderNumber,
         blockOrderNumber,
@@ -2060,7 +2323,13 @@ export function useGridData(deps: UseGridDataDeps) {
   };
 
   const submitSaveComponent = (name: string, description: string) => {
-    if (!saveComponentContext || !webSocket || !connected || !botJobId) return;
+    if (
+      workspaceKind === 'COMPONENT'
+      || !saveComponentContext
+      || !webSocket
+      || !connected
+      || !botJobId
+    ) return;
     webSocket.send(JSON.stringify({
       type: 'componentSave.apply', sessionId, homeBankingId,
       body: JSON.stringify({ ...saveComponentContext, name, description,
@@ -2074,6 +2343,8 @@ export function useGridData(deps: UseGridDataDeps) {
     // core state
     instructionsData,
     setInstructionsData,
+    workspaceBlocks,
+    setWorkspaceBlocks,
     groupedData,
     setGroupedData,
     isDataReordered,
@@ -2088,6 +2359,7 @@ export function useGridData(deps: UseGridDataDeps) {
     setBlockName,
     // drag / capability state
     activeDraggedInstructionId,
+    moveGraphRevision,
     blockDeleteCapabilities,
     // mutation handlers
     handleCreateNewBlock,

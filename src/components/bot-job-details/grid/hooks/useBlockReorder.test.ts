@@ -64,6 +64,33 @@ describe('useBlockReorder', () => {
     expect(msg.updatedBlocks.map((b: any) => b.blockOrderNumber)).toEqual([1, 2, 3]);
   });
 
+  it('preserves empty component blocks in drag and arrow ordering', () => {
+    const send = jest.fn();
+    const setWorkspaceBlocks = jest.fn();
+    const workspaceBlocks = [
+      { blockId: 10, blockOrderNumber: 1, blockName: 'Block 1', blockActive: true, blockWait: 0 },
+      { blockId: 15, blockOrderNumber: 2, blockName: 'Empty block', blockActive: true, blockWait: 0 },
+      { blockId: 20, blockOrderNumber: 3, blockName: 'Block 2', blockActive: true, blockWait: 0 },
+      { blockId: 30, blockOrderNumber: 4, blockName: 'Block 3', blockActive: true, blockWait: 0 },
+    ];
+    const { result } = renderHook(() =>
+      useBlockReorder(makeDeps({
+        webSocket: { send } as unknown as WebSocket,
+        connected: true,
+        targetSessionId: 'componentTasks',
+        workspaceBlocks,
+        setWorkspaceBlocks,
+      })),
+    );
+
+    result.current.handleMoveBlockDown(10);
+
+    const message = JSON.parse(send.mock.calls[0][0]);
+    expect(message.updatedBlocks.map((block: any) => block.blockId)).toEqual([15, 10, 20, 30]);
+    expect(message.updatedBlocks.map((block: any) => block.blockOrderNumber)).toEqual([1, 2, 3, 4]);
+    expect(setWorkspaceBlocks).toHaveBeenCalledTimes(1);
+  });
+
   it('commitBlockReorder is a no-op for equal / out-of-range indices', () => {
     const send = jest.fn();
     const { result } = renderHook(() =>

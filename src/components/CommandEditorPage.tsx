@@ -14,7 +14,7 @@ export const COMMAND_EDITOR_SESSION_ID = 'commandEditorManager';
 
 type CommandEditorTarget = {
   bindingEpoch: string;
-  targetSessionId: string;
+  targetSessionId: 'botJobTasks' | 'componentTasks';
   workspaceEpoch: number;
   selectionRevision: number;
   homeBankingId: number;
@@ -54,6 +54,8 @@ const parseTarget = (body: any): CommandEditorTarget | null => {
   const instruction = candidate?.instruction;
   const bindingEpoch = String(candidate?.bindingEpoch || '').trim();
   const targetSessionId = String(candidate?.targetSessionId || '').trim();
+  const supportedTarget =
+    targetSessionId === 'botJobTasks' || targetSessionId === 'componentTasks';
   const homeBankingId = Number(candidate?.homeBankingId);
   const botJobId = Number(candidate?.botJobId);
   const workspaceEpoch = Number(candidate?.workspaceEpoch);
@@ -61,7 +63,7 @@ const parseTarget = (body: any): CommandEditorTarget | null => {
   if (
     candidate?.ok === false
     || !bindingEpoch
-    || targetSessionId !== 'botJobTasks'
+    || !supportedTarget
     || !Number.isSafeInteger(homeBankingId)
     || homeBankingId <= 0
     || !Number.isSafeInteger(botJobId)
@@ -79,7 +81,7 @@ const parseTarget = (body: any): CommandEditorTarget | null => {
 
   return {
     bindingEpoch,
-    targetSessionId,
+    targetSessionId: targetSessionId as CommandEditorTarget['targetSessionId'],
     homeBankingId,
     botJobId,
     workspaceEpoch,

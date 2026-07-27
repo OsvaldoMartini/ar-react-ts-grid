@@ -11,6 +11,10 @@ import { useExcelExport } from './useExcelExport';
 import { useBlockReorder } from './useBlockReorder';
 import { useGridData } from './useGridData';
 import type { UseInstructionGridProps } from '../types/instructionGrid.types';
+import {
+  BOT_JOB_INSTRUCTION_GRID_POLICY,
+  COMPONENT_INSTRUCTION_GRID_POLICY,
+} from '../instructionGrid.policy';
 
 // Phase 6, step 10 — the composition-root hook. GridItem's hook wiring
 // (WebSocket, identity state, controller, every sub-hook, the UI refs/state,
@@ -19,13 +23,18 @@ import type { UseInstructionGridProps } from '../types/instructionGrid.types';
 export function useInstructionGrid({
   homeBankingIdInitial,
   data,
+  initialBlocks,
   socketPort,
   sessionId,
   botJobIdInitial,
   botJobNameInitial,
   onSessionOpen,
   onDetachedClose,
+  workspaceMode = 'BOT_JOB',
 }: UseInstructionGridProps) {
+  const workspacePolicy = workspaceMode === 'COMPONENT'
+    ? COMPONENT_INSTRUCTION_GRID_POLICY
+    : BOT_JOB_INSTRUCTION_GRID_POLICY;
   // Using the custom WebSocket hook
   const { webSocket, connected, reconnectAttempts, messages, error } = useWebSocket(socketPort, sessionId);
 
@@ -39,8 +48,17 @@ export function useInstructionGrid({
   const [botJobId, setBotJobId] = useState<number | null>(botJobIdInitial);
   const [blockId, setBlockId] = useState<number | null>(-1);
   const [botJobName, setBotJobName] = useState<string | null>(botJobNameInitial);
+  useEffect(() => {
+    setHomeBankingId(homeBankingIdInitial);
+    setBotJobId(botJobIdInitial);
+    setBotJobName(botJobNameInitial);
+    setBlockId(-1);
+  }, [homeBankingIdInitial, botJobIdInitial, botJobNameInitial]);
   const botJobHeader = useBotJobDetailsController({
     webSocket, connected, messages, sessionId, homeBankingId, botJobId,
+    // Components needs the same post-connect bootstrap handshake. The backend
+    // responds first, then publishes the correct grid payload for componentTasks.
+    enabled: true,
     onSurfaceOpen: (targetSession, nextBotJobId) => onSessionOpen(targetSession, socketPort, nextBotJobId),
   });
 
@@ -92,6 +110,7 @@ export function useInstructionGrid({
   // Presentation lives in the one detached Memory List workspace.
   const {
     memorySteps, setMemorySteps,
+    componentMemoryItems, setComponentMemoryItems, memoryItemCount,
     memoryTargetBlockId, setMemoryTargetBlockId,
     memoryBlockOptions, setMemoryBlockOptions,
     createBlockOpen, setCreateBlockOpen,
@@ -102,14 +121,16 @@ export function useInstructionGrid({
     memoryListOpenRequestedRef, memoryListOpenedRef,
     memoryListOpenPendingRequestRef, memoryListOwnerEpochRef,
     requestMemoryListOpen,
-    handleAddToMemory, handleAddBlockToMemory, handleRemoveFromMemory,
-  } = useInstructionMemory(data);
+    handleAddToMemory, handleAddBlockToMemory, handleStageComponentBlock,
+    handleRemoveFromMemory, handleRemoveComponentMemoryItem,
+  } = useInstructionMemory(data, workspacePolicy);
   // Phase 6, step 9 — the grid DATA LAYER (core grid state, drag state, refs, the
   // WebSocket-driven effects, and every mutation/drag handler) lives in useGridData.
   // GridItem feeds it the identity state, alert/execution/find/memory/excel surfaces,
   // and renders the handlers it returns. Extracted verbatim; no behavior change.
   const {
     instructionsData, setInstructionsData,
+    workspaceBlocks, setWorkspaceBlocks,
     groupedData,
     setIsDataReordered,
     excelGotoInstruction,
@@ -117,6 +138,7 @@ export function useInstructionGrid({
     editingInstructionId, instructionName, setInstructionName,
     editingBlockId, blockName, setBlockName,
     activeDraggedInstructionId,
+    moveGraphRevision,
     blockDeleteCapabilities,
     handleCreateNewBlock,
     handleBlockStatus,
@@ -141,7 +163,7 @@ export function useInstructionGrid({
     handleRowDrop,
     handleRowDragEnd,
   } = useGridData({
-    data, sessionId, socketPort, onSessionOpen, onDetachedClose,
+    data, initialBlocks, sessionId, socketPort, onSessionOpen, onDetachedClose, workspacePolicy,
     webSocket, connected, messages,
     homeBankingId, botJobId, botJobName,
     setHomeBankingId, setBotJobId, setBotJobName, setBlockId,
@@ -151,11 +173,11 @@ export function useInstructionGrid({
     setAlertMessageHeader, setAlertMessageBody, setAlertMessageFooter, setAlertOnConfirm, handleClose,
     setExecutionId, setExecutionState,
     findText,
-    memorySteps, memoryTargetBlockId, memoryBlockOptions, memoryCapabilities,
+    memorySteps, componentMemoryItems, memoryTargetBlockId, memoryBlockOptions, memoryCapabilities,
     pendingMemoryMove, memoryMoveStatus, memoryListOpenVersion,
-    setMemorySteps, setMemoryTargetBlockId, setMemoryBlockOptions, setMemoryCapabilities,
+    setMemorySteps, setComponentMemoryItems, setMemoryTargetBlockId, setMemoryBlockOptions, setMemoryCapabilities,
     setPendingMemoryMove, setMemoryMoveStatus, setMemoryListOpenVersion, setCreateBlockOpen,
-    handleRemoveFromMemory,
+    handleRemoveFromMemory, handleRemoveComponentMemoryItem,
     memoryListOpenRequestedRef, memoryListOpenedRef, memoryListOpenPendingRequestRef, memoryListOwnerEpochRef,
     pendingExcelExportDirectoryRequestRef, setChoosingExcelExportDirectory, setExcelExportDirectory,
   });
@@ -167,8 +189,9 @@ export function useInstructionGrid({
     sortedBlockIndex, handleMoveBlockUp, handleMoveBlockDown,
   } = useBlockReorder({
     groupedData, instructionsData, setInstructionsData, setIsDataReordered,
+    workspaceBlocks, setWorkspaceBlocks,
     webSocket, connected, botJobId, botJobName, homeBankingId,
-    targetSessionId: 'botJobTasks',
+    targetSessionId: workspacePolicy.targetSessionId,
   });
 
   // Native block reorder (drag whole blocks + up/down buttons) now lives in
@@ -226,7 +249,8 @@ export function useInstructionGrid({
 
   return {
     // useWebSocket
-    webSocket, connected, messages,
+    webSocket, connected, reconnectAttempts, messages, error,
+    workspacePolicy,
     // identity state
     homeBankingId, botJobId, botJobName,
     // UI refs
@@ -253,17 +277,19 @@ export function useInstructionGrid({
     excelExportContext, excelExportDirectory, choosingExcelExportDirectory,
     handleExcelFileBlockName, submitExcelExport, chooseExcelExportDirectory, closeExcelExport,
     // useInstructionMemory
-    memorySteps, memoryBlockOptions, createBlockOpen, setCreateBlockOpen,
+    memorySteps, memoryItemCount, memoryBlockOptions, createBlockOpen, setCreateBlockOpen,
     memoryCapabilities, requestMemoryListOpen,
-    handleAddToMemory, handleAddBlockToMemory,
+    handleAddToMemory, handleAddBlockToMemory, handleStageComponentBlock,
     // useGridData
     instructionsData, setInstructionsData,
+    workspaceBlocks,
     groupedData,
     excelGotoInstruction,
     dropdownPosition,
     editingInstructionId, instructionName, setInstructionName,
     editingBlockId, blockName, setBlockName,
     activeDraggedInstructionId,
+    moveGraphRevision,
     blockDeleteCapabilities,
     handleCreateNewBlock,
     handleBlockStatus,

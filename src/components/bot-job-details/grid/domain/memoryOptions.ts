@@ -1,7 +1,11 @@
 import { BlockLoopInstructionLoadDTO } from '../../../instructionsMockData';
 import { CreateBlockOption } from '../../../CreateNewBlock';
 import { instructionDisplayLabel } from '../../../instructionDisplay';
-import type { MemoryListItem, MemoryListItemIcon } from '../../../memoryList.contract';
+import type {
+  ComponentMemoryListPayload,
+  MemoryListItem,
+  MemoryListItemIcon,
+} from '../../../memoryList.contract';
 
 /**
  * Phase 6 — DOMAIN layer (pure, no React / no I/O). Mapping helpers shared by
@@ -64,3 +68,54 @@ export const instructionMemoryItem = (
   active: instruction.instructionActive !== false,
   payload: { instructionId: instruction.id },
 });
+
+const componentInstructionSourceKey = (
+  instruction: BlockLoopInstructionLoadDTO,
+): string => (
+  `INSTRUCTION:${instruction.homeBankingId}:${instruction.blockId}:${instruction.id}`
+);
+
+export const componentInstructionMemoryItem = (
+  instruction: BlockLoopInstructionLoadDTO,
+  sourceRevision: string,
+): MemoryListItem<ComponentMemoryListPayload> => {
+  const sourceItemKey = componentInstructionSourceKey(instruction);
+  return {
+    key: `COMPONENT:${sourceItemKey}`,
+    sourceKind: 'COMPONENT',
+    sourceItemKey,
+    label: `(${instruction.id})${instructionDisplayLabel(instruction) || instruction.actions || 'Instruction'}`,
+    detail: `Component block #${instruction.blockOrderNumber} ${instruction.blockName}`,
+    icon: instructionMemoryIcon(instruction),
+    active: instruction.instructionActive !== false,
+    payload: {
+      kind: 'INSTRUCTION',
+      componentInstructionId: instruction.id,
+      componentBlockId: instruction.blockId,
+      sourceRevision,
+    },
+  };
+};
+
+export const componentBlockMemoryItem = (
+  instructions: BlockLoopInstructionLoadDTO[],
+  sourceRevision: string,
+): MemoryListItem<ComponentMemoryListPayload> | null => {
+  const first = instructions[0];
+  if (!first) return null;
+  const sourceItemKey = `BLOCK:${first.homeBankingId}:${first.blockId}`;
+  return {
+    key: `COMPONENT:${sourceItemKey}`,
+    sourceKind: 'COMPONENT',
+    sourceItemKey,
+    label: first.blockName || `Component block ${first.blockId}`,
+    detail: `Whole component block (${instructions.length} instruction${instructions.length === 1 ? '' : 's'})`,
+    icon: 'default',
+    active: first.blockActive !== false,
+    payload: {
+      kind: 'BLOCK',
+      componentBlockId: first.blockId,
+      sourceRevision,
+    },
+  };
+};

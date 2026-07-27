@@ -10,9 +10,10 @@ import CreateNewBlock, {
   type CreateBlockPosition,
 } from './CreateNewBlock';
 import DetachedPageShell from './DetachedPageShell';
-import type {
-  MemoryListItemIcon,
-  MemoryListSnapshot,
+import {
+  memoryListRequiresTargetBlock,
+  type MemoryListItemIcon,
+  type MemoryListSnapshot,
 } from './memoryList.contract';
 import PagesOpenButton from './PagesOpenButton';
 import { useWebSocket } from './useWebSocket';
@@ -295,10 +296,12 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose,
   }, []);
 
   const sourceLabel = snapshot.sourceKind === 'MIXED'
-    ? 'Bot Job instructions + Page Scanner elements'
+    ? 'Bot Job instructions + Page Scanner elements + reusable Components'
     : snapshot.sourceKind === 'PAGE_SCANNER'
       ? 'Page Scanner elements'
-      : 'Bot Job instructions';
+      : snapshot.sourceKind === 'COMPONENT'
+        ? 'Reusable Component instructions'
+        : 'Bot Job instructions';
   const statusText = localStatus
     || snapshot.status
     || (connected ? 'Memory List ready' : 'Connecting to Memory List...');
@@ -307,9 +310,10 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose,
     : snapshot.busy
       ? styles.statusWarn
       : styles.statusOk;
+  const targetBlockRequired = memoryListRequiresTargetBlock(snapshot.items);
   const applyDisabled = snapshot.busy
     || snapshot.canApply === false
-    || snapshot.targetBlockId === null
+    || (targetBlockRequired && snapshot.targetBlockId === null)
     || snapshot.items.length === 0;
 
   return (

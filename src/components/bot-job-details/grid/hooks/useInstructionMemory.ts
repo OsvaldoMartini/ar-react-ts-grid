@@ -1,7 +1,19 @@
 import { useRef, useState } from 'react';
 import { BlockLoopInstructionLoadDTO } from '../../../instructionsMockData';
 import { CreateBlockOption } from '../../../CreateNewBlock';
-import { blockOptionsFromInstructions } from '../domain/memoryOptions';
+import type {
+  ComponentMemoryListPayload,
+  MemoryListItem,
+} from '../../../memoryList.contract';
+import {
+  blockOptionsFromInstructions,
+  componentBlockMemoryItem,
+  componentInstructionMemoryItem,
+} from '../domain/memoryOptions';
+import {
+  BOT_JOB_INSTRUCTION_GRID_POLICY,
+  type InstructionGridWorkspacePolicy,
+} from '../instructionGrid.policy';
 
 /** Per-instruction Memory-List capability flags, keyed by instruction id. */
 export type MemoryCapability = {
@@ -21,6 +33,9 @@ export type PendingMemoryMove = { requestId: string; ids: Set<number> } | null;
 export interface UseInstructionMemory {
   memorySteps: BlockLoopInstructionLoadDTO[];
   setMemorySteps: React.Dispatch<React.SetStateAction<BlockLoopInstructionLoadDTO[]>>;
+  componentMemoryItems: MemoryListItem<ComponentMemoryListPayload>[];
+  setComponentMemoryItems: React.Dispatch<React.SetStateAction<MemoryListItem<ComponentMemoryListPayload>[]>>;
+  memoryItemCount: number;
   memoryTargetBlockId: number | null;
   setMemoryTargetBlockId: React.Dispatch<React.SetStateAction<number | null>>;
   memoryBlockOptions: CreateBlockOption[];
@@ -43,11 +58,14 @@ export interface UseInstructionMemory {
   /** Ask the detached Memory List to (re)open; bumps the open version the sync effect watches. */
   requestMemoryListOpen: () => void;
   /** Add a single eligible instruction to the Memory List and request it opens. */
-  handleAddToMemory: (instruction: BlockLoopInstructionLoadDTO) => void;
+  handleAddToMemory: (instruction: BlockLoopInstructionLoadDTO, sourceRevision?: string) => void;
   /** Add every eligible instruction in a block to the Memory List. */
-  handleAddBlockToMemory: (instructions: BlockLoopInstructionLoadDTO[]) => void;
+  handleAddBlockToMemory: (instructions: BlockLoopInstructionLoadDTO[], sourceRevision?: string) => void;
+  /** Stage one complete reusable component block. Never injects directly. */
+  handleStageComponentBlock: (instructions: BlockLoopInstructionLoadDTO[], sourceRevision: string) => void;
   /** Remove one memorized step by instruction id. */
   handleRemoveFromMemory: (id: number) => void;
+  handleRemoveComponentMemoryItem: (sourceItemKey: string) => void;
 }
 
 /**
@@ -62,11 +80,15 @@ export interface UseInstructionMemory {
  */
 export function useInstructionMemory(
   data: BlockLoopInstructionLoadDTO[],
+  policy: InstructionGridWorkspacePolicy = BOT_JOB_INSTRUCTION_GRID_POLICY,
 ): UseInstructionMemory {
   const [memorySteps, setMemorySteps] = useState<BlockLoopInstructionLoadDTO[]>([]);
+  const [componentMemoryItems, setComponentMemoryItems] = useState<
+    MemoryListItem<ComponentMemoryListPayload>[]
+  >([]);
   const [memoryTargetBlockId, setMemoryTargetBlockId] = useState<number | null>(null);
   const [memoryBlockOptions, setMemoryBlockOptions] = useState<CreateBlockOption[]>(
-    blockOptionsFromInstructions(data),
+    policy.kind === 'COMPONENT' ? [] : blockOptionsFromInstructions(data),
   );
   const [createBlockOpen, setCreateBlockOpen] = useState<boolean>(false);
   const [memoryCapabilities, setMemoryCapabilities] = useState<Map<number, MemoryCapability>>(
@@ -88,18 +110,52 @@ export function useInstructionMemory(
     setMemoryListOpenVersion((version) => version + 1);
   };
 
-  const handleAddToMemory = (instruction: BlockLoopInstructionLoadDTO) => {
+  const addComponentItems = (items: MemoryListItem<ComponentMemoryListPayload>[]) => {
+    setComponentMemoryItems((previous) => {
+      const seen = new Set(previous.map((item) => item.sourceItemKey));
+      return [
+        ...previous,
+        ...items.filter((item) => {
+          if (seen.has(item.sourceItemKey)) return false;
+          seen.add(item.sourceItemKey);
+          return true;
+        }),
+      ];
+    });
+  };
+
+  const handleAddToMemory = (
+    instruction: BlockLoopInstructionLoadDTO,
+    sourceRevision = '',
+  ) => {
     if (!memoryCapabilities.get(instruction.id)?.canAdd) return;
+    if (policy.kind === 'COMPONENT') {
+      if (!sourceRevision.trim()) return;
+      addComponentItems([componentInstructionMemoryItem(instruction, sourceRevision)]);
+      requestMemoryListOpen();
+      return;
+    }
     setMemorySteps((prev) =>
       prev.some((step) => step.id === instruction.id) ? prev : [...prev, instruction],
     );
     requestMemoryListOpen();
   };
 
-  const handleAddBlockToMemory = (instructions: BlockLoopInstructionLoadDTO[]) => {
+  const handleAddBlockToMemory = (
+    instructions: BlockLoopInstructionLoadDTO[],
+    sourceRevision = '',
+  ) => {
     const eligible = instructions.filter(
       (instruction) => memoryCapabilities.get(instruction.id)?.canAdd,
     );
+    if (policy.kind === 'COMPONENT') {
+      if (!sourceRevision.trim()) return;
+      addComponentItems(
+        eligible.map((instruction) => componentInstructionMemoryItem(instruction, sourceRevision)),
+      );
+      if (eligible.length > 0) requestMemoryListOpen();
+      return;
+    }
     setMemorySteps((prev) => {
       const seen = new Set(prev.map((step) => step.id));
       const next = [...prev];
@@ -114,13 +170,33 @@ export function useInstructionMemory(
     requestMemoryListOpen();
   };
 
+  const handleStageComponentBlock = (
+    instructions: BlockLoopInstructionLoadDTO[],
+    sourceRevision: string,
+  ) => {
+    if (policy.kind !== 'COMPONENT' || !sourceRevision.trim()) return;
+    const item = componentBlockMemoryItem(instructions, sourceRevision);
+    if (!item) return;
+    addComponentItems([item]);
+    requestMemoryListOpen();
+  };
+
   const handleRemoveFromMemory = (id: number) => {
     setMemorySteps((prev) => prev.filter((step) => step.id !== id));
+  };
+
+  const handleRemoveComponentMemoryItem = (sourceItemKey: string) => {
+    setComponentMemoryItems((previous) =>
+      previous.filter((item) => item.sourceItemKey !== sourceItemKey)
+    );
   };
 
   return {
     memorySteps,
     setMemorySteps,
+    componentMemoryItems,
+    setComponentMemoryItems,
+    memoryItemCount: policy.kind === 'COMPONENT' ? componentMemoryItems.length : memorySteps.length,
     memoryTargetBlockId,
     setMemoryTargetBlockId,
     memoryBlockOptions,
@@ -142,6 +218,8 @@ export function useInstructionMemory(
     requestMemoryListOpen,
     handleAddToMemory,
     handleAddBlockToMemory,
+    handleStageComponentBlock,
     handleRemoveFromMemory,
+    handleRemoveComponentMemoryItem,
   };
 }

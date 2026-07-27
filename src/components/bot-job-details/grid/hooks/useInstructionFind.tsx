@@ -2,7 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { BlockLoopInstructionLoadDTO } from '../../../instructionsMockData';
 import { instructionDisplayLabel } from '../../../instructionDisplay';
 // The highlight `<mark>` keeps GridItem's `.findHighlight` styling.
-import styles from '../../../GridItem.module.scss';
+import styles from '../../../Griditem.module.scss';
 
 /**
  * Pure predicate: does an instruction match the (already lower-cased) find query,

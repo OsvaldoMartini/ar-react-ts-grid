@@ -14,6 +14,7 @@ type MoveContext = {
   botJobName: string | null;
   homeBankingId: number;
   targetSessionId: 'botJobTasks' | 'componentTasks';
+  moveType: 'ROW_MOVE' | 'COMPONENT_ROW_MOVE';
 };
 
 export const useInstructionDrag = (context: MoveContext) => useCallback((
@@ -25,7 +26,7 @@ export const useInstructionDrag = (context: MoveContext) => useCallback((
   const requestId = `${Date.now()}-${context.targetSessionId}-${requestLabel}`;
   try {
     context.webSocket.send(JSON.stringify({
-    type: 'ROW_MOVE',
+    type: context.moveType,
     requestId,
     graphRevision: context.graphRevision,
     botJobId: context.botJobId,

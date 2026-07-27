@@ -51,6 +51,10 @@ import {
   PRE_SCANNER_GRID_SESSION_ID,
   SCANNER_GRID_SESSION_ID,
 } from './components/scanner/Scanner.sessions';
+import {
+  normalizeWorkspaceBlocks,
+  type WorkspaceBlock,
+} from './components/bot-job-details/grid/domain/workspaceBlocks';
 
 // Initialize the root
 const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
@@ -58,6 +62,7 @@ const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement)
 const App: React.FC = () => {
   const [instructionsData, setInstructionsData] = useState<BlockLoopInstructionLoadDTO[]>([]);
   const [componentsData, setComponentsData] = useState<ComponentsInstructionsDTO[]>([]);
+  const [componentBlocks, setComponentBlocks] = useState<WorkspaceBlock[]>([]);
   const [elementDTO, setElementDTO] = useState<ElementDTO[]>(elementsDTOMockData);
   const [botJobData, setBotJobData] = useState<BotJobData>(botJobMockData);
   const [socketPort, setSocketPort] = useState<number>(0);
@@ -127,6 +132,7 @@ const App: React.FC = () => {
     // label, or identity from the previous target can flash in the reused panel.
     setInstructionsData([]);
     setComponentsData([]);
+    setComponentBlocks([]);
     setElementDTO([]);
     setBotJobId(target.botJobId);
     setBotJobName('');
@@ -166,6 +172,7 @@ const App: React.FC = () => {
     // Reset all identity-bearing shell state and key-remount the page before it bootstraps.
     setInstructionsData([]);
     setComponentsData([]);
+    setComponentBlocks([]);
     setElementDTO([]);
     setHomeBanking(target.homeBankingId);
     setHomeBankName('');
@@ -345,12 +352,22 @@ const App: React.FC = () => {
         // keep your resets
         setInstructionsData([] as BlockLoopInstructionLoadDTO[]);
         setComponentsData([] as BlockLoopInstructionLoadDTO[]);
+        setComponentBlocks([]);
         setElementDTO([] as ElementDTO[]);
 
         if (Array.isArray(dataLoad) && dataLoad.length > 0 && sessionIdFromJava.includes("botJobTasks")) {
           setInstructionsData(dataLoad as BlockLoopInstructionLoadDTO[]);
+        } else if (
+          sessionIdFromJava.includes("componentTasks")
+          && !Array.isArray(dataLoad)
+          && Array.isArray(dataLoad?.instructions)
+        ) {
+          setComponentsData(dataLoad.instructions as ComponentsInstructionsDTO[]);
+          setComponentBlocks(normalizeWorkspaceBlocks(
+            Array.isArray(dataLoad.blocks) ? dataLoad.blocks : [],
+          ));
         } else if (Array.isArray(dataLoad) && dataLoad.length > 0 && sessionIdFromJava.includes("componentTasks")) {
-          setComponentsData(dataLoad as BlockLoopInstructionLoadDTO[]);
+          setComponentsData(dataLoad as ComponentsInstructionsDTO[]);
         } else if (
           Array.isArray(dataLoad)
           && dataLoad.length > 0
@@ -452,6 +469,7 @@ const App: React.FC = () => {
           key={`${botJobWorkspaceKey}:components`}
           homeBankingIdInitial={homeBanking}
           dataComp={componentsData}
+          blocksComp={componentBlocks}
           socketPort={socketPort}
           sessionId={sessionId}
           botJobIdInitial={botJobId}

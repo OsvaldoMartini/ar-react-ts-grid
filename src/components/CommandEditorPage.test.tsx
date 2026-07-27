@@ -53,11 +53,13 @@ const snapshotBody = ({
   bindingEpoch = 'binding-1',
   selectionRevision = 1,
   selectedInstruction = loginWait,
+  targetSessionId = 'botJobTasks',
   requestId,
 }: {
   bindingEpoch?: string;
   selectionRevision?: number;
   selectedInstruction?: typeof loginWait;
+  targetSessionId?: 'botJobTasks' | 'componentTasks';
   requestId?: string;
 } = {}) => ({
   ok: true,
@@ -65,7 +67,7 @@ const snapshotBody = ({
   ...(requestId ? { requestId } : {}),
   bindingEpoch,
   selectionRevision,
-  targetSessionId: 'botJobTasks',
+  targetSessionId,
   workspaceEpoch: 41,
   homeBankingId: 2,
   botJobId: 5,
@@ -145,6 +147,23 @@ test('hydrates the complete first workspace snapshot without a child bootstrap',
   expect(screen.getByRole('button', { name: /Add command before/ })).toBeEnabled();
   expect(requests('commandEditor.workspaceBootstrap')).toHaveLength(1);
   expect(requests('commandEditor.bootstrap')).toHaveLength(0);
+});
+
+test('hydrates an authoritative Components instruction workspace', async () => {
+  mockMessages = [
+    envelope('commandEditor.workspaceBootstrapResponse', snapshotBody({
+      requestId: BOOTSTRAP_REQUEST_ID,
+      targetSessionId: 'componentTasks',
+    })),
+  ];
+
+  render(
+    <CommandEditorPage socketPort={7357} sessionId="commandEditorManager" />,
+  );
+
+  expect(await screen.findByLabelText('Command Editor Instruction')).toHaveValue('21');
+  expect(screen.getByText('3 instructions loaded')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /Add command before/ })).toBeEnabled();
 });
 
 test('selects another instruction once and ignores stale select and snapshot responses', async () => {
