@@ -307,6 +307,7 @@ const VariablesPage: React.FC<Props> = ({
   const [expandedIds, setExpandedIds] = useState<Set<number>>(() => new Set());
   const [findText, setFindText] = useState('');
   const [healthFilter, setHealthFilter] = useState<HealthFilter>('ALL');
+  const [blockFilter, setBlockFilter] = useState<'ALL' | number>('ALL');
   const [status, setStatus] = useState<Status>({
     level: 'warn',
     text: 'Waiting for Variables workspace',
@@ -504,9 +505,25 @@ const VariablesPage: React.FC<Props> = ({
           : healthFilter === 'UNUSED'
             ? variable.unused
             : variable.health === healthFilter);
-      return healthMatches && (!query || variableSearchText(variable).includes(query));
+      // A variable belongs to a block through its owning Web Field OR any linked command.
+      const blockMatches = blockFilter === 'ALL'
+        || variable.owner?.blockId === blockFilter
+        || variable.commands.some(command => command.blockId === blockFilter);
+      return healthMatches
+        && blockMatches
+        && (!query || variableSearchText(variable).includes(query));
     });
-  }, [findText, healthFilter, snapshot?.variables]);
+  }, [blockFilter, findText, healthFilter, snapshot?.variables]);
+
+  useEffect(() => {
+    if (
+      blockFilter !== 'ALL'
+      && snapshot
+      && !snapshot.blocks.some(candidate => candidate.id === blockFilter)
+    ) {
+      setBlockFilter('ALL');
+    }
+  }, [blockFilter, snapshot]);
 
   useEffect(() => {
     if (
@@ -655,6 +672,24 @@ const VariablesPage: React.FC<Props> = ({
                 </button>
               ))}
             </div>
+            <label className={styles.blockFilterControl}>
+              <span className={styles.srOnly}>Filter variables by block</span>
+              <select
+                value={blockFilter === 'ALL' ? 'ALL' : String(blockFilter)}
+                title="Show only variables whose Web Element owner or linked commands belong to this block"
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setBlockFilter(value === 'ALL' ? 'ALL' : Number(value));
+                }}
+              >
+                <option value="ALL">All blocks</option>
+                {(snapshot?.blocks ?? []).map(candidate => (
+                  <option key={candidate.id} value={String(candidate.id)}>
+                    {`#${candidate.order ?? candidate.id} ${candidate.name}`}
+                  </option>
+                ))}
+              </select>
+            </label>
             <div className={styles.expandActions}>
               <button
                 type="button"

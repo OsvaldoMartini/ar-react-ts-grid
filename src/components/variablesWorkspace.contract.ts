@@ -1,3 +1,5 @@
+import { buildVariableRelationshipGraph } from './variablesGraph';
+
 export const VARIABLES_MANAGER_SESSION_ID = 'variablesManager';
 
 export type VariableCommandRole =
@@ -442,8 +444,17 @@ export const normalizeVariablesWorkspaceSnapshot = (
   const root = asObject(parseJsonValue(payload));
   if (!root) return null;
   const nestedSnapshot = asObject(parseJsonValue(root.snapshot));
-  const candidate = nestedSnapshot ?? root;
+  let candidate = nestedSnapshot ?? root;
   if (candidate.ok !== true) return null;
+
+  // RAW_FACTS_V1: Java supplies only raw blocks/variables/commands; the semantic
+  // graph (roles, edges, diagnostics, summary) is computed here in React, which is
+  // the source of truth for variable-flow verification.
+  if (candidate.graphKind === 'RAW_FACTS_V1') {
+    const derived = buildVariableRelationshipGraph(candidate);
+    if (!derived) return null;
+    candidate = { ...candidate, ...derived };
+  }
 
   const botJob = normalizeBotJob(root, candidate);
   if (!botJob) return null;

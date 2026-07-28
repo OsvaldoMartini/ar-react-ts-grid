@@ -253,6 +253,30 @@
   gap: 5px;
 }
 
+.blockFilterControl {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.blockFilterControl select {
+  max-width: 220px;
+  min-height: 27px;
+  padding: 2px 7px;
+  border: 1px solid #c6d3e2;
+  border-radius: 5px;
+  background: #ffffff;
+  color: #1f2937;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.blockFilterControl select:focus {
+  outline: 0;
+  border-color: #2b6cad;
+  box-shadow: 0 0 0 2px rgba(43, 108, 173, 0.13);
+}
+
 .filterButtons button,
 .expandActions button {
   min-height: 27px;
