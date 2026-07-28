@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import DetachedPageShell from './DetachedPageShell';
 import PagesOpenButton from './PagesOpenButton';
+import SearchBox, { type SearchBoxOption } from './SearchBox';
 import { useWebSocket } from './useWebSocket';
 import {
   normalizeVariablesWorkspaceSnapshot,
@@ -235,54 +236,79 @@ const VariableTreeRow: React.FC<{
   expanded,
   onSelect,
   onToggle,
-}) => (
-  <article className={`${styles.treeItem} ${selected ? styles.treeItemSelected : ''}`}>
-    <div className={styles.treeItemRow}>
-      <button
-        type="button"
-        className={styles.treeToggle}
-        aria-label={`${expanded ? 'Collapse' : 'Expand'} ${variable.name}`}
-        aria-expanded={expanded}
-        onClick={onToggle}
-      >
-        <ChevronDown
-          size={16}
-          aria-hidden="true"
-          className={expanded ? '' : styles.chevronClosed}
-        />
-      </button>
-      <button type="button" className={styles.treeSelect} onClick={onSelect}>
-        <span className={styles.treeIdentity}>
-          <strong title={variable.name}>{variable.name}</strong>
-          <small>{variable.type || 'Variable'} · ID {variable.id}</small>
-        </span>
-        <span className={`${styles.healthBadge} ${healthTone(variable.health)}`}>
-          {healthLabel(variable.health)}
-        </span>
-      </button>
-    </div>
-    {expanded && (
-      <button type="button" className={styles.treeDetails} onClick={onSelect}>
-        <span>
-          <b>Owner</b>
-          {variable.owner?.name || 'Missing owner'}
-        </span>
-        <span>
-          <b>GET</b>
-          {variable.producers.length}
-        </span>
-        <span>
-          <b>Reads</b>
-          {variable.consumers.length}
-        </span>
-        <span>
-          <b>SET</b>
-          {variable.literalAssignments.length}
-        </span>
-      </button>
-    )}
-  </article>
-);
+}) => {
+  const ownerBlockLabel = variable.owner
+    ? `#${variable.owner.blockOrder ?? variable.owner.blockId ?? '?'} ${variable.owner.blockName || 'Block'}`
+    : 'No owner block';
+  // Commands may legitimately read/check the variable from other blocks.
+  const extraBlockCount = new Set(
+    variable.commands
+      .map(command => command.blockId)
+      .filter((blockId): blockId is number =>
+        blockId != null && blockId !== variable.owner?.blockId),
+  ).size;
+  return (
+    <article className={`${styles.treeItem} ${selected ? styles.treeItemSelected : ''}`}>
+      <div className={styles.treeItemRow}>
+        <button
+          type="button"
+          className={styles.treeToggle}
+          aria-label={`${expanded ? 'Collapse' : 'Expand'} ${variable.name}`}
+          aria-expanded={expanded}
+          onClick={onToggle}
+        >
+          <ChevronDown
+            size={16}
+            aria-hidden="true"
+            className={expanded ? '' : styles.chevronClosed}
+          />
+        </button>
+        <button type="button" className={styles.treeSelect} onClick={onSelect}>
+          <span className={styles.treeIdentity}>
+            <strong title={variable.name}>{variable.name}</strong>
+            <small>{variable.type || 'Variable'} · ID {variable.id}</small>
+            <span
+              className={styles.treeBlockChip}
+              title={extraBlockCount > 0
+                ? `Owner block ${ownerBlockLabel}; commands span ${extraBlockCount} other block(s)`
+                : `Owner block ${ownerBlockLabel}`}
+            >
+              {ownerBlockLabel}
+              {extraBlockCount > 0 ? ` +${extraBlockCount}` : ''}
+            </span>
+          </span>
+          <span className={`${styles.healthBadge} ${healthTone(variable.health)}`}>
+            {healthLabel(variable.health)}
+          </span>
+        </button>
+      </div>
+      {expanded && (
+        <button type="button" className={styles.treeDetails} onClick={onSelect}>
+          <span>
+            <b>Block</b>
+            {ownerBlockLabel}
+          </span>
+          <span>
+            <b>Owner</b>
+            {variable.owner?.name || 'Missing owner'}
+          </span>
+          <span>
+            <b>GET</b>
+            {variable.producers.length}
+          </span>
+          <span>
+            <b>Reads</b>
+            {variable.consumers.length}
+          </span>
+          <span>
+            <b>SET</b>
+            {variable.literalAssignments.length}
+          </span>
+        </button>
+      )}
+    </article>
+  );
+};
 
 const VariablesPage: React.FC<Props> = ({
   socketPort,
@@ -525,6 +551,27 @@ const VariablesPage: React.FC<Props> = ({
     }
   }, [blockFilter, snapshot]);
 
+  const blockSearchOptions = useMemo<SearchBoxOption[]>(() => {
+    const counts = new Map<number, number>();
+    (snapshot?.variables ?? []).forEach((variable) => {
+      const blockIds = new Set<number>();
+      if (variable.owner?.blockId != null) blockIds.add(variable.owner.blockId);
+      variable.commands.forEach((command) => {
+        if (command.blockId != null) blockIds.add(command.blockId);
+      });
+      blockIds.forEach(blockId => counts.set(blockId, (counts.get(blockId) ?? 0) + 1));
+    });
+    return (snapshot?.blocks ?? []).map(candidate => ({
+      value: String(candidate.id),
+      label: `#${candidate.order ?? candidate.id} ${candidate.name}`,
+      sublabel: `${counts.get(candidate.id) ?? 0} variable link(s) · block ID ${candidate.id}`,
+      badges: [candidate.active === false
+        ? { text: 'INACTIVE', tone: 'red' as const }
+        : { text: 'ACTIVE', tone: 'green' as const }],
+      keywords: String(candidate.id),
+    }));
+  }, [snapshot?.blocks, snapshot?.variables]);
+
   useEffect(() => {
     if (
       selectedVariableId === null
@@ -672,24 +719,16 @@ const VariablesPage: React.FC<Props> = ({
                 </button>
               ))}
             </div>
-            <label className={styles.blockFilterControl}>
-              <span className={styles.srOnly}>Filter variables by block</span>
-              <select
-                value={blockFilter === 'ALL' ? 'ALL' : String(blockFilter)}
-                title="Show only variables whose Web Element owner or linked commands belong to this block"
-                onChange={(event) => {
-                  const value = event.target.value;
-                  setBlockFilter(value === 'ALL' ? 'ALL' : Number(value));
-                }}
-              >
-                <option value="ALL">All blocks</option>
-                {(snapshot?.blocks ?? []).map(candidate => (
-                  <option key={candidate.id} value={String(candidate.id)}>
-                    {`#${candidate.order ?? candidate.id} ${candidate.name}`}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <SearchBox
+              label="Block"
+              placeholder="Search block name or number..."
+              headerRight="Variables per block"
+              countLabel={count => `${count} BLOCK${count === 1 ? '' : 'S'}`}
+              allOptionLabel="All blocks"
+              options={blockSearchOptions}
+              value={blockFilter === 'ALL' ? null : String(blockFilter)}
+              onChange={value => setBlockFilter(value === null ? 'ALL' : Number(value))}
+            />
             <div className={styles.expandActions}>
               <button
                 type="button"
