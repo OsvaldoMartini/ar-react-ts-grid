@@ -123,6 +123,10 @@
       justify-content: center;
       margin-top: 12px;
 
+      > button {
+        min-height: 38px;
+      }
+
       .confirm-btn {
         background-color: #d32f2f;
         color: white;
