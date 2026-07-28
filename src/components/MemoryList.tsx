@@ -13,11 +13,12 @@ import ConfirmationDialog from './ConfirmationDialog';
 import DetachedPageShell from './DetachedPageShell';
 import {
   memoryListRequiresTargetBlock,
+  type MemoryListItem,
   type MemoryListItemIcon,
   type MemoryListSnapshot,
 } from './memoryList.contract';
-import { reorderMemoryItemsAsGroups } from './memoryList.groups';
 import PagesOpenButton from './PagesOpenButton';
+import { useMemoryListDrag } from './useMemoryListDrag';
 import { useWebSocket } from './useWebSocket';
 import styles from './MemoryList.module.scss';
 
@@ -350,106 +351,26 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose,
     }
   };
 
-  // Native HTML5 drag & drop — no react-beautiful-dnd. rbd depends on
-  // requestAnimationFrame, which the browser pauses for hidden/occluded tabs, so
-  // its drag silently died there. Plain draggable rows work in any tab state and
-  // are trivially observable. dragIndexRef is the row being carried; overIndex is
-  // the row it is hovering, used only for the drop-target highlight.
-  const dragIndexRef = useRef<number | null>(null);
-  const [overIndex, setOverIndex] = useState<number | null>(null);
-
-  // Pure reorder core: move the row at `from` to `to`, optimistically update the
-  // snapshot, and send REORDER. Every step logs to [MemoryList][drag]. Also exposed
-  // as window.__mlReorder(from, to) so the whole pipeline can be triggered/verified
-  // without a physical drag (e.g. in an occluded tab or an automated test).
-  const reorderByIndex = useCallback((from: number, to: number) => {
-    const items = snapshot.items;
-    console.log(`[MemoryList][drag] REORDER requested ${from} -> ${to}`, {
-      itemCount: items.length,
-      busy: snapshot.busy,
-      order: items.map(item => item.key),
-    });
-    if (snapshot.busy || pendingCommandRef.current) {
-      console.warn('[MemoryList][drag] blocked: list is busy');
-      return false;
-    }
-    if (
-      from < 0 || to < 0
-      || from >= items.length || to >= items.length
-      || from === to
-    ) {
-      console.warn('[MemoryList][drag] no-op reorder (same slot or out of range)', { from, to });
-      return false;
-    }
-    const previousOrder = items.map(item => item.key);
-    const groupReorder = reorderMemoryItemsAsGroups(items, from, to);
-    if (!groupReorder.ok) {
-      console.warn('[MemoryList][drag] blocked:', groupReorder.reason, { from, to });
-      return false;
-    }
-    const nextItems = groupReorder.items;
-    const movedItem = items[from];
-    setSnapshot(current => ({ ...current, items: nextItems }));
+  // The detached Memory List owns its native drag lifecycle. Stable row keys make
+  // it safe when an authoritative realtime snapshot arrives during a drag.
+  const commitMemoryReorder = useCallback((nextItems: MemoryListItem[]) => {
     const orderedItemKeys = nextItems.map(item => item.key);
-    console.log(
-      `[MemoryList][drag] REORDERED "${movedItem.label}" ${from} -> ${to}; `
-        + `moved ${groupReorder.movedCount} connected row(s); sending REORDER command`,
-      { previousOrder, orderedItemKeys, movedCount: groupReorder.movedCount },
-    );
-    sendCommand({ action: 'REORDER', orderedItemKeys });
+    if (!sendCommand({ action: 'REORDER', orderedItemKeys })) return false;
+    setSnapshot(current => ({ ...current, items: nextItems }));
     return true;
-  }, [sendCommand, snapshot.busy, snapshot.items]);
-
-  // Diagnostic hook: window.__mlReorder(from, to) reorders without a physical drag.
-  useEffect(() => {
-    (window as any).__mlReorder = reorderByIndex;
-    return () => {
-      if ((window as any).__mlReorder === reorderByIndex) delete (window as any).__mlReorder;
-    };
-  }, [reorderByIndex]);
-
-  const handleRowDragStart = useCallback((index: number, event: React.DragEvent) => {
-    if (snapshot.busy) {
-      event.preventDefault();
-      return;
-    }
-    dragIndexRef.current = index;
-    setOverIndex(index);
-    try {
-      event.dataTransfer.effectAllowed = 'move';
-      event.dataTransfer.setData('text/plain', String(index)); // Firefox needs a payload
-    } catch {
-      // Some environments restrict dataTransfer; the ref still carries the index.
-    }
-    const label = snapshot.items[index]?.label ?? index;
-    console.log(`[MemoryList][drag] GRABBED "${label}" at index ${index}`);
-  }, [snapshot.busy, snapshot.items]);
-
-  const handleRowDragOver = useCallback((index: number, event: React.DragEvent) => {
-    event.preventDefault(); // required to allow a drop
-    event.dataTransfer.dropEffect = 'move';
-    if (overIndex !== index) {
-      setOverIndex(index);
-      console.log(`[MemoryList][drag] MOVE over index ${index}`);
-    }
-  }, [overIndex]);
-
-  const handleRowDrop = useCallback((index: number, event: React.DragEvent) => {
-    event.preventDefault();
-    const from = dragIndexRef.current;
-    console.log(`[MemoryList][drag] DROP on index ${index} (carrying ${from})`);
-    if (from !== null) reorderByIndex(from, index);
-    dragIndexRef.current = null;
-    setOverIndex(null);
-  }, [reorderByIndex]);
-
-  const handleRowDragEnd = useCallback(() => {
-    if (dragIndexRef.current !== null) {
-      console.log('[MemoryList][drag] RELEASED without a valid drop target — no reorder');
-    }
-    dragIndexRef.current = null;
-    setOverIndex(null);
-  }, []);
+  }, [sendCommand]);
+  const {
+    overItemKey,
+    handleRowDragStart,
+    handleRowDragOver,
+    handleRowDrop,
+    handleRowDragEnd,
+  } = useMemoryListDrag({
+    items: snapshot.items,
+    busy: snapshot.busy || pendingAction !== null,
+    onReorder: commitMemoryReorder,
+    onRefusal: setLocalStatus,
+  });
 
   const sourceLabel = snapshot.sourceKind === 'MIXED'
     ? 'Bot Job instructions + Page Scanner elements + reusable Components'
@@ -550,13 +471,13 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose,
                     key={item.key}
                     data-memory-item-key={item.key}
                     draggable={!uiBusy}
-                    onDragStart={event => handleRowDragStart(index, event)}
-                    onDragOver={event => handleRowDragOver(index, event)}
-                    onDrop={event => handleRowDrop(index, event)}
+                    onDragStart={event => handleRowDragStart(item.key, event)}
+                    onDragOver={event => handleRowDragOver(item.key, event)}
+                    onDrop={event => handleRowDrop(item.key, event)}
                     className={[
                       styles.item,
                       item.active === false ? styles.inactiveItem : '',
-                      overIndex === index ? styles.draggingItem : '',
+                      overItemKey === item.key ? styles.draggingItem : '',
                     ].filter(Boolean).join(' ')}
                   >
                     <button

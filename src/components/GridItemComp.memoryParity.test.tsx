@@ -345,9 +345,100 @@ test('component row drag commits with COMPONENT_ROW_MOVE after authoritative pre
       sessionId: 'componentTasks',
       graphRevision: 'component-revision-1',
     }));
+    expect(move.updatedRows).toEqual([
+      expect.objectContaining({ instructionId: 102, instructionOrderNumber: 1 }),
+      expect.objectContaining({ instructionId: 101, instructionOrderNumber: 2 }),
+    ]);
   });
   expect(mockSend.mock.calls.map(([payload]) => JSON.parse(payload).type))
     .not.toContain('ROW_MOVE');
+});
+
+test('component drag moves an authoritative connected family after the target row', async () => {
+  const third: ComponentsInstructionsDTO = {
+    ...first,
+    id: 103,
+    instructionOrderNumber: 3,
+    name: 'Middle',
+  };
+  const fourth: ComponentsInstructionsDTO = {
+    ...first,
+    id: 104,
+    instructionOrderNumber: 4,
+    name: 'Last',
+  };
+  const connectedProps = {
+    ...props,
+    dataComp: [first, second, third, fourth],
+  };
+  const view = render(<GridItemComp {...connectedProps} />);
+  await authorizeGrid(view, connectedProps, [], [44], true);
+  const capabilityResponse = mockMessages[0];
+
+  fireEvent.dragStart(
+    screen.getByLabelText('Move instruction 1').closest('[draggable]') as Element,
+  );
+  fireEvent.drop(
+    screen.getByLabelText('Move instruction 3').closest('[draggable]') as Element,
+  );
+
+  let previewRequestId = '';
+  await waitFor(() => {
+    const preview = mockSend.mock.calls
+      .map(([payload]) => JSON.parse(payload))
+      .find(message => message.type === 'instructionGraph.previewMove');
+    previewRequestId = JSON.parse(preview.body).requestId;
+    expect(previewRequestId).toBeTruthy();
+  });
+  mockMessages = [
+    capabilityResponse,
+    JSON.stringify({
+      sessionId: 'componentTasks',
+      operationId: 'instructionGraph.previewMoveResponse',
+      body: JSON.stringify({
+        ok: true,
+        requestId: previewRequestId,
+        groupRows: [
+          { id: 101, order: 1, name: 'Continue', action: 'CLICK' },
+          { id: 102, order: 2, name: 'Confirm', action: 'CLICK' },
+        ],
+      }),
+    }),
+  ];
+  view.rerender(<GridItemComp {...connectedProps} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Confirm' }));
+
+  await waitFor(() => {
+    const moves = mockSend.mock.calls
+      .map(([payload]) => JSON.parse(payload))
+      .filter(message => message.type === 'COMPONENT_ROW_MOVE');
+    expect(moves).toHaveLength(1);
+    expect(moves[0].updatedRows).toEqual([
+      expect.objectContaining({ instructionId: 103, instructionOrderNumber: 1 }),
+      expect.objectContaining({ instructionId: 101, instructionOrderNumber: 2 }),
+      expect.objectContaining({ instructionId: 102, instructionOrderNumber: 3 }),
+      expect.objectContaining({ instructionId: 104, instructionOrderNumber: 4 }),
+    ]);
+  });
+});
+
+test('component drag on another member of its connected family is a no-op', async () => {
+  const view = render(<GridItemComp {...props} />);
+  await authorizeGrid(view, props, [], [44], true);
+  mockSend.mockClear();
+
+  fireEvent.dragStart(
+    screen.getByLabelText('Move instruction 1').closest('[draggable]') as Element,
+  );
+  fireEvent.drop(
+    screen.getByLabelText('Move instruction 2').closest('[draggable]') as Element,
+  );
+
+  await new Promise(resolve => setTimeout(resolve, 0));
+  expect(mockSend.mock.calls.map(([payload]) => JSON.parse(payload).type))
+    .not.toContain('instructionGraph.previewMove');
+  expect(mockSend.mock.calls.map(([payload]) => JSON.parse(payload).type))
+    .not.toContain('COMPONENT_ROW_MOVE');
 });
 
 test('component row drag can target an authoritative empty component block', async () => {

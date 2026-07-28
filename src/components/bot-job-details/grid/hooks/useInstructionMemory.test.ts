@@ -245,7 +245,45 @@ describe('useInstructionMemory', () => {
       step => (step as typeof step & { dependencyGroupKey?: string }).dependencyGroupKey,
     );
     expect(new Set(groupKeys).size).toBe(1);
-    expect(groupKeys[0]).toContain('BOT_JOB:2:5:BLOCK:100|I:10,20,30');
+    expect(groupKeys[0]).toContain('BOT_JOB:2:5:I:10,20,30|B:');
+  });
+
+  it('keeps independent rows in one staged Bot Job block as separate draggable families', () => {
+    const rows = [1, 2, 3].map((id, index) => ({
+      ...ins(id, 100, 1),
+      homeBankingId: 2,
+      botJobId: 5,
+      instructionOrderNumber: index + 1,
+      name: `Independent ${id}`,
+    }));
+    const { result } = renderHook(() => useInstructionMemory(rows));
+    act(() => {
+      result.current.setMemoryCapabilities(new Map(rows.map(row => [
+        row.id,
+        capability([{
+          id: row.id,
+          order: row.instructionOrderNumber,
+          name: row.name,
+          action: row.actions,
+          parentId: null,
+          blockId: row.blockId,
+        }]),
+      ])));
+    });
+
+    act(() => {
+      result.current.handleAddBlockToMemory(rows, rows);
+    });
+
+    const groupKeys = result.current.memorySteps.map(
+      step => (step as typeof step & { dependencyGroupKey?: string }).dependencyGroupKey,
+    );
+    expect(new Set(groupKeys).size).toBe(3);
+    expect(groupKeys).toEqual([
+      expect.stringContaining('I:1|B:'),
+      expect.stringContaining('I:2|B:'),
+      expect.stringContaining('I:3|B:'),
+    ]);
   });
 
   it('refuses the whole Bot Job block when a fixed-point member capability is missing', () => {

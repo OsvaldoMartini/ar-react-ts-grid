@@ -84,6 +84,64 @@ beforeEach(() => {
   mockMessages = [];
 });
 
+test('connected drag emits one correlated REORDER command with the complete order', async () => {
+  mockMessages = [JSON.stringify({
+    operationId: 'memoryList.snapshot',
+    sessionId: 'memoryListManager',
+    body: JSON.stringify({
+      ownerEpoch: 'memory-owner-1',
+      sourceKind: 'BOT_JOB',
+      homeBankingId: 2,
+      botJobId: 5,
+      botJobName: 'Saldo Banca Stato',
+      items: [
+        {
+          key: 'BOT_JOB:field',
+          sourceKind: 'BOT_JOB',
+          sourceItemKey: 'field',
+          label: 'Field',
+          dependencyGroupKey: 'family-1',
+          payload: { instructionId: 21 },
+        },
+        {
+          key: 'BOT_JOB:get',
+          sourceKind: 'BOT_JOB',
+          sourceItemKey: 'get',
+          label: 'Get',
+          dependencyGroupKey: 'family-1',
+          payload: { instructionId: 22 },
+        },
+        {
+          key: 'BOT_JOB:other',
+          sourceKind: 'BOT_JOB',
+          sourceItemKey: 'other',
+          label: 'Other',
+          payload: { instructionId: 23 },
+        },
+      ],
+      blocks: [{ blockId: 7, blockOrderNumber: 1, blockName: 'Target' }],
+      targetBlockId: 7,
+      busy: false,
+      canApply: true,
+    }),
+  })];
+  render(<MemoryList socketPort={7357} sessionId="memoryListManager" />);
+  await screen.findByText('Field');
+
+  act(() => {
+    expect((window as any).__mlReorder(0, 2)).toBe(true);
+  });
+
+  const commands = memoryCommands();
+  expect(commands).toHaveLength(1);
+  expect(commands[0]).toEqual(expect.objectContaining({
+    action: 'REORDER',
+    ownerEpoch: 'memory-owner-1',
+    orderedItemKeys: ['BOT_JOB:other', 'BOT_JOB:field', 'BOT_JOB:get'],
+  }));
+  expect(commands[0].requestId).toMatch(/^memory-list-\d+-\d+-reorder$/);
+});
+
 test.each(['BOT_JOB', 'COMPONENT'] as const)(
   'sends only one correlated Apply while the %s command is pending',
   async (sourceKind) => {

@@ -450,14 +450,52 @@ export function useInstructionMemory(
       };
     }
 
-    const groupKey = dependencyGroupKey(
-      first,
-      `BLOCK:${first.blockId}|I:${[...unionById.keys()].sort((a, b) => a - b).join(',')}`,
+    // A staged Block is one apply selection, but it is not one draggable dependency
+    // family. Merge only overlapping backend-authorized families (union-find), so
+    // independent rows remain movable while transitive parent/child dependencies
+    // can never be separated.
+    const familyParent = new Map<number, number>(
+      ordered.map(instruction => [instruction.id, instruction.id]),
     );
-    if (!groupKey) {
+    const findFamily = (id: number): number => {
+      const parent = familyParent.get(id);
+      if (parent === undefined || parent === id) return id;
+      const root = findFamily(parent);
+      familyParent.set(id, root);
+      return root;
+    };
+    const unionFamily = (left: number, right: number) => {
+      const leftRoot = findFamily(left);
+      const rightRoot = findFamily(right);
+      if (leftRoot !== rightRoot) familyParent.set(rightRoot, leftRoot);
+    };
+    for (const instruction of ordered) {
+      const groupRows = memoryCapabilities.get(instruction.id)?.memoryGroupRows ?? [];
+      const groupIds = groupRows
+        .map(row => Number(row.id))
+        .filter(id => familyParent.has(id));
+      groupIds.slice(1).forEach(id => unionFamily(groupIds[0], id));
+    }
+    const familyIdsByRoot = new Map<number, number[]>();
+    ordered.forEach((instruction) => {
+      const root = findFamily(instruction.id);
+      const family = familyIdsByRoot.get(root) ?? [];
+      family.push(instruction.id);
+      familyIdsByRoot.set(root, family);
+    });
+    const dependencyKeyByInstructionId = new Map<number, string>();
+    familyIdsByRoot.forEach((ids) => {
+      ids.sort((left, right) => left - right);
+      const firstMember = unionById.get(ids[0]);
+      const groupKey = firstMember
+        ? dependencyGroupKey(firstMember, `I:${ids.join(',')}|B:`)
+        : undefined;
+      if (groupKey) ids.forEach(id => dependencyKeyByInstructionId.set(id, groupKey));
+    });
+    if (dependencyKeyByInstructionId.size !== ordered.length) {
       return {
         ok: false,
-        reason: 'The Bot Job Block dependency group is unavailable.',
+        reason: 'A Bot Job instruction dependency group is unavailable.',
       };
     }
     const groupIds = new Set(ordered.map((instruction) => instruction.id));
@@ -472,7 +510,7 @@ export function useInstructionMemory(
           .length;
       const grouped = ordered.map((instruction) => ({
         ...instruction,
-        dependencyGroupKey: groupKey,
+        dependencyGroupKey: dependencyKeyByInstructionId.get(instruction.id),
       }));
       return [
         ...remaining.slice(0, insertionIndex),

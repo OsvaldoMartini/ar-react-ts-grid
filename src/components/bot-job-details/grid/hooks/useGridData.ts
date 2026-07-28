@@ -7,6 +7,7 @@ import {
 import { CreateBlockOption, CreateBlockPosition } from '../../../CreateNewBlock';
 import { SaveComponentContext } from '../../../SaveComponentPanel';
 import { useInstructionDrag } from '../../../useInstructionDrag';
+import { useComponentInstructionDrag } from '../../../useComponentInstructionDrag';
 import {
   blockOptionsFromInstructions,
   normalizeBlockOptions,
@@ -279,10 +280,19 @@ export function useGridData(deps: UseGridDataDeps) {
     homeBankingIdInitial,
     botJobIdInitial,
   ]);
-  const submitInstructionMove = useInstructionDrag({
+  const submitBotJobInstructionMove = useInstructionDrag({
     webSocket, connected, graphRevision: moveGraphRevision, botJobId, botJobName,
     homeBankingId, targetSessionId, moveType: rowMoveVerb,
   });
+  const submitComponentInstructionMove = useComponentInstructionDrag({
+    webSocket, connected, graphRevision: moveGraphRevision, botJobId, botJobName,
+    homeBankingId,
+  });
+  // Keep the mutation transports private to their owning workspaces. In particular,
+  // Components never falls through the generic Bot Job ROW_MOVE sender.
+  const submitInstructionMove = workspaceKind === 'COMPONENT'
+    ? submitComponentInstructionMove
+    : submitBotJobInstructionMove;
 
   useEffect(() => {
     if (workspaceKind === 'COMPONENT') return;
@@ -470,14 +480,52 @@ export function useGridData(deps: UseGridDataDeps) {
     }
 
     const groupIds = new Set(previewRows.map(row => Number(row.id)));
-    const movedInstructions = sourceBlock.instructions.filter(instruction => groupIds.has(instruction.id));
+    const previewOrder = new Map(
+      previewRows.map((row, index) => [Number(row.id), index]),
+    );
+    const movedInstructions = sourceBlock.instructions
+      .filter(instruction => groupIds.has(instruction.id))
+      .sort((left, right) => (
+        (previewOrder.get(left.id) ?? Number.MAX_SAFE_INTEGER)
+        - (previewOrder.get(right.id) ?? Number.MAX_SAFE_INTEGER)
+      ));
     const sourceInstructions = sourceBlock.instructions.filter(instruction => !groupIds.has(instruction.id));
     if (movedInstructions.length !== groupIds.size) return;
     let updatedGroupedData = { ...groupedData };
     let deleteBlockId = -1;
 
     if (sourceBlockId === destinationBlockId) {
-      sourceInstructions.splice(destination.index, 0, ...movedInstructions);
+      if (workspaceKind === 'COMPONENT') {
+        const targetInstruction = sourceBlock.instructions[destination.index];
+        // Dropping on any row already carried by the authoritative family is a no-op.
+        if (targetInstruction && groupIds.has(targetInstruction.id)) return;
+
+        let insertionIndex = sourceInstructions.length;
+        if (targetInstruction) {
+          const targetCapability = memoryCapabilities.get(targetInstruction.id);
+          const targetUnitIds = new Set(
+            (targetCapability?.memoryGroupRows ?? [{ id: targetInstruction.id }])
+              .map(row => Number(row.id)),
+          );
+          const targetIndexes = sourceInstructions
+            .map((instruction, index) => (
+              targetUnitIds.has(instruction.id) ? index : -1
+            ))
+            .filter(index => index >= 0);
+          if (targetIndexes.length > 0) {
+            const sourceFirstIndex = sourceBlock.instructions.findIndex(
+              instruction => groupIds.has(instruction.id),
+            );
+            insertionIndex = sourceFirstIndex < destination.index
+              ? Math.max(...targetIndexes) + 1
+              : Math.min(...targetIndexes);
+          }
+        }
+        sourceInstructions.splice(insertionIndex, 0, ...movedInstructions);
+      } else {
+        // Accepted Bot Job behavior remains unchanged during the Components-first pass.
+        sourceInstructions.splice(destination.index, 0, ...movedInstructions);
+      }
       updatedGroupedData[sourceBlockId] = {
         ...sourceBlock,
         instructions: sourceInstructions.map((instruction, index) => ({
@@ -487,7 +535,22 @@ export function useGridData(deps: UseGridDataDeps) {
       };
     } else {
       const destinationInstructions = [...destinationBlock.instructions];
-      destinationInstructions.splice(destination.index, 0, ...movedInstructions);
+      let insertionIndex = destination.index;
+      if (workspaceKind === 'COMPONENT' && destinationInstructions[destination.index]) {
+        const targetInstruction = destinationInstructions[destination.index];
+        const targetCapability = memoryCapabilities.get(targetInstruction.id);
+        const targetUnitIds = new Set(
+          (targetCapability?.memoryGroupRows ?? [{ id: targetInstruction.id }])
+            .map(row => Number(row.id)),
+        );
+        const targetIndexes = destinationInstructions
+          .map((instruction, index) => (
+            targetUnitIds.has(instruction.id) ? index : -1
+          ))
+          .filter(index => index >= 0);
+        if (targetIndexes.length > 0) insertionIndex = Math.min(...targetIndexes);
+      }
+      destinationInstructions.splice(insertionIndex, 0, ...movedInstructions);
       updatedGroupedData[sourceBlockId] = {
         ...sourceBlock,
         instructions: sourceInstructions.map((instruction, index) => ({
@@ -528,6 +591,19 @@ export function useGridData(deps: UseGridDataDeps) {
       result.source?.index === result.destination.index
     ) {
       return;
+    }
+    if (
+      workspaceKind === 'COMPONENT'
+      && result.source?.droppableId === result.destination.droppableId
+    ) {
+      const instructionId = Number(result.draggableId);
+      const targetInstruction = groupedData[Number(result.destination.droppableId)]
+        ?.instructions[result.destination.index];
+      const sourceGroupIds = new Set(
+        (memoryCapabilities.get(instructionId)?.memoryGroupRows ?? [{ id: instructionId }])
+          .map(row => Number(row.id)),
+      );
+      if (targetInstruction && sourceGroupIds.has(targetInstruction.id)) return;
     }
     if (!webSocket || !connected || !moveGraphRevision) return;
     const requestId = `${Date.now()}-${targetSessionId}-move-preview`;
@@ -611,7 +687,10 @@ export function useGridData(deps: UseGridDataDeps) {
   };
 
   useEffect(() => {
-    (window as any).__gridReorder = (
+    const diagnosticHookName = workspaceKind === 'COMPONENT'
+      ? '__componentGridReorder'
+      : '__gridReorder';
+    const diagnosticReorder = (
       instructionId: number,
       destinationDroppableId: string,
       destinationIndex: number,
@@ -636,10 +715,13 @@ export function useGridData(deps: UseGridDataDeps) {
         destination: { droppableId: destinationDroppableId, index: destinationIndex },
       });
     };
+    (window as any)[diagnosticHookName] = diagnosticReorder;
     return () => {
-      delete (window as any).__gridReorder;
+      if ((window as any)[diagnosticHookName] === diagnosticReorder) {
+        delete (window as any)[diagnosticHookName];
+      }
     };
-  }, [groupedData, onDragEnd]);
+  }, [groupedData, onDragEnd, workspaceKind]);
 
   useEffect(() => {
     console.log("WebSocket Messages");
@@ -1861,7 +1943,20 @@ export function useGridData(deps: UseGridDataDeps) {
       .filter(row => row.blockId === instruction.blockId)
       .sort((left, right) => left.instructionOrderNumber - right.instructionOrderNumber);
     const sourceIndex = blockInstructions.findIndex(row => row.id === instructionId);
-    const destinationIndex = sourceIndex + (1);
+    let destinationIndex = sourceIndex + 1;
+    if (workspaceKind === 'COMPONENT') {
+      const groupIds = new Set(
+        (memoryCapabilities.get(instructionId)?.memoryGroupRows ?? [{ id: instructionId }])
+          .map(row => Number(row.id)),
+      );
+      const lastGroupIndex = blockInstructions.reduce(
+        (last, row, index) => (groupIds.has(row.id) ? index : last),
+        -1,
+      );
+      destinationIndex = blockInstructions.findIndex(
+        (row, index) => index > lastGroupIndex && !groupIds.has(row.id),
+      );
+    }
     if (sourceIndex < 0 || destinationIndex < 0 || destinationIndex >= blockInstructions.length) return;
     onDragEnd({
       draggableId: String(instructionId),
@@ -1877,7 +1972,21 @@ export function useGridData(deps: UseGridDataDeps) {
       .filter(row => row.blockId === instruction.blockId)
       .sort((left, right) => left.instructionOrderNumber - right.instructionOrderNumber);
     const sourceIndex = blockInstructions.findIndex(row => row.id === instructionId);
-    const destinationIndex = sourceIndex + (-1);
+    let destinationIndex = sourceIndex - 1;
+    if (workspaceKind === 'COMPONENT') {
+      const groupIds = new Set(
+        (memoryCapabilities.get(instructionId)?.memoryGroupRows ?? [{ id: instructionId }])
+          .map(row => Number(row.id)),
+      );
+      const firstGroupIndex = blockInstructions.findIndex(row => groupIds.has(row.id));
+      destinationIndex = -1;
+      for (let index = firstGroupIndex - 1; index >= 0; index -= 1) {
+        if (!groupIds.has(blockInstructions[index].id)) {
+          destinationIndex = index;
+          break;
+        }
+      }
+    }
     if (sourceIndex < 0 || destinationIndex < 0 || destinationIndex >= blockInstructions.length) return;
     onDragEnd({
       draggableId: String(instructionId),
