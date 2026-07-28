@@ -157,6 +157,101 @@ test('Component grid consumes a capability response even when a later frame is q
   await expectQueuedCapabilityEnablesDrag('componentTasks');
 });
 
+test('Bot Job block plus stages its complete connected dependency union atomically', async () => {
+  const getValue: BlockLoopInstructionLoadDTO = {
+    ...secondRow,
+    blockId: 20,
+    blockOrderNumber: 2,
+    blockName: 'Extraction',
+    instructionOrderNumber: 1,
+    name: 'Get Value',
+    actions: 'GET',
+    parentId: 101,
+  };
+  const extractField: BlockLoopInstructionLoadDTO = {
+    ...getValue,
+    id: 103,
+    instructionOrderNumber: 2,
+    name: 'Extract Field',
+    actions: 'E',
+  };
+  const props = {
+    homeBankingIdInitial: 2,
+    data: [row, getValue, extractField],
+    socketPort: 52101,
+    sessionId: 'botJobTasks',
+    botJobIdInitial: 5,
+    botJobNameInitial: 'Drag regression',
+    onSessionOpen: jest.fn(),
+  };
+  const view = render(<GridItem {...props} />);
+  await waitFor(() => expect(mockSend.mock.calls
+    .map(([payload]) => JSON.parse(payload).type))
+    .toContain('instructionEditor.memoryCapabilities'));
+
+  const request = [...mockSend.mock.calls]
+    .reverse()
+    .map(([payload]) => JSON.parse(payload))
+    .find(message => message.type === 'instructionEditor.memoryCapabilities');
+  const requestedBody = JSON.parse(request.body);
+  const memoryGroupRows = [
+    { id: 101, order: 1, name: 'Continue', action: 'CLICK', parentId: null, blockId: 10 },
+    { id: 102, order: 1, name: 'Get Value', action: 'GET', parentId: 101, blockId: 20 },
+    { id: 103, order: 2, name: 'Extract Field', action: 'E', parentId: 101, blockId: 20 },
+  ];
+  mockMessages = [JSON.stringify({
+    sessionId: 'botJobTasks',
+    homeBankingId: 2,
+    operationId: 'instructionEditor.memoryCapabilitiesResponse',
+    body: JSON.stringify({
+      ok: true,
+      requestId: requestedBody.requestId,
+      targetSessionId: 'botJobTasks',
+      homeBankingId: 2,
+      botJobId: 5,
+      graphRevision: 'revision-1',
+      capabilities: [101, 102, 103].map(instructionId => ({
+        instructionId,
+        canAddToMemory: true,
+        canMove: true,
+        canDelete: true,
+        allowedBlockIds: [10, 20],
+        memoryGroupKey: 'I:101,102,103|B:',
+        memoryGroupRows,
+        memoryGroupBlocks: [],
+      })),
+      blockCapabilities: [],
+    }),
+  })];
+  view.rerender(<GridItem {...props} />);
+  await waitFor(() => expect(screen.getAllByTitle(
+    'Add eligible steps in this block to memory list',
+  )[0]).toBeEnabled());
+
+  fireEvent.click(screen.getAllByTitle(
+    'Add eligible steps in this block to memory list',
+  )[0]);
+  expect(screen.getByText(
+    'Add the complete connected Bot Job Block to Memory List?',
+  )).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+
+  await waitFor(() => expect(mockSend.mock.calls
+    .map(([payload]) => JSON.parse(payload).type))
+    .toContain('memoryList.open'));
+  const open = [...mockSend.mock.calls]
+    .reverse()
+    .map(([payload]) => JSON.parse(payload))
+    .find(message => message.type === 'memoryList.open');
+  const snapshot = JSON.parse(open.body).snapshot;
+  expect(snapshot.items.map(
+    (item: { payload: { instructionId: number } }) => item.payload.instructionId,
+  )).toEqual([101, 102, 103]);
+  expect(new Set(snapshot.items.map(
+    (item: { dependencyGroupKey?: string }) => item.dependencyGroupKey,
+  )).size).toBe(1);
+});
+
 test('an authoritative empty block never triggers the legacy automatic BLOCK_ORDER writer', async () => {
   const props = {
     homeBankingIdInitial: 2,

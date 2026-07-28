@@ -16,6 +16,7 @@ import {
   type MemoryListItemIcon,
   type MemoryListSnapshot,
 } from './memoryList.contract';
+import { reorderMemoryItemsAsGroups } from './memoryList.groups';
 import PagesOpenButton from './PagesOpenButton';
 import { useWebSocket } from './useWebSocket';
 import styles from './MemoryList.module.scss';
@@ -381,14 +382,19 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose,
       return false;
     }
     const previousOrder = items.map(item => item.key);
-    const nextItems = [...items];
-    const [movedItem] = nextItems.splice(from, 1);
-    nextItems.splice(to, 0, movedItem);
+    const groupReorder = reorderMemoryItemsAsGroups(items, from, to);
+    if (!groupReorder.ok) {
+      console.warn('[MemoryList][drag] blocked:', groupReorder.reason, { from, to });
+      return false;
+    }
+    const nextItems = groupReorder.items;
+    const movedItem = items[from];
     setSnapshot(current => ({ ...current, items: nextItems }));
     const orderedItemKeys = nextItems.map(item => item.key);
     console.log(
-      `[MemoryList][drag] REORDERED "${movedItem.label}" ${from} -> ${to}; sending REORDER command`,
-      { previousOrder, orderedItemKeys },
+      `[MemoryList][drag] REORDERED "${movedItem.label}" ${from} -> ${to}; `
+        + `moved ${groupReorder.movedCount} connected row(s); sending REORDER command`,
+      { previousOrder, orderedItemKeys, movedCount: groupReorder.movedCount },
     );
     sendCommand({ action: 'REORDER', orderedItemKeys });
     return true;

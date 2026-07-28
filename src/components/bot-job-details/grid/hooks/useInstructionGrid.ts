@@ -11,6 +11,10 @@ import { useExcelExport } from './useExcelExport';
 import { useBlockReorder } from './useBlockReorder';
 import { useGridData } from './useGridData';
 import type { UseInstructionGridProps } from '../types/instructionGrid.types';
+import type {
+  MemoryInstructionGroupBlock,
+  MemoryInstructionGroupRow,
+} from '../../../memoryList.contract';
 import {
   BOT_JOB_INSTRUCTION_GRID_POLICY,
   COMPONENT_INSTRUCTION_GRID_POLICY,
@@ -121,7 +125,9 @@ export function useInstructionGrid({
     memoryListOpenRequestedRef, memoryListOpenedRef,
     memoryListOpenPendingRequestRef, memoryListOwnerEpochRef,
     requestMemoryListOpen,
-    handleAddToMemory, handleAddBlockToMemory, handleStageComponentBlock,
+    handleAddToMemory, handleAddConnectedGroupToMemory: stageConnectedGroupToMemory,
+    handleAddBlockToMemory: stageBotJobBlockToMemory,
+    handleStageComponentBlock: stageComponentBlockToMemory,
     handleRemoveFromMemory, handleRemoveComponentMemoryItem,
   } = useInstructionMemory(data, workspacePolicy);
   // Phase 6, step 9 — the grid DATA LAYER (core grid state, drag state, refs, the
@@ -184,6 +190,257 @@ export function useInstructionGrid({
     memoryListOpenRequestedRef, memoryListOpenedRef, memoryListOpenPendingRequestRef, memoryListOwnerEpochRef,
     pendingExcelExportDirectoryRequestRef, setChoosingExcelExportDirectory, setExcelExportDirectory,
   });
+
+  /*
+   * Confirmation dialogs outlive the render that opened them. Keep an
+   * identity snapshot of the latest authoritative graph so a realtime refresh
+   * cannot make an old confirmation callback stage an obsolete closure.
+   */
+  const memoryStageContextRef = useRef({
+    instructionsData,
+    memoryCapabilities,
+    blockDeleteCapabilities,
+    moveGraphRevision,
+  });
+  memoryStageContextRef.current = {
+    instructionsData,
+    memoryCapabilities,
+    blockDeleteCapabilities,
+    moveGraphRevision,
+  };
+
+  const showMemoryStageFailure = (reason: string) => {
+    setAlertMessageHeader('Memory List Selection Refused');
+    setAlertMessageBody(reason);
+    setAlertMessageFooter('Refresh this workspace before selecting the instruction again.');
+    setErrorFlag(true);
+    setAlertOnConfirm(undefined);
+  };
+
+  const handleAddConnectedGroupToMemory = (
+    instruction: (typeof instructionsData)[number],
+  ) => {
+    const capability = memoryCapabilities.get(instruction.id);
+    if (!capability?.canAdd) {
+      showMemoryStageFailure(
+        capability?.addReason || capability?.reason
+          || 'This instruction cannot be added to Memory List.',
+      );
+      return;
+    }
+    const groupRows = capability.memoryGroupRows ?? [];
+    const groupBlocks = capability.memoryGroupBlocks ?? [];
+    const stageContext = memoryStageContextRef.current;
+    const stage = () => {
+      handleClose();
+      const latest = memoryStageContextRef.current;
+      if (
+        latest.instructionsData !== stageContext.instructionsData
+        || latest.memoryCapabilities !== stageContext.memoryCapabilities
+        || latest.moveGraphRevision !== stageContext.moveGraphRevision
+      ) {
+        showMemoryStageFailure(
+          'The connected instruction graph changed while confirmation was open.',
+        );
+        return;
+      }
+      const result = stageConnectedGroupToMemory(
+        instruction,
+        instructionsData,
+        moveGraphRevision,
+      );
+      if (!result.ok) showMemoryStageFailure(result.reason);
+    };
+    if (groupRows.length <= 1 && groupBlocks.length === 0) {
+      stage();
+      return;
+    }
+
+    const visibleRows = groupRows.slice(0, 5).map(
+      (row) => `#${row.order} ${row.name || row.action}`,
+    );
+    if (groupRows.length > visibleRows.length) {
+      visibleRows.push(`+ ${groupRows.length - visibleRows.length} more connected instruction(s)`);
+    }
+    groupBlocks.forEach((block) => {
+      visibleRows.push(
+        `Complete Block #${block.blockOrderNumber ?? block.blockId} `
+          + `${block.blockName || block.blockId}`,
+      );
+    });
+    setAlertMessageHeader(
+      `Add ${groupRows.length} connected instruction${groupRows.length === 1 ? '' : 's'} to Memory List?`,
+    );
+    setAlertMessageBody(visibleRows.join('\n'));
+    setAlertMessageFooter(
+      'The complete connected group will be staged together. '
+        + 'Parent, child, Block, and Variable links will be preserved.',
+    );
+    setErrorFlag(false);
+    setAlertOnConfirm(() => stage);
+  };
+
+  const handleAddBlockToMemory = (
+    blockInstructions: (typeof instructionsData),
+  ) => {
+    const first = blockInstructions[0];
+    if (!first || workspacePolicy.kind !== 'BOT_JOB') {
+      showMemoryStageFailure('This Bot Job Block cannot be added to Memory List.');
+      return;
+    }
+
+    const selectedIds = new Set(blockInstructions.map((instruction) => instruction.id));
+    const groupRows = new Map<number, MemoryInstructionGroupRow>();
+    const groupBlocks = new Map<number, MemoryInstructionGroupBlock>();
+    for (const instruction of blockInstructions) {
+      const capability = memoryCapabilities.get(instruction.id);
+      if (
+        capability?.canAdd !== true
+        || !capability.memoryGroupKey?.trim()
+        || !Array.isArray(capability.memoryGroupRows)
+      ) {
+        showMemoryStageFailure(
+          capability?.addReason || capability?.reason
+            || 'A connected instruction capability is stale.',
+        );
+        return;
+      }
+      capability.memoryGroupRows.forEach((row) => groupRows.set(row.id, row));
+      (capability.memoryGroupBlocks ?? []).forEach(
+        (block) => groupBlocks.set(block.blockId, block),
+      );
+    }
+    for (const row of groupRows.values()) {
+      const capability = memoryCapabilities.get(row.id);
+      if (
+        capability?.canAdd !== true
+        || !capability.memoryGroupKey?.trim()
+        || !Array.isArray(capability.memoryGroupRows)
+      ) {
+        showMemoryStageFailure(
+          'A connected instruction capability is stale. Refresh the instruction grid.',
+        );
+        return;
+      }
+    }
+
+    const stageContext = memoryStageContextRef.current;
+    const stage = () => {
+      handleClose();
+      const latest = memoryStageContextRef.current;
+      if (
+        latest.instructionsData !== stageContext.instructionsData
+        || latest.memoryCapabilities !== stageContext.memoryCapabilities
+        || latest.moveGraphRevision !== stageContext.moveGraphRevision
+      ) {
+        showMemoryStageFailure(
+          'The connected Bot Job Block changed while confirmation was open.',
+        );
+        return;
+      }
+      const result = stageBotJobBlockToMemory(
+        blockInstructions,
+        stageContext.instructionsData,
+      );
+      if (!result.ok) showMemoryStageFailure(result.reason);
+    };
+
+    const externalRows = [...groupRows.values()].filter(
+      (row) => !selectedIds.has(row.id),
+    );
+    const externalBlocks = [...groupBlocks.values()].filter(
+      (block) => block.blockId !== first.blockId,
+    );
+    if (externalRows.length === 0 && externalBlocks.length === 0) {
+      stage();
+      return;
+    }
+
+    const details = externalRows.slice(0, 5).map(
+      (row) => `#${row.order} ${row.name || row.action}`,
+    );
+    if (externalRows.length > details.length) {
+      details.push(`+ ${externalRows.length - details.length} more connected instruction(s)`);
+    }
+    externalBlocks.forEach((block) => details.push(
+      `Complete Block #${block.blockOrderNumber ?? block.blockId} `
+        + `${block.blockName || block.blockId}`,
+    ));
+    setAlertMessageHeader('Add the complete connected Bot Job Block to Memory List?');
+    setAlertMessageBody(details.join('\n'));
+    setAlertMessageFooter(
+      'The complete dependency group will be staged atomically and kept together.',
+    );
+    setErrorFlag(false);
+    setAlertOnConfirm(() => stage);
+  };
+
+  const handleStageComponentBlock = (
+    blockInstructions: (typeof instructionsData),
+    sourceRevision: string,
+  ) => {
+    const first = blockInstructions[0];
+    const capability = first
+      ? blockDeleteCapabilities.get(first.blockId)
+      : undefined;
+    if (!first || capability?.canAddToMemory !== true) {
+      showMemoryStageFailure(
+        capability?.addReason || 'This connected Component Block cannot be added to Memory List.',
+      );
+      return;
+    }
+    const stageContext = memoryStageContextRef.current;
+    const stage = () => {
+      handleClose();
+      const latest = memoryStageContextRef.current;
+      if (
+        latest.instructionsData !== stageContext.instructionsData
+        || latest.blockDeleteCapabilities !== stageContext.blockDeleteCapabilities
+        || latest.moveGraphRevision !== stageContext.moveGraphRevision
+        || latest.moveGraphRevision !== sourceRevision
+      ) {
+        showMemoryStageFailure(
+          'The connected Component Block changed while confirmation was open.',
+        );
+        return;
+      }
+      const result = stageComponentBlockToMemory(
+        blockInstructions,
+        instructionsData,
+        sourceRevision,
+        capability,
+      );
+      if (!result.ok) showMemoryStageFailure(result.reason);
+    };
+    const externalRows = (capability.memoryGroupRows ?? []).filter(
+      (row) => row.blockId !== first.blockId,
+    );
+    const requiredBlocks = (capability.memoryGroupBlocks ?? []).filter(
+      (block) => block.blockId !== first.blockId,
+    );
+    if (externalRows.length === 0 && requiredBlocks.length === 0) {
+      stage();
+      return;
+    }
+
+    const details = externalRows.slice(0, 5).map(
+      (row) => `#${row.order} ${row.name || row.action}`,
+    );
+    if (externalRows.length > details.length) {
+      details.push(`+ ${externalRows.length - details.length} more connected instruction(s)`);
+    }
+    requiredBlocks.forEach((block) => details.push(
+      `Complete Block #${block.blockOrderNumber ?? block.blockId} `
+        + `${block.blockName || block.blockId}`,
+    ));
+    setAlertMessageHeader('Add the complete connected Component Block to Memory List?');
+    setAlertMessageBody(details.join('\n'));
+    setAlertMessageFooter(
+      'External parent, Variable, and GOTO dependencies will be staged with this Block.',
+    );
+    setErrorFlag(false);
+    setAlertOnConfirm(() => stage);
+  };
 
   // Whole-block reordering (drag + up/down buttons) lives in useBlockReorder.
   const {
@@ -282,7 +539,8 @@ export function useInstructionGrid({
     // useInstructionMemory
     memorySteps, memoryItemCount, memoryBlockOptions, createBlockOpen, setCreateBlockOpen,
     memoryCapabilities, requestMemoryListOpen,
-    handleAddToMemory, handleAddBlockToMemory, handleStageComponentBlock,
+    handleAddToMemory, handleAddConnectedGroupToMemory,
+    handleAddBlockToMemory, handleStageComponentBlock,
     // useGridData
     instructionsData, setInstructionsData,
     workspaceBlocks,

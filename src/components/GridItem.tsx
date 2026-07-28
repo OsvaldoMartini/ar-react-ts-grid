@@ -70,7 +70,8 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
     handleExcelFileBlockName, submitExcelExport, chooseExcelExportDirectory, closeExcelExport,
     memoryItemCount, memoryBlockOptions, createBlockOpen, setCreateBlockOpen,
     memoryCapabilities, requestMemoryListOpen,
-    handleAddToMemory, handleAddBlockToMemory, handleStageComponentBlock,
+    handleAddConnectedGroupToMemory,
+    handleAddBlockToMemory, handleStageComponentBlock,
     instructionsData,
     workspaceBlocks,
     groupedData,
@@ -663,8 +664,14 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                         canAddToMemory={
                           componentWorkspace
                             ? Boolean(moveGraphRevision)
-                            : blockData.instructions.some(
-                                instruction => memoryCapabilities.get(instruction.id)?.canAdd,
+                            : blockData.instructions.length > 0
+                              && blockData.instructions.every(
+                                instruction => {
+                                  const capability = memoryCapabilities.get(instruction.id);
+                                  return capability?.canAdd === true
+                                    && Array.isArray(capability.memoryGroupRows)
+                                    && Boolean(capability.memoryGroupKey?.trim());
+                                },
                               )
                         }
                         showCreateComponent={!componentWorkspace}
@@ -708,7 +715,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                             handleStageComponentBlock(blockData.instructions, moveGraphRevision);
                             return;
                           }
-                          handleAddBlockToMemory(blockData.instructions, moveGraphRevision);
+                          handleAddBlockToMemory(blockData.instructions);
                         }}
                         onRollback={() => handleRollbackBlock(Number(blockData.instructions[0].blockId))}
                         onMoveUp={() => handleMoveBlockUp(Number(blockData.instructions[0].blockId))}
@@ -755,7 +762,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                             onToggleStatus={() => handleInstructionStatus(instruction.id, blockData.instructions)}
                             onAddToMemory={(e) => {
                               e.stopPropagation();
-                              handleAddToMemory(instruction, moveGraphRevision);
+                              handleAddConnectedGroupToMemory(instruction);
                             }}
                             onRemove={() => handleRemoveInstruction(instruction.id)}
                             onOpenCommandEditor={() => handleOpenCommandEditor(instruction)}

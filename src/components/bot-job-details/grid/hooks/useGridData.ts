@@ -38,7 +38,17 @@ import constructionImage from '../../../../assets/construction.png';
 import forbiddenImage from '../../../../assets/forbidden.png';
 import warningRedImage from '../../../../assets/warning_red.png';
 
-type BlockDeleteCapability = { canDelete: boolean; reason: string; instructionCount: number; deleteRows: { id: number; name: string; action: string; order: number }[] };
+type BlockDeleteCapability = {
+  canDelete: boolean;
+  reason: string;
+  instructionCount: number;
+  deleteRows: { id: number; name: string; action: string; order: number }[];
+  canAddToMemory?: boolean;
+  addReason?: string;
+  memoryGroupKey?: string;
+  memoryGroupRows?: MemoryCapability['memoryGroupRows'];
+  memoryGroupBlocks?: MemoryCapability['memoryGroupBlocks'];
+};
 
 export type GridActionNotice = {
   title: string;
@@ -323,7 +333,10 @@ export function useGridData(deps: UseGridDataDeps) {
       botJobName: botJobName || '',
       items: componentWorkspace
         ? componentMemoryItems
-        : memorySteps.map(instructionMemoryItem),
+        : memorySteps.map((step) => instructionMemoryItem(
+          step,
+          (step as typeof step & { dependencyGroupKey?: string }).dependencyGroupKey,
+        )),
       // Component blocks are reusable sources, never Bot Job destinations.
       blocks: componentWorkspace ? [] : memoryBlockOptions,
       targetBlockId: componentWorkspace ? null : memoryTargetBlockId,
@@ -1011,17 +1024,81 @@ export function useGridData(deps: UseGridDataDeps) {
             return;
           }
           setGridActionNotice(null);
-          const next = new Map<number, { canAdd: boolean; canMove: boolean; canDelete: boolean; deleteCount: number; reason: string; deleteReason: string; allowedBlockIds: number[]; deleteRows: { id: number; name: string; action: string; order: number }[] }>();
+          const next = new Map<number, MemoryCapability>();
           if (Array.isArray(bodyData?.capabilities)) {
-            bodyData.capabilities.forEach((capability: { instructionId: number; canAddToMemory: boolean; canMove: boolean; canDelete: boolean; deleteCount?: number; reason?: string; deleteReason?: string; allowedBlockIds?: number[]; deleteRows?: { id: number; name: string; action: string; order: number }[] }) => {
-              next.set(capability.instructionId, { canAdd: capability.canAddToMemory === true, canMove: capability.canMove === true, canDelete: capability.canDelete === true, deleteCount: capability.deleteCount || 1, reason: capability.reason || '', deleteReason: capability.deleteReason || '', allowedBlockIds: Array.isArray(capability.allowedBlockIds) ? capability.allowedBlockIds : [], deleteRows: Array.isArray(capability.deleteRows) ? capability.deleteRows : [] });
+            bodyData.capabilities.forEach((capability: {
+              instructionId: number;
+              canAddToMemory: boolean;
+              canMove: boolean;
+              canDelete: boolean;
+              deleteCount?: number;
+              reason?: string;
+              addReason?: string;
+              deleteReason?: string;
+              allowedBlockIds?: number[];
+              deleteRows?: MemoryCapability['deleteRows'];
+              memoryGroupKey?: string;
+              memoryGroupRows?: MemoryCapability['memoryGroupRows'];
+              memoryGroupBlocks?: MemoryCapability['memoryGroupBlocks'];
+            }) => {
+              next.set(capability.instructionId, {
+                canAdd: capability.canAddToMemory === true,
+                canMove: capability.canMove === true,
+                canDelete: capability.canDelete === true,
+                deleteCount: capability.deleteCount || 1,
+                reason: capability.reason || '',
+                addReason: capability.addReason || '',
+                deleteReason: capability.deleteReason || '',
+                allowedBlockIds: Array.isArray(capability.allowedBlockIds)
+                  ? capability.allowedBlockIds
+                  : [],
+                deleteRows: Array.isArray(capability.deleteRows)
+                  ? capability.deleteRows
+                  : [],
+                memoryGroupKey: typeof capability.memoryGroupKey === 'string'
+                  ? capability.memoryGroupKey
+                  : undefined,
+                memoryGroupRows: Array.isArray(capability.memoryGroupRows)
+                  ? capability.memoryGroupRows
+                  : undefined,
+                memoryGroupBlocks: Array.isArray(capability.memoryGroupBlocks)
+                  ? capability.memoryGroupBlocks
+                  : undefined,
+              });
             });
           }
           setMemoryCapabilities(next);
           const nextBlocks = new Map<number, BlockDeleteCapability>();
           if (Array.isArray(bodyData?.blockCapabilities)) {
-            bodyData.blockCapabilities.forEach((capability: { blockId: number; canDelete: boolean; reason?: string; instructionCount?: number; deleteRows?: BlockDeleteCapability['deleteRows'] }) => {
-              nextBlocks.set(capability.blockId, { canDelete: capability.canDelete === true, reason: capability.reason || '', instructionCount: capability.instructionCount || 0, deleteRows: Array.isArray(capability.deleteRows) ? capability.deleteRows : [] });
+            bodyData.blockCapabilities.forEach((capability: {
+              blockId: number;
+              canDelete: boolean;
+              reason?: string;
+              instructionCount?: number;
+              deleteRows?: BlockDeleteCapability['deleteRows'];
+              canAddToMemory?: boolean;
+              addReason?: string;
+              memoryGroupKey?: string;
+              memoryGroupRows?: BlockDeleteCapability['memoryGroupRows'];
+              memoryGroupBlocks?: BlockDeleteCapability['memoryGroupBlocks'];
+            }) => {
+              nextBlocks.set(capability.blockId, {
+                canDelete: capability.canDelete === true,
+                reason: capability.reason || '',
+                instructionCount: capability.instructionCount || 0,
+                deleteRows: Array.isArray(capability.deleteRows) ? capability.deleteRows : [],
+                canAddToMemory: capability.canAddToMemory === true,
+                addReason: capability.addReason || '',
+                memoryGroupKey: typeof capability.memoryGroupKey === 'string'
+                  ? capability.memoryGroupKey
+                  : undefined,
+                memoryGroupRows: Array.isArray(capability.memoryGroupRows)
+                  ? capability.memoryGroupRows
+                  : undefined,
+                memoryGroupBlocks: Array.isArray(capability.memoryGroupBlocks)
+                  ? capability.memoryGroupBlocks
+                  : undefined,
+              });
             });
           }
           setBlockDeleteCapabilities(nextBlocks);

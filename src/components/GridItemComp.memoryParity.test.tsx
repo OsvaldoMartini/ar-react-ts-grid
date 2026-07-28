@@ -57,6 +57,7 @@ const second: ComponentsInstructionsDTO = {
 const capabilityResponseForLastRequest = (
   blockCapabilities: unknown[] = [],
   allowedBlockIds: number[] = [44],
+  connectedMemoryGroup = false,
 ) => {
   const request = [...mockSend.mock.calls]
     .reverse()
@@ -81,6 +82,19 @@ const capabilityResponseForLastRequest = (
         canMove: true,
         canDelete: true,
         allowedBlockIds,
+        memoryGroupKey: connectedMemoryGroup
+          ? 'I:101,102|B:'
+          : `I:${instructionId}|B:`,
+        memoryGroupRows: (connectedMemoryGroup ? [101, 102] : [instructionId])
+          .map(groupInstructionId => ({
+            id: groupInstructionId,
+            order: groupInstructionId === 101 ? 1 : 2,
+            name: groupInstructionId === 101 ? 'Continue' : 'Confirm',
+            action: 'CLICK',
+            parentId: null,
+            blockId: 44,
+          })),
+        memoryGroupBlocks: [],
       })),
       blockCapabilities,
     }),
@@ -92,6 +106,7 @@ const authorizeGrid = async (
   renderProps = props,
   blockCapabilities: unknown[] = [],
   allowedBlockIds: number[] = [44],
+  connectedMemoryGroup = false,
 ) => {
   await waitFor(() => expect(
     mockSend.mock.calls
@@ -99,7 +114,11 @@ const authorizeGrid = async (
       .some(message => message.type === 'instructionEditor.memoryCapabilities'),
   ).toBe(true));
   mockMessages = [
-    capabilityResponseForLastRequest(blockCapabilities, allowedBlockIds),
+    capabilityResponseForLastRequest(
+      blockCapabilities,
+      allowedBlockIds,
+      connectedMemoryGroup,
+    ),
   ];
   view.rerender(<GridItemComp {...renderProps} />);
   await waitFor(() => expect(screen.getByLabelText('Move instruction 1')).toBeEnabled());
@@ -152,6 +171,136 @@ test('row plus stages a typed COMPONENT instruction and exposes no component tar
   });
   expect(mockSend.mock.calls.map(([payload]) => JSON.parse(payload).type))
     .not.toContain('COMPONENT_INJECT');
+});
+
+test('row plus confirms and stages the complete connected COMPONENT group', async () => {
+  const view = render(<GridItemComp {...props} />);
+  await authorizeGrid(view, props, [], [44], true);
+
+  fireEvent.click(screen.getAllByTitle('Add step to memory list')[0]);
+
+  expect(screen.getByText('Add 2 connected instructions to Memory List?')).toBeInTheDocument();
+  expect(screen.getByText(/#1 Continue/)).toBeInTheDocument();
+  expect(screen.getByText(/#2 Confirm/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+
+  await waitFor(() => expect(latestMemorySnapshot().items).toHaveLength(2));
+  expect(latestMemorySnapshot().items.map((item: { sourceItemKey: string }) =>
+    item.sourceItemKey)).toEqual([
+    'INSTRUCTION:2:44:101',
+    'INSTRUCTION:2:44:102',
+  ]);
+});
+
+test('connected row confirmation refuses a graph that refreshed while the modal was open', async () => {
+  const view = render(<GridItemComp {...props} />);
+  await authorizeGrid(view, props, [], [44], true);
+
+  fireEvent.click(screen.getAllByTitle('Add step to memory list')[0]);
+  expect(screen.getByText('Add 2 connected instructions to Memory List?')).toBeInTheDocument();
+
+  mockMessages = [
+    mockMessages[0],
+    JSON.stringify({
+      sessionId: 'componentTasks',
+      homeBankingId: 2,
+      operationId: 'componentsUpdate',
+      body: JSON.stringify({
+        instructions: [
+          { ...first, name: 'Continue refreshed' },
+          second,
+        ],
+        blocks: [{
+          blockId: 44,
+          blockOrderNumber: 1,
+          blockName: 'Reusable Login',
+          blockActive: true,
+          blockWait: 0,
+        }],
+        homeBankingId: 2,
+        botJobId: 5,
+        botJobName: 'Target Bot Job',
+      }),
+    }),
+  ];
+  view.rerender(<GridItemComp {...props} />);
+  await screen.findByText('(101)Continue refreshed');
+
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+
+  expect(await screen.findByText('Memory List Selection Refused')).toBeInTheDocument();
+  expect(screen.getByText(
+    'The connected instruction graph changed while confirmation was open.',
+  )).toBeInTheDocument();
+  expect(mockSend.mock.calls
+    .map(([payload]) => JSON.parse(payload).type))
+    .not.toContain('memoryList.open');
+});
+
+test('connected block confirmation refuses a graph that refreshed while the modal was open', async () => {
+  const blockCapability = {
+    blockId: 44,
+    canDelete: false,
+    reason: '',
+    instructionCount: 2,
+    deleteRows: [],
+    canAddToMemory: true,
+    memoryGroupKey: 'I:101,102,201|B:55',
+    memoryGroupRows: [
+      { id: 101, order: 1, name: 'Continue', action: 'CLICK', parentId: null, blockId: 44 },
+      { id: 102, order: 2, name: 'Confirm', action: 'CLICK', parentId: null, blockId: 44 },
+      { id: 201, order: 1, name: 'Target', action: 'CLICK', parentId: null, blockId: 55 },
+    ],
+    memoryGroupBlocks: [{
+      blockId: 55,
+      blockOrderNumber: 2,
+      blockName: 'Target Block',
+    }],
+  };
+  const view = render(<GridItemComp {...props} />);
+  await authorizeGrid(view, props, [blockCapability]);
+
+  fireEvent.click(screen.getByTitle('Add eligible steps in this block to memory list'));
+  expect(screen.getByText(
+    'Add the complete connected Component Block to Memory List?',
+  )).toBeInTheDocument();
+
+  mockMessages = [
+    mockMessages[0],
+    JSON.stringify({
+      sessionId: 'componentTasks',
+      homeBankingId: 2,
+      operationId: 'componentsUpdate',
+      body: JSON.stringify({
+        instructions: [
+          { ...first, name: 'Continue refreshed' },
+          second,
+        ],
+        blocks: [{
+          blockId: 44,
+          blockOrderNumber: 1,
+          blockName: 'Reusable Login',
+          blockActive: true,
+          blockWait: 0,
+        }],
+        homeBankingId: 2,
+        botJobId: 5,
+        botJobName: 'Target Bot Job',
+      }),
+    }),
+  ];
+  view.rerender(<GridItemComp {...props} />);
+  await screen.findByText('(101)Continue refreshed');
+
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+
+  expect(await screen.findByText('Memory List Selection Refused')).toBeInTheDocument();
+  expect(screen.getByText(
+    'The connected Component Block changed while confirmation was open.',
+  )).toBeInTheDocument();
+  expect(mockSend.mock.calls
+    .map(([payload]) => JSON.parse(payload).type))
+    .not.toContain('memoryList.open');
 });
 
 test('component row drag commits with COMPONENT_ROW_MOVE after authoritative preview', async () => {

@@ -35,6 +35,33 @@ export interface ComponentBlockMemoryListPayload {
   sourceRevision: string;
 }
 
+/**
+ * One authoritative member of the dependency group returned for an instruction.
+ *
+ * The row intentionally carries source identity/presentation data only. Parent,
+ * variable, and destination IDs are resolved again by Java from the authoritative
+ * graph before apply, so React never invents foreign keys.
+ */
+export interface MemoryInstructionGroupRow {
+  id: number;
+  order: number;
+  name: string;
+  action: string;
+  parentId?: number | null;
+  blockId: number;
+}
+
+/**
+ * Optional cross-block context for dependency groups such as GOTO. The first
+ * connected-group implementation is row based, but keeping this typed prevents
+ * future block relationships from being represented by unvalidated `any` data.
+ */
+export interface MemoryInstructionGroupBlock {
+  blockId: number;
+  blockOrderNumber?: number;
+  blockName?: string;
+}
+
 export type ComponentMemoryListPayload =
   | ComponentInstructionMemoryListPayload
   | ComponentBlockMemoryListPayload;
@@ -53,6 +80,11 @@ export interface MemoryListItem<
    */
   key: string;
   sourceKind: MemoryListItemSourceKind;
+  /**
+   * Backend-authorized connected-graph identity. Items with the same key are one
+   * atomic Memory List unit: they are reordered, removed, and applied together.
+   */
+  dependencyGroupKey?: string;
   /**
    * Producer-native key used when the aggregate workspace routes commands back
    * to the component that owns the item.

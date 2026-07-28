@@ -3,6 +3,7 @@ import { CreateBlockOption } from '../../../CreateNewBlock';
 import { instructionDisplayLabel } from '../../../instructionDisplay';
 import type {
   ComponentMemoryListPayload,
+  MemoryInstructionGroupRow,
   MemoryListItem,
   MemoryListItemIcon,
 } from '../../../memoryList.contract';
@@ -39,6 +40,88 @@ export const normalizeBlockOptions = (blocks: CreateBlockOption[]): CreateBlockO
   return Array.from(byBlockId.values()).sort((a, b) => a.blockOrderNumber - b.blockOrderNumber);
 };
 
+export type MemoryGroupResolution =
+  | {
+      ok: true;
+      instructions: BlockLoopInstructionLoadDTO[];
+    }
+  | {
+      ok: false;
+      reason: string;
+    };
+
+/**
+ * Resolve a backend-authorized Memory group against the current rendered graph.
+ *
+ * Resolution is deliberately all-or-nothing. The UI must never stage a partial
+ * parent/child or variable family when one authoritative member is stale or
+ * absent. The backend-provided array order is retained exactly.
+ */
+export const resolveMemoryGroupInstructions = (
+  selected: BlockLoopInstructionLoadDTO,
+  currentInstructions: BlockLoopInstructionLoadDTO[],
+  authoritativeRows?: readonly MemoryInstructionGroupRow[],
+): MemoryGroupResolution => {
+  const rows = authoritativeRows === undefined
+    ? [{
+        id: selected.id,
+        order: selected.instructionOrderNumber,
+        name: selected.name,
+        action: selected.actions,
+        parentId: selected.parentId ?? null,
+        blockId: selected.blockId,
+      }]
+    : authoritativeRows;
+  if (rows.length === 0) {
+    return { ok: false, reason: 'The connected Memory group is empty.' };
+  }
+
+  const currentById = new Map<number, BlockLoopInstructionLoadDTO>();
+  for (const instruction of currentInstructions) {
+    if (!Number.isSafeInteger(instruction.id) || instruction.id <= 0
+        || currentById.has(instruction.id)) {
+      return {
+        ok: false,
+        reason: 'The current instruction grid contains invalid or duplicate IDs.',
+      };
+    }
+    currentById.set(instruction.id, instruction);
+  }
+
+  const groupIds = new Set<number>();
+  const resolved: BlockLoopInstructionLoadDTO[] = [];
+  for (const row of rows) {
+    if (!Number.isSafeInteger(row.id) || row.id <= 0
+        || !Number.isSafeInteger(row.order) || row.order <= 0
+        || !Number.isSafeInteger(row.blockId) || row.blockId <= 0
+        || groupIds.has(row.id)) {
+      return {
+        ok: false,
+        reason: 'The connected Memory group contains invalid or duplicate rows.',
+      };
+    }
+    groupIds.add(row.id);
+    const current = currentById.get(row.id);
+    if (!current
+        || current.blockId !== row.blockId
+        || current.instructionOrderNumber !== row.order) {
+      return {
+        ok: false,
+        reason: 'The connected Memory group changed. Refresh the instruction grid.',
+      };
+    }
+    resolved.push(current);
+  }
+
+  if (!groupIds.has(selected.id)) {
+    return {
+      ok: false,
+      reason: 'The selected instruction is not part of its connected Memory group.',
+    };
+  }
+  return { ok: true, instructions: resolved };
+};
+
 /** Pick the Memory-List row icon for an instruction from its action / tag. */
 export const instructionMemoryIcon = (
   instruction: BlockLoopInstructionLoadDTO,
@@ -58,9 +141,11 @@ export const instructionMemoryIcon = (
 /** Project an instruction into a Memory-List item (the detached-list wire shape). */
 export const instructionMemoryItem = (
   instruction: BlockLoopInstructionLoadDTO,
+  dependencyGroupKey?: string,
 ): MemoryListItem => ({
   key: `BOT_JOB:${instruction.id}`,
   sourceKind: 'BOT_JOB',
+  dependencyGroupKey,
   sourceItemKey: String(instruction.id),
   label: `(${instruction.id})${instructionDisplayLabel(instruction) || instruction.actions || 'Instruction'}`,
   detail: `Block #${instruction.blockOrderNumber} ${instruction.blockName}`,
@@ -78,11 +163,13 @@ const componentInstructionSourceKey = (
 export const componentInstructionMemoryItem = (
   instruction: BlockLoopInstructionLoadDTO,
   sourceRevision: string,
+  dependencyGroupKey?: string,
 ): MemoryListItem<ComponentMemoryListPayload> => {
   const sourceItemKey = componentInstructionSourceKey(instruction);
   return {
     key: `COMPONENT:${sourceItemKey}`,
     sourceKind: 'COMPONENT',
+    dependencyGroupKey,
     sourceItemKey,
     label: `(${instruction.id})${instructionDisplayLabel(instruction) || instruction.actions || 'Instruction'}`,
     detail: `Component block #${instruction.blockOrderNumber} ${instruction.blockName}`,
@@ -108,6 +195,7 @@ export const componentInstructionMemoryItem = (
 export const componentBlockMemoryItem = (
   instructions: BlockLoopInstructionLoadDTO[],
   sourceRevision: string,
+  dependencyGroupKey?: string,
 ): MemoryListItem<ComponentMemoryListPayload> | null => {
   const first = instructions[0];
   if (!first) return null;
@@ -115,6 +203,7 @@ export const componentBlockMemoryItem = (
   return {
     key: `COMPONENT:${sourceItemKey}`,
     sourceKind: 'COMPONENT',
+    dependencyGroupKey,
     sourceItemKey,
     label: first.blockName || `Component block ${first.blockId}`,
     detail: `Whole component block (${instructions.length} instruction${instructions.length === 1 ? '' : 's'})`,
