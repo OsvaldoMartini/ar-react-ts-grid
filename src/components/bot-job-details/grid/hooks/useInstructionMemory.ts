@@ -25,11 +25,9 @@ export type MemoryCapability = {
   canAdd: boolean;
   canMove: boolean;
   canDelete: boolean;
-  deleteCount: number;
   reason: string;
   deleteReason: string;
   allowedBlockIds: number[];
-  deleteRows: { id: number; name: string; action: string; order: number }[];
   /** Memory-specific refusal reason; distinct from the drag/move reason. */
   addReason?: string;
   /** Stable React-resolved group identity calculated from the current grid graph. */

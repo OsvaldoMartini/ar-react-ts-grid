@@ -390,6 +390,53 @@ test('connected block confirmation refuses a graph that refreshed while the moda
     .not.toContain('memoryList.open');
 });
 
+test('delete modal and v2 request contain the same exact conditional boundaries', async () => {
+  const conditionalRows: ComponentsInstructionsDTO[] = [
+    { ...first, id: 201, instructionOrderNumber: 1, name: 'IF root', actions: 'IF', parentId: 201 },
+    { ...first, id: 202, instructionOrderNumber: 2, name: 'IF body', actions: 'C', parentId: 201 },
+    { ...first, id: 203, instructionOrderNumber: 3, name: 'ELSE boundary', actions: 'ELSE', parentId: 201 },
+    { ...first, id: 204, instructionOrderNumber: 4, name: 'ELSE body', actions: 'H', parentId: 203 },
+    { ...first, id: 205, instructionOrderNumber: 5, name: 'ENDIF boundary', actions: 'ENDIF', parentId: 201 },
+  ];
+  const conditionalProps = {
+    ...props,
+    dataComp: conditionalRows,
+  };
+  const view = render(<GridItemComp {...conditionalProps} />);
+  await authorizeGrid(view, conditionalProps);
+  const capabilityRequest = mockSend.mock.calls
+    .map(([payload]) => JSON.parse(payload))
+    .find(message => message.type === 'instructionEditor.memoryCapabilities');
+  expect(JSON.parse(capabilityRequest.body).deleteContractVersion).toBe(2);
+
+  fireEvent.click(screen.getAllByTitle('Delete instruction')[2]);
+
+  expect(screen.getByText('Delete Conditional Boundaries')).toBeInTheDocument();
+  const modalRowIds = Array.from(
+    document.querySelectorAll('.complex-message-row td:first-child'),
+  ).map(cell => Number(cell.textContent?.match(/\((\d+)\)/)?.[1]));
+  expect(modalRowIds).toEqual([201, 203, 205]);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+
+  const deletion = mockSend.mock.calls
+    .map(([payload]) => JSON.parse(payload))
+    .find(message => message.type === 'DELETE_INSTRUCTION');
+  expect(deletion).toEqual(expect.objectContaining({
+    deleteContractVersion: 2,
+    sessionId: 'componentTasks',
+    graphRevision: computeInstructionGraphRevision(conditionalRows, []),
+    selectedInstructionId: 203,
+    instructionId: 203,
+    deleteInstructionIds: [201, 203, 205],
+    deleteParentRepairs: [
+      { instructionId: 202, parentId: null },
+      { instructionId: 204, parentId: null },
+    ],
+  }));
+  expect(deletion.deleteInstructionIds).toEqual(modalRowIds);
+});
+
 test('component row drag commits one React-planned COMPONENT_ROW_MOVE', async () => {
   const view = render(<GridItemComp {...props} />);
   await authorizeGrid(view);

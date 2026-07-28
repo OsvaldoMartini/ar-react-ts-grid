@@ -36,11 +36,9 @@ const capability = (
   canAdd: true,
   canMove: true,
   canDelete: true,
-  deleteCount: 1,
   reason: '',
   deleteReason: '',
   allowedBlockIds: [10, 20],
-  deleteRows: [],
   memoryGroupRows,
   memoryGroupBlocks,
   memoryGroupKey,
@@ -65,7 +63,7 @@ describe('useInstructionMemory', () => {
     const { result } = renderHook(() => useInstructionMemory(data));
     act(() => {
       result.current.setMemoryCapabilities(
-        new Map([[1, { canAdd: true, canMove: false, canDelete: false, deleteCount: 0, reason: '', deleteReason: '', allowedBlockIds: [], deleteRows: [] }]]),
+        new Map([[1, { canAdd: true, canMove: false, canDelete: false, reason: '', deleteReason: '', allowedBlockIds: [] }]]),
       );
     });
     act(() => result.current.handleAddToMemory(data[0], 'revision-single'));

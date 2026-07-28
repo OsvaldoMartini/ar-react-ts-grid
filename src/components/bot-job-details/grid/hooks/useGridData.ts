@@ -14,13 +14,20 @@ import {
   instructionMemoryItem,
   projectMemorySelections,
 } from '../domain/memoryOptions';
-import type { InstructionVariableLink } from '../domain/instructionDependency';
+import {
+  canonicalInstructionAction,
+  type InstructionVariableLink,
+} from '../domain/instructionDependency';
 import {
   planInstructionMove,
   resolveInstructionDragGroup,
   type InstructionMovePlan,
 } from '../domain/instructionMove';
 import { computeInstructionGraphRevision } from '../domain/instructionGraphRevision';
+import {
+  planInstructionDeletion,
+  type InstructionDeletePlan,
+} from '../domain/instructionDelete';
 import {
   groupByBlock,
   reassignInstructionOrderNumbersByBlock,
@@ -64,6 +71,11 @@ export type GridActionNotice = {
   message: string;
   action: string;
 };
+
+type SuccessfulInstructionDeletePlan = Extract<
+  InstructionDeletePlan,
+  { ok: true }
+>;
 
 export interface UseGridDataDeps {
   // Props
@@ -222,6 +234,18 @@ export function useGridData(deps: UseGridDataDeps) {
   const [variableLinks, setVariableLinks] = useState<InstructionVariableLink[]>([]);
   const [blockDeleteCapabilities, setBlockDeleteCapabilities] = useState<Map<number, BlockDeleteCapability>>(new Map());
   const [moveGraphRevision, setMoveGraphRevision] = useState('');
+  const deleteContextRef = useRef({
+    instructionsData,
+    variableLinks,
+    moveGraphRevision,
+    memoryCapabilities,
+  });
+  deleteContextRef.current = {
+    instructionsData,
+    variableLinks,
+    moveGraphRevision,
+    memoryCapabilities,
+  };
   const [gridActionNotice, setGridActionNotice] = useState<GridActionNotice | null>(null);
   const dismissGridActionNotice = useCallback(() => setGridActionNotice(null), []);
   const propIdentityRef = useRef(
@@ -336,7 +360,13 @@ export function useGridData(deps: UseGridDataDeps) {
       type: 'instructionEditor.memoryCapabilities',
       sessionId,
       homeBankingId,
-      body: JSON.stringify({ requestId, targetSessionId, botJobId, homeBankingId }),
+      body: JSON.stringify({
+        requestId,
+        targetSessionId,
+        botJobId,
+        homeBankingId,
+        deleteContractVersion: 2,
+      }),
     }));
   }, [webSocket, connected, instructionsData, workspaceBlocks, botJobId, homeBankingId,
     sessionId, targetSessionId]);
@@ -952,22 +982,18 @@ export function useGridData(deps: UseGridDataDeps) {
             instructionId: number;
             canMove: boolean;
             canDelete: boolean;
-            deleteCount?: number;
             reason?: string;
             deleteReason?: string;
             allowedBlockIds?: number[];
-            deleteRows?: MemoryCapability['deleteRows'];
           }>();
           if (Array.isArray(bodyData?.capabilities)) {
             bodyData.capabilities.forEach((capability: {
               instructionId: number;
               canMove: boolean;
               canDelete: boolean;
-              deleteCount?: number;
               reason?: string;
               deleteReason?: string;
               allowedBlockIds?: number[];
-              deleteRows?: MemoryCapability['deleteRows'];
             }) => {
               serverCapabilities.set(Number(capability.instructionId), capability);
             });
@@ -1022,7 +1048,6 @@ export function useGridData(deps: UseGridDataDeps) {
               // must not disable drag (for example, EXCEL GOTO is non-copyable).
               canMove: moveGraphSynchronized && capability != null,
               canDelete: capability?.canDelete === true,
-              deleteCount: capability?.deleteCount || 1,
               reason: moveGraphSynchronized && capability != null
                 ? ''
                 : 'Refresh this workspace before moving instructions.',
@@ -1031,9 +1056,6 @@ export function useGridData(deps: UseGridDataDeps) {
                 : memorySelection?.addReason || '',
               deleteReason: capability?.deleteReason || '',
               allowedBlockIds: workspaceBlocks.map(block => block.blockId),
-              deleteRows: Array.isArray(capability?.deleteRows)
-                ? capability?.deleteRows ?? []
-                : [],
               memoryGroupKey: memorySelection?.memoryGroupKey,
               memoryGroupRows: memorySelection?.memoryGroupRows,
               memoryGroupBlocks: memorySelection?.memoryGroupBlocks,
@@ -2050,61 +2072,151 @@ export function useGridData(deps: UseGridDataDeps) {
   };
 
 
-  const handleRemoveInstruction = (instructionId: number) => {
-    if (!moveGraphRevision || !memoryCapabilities.get(instructionId)?.canDelete) return;
-    const instruction = instructionsData.find(row => row.id === instructionId);
-    if (!instruction) return;
-    const familyDelete = ["IF", "ELSEIF", "ELSE", "ENDIF"].includes(instruction.actions);
-    const loopDelete = ["LOOP", "REFRESH_LOOP"].includes(instruction.actions);
-    const capability = memoryCapabilities.get(instructionId);
-    const deleteCount = capability?.deleteCount || 1;
-    const deleteRows = capability?.deleteRows || [];
+  const showDeletePlanningFailure = (reason: string) => {
     setAlertImage(warningRedImage);
     setAlertClass('construction-image');
-    setAlertMessageHeader(loopDelete ? 'Delete Loop Group' : instruction.actions === 'ELSEIF' ? 'Delete ElseIf Branch' : familyDelete ? 'Delete Conditional Family' : 'Delete Instruction');
-    setAlertMessageBody(deleteRows.length > 0 ? deleteRows.map(row => ({
-      parentNameWithId: `#${row.order} (${row.id}) ${row.name}`,
-      connectionLabel: 'Action',
-      actions: row.action,
-    })) : [{ parentNameWithId: `(${instruction.id}) ${instruction.name}`, connectionLabel: 'Action', actions: instruction.actions }]);
-    setAlertMessageFooter(`Delete ${deleteCount} row(s). Java will verify graph integrity before deletion.`);
+    setAlertMessageHeader('Delete Instruction Refused');
+    setAlertMessageBody(reason);
+    setAlertMessageFooter(
+      'The last valid rows remain visible. Refresh this workspace before deleting.',
+    );
     setErrorFlag(true);
-    setAlertOnConfirm(() => () => executeRemoveInstruction(instructionId));
+    setAlertOnConfirm(undefined);
   };
 
-  const executeRemoveInstruction = (instructionId: number) => {
+  const handleRemoveInstruction = (instructionId: number) => {
+    if (!moveGraphRevision || !memoryCapabilities.get(instructionId)?.canDelete) return;
+    const plan = planInstructionDeletion(
+      instructionsData,
+      variableLinks,
+      instructionId,
+    );
+    if (!plan.ok) {
+      showDeletePlanningFailure(plan.reason);
+      return;
+    }
+
+    const instructionAction = canonicalInstructionAction(
+      plan.selectedInstruction.actions,
+    );
+    const conditionalDelete = ['IF', 'ELSEIF', 'ELSE', 'ENDIF']
+      .includes(instructionAction);
+    const loopDelete = ['LOOP', 'REFRESH_LOOP'].includes(instructionAction);
+    setAlertImage(warningRedImage);
+    setAlertClass('construction-image');
+    setAlertMessageHeader(
+      loopDelete
+        ? 'Delete Loop Relationship'
+        : conditionalDelete
+          ? 'Delete Conditional Boundaries'
+          : 'Delete Instruction',
+    );
+    // The modal and request are deliberately projected from the same immutable plan.
+    setAlertMessageBody(plan.instructions.map(row => ({
+      parentNameWithId:
+        `#${row.instructionOrderNumber} (${row.id}) ${row.name}`,
+      connectionLabel: 'Action',
+      actions: row.actions,
+    })));
+    const survivorNotice = plan.survivingParentReferences.length > 0
+      ? ` ${plan.survivingParentReferences.length} preserved body row parent reference(s) `
+        + 'will be detached by this exact React plan.'
+      : '';
+    setAlertMessageFooter(
+      `Delete ${plan.deleteInstructionIds.length} explicitly linked row(s). `
+      + `Positional IF/LOOP body rows are preserved.${survivorNotice}`,
+    );
+    setErrorFlag(true);
+    const sourceRevision = moveGraphRevision;
+    setAlertOnConfirm(
+      () => () => executeRemoveInstruction(plan, sourceRevision),
+    );
+  };
+
+  const executeRemoveInstruction = (
+    confirmedPlan: SuccessfulInstructionDeletePlan,
+    sourceRevision: string,
+  ) => {
     handleClose();
-    // Find the instruction to remove
-    const instructionToRemove = instructionsData.find(instruction => instruction.id === instructionId);
+    const latest = deleteContextRef.current;
+    const latestPlan = planInstructionDeletion(
+      latest.instructionsData,
+      latest.variableLinks,
+      confirmedPlan.selectedInstruction.id,
+    );
+    const confirmedParentRepairs = confirmedPlan.survivingParentReferences.map(
+      reference => ({
+        instructionId: reference.instructionId,
+        parentId: null,
+      }),
+    );
+    const latestParentRepairs = latestPlan.ok
+      ? latestPlan.survivingParentReferences.map(reference => ({
+          instructionId: reference.instructionId,
+          parentId: null,
+        }))
+      : [];
+    const exactPlanStillCurrent = latestPlan.ok
+      && latest.moveGraphRevision === sourceRevision
+      && latest.memoryCapabilities
+        .get(confirmedPlan.selectedInstruction.id)?.canDelete === true
+      && latestPlan.deleteInstructionIds.length
+        === confirmedPlan.deleteInstructionIds.length
+      && latestPlan.deleteInstructionIds.every(
+        (instructionId, index) =>
+          instructionId === confirmedPlan.deleteInstructionIds[index],
+      )
+      && latestParentRepairs.length === confirmedParentRepairs.length
+      && latestParentRepairs.every(
+        (repair, index) =>
+          repair.instructionId === confirmedParentRepairs[index].instructionId,
+      );
+    if (!exactPlanStillCurrent || !latestPlan.ok) {
+      showDeletePlanningFailure(
+        latestPlan.ok
+          ? 'The instruction relationships changed while confirmation was open.'
+          : latestPlan.reason,
+      );
+      return;
+    }
 
-    if (!instructionToRemove) return;
+    const {
+      botJobId: ownerBotJobId,
+      botJobName: ownerBotJobName,
+      blockId: ownerBlockId,
+      actions,
+      parentId,
+      id,
+      homeBankingId: ownerHomeBankingId,
+    } = latestPlan.selectedInstruction;
 
-    const { botJobId, botJobName, blockId, actions, parentId, id } = instructionToRemove;
-
-    // Send WebSocket message if connected
     if (webSocket && connected) {
       const message = {
-        type: "DELETE_INSTRUCTION",
-        requestId: `${Date.now()}-bot-instruction-delete-${instructionId}`,
-        graphRevision: moveGraphRevision,
-        instructionId,
+        type: 'DELETE_INSTRUCTION',
+        deleteContractVersion: 2,
+        requestId: `${Date.now()}-instruction-delete-${id}`,
+        graphRevision: sourceRevision,
+        selectedInstructionId: id,
+        deleteInstructionIds: confirmedPlan.deleteInstructionIds,
+        deleteParentRepairs: confirmedParentRepairs,
+        // Existing metadata remains present for routing and audit compatibility.
+        instructionId: id,
         actions,
         parentId,
-        botJobId,
-        botJobName,
-        blockId,
-        homeBankingId: homeBankingId,
+        botJobId: ownerBotJobId,
+        botJobName: ownerBotJobName,
+        blockId: ownerBlockId,
+        homeBankingId: ownerHomeBankingId,
         sessionId: targetSessionId,
       };
 
-      webSocket.send(
-        JSON.stringify(message),
+      webSocket.send(JSON.stringify(message));
+      console.log(
+        `Sent exact delete plan [${confirmedPlan.deleteInstructionIds.join(', ')}] `
+        + `for selected instruction ID ${id} in block ID ${ownerBlockId}`,
       );
-
-      console.log(`Sent delete instruction message for instruction ID: ${instructionId} in block ID: ${blockId}`);
     }
 
-    // Close the dropdown
     setOpenDropdown(null);
   };
 
