@@ -1057,6 +1057,10 @@ export function useGridData(deps: UseGridDataDeps) {
           const backendGraphRevision = typeof bodyData?.graphRevision === 'string'
             ? bodyData.graphRevision.trim().toLowerCase()
             : '';
+          const renderedGraphRevision = computeInstructionGraphRevision(
+            instructionsData,
+            variableLinks,
+          );
           const memoryGraphSynchronized =
             renderedInstructionIds.size === instructionsData.length
             && serverCapabilities.size === renderedInstructionIds.size
@@ -1064,10 +1068,16 @@ export function useGridData(deps: UseGridDataDeps) {
               instructionId => serverCapabilities.has(instructionId),
             )
             && /^[a-f0-9]{64}$/.test(backendGraphRevision)
-            && computeInstructionGraphRevision(
-              instructionsData,
-              variableLinks,
-            ) === backendGraphRevision;
+            // Components are reusable source rows. Their presentation model may be
+            // locally normalized before this correlated response arrives, while the
+            // server revision still identifies the authoritative database graph.
+            // Exact ID coverage prevents an unrelated/stale Component snapshot from
+            // enabling Memory actions; ComponentMemoryApplyService revalidates the
+            // supplied server revision transactionally before it copies anything.
+            && (
+              workspaceKind === 'COMPONENT'
+              || renderedGraphRevision === backendGraphRevision
+            );
           const staleMemoryReason =
             'The instruction graph changed. Refresh this workspace before adding rows or blocks to Memory List.';
           const next = new Map<number, MemoryCapability>();

@@ -178,6 +178,75 @@ test('row plus stages a typed COMPONENT instruction and exposes no component tar
     .not.toContain('COMPONENT_INJECT');
 });
 
+test('component plus keeps the authoritative server revision when presentation hashing differs', async () => {
+  const view = render(<GridItemComp {...props} />);
+  await waitFor(() => expect(
+    mockSend.mock.calls
+      .map(([payload]) => JSON.parse(payload))
+      .some(message => message.type === 'instructionEditor.memoryCapabilities'),
+  ).toBe(true));
+  const request = [...mockSend.mock.calls]
+    .reverse()
+    .map(([payload]) => JSON.parse(payload))
+    .find(message => message.type === 'instructionEditor.memoryCapabilities');
+  const requestedBody = JSON.parse(request.body);
+  const authoritativeRevision = 'a'.repeat(64);
+  mockMessages = [JSON.stringify({
+    sessionId: 'componentTasks',
+    homeBankingId: 2,
+    operationId: 'instructionEditor.memoryCapabilitiesResponse',
+    body: JSON.stringify({
+      ok: true,
+      requestId: requestedBody.requestId,
+      targetSessionId: requestedBody.targetSessionId,
+      homeBankingId: requestedBody.homeBankingId,
+      botJobId: requestedBody.botJobId,
+      graphRevision: authoritativeRevision,
+      capabilities: props.dataComp.map(instruction => ({
+        instructionId: instruction.id,
+        canMove: true,
+        canDelete: true,
+        allowedBlockIds: [44],
+      })),
+      blockCapabilities: [],
+      variableLinks: [],
+    }),
+  })];
+  view.rerender(<GridItemComp {...props} />);
+
+  const addButton = (await screen.findAllByTitle('Add step to memory list'))[0];
+  expect(addButton).toBeEnabled();
+  fireEvent.click(addButton);
+
+  await waitFor(() => expect(latestMemorySnapshot().items[0].payload).toEqual({
+    kind: 'INSTRUCTION',
+    componentInstructionId: 101,
+    componentBlockId: 44,
+    sourceRevision: authoritativeRevision,
+  }));
+});
+
+test('block-header plus stages the complete COMPONENT block as one typed item', async () => {
+  const view = render(<GridItemComp {...props} />);
+  await authorizeGrid(view);
+
+  fireEvent.click(
+    screen.getByTitle('Add this complete connected block to Memory List'),
+  );
+
+  await waitFor(() => expect(latestMemorySnapshot().items).toEqual([
+    expect.objectContaining({
+      key: 'COMPONENT:BLOCK:2:44',
+      sourceItemKey: 'BLOCK:2:44',
+      payload: {
+        kind: 'BLOCK',
+        componentBlockId: 44,
+        sourceRevision: defaultGraphRevision,
+      },
+    }),
+  ]));
+});
+
 test('row plus confirms and stages the complete connected COMPONENT group', async () => {
   const view = render(<GridItemComp {...connectedProps} />);
   await authorizeGrid(view, connectedProps, [], [44]);
