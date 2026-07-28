@@ -11,6 +11,30 @@ describe('Java-compatible instruction graph revision', () => {
     expect(sha256Utf8('abc')).toBe(
       'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
     );
+    expect(sha256Utf8('\ud800')).toBe(sha256Utf8('?'));
+    expect(sha256Utf8('\udc00')).toBe(sha256Utf8('?'));
+  });
+
+  it('matches Java stable sorting when null and MAX_VALUE instruction IDs share a key', () => {
+    const nullId = {
+      id: null,
+      blockId: 1,
+      instructionOrderNumber: 1,
+      actions: 'A',
+    };
+    const maxId = {
+      id: 2147483647,
+      blockId: 1,
+      instructionOrderNumber: 2,
+      actions: 'B',
+    };
+    const canonical =
+      'null|1|1|A|null|null|null|null\n'
+      + '2147483647|1|2|B|null|null|null|null\n';
+
+    expect(computeInstructionGraphRevision([nullId, maxId], [])).toBe(
+      sha256Utf8(canonical),
+    );
   });
 
   it('matches the Java canonical row and variable format regardless of input order', () => {

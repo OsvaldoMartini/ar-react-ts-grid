@@ -44,10 +44,12 @@ const utf8Bytes = (text: string): number[] => {
         codePoint = 0x10000 + ((codePoint - 0xd800) << 10) + low - 0xdc00;
         index += 1;
       } else {
-        codePoint = 0xfffd;
+        // Java's StandardCharsets.UTF_8 encoder replaces an unpaired UTF-16
+        // surrogate with '?' (0x3f), not the UTF-8 replacement character.
+        codePoint = 0x3f;
       }
     } else if (codePoint >= 0xdc00 && codePoint <= 0xdfff) {
-      codePoint = 0xfffd;
+      codePoint = 0x3f;
     }
 
     if (codePoint <= 0x7f) {
@@ -174,6 +176,15 @@ const nullableNumberOrder = (
   return left - right;
 };
 
+const javaInstructionIdOrder = (
+  left: number | null | undefined,
+  right: number | null | undefined,
+): number => {
+  const leftKey = left == null ? 0x7fffffff : left;
+  const rightKey = right == null ? 0x7fffffff : right;
+  return leftKey - rightKey;
+};
+
 /**
  * Reproduces InstructionGraphRevisionService exactly. React can therefore
  * prove that its rendered graph is the same graph authorized by Java before
@@ -191,7 +202,7 @@ export const computeInstructionGraphRevision = (
 ): string => {
   const canonicalRows = [...(instructions ?? [])]
     .filter((row): row is GraphRevisionInstruction => row != null)
-    .sort((left, right) => nullableNumberOrder(left.id, right.id))
+    .sort((left, right) => javaInstructionIdOrder(left.id, right.id))
     .map(row => [
       row.id,
       row.blockId,
