@@ -8,16 +8,24 @@
   border-radius: 12px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
   z-index: 1000;
-  width: 450px;  // Increased width for better text fitting
+  box-sizing: border-box;
+  width: min(450px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow: hidden;
 
   .alert-content {
     display: grid;  // Use grid layout for better control over spacing
     grid-template-columns: 1fr;  // Single column layout
+    grid-template-rows: auto auto minmax(0, 1fr) auto auto;
     grid-gap: 8px;  // Reduced gap between grid items (for compact layout)
     align-items: center;
     justify-items: center;
     text-align: center;
     padding: 0;  // Removed padding inside content to avoid excess space
+    width: 100%;
+    max-height: calc(100vh - 72px);
+    min-height: 0;
+    overflow: hidden;
 
     // Apply default styling for images if no class is provided
     img.default-image-class {
@@ -57,6 +65,12 @@
       line-height: 1.4;
       text-align: left;
       white-space: pre-line;
+      box-sizing: border-box;
+      width: 100%;
+      max-width: 100%;
+      min-height: 0;
+      overflow: auto;
+      overscroll-behavior: contain;
 
       // Render body as rows if it is an array
       &.is-array {

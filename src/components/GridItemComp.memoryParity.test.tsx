@@ -98,7 +98,6 @@ const capabilityResponseForLastRequest = (
       capabilities: instructionRows.map(instruction => ({
         instructionId: instruction.id,
         canMove: true,
-        canDelete: true,
         allowedBlockIds,
       })),
       blockCapabilities,
@@ -205,7 +204,6 @@ test('component plus keeps the server revision but stale presentation cannot mov
       capabilities: props.dataComp.map(instruction => ({
         instructionId: instruction.id,
         canMove: true,
-        canDelete: true,
         allowedBlockIds: [44],
       })),
       blockCapabilities: [],
@@ -435,6 +433,49 @@ test('delete modal and v2 request contain the same exact conditional boundaries'
     ],
   }));
   expect(deletion.deleteInstructionIds).toEqual(modalRowIds);
+});
+
+test('delete modal summarizes more than five exact rows without truncating the v2 request', async () => {
+  const rootId = 301;
+  const linkedRows: ComponentsInstructionsDTO[] = Array.from(
+    { length: 6 },
+    (_, index) => ({
+      ...first,
+      id: rootId + index,
+      instructionOrderNumber: index + 1,
+      name: index === 0 ? 'Selected root' : `Linked child ${index}`,
+      actions: index === 0 ? 'CLICK' : 'GET',
+      parentId: index === 0 ? undefined : rootId,
+    }),
+  );
+  const linkedProps = {
+    ...props,
+    dataComp: linkedRows,
+  };
+  const view = render(<GridItemComp {...linkedProps} />);
+  await authorizeGrid(view, linkedProps);
+
+  fireEvent.click(screen.getAllByTitle('Delete instruction')[0]);
+
+  expect(screen.getByText(
+    'All 6 explicitly linked instructions/steps selected by the exact React plan will be deleted.',
+  )).toBeInTheDocument();
+  expect(document.querySelectorAll('.complex-message-row')).toHaveLength(0);
+  expect(mockSend.mock.calls
+    .map(([payload]) => JSON.parse(payload).type))
+    .not.toContain('DELETE_INSTRUCTION');
+
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+
+  const deletion = mockSend.mock.calls
+    .map(([payload]) => JSON.parse(payload))
+    .find(message => message.type === 'DELETE_INSTRUCTION');
+  expect(deletion).toEqual(expect.objectContaining({
+    deleteContractVersion: 2,
+    selectedInstructionId: rootId,
+    deleteInstructionIds: linkedRows.map(row => row.id),
+    deleteParentRepairs: [],
+  }));
 });
 
 test('component row drag commits one React-planned COMPONENT_ROW_MOVE', async () => {

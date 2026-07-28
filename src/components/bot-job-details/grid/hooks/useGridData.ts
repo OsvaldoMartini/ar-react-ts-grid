@@ -981,18 +981,14 @@ export function useGridData(deps: UseGridDataDeps) {
           const serverCapabilities = new Map<number, {
             instructionId: number;
             canMove: boolean;
-            canDelete: boolean;
             reason?: string;
-            deleteReason?: string;
             allowedBlockIds?: number[];
           }>();
           if (Array.isArray(bodyData?.capabilities)) {
             bodyData.capabilities.forEach((capability: {
               instructionId: number;
               canMove: boolean;
-              canDelete: boolean;
               reason?: string;
-              deleteReason?: string;
               allowedBlockIds?: number[];
             }) => {
               serverCapabilities.set(Number(capability.instructionId), capability);
@@ -1047,14 +1043,19 @@ export function useGridData(deps: UseGridDataDeps) {
               // graph. Memory copy eligibility is a separate operation and
               // must not disable drag (for example, EXCEL GOTO is non-copyable).
               canMove: moveGraphSynchronized && capability != null,
-              canDelete: capability?.canDelete === true,
+              // React owns instruction-delete planning. A correlated capability
+              // row proves freshness/coverage; Java no longer supplies UI
+              // deletion semantics for individual instructions.
+              canDelete: moveGraphSynchronized && capability != null,
               reason: moveGraphSynchronized && capability != null
                 ? ''
                 : 'Refresh this workspace before moving instructions.',
               addReason: !memoryGraphSynchronized || capability == null
                 ? staleMemoryReason
                 : memorySelection?.addReason || '',
-              deleteReason: capability?.deleteReason || '',
+              deleteReason: moveGraphSynchronized && capability != null
+                ? ''
+                : 'Refresh this workspace before deleting instructions.',
               allowedBlockIds: workspaceBlocks.map(block => block.blockId),
               memoryGroupKey: memorySelection?.memoryGroupKey,
               memoryGroupRows: memorySelection?.memoryGroupRows,
@@ -2112,12 +2113,15 @@ export function useGridData(deps: UseGridDataDeps) {
           : 'Delete Instruction',
     );
     // The modal and request are deliberately projected from the same immutable plan.
-    setAlertMessageBody(plan.instructions.map(row => ({
-      parentNameWithId:
-        `#${row.instructionOrderNumber} (${row.id}) ${row.name}`,
-      connectionLabel: 'Action',
-      actions: row.actions,
-    })));
+    setAlertMessageBody(plan.instructions.length > 5
+      ? `All ${plan.instructions.length} explicitly linked instructions/steps `
+        + 'selected by the exact React plan will be deleted.'
+      : plan.instructions.map(row => ({
+          parentNameWithId:
+            `#${row.instructionOrderNumber} (${row.id}) ${row.name}`,
+          connectionLabel: 'Action',
+          actions: row.actions,
+        })));
     const survivorNotice = plan.survivingParentReferences.length > 0
       ? ` ${plan.survivingParentReferences.length} preserved body row parent reference(s) `
         + 'will be detached by this exact React plan.'
