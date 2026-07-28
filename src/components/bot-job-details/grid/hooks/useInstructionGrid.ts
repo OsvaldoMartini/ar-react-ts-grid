@@ -310,7 +310,8 @@ export function useInstructionGrid({
       'The complete connected group will be staged together. '
         + 'Parent, child, Block, and Variable links will be preserved. '
         + (directAvailable
-          ? 'Use the orange option to stage only the displayed direct steps.'
+          ? 'Choose GET PARENTS ONLY for the displayed direct steps, '
+            + 'or GET ALL BETWEEN for the complete connected group.'
           : ''),
     );
     setErrorFlag(false);
@@ -318,9 +319,9 @@ export function useInstructionGrid({
     setAlertAlternateAction(
       directAvailable
         ? {
-            label: 'Only GET the Direct Steps',
+            label: 'GET PARENTS ONLY',
             onAction: () => stage('DIRECT'),
-            title: 'Stage only the direct ID-connected instructions shown above',
+            title: 'Stage only the parent/direct ID-connected instructions shown above',
           }
         : undefined,
     );

@@ -74,22 +74,38 @@ const AlertModal: React.FC<AlertModalProps> = ({
         {/* Buttons */}
         {onConfirm ? (
           <div className="alert-buttons">
-            <button onClick={onConfirm} className="confirm-btn">Confirm</button>
-            {alternateAction && (
-              <RulesCard
-                event={{
-                  color: 'orange',
-                  rules: alternateAction.label,
-                  ts: 0,
-                }}
-                animate={false}
-                pulse
-                glow
-                icon={false}
-                onClick={alternateAction.onAction}
-                title={alternateAction.title}
-                disabled={alternateAction.disabled}
-              />
+            {alternateAction ? (
+              <>
+                <RulesCard
+                  event={{
+                    color: 'green',
+                    rules: alternateAction.label,
+                    ts: 0,
+                  }}
+                  animate={false}
+                  pulse
+                  glow
+                  icon={false}
+                  onClick={alternateAction.onAction}
+                  title={alternateAction.title}
+                  disabled={alternateAction.disabled}
+                />
+                <RulesCard
+                  event={{
+                    color: 'orange',
+                    rules: 'GET ALL BETWEEN',
+                    ts: 0,
+                  }}
+                  animate={false}
+                  pulse
+                  glow
+                  icon={false}
+                  onClick={onConfirm}
+                  title="Stage the complete connected instruction group shown above"
+                />
+              </>
+            ) : (
+              <button onClick={onConfirm} className="confirm-btn">Confirm</button>
             )}
             <button onClick={onClose} className="cancel-btn">Cancel</button>
           </div>
