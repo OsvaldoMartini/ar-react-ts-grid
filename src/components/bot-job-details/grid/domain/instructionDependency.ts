@@ -11,6 +11,9 @@ export type DependencyClosureMode =
   | 'BOT_JOB_COPY'
   | 'BOT_JOB_MOVE';
 
+/** React-owned breadth used when projecting a Memory List selection. */
+export type DependencySelectionScope = 'FULL' | 'DIRECT';
+
 export type DependencyClosureErrorCode =
   | 'INVALID_REQUEST'
   | 'INVALID_INSTRUCTION'
@@ -23,6 +26,7 @@ export type DependencyClosureErrorCode =
   | 'DANGLING_VARIABLE'
   | 'MISSING_VARIABLE_OWNER'
   | 'DANGLING_VARIABLE_OWNER'
+  | 'MISSING_VARIABLE_PRODUCER'
   | 'MISSING_GOTO_TARGET_BLOCK'
   | 'DANGLING_GOTO_TARGET_BLOCK';
 
@@ -71,6 +75,7 @@ export interface ResolveInstructionDependencyClosureRequest<
     | null;
   selectedInstructionIds: readonly number[] | null | undefined;
   mode: DependencyClosureMode | null | undefined;
+  selectionScope?: DependencySelectionScope | null;
 }
 
 export interface InstructionDependencyResolver<
@@ -79,6 +84,7 @@ export interface InstructionDependencyResolver<
   resolve(
     selectedInstructionIds: readonly number[] | null | undefined,
     mode: DependencyClosureMode | null | undefined,
+    selectionScope?: DependencySelectionScope | null,
   ): DependencyClosureResult<TInstruction>;
 }
 
@@ -101,6 +107,30 @@ const VALID_MODES = new Set<DependencyClosureMode>([
   'COMPONENT_COPY',
   'BOT_JOB_COPY',
   'BOT_JOB_MOVE',
+]);
+
+const VALID_SELECTION_SCOPES = new Set<DependencySelectionScope>([
+  'FULL',
+  'DIRECT',
+]);
+
+const CONDITIONAL_BOUNDARY_ACTIONS = new Set([
+  'IF',
+  'ELSEIF',
+  'ELSE',
+  'ENDIF',
+]);
+
+const LOOP_BOUNDARY_ACTIONS = new Set([
+  'LOOP',
+  'REFRESH_LOOP',
+]);
+
+const VARIABLE_CONSUMER_ACTIONS = new Set([
+  'E',
+  'CK',
+  'PDF CHECK',
+  'CSV CHECK',
 ]);
 
 const MAX_ORDER = Number.MAX_SAFE_INTEGER;
@@ -483,6 +513,11 @@ const isMode = (
 ): mode is DependencyClosureMode =>
   mode != null && VALID_MODES.has(mode);
 
+const isSelectionScope = (
+  selectionScope: DependencySelectionScope | null | undefined,
+): selectionScope is DependencySelectionScope =>
+  selectionScope != null && VALID_SELECTION_SCOPES.has(selectionScope);
+
 const blockOrder = <TInstruction extends DependencyInstruction>(
   graph: GraphIndex<TInstruction>,
   blockId: number,
@@ -492,6 +527,240 @@ const blockOrder = <TInstruction extends DependencyInstruction>(
     minimum = Math.min(minimum, orderValue(row.blockOrderNumber));
   });
   return minimum;
+};
+
+/**
+ * Resolve the bounded, ID-based neighborhood requested by Only GET the Direct Steps.
+ *
+ * Unlike FULL selection this function never includes positional IF/LOOP bodies and never expands
+ * every user of a variable. It selects the semantic one-hop family visible in React, then follows
+ * only hard references required to persist a valid clone: ordinary parents, variable declaration
+ * owners/GET producers, and complete Component navigation destinations.
+ */
+const resolveDirectDependencyGroup = <
+  TInstruction extends DependencyInstruction,
+>(
+  graph: GraphIndex<TInstruction>,
+  selectedInstructionIds: readonly number[],
+  mode: DependencyClosureMode,
+): DependencyClosureResult<TInstruction> => {
+  const includedIds = new Set<number>();
+  const requiredBlockIds = new Set<number>();
+  const requiredQueue: number[] = [];
+  let requiredIndex = 0;
+
+  const include = (instructionId: number): void => {
+    if (!includedIds.has(instructionId)) {
+      includedIds.add(instructionId);
+      requiredQueue.push(instructionId);
+    }
+  };
+
+  const includeConditionalFamily = (
+    selected: TInstruction,
+    blockRows: readonly TInstruction[],
+  ): void => {
+    // Queue the selected row first. If its IF root is stale/missing, the
+    // required-reference validation below returns DANGLING_PARENT before any
+    // missing ID can be dereferenced.
+    if (isPositiveId(selected.id)) include(selected.id);
+    const action = canonicalInstructionAction(selected.actions);
+    const rootId = action === 'IF' ? selected.id : selected.parentId;
+    if (!isPositiveId(rootId)) {
+      return;
+    }
+    include(rootId);
+    blockRows.forEach((row) => {
+      if (
+        isPositiveId(row.id)
+        && row.parentId === rootId
+        && CONDITIONAL_BOUNDARY_ACTIONS.has(
+          canonicalInstructionAction(row.actions),
+        )
+      ) {
+        include(row.id);
+      }
+    });
+  };
+
+  const includeDirectFamily = (selected: TInstruction): void => {
+    if (!isPositiveId(selected.id) || !isPositiveId(selected.blockId)) return;
+    const blockRows = graph.rowsByBlock.get(selected.blockId) ?? [];
+    const action = canonicalInstructionAction(selected.actions);
+    if (CONDITIONAL_BOUNDARY_ACTIONS.has(action)) {
+      includeConditionalFamily(selected, blockRows);
+      return;
+    }
+    if (LOOP_BOUNDARY_ACTIONS.has(action)) {
+      include(selected.id);
+      if (isPositiveId(selected.parentId) && selected.parentId !== selected.id) {
+        include(selected.parentId);
+      }
+      return;
+    }
+
+    const crossBlockNavigation = isCrossBlockNavigation(
+      selected.actions,
+      selected.parentBlockId,
+      selected.blockId,
+    );
+    const rootId = !crossBlockNavigation
+      && isPositiveId(selected.parentId)
+      && selected.parentId !== selected.id
+      ? selected.parentId
+      : selected.id;
+    // Keep the concrete selected row ahead of any parent reference so a
+    // dangling parent is reported as data corruption instead of reaching the
+    // queue as an undefined instruction.
+    include(selected.id);
+    include(rootId);
+    blockRows.forEach((row) => {
+      const rowAction = canonicalInstructionAction(row.actions);
+      if (
+        isPositiveId(row.id)
+        && row.parentId === rootId
+        && !CONDITIONAL_BOUNDARY_ACTIONS.has(rowAction)
+        && !LOOP_BOUNDARY_ACTIONS.has(rowAction)
+        && !isCrossBlockNavigation(
+          row.actions,
+          row.parentBlockId,
+          row.blockId,
+        )
+      ) {
+        include(row.id);
+      }
+    });
+  };
+
+  selectedInstructionIds.forEach((selectedId) => {
+    includeDirectFamily(
+      graph.instructionsById.get(selectedId) as TInstruction,
+    );
+  });
+
+  while (requiredIndex < requiredQueue.length) {
+    const currentId = requiredQueue[requiredIndex];
+    requiredIndex += 1;
+    const current = graph.instructionsById.get(currentId);
+    if (current == null) {
+      return failure(
+        'DANGLING_PARENT',
+        'An instruction references a parent outside the supplied owner graph.',
+        null,
+        currentId,
+      );
+    }
+    const crossBlockNavigation = isCrossBlockNavigation(
+      current.actions,
+      current.parentBlockId,
+      current.blockId,
+    );
+
+    if (
+      isPositiveId(current.parentId)
+      && current.parentId !== currentId
+      && !crossBlockNavigation
+    ) {
+      if (!graph.instructionsById.has(current.parentId)) {
+        return failure(
+          'DANGLING_PARENT',
+          'An instruction references a parent outside the supplied owner graph.',
+          currentId,
+          current.parentId,
+        );
+      }
+      include(current.parentId);
+    }
+
+    if (current.variableId != null) {
+      const variable = graph.variablesById.get(current.variableId);
+      if (variable == null) {
+        return failure(
+          'DANGLING_VARIABLE',
+          'An instruction references a variable outside the supplied owner graph.',
+          currentId,
+          current.variableId,
+        );
+      }
+      const ownerId = variable.instructionId;
+      if (!isPositiveId(ownerId)) {
+        return failure(
+          'MISSING_VARIABLE_OWNER',
+          'A connected variable does not have an owning instruction.',
+          currentId,
+          current.variableId,
+        );
+      }
+      if (!graph.instructionsById.has(ownerId)) {
+        return failure(
+          'DANGLING_VARIABLE_OWNER',
+          'A connected variable owner is outside the supplied instruction graph.',
+          currentId,
+          ownerId,
+        );
+      }
+      include(ownerId);
+
+      if (
+        VARIABLE_CONSUMER_ACTIONS.has(
+          canonicalInstructionAction(current.actions),
+        )
+      ) {
+        const producers = (graph.usersByVariable.get(current.variableId) ?? [])
+          .filter(
+            (candidate) =>
+              canonicalInstructionAction(candidate.actions) === 'GET',
+          );
+        if (producers.length === 0) {
+          return failure(
+            'MISSING_VARIABLE_PRODUCER',
+            'A selected variable consumer does not have a matching GET producer.',
+            currentId,
+            current.variableId,
+          );
+        }
+        producers.forEach((producer) => {
+          if (isPositiveId(producer.id)) include(producer.id);
+        });
+      }
+    }
+
+    if (mode === 'COMPONENT_COPY' && crossBlockNavigation) {
+      const targetBlockId = current.parentBlockId;
+      if (!isPositiveId(targetBlockId)) {
+        return failure(
+          'MISSING_GOTO_TARGET_BLOCK',
+          'A component GOTO does not reference a positive target block.',
+          currentId,
+          nullableNumber(targetBlockId),
+        );
+      }
+      const targetRows = graph.rowsByBlock.get(targetBlockId);
+      if (targetRows == null || targetRows.length === 0) {
+        return failure(
+          'DANGLING_GOTO_TARGET_BLOCK',
+          'A component GOTO references a block outside the supplied owner graph.',
+          currentId,
+          targetBlockId,
+        );
+      }
+      requiredBlockIds.add(targetBlockId);
+      targetRows.forEach((targetRow) => {
+        if (isPositiveId(targetRow.id)) include(targetRow.id);
+      });
+    }
+  }
+
+  return success(
+    graph.instructions.filter(
+      (instruction) =>
+        isPositiveId(instruction.id) && includedIds.has(instruction.id),
+    ),
+    [...requiredBlockIds].sort(
+      (left, right) =>
+        blockOrder(graph, left) - blockOrder(graph, right) || left - right,
+    ),
+  );
 };
 
 /**
@@ -514,11 +783,20 @@ export const createInstructionDependencyResolver = <
     resolve: (
       selectedInstructionIds,
       mode,
+      selectionScope = 'FULL',
     ): DependencyClosureResult<TInstruction> => {
       if (!isMode(mode)) {
         return failure(
           'INVALID_REQUEST',
           'A dependency resolution mode is required.',
+          null,
+          null,
+        );
+      }
+      if (!isSelectionScope(selectionScope)) {
+        return failure(
+          'INVALID_REQUEST',
+          'A valid dependency selection scope is required.',
           null,
           null,
         );
@@ -571,6 +849,14 @@ export const createInstructionDependencyResolver = <
             null,
           );
         }
+      }
+
+      if (selectionScope === 'DIRECT') {
+        return resolveDirectDependencyGroup(
+          graph,
+          normalizedSelectedIds,
+          mode,
+        );
       }
 
       const includedIds = new Set<number>();
@@ -726,8 +1012,10 @@ export const resolveInstructionDependencyClosure = <
   variableLinks,
   selectedInstructionIds,
   mode,
+  selectionScope = 'FULL',
 }: ResolveInstructionDependencyClosureRequest<TInstruction>): DependencyClosureResult<TInstruction> =>
   createInstructionDependencyResolver(instructions, variableLinks).resolve(
     selectedInstructionIds,
     mode,
+    selectionScope,
   );

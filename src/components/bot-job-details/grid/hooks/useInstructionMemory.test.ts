@@ -68,9 +68,12 @@ describe('useInstructionMemory', () => {
         new Map([[1, { canAdd: true, canMove: false, canDelete: false, deleteCount: 0, reason: '', deleteReason: '', allowedBlockIds: [], deleteRows: [] }]]),
       );
     });
-    act(() => result.current.handleAddToMemory(data[0]));
-    act(() => result.current.handleAddToMemory(data[0])); // duplicate ignored
+    act(() => result.current.handleAddToMemory(data[0], 'revision-single'));
+    act(() => result.current.handleAddToMemory(data[0], 'revision-single')); // duplicate ignored
     expect(result.current.memorySteps.map((s) => s.id)).toEqual([1]);
+    expect((result.current.memorySteps[0] as typeof data[number] & {
+      sourceRevision?: string;
+    }).sourceRevision).toBe('revision-single');
     expect(result.current.memoryListOpenVersion).toBeGreaterThan(0);
     expect(result.current.memoryListOpenRequestedRef.current).toBe(true);
   });
@@ -118,7 +121,11 @@ describe('useInstructionMemory', () => {
 
     let firstResult: ReturnType<typeof result.current.handleAddConnectedGroupToMemory>;
     act(() => {
-      firstResult = result.current.handleAddConnectedGroupToMemory(excel, current);
+      firstResult = result.current.handleAddConnectedGroupToMemory(
+        excel,
+        current,
+        'revision-bot-job',
+      );
     });
     expect(firstResult!.ok).toBe(true);
     expect(result.current.memorySteps.map(step => step.id)).toEqual([5, 4, 6]);
@@ -128,7 +135,11 @@ describe('useInstructionMemory', () => {
     )).toBe(true);
 
     act(() => {
-      result.current.handleAddConnectedGroupToMemory(get, current);
+      result.current.handleAddConnectedGroupToMemory(
+        get,
+        current,
+        'revision-bot-job',
+      );
     });
     expect(result.current.memorySteps.map(step => step.id)).toEqual([5, 4, 6]);
 
@@ -136,6 +147,157 @@ describe('useInstructionMemory', () => {
       result.current.handleRemoveFromMemory(5);
     });
     expect(result.current.memorySteps).toEqual([]);
+  });
+
+  it('stages only the authoritative DIRECT Bot Job rows and preserves source metadata', () => {
+    const field = {
+      ...ins(4, 10, 1),
+      instructionOrderNumber: 1,
+      name: 'user_number',
+    };
+    const get = {
+      ...ins(5, 10, 1),
+      instructionOrderNumber: 2,
+      name: 'Get Value',
+      actions: 'GET',
+      parentId: 4,
+      variableId: 50,
+    };
+    const excel = {
+      ...ins(6, 10, 1),
+      instructionOrderNumber: 3,
+      name: 'Extract Field',
+      actions: 'E',
+      parentId: 4,
+      variableId: 50,
+    };
+    const unrelated = {
+      ...ins(7, 10, 1),
+      instructionOrderNumber: 4,
+      name: 'Unrelated consumer',
+      actions: 'CHECK',
+      variableId: 50,
+    };
+    const current = [field, get, excel, unrelated];
+    const fullRows = current.map(row => ({
+      id: row.id,
+      order: row.instructionOrderNumber,
+      name: row.name,
+      action: row.actions,
+      parentId: row.parentId ?? null,
+      blockId: row.blockId,
+    }));
+    const directRows = fullRows.filter(row => row.id !== unrelated.id);
+    const fullCapability = {
+      ...capability(fullRows),
+      directMemorySelection: {
+        canAdd: true,
+        addReason: '',
+        memoryGroupRows: directRows,
+        memoryGroupBlocks: [],
+        memoryGroupKey: 'DIRECT:I:4,5,6|B:',
+      },
+    };
+    const { result } = renderHook(() => useInstructionMemory(current));
+    act(() => {
+      result.current.setMemoryCapabilities(new Map([[excel.id, fullCapability]]));
+    });
+
+    act(() => {
+      result.current.handleAddConnectedGroupToMemory(
+        excel,
+        current,
+        'revision-full',
+        'FULL',
+      );
+    });
+    expect(result.current.memorySteps.map(step => step.id)).toEqual([4, 5, 6, 7]);
+
+    let stageResult: ReturnType<typeof result.current.handleAddConnectedGroupToMemory>;
+    act(() => {
+      stageResult = result.current.handleAddConnectedGroupToMemory(
+        excel,
+        current,
+        'revision-direct',
+        'DIRECT',
+      );
+    });
+
+    expect(stageResult!.ok).toBe(true);
+    expect(result.current.memorySteps.map(step => step.id)).toEqual([4, 5, 6]);
+    expect(result.current.memorySteps.every(step => {
+      const staged = step as typeof step & {
+        dependencyGroupKey?: string;
+        dependencySelectionScope?: string;
+        sourceRevision?: string;
+      };
+      return staged.dependencyGroupKey?.endsWith('DIRECT:I:4,5,6|B:') === true
+        && staged.dependencySelectionScope === 'DIRECT'
+        && staged.sourceRevision === 'revision-direct';
+    })).toBe(true);
+  });
+
+  it('replaces an overlapping Component FULL group instead of orphaning it after DIRECT staging', () => {
+    const rows = [101, 102, 103, 104].map((id, index) => ({
+      ...ins(id, 44, 3),
+      homeBankingId: 2,
+      instructionOrderNumber: index + 1,
+      name: `Component ${id}`,
+    }));
+    const groupRows = rows.map(row => ({
+      id: row.id,
+      order: row.instructionOrderNumber,
+      name: row.name,
+      action: row.actions,
+      parentId: null,
+      blockId: row.blockId,
+    }));
+    const fullCapability = {
+      ...capability(groupRows),
+      directMemorySelection: {
+        canAdd: true,
+        addReason: '',
+        memoryGroupRows: groupRows.slice(0, 3),
+        memoryGroupBlocks: [],
+        memoryGroupKey: 'DIRECT:I:101,102,103|B:',
+      },
+    };
+    const { result } = renderHook(() =>
+      useInstructionMemory(rows, COMPONENT_INSTRUCTION_GRID_POLICY));
+    act(() => {
+      result.current.setMemoryCapabilities(new Map([[rows[0].id, fullCapability]]));
+    });
+    act(() => {
+      result.current.handleAddConnectedGroupToMemory(
+        rows[0],
+        rows,
+        'component-full',
+        'FULL',
+      );
+    });
+    expect(result.current.componentMemoryItems.map(
+      item => item.payload?.kind === 'INSTRUCTION'
+        ? item.payload.componentInstructionId
+        : -1,
+    )).toEqual([101, 102, 103, 104]);
+
+    act(() => {
+      result.current.handleAddConnectedGroupToMemory(
+        rows[0],
+        rows,
+        'component-direct',
+        'DIRECT',
+      );
+    });
+
+    expect(result.current.componentMemoryItems.map(
+      item => item.payload?.kind === 'INSTRUCTION'
+        ? item.payload.componentInstructionId
+        : -1,
+    )).toEqual([101, 102, 103]);
+    expect(result.current.componentMemoryItems.every(
+      item => item.dependencySelectionScope === 'DIRECT',
+    )).toBe(true);
   });
 
   it('does not stage any member when an authoritative group row is missing', () => {
@@ -161,7 +323,11 @@ describe('useInstructionMemory', () => {
 
     let stageResult: ReturnType<typeof result.current.handleAddConnectedGroupToMemory>;
     act(() => {
-      stageResult = result.current.handleAddConnectedGroupToMemory(excel, [field, excel]);
+      stageResult = result.current.handleAddConnectedGroupToMemory(
+        excel,
+        [field, excel],
+        'revision-missing-row',
+      );
     });
 
     expect(stageResult!).toEqual({
@@ -180,7 +346,11 @@ describe('useInstructionMemory', () => {
 
     let stageResult: ReturnType<typeof result.current.handleAddConnectedGroupToMemory>;
     act(() => {
-      stageResult = result.current.handleAddConnectedGroupToMemory(data[0], data);
+      stageResult = result.current.handleAddConnectedGroupToMemory(
+        data[0],
+        data,
+        'revision-missing-metadata',
+      );
     });
 
     expect(stageResult!).toEqual({
@@ -236,7 +406,11 @@ describe('useInstructionMemory', () => {
 
     let stageResult: ReturnType<typeof result.current.handleAddBlockToMemory>;
     act(() => {
-      stageResult = result.current.handleAddBlockToMemory([root], current);
+      stageResult = result.current.handleAddBlockToMemory(
+        [root],
+        current,
+        'revision-bot-job-block',
+      );
     });
 
     expect(stageResult!.ok).toBe(true);
@@ -272,7 +446,7 @@ describe('useInstructionMemory', () => {
     });
 
     act(() => {
-      result.current.handleAddBlockToMemory(rows, rows);
+      result.current.handleAddBlockToMemory(rows, rows, 'revision-independent-block');
     });
 
     const groupKeys = result.current.memorySteps.map(
@@ -317,7 +491,11 @@ describe('useInstructionMemory', () => {
 
     let stageResult: ReturnType<typeof result.current.handleAddBlockToMemory>;
     act(() => {
-      stageResult = result.current.handleAddBlockToMemory([root], current);
+      stageResult = result.current.handleAddBlockToMemory(
+        [root],
+        current,
+        'revision-stale-block',
+      );
     });
 
     expect(stageResult!).toEqual({

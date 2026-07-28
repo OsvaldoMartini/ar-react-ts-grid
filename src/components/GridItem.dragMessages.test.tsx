@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import GridItem from './GridItem';
 import GridItemComp from './GridItemComp';
 import { BlockLoopInstructionLoadDTO, ComponentsInstructionsDTO } from './instructionsMockData';
+import { computeInstructionGraphRevision } from './bot-job-details/grid/domain/instructionGraphRevision';
 
 const mockSend = jest.fn();
 const mockWebSocket = { send: mockSend, readyState: WebSocket.OPEN } as unknown as WebSocket;
@@ -204,6 +205,10 @@ test('Bot Job block plus stages its complete connected dependency union atomical
     { id: 102, order: 1, name: 'Get Value', action: 'GET', parentId: 101, blockId: 20 },
     { id: 103, order: 2, name: 'Extract Field', action: 'E', parentId: 101, blockId: 20 },
   ];
+  const graphRevision = computeInstructionGraphRevision(
+    [row, getValue, extractField],
+    [],
+  );
   mockMessages = [JSON.stringify({
     sessionId: 'botJobTasks',
     homeBankingId: 2,
@@ -214,7 +219,7 @@ test('Bot Job block plus stages its complete connected dependency union atomical
       targetSessionId: 'botJobTasks',
       homeBankingId: 2,
       botJobId: 5,
-      graphRevision: 'revision-1',
+      graphRevision,
       capabilities: [101, 102, 103].map(instructionId => ({
         instructionId,
         canAddToMemory: true,

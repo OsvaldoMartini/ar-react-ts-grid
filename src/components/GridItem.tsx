@@ -62,7 +62,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
     alertMessageHeader,
     alertMessageBody,
     alertMessageFooter,
-    alertOnConfirm, handleClose,
+    alertOnConfirm, alertAlternateAction, handleClose,
     executionId, executionState,
     findText, setFindText, renderHighlighted,
     collapsedBlocks, toggleBlockCollapsed,
@@ -512,6 +512,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
           extraMsg={alertMessageFooter || ''}
           onClose={handleClose}
           onConfirm={alertOnConfirm}
+          alternateAction={alertAlternateAction}
           imageSrc={alertImage}
           imageClass={alertClass}
           error={errorFlag}

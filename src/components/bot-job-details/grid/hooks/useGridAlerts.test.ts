@@ -24,6 +24,41 @@ describe('useGridAlerts', () => {
     expect(result.current.alertOnConfirm).toBeInstanceOf(Function);
   });
 
+  it('clears stale confirm and alternate actions whenever a new modal starts', () => {
+    const { result } = renderHook(() => useGridAlerts());
+    act(() => {
+      result.current.setAlertOnConfirm(() => () => {});
+      result.current.setAlertAlternateAction({
+        label: 'Only GET the Direct Steps',
+        onAction: () => {},
+      });
+    });
+
+    act(() => {
+      result.current.setAlertMessageHeader('WebSocket Error');
+    });
+
+    expect(result.current.alertOnConfirm).toBeUndefined();
+    expect(result.current.alertAlternateAction).toBeUndefined();
+  });
+
+  it('allows a confirmation producer to install fresh actions after its header', () => {
+    const { result } = renderHook(() => useGridAlerts());
+    act(() => {
+      result.current.setAlertMessageHeader('Add connected instructions?');
+      result.current.setAlertOnConfirm(() => () => {});
+      result.current.setAlertAlternateAction({
+        label: 'Only GET the Direct Steps',
+        onAction: () => {},
+      });
+    });
+
+    expect(result.current.alertOnConfirm).toBeInstanceOf(Function);
+    expect(result.current.alertAlternateAction?.label).toBe(
+      'Only GET the Direct Steps',
+    );
+  });
+
   it('handleClose clears the error, header/body, pending delete and confirm', () => {
     const { result } = renderHook(() => useGridAlerts());
     act(() => {

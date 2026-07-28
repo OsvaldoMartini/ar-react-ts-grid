@@ -15,6 +15,7 @@ import {
   projectMemorySelections,
 } from '../domain/memoryOptions';
 import type { InstructionVariableLink } from '../domain/instructionDependency';
+import { computeInstructionGraphRevision } from '../domain/instructionGraphRevision';
 import {
   groupByBlock,
   reassignInstructionOrderNumbersByBlock,
@@ -348,6 +349,10 @@ export function useGridData(deps: UseGridDataDeps) {
         : memorySteps.map((step) => instructionMemoryItem(
           step,
           (step as typeof step & { dependencyGroupKey?: string }).dependencyGroupKey,
+          (step as typeof step & { sourceRevision?: string }).sourceRevision || '',
+          (step as typeof step & {
+            dependencySelectionScope?: 'FULL' | 'DIRECT';
+          }).dependencySelectionScope || 'FULL',
         )),
       // Component blocks are reusable sources, never Bot Job destinations.
       blocks: componentWorkspace ? [] : memoryBlockOptions,
@@ -1049,12 +1054,20 @@ export function useGridData(deps: UseGridDataDeps) {
           const renderedInstructionIds = new Set(
             instructionsData.map(instruction => instruction.id),
           );
+          const backendGraphRevision = typeof bodyData?.graphRevision === 'string'
+            ? bodyData.graphRevision.trim().toLowerCase()
+            : '';
           const memoryGraphSynchronized =
             renderedInstructionIds.size === instructionsData.length
             && serverCapabilities.size === renderedInstructionIds.size
             && [...renderedInstructionIds].every(
               instructionId => serverCapabilities.has(instructionId),
-            );
+            )
+            && /^[a-f0-9]{64}$/.test(backendGraphRevision)
+            && computeInstructionGraphRevision(
+              instructionsData,
+              variableLinks,
+            ) === backendGraphRevision;
           const staleMemoryReason =
             'The instruction graph changed. Refresh this workspace before adding rows or blocks to Memory List.';
           const next = new Map<number, MemoryCapability>();
@@ -1082,6 +1095,7 @@ export function useGridData(deps: UseGridDataDeps) {
               memoryGroupKey: memorySelection?.memoryGroupKey,
               memoryGroupRows: memorySelection?.memoryGroupRows,
               memoryGroupBlocks: memorySelection?.memoryGroupBlocks,
+              directMemorySelection: memorySelection?.directMemorySelection,
             });
           });
           setMemoryCapabilities(next);

@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { ComplexMessage } from '../../../instructionsMockData';
 import constructionImage from '../../../../assets/construction.png';
+import type { AlertAlternateAction } from '../../../AlertModal';
 
 export interface UseGridAlerts {
   errorFlag: boolean;
@@ -21,6 +22,10 @@ export interface UseGridAlerts {
   setPendingDeleteBlockId: React.Dispatch<React.SetStateAction<number | null>>;
   alertOnConfirm: (() => void) | undefined;
   setAlertOnConfirm: React.Dispatch<React.SetStateAction<(() => void) | undefined>>;
+  alertAlternateAction: AlertAlternateAction | undefined;
+  setAlertAlternateAction: React.Dispatch<
+    React.SetStateAction<AlertAlternateAction | undefined>
+  >;
   /** Dismiss the alert / confirmation modal and reset its transient fields. */
   handleClose: () => void;
 }
@@ -35,12 +40,28 @@ export function useGridAlerts(): UseGridAlerts {
   const [errorFlag, setErrorFlag] = useState<boolean>(false);
   const [alertImage, setAlertImage] = useState<string>(constructionImage);
   const [alertClass, setAlertClass] = useState<string>('construction-image');
-  const [alertMessageHeader, setAlertMessageHeader] = useState<string | null>(null);
+  const [alertMessageHeader, setAlertMessageHeaderState] = useState<string | null>(null);
   const [alertMessageBody, setAlertMessageBody] = useState<string | ComplexMessage[]>([]);
   const [alertMessageFooter, setAlertMessageFooter] = useState<string | null>(null);
   const [alertDismissed, setAlertDismissed] = useState<boolean>(false);
   const [pendingDeleteBlockId, setPendingDeleteBlockId] = useState<number | null>(null);
   const [alertOnConfirm, setAlertOnConfirm] = useState<(() => void) | undefined>(undefined);
+  const [alertAlternateAction, setAlertAlternateAction] = useState<
+    AlertAlternateAction | undefined
+  >(undefined);
+
+  /**
+   * Starting a new modal always invalidates actions owned by the previous
+   * modal. Confirmation producers set their fresh callbacks after the header
+   * in the same React batch.
+   */
+  const setAlertMessageHeader = useCallback<
+    React.Dispatch<React.SetStateAction<string | null>>
+  >((nextHeader) => {
+    setAlertOnConfirm(undefined);
+    setAlertAlternateAction(undefined);
+    setAlertMessageHeaderState(nextHeader);
+  }, []);
 
   const handleClose = useCallback(() => {
     setAlertDismissed(true); // Trigger re-execution of the effect
@@ -49,7 +70,8 @@ export function useGridAlerts(): UseGridAlerts {
     setAlertMessageBody('');
     setPendingDeleteBlockId(null);
     setAlertOnConfirm(undefined);
-  }, []);
+    setAlertAlternateAction(undefined);
+  }, [setAlertMessageHeader]);
 
   return {
     errorFlag,
@@ -70,6 +92,8 @@ export function useGridAlerts(): UseGridAlerts {
     setPendingDeleteBlockId,
     alertOnConfirm,
     setAlertOnConfirm,
+    alertAlternateAction,
+    setAlertAlternateAction,
     handleClose,
   };
 }

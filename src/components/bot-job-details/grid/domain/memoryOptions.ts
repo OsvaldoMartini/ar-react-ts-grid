@@ -5,6 +5,7 @@ import type {
   ComponentMemoryListPayload,
   MemoryInstructionGroupBlock,
   MemoryInstructionGroupRow,
+  MemoryDependencySelectionScope,
   MemoryListItem,
   MemoryListItemIcon,
 } from '../../../memoryList.contract';
@@ -13,6 +14,7 @@ import {
   createInstructionDependencyResolver,
   type DependencyClosureMode,
   type DependencyClosureResult,
+  type DependencySelectionScope,
   type InstructionVariableLink,
 } from './instructionDependency';
 
@@ -64,6 +66,7 @@ export type ProjectedMemorySelection = {
   memoryGroupKey?: string;
   memoryGroupRows?: MemoryInstructionGroupRow[];
   memoryGroupBlocks?: MemoryInstructionGroupBlock[];
+  directMemorySelection?: Omit<ProjectedMemorySelection, 'directMemorySelection'>;
 };
 
 export type ProjectedMemorySelections = {
@@ -71,9 +74,28 @@ export type ProjectedMemorySelections = {
   blocks: Map<number, ProjectedMemorySelection>;
 };
 
+const projectedSelectionMembersEqual = (
+  left: ProjectedMemorySelection,
+  right: ProjectedMemorySelection,
+): boolean => {
+  const leftRows = new Set((left.memoryGroupRows ?? []).map((row) => row.id));
+  const rightRows = new Set((right.memoryGroupRows ?? []).map((row) => row.id));
+  const leftBlocks = new Set(
+    (left.memoryGroupBlocks ?? []).map((block) => block.blockId),
+  );
+  const rightBlocks = new Set(
+    (right.memoryGroupBlocks ?? []).map((block) => block.blockId),
+  );
+  return leftRows.size === rightRows.size
+    && leftBlocks.size === rightBlocks.size
+    && [...leftRows].every((id) => rightRows.has(id))
+    && [...leftBlocks].every((id) => rightBlocks.has(id));
+};
+
 const projectDependencyClosure = (
   closure: DependencyClosureResult<BlockLoopInstructionLoadDTO>,
   mode: DependencyClosureMode,
+  selectionScope: DependencySelectionScope = 'FULL',
 ): ProjectedMemorySelection => {
   if (!closure.successful) {
     return {
@@ -133,7 +155,7 @@ const projectDependencyClosure = (
   return {
     canAdd: true,
     addReason: '',
-    memoryGroupKey: `I:${instructionIds}|B:${blockIds}`,
+    memoryGroupKey: `${selectionScope}:I:${instructionIds}|B:${blockIds}`,
     memoryGroupRows: rows,
     memoryGroupBlocks: blocks,
   };
@@ -158,9 +180,25 @@ export const projectMemorySelections = (
   );
   const instructionSelections = new Map<number, ProjectedMemorySelection>();
   currentInstructions.forEach((instruction) => {
+    const full = projectDependencyClosure(
+      resolver.resolve([instruction.id], mode, 'FULL'),
+      mode,
+      'FULL',
+    );
+    const direct = projectDependencyClosure(
+      resolver.resolve([instruction.id], mode, 'DIRECT'),
+      mode,
+      'DIRECT',
+    );
     instructionSelections.set(
       instruction.id,
-      projectDependencyClosure(resolver.resolve([instruction.id], mode), mode),
+      {
+        ...full,
+        directMemorySelection: direct.canAdd
+          && !projectedSelectionMembersEqual(full, direct)
+          ? direct
+          : undefined,
+      },
     );
   });
 
@@ -174,7 +212,11 @@ export const projectMemorySelections = (
   instructionIdsByBlock.forEach((instructionIds, blockId) => {
     blockSelections.set(
       blockId,
-      projectDependencyClosure(resolver.resolve(instructionIds, mode), mode),
+      projectDependencyClosure(
+        resolver.resolve(instructionIds, mode, 'FULL'),
+        mode,
+        'FULL',
+      ),
     );
   });
 
@@ -276,16 +318,19 @@ export const instructionMemoryIcon = (
 export const instructionMemoryItem = (
   instruction: BlockLoopInstructionLoadDTO,
   dependencyGroupKey?: string,
+  sourceRevision = '',
+  dependencySelectionScope: MemoryDependencySelectionScope = 'FULL',
 ): MemoryListItem => ({
   key: `BOT_JOB:${instruction.id}`,
   sourceKind: 'BOT_JOB',
   dependencyGroupKey,
+  dependencySelectionScope,
   sourceItemKey: String(instruction.id),
   label: `(${instruction.id})${instructionDisplayLabel(instruction) || instruction.actions || 'Instruction'}`,
   detail: `Block #${instruction.blockOrderNumber} ${instruction.blockName}`,
   icon: instructionMemoryIcon(instruction),
   active: instruction.instructionActive !== false,
-  payload: { instructionId: instruction.id },
+  payload: { instructionId: instruction.id, sourceRevision },
 });
 
 const componentInstructionSourceKey = (
@@ -298,12 +343,14 @@ export const componentInstructionMemoryItem = (
   instruction: BlockLoopInstructionLoadDTO,
   sourceRevision: string,
   dependencyGroupKey?: string,
+  dependencySelectionScope: MemoryDependencySelectionScope = 'FULL',
 ): MemoryListItem<ComponentMemoryListPayload> => {
   const sourceItemKey = componentInstructionSourceKey(instruction);
   return {
     key: `COMPONENT:${sourceItemKey}`,
     sourceKind: 'COMPONENT',
     dependencyGroupKey,
+    dependencySelectionScope,
     sourceItemKey,
     label: `(${instruction.id})${instructionDisplayLabel(instruction) || instruction.actions || 'Instruction'}`,
     detail: `Component block #${instruction.blockOrderNumber} ${instruction.blockName}`,
@@ -330,6 +377,7 @@ export const componentBlockMemoryItem = (
   instructions: BlockLoopInstructionLoadDTO[],
   sourceRevision: string,
   dependencyGroupKey?: string,
+  dependencySelectionScope: MemoryDependencySelectionScope = 'FULL',
 ): MemoryListItem<ComponentMemoryListPayload> | null => {
   const first = instructions[0];
   if (!first) return null;
@@ -338,6 +386,7 @@ export const componentBlockMemoryItem = (
     key: `COMPONENT:${sourceItemKey}`,
     sourceKind: 'COMPONENT',
     dependencyGroupKey,
+    dependencySelectionScope,
     sourceItemKey,
     label: first.blockName || `Component block ${first.blockId}`,
     detail: `Whole component block (${instructions.length} instruction${instructions.length === 1 ? '' : 's'})`,

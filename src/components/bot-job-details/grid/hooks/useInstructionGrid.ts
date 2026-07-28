@@ -89,6 +89,7 @@ export function useInstructionGrid({
     alertDismissed, setAlertDismissed,
     pendingDeleteBlockId, setPendingDeleteBlockId,
     alertOnConfirm, setAlertOnConfirm,
+    alertAlternateAction, setAlertAlternateAction,
     handleClose,
   } = useGridAlerts();
 
@@ -215,6 +216,7 @@ export function useInstructionGrid({
     setAlertMessageFooter('Refresh this workspace before selecting the instruction again.');
     setErrorFlag(true);
     setAlertOnConfirm(undefined);
+    setAlertAlternateAction(undefined);
   };
 
   const handleAddConnectedGroupToMemory = (
@@ -231,7 +233,7 @@ export function useInstructionGrid({
     const groupRows = capability.memoryGroupRows ?? [];
     const groupBlocks = capability.memoryGroupBlocks ?? [];
     const stageContext = memoryStageContextRef.current;
-    const stage = () => {
+    const stage = (selectionScope: 'FULL' | 'DIRECT') => {
       handleClose();
       const latest = memoryStageContextRef.current;
       if (
@@ -246,13 +248,14 @@ export function useInstructionGrid({
       }
       const result = stageConnectedGroupToMemory(
         instruction,
-        instructionsData,
-        moveGraphRevision,
+        stageContext.instructionsData,
+        stageContext.moveGraphRevision,
+        selectionScope,
       );
       if (!result.ok) showMemoryStageFailure(result.reason);
     };
     if (groupRows.length <= 1 && groupBlocks.length === 0) {
-      stage();
+      stage('FULL');
       return;
     }
 
@@ -268,16 +271,59 @@ export function useInstructionGrid({
           + `${block.blockName || block.blockId}`,
       );
     });
+    const directSelection = capability.directMemorySelection;
+    const directRows = directSelection?.memoryGroupRows ?? [];
+    const directBlocks = directSelection?.memoryGroupBlocks ?? [];
+    const fullRowIds = new Set(groupRows.map((row) => row.id));
+    const fullBlockIds = new Set(groupBlocks.map((block) => block.blockId));
+    const sameSelectionMembers = fullRowIds.size === directRows.length
+      && fullBlockIds.size === directBlocks.length
+      && directRows.every((row) => fullRowIds.has(row.id))
+      && directBlocks.every((block) => fullBlockIds.has(block.blockId));
+    const directAvailable = directSelection?.canAdd === true
+      && directRows.length > 0
+      && !sameSelectionMembers;
+    if (directAvailable) {
+      visibleRows.push('');
+      visibleRows.push(
+        `Direct steps option (${directRows.length} instruction`
+          + `${directRows.length === 1 ? '' : 's'}):`,
+      );
+      directRows.slice(0, 5).forEach((row) => {
+        visibleRows.push(`#${row.order} ${row.name || row.action}`);
+      });
+      if (directRows.length > 5) {
+        visibleRows.push(`+ ${directRows.length - 5} more direct instruction(s)`);
+      }
+      directBlocks.forEach((block) => {
+        visibleRows.push(
+          `Required Block #${block.blockOrderNumber ?? block.blockId} `
+            + `${block.blockName || block.blockId}`,
+        );
+      });
+    }
     setAlertMessageHeader(
       `Add ${groupRows.length} connected instruction${groupRows.length === 1 ? '' : 's'} to Memory List?`,
     );
     setAlertMessageBody(visibleRows.join('\n'));
     setAlertMessageFooter(
       'The complete connected group will be staged together. '
-        + 'Parent, child, Block, and Variable links will be preserved.',
+        + 'Parent, child, Block, and Variable links will be preserved. '
+        + (directAvailable
+          ? 'Use the orange option to stage only the displayed direct steps.'
+          : ''),
     );
     setErrorFlag(false);
-    setAlertOnConfirm(() => stage);
+    setAlertOnConfirm(() => () => stage('FULL'));
+    setAlertAlternateAction(
+      directAvailable
+        ? {
+            label: 'Only GET the Direct Steps',
+            onAction: () => stage('DIRECT'),
+            title: 'Stage only the direct ID-connected instructions shown above',
+          }
+        : undefined,
+    );
   };
 
   const handleAddBlockToMemory = (
@@ -341,6 +387,7 @@ export function useInstructionGrid({
       const result = stageBotJobBlockToMemory(
         blockInstructions,
         stageContext.instructionsData,
+        stageContext.moveGraphRevision,
       );
       if (!result.ok) showMemoryStageFailure(result.reason);
     };
@@ -373,6 +420,7 @@ export function useInstructionGrid({
     );
     setErrorFlag(false);
     setAlertOnConfirm(() => stage);
+    setAlertAlternateAction(undefined);
   };
 
   const handleStageComponentBlock = (
@@ -440,6 +488,7 @@ export function useInstructionGrid({
     );
     setErrorFlag(false);
     setAlertOnConfirm(() => stage);
+    setAlertAlternateAction(undefined);
   };
 
   // Whole-block reordering (drag + up/down buttons) lives in useBlockReorder.
@@ -526,7 +575,7 @@ export function useInstructionGrid({
     alertMessageHeader, setAlertMessageHeader,
     alertMessageBody, setAlertMessageBody,
     alertMessageFooter, setAlertMessageFooter,
-    alertOnConfirm, handleClose,
+    alertOnConfirm, alertAlternateAction, handleClose,
     // useExecutionState
     executionId, executionState,
     // useInstructionFind

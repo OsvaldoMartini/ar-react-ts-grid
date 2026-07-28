@@ -7,7 +7,10 @@ const item = (key: string, dependencyGroupKey?: string): MemoryListItem => ({
   sourceItemKey: key,
   label: key,
   dependencyGroupKey,
-  payload: { instructionId: Number(key.replace(/\D/g, '')) || 1 },
+  payload: {
+    instructionId: Number(key.replace(/\D/g, '')) || 1,
+    sourceRevision: 'revision-1',
+  },
 });
 
 test('moves a parent GET Excel group as one unit and preserves its internal order', () => {

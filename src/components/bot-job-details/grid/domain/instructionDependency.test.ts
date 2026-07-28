@@ -1,6 +1,7 @@
 import {
   DependencyClosureMode,
   DependencyInstruction,
+  DependencySelectionScope,
   InstructionVariableLink,
   canonicalInstructionAction,
   createInstructionDependencyResolver,
@@ -45,12 +46,14 @@ const resolve = (
   variableLinks: readonly InstructionVariableLink[],
   selectedInstructionIds: readonly number[],
   mode: DependencyClosureMode,
+  selectionScope: DependencySelectionScope = 'FULL',
 ) =>
   resolveInstructionDependencyClosure({
     instructions,
     variableLinks,
     selectedInstructionIds,
     mode,
+    selectionScope,
   });
 
 describe('canonical instruction actions', () => {
@@ -251,6 +254,127 @@ describe('resolveInstructionDependencyClosure', () => {
     expect(ids(result)).toEqual([
       804, 805, 806, 807, 808, 809, 810, 811, 812, 813, 814, 815, 816,
     ]);
+
+    const directExcel = resolve(
+      checkPaymentRows,
+      [variable(501, 804), variable(502, 804)],
+      [809],
+      'COMPONENT_COPY',
+      'DIRECT',
+    );
+    expect(directExcel.successful).toBe(true);
+    expect(ids(directExcel)).toEqual([804, 805, 807, 808, 809]);
+
+    [806, 810, 816].forEach((selectedId) => {
+      const directConditional = resolve(
+        checkPaymentRows,
+        [variable(501, 804), variable(502, 804)],
+        [selectedId],
+        'COMPONENT_COPY',
+        'DIRECT',
+      );
+      expect(ids(directConditional)).toEqual([806, 810, 816]);
+    });
+
+    const directBody = resolve(
+      checkPaymentRows,
+      [variable(501, 804), variable(502, 804)],
+      [812],
+      'COMPONENT_COPY',
+      'DIRECT',
+    );
+    expect(ids(directBody)).toEqual([812]);
+  });
+
+  it('DIRECT selects only IF boundaries and LOOP endpoints, never positional bodies', () => {
+    const rows = [
+      row(1, 7, 1, 1, 'IF', 1),
+      row(2, 7, 1, 2, 'C'),
+      row(3, 7, 1, 3, 'ELSEIF', 1),
+      row(4, 7, 1, 4, 'C'),
+      row(5, 7, 1, 5, 'ELSE', 1),
+      row(6, 7, 1, 6, 'C'),
+      row(7, 7, 1, 7, 'ENDIF', 1),
+      row(8, 7, 1, 8, 'O'),
+      row(9, 7, 1, 9, 'C'),
+      row(10, 7, 1, 10, 'REFRESH_LOOP', 8),
+    ];
+
+    expect(ids(resolve(rows, [], [4], 'BOT_JOB_COPY', 'DIRECT'))).toEqual([4]);
+    expect(ids(resolve(rows, [], [5], 'BOT_JOB_COPY', 'DIRECT'))).toEqual([
+      1, 3, 5, 7,
+    ]);
+    expect(ids(resolve(rows, [], [10], 'BOT_JOB_COPY', 'DIRECT'))).toEqual([
+      8, 10,
+    ]);
+  });
+
+  it('DIRECT includes a variable owner and GET producer without unrelated consumers', () => {
+    const rows = [
+      row(10, 1, 1, 1, 'O'),
+      row(11, 1, 1, 2, 'GET', 10, 100, 1),
+      row(12, 1, 1, 3, 'E', 10, 100, 1),
+      row(20, 2, 2, 1, 'O'),
+      row(21, 2, 2, 2, 'CK', 20, 100, 2),
+    ];
+
+    const result = resolve(
+      rows,
+      [variable(100, 10)],
+      [12],
+      'COMPONENT_COPY',
+      'DIRECT',
+    );
+    expect(result.successful).toBe(true);
+    expect(ids(result)).toEqual([10, 11, 12]);
+  });
+
+  it('DIRECT recursively includes required Component GOTO blocks without its source IF body', () => {
+    const rows = [
+      row(1, 1, 1, 1, 'IF', 1),
+      row(2, 1, 1, 2, 'GOTO', 20, null, 2),
+      row(3, 1, 1, 3, 'ENDIF', 1),
+      row(20, 2, 2, 1, 'O'),
+      row(21, 2, 2, 2, 'EXCEL GOTO', 30, null, 3),
+      row(30, 3, 3, 1, 'O'),
+    ];
+
+    const result = resolve(
+      rows,
+      [],
+      [2],
+      'COMPONENT_COPY',
+      'DIRECT',
+    );
+    expect(result.successful).toBe(true);
+    expect(ids(result)).toEqual([2, 20, 21, 30]);
+    expect(result.requiredBlockIds).toEqual([2, 3]);
+  });
+
+  it.each([
+    ['ordinary child', row(41, 7, 1, 1, 'C', 999)],
+    ['ELSE boundary', row(42, 7, 1, 1, 'ELSE', 999)],
+    ['ENDIF boundary', row(43, 7, 1, 1, 'ENDIF', 999)],
+    ['LOOP boundary', row(44, 7, 1, 1, 'LOOP', 999)],
+  ])('DIRECT reports a dangling parent for a stale %s without throwing', (_label, selected) => {
+    const result = resolve(
+      [selected],
+      [],
+      [selected.id as number],
+      'COMPONENT_COPY',
+      'DIRECT',
+    );
+
+    expect(result.successful).toBe(false);
+    expect(result.error).toEqual({
+      code: 'DANGLING_PARENT',
+      message:
+        'An instruction references a parent outside the supplied owner graph.',
+      instructionId: selected.id,
+      relatedId: 999,
+    });
+    expect(result.orderedInstructions).toEqual([]);
+    expect(result.requiredBlockIds).toEqual([]);
   });
 
   it('returns a structured dangling-parent error with no partial closure', () => {

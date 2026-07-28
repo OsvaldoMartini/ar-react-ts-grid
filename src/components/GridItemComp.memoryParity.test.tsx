@@ -2,6 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import GridItemComp from './GridItemComp';
 import type { ComponentsInstructionsDTO } from './instructionsMockData';
+import { computeInstructionGraphRevision } from './bot-job-details/grid/domain/instructionGraphRevision';
 
 const mockSend = jest.fn();
 const mockWebSocket = { send: mockSend, readyState: WebSocket.OPEN } as unknown as WebSocket;
@@ -54,6 +55,8 @@ const second: ComponentsInstructionsDTO = {
   name: 'Confirm',
 };
 
+const defaultGraphRevision = computeInstructionGraphRevision([first, second], []);
+
 const connectedSecond: ComponentsInstructionsDTO = {
   ...second,
   actions: 'GET',
@@ -91,7 +94,7 @@ const capabilityResponseForLastRequest = (
       targetSessionId: requestedBody.targetSessionId,
       homeBankingId: requestedBody.homeBankingId,
       botJobId: requestedBody.botJobId,
-      graphRevision: 'component-revision-1',
+      graphRevision: computeInstructionGraphRevision(instructionRows, []),
       capabilities: instructionRows.map(instruction => ({
         instructionId: instruction.id,
         canMove: true,
@@ -166,7 +169,7 @@ test('row plus stages a typed COMPONENT instruction and exposes no component tar
           kind: 'INSTRUCTION',
           componentInstructionId: 101,
           componentBlockId: 44,
-          sourceRevision: 'component-revision-1',
+          sourceRevision: defaultGraphRevision,
         },
       })],
     }));
@@ -357,7 +360,7 @@ test('component row drag commits with COMPONENT_ROW_MOVE after authoritative pre
       .find(message => message.type === 'COMPONENT_ROW_MOVE');
     expect(move).toEqual(expect.objectContaining({
       sessionId: 'componentTasks',
-      graphRevision: 'component-revision-1',
+      graphRevision: defaultGraphRevision,
     }));
     expect(move.updatedRows).toEqual([
       expect.objectContaining({ instructionId: 102, instructionOrderNumber: 1 }),
@@ -588,7 +591,7 @@ test('an empty first component block can roll all instructions back into itself'
     sessionId: 'componentTasks',
     blockId: 33,
     botJobId: 5,
-    graphRevision: 'component-revision-1',
+    graphRevision: defaultGraphRevision,
   }));
   expect(rollback.updatedRows).toEqual([
     expect.objectContaining({ instructionId: 101, blockId: 33, instructionOrderNumber: 1 }),
@@ -659,7 +662,7 @@ test('empty component block delete uses catalog metadata and component routing',
     sessionId: 'componentTasks',
     blockId: 33,
     botJobId: 5,
-    graphRevision: 'component-revision-1',
+    graphRevision: defaultGraphRevision,
     updatedBlocks: [{
       blockId: 44,
       botJobId: 5,

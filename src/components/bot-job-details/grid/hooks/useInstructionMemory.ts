@@ -3,6 +3,7 @@ import { BlockLoopInstructionLoadDTO } from '../../../instructionsMockData';
 import { CreateBlockOption } from '../../../CreateNewBlock';
 import type {
   ComponentMemoryListPayload,
+  MemoryDependencySelectionScope,
   MemoryInstructionGroupBlock,
   MemoryInstructionGroupRow,
   MemoryListItem,
@@ -37,6 +38,14 @@ export type MemoryCapability = {
   memoryGroupRows?: MemoryInstructionGroupRow[];
   /** Optional cross-block dependency context (for example GOTO). */
   memoryGroupBlocks?: MemoryInstructionGroupBlock[];
+  /** Bounded React-only alternative used by the orange Direct Steps action. */
+  directMemorySelection?: {
+    canAdd: boolean;
+    addReason: string;
+    memoryGroupKey?: string;
+    memoryGroupRows?: MemoryInstructionGroupRow[];
+    memoryGroupBlocks?: MemoryInstructionGroupBlock[];
+  };
 };
 
 export type MemoryBlockCapability = {
@@ -52,6 +61,8 @@ export type PendingMemoryMove = { requestId: string; ids: Set<number> } | null;
 
 type MemoryInstructionSelection = BlockLoopInstructionLoadDTO & {
   dependencyGroupKey?: string;
+  dependencySelectionScope?: MemoryDependencySelectionScope;
+  sourceRevision?: string;
 };
 
 export interface UseInstructionMemory {
@@ -92,6 +103,7 @@ export interface UseInstructionMemory {
     instruction: BlockLoopInstructionLoadDTO,
     currentInstructions: BlockLoopInstructionLoadDTO[],
     sourceRevision?: string,
+    selectionScope?: MemoryDependencySelectionScope,
   ) => MemoryGroupResolution;
   /**
    * Atomically stage a Bot Job block plus the fixed-point union of every
@@ -100,6 +112,7 @@ export interface UseInstructionMemory {
   handleAddBlockToMemory: (
     instructions: BlockLoopInstructionLoadDTO[],
     currentInstructions: BlockLoopInstructionLoadDTO[],
+    sourceRevision?: string,
   ) => MemoryGroupResolution;
   /** Stage one complete reusable component block without row-level filtering. */
   handleStageComponentBlock: (
@@ -166,14 +179,30 @@ export function useInstructionMemory(
 
   const addComponentItems = (items: MemoryListItem<ComponentMemoryListPayload>[]) => {
     setComponentMemoryItems((previous) => {
-      const incoming = new Map(items.map((item) => [item.sourceItemKey, item]));
-      const merged = previous.map((item) => {
-        const update = incoming.get(item.sourceItemKey);
-        if (!update) return item;
-        incoming.delete(item.sourceItemKey);
-        return update;
-      });
-      return [...merged, ...incoming.values()];
+      const incoming = [
+        ...new Map(items.map((item) => [item.sourceItemKey, item])).values(),
+      ];
+      const incomingKeys = new Set(incoming.map((item) => item.sourceItemKey));
+      const overlappingGroups = new Set(
+        previous
+          .filter((item) => incomingKeys.has(item.sourceItemKey))
+          .map((item) => item.dependencyGroupKey)
+          .filter((key): key is string => Boolean(key)),
+      );
+      const isReplaced = (item: MemoryListItem<ComponentMemoryListPayload>) =>
+        incomingKeys.has(item.sourceItemKey)
+        || (item.dependencyGroupKey != null
+          && overlappingGroups.has(item.dependencyGroupKey));
+      const firstReplacedIndex = previous.findIndex(isReplaced);
+      const remaining = previous.filter((item) => !isReplaced(item));
+      const insertionIndex = firstReplacedIndex < 0
+        ? remaining.length
+        : Math.min(firstReplacedIndex, remaining.length);
+      return [
+        ...remaining.slice(0, insertionIndex),
+        ...incoming,
+        ...remaining.slice(insertionIndex),
+      ];
     });
   };
 
@@ -195,16 +224,24 @@ export function useInstructionMemory(
     instruction: BlockLoopInstructionLoadDTO,
     sourceRevision = '',
   ) => {
-    if (!memoryCapabilities.get(instruction.id)?.canAdd) return;
+    if (!memoryCapabilities.get(instruction.id)?.canAdd || !sourceRevision.trim()) return;
     if (policy.kind === 'COMPONENT') {
-      if (!sourceRevision.trim()) return;
       addComponentItems([componentInstructionMemoryItem(instruction, sourceRevision)]);
       requestMemoryListOpen();
       return;
     }
-    setMemorySteps((prev) =>
-      prev.some((step) => step.id === instruction.id) ? prev : [...prev, instruction],
-    );
+    setMemorySteps((previous) => {
+      const staged = {
+        ...instruction,
+        dependencySelectionScope: 'FULL' as const,
+        sourceRevision,
+      };
+      return previous.some((step) => step.id === instruction.id)
+        ? previous.map((step) => step.id === instruction.id
+          ? { ...step, ...staged }
+          : step)
+        : [...previous, staged];
+    });
     requestMemoryListOpen();
   };
 
@@ -212,22 +249,27 @@ export function useInstructionMemory(
     instruction: BlockLoopInstructionLoadDTO,
     currentInstructions: BlockLoopInstructionLoadDTO[],
     sourceRevision = '',
+    selectionScope: MemoryDependencySelectionScope = 'FULL',
   ): MemoryGroupResolution => {
     const capability = memoryCapabilities.get(instruction.id);
-    if (!capability?.canAdd) {
+    const selection = selectionScope === 'DIRECT'
+      ? capability?.directMemorySelection
+      : capability;
+    if (!capability?.canAdd || !selection?.canAdd) {
       return {
         ok: false,
-        reason: capability?.addReason || capability?.reason
+        reason: selection?.addReason || capability?.addReason || capability?.reason
           || 'This instruction cannot be added to Memory List.',
       };
     }
-    if (policy.kind === 'COMPONENT' && !sourceRevision.trim()) {
+    if (!sourceRevision.trim()) {
       return {
         ok: false,
-        reason: 'Refresh Components before adding this connected group.',
+        reason: `Refresh ${policy.kind === 'COMPONENT' ? 'Components' : 'Bot Job Details'} `
+          + 'before adding this connected group.',
       };
     }
-    if (!capability.memoryGroupRows) {
+    if (!selection.memoryGroupRows) {
       return {
         ok: false,
         reason: 'Refresh the instruction grid before adding this connected group.',
@@ -237,13 +279,13 @@ export function useInstructionMemory(
     const resolution = resolveMemoryGroupInstructions(
       instruction,
       currentInstructions,
-      capability.memoryGroupRows,
+      selection.memoryGroupRows,
     );
     if (!resolution.ok) return resolution;
-    const groupKey = dependencyGroupKey(instruction, capability.memoryGroupKey);
+    const groupKey = dependencyGroupKey(instruction, selection.memoryGroupKey);
 
     if (policy.kind === 'COMPONENT') {
-      const requiredBlocks = capability.memoryGroupBlocks ?? [];
+      const requiredBlocks = selection.memoryGroupBlocks ?? [];
       const requiredBlockIds = new Set(requiredBlocks.map((block) => block.blockId));
       const blockItems: MemoryListItem<ComponentMemoryListPayload>[] = [];
       for (const requiredBlock of requiredBlocks) {
@@ -270,6 +312,7 @@ export function useInstructionMemory(
           blockInstructions,
           sourceRevision,
           groupKey,
+          selectionScope,
         );
         if (!blockItem) {
           return {
@@ -286,25 +329,41 @@ export function useInstructionMemory(
             member,
             sourceRevision,
             groupKey,
+            selectionScope,
           )),
         ...blockItems,
       ]);
     } else {
-      setMemorySteps((previous) => {
-        const groupIds = new Set(resolution.instructions.map((member) => member.id));
-        const seen = new Set(previous.map((step) => step.id));
-        const next = previous.map((step) => (
-          groupKey && groupIds.has(step.id)
-            ? { ...step, dependencyGroupKey: groupKey }
-            : step
-        ));
-        resolution.instructions.forEach((member) => {
-          if (!seen.has(member.id)) {
-            seen.add(member.id);
-            next.push({ ...member, dependencyGroupKey: groupKey });
-          }
-        });
-        return next;
+      setMemoryStepSelections((previous) => {
+        const incomingIds = new Set(
+          resolution.instructions.map((member) => member.id),
+        );
+        const overlappingGroups = new Set(
+          previous
+            .filter((step) => incomingIds.has(step.id))
+            .map((step) => step.dependencyGroupKey)
+            .filter((key): key is string => Boolean(key)),
+        );
+        const isReplaced = (step: MemoryInstructionSelection) =>
+          incomingIds.has(step.id)
+          || (step.dependencyGroupKey != null
+            && overlappingGroups.has(step.dependencyGroupKey));
+        const firstReplacedIndex = previous.findIndex(isReplaced);
+        const remaining = previous.filter((step) => !isReplaced(step));
+        const insertionIndex = firstReplacedIndex < 0
+          ? remaining.length
+          : Math.min(firstReplacedIndex, remaining.length);
+        const stagedGroup = resolution.instructions.map((member) => ({
+          ...member,
+          dependencyGroupKey: groupKey,
+          dependencySelectionScope: selectionScope,
+          sourceRevision,
+        }));
+        return [
+          ...remaining.slice(0, insertionIndex),
+          ...stagedGroup,
+          ...remaining.slice(insertionIndex),
+        ];
       });
     }
     requestMemoryListOpen();
@@ -314,12 +373,19 @@ export function useInstructionMemory(
   const handleAddBlockToMemory = (
     instructions: BlockLoopInstructionLoadDTO[],
     currentInstructions: BlockLoopInstructionLoadDTO[],
+    sourceRevision = '',
   ): MemoryGroupResolution => {
     const first = instructions[0];
     if (policy.kind !== 'BOT_JOB' || !first) {
       return {
         ok: false,
         reason: 'This Bot Job Block cannot be added to Memory List.',
+      };
+    }
+    if (!sourceRevision.trim()) {
+      return {
+        ok: false,
+        reason: 'Refresh Bot Job Details before adding this connected Block.',
       };
     }
 
@@ -511,6 +577,8 @@ export function useInstructionMemory(
       const grouped = ordered.map((instruction) => ({
         ...instruction,
         dependencyGroupKey: dependencyKeyByInstructionId.get(instruction.id),
+        dependencySelectionScope: 'FULL' as const,
+        sourceRevision,
       }));
       return [
         ...remaining.slice(0, insertionIndex),
@@ -585,6 +653,7 @@ export function useInstructionMemory(
         connectedBlock,
         sourceRevision,
         groupKey,
+        'FULL',
       );
       if (!blockItem) {
         return {
@@ -603,6 +672,7 @@ export function useInstructionMemory(
           instruction,
           sourceRevision,
           groupKey,
+          'FULL',
         )),
     ]);
     requestMemoryListOpen();

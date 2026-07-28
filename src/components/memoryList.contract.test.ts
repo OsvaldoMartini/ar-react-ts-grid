@@ -52,7 +52,7 @@ describe('memoryListRequiresTargetBlock', () => {
         sourceKind: 'BOT_JOB',
         sourceItemKey: '101',
         label: 'Existing instruction',
-        payload: { instructionId: 101 },
+        payload: { instructionId: 101, sourceRevision: 'revision-1' },
       },
     ])).toBe(true);
     expect(memoryListRequiresTargetBlock([{

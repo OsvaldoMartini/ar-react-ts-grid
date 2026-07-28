@@ -3,6 +3,7 @@ import type { ElementDTO } from './instructionsMockData';
 
 export type MemoryListSourceKind = 'BOT_JOB' | 'PAGE_SCANNER' | 'COMPONENT' | 'MIXED';
 export type MemoryListItemSourceKind = Exclude<MemoryListSourceKind, 'MIXED'>;
+export type MemoryDependencySelectionScope = 'FULL' | 'DIRECT';
 
 export type MemoryListItemIcon =
   | 'click'
@@ -16,6 +17,7 @@ export type MemoryListItemIcon =
 
 export interface BotJobMemoryListPayload {
   instructionId: number;
+  sourceRevision: string;
 }
 
 export interface PageScannerMemoryListPayload {
@@ -85,6 +87,8 @@ export interface MemoryListItem<
    * atomic Memory List unit: they are reordered, removed, and applied together.
    */
   dependencyGroupKey?: string;
+  /** React-owned group breadth; Java persists these exact submitted rows. */
+  dependencySelectionScope?: MemoryDependencySelectionScope;
   /**
    * Producer-native key used when the aggregate workspace routes commands back
    * to the component that owns the item.

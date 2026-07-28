@@ -119,3 +119,45 @@ test('Bot Job EXCEL GOTO is resolved but cannot be duplicated inside the same jo
     canAdd: true,
   }));
 });
+
+test('does not expose a DIRECT action when it selects the same members as FULL', () => {
+  const getValue: BlockLoopInstructionLoadDTO = {
+    ...instruction,
+    id: 102,
+    instructionOrderNumber: 2,
+    actions: 'GET',
+    parentId: 101,
+    variableId: 501,
+  };
+  const selection = projectMemorySelections(
+    [{ ...instruction, variableId: 501 }, getValue],
+    [{ id: 501, instructionId: 101 }],
+    'BOT_JOB_COPY',
+  ).instructions.get(102);
+
+  expect(selection?.canAdd).toBe(true);
+  expect(selection?.memoryGroupRows?.map((row) => row.id)).toEqual([101, 102]);
+  expect(selection?.directMemorySelection).toBeUndefined();
+});
+
+test('exposes DIRECT when it removes positional conditional body rows', () => {
+  const rows: BlockLoopInstructionLoadDTO[] = [
+    { ...instruction, id: 201, instructionOrderNumber: 1, actions: 'IF', parentId: 201 },
+    { ...instruction, id: 202, instructionOrderNumber: 2, actions: 'C' },
+    { ...instruction, id: 203, instructionOrderNumber: 3, actions: 'ELSE', parentId: 201 },
+    { ...instruction, id: 204, instructionOrderNumber: 4, actions: 'C' },
+    { ...instruction, id: 205, instructionOrderNumber: 5, actions: 'ENDIF', parentId: 201 },
+  ];
+  const selection = projectMemorySelections(
+    rows,
+    [],
+    'BOT_JOB_COPY',
+  ).instructions.get(201);
+
+  expect(selection?.memoryGroupRows?.map((row) => row.id)).toEqual([
+    201, 202, 203, 204, 205,
+  ]);
+  expect(selection?.directMemorySelection?.memoryGroupRows?.map(
+    (row) => row.id,
+  )).toEqual([201, 203, 205]);
+});
