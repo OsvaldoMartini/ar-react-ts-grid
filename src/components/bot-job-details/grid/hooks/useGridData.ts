@@ -395,102 +395,11 @@ export function useGridData(deps: UseGridDataDeps) {
     workspaceKind,
   ]);
 
-  // Apply: move the memorized steps (in insertion order) to the end of the
-  // selected block, then persist exactly like a drag & drop move (ROW_MOVE).
-  const handleApplyMemory = (
-    targetBlockIdOverride?: number | null,
-    sourceItemKeys?: string[],
-  ) => {
-    // COMPONENT items are authoritatively and atomically applied by the central
-    // Java Memory service. Never reinterpret component ids as Bot Job row ids.
-    if (workspaceKind === 'COMPONENT') return;
-    const targetBlockId = targetBlockIdOverride === undefined
-      ? memoryTargetBlockId
-      : targetBlockIdOverride;
-    if (targetBlockId === null || memorySteps.length === 0) return;
-
-    const targetBlockOption = memoryBlockOptions.find((block) => block.blockId === targetBlockId);
-    if (!targetBlockOption) return;
-
-    const memoryStepBySourceKey = new Map(
-      memorySteps.map(step => [String(step.id), step] as const),
-    );
-    const requestedSteps = sourceItemKeys === undefined
-      ? memorySteps
-      : sourceItemKeys
-        .map((itemKey) => {
-          const rawKey = String(itemKey).replace(/^BOT_JOB:/, '');
-          return memoryStepBySourceKey.get(rawKey);
-        })
-        .filter((step): step is BlockLoopInstructionLoadDTO => Boolean(step));
-    const movable = requestedSteps.filter(step => memoryCapabilities.get(step.id)?.canAdd);
-    if (movable.length === 0) return;
-    const movableIds = new Set(movable.map((step) => step.id));
-
-    // Pull the live rows out of every block (the memory list holds snapshots).
-    const movedById = new Map<number, BlockLoopInstructionLoadDTO>();
-    const updatedGroupedData: typeof groupedData = {};
-    Object.keys(groupedData).forEach((key) => {
-      const currentBlockId = Number(key);
-      const blockData = groupedData[currentBlockId];
-      const kept = blockData.instructions.filter((ins) => {
-        if (movableIds.has(ins.id)) {
-          movedById.set(ins.id, ins);
-          return false;
-        }
-        return true;
-      });
-      updatedGroupedData[currentBlockId] = { ...blockData, instructions: kept };
-    });
-
-    // Append to the target block, in memory-list insertion order.
-    const blockId = targetBlockOption.blockId;
-    const blockName = targetBlockOption.blockName;
-    const blockOrderNumber = targetBlockOption.blockOrderNumber;
-    const appended = movable
-      .map((step) => movedById.get(step.id))
-      .filter((ins): ins is BlockLoopInstructionLoadDTO => Boolean(ins))
-      .map((ins) => ({ ...ins, blockId, blockName, blockOrderNumber }));
-    const existingTargetBlock = updatedGroupedData[blockId] ?? {
-      blockName,
-      instructions: [],
-      exportFile: "No Excel Export File",
-    };
-    updatedGroupedData[blockId] = {
-      ...existingTargetBlock,
-      instructions: [...existingTargetBlock.instructions, ...appended],
-    };
-
-    // Renumber every block and drop the ones the move emptied.
-    let deleteBlockId = -1;
-    Object.keys(updatedGroupedData).forEach((key) => {
-      const currentBlockId = Number(key);
-      const block = updatedGroupedData[currentBlockId];
-      if (block.instructions.length === 0) {
-        if (deleteBlockId === -1) deleteBlockId = currentBlockId;
-        delete updatedGroupedData[currentBlockId];
-        return;
-      }
-      block.instructions = block.instructions.map((ins, i) => ({
-        ...ins,
-        instructionOrderNumber: i + 1,
-      }));
-    });
-
-    const updatedInstructionsData = Object.values(updatedGroupedData).flatMap(
-      (block) => block.instructions
-    );
-
-    if (webSocket && connected) {
-      const requestId = submitInstructionMove(updatedInstructionsData, deleteBlockId, 'memory');
-      if (requestId) {
-        setPendingMemoryMove({ requestId, ids: movableIds });
-        setMemoryMoveStatus('Applying...');
-      } else {
-        setMemoryMoveStatus('Memory Apply could not be sent.');
-      }
-    }
-
+  // Memory Apply is owned exclusively by the aggregate Java transaction, which clones selected
+  // Bot Job rows with fresh IDs. A stale or forged producer command must never reinterpret Apply
+  // as ROW_MOVE and remove the live source rows.
+  const rejectLegacyMemoryApply = () => {
+    console.warn('Ignored legacy producer-side Memory Apply; the backend owns this transaction.');
   };
 
   // Java backend owns block creation and mints the new blockId. It refreshes the
@@ -804,18 +713,7 @@ export function useGridData(deps: UseGridDataDeps) {
               Number.isFinite(selectedBlockId) && selectedBlockId > 0 ? selectedBlockId : null,
             );
           } else if (command === 'APPLY') {
-            // The aggregate Java Memory service owns COMPONENT validation/apply.
-            if (workspaceKind === 'COMPONENT') return;
-            const requestedTargetBlockId = Number(payload?.targetBlockId);
-            const requestedSourceItemKeys = Array.isArray(payload?.sourceItemKeys)
-              ? payload.sourceItemKeys.map((itemKey: unknown) => String(itemKey))
-              : undefined;
-            handleApplyMemory(
-              Number.isFinite(requestedTargetBlockId) && requestedTargetBlockId > 0
-                ? requestedTargetBlockId
-                : null,
-              requestedSourceItemKeys,
-            );
+            rejectLegacyMemoryApply();
           } else if (command === 'REORDER') {
             // The aggregate Memory List owns the mixed-source display order.
             // Producers apply the ordered sourceItemKeys routed with APPLY.

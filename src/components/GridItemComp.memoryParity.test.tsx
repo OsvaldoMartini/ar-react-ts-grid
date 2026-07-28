@@ -260,7 +260,7 @@ test('connected block confirmation refuses a graph that refreshed while the moda
   const view = render(<GridItemComp {...props} />);
   await authorizeGrid(view, props, [blockCapability]);
 
-  fireEvent.click(screen.getByTitle('Add eligible steps in this block to memory list'));
+  fireEvent.click(screen.getByTitle('Add this complete connected block to Memory List'));
   expect(screen.getByText(
     'Add the complete connected Component Block to Memory List?',
   )).toBeInTheDocument();

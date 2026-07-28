@@ -103,7 +103,7 @@ const BlockHeader: React.FC<BlockHeaderProps> = ({
     <span className={styles.blockCount}>({instructionCount})</span>
     <MemoryAddButton
       disabled={!canAddToMemory}
-      title="Add eligible steps in this block to memory list"
+      title="Add this complete connected block to Memory List"
       onClick={onAddToMemory}
     />
     <span className={styles.blockExportFile}>{exportFileNode}</span>

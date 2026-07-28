@@ -225,11 +225,11 @@ test('Bot Job block plus stages its complete connected dependency union atomical
   })];
   view.rerender(<GridItem {...props} />);
   await waitFor(() => expect(screen.getAllByTitle(
-    'Add eligible steps in this block to memory list',
+    'Add this complete connected block to Memory List',
   )[0]).toBeEnabled());
 
   fireEvent.click(screen.getAllByTitle(
-    'Add eligible steps in this block to memory list',
+    'Add this complete connected block to Memory List',
   )[0]);
   expect(screen.getByText(
     'Add the complete connected Bot Job Block to Memory List?',
@@ -301,7 +301,7 @@ test('an authoritative empty block never triggers the legacy automatic BLOCK_ORD
   ).toBeTruthy();
 });
 
-test('Memory Apply structured refresh places the row in its new block without manual Refresh', async () => {
+test('Memory Apply structured refresh keeps the source and renders its fresh copy', async () => {
   const props = {
     homeBankingIdInitial: 2,
     data: [row],
@@ -349,8 +349,9 @@ test('Memory Apply structured refresh places the row in its new block without ma
     expect(screen.getByText('No instructions in this block')).toBeInTheDocument();
   });
 
-  const movedRow = {
+  const copiedRow = {
     ...row,
+    id: 201,
     blockId: 135,
     blockOrderNumber: 2,
     blockName: 'TEST',
@@ -358,18 +359,79 @@ test('Memory Apply structured refresh places the row in its new block without ma
   };
   mockMessages = [
     update([row], 'memory-create-1'),
-    update([movedRow], 'memory-apply-1'),
+    update([row, copiedRow], 'memory-apply-1'),
   ];
   view.rerender(<GridItem {...props} />);
 
   await waitFor(() => {
+    const mainTitle = screen.getByText('Main');
+    const mainCard = mainTitle.parentElement?.parentElement?.parentElement;
+    expect(mainCard).not.toBeNull();
+    expect(within(mainCard as HTMLElement).getByText('(101)Continue')).toBeInTheDocument();
+
     const testTitle = screen.getByText('TEST');
     const testCard = testTitle.parentElement?.parentElement?.parentElement;
     expect(testCard).not.toBeNull();
-    expect(within(testCard as HTMLElement).getByText('(101)Continue')).toBeInTheDocument();
+    expect(within(testCard as HTMLElement).getByText('(201)Continue')).toBeInTheDocument();
     expect(within(testCard as HTMLElement).queryByText('No instructions in this block')).not.toBeInTheDocument();
   });
   expect(mockSend.mock.calls
     .map(([payload]) => JSON.parse(payload).type))
     .not.toContain('BLOCK_ORDER');
+});
+
+test('legacy producer Memory Apply cannot emit ROW_MOVE or remove its source row', async () => {
+  const warning = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+  const props = {
+    homeBankingIdInitial: 2,
+    data: [row],
+    initialBlocks: [
+      {
+        blockId: 10,
+        blockOrderNumber: 1,
+        blockName: 'Main',
+        blockActive: true,
+        blockWait: 0,
+      },
+      {
+        blockId: 135,
+        blockOrderNumber: 2,
+        blockName: 'TEST',
+        blockActive: true,
+        blockWait: 0,
+      },
+    ],
+    socketPort: 52101,
+    sessionId: 'botJobTasks',
+    botJobIdInitial: 5,
+    botJobNameInitial: 'Copy regression',
+    onSessionOpen: jest.fn(),
+  };
+  const view = render(<GridItem {...props} />);
+
+  mockMessages = [JSON.stringify({
+    sessionId: 'botJobTasks',
+    homeBankingId: 2,
+    operationId: 'memoryList.command',
+    body: JSON.stringify({
+      botJobId: 5,
+      command: 'APPLY',
+      payload: {
+        targetBlockId: 135,
+        sourceItemKeys: ['BOT_JOB:101'],
+      },
+    }),
+  })];
+  view.rerender(<GridItem {...props} />);
+
+  await waitFor(() => {
+    expect(warning).toHaveBeenCalledWith(
+      'Ignored legacy producer-side Memory Apply; the backend owns this transaction.',
+    );
+  });
+  expect(mockSend.mock.calls
+    .map(([payload]) => JSON.parse(payload).type))
+    .not.toContain('ROW_MOVE');
+  expect(screen.getByText('(101)Continue')).toBeInTheDocument();
+  warning.mockRestore();
 });
