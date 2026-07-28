@@ -58,4 +58,13 @@ describe('BlockHeader', () => {
     // edit/excel/save alts plus the rollback (alt="") — assert move controls exist.
     fireEvent.click(screen.getByAltText('excel'));
   });
+
+  it('shows the supplied Memory refusal reason on the block add button', () => {
+    render(<BlockHeader
+      {...baseProps}
+      canAddToMemory={false}
+      memoryAddTitle="Refresh the component graph."
+    />);
+    expect(screen.getByTitle('Refresh the component graph.')).toBeDisabled();
+  });
 });

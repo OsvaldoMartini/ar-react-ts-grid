@@ -641,6 +641,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                     const blockId = Number(blockData.instructions[0].blockId);
                     const authoritativeIndex = workspaceBlockIndex(blockId, index);
                     const displayOrder = authoritativeIndex + 1;
+                    const blockCapability = blockDeleteCapabilities.get(blockId);
                     return (
                     <BlockCard
                       key={blockGroupIndex}
@@ -661,23 +662,12 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                         editingName={blockName}
                         nameInputRef={blockRef}
                         findText={findText}
-                        canAddToMemory={
-                          componentWorkspace
-                            ? Boolean(moveGraphRevision)
-                            : blockData.instructions.length > 0
-                              && blockData.instructions.every(
-                                instruction => {
-                                  const capability = memoryCapabilities.get(instruction.id);
-                                  return capability?.canAdd === true
-                                    && Array.isArray(capability.memoryGroupRows)
-                                    && Boolean(capability.memoryGroupKey?.trim());
-                                },
-                              )
-                        }
+                        canAddToMemory={blockCapability?.canAddToMemory === true}
+                        memoryAddTitle={blockCapability?.addReason}
                         showCreateComponent={!componentWorkspace}
                         isFirstBlock={authoritativeIndex === 0 && Boolean(moveGraphRevision)}
-                        blockDeleteTitle={blockDeleteCapabilities.get(Number(blockData.instructions[0].blockId))?.reason}
-                        blockDeleteDimmed={!blockDeleteCapabilities.get(Number(blockData.instructions[0].blockId))?.canDelete}
+                        blockDeleteTitle={blockCapability?.reason}
+                        blockDeleteDimmed={!blockCapability?.canDelete}
                         renderHighlighted={renderHighlighted}
                         exportFileNode={renderExportFile(String(blockData.exportFile))}
                         excelGotoNode={excelGotoInstruction &&
@@ -796,6 +786,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                         nameInputRef={blockRef}
                         findText={findText}
                         canAddToMemory={false}
+                        memoryAddTitle={capability?.addReason}
                         showCreateComponent={!componentWorkspace}
                         isFirstBlock={index === 0 && Boolean(moveGraphRevision)}
                         blockDeleteTitle={capability?.reason}

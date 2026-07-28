@@ -1,6 +1,7 @@
 import type { BlockLoopInstructionLoadDTO } from '../../../instructionsMockData';
 import {
   componentInstructionMemoryItem,
+  projectMemorySelections,
   resolveMemoryGroupInstructions,
 } from './memoryOptions';
 
@@ -96,4 +97,25 @@ test('connected Memory resolution refuses a partial or stale group', () => {
     ok: false,
     reason: 'The connected Memory group changed. Refresh the instruction grid.',
   });
+});
+
+test('Bot Job EXCEL GOTO is resolved but cannot be duplicated inside the same job', () => {
+  const excelGoto: BlockLoopInstructionLoadDTO = {
+    ...instruction,
+    id: 104,
+    actions: 'EXCEL GOTO',
+    name: 'Excel navigation',
+  };
+
+  expect(
+    projectMemorySelections([excelGoto], [], 'BOT_JOB_COPY').instructions.get(104),
+  ).toEqual(expect.objectContaining({
+    canAdd: false,
+    addReason: expect.stringContaining('only one EXCEL GOTO'),
+  }));
+  expect(
+    projectMemorySelections([excelGoto], [], 'COMPONENT_COPY').instructions.get(104),
+  ).toEqual(expect.objectContaining({
+    canAdd: true,
+  }));
 });

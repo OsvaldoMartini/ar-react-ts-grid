@@ -22,6 +22,7 @@ export interface InstructionRowCapability {
   canAdd?: boolean;
   canDelete?: boolean;
   reason?: string;
+  addReason?: string;
   deleteReason?: string;
 }
 
@@ -141,7 +142,7 @@ const InstructionRow: React.FC<InstructionRowProps> = ({
           />
           <MemoryAddButton
             disabled={!capability?.canAdd}
-            title={capability?.reason || 'Add step to memory list'}
+            title={capability?.addReason || 'Add step to memory list'}
             onClick={onAddToMemory}
           />
           {instruction.refreshLoop && (

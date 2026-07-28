@@ -3,10 +3,18 @@ import { CreateBlockOption } from '../../../CreateNewBlock';
 import { instructionDisplayLabel } from '../../../instructionDisplay';
 import type {
   ComponentMemoryListPayload,
+  MemoryInstructionGroupBlock,
   MemoryInstructionGroupRow,
   MemoryListItem,
   MemoryListItemIcon,
 } from '../../../memoryList.contract';
+import {
+  canonicalInstructionAction,
+  createInstructionDependencyResolver,
+  type DependencyClosureMode,
+  type DependencyClosureResult,
+  type InstructionVariableLink,
+} from './instructionDependency';
 
 /**
  * Phase 6 — DOMAIN layer (pure, no React / no I/O). Mapping helpers shared by
@@ -50,12 +58,138 @@ export type MemoryGroupResolution =
       reason: string;
     };
 
+export type ProjectedMemorySelection = {
+  canAdd: boolean;
+  addReason: string;
+  memoryGroupKey?: string;
+  memoryGroupRows?: MemoryInstructionGroupRow[];
+  memoryGroupBlocks?: MemoryInstructionGroupBlock[];
+};
+
+export type ProjectedMemorySelections = {
+  instructions: Map<number, ProjectedMemorySelection>;
+  blocks: Map<number, ProjectedMemorySelection>;
+};
+
+const projectDependencyClosure = (
+  closure: DependencyClosureResult<BlockLoopInstructionLoadDTO>,
+  mode: DependencyClosureMode,
+): ProjectedMemorySelection => {
+  if (!closure.successful) {
+    return {
+      canAdd: false,
+      addReason: closure.error?.message || 'The connected Memory group could not be resolved.',
+    };
+  }
+
+  const rows: MemoryInstructionGroupRow[] = [];
+  for (const instruction of closure.orderedInstructions) {
+    if (!Number.isSafeInteger(instruction.instructionOrderNumber)
+        || instruction.instructionOrderNumber <= 0) {
+      return {
+        canAdd: false,
+        addReason: 'A connected instruction does not have a positive display order.',
+      };
+    }
+    rows.push({
+      id: instruction.id,
+      order: instruction.instructionOrderNumber,
+      name: instruction.name || '',
+      action: instruction.actions || '',
+      parentId: instruction.parentId ?? null,
+      blockId: instruction.blockId,
+    });
+  }
+
+  // A Bot Job already owns the selected EXCEL GOTO. Copying that row inside the same job
+  // would create a second EXCEL GOTO, which the persistence contract deliberately forbids.
+  // Components remain stageable because their destination Bot Job is not known in this grid.
+  if (mode === 'BOT_JOB_COPY'
+      && closure.orderedInstructions.some(
+        instruction => canonicalInstructionAction(instruction.actions) === 'EXCEL GOTO',
+      )) {
+    return {
+      canAdd: false,
+      addReason: 'EXCEL GOTO cannot be copied inside the same Bot Job because only one EXCEL GOTO command is allowed.',
+    };
+  }
+
+  const firstRowByBlock = new Map<number, BlockLoopInstructionLoadDTO>();
+  closure.orderedInstructions.forEach((instruction) => {
+    if (!firstRowByBlock.has(instruction.blockId)) {
+      firstRowByBlock.set(instruction.blockId, instruction);
+    }
+  });
+  const blocks: MemoryInstructionGroupBlock[] = closure.requiredBlockIds.map((blockId) => {
+    const first = firstRowByBlock.get(blockId);
+    return {
+      blockId,
+      blockOrderNumber: first?.blockOrderNumber,
+      blockName: first?.blockName,
+    };
+  });
+  const instructionIds = rows.map((row) => row.id).join(',');
+  const blockIds = blocks.map((block) => block.blockId).join(',');
+  return {
+    canAdd: true,
+    addReason: '',
+    memoryGroupKey: `I:${instructionIds}|B:${blockIds}`,
+    memoryGroupRows: rows,
+    memoryGroupBlocks: blocks,
+  };
+};
+
 /**
- * Resolve a backend-authorized Memory group against the current rendered graph.
+ * Calculate every Memory List selection from the rows currently rendered by React.
+ *
+ * The backend supplies raw variable ownership facts with the authoritative graph revision, but it
+ * does not choose or expand Memory groups. Both instruction and whole-block projections share one
+ * indexed resolver, so GridItem and GridItemComp use identical WYSIWYG dependency rules without
+ * click-time database queries.
+ */
+export const projectMemorySelections = (
+  currentInstructions: BlockLoopInstructionLoadDTO[],
+  variableLinks: readonly InstructionVariableLink[],
+  mode: DependencyClosureMode,
+): ProjectedMemorySelections => {
+  const resolver = createInstructionDependencyResolver(
+    currentInstructions,
+    variableLinks,
+  );
+  const instructionSelections = new Map<number, ProjectedMemorySelection>();
+  currentInstructions.forEach((instruction) => {
+    instructionSelections.set(
+      instruction.id,
+      projectDependencyClosure(resolver.resolve([instruction.id], mode), mode),
+    );
+  });
+
+  const instructionIdsByBlock = new Map<number, number[]>();
+  currentInstructions.forEach((instruction) => {
+    const ids = instructionIdsByBlock.get(instruction.blockId) ?? [];
+    ids.push(instruction.id);
+    instructionIdsByBlock.set(instruction.blockId, ids);
+  });
+  const blockSelections = new Map<number, ProjectedMemorySelection>();
+  instructionIdsByBlock.forEach((instructionIds, blockId) => {
+    blockSelections.set(
+      blockId,
+      projectDependencyClosure(resolver.resolve(instructionIds, mode), mode),
+    );
+  });
+
+  return {
+    instructions: instructionSelections,
+    blocks: blockSelections,
+  };
+};
+
+/**
+ * Resolve a React-calculated Memory group against the current rendered graph.
  *
  * Resolution is deliberately all-or-nothing. The UI must never stage a partial
- * parent/child or variable family when one authoritative member is stale or
- * absent. The backend-provided array order is retained exactly.
+ * parent/child or variable family when one current member is stale or absent.
+ * The pure dependency resolver's deterministic array order is retained exactly.
  */
 export const resolveMemoryGroupInstructions = (
   selected: BlockLoopInstructionLoadDTO,

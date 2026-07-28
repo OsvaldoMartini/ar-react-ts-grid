@@ -88,6 +88,11 @@ const unrelatedResponse = (sessionId: string) => JSON.stringify({
 
 const expectQueuedCapabilityEnablesDrag = async (sessionId: string) => {
   await waitFor(() => expect(screen.getByLabelText('Move instruction 1')).toBeEnabled());
+  const staleMemoryButtons = screen.getAllByTitle(
+    'The instruction graph changed. Refresh this workspace before adding rows or blocks to Memory List.',
+  );
+  expect(staleMemoryButtons.length).toBeGreaterThanOrEqual(2);
+  staleMemoryButtons.forEach(button => expect(button).toBeDisabled());
 
   // Native HTML5 drag: grab row 1 (instruction 101) and drop it on row 2 (index 1).
   const sourceRow = screen.getByLabelText('Move instruction 1').closest('[draggable]');

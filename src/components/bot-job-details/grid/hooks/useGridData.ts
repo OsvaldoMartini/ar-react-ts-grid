@@ -12,7 +12,9 @@ import {
   blockOptionsFromInstructions,
   normalizeBlockOptions,
   instructionMemoryItem,
+  projectMemorySelections,
 } from '../domain/memoryOptions';
+import type { InstructionVariableLink } from '../domain/instructionDependency';
 import {
   groupByBlock,
   reassignInstructionOrderNumbersByBlock,
@@ -1004,49 +1006,84 @@ export function useGridData(deps: UseGridDataDeps) {
             return;
           }
           setGridActionNotice(null);
-          const next = new Map<number, MemoryCapability>();
+          const variableLinks: InstructionVariableLink[] = Array.isArray(bodyData?.variableLinks)
+            ? bodyData.variableLinks.map((candidate: {
+                id?: unknown;
+                instructionId?: unknown;
+              } | null) => ({
+                id: Number(candidate?.id),
+                instructionId: candidate?.instructionId == null
+                  ? null
+                  : Number(candidate.instructionId),
+              }))
+            : [];
+          const localMemorySelections = projectMemorySelections(
+            instructionsData,
+            variableLinks,
+            workspaceKind === 'COMPONENT' ? 'COMPONENT_COPY' : 'BOT_JOB_COPY',
+          );
+          const serverCapabilities = new Map<number, {
+            instructionId: number;
+            canMove: boolean;
+            canDelete: boolean;
+            deleteCount?: number;
+            reason?: string;
+            deleteReason?: string;
+            allowedBlockIds?: number[];
+            deleteRows?: MemoryCapability['deleteRows'];
+          }>();
           if (Array.isArray(bodyData?.capabilities)) {
             bodyData.capabilities.forEach((capability: {
               instructionId: number;
-              canAddToMemory: boolean;
               canMove: boolean;
               canDelete: boolean;
               deleteCount?: number;
               reason?: string;
-              addReason?: string;
               deleteReason?: string;
               allowedBlockIds?: number[];
               deleteRows?: MemoryCapability['deleteRows'];
-              memoryGroupKey?: string;
-              memoryGroupRows?: MemoryCapability['memoryGroupRows'];
-              memoryGroupBlocks?: MemoryCapability['memoryGroupBlocks'];
             }) => {
-              next.set(capability.instructionId, {
-                canAdd: capability.canAddToMemory === true,
-                canMove: capability.canMove === true,
-                canDelete: capability.canDelete === true,
-                deleteCount: capability.deleteCount || 1,
-                reason: capability.reason || '',
-                addReason: capability.addReason || '',
-                deleteReason: capability.deleteReason || '',
-                allowedBlockIds: Array.isArray(capability.allowedBlockIds)
-                  ? capability.allowedBlockIds
-                  : [],
-                deleteRows: Array.isArray(capability.deleteRows)
-                  ? capability.deleteRows
-                  : [],
-                memoryGroupKey: typeof capability.memoryGroupKey === 'string'
-                  ? capability.memoryGroupKey
-                  : undefined,
-                memoryGroupRows: Array.isArray(capability.memoryGroupRows)
-                  ? capability.memoryGroupRows
-                  : undefined,
-                memoryGroupBlocks: Array.isArray(capability.memoryGroupBlocks)
-                  ? capability.memoryGroupBlocks
-                  : undefined,
-              });
+              serverCapabilities.set(Number(capability.instructionId), capability);
             });
           }
+          const renderedInstructionIds = new Set(
+            instructionsData.map(instruction => instruction.id),
+          );
+          const memoryGraphSynchronized =
+            renderedInstructionIds.size === instructionsData.length
+            && serverCapabilities.size === renderedInstructionIds.size
+            && [...renderedInstructionIds].every(
+              instructionId => serverCapabilities.has(instructionId),
+            );
+          const staleMemoryReason =
+            'The instruction graph changed. Refresh this workspace before adding rows or blocks to Memory List.';
+          const next = new Map<number, MemoryCapability>();
+          instructionsData.forEach((instruction) => {
+            const capability = serverCapabilities.get(instruction.id);
+            const memorySelection = localMemorySelections.instructions.get(instruction.id);
+            next.set(instruction.id, {
+              canAdd: memoryGraphSynchronized
+                && capability != null
+                && memorySelection?.canAdd === true,
+              canMove: capability?.canMove === true,
+              canDelete: capability?.canDelete === true,
+              deleteCount: capability?.deleteCount || 1,
+              reason: capability?.reason || '',
+              addReason: !memoryGraphSynchronized || capability == null
+                ? staleMemoryReason
+                : memorySelection?.addReason || '',
+              deleteReason: capability?.deleteReason || '',
+              allowedBlockIds: Array.isArray(capability?.allowedBlockIds)
+                ? capability?.allowedBlockIds ?? []
+                : [],
+              deleteRows: Array.isArray(capability?.deleteRows)
+                ? capability?.deleteRows ?? []
+                : [],
+              memoryGroupKey: memorySelection?.memoryGroupKey,
+              memoryGroupRows: memorySelection?.memoryGroupRows,
+              memoryGroupBlocks: memorySelection?.memoryGroupBlocks,
+            });
+          });
           setMemoryCapabilities(next);
           const nextBlocks = new Map<number, BlockDeleteCapability>();
           if (Array.isArray(bodyData?.blockCapabilities)) {
@@ -1056,31 +1093,35 @@ export function useGridData(deps: UseGridDataDeps) {
               reason?: string;
               instructionCount?: number;
               deleteRows?: BlockDeleteCapability['deleteRows'];
-              canAddToMemory?: boolean;
-              addReason?: string;
-              memoryGroupKey?: string;
-              memoryGroupRows?: BlockDeleteCapability['memoryGroupRows'];
-              memoryGroupBlocks?: BlockDeleteCapability['memoryGroupBlocks'];
             }) => {
               nextBlocks.set(capability.blockId, {
                 canDelete: capability.canDelete === true,
                 reason: capability.reason || '',
                 instructionCount: capability.instructionCount || 0,
                 deleteRows: Array.isArray(capability.deleteRows) ? capability.deleteRows : [],
-                canAddToMemory: capability.canAddToMemory === true,
-                addReason: capability.addReason || '',
-                memoryGroupKey: typeof capability.memoryGroupKey === 'string'
-                  ? capability.memoryGroupKey
-                  : undefined,
-                memoryGroupRows: Array.isArray(capability.memoryGroupRows)
-                  ? capability.memoryGroupRows
-                  : undefined,
-                memoryGroupBlocks: Array.isArray(capability.memoryGroupBlocks)
-                  ? capability.memoryGroupBlocks
-                  : undefined,
               });
             });
           }
+          localMemorySelections.blocks.forEach((memorySelection, blockId) => {
+            const existing = nextBlocks.get(blockId) ?? {
+              canDelete: false,
+              reason: 'Refresh this workspace before deleting this block.',
+              instructionCount: instructionsData.filter(
+                (instruction) => instruction.blockId === blockId,
+              ).length,
+              deleteRows: [],
+            };
+            nextBlocks.set(blockId, {
+              ...existing,
+              canAddToMemory: memoryGraphSynchronized && memorySelection.canAdd,
+              addReason: memoryGraphSynchronized
+                ? memorySelection.addReason
+                : staleMemoryReason,
+              memoryGroupKey: memorySelection.memoryGroupKey,
+              memoryGroupRows: memorySelection.memoryGroupRows,
+              memoryGroupBlocks: memorySelection.memoryGroupBlocks,
+            });
+          });
           setBlockDeleteCapabilities(nextBlocks);
           setMoveGraphRevision(typeof bodyData?.graphRevision === 'string' ? bodyData.graphRevision : '');
         } else if (

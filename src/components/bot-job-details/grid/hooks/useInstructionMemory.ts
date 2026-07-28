@@ -31,7 +31,7 @@ export type MemoryCapability = {
   deleteRows: { id: number; name: string; action: string; order: number }[];
   /** Memory-specific refusal reason; distinct from the drag/move reason. */
   addReason?: string;
-  /** Stable backend group identity, when the resolver exposes one. */
+  /** Stable React-resolved group identity calculated from the current grid graph. */
   memoryGroupKey?: string;
   /** Authoritative dependency closure in the exact order it must enter Memory. */
   memoryGroupRows?: MemoryInstructionGroupRow[];
@@ -85,7 +85,7 @@ export interface UseInstructionMemory {
   handleAddToMemory: (instruction: BlockLoopInstructionLoadDTO, sourceRevision?: string) => void;
   /**
    * Atomically stage the selected instruction's complete authoritative dependency
-   * group. Validation happens before the single state update; partial groups are
+   * group. React validation happens before the single state update; partial groups are
    * never added.
    */
   handleAddConnectedGroupToMemory: (

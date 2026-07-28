@@ -36,11 +36,11 @@ export interface ComponentBlockMemoryListPayload {
 }
 
 /**
- * One authoritative member of the dependency group returned for an instruction.
+ * One current member of the dependency group calculated from React's rendered graph.
  *
- * The row intentionally carries source identity/presentation data only. Parent,
- * variable, and destination IDs are resolved again by Java from the authoritative
- * graph before apply, so React never invents foreign keys.
+ * The row carries source identity/presentation data only. React calculates membership from the
+ * loaded parent, variable, and destination facts; Java transactionally verifies the submitted
+ * group before assigning fresh persistent IDs, so React never invents database foreign keys.
  */
 export interface MemoryInstructionGroupRow {
   id: number;
@@ -81,7 +81,7 @@ export interface MemoryListItem<
   key: string;
   sourceKind: MemoryListItemSourceKind;
   /**
-   * Backend-authorized connected-graph identity. Items with the same key are one
+   * React-resolved connected-graph identity. Items with the same key are one
    * atomic Memory List unit: they are reordered, removed, and applied together.
    */
   dependencyGroupKey?: string;

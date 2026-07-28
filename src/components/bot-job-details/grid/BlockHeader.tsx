@@ -26,6 +26,7 @@ export interface BlockHeaderProps {
   nameInputRef: React.RefObject<HTMLInputElement>;
   findText: string;
   canAddToMemory: boolean;
+  memoryAddTitle?: string;
   showCreateComponent?: boolean;
   isFirstBlock: boolean;
   blockDeleteTitle?: string;
@@ -66,6 +67,7 @@ const BlockHeader: React.FC<BlockHeaderProps> = ({
   nameInputRef,
   findText,
   canAddToMemory,
+  memoryAddTitle,
   showCreateComponent = true,
   isFirstBlock,
   blockDeleteTitle,
@@ -103,7 +105,7 @@ const BlockHeader: React.FC<BlockHeaderProps> = ({
     <span className={styles.blockCount}>({instructionCount})</span>
     <MemoryAddButton
       disabled={!canAddToMemory}
-      title="Add this complete connected block to Memory List"
+      title={memoryAddTitle || 'Add this complete connected block to Memory List'}
       onClick={onAddToMemory}
     />
     <span className={styles.blockExportFile}>{exportFileNode}</span>

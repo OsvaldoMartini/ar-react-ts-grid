@@ -61,4 +61,17 @@ describe('InstructionRow', () => {
     render(<InstructionRow {...baseProps} />);
     expect(screen.getByAltText('Active')).toBeInTheDocument();
   });
+
+  it('shows the Memory-specific refusal reason on a disabled add button', () => {
+    render(<InstructionRow
+      {...baseProps}
+      capability={{
+        canMove: true,
+        canAdd: false,
+        canDelete: true,
+        addReason: 'Refresh the dependency graph.',
+      }}
+    />);
+    expect(screen.getByTitle('Refresh the dependency graph.')).toBeDisabled();
+  });
 });
