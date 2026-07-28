@@ -3,7 +3,10 @@ import { useCallback } from 'react';
 export type InstructionMoveRow = {
   id: number;
   blockId: number;
+  blockOrderNumber: number;
   instructionOrderNumber: number;
+  parentId?: number | null;
+  parentBlockId?: number | null;
 };
 
 type MoveContext = {
@@ -13,8 +16,6 @@ type MoveContext = {
   botJobId: number | null;
   botJobName: string | null;
   homeBankingId: number;
-  targetSessionId: 'botJobTasks' | 'componentTasks';
-  moveType: 'ROW_MOVE' | 'COMPONENT_ROW_MOVE';
 };
 
 export const useInstructionDrag = (context: MoveContext) => useCallback((
@@ -23,21 +24,25 @@ export const useInstructionDrag = (context: MoveContext) => useCallback((
   requestLabel = 'row-move',
 ) => {
   if (!context.webSocket || !context.connected || !context.graphRevision) return null;
-  const requestId = `${Date.now()}-${context.targetSessionId}-${requestLabel}`;
+  const requestId = `${Date.now()}-botJobTasks-${requestLabel}`;
   try {
     context.webSocket.send(JSON.stringify({
-    type: context.moveType,
+    type: 'ROW_MOVE',
     requestId,
     graphRevision: context.graphRevision,
     botJobId: context.botJobId,
     botJobName: context.botJobName,
     deleteBlockId,
     homeBankingId: context.homeBankingId,
-    sessionId: context.targetSessionId,
+    sessionId: 'botJobTasks',
+    rowMoveLayoutVersion: 2,
     updatedRows: rows.map(row => ({
       blockId: row.blockId,
       instructionId: row.id,
+      blockOrderNumber: row.blockOrderNumber,
       instructionOrderNumber: row.instructionOrderNumber,
+      parentId: row.parentId ?? null,
+      parentBlockId: row.parentBlockId ?? null,
     })),
     }));
     return requestId;

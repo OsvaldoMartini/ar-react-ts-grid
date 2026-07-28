@@ -15,6 +15,11 @@ import {
   projectMemorySelections,
 } from '../domain/memoryOptions';
 import type { InstructionVariableLink } from '../domain/instructionDependency';
+import {
+  planInstructionMove,
+  resolveInstructionDragGroup,
+  type InstructionMovePlan,
+} from '../domain/instructionMove';
 import { computeInstructionGraphRevision } from '../domain/instructionGraphRevision';
 import {
   groupByBlock,
@@ -170,7 +175,6 @@ export function useGridData(deps: UseGridDataDeps) {
     kind: workspaceKind,
     targetSessionId,
     updateOperation,
-    rowMoveVerb,
     commandEditorTargetSessionId,
   } = workspacePolicy;
 
@@ -203,6 +207,10 @@ export function useGridData(deps: UseGridDataDeps) {
     homeBankingId: number;
     botJobId: number | null;
   } | null>(null);
+  const pendingRowMoveRef = useRef<{
+    requestId: string;
+    previousRows: BlockLoopInstructionLoadDTO[];
+  } | null>(null);
 
   useLayoutEffect(() => {
     if (pendingScrollTopRef.current === null || !gridScrollRef.current) return;
@@ -211,7 +219,7 @@ export function useGridData(deps: UseGridDataDeps) {
   }, [instructionsData]);
 
   const [activeDraggedInstructionId, setActiveDraggedInstructionId] = useState<number | null>(null);
-  const [pendingDragPreview, setPendingDragPreview] = useState<{ requestId: string; result: any } | null>(null);
+  const [variableLinks, setVariableLinks] = useState<InstructionVariableLink[]>([]);
   const [blockDeleteCapabilities, setBlockDeleteCapabilities] = useState<Map<number, BlockDeleteCapability>>(new Map());
   const [moveGraphRevision, setMoveGraphRevision] = useState('');
   const [gridActionNotice, setGridActionNotice] = useState<GridActionNotice | null>(null);
@@ -271,6 +279,7 @@ export function useGridData(deps: UseGridDataDeps) {
     setMemoryCapabilities(new Map());
     setBlockDeleteCapabilities(new Map());
     pendingCapabilityRequestRef.current = null;
+    pendingRowMoveRef.current = null;
     setIsDataReordered(data.length === 0);
   // Prop changes are the synchronization trigger; optimistic row edits must not retrigger it.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -285,7 +294,7 @@ export function useGridData(deps: UseGridDataDeps) {
   ]);
   const submitBotJobInstructionMove = useInstructionDrag({
     webSocket, connected, graphRevision: moveGraphRevision, botJobId, botJobName,
-    homeBankingId, targetSessionId, moveType: rowMoveVerb,
+    homeBankingId,
   });
   const submitComponentInstructionMove = useComponentInstructionDrag({
     webSocket, connected, graphRevision: moveGraphRevision, botJobId, botJobName,
@@ -452,8 +461,31 @@ export function useGridData(deps: UseGridDataDeps) {
     }
   };
 
-  // Drag-and-drop event handler
-  const applyDragMove = (result: any, previewRows: { id: number }[]) => {
+  const commitDragPlan = (plan: InstructionMovePlan) => {
+    const requestId = submitInstructionMove(plan.rows, plan.deleteBlockId, 'drag');
+    if (!requestId) {
+      setAlertImage(forbiddenImage);
+      setAlertClass('construction-image');
+      setAlertMessageHeader('Move Instruction Not Sent');
+      setAlertMessageBody('The workspace is not synchronized with the backend.');
+      setAlertMessageFooter('Refresh this workspace and try again.');
+      setAlertOnConfirm(undefined);
+      setErrorFlag(true);
+      return;
+    }
+    pendingRowMoveRef.current = {
+      requestId,
+      previousRows: instructionsData,
+    };
+    setMoveGraphRevision('');
+    setGroupedData(groupByBlock(plan.rows));
+    setInstructionsData(plan.rows);
+    setIsDataReordered(false);
+  };
+
+  // React owns grouping and final-layout validation. Java receives exactly one
+  // complete version-2 persistence layout after this planner succeeds.
+  const applyDragMove = (result: any) => {
     const { source, destination, draggableId } = result;
     setActiveDraggedInstructionId(null);
     if (!destination) return;
@@ -475,119 +507,60 @@ export function useGridData(deps: UseGridDataDeps) {
 
     const instructionId = Number(draggableId);
     const capability = memoryCapabilities.get(instructionId);
-    const destinationId = destinationBlockId;
-    if (!capability?.canMove || !capability.allowedBlockIds.includes(destinationId)) {
+    if (!capability?.canMove || !capability.allowedBlockIds.includes(destinationBlockId)) {
       setAlertImage(forbiddenImage);
       setAlertClass('construction-image');
       setAlertMessageHeader('Drag & Drop not Allowed');
-      setAlertMessageBody(capability?.reason || 'The backend does not allow this movement.');
+      setAlertMessageBody(capability?.reason || 'This workspace is not synchronized for row movement.');
       setAlertMessageFooter('Select one of the highlighted destinations.');
+      setAlertOnConfirm(undefined);
       setErrorFlag(true);
       return;
     }
 
-    const groupIds = new Set(previewRows.map(row => Number(row.id)));
-    const previewOrder = new Map(
-      previewRows.map((row, index) => [Number(row.id), index]),
+    const plan = planInstructionMove(
+      instructionsData,
+      variableLinks,
+      instructionId,
+      destinationBlockId,
+      destination.index,
+      workspaceBlocks,
     );
-    const movedInstructions = sourceBlock.instructions
-      .filter(instruction => groupIds.has(instruction.id))
-      .sort((left, right) => (
-        (previewOrder.get(left.id) ?? Number.MAX_SAFE_INTEGER)
-        - (previewOrder.get(right.id) ?? Number.MAX_SAFE_INTEGER)
-      ));
-    const sourceInstructions = sourceBlock.instructions.filter(instruction => !groupIds.has(instruction.id));
-    if (movedInstructions.length !== groupIds.size) return;
-    let updatedGroupedData = { ...groupedData };
-    let deleteBlockId = -1;
-
-    if (sourceBlockId === destinationBlockId) {
-      if (workspaceKind === 'COMPONENT') {
-        const targetInstruction = sourceBlock.instructions[destination.index];
-        // Dropping on any row already carried by the authoritative family is a no-op.
-        if (targetInstruction && groupIds.has(targetInstruction.id)) return;
-
-        let insertionIndex = sourceInstructions.length;
-        if (targetInstruction) {
-          const targetCapability = memoryCapabilities.get(targetInstruction.id);
-          const targetUnitIds = new Set(
-            (targetCapability?.memoryGroupRows ?? [{ id: targetInstruction.id }])
-              .map(row => Number(row.id)),
-          );
-          const targetIndexes = sourceInstructions
-            .map((instruction, index) => (
-              targetUnitIds.has(instruction.id) ? index : -1
-            ))
-            .filter(index => index >= 0);
-          if (targetIndexes.length > 0) {
-            const sourceFirstIndex = sourceBlock.instructions.findIndex(
-              instruction => groupIds.has(instruction.id),
-            );
-            insertionIndex = sourceFirstIndex < destination.index
-              ? Math.max(...targetIndexes) + 1
-              : Math.min(...targetIndexes);
-          }
-        }
-        sourceInstructions.splice(insertionIndex, 0, ...movedInstructions);
-      } else {
-        // Accepted Bot Job behavior remains unchanged during the Components-first pass.
-        sourceInstructions.splice(destination.index, 0, ...movedInstructions);
-      }
-      updatedGroupedData[sourceBlockId] = {
-        ...sourceBlock,
-        instructions: sourceInstructions.map((instruction, index) => ({
-          ...instruction,
-          instructionOrderNumber: index + 1,
-        })),
-      };
-    } else {
-      const destinationInstructions = [...destinationBlock.instructions];
-      let insertionIndex = destination.index;
-      if (workspaceKind === 'COMPONENT' && destinationInstructions[destination.index]) {
-        const targetInstruction = destinationInstructions[destination.index];
-        const targetCapability = memoryCapabilities.get(targetInstruction.id);
-        const targetUnitIds = new Set(
-          (targetCapability?.memoryGroupRows ?? [{ id: targetInstruction.id }])
-            .map(row => Number(row.id)),
-        );
-        const targetIndexes = destinationInstructions
-          .map((instruction, index) => (
-            targetUnitIds.has(instruction.id) ? index : -1
-          ))
-          .filter(index => index >= 0);
-        if (targetIndexes.length > 0) insertionIndex = Math.min(...targetIndexes);
-      }
-      destinationInstructions.splice(insertionIndex, 0, ...movedInstructions);
-      updatedGroupedData[sourceBlockId] = {
-        ...sourceBlock,
-        instructions: sourceInstructions.map((instruction, index) => ({
-          ...instruction,
-          instructionOrderNumber: index + 1,
-        })),
-      };
-      updatedGroupedData[destinationBlockId] = {
-        ...destinationBlock,
-        instructions: destinationInstructions.map((instruction, index) => ({
-          ...instruction,
-          blockId: destinationId,
-          blockName: destinationBlock.blockName,
-          blockOrderNumber: destinationBlock.instructions[0]?.blockOrderNumber
-            ?? destinationWorkspaceBlock?.blockOrderNumber
-            ?? instruction.blockOrderNumber,
-          instructionOrderNumber: index + 1,
-        })),
-      };
-      if (sourceInstructions.length === 0) {
-        deleteBlockId = sourceBlockId;
-        delete updatedGroupedData[sourceBlockId];
-      }
+    if (!plan.ok) {
+      setAlertImage(forbiddenImage);
+      setAlertClass('construction-image');
+      setAlertMessageHeader('Drag & Drop not Allowed');
+      setAlertMessageBody(plan.error || 'The movement breaks instruction relationships.');
+      setAlertMessageFooter('Keep related instructions together.');
+      setAlertOnConfirm(undefined);
+      setErrorFlag(true);
+      return;
     }
+    if (!plan.changed) return;
 
-    const updatedInstructionsData = Object.values(updatedGroupedData).flatMap(block => block.instructions);
-    setGroupedData(updatedGroupedData);
-    setInstructionsData(updatedInstructionsData);
-    setIsDataReordered(false);
-    submitInstructionMove(updatedInstructionsData, deleteBlockId, 'drag');
+    if (plan.group.length > 1) {
+      const visibleRows = plan.group.slice(0, 8);
+      const summary = visibleRows
+        .map(row => `#${row.instructionOrderNumber} ${row.name || row.actions}`)
+        .join('\n');
+      const remaining = plan.group.length - visibleRows.length;
+      setAlertImage(constructionImage);
+      setAlertClass('construction-image');
+      setAlertMessageHeader(`Move ${plan.group.length} connected instructions?`);
+      setAlertMessageBody(
+        remaining > 0
+          ? `${summary}\n+ ${remaining} more connected instruction(s)`
+          : summary,
+      );
+      setAlertMessageFooter('The complete connected group will move together.');
+      setErrorFlag(false);
+      setAlertOnConfirm(() => () => {
+        handleClose();
+        commitDragPlan(plan);
+      });
+      return;
+    }
+    commitDragPlan(plan);
   };
 
   const onDragEnd = (result: any) => {
@@ -599,44 +572,12 @@ export function useGridData(deps: UseGridDataDeps) {
     ) {
       return;
     }
-    if (
-      workspaceKind === 'COMPONENT'
-      && result.source?.droppableId === result.destination.droppableId
-    ) {
-      const instructionId = Number(result.draggableId);
-      const targetInstruction = groupedData[Number(result.destination.droppableId)]
-        ?.instructions[result.destination.index];
-      const sourceGroupIds = new Set(
-        (memoryCapabilities.get(instructionId)?.memoryGroupRows ?? [{ id: instructionId }])
-          .map(row => Number(row.id)),
-      );
-      if (targetInstruction && sourceGroupIds.has(targetInstruction.id)) return;
-    }
     if (!webSocket || !connected || !moveGraphRevision) return;
-    const requestId = `${Date.now()}-${targetSessionId}-move-preview`;
-    setPendingDragPreview({ requestId, result });
-    webSocket.send(JSON.stringify({
-      type: 'instructionGraph.previewMove',
-      sessionId,
-      homeBankingId,
-      body: JSON.stringify({
-        requestId,
-        targetSessionId,
-        botJobId,
-        homeBankingId,
-        graphRevision: moveGraphRevision,
-        instructionId: Number(result.draggableId),
-        destinationBlockId: Number(result.destination.droppableId),
-        destinationIndex: result.destination.index,
-      }),
-    }));
+    applyDragMove(result);
   };
 
-  // ── Native HTML5 drag & drop (Phase 7; replaces react-beautiful-dnd) ────────
-  // Only the drag *mechanism* changed: on drop we synthesize the exact same
-  // result shape rbd produced and call onDragEnd() above unchanged (so the
-  // backend preview-move round-trip is untouched). [Grid][drag] logs + the
-  // window.__gridReorder hook make the pipeline observable/testable like Memory List.
+  // Native HTML5 drag & drop. The synthesized result is planned locally and
+  // produces one version-2 persistence command after any required confirmation.
   const dragSourceRef = useRef<{ droppableId: string; index: number; instructionId: number } | null>(null);
 
   const commitInstructionDrag = useCallback((destinationDroppableId: string, destinationIndex: number) => {
@@ -883,37 +824,6 @@ export function useGridData(deps: UseGridDataDeps) {
             setErrorFlag(true);
             setAlertOnConfirm(undefined);
           }
-        } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "instructionGraph.previewMoveResponse") {
-          const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
-          if (pendingDragPreview && bodyData?.requestId === pendingDragPreview.requestId) {
-            const pendingResult = pendingDragPreview.result;
-            const groupRows = Array.isArray(bodyData?.groupRows) ? bodyData.groupRows : [];
-            setPendingDragPreview(null);
-            if (bodyData?.ok === false || groupRows.length === 0) {
-              setAlertImage(forbiddenImage);
-              setAlertClass('construction-image');
-              setAlertMessageHeader('Move Preview Refused');
-              setAlertMessageBody(bodyData?.error || 'The backend could not preview this movement.');
-              setAlertMessageFooter('Refresh the grid and try again.');
-              setErrorFlag(true);
-              setAlertOnConfirm(undefined);
-            } else if (groupRows.length === 1) {
-              applyDragMove(pendingResult, groupRows);
-            } else {
-              const summary = groupRows.map((row: { order: number; name: string; action: string }) =>
-                `#${row.order} ${row.name || row.action}`).join('\n');
-              setAlertImage(constructionImage);
-              setAlertClass('construction-image');
-              setAlertMessageHeader(`Move ${groupRows.length} connected instructions?`);
-              setAlertMessageBody(summary);
-              setAlertMessageFooter('The complete connected group will move together.');
-              setErrorFlag(false);
-              setAlertOnConfirm(() => () => {
-                handleClose();
-                applyDragMove(pendingResult, groupRows);
-              });
-            }
-          }
         } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "instructionGraph.applySplitResponse") {
           const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
           if (!pendingSplitRequestRef.current || bodyData?.requestId !== pendingSplitRequestRef.current) {
@@ -977,7 +887,17 @@ export function useGridData(deps: UseGridDataDeps) {
               setMemoryMoveStatus(bodyData?.error || 'Memory Apply was refused.');
             }
             setPendingMemoryMove(null);
-          } else if (bodyData?.ok === false) {
+          } else {
+            const pendingRowMove = pendingRowMoveRef.current;
+            if (pendingRowMove && pendingRowMove.requestId === bodyData?.requestId) {
+              pendingRowMoveRef.current = null;
+              if (bodyData?.ok === false) {
+                setInstructionsData(pendingRowMove.previousRows);
+                setGroupedData(groupByBlock(pendingRowMove.previousRows));
+                setIsDataReordered(false);
+              }
+            }
+            if (bodyData?.ok !== false) return;
             setAlertImage(warningRedImage);
             setAlertClass('construction-image');
             setAlertMessageHeader(bodyData?.errorTitle || 'Move Instruction Refused');
@@ -1022,6 +942,7 @@ export function useGridData(deps: UseGridDataDeps) {
                   : Number(candidate.instructionId),
               }))
             : [];
+          setVariableLinks(variableLinks);
           const localMemorySelections = projectMemorySelections(
             instructionsData,
             variableLinks,
@@ -1061,13 +982,15 @@ export function useGridData(deps: UseGridDataDeps) {
             instructionsData,
             variableLinks,
           );
-          const memoryGraphSynchronized =
+          const capabilityCoverageSynchronized =
             renderedInstructionIds.size === instructionsData.length
             && serverCapabilities.size === renderedInstructionIds.size
             && [...renderedInstructionIds].every(
               instructionId => serverCapabilities.has(instructionId),
             )
-            && /^[a-f0-9]{64}$/.test(backendGraphRevision)
+            && /^[a-f0-9]{64}$/.test(backendGraphRevision);
+          const memoryGraphSynchronized =
+            capabilityCoverageSynchronized
             // Components are reusable source rows. Their presentation model may be
             // locally normalized before this correlated response arrives, while the
             // server revision still identifies the authoritative database graph.
@@ -1078,6 +1001,12 @@ export function useGridData(deps: UseGridDataDeps) {
               workspaceKind === 'COMPONENT'
               || renderedGraphRevision === backendGraphRevision
             );
+          // ROW_MOVE persists the complete rendered layout, so ID coverage alone is
+          // never sufficient. A locally normalized/stale Component layout must not
+          // overwrite authoritative block/order data under a newer server revision.
+          const moveGraphSynchronized =
+            capabilityCoverageSynchronized
+            && renderedGraphRevision === backendGraphRevision;
           const staleMemoryReason =
             'The instruction graph changed. Refresh this workspace before adding rows or blocks to Memory List.';
           const next = new Map<number, MemoryCapability>();
@@ -1088,17 +1017,20 @@ export function useGridData(deps: UseGridDataDeps) {
               canAdd: memoryGraphSynchronized
                 && capability != null
                 && memorySelection?.canAdd === true,
-              canMove: capability?.canMove === true,
+              // Row movement is planned from the complete correlated React
+              // graph. Memory copy eligibility is a separate operation and
+              // must not disable drag (for example, EXCEL GOTO is non-copyable).
+              canMove: moveGraphSynchronized && capability != null,
               canDelete: capability?.canDelete === true,
               deleteCount: capability?.deleteCount || 1,
-              reason: capability?.reason || '',
+              reason: moveGraphSynchronized && capability != null
+                ? ''
+                : 'Refresh this workspace before moving instructions.',
               addReason: !memoryGraphSynchronized || capability == null
                 ? staleMemoryReason
                 : memorySelection?.addReason || '',
               deleteReason: capability?.deleteReason || '',
-              allowedBlockIds: Array.isArray(capability?.allowedBlockIds)
-                ? capability?.allowedBlockIds ?? []
-                : [],
+              allowedBlockIds: workspaceBlocks.map(block => block.blockId),
               deleteRows: Array.isArray(capability?.deleteRows)
                 ? capability?.deleteRows ?? []
                 : [],
@@ -1156,6 +1088,7 @@ export function useGridData(deps: UseGridDataDeps) {
             ? JSON.parse(parsedMessage.body)
             : parsedMessage.body;
           pendingCapabilityRequestRef.current = null;
+          pendingRowMoveRef.current = null;
           setMoveGraphRevision('');
           setMemoryCapabilities(new Map());
           setBlockDeleteCapabilities(new Map());
@@ -1228,6 +1161,7 @@ export function useGridData(deps: UseGridDataDeps) {
           }
 
           pendingCapabilityRequestRef.current = null;
+          pendingRowMoveRef.current = null;
           setMoveGraphRevision('');
           setMemoryCapabilities(new Map());
           setBlockDeleteCapabilities(new Map());
@@ -1343,7 +1277,7 @@ export function useGridData(deps: UseGridDataDeps) {
       }
     });
   }, [
-    messages, onDetachedClose, onSessionOpen, pendingMemoryMove, pendingDragPreview,
+    messages, onDetachedClose, onSessionOpen, pendingMemoryMove,
     sessionId, socketPort, updateOperation, workspaceKind,
   ]);
 
@@ -2008,25 +1942,22 @@ export function useGridData(deps: UseGridDataDeps) {
       .filter(row => row.blockId === instruction.blockId)
       .sort((left, right) => left.instructionOrderNumber - right.instructionOrderNumber);
     const sourceIndex = blockInstructions.findIndex(row => row.id === instructionId);
-    let destinationIndex = sourceIndex + 1;
-    if (workspaceKind === 'COMPONENT') {
-      const groupIds = new Set(
-        (memoryCapabilities.get(instructionId)?.memoryGroupRows ?? [{ id: instructionId }])
-          .map(row => Number(row.id)),
-      );
-      const lastGroupIndex = blockInstructions.reduce(
-        (last, row, index) => (groupIds.has(row.id) ? index : last),
-        -1,
-      );
-      destinationIndex = blockInstructions.findIndex(
-        (row, index) => index > lastGroupIndex && !groupIds.has(row.id),
-      );
-    }
-    if (sourceIndex < 0 || destinationIndex < 0 || destinationIndex >= blockInstructions.length) return;
+    if (sourceIndex < 0) return;
+    const groupIds = new Set(
+      resolveInstructionDragGroup(blockInstructions, instructionId).map(row => row.id),
+    );
+    const groupIndexes = blockInstructions
+      .map((row, index) => (groupIds.has(row.id) ? index : -1))
+      .filter(index => index >= 0);
+    const lastGroupIndex = Math.max(...groupIndexes);
+    const targetIndex = blockInstructions.findIndex(
+      (row, index) => index > lastGroupIndex && !groupIds.has(row.id),
+    );
+    if (targetIndex < 0) return;
     onDragEnd({
       draggableId: String(instructionId),
       source: { droppableId: String(instruction.blockId), index: sourceIndex },
-      destination: { droppableId: String(instruction.blockId), index: destinationIndex },
+      destination: { droppableId: String(instruction.blockId), index: targetIndex },
     });
   };
 
@@ -2037,22 +1968,19 @@ export function useGridData(deps: UseGridDataDeps) {
       .filter(row => row.blockId === instruction.blockId)
       .sort((left, right) => left.instructionOrderNumber - right.instructionOrderNumber);
     const sourceIndex = blockInstructions.findIndex(row => row.id === instructionId);
-    let destinationIndex = sourceIndex - 1;
-    if (workspaceKind === 'COMPONENT') {
-      const groupIds = new Set(
-        (memoryCapabilities.get(instructionId)?.memoryGroupRows ?? [{ id: instructionId }])
-          .map(row => Number(row.id)),
-      );
-      const firstGroupIndex = blockInstructions.findIndex(row => groupIds.has(row.id));
-      destinationIndex = -1;
-      for (let index = firstGroupIndex - 1; index >= 0; index -= 1) {
-        if (!groupIds.has(blockInstructions[index].id)) {
-          destinationIndex = index;
-          break;
-        }
+    if (sourceIndex < 0) return;
+    const groupIds = new Set(
+      resolveInstructionDragGroup(blockInstructions, instructionId).map(row => row.id),
+    );
+    const firstGroupIndex = blockInstructions.findIndex(row => groupIds.has(row.id));
+    let destinationIndex = -1;
+    for (let index = firstGroupIndex - 1; index >= 0; index -= 1) {
+      if (!groupIds.has(blockInstructions[index].id)) {
+        destinationIndex = index;
+        break;
       }
     }
-    if (sourceIndex < 0 || destinationIndex < 0 || destinationIndex >= blockInstructions.length) return;
+    if (destinationIndex < 0) return;
     onDragEnd({
       draggableId: String(instructionId),
       source: { droppableId: String(instruction.blockId), index: sourceIndex },

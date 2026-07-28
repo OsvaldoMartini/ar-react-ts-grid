@@ -3,7 +3,10 @@ import { useCallback } from 'react';
 export type ComponentInstructionMoveRow = {
   id: number;
   blockId: number;
+  blockOrderNumber: number;
   instructionOrderNumber: number;
+  parentId?: number | null;
+  parentBlockId?: number | null;
 };
 
 type ComponentMoveContext = {
@@ -38,10 +41,14 @@ export const useComponentInstructionDrag = (context: ComponentMoveContext) => us
     deleteBlockId,
     homeBankingId: context.homeBankingId,
     sessionId: 'componentTasks',
+    rowMoveLayoutVersion: 2,
     updatedRows: rows.map(row => ({
       blockId: row.blockId,
       instructionId: row.id,
+      blockOrderNumber: row.blockOrderNumber,
       instructionOrderNumber: row.instructionOrderNumber,
+      parentId: row.parentId ?? null,
+      parentBlockId: row.parentBlockId ?? null,
     })),
     }));
     return requestId;

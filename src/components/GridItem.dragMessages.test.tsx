@@ -68,15 +68,16 @@ const capabilityResponse = (sessionId: string) => {
     targetSessionId: requestedBody.targetSessionId,
     homeBankingId: requestedBody.homeBankingId,
     botJobId: requestedBody.botJobId,
-    graphRevision: 'revision-1',
-    capabilities: [{
-      instructionId: 101,
+    graphRevision: computeInstructionGraphRevision([row, secondRow], []),
+    capabilities: [row, secondRow].map(instruction => ({
+      instructionId: instruction.id,
       canAddToMemory: true,
       canMove: true,
       canDelete: true,
       allowedBlockIds: [10],
-    }],
+    })),
     blockCapabilities: [],
+    variableLinks: [],
   }),
   });
 };
@@ -89,11 +90,9 @@ const unrelatedResponse = (sessionId: string) => JSON.stringify({
 
 const expectQueuedCapabilityEnablesDrag = async (sessionId: string) => {
   await waitFor(() => expect(screen.getByLabelText('Move instruction 1')).toBeEnabled());
-  const staleMemoryButtons = screen.getAllByTitle(
-    'The instruction graph changed. Refresh this workspace before adding rows or blocks to Memory List.',
-  );
-  expect(staleMemoryButtons.length).toBeGreaterThanOrEqual(2);
-  staleMemoryButtons.forEach(button => expect(button).toBeDisabled());
+  const synchronizedMemoryButtons = screen.getAllByTitle('Add step to memory list');
+  expect(synchronizedMemoryButtons).toHaveLength(2);
+  synchronizedMemoryButtons.forEach(button => expect(button).toBeEnabled());
 
   // Native HTML5 drag: grab row 1 (instruction 101) and drop it on row 2 (index 1).
   const sourceRow = screen.getByLabelText('Move instruction 1').closest('[draggable]');
@@ -102,17 +101,33 @@ const expectQueuedCapabilityEnablesDrag = async (sessionId: string) => {
   fireEvent.drop(destinationRow as Element);
 
   await waitFor(() => {
-    const preview = mockSend.mock.calls
+    const move = mockSend.mock.calls
       .map(([payload]) => JSON.parse(payload))
-      .find((message) => message.type === 'instructionGraph.previewMove');
-    expect(preview).toBeDefined();
-    expect(JSON.parse(preview.body)).toMatchObject({
-      targetSessionId: sessionId,
-      graphRevision: 'revision-1',
-      instructionId: 101,
-      destinationBlockId: 10,
+      .find((message) => message.type === (
+        sessionId === 'componentTasks' ? 'COMPONENT_ROW_MOVE' : 'ROW_MOVE'
+      ));
+    expect(move).toMatchObject({
+      sessionId,
+      rowMoveLayoutVersion: 2,
+      graphRevision: computeInstructionGraphRevision([row, secondRow], []),
     });
+    expect(move.updatedRows).toEqual([
+      expect.objectContaining({
+        instructionId: 102,
+        instructionOrderNumber: 1,
+        parentId: null,
+        parentBlockId: null,
+      }),
+      expect.objectContaining({
+        instructionId: 101,
+        instructionOrderNumber: 2,
+        parentId: null,
+        parentBlockId: null,
+      }),
+    ]);
   });
+  expect(mockSend.mock.calls.map(([payload]) => JSON.parse(payload).type))
+    .not.toContain('instructionGraph.previewMove');
 };
 
 afterEach(() => {
