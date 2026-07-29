@@ -17,7 +17,9 @@ test('keeps capability-gated actions disabled until bootstrap state is available
     status: 'Loading Bot Job details',
     statusTone: 'neutral',
     executionPause: null,
+    executionPreflight: null,
     resolveExecutionPause: jest.fn(),
+    dismissExecutionPreflight: jest.fn(),
     sendAction: jest.fn(),
     sendToolbarAction: jest.fn(),
     saveMetadata: jest.fn(),
@@ -54,7 +56,9 @@ test('keeps Stop available but disables editing, navigation, and file mutations 
     status: 'TEST RUN active',
     statusTone: 'warning',
     executionPause: null,
+    executionPreflight: null,
     resolveExecutionPause: jest.fn(),
+    dismissExecutionPreflight: jest.fn(),
     sendAction: jest.fn(),
     sendToolbarAction: jest.fn(),
     saveMetadata: jest.fn(),
@@ -93,7 +97,9 @@ test('saves metadata through the restored editor entry point', () => {
     status: 'Ready',
     statusTone: 'neutral',
     executionPause: null,
+    executionPreflight: null,
     resolveExecutionPause: jest.fn(),
+    dismissExecutionPreflight: jest.fn(),
     sendAction: jest.fn(),
     sendToolbarAction: jest.fn(),
     saveMetadata,
@@ -152,7 +158,9 @@ test('renders the standard React confirmation for an instruction PAUSE', () => {
       continueLabel: 'Continue',
       stopLabel: 'Stop Run',
     },
+    executionPreflight: null,
     resolveExecutionPause,
+    dismissExecutionPreflight: jest.fn(),
     sendAction: jest.fn(),
     sendToolbarAction: jest.fn(),
     saveMetadata: jest.fn(),
@@ -174,4 +182,72 @@ test('renders the standard React confirmation for an instruction PAUSE', () => {
   expect(screen.getByRole('dialog')).toHaveTextContent('Review customer page');
   fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
   expect(resolveExecutionPause).toHaveBeenCalledWith('CONTINUE');
+});
+
+test('renders the authoritative WARN preflight and delegates row focus without another action', () => {
+  const dismissExecutionPreflight = jest.fn();
+  const onFocusPreflightIssue = jest.fn();
+  const issue = {
+    code: 'MISSING_LOOP_ANCHOR',
+    kind: 'LOOP_ANCHOR',
+    blockId: 12,
+    instructionId: 101,
+    message: 'LOOP has no Web Element anchor.',
+  };
+  const controller: BotJobDetailsControllerState = {
+    state: botJobDetailsTestState,
+    loadingState: false,
+    savingMetadata: false,
+    fieldErrors: {},
+    metadataSavedRevision: null,
+    pendingAction: null,
+    pendingToolbarAction: null,
+    transferPath: '',
+    status: 'TEST RUN started',
+    statusTone: 'warning',
+    executionPause: null,
+    executionPreflight: {
+      action: 'TEST_RUN',
+      report: {
+        enforcement: 'WARN',
+        status: 'WOULD_BLOCK',
+        stage: 'BOT_JOB_DETAILS_TEST_RUN',
+        owner: { homeBankingId: 7, botJobId: 42 },
+        runScope: { kind: 'ONE', selectedBlockId: 12 },
+        graphVersion: 4,
+        contentRevision: 'revision-4',
+        reachableBlockIds: [12],
+        reachableInstructionIds: [101],
+        totalIssues: 1,
+        issues: [issue],
+        unavailableReason: null,
+      },
+    },
+    resolveExecutionPause: jest.fn(),
+    dismissExecutionPreflight,
+    sendAction: jest.fn(),
+    sendToolbarAction: jest.fn(),
+    saveMetadata: jest.fn(),
+    refreshEnvironments: jest.fn(),
+    retryBootstrap: jest.fn(),
+  };
+
+  render(
+    <BotJobDetailsChrome
+      fallbackBotJobId={42}
+      fallbackBotJobName="Payments"
+      fallbackSurface="botJob"
+      connected
+      controller={controller}
+      onFocusPreflightIssue={onFocusPreflightIssue}
+    />,
+  );
+
+  expect(screen.getByRole('dialog', { name: 'Test Run preflight' })).toHaveTextContent(
+    'Execution was started because observation mode is active.',
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Focus' }));
+  expect(onFocusPreflightIssue).toHaveBeenCalledWith(issue);
+  expect(dismissExecutionPreflight).toHaveBeenCalledTimes(1);
+  expect(controller.sendToolbarAction).not.toHaveBeenCalled();
 });

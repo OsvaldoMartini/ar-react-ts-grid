@@ -3,6 +3,8 @@ import React from 'react';
 import styles from '../../Griditem.module.scss';
 
 export interface BlockCardProps {
+  /** Stable database id used by diagnostic focus/navigation. */
+  blockId?: number;
   /** Stable visual order from the authoritative block catalog (including empty blocks). */
   displayOrder?: number;
   /** Whether this block header can initiate a block reorder drag. */
@@ -24,6 +26,7 @@ export interface BlockCardProps {
  * by the block drop handler (which only acts on an active block drag).
  */
 const BlockCard: React.FC<BlockCardProps> = ({
+  blockId,
   displayOrder,
   blockDraggable,
   onBlockDragStart,
@@ -33,24 +36,45 @@ const BlockCard: React.FC<BlockCardProps> = ({
   collapsed,
   header,
   list,
-}) => (
-  <div
-    className={styles.block}
-    style={displayOrder == null ? undefined : { order: displayOrder }}
-    onDragOver={onBlockDragOver}
-    onDrop={onBlockDrop}
-  >
+}) => {
+  /*
+   * InstructionList's droppable id is the block id in the current grid.
+   * Keep that as a compatibility fallback until every BlockCard caller passes
+   * blockId explicitly. It is also important for EXCEL GOTO: that command is
+   * intentionally omitted from the normal InstructionRow list, so diagnostics
+   * must be able to focus its containing block instead.
+   */
+  const listDroppableId = React.isValidElement<{ droppableId?: unknown }>(list)
+    ? Number(list.props.droppableId)
+    : Number.NaN;
+  const resolvedBlockId = Number.isSafeInteger(blockId)
+    ? blockId
+    : Number.isSafeInteger(listDroppableId)
+      ? listDroppableId
+      : undefined;
+
+  return (
     <div
-      draggable={blockDraggable}
-      onDragStart={onBlockDragStart}
-      onDragEnd={onBlockDragEnd}
-      style={{ cursor: blockDraggable ? 'grab' : undefined }}
-      title={blockDraggable ? 'Drag the block header to reorder blocks' : undefined}
+      className={styles.block}
+      data-focus-target="block"
+      data-block-id={resolvedBlockId}
+      tabIndex={-1}
+      style={displayOrder == null ? undefined : { order: displayOrder }}
+      onDragOver={onBlockDragOver}
+      onDrop={onBlockDrop}
     >
-      {header}
+      <div
+        draggable={blockDraggable}
+        onDragStart={onBlockDragStart}
+        onDragEnd={onBlockDragEnd}
+        style={{ cursor: blockDraggable ? 'grab' : undefined }}
+        title={blockDraggable ? 'Drag the block header to reorder blocks' : undefined}
+      >
+        {header}
+      </div>
+      {!collapsed && list}
     </div>
-    {!collapsed && list}
-  </div>
-);
+  );
+};
 
 export default BlockCard;

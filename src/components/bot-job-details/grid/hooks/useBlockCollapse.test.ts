@@ -25,4 +25,21 @@ describe('useBlockCollapse', () => {
     expect(result.current.isCollapsed(2)).toBe(true);
     expect(result.current.isCollapsed(3)).toBe(false);
   });
+
+  it('expands only a collapsed block and is idempotent for an open block', () => {
+    const { result } = renderHook(() => useBlockCollapse());
+    const initialSet = result.current.collapsedBlocks;
+
+    act(() => result.current.expandBlock(5));
+    expect(result.current.collapsedBlocks).toBe(initialSet);
+
+    act(() => result.current.toggleBlockCollapsed(5));
+    expect(result.current.isCollapsed(5)).toBe(true);
+    act(() => result.current.expandBlock(5));
+    expect(result.current.isCollapsed(5)).toBe(false);
+
+    const expandedSet = result.current.collapsedBlocks;
+    act(() => result.current.expandBlock(5));
+    expect(result.current.collapsedBlocks).toBe(expandedSet);
+  });
 });

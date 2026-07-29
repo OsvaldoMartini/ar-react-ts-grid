@@ -5,6 +5,7 @@ import type { BlockLoopInstructionLoadDTO } from '../../instructionsMockData';
 
 const instruction = {
   id: 7,
+  blockId: 11,
   actions: 'GOTO',
   instructionActive: true,
   instructionOrderNumber: 3,
@@ -73,5 +74,13 @@ describe('InstructionRow', () => {
       }}
     />);
     expect(screen.getByTitle('Refresh the dependency graph.')).toBeDisabled();
+  });
+
+  it('exposes stable focus markers without entering the normal tab order', () => {
+    const { container } = render(<InstructionRow {...baseProps} />);
+    expect(container.firstChild).toHaveAttribute('data-focus-target', 'instruction');
+    expect(container.firstChild).toHaveAttribute('data-block-id', '11');
+    expect(container.firstChild).toHaveAttribute('data-instruction-id', '7');
+    expect(container.firstChild).toHaveAttribute('tabindex', '-1');
   });
 });

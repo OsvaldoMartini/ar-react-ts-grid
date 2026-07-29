@@ -4,6 +4,7 @@ import { useBotJobDetailsController } from '../../useBotJobDetailsController';
 import { useWebSocket } from '../../../useWebSocket';
 import { useInstructionFind } from './useInstructionFind';
 import { useBlockCollapse } from './useBlockCollapse';
+import { useInstructionFocus } from './useInstructionFocus';
 import { useGridAlerts } from './useGridAlerts';
 import { useExecutionState } from './useExecutionState';
 import { useInstructionMemory } from './useInstructionMemory';
@@ -99,7 +100,12 @@ export function useInstructionGrid({
 
   const { executionId, setExecutionId, executionState, setExecutionState } = useExecutionState();
   const { findText, setFindText, renderHighlighted } = useInstructionFind();
-  const { collapsedBlocks, toggleBlockCollapsed } = useBlockCollapse();
+  const { collapsedBlocks, expandBlock, toggleBlockCollapsed } = useBlockCollapse();
+  const focusInstructionTarget = useInstructionFocus({
+    containerRef: gridScrollRef,
+    expandBlock,
+    clearFind: () => setFindText(''),
+  });
   const {
     excelExportContext, setExcelExportContext,
     excelExportDirectory, setExcelExportDirectory,
@@ -647,7 +653,7 @@ export function useInstructionGrid({
     // useInstructionFind
     findText, setFindText, renderHighlighted,
     // useBlockCollapse
-    collapsedBlocks, toggleBlockCollapsed,
+    collapsedBlocks, expandBlock, toggleBlockCollapsed, focusInstructionTarget,
     // useExcelExport
     excelExportContext, excelExportDirectory, choosingExcelExportDirectory,
     handleExcelFileBlockName, submitExcelExport, chooseExcelExportDirectory, closeExcelExport,

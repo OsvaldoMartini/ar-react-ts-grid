@@ -30,6 +30,58 @@ export type BotJobToolbarPayload = Record<string, string | number | boolean | nu
 
 export type BotJobWorkspaceStatusTone = 'neutral' | 'success' | 'warning' | 'error';
 
+export type ExecutionPreflightEnforcement = 'WARN';
+
+export type ExecutionPreflightStatus =
+  | 'READY'
+  | 'WOULD_BLOCK'
+  | 'UNAVAILABLE';
+
+export type ExecutionPreflightRunScopeKind =
+  | 'ALL'
+  | 'ONE'
+  | 'FROM_BLOCK';
+
+export interface ExecutionPreflightOwner {
+  homeBankingId: number;
+  botJobId: number;
+}
+
+export interface ExecutionPreflightRunScope {
+  kind: ExecutionPreflightRunScopeKind;
+  selectedBlockId: number | null;
+}
+
+export interface ExecutionPreflightIssue {
+  code: string;
+  kind: string;
+  blockId: number | null;
+  instructionId: number | null;
+  message: string;
+}
+
+/**
+ * Authoritative backend observation captured immediately before execution.
+ *
+ * WARN is intentionally observational: it reports what a future hard gate
+ * would refuse, while the current TEST RUN or LAUNCH still starts exactly
+ * once.
+ */
+export interface ExecutionPreflightReport {
+  enforcement: ExecutionPreflightEnforcement;
+  status: ExecutionPreflightStatus;
+  stage: string;
+  owner: ExecutionPreflightOwner | null;
+  runScope: ExecutionPreflightRunScope | null;
+  graphVersion: number | null;
+  contentRevision: string | null;
+  reachableBlockIds: number[];
+  reachableInstructionIds: number[];
+  totalIssues: number;
+  issues: ExecutionPreflightIssue[];
+  unavailableReason: string | null;
+}
+
 export type BotJobExecutionState =
   | 'UNKNOWN'
   | 'IDLE'
@@ -109,6 +161,7 @@ export interface BotJobDetailsResponse {
   componentsVisible?: boolean;
   action?: BotJobWorkspaceAction | BotJobToolbarAction;
   selectedPath?: string;
+  executionPreflight?: ExecutionPreflightReport;
   errorCode?: string | null;
   fieldErrors?: Record<string, string>;
 }

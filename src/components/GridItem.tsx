@@ -68,7 +68,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
     alertOnConfirm, alertAlternateAction, handleClose,
     executionId, executionState,
     findText, setFindText, renderHighlighted,
-    collapsedBlocks, toggleBlockCollapsed,
+    collapsedBlocks, toggleBlockCollapsed, focusInstructionTarget,
     excelExportContext, excelExportDirectory, choosingExcelExportDirectory,
     handleExcelFileBlockName, submitExcelExport, chooseExcelExportDirectory, closeExcelExport,
     memoryItemCount, memoryBlockOptions, createBlockOpen, setCreateBlockOpen,
@@ -281,6 +281,13 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
         webSocket={webSocket}
         messages={messages}
         sessionId={sessionId}
+        onFocusPreflightIssue={(issue) => {
+          if (issue.blockId === null) return;
+          focusInstructionTarget({
+            blockId: issue.blockId,
+            instructionId: issue.instructionId,
+          });
+        }}
         controller={{
           ...botJobHeader,
           sendAction: (action: Parameters<typeof botJobHeader.sendAction>[0]) => {
@@ -448,6 +455,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                     return (
                     <BlockCard
                       key={blockGroupIndex}
+                      blockId={blockId}
                       displayOrder={displayOrder}
                       blockDraggable={findText.trim().length === 0}
                       onBlockDragStart={handleBlockDragStart(authoritativeIndex, blockId)}
@@ -580,6 +588,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                   return (
                     <BlockCard
                       key={`empty-${block.blockId}`}
+                      blockId={block.blockId}
                       displayOrder={index + 1}
                       blockDraggable={findText.trim().length === 0}
                       onBlockDragStart={handleBlockDragStart(index, block.blockId)}

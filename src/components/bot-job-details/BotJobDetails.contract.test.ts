@@ -89,6 +89,85 @@ test('rejects incomplete state and malformed capabilities before Chrome can cons
   expect(parseBotJobDetailsEnvelope(malformedCapabilitiesEnvelope, 'botJobTasks', 42)).toBeNull();
 });
 
+test('accepts a strictly correlated execution preflight observation', () => {
+  const executionPreflight = {
+    enforcement: 'WARN',
+    status: 'WOULD_BLOCK',
+    stage: 'BOT_JOB_TEST_RUN',
+    owner: { homeBankingId: 7, botJobId: 42 },
+    runScope: { kind: 'ONE', selectedBlockId: 9 },
+    graphVersion: 12,
+    contentRevision: 'revision-a',
+    reachableBlockIds: [9],
+    reachableInstructionIds: [101],
+    totalIssues: 1,
+    issues: [{
+      code: 'MISSING_LOOP_ANCHOR',
+      kind: 'LOOP_ANCHOR',
+      blockId: 9,
+      instructionId: 101,
+      message: 'LOOP has no Web Element anchor.',
+    }],
+    unavailableReason: null,
+  };
+  const envelope = JSON.stringify({
+    sessionId: 'botJobTasks',
+    operationId: 'botJobDetails.toolbar.actionResponse',
+    body: JSON.stringify({ ok: true, botJobId: 42, executionPreflight }),
+  });
+
+  expect(parseBotJobDetailsEnvelope(envelope, 'botJobTasks', 42)
+    ?.body.executionPreflight).toEqual(executionPreflight);
+});
+
+test('rejects malformed or internally inconsistent execution preflight observations', () => {
+  const base = {
+    enforcement: 'WARN',
+    status: 'WOULD_BLOCK',
+    stage: 'BOT_JOB_TEST_RUN',
+    owner: { homeBankingId: 7, botJobId: 42 },
+    runScope: { kind: 'ONE', selectedBlockId: 9 },
+    graphVersion: null,
+    contentRevision: 'revision-a',
+    reachableBlockIds: [9],
+    reachableInstructionIds: [101],
+    totalIssues: 1,
+    issues: [{
+      code: 'MISSING_LOOP_ANCHOR',
+      kind: 'LOOP_ANCHOR',
+      blockId: 9,
+      instructionId: 101,
+      message: 'LOOP has no Web Element anchor.',
+    }],
+    unavailableReason: null,
+  };
+  const parseWith = (executionPreflight: unknown) => parseBotJobDetailsEnvelope(
+    JSON.stringify({
+      sessionId: 'botJobTasks',
+      operationId: 'botJobDetails.toolbar.actionResponse',
+      body: JSON.stringify({ ok: true, botJobId: 42, executionPreflight }),
+    }),
+    'botJobTasks',
+    42,
+  );
+
+  expect(parseWith({ ...base, enforcement: 'BLOCK' })).toBeNull();
+  expect(parseWith({
+    ...base,
+    owner: { homeBankingId: 7, botJobId: 99 },
+  })).toBeNull();
+  expect(parseWith({
+    ...base,
+    runScope: { kind: 'ALL', selectedBlockId: 9 },
+  })).toBeNull();
+  expect(parseWith({ ...base, totalIssues: 0 })).toBeNull();
+  expect(parseWith({
+    ...base,
+    status: 'UNAVAILABLE',
+    unavailableReason: 'Snapshot failed.',
+  })).toBeNull();
+});
+
 test('accepts only a fully correlated PAUSE request for the bound Bot Job session', () => {
   const pause = {
     requestId: 'pause-1', botJobId: 42, workspaceEpoch: 9, executionId: 17,

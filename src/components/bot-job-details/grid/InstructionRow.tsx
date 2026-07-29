@@ -108,6 +108,10 @@ const InstructionRow: React.FC<InstructionRowProps> = ({
 
   return (
     <div
+      data-focus-target="instruction"
+      data-block-id={instruction.blockId}
+      data-instruction-id={instruction.id}
+      tabIndex={-1}
       draggable={!dragDisabled}
       onDragStart={onRowDragStart}
       onDragOver={onRowDragOver}

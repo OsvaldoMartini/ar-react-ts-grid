@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react';
 export interface UseBlockCollapse {
   collapsedBlocks: Set<number>;
   isCollapsed: (blockId: number) => boolean;
+  expandBlock: (blockId: number) => void;
   toggleBlockCollapsed: (blockId: number) => void;
 }
 
@@ -24,5 +25,14 @@ export function useBlockCollapse(): UseBlockCollapse {
 
   const isCollapsed = useCallback((blockId: number) => collapsedBlocks.has(blockId), [collapsedBlocks]);
 
-  return { collapsedBlocks, isCollapsed, toggleBlockCollapsed };
+  const expandBlock = useCallback((blockId: number) => {
+    setCollapsedBlocks((prev) => {
+      if (!prev.has(blockId)) return prev;
+      const next = new Set(prev);
+      next.delete(blockId);
+      return next;
+    });
+  }, []);
+
+  return { collapsedBlocks, isCollapsed, expandBlock, toggleBlockCollapsed };
 }

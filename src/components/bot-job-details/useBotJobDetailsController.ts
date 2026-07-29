@@ -8,6 +8,7 @@ import type {
   BotJobExecutionPauseDecision,
   BotJobExecutionPauseRequest,
   BotJobDetailsState,
+  ExecutionPreflightReport,
   BotJobMetadataDraft,
   BotJobToolbarAction,
   BotJobToolbarPayload,
@@ -38,7 +39,12 @@ export interface BotJobDetailsControllerState {
   status: string;
   statusTone: BotJobWorkspaceStatusTone;
   executionPause: BotJobExecutionPauseRequest | null;
+  executionPreflight: {
+    action: Extract<BotJobToolbarAction, 'TEST_RUN' | 'LAUNCH'>;
+    report: ExecutionPreflightReport;
+  } | null;
   resolveExecutionPause: (decision: BotJobExecutionPauseDecision) => void;
+  dismissExecutionPreflight: () => void;
   sendAction: (action: BotJobWorkspaceAction) => void;
   sendToolbarAction: (action: BotJobToolbarAction, payload?: BotJobToolbarPayload) => void;
   saveMetadata: (draft: BotJobMetadataDraft) => void;
@@ -134,6 +140,9 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
   const [status, setStatus] = useState(enabled ? 'Loading Bot Job details' : 'Ready');
   const [statusTone, setStatusTone] = useState<BotJobWorkspaceStatusTone>('neutral');
   const [executionPause, setExecutionPause] = useState<BotJobExecutionPauseRequest | null>(null);
+  const [executionPreflight, setExecutionPreflight] = useState<
+    BotJobDetailsControllerState['executionPreflight']
+  >(null);
 
   const setTransientStatus = useCallback((message: string, tone: BotJobWorkspaceStatusTone) => {
     clearTimer(statusResetRef);
@@ -161,6 +170,7 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
     setPendingToolbarAction(null);
     setSavingMetadata(false);
     setFieldErrors({});
+    setExecutionPreflight(null);
     setState((current) => current ? {
       ...current,
       capabilities: {
@@ -215,6 +225,7 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
     setFieldErrors({});
     setMetadataSavedRevision(null);
     setExecutionPause(null);
+    setExecutionPreflight(null);
     setLoadingState(enabled);
     setStatus(enabled ? 'Loading Bot Job details' : 'Ready');
     setStatusTone('neutral');
@@ -385,6 +396,19 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
           && body.selectedPath.trim()) {
           setTransferPath(body.selectedPath);
         }
+        const executionAction = body.action === 'TEST_RUN' || body.action === 'LAUNCH'
+          ? body.action
+          : null;
+        const preflightWarning = body.ok !== false
+          && executionAction !== null
+          && body.executionPreflight?.enforcement === 'WARN'
+          && body.executionPreflight.status !== 'READY';
+        if (preflightWarning && executionAction) {
+          setExecutionPreflight({
+            action: executionAction,
+            report: body.executionPreflight!,
+          });
+        }
         const successfulBatPath = body.ok !== false
           && body.action === 'CREATE_BAT'
           && typeof body.selectedPath === 'string'
@@ -394,7 +418,10 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
         const toolbarStatus = successfulBatPath
           ? `${body.message || 'BAT file created'} — ${successfulBatPath}`
           : body.message || (body.ok === false ? 'Toolbar action failed' : 'Toolbar action completed');
-        setTransientStatus(toolbarStatus, body.ok === false ? 'error' : 'success');
+        setTransientStatus(
+          toolbarStatus,
+          body.ok === false ? 'error' : preflightWarning ? 'warning' : 'success',
+        );
         if (body.errorCode === 'LICENSE_REQUIRED') invalidateLicenseCapabilities();
         return;
       }
@@ -449,6 +476,7 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
       setPendingToolbarAction(null);
       setSavingMetadata(false);
       setExecutionPause(null);
+      setExecutionPreflight(null);
       setLoadingState(true);
       setStatus('Waiting for backend connection');
       setStatusTone('warning');
@@ -481,6 +509,10 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
       );
     }
   }, [send, setTransientStatus]);
+
+  const dismissExecutionPreflight = useCallback(() => {
+    setExecutionPreflight(null);
+  }, []);
 
   useEffect(() => () => {
     clearTimer(bootstrapTimeoutRef);
@@ -564,6 +596,9 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
     clearTimer(toolbarTimeoutRef);
     clearTimer(statusResetRef);
     pendingToolbarActionRef.current = { requestId: toolbarRequestId, action };
+    if (action === 'TEST_RUN' || action === 'LAUNCH') {
+      setExecutionPreflight(null);
+    }
     setPendingToolbarAction(action);
     setStatus(`Running ${action.toLowerCase().replaceAll('_', ' ')}…`);
     setStatusTone('neutral');
@@ -657,7 +692,9 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
     status,
     statusTone,
     executionPause,
+    executionPreflight,
     resolveExecutionPause,
+    dismissExecutionPreflight,
     sendAction,
     sendToolbarAction,
     saveMetadata,

@@ -3,6 +3,8 @@ import type {
   BotJobDetailsResponse,
   BotJobDetailsState,
   BotJobExecutionPauseRequest,
+  ExecutionPreflightIssue,
+  ExecutionPreflightReport,
 } from './BotJobDetails.types';
 
 const BOT_JOB_DETAILS_OPERATIONS = new Set([
@@ -29,6 +31,15 @@ function isInteger(value: unknown, minimum = 0): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= minimum;
 }
 
+function isNullablePositiveInteger(value: unknown): value is number | null {
+  return value === null || isInteger(value, 1);
+}
+
+function isIntegerArray(value: unknown, minimum = 1): value is number[] {
+  return Array.isArray(value)
+    && value.every(item => isInteger(item, minimum));
+}
+
 function hasBooleanFields(value: unknown, fields: string[]): boolean {
   return isRecord(value) && fields.every((field) => typeof value[field] === 'boolean');
 }
@@ -51,6 +62,74 @@ function isBlock(value: unknown): boolean {
     && isInteger(value.typeId, 0)
     && typeof value.active === 'boolean'
     && isInteger(value.waitSeconds, 0);
+}
+
+function isExecutionPreflightIssue(value: unknown): value is ExecutionPreflightIssue {
+  return isRecord(value)
+    && typeof value.code === 'string'
+    && value.code.trim().length > 0
+    && typeof value.kind === 'string'
+    && value.kind.trim().length > 0
+    && isNullablePositiveInteger(value.blockId)
+    && isNullablePositiveInteger(value.instructionId)
+    && typeof value.message === 'string'
+    && value.message.trim().length > 0;
+}
+
+export function isExecutionPreflightReport(
+  value: unknown,
+): value is ExecutionPreflightReport {
+  if (!isRecord(value)
+    || value.enforcement !== 'WARN'
+    || !['READY', 'WOULD_BLOCK', 'UNAVAILABLE'].includes(value.status)
+    || typeof value.stage !== 'string'
+    || value.stage.trim().length === 0
+    || !isIntegerArray(value.reachableBlockIds)
+    || !isIntegerArray(value.reachableInstructionIds)
+    || !isInteger(value.totalIssues, 0)
+    || !Array.isArray(value.issues)
+    || !value.issues.every(isExecutionPreflightIssue)
+    || value.totalIssues < value.issues.length
+    || !(value.graphVersion === null || isInteger(value.graphVersion, 0))
+    || !(value.contentRevision === null || typeof value.contentRevision === 'string')
+    || !(value.unavailableReason === null || typeof value.unavailableReason === 'string')) {
+    return false;
+  }
+
+  const ownerValid = value.owner === null
+    || (isRecord(value.owner)
+      && isInteger(value.owner.homeBankingId, 1)
+      && isInteger(value.owner.botJobId, 1));
+  const scopeValid = value.runScope === null
+    || (isRecord(value.runScope)
+      && ['ALL', 'ONE', 'FROM_BLOCK'].includes(value.runScope.kind)
+      && isNullablePositiveInteger(value.runScope.selectedBlockId)
+      && (value.runScope.kind === 'ALL'
+        ? value.runScope.selectedBlockId === null
+        : isInteger(value.runScope.selectedBlockId, 1)));
+  if (!ownerValid || !scopeValid) return false;
+
+  if (value.status === 'UNAVAILABLE') {
+    return value.owner === null
+      && value.runScope === null
+      && value.contentRevision === null
+      && value.graphVersion === null
+      && value.reachableBlockIds.length === 0
+      && value.reachableInstructionIds.length === 0
+      && value.totalIssues === 0
+      && value.issues.length === 0
+      && typeof value.unavailableReason === 'string'
+      && value.unavailableReason.trim().length > 0;
+  }
+
+  return value.owner !== null
+    && value.runScope !== null
+    && typeof value.contentRevision === 'string'
+    && value.contentRevision.trim().length > 0
+    && value.unavailableReason === null
+    && (value.status === 'READY'
+      ? value.totalIssues === 0 && value.issues.length === 0
+      : value.totalIssues > 0);
 }
 
 function isBotJobDetailsState(value: unknown, expectedBotJobId: number): value is BotJobDetailsState {
@@ -117,6 +196,13 @@ export function parseBotJobDetailsEnvelope(
   const body = parseJsonObject(outer.body) as BotJobDetailsResponse | null;
   if (!body || !isInteger(body.botJobId, 1) || body.botJobId !== expectedBotJobId) return null;
   if (body.state != null && !isBotJobDetailsState(body.state, expectedBotJobId)) return null;
+  if (body.executionPreflight !== undefined
+    && !isExecutionPreflightReport(body.executionPreflight)) return null;
+  if (body.executionPreflight?.owner
+    && body.executionPreflight.owner.botJobId !== expectedBotJobId) return null;
+  if (body.executionPreflight?.owner
+    && isInteger(outer.homeBankingId, 1)
+    && body.executionPreflight.owner.homeBankingId !== outer.homeBankingId) return null;
   return {
     sessionId: expectedSessionId,
     operationId,

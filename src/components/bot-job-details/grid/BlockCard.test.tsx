@@ -44,4 +44,20 @@ describe('BlockCard', () => {
     const headerHost = screen.getByText('Header content').closest('[draggable]');
     expect(headerHost).toHaveAttribute('draggable', 'false');
   });
+
+  it('exposes its explicit block id as a programmatic focus target', () => {
+    const { container } = render(<BlockCard {...baseProps} blockId={42} />);
+    expect(container.firstChild).toHaveAttribute('data-focus-target', 'block');
+    expect(container.firstChild).toHaveAttribute('data-block-id', '42');
+    expect(container.firstChild).toHaveAttribute('tabindex', '-1');
+  });
+
+  it('derives the block id from an InstructionList-compatible droppable id', () => {
+    const list = React.createElement(
+      () => <div>Only EXCEL GOTO is represented in the header</div>,
+      { droppableId: '73' },
+    );
+    const { container } = render(<BlockCard {...baseProps} list={list} />);
+    expect(container.firstChild).toHaveAttribute('data-block-id', '73');
+  });
 });

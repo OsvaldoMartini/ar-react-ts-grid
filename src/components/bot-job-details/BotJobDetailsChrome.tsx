@@ -3,8 +3,12 @@ import QuestionsCard from '../QuestionsCard';
 import BotJobDetailsHeader from './BotJobDetailsHeader';
 import BotJobDetailsPageTitle from './BotJobDetailsPageTitle';
 import BotJobMetadataPanel from './BotJobMetadataPanel';
+import ExecutionPreflightDialog from './execution/ExecutionPreflightDialog';
 import type { BotJobDetailsControllerState } from './useBotJobDetailsController';
-import type { BotJobWorkspaceSurface } from './BotJobDetails.types';
+import type {
+  BotJobWorkspaceSurface,
+  ExecutionPreflightIssue,
+} from './BotJobDetails.types';
 import styles from './BotJobDetailsChrome.module.scss';
 
 interface BotJobDetailsChromeProps {
@@ -16,6 +20,7 @@ interface BotJobDetailsChromeProps {
   messages?: readonly string[];
   sessionId?: string;
   controller: BotJobDetailsControllerState;
+  onFocusPreflightIssue?: (issue: ExecutionPreflightIssue) => void;
 }
 
 const BotJobDetailsChrome: React.FC<BotJobDetailsChromeProps> = ({
@@ -27,6 +32,7 @@ const BotJobDetailsChrome: React.FC<BotJobDetailsChromeProps> = ({
   messages,
   sessionId,
   controller,
+  onFocusPreflightIssue,
 }) => {
   const state = controller.state;
   const operationBusy = Boolean(
@@ -94,6 +100,14 @@ const BotJobDetailsChrome: React.FC<BotJobDetailsChromeProps> = ({
           cancelLabel={controller.executionPause.stopLabel || 'Stop Run'}
           onSubmit={() => controller.resolveExecutionPause('CONTINUE')}
           onCancel={() => controller.resolveExecutionPause('STOP')}
+        />
+      )}
+      {controller.executionPreflight && !controller.executionPause && (
+        <ExecutionPreflightDialog
+          action={controller.executionPreflight.action}
+          report={controller.executionPreflight.report}
+          onClose={controller.dismissExecutionPreflight}
+          onFocusIssue={onFocusPreflightIssue}
         />
       )}
     </div>

@@ -1,6 +1,9 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import type { BotJobDetailsState } from './BotJobDetails.types';
+import type {
+  BotJobDetailsState,
+  ExecutionPreflightReport,
+} from './BotJobDetails.types';
 import { useBotJobDetailsController } from './useBotJobDetailsController';
 
 const state: BotJobDetailsState = {
@@ -11,6 +14,27 @@ const state: BotJobDetailsState = {
   blocks: [],
   capabilities: { canUseWorkspaceActions: true, canEditMetadata: true, canUsePreScan: true, canShowComponents: true, canExecute: true, canLaunch: true, canUseFileActions: true, canOpenOrganizations: true },
   executionState: 'IDLE', activeSurface: 'botJob', componentsVisible: false,
+};
+
+const warningPreflight: ExecutionPreflightReport = {
+  enforcement: 'WARN',
+  status: 'WOULD_BLOCK',
+  stage: 'BOT_JOB_DETAILS_TEST_RUN',
+  owner: { homeBankingId: 7, botJobId: 42 },
+  runScope: { kind: 'ALL', selectedBlockId: null },
+  graphVersion: 11,
+  contentRevision: 'revision-11',
+  reachableBlockIds: [12],
+  reachableInstructionIds: [101],
+  totalIssues: 1,
+  issues: [{
+    code: 'MISSING_LOOP_ANCHOR',
+    kind: 'LOOP_ANCHOR',
+    blockId: 12,
+    instructionId: 101,
+    message: 'LOOP has no Web Element anchor.',
+  }],
+  unavailableReason: null,
 };
 
 interface HarnessProps {
@@ -36,6 +60,8 @@ const Harness: React.FC<HarnessProps> = ({ socket, messages, botJobId = 42, onSu
     <span data-testid="transfer-path">{controller.transferPath}</span>
     <span data-testid="status">{controller.status}</span>
     <span data-testid="pause-request">{controller.executionPause?.requestId || ''}</span>
+    <span data-testid="preflight-status">{controller.executionPreflight?.report.status || ''}</span>
+    <span data-testid="preflight-action">{controller.executionPreflight?.action || ''}</span>
     <button type="button" onClick={() => controller.saveMetadata({ expectedMetadataRevision: 3, name: 'Payments QA', description: 'Flow', homeUrlId: 8 })}>Save metadata</button>
     <button type="button" onClick={() => controller.sendAction('SHOW_COMPONENTS')}>Show components</button>
     <button type="button" onClick={() => controller.sendAction('SHOW_VARIABLES')}>Show variables</button>
@@ -49,6 +75,7 @@ const Harness: React.FC<HarnessProps> = ({ socket, messages, botJobId = 42, onSu
     <button type="button" onClick={() => controller.sendAction('CLOSE')}>Close workspace</button>
     <button type="button" onClick={() => controller.resolveExecutionPause('CONTINUE')}>Continue pause</button>
     <button type="button" onClick={() => controller.resolveExecutionPause('STOP')}>Stop pause</button>
+    <button type="button" onClick={controller.dismissExecutionPreflight}>Dismiss preflight</button>
     <button type="button" onClick={controller.retryBootstrap}>Retry bootstrap</button>
   </div>;
 };
@@ -265,6 +292,35 @@ test('keeps the toolbar action pending until request and action correlation both
   await waitFor(() => expect(screen.getByTestId('pending-toolbar')).toBeEmptyDOMElement());
   expect(screen.getByTestId('transfer-path')).toHaveTextContent('D:\\exports\\payments');
   expect(screen.getByTestId('status')).toHaveTextContent('Transfer folder selected');
+});
+
+test('records one correlated WARN preflight without resending TEST RUN', async () => {
+  const send = jest.fn();
+  const socket = { readyState: WebSocket.OPEN, send } as unknown as WebSocket;
+  const view = render(<Harness socket={socket} messages={[]} />);
+  let messages = await completeBootstrap(view, socket, send);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Start test run' }));
+  expect(send).toHaveBeenCalledTimes(2);
+  const request = sentBody(send, 1);
+
+  messages = [...messages, response('botJobDetails.toolbar.actionResponse', {
+    ok: true,
+    botJobId: 42,
+    requestId: request.requestId,
+    action: 'TEST_RUN',
+    message: 'TEST RUN started',
+    executionPreflight: warningPreflight,
+  })];
+  view.rerender(<Harness socket={socket} messages={messages} />);
+
+  await waitFor(() => expect(screen.getByTestId('preflight-status')).toHaveTextContent('WOULD_BLOCK'));
+  expect(screen.getByTestId('preflight-action')).toHaveTextContent('TEST_RUN');
+  expect(send).toHaveBeenCalledTimes(2);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Dismiss preflight' }));
+  expect(screen.getByTestId('preflight-status')).toBeEmptyDOMElement();
+  expect(send).toHaveBeenCalledTimes(2);
 });
 
 test('does not treat the opened workbook path as the Bot Job transfer folder', async () => {
