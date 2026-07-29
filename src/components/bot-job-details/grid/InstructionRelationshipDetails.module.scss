@@ -1,0 +1,49 @@
+.chips {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 16px;
+  padding: 1px 6px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: default;
+  pointer-events: none;
+  user-select: none;
+}
+
+.neutral {
+  background: #eef2f5;
+  color: #52606d;
+}
+
+.repair {
+  background: #f8ecff;
+  color: #8b1e62;
+}
+
+.warning {
+  background: #fff4d6;
+  color: #8a5b00;
+}
+
+.pending {
+  background: #e9f3ff;
+  color: #0b5394;
+}
+
+.refused {
+  background: #ffe9e9;
+  color: #a61b1b;
+}

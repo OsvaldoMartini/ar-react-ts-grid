@@ -463,7 +463,7 @@ const App: React.FC = () => {
       )}
       {sessionId && (sessionId.includes("botJobTasks")) && (
         <DesktopWorkspaceShell ariaLabel="Bot Job Details" testId="bot-job-details-workspace">
-          <GridItem key={`${botJobWorkspaceKey}:details`} homeBankingIdInitial={homeBanking} data={instructionsData} socketPort={socketPort} sessionId={sessionId} botJobIdInitial={botJobId} botJobNameInitial={botJobName} onSessionOpen={onSessionOpen} onDetachedClose={closeDetachedWorkspace} />
+          <GridItem key={`${botJobWorkspaceKey}:details`} homeBankingIdInitial={homeBanking} data={instructionsData} socketPort={socketPort} sessionId={sessionId} botJobIdInitial={botJobId} botJobNameInitial={botJobName} workspaceEpochInitial={botJobWorkspaceEpoch} onSessionOpen={onSessionOpen} onDetachedClose={closeDetachedWorkspace} />
         </DesktopWorkspaceShell>
       )}
       {sessionId === "componentTasks" && (
@@ -476,6 +476,7 @@ const App: React.FC = () => {
           sessionId={sessionId}
           botJobIdInitial={botJobId}
           botJobNameInitial={botJobName}
+          workspaceEpochInitial={botJobWorkspaceEpoch}
           onSessionOpen={onSessionOpen}
           onClose={closeDetachedWorkspace}
         />

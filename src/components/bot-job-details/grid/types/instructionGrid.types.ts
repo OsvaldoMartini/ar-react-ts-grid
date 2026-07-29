@@ -11,6 +11,8 @@ export interface UseInstructionGridProps {
   sessionId: string;
   botJobIdInitial: number;
   botJobNameInitial: string;
+  /** Authoritative detached-workspace epoch; zero disables epoch-gated features. */
+  workspaceEpochInitial?: number;
   onSessionOpen: (targetSession: string, port: number, botJobId?: number) => void;
   onDetachedClose?: () => void;
   /** Defaults to BOT_JOB so every existing GridItem caller keeps its behavior. */

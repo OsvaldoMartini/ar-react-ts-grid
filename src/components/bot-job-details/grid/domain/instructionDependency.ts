@@ -49,6 +49,8 @@ export interface DependencyInstruction {
 export interface InstructionVariableLink {
   id: number | null;
   instructionId: number | null;
+  /** Read-only declaration type supplied with correlated relationship facts. */
+  type?: string | null;
 }
 
 export interface DependencyClosureError {

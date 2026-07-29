@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { SaveComponentContext } from '../../../SaveComponentPanel';
 import { useBotJobDetailsController } from '../../useBotJobDetailsController';
 import { useWebSocket } from '../../../useWebSocket';
@@ -19,6 +19,9 @@ import {
   BOT_JOB_INSTRUCTION_GRID_POLICY,
   COMPONENT_INSTRUCTION_GRID_POLICY,
 } from '../instructionGrid.policy';
+import { buildInstructionRelationshipGraph } from '../domain/instructionRelationshipGraph';
+import type { InstructionRelationshipEdge } from '../domain/instructionRelationshipGraph';
+import { buildBotJobRelationshipFacts } from '../domain/instructionRelationshipFacts';
 
 // Phase 6, step 10 — the composition-root hook. GridItem's hook wiring
 // (WebSocket, identity state, controller, every sub-hook, the UI refs/state,
@@ -32,6 +35,7 @@ export function useInstructionGrid({
   sessionId,
   botJobIdInitial,
   botJobNameInitial,
+  workspaceEpochInitial = 0,
   onSessionOpen,
   onDetachedClose,
   workspaceMode = 'BOT_JOB',
@@ -146,6 +150,8 @@ export function useInstructionGrid({
     editingBlockId, blockName, setBlockName,
     activeDraggedInstructionId,
     moveGraphRevision,
+    variableLinks,
+    relationshipChipsV1,
     blockDeleteCapabilities,
     gridActionNotice,
     dismissGridActionNotice,
@@ -176,6 +182,7 @@ export function useInstructionGrid({
     sessionId, socketPort, onSessionOpen, onDetachedClose, workspacePolicy,
     webSocket, connected, messages,
     homeBankingId, botJobId, botJobName,
+    workspaceEpoch: workspaceEpochInitial,
     setHomeBankingId, setBotJobId, setBotJobName, setBlockId,
     gridScrollRef, setOpenDropdown,
     saveComponentContext, setSaveComponentContext,
@@ -191,6 +198,64 @@ export function useInstructionGrid({
     memoryListOpenRequestedRef, memoryListOpenedRef, memoryListOpenPendingRequestRef, memoryListOwnerEpochRef,
     pendingExcelExportDirectoryRequestRef, setChoosingExcelExportDirectory, setExcelExportDirectory,
   });
+
+  const relationshipEdgesByInstruction = useMemo(() => {
+    const edgesByInstruction = new Map<number, InstructionRelationshipEdge[]>();
+    if (
+      workspacePolicy.kind !== 'BOT_JOB'
+      || !relationshipChipsV1
+      || !moveGraphRevision
+      || !Number.isSafeInteger(homeBankingId)
+      || homeBankingId <= 0
+      || botJobId == null
+      || !Number.isSafeInteger(botJobId)
+      || botJobId <= 0
+    ) {
+      return edgesByInstruction;
+    }
+
+    const facts = buildBotJobRelationshipFacts({
+      homeBankingId,
+      botJobId,
+      instructions: instructionsData,
+      blocks: workspaceBlocks,
+      variables: variableLinks,
+    });
+    if (!facts) return edgesByInstruction;
+
+    const append = (
+      instructionId: number,
+      edge: InstructionRelationshipEdge,
+    ) => {
+      const current = edgesByInstruction.get(instructionId) ?? [];
+      current.push(edge);
+      edgesByInstruction.set(instructionId, current);
+    };
+
+    buildInstructionRelationshipGraph(facts).edges.forEach((edge) => {
+      if (edge.source.entity === 'INSTRUCTION') {
+        append(edge.source.id, edge);
+        return;
+      }
+      if (edge.source.entity !== 'VARIABLE') return;
+      instructionsData.forEach((instruction) => {
+        if (instruction.variableId === edge.source.id) {
+          append(instruction.id, edge);
+        }
+      });
+    });
+
+    return edgesByInstruction;
+  }, [
+    workspacePolicy.kind,
+    relationshipChipsV1,
+    moveGraphRevision,
+    homeBankingId,
+    botJobId,
+    instructionsData,
+    workspaceBlocks,
+    variableLinks,
+  ]);
 
   /*
    * Confirmation dialogs outlive the render that opened them. Keep an
@@ -601,6 +666,7 @@ export function useInstructionGrid({
     editingBlockId, blockName, setBlockName,
     activeDraggedInstructionId,
     moveGraphRevision,
+    relationshipEdgesByInstruction,
     blockDeleteCapabilities,
     gridActionNotice,
     dismissGridActionNotice,

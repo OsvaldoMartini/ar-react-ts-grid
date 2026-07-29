@@ -13,6 +13,7 @@ export interface GridItemCompProps {
   sessionId: string;
   botJobIdInitial: number;
   botJobNameInitial: string;
+  workspaceEpochInitial?: number;
   onSessionOpen: (targetSession: string, port: number, botJobId?: number) => void;
   onDetachedClose?: () => void;
 }

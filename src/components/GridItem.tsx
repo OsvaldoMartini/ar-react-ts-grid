@@ -20,6 +20,7 @@ import FindBar from './bot-job-details/grid/FindBar';
 import DeleteButton from './bot-job-details/grid/DeleteButton';
 import InstructionRow from './bot-job-details/grid/InstructionRow';
 import InstructionList from './bot-job-details/grid/InstructionList';
+import InstructionRelationshipDetails from './bot-job-details/grid/InstructionRelationshipDetails';
 import BlockHeader from './bot-job-details/grid/BlockHeader';
 import BlockCard from './bot-job-details/grid/BlockCard';
 import { instructionMatchesFind } from './bot-job-details/grid/hooks/useInstructionFind';
@@ -37,6 +38,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
   sessionId,
   botJobIdInitial,
   botJobNameInitial,
+  workspaceEpochInitial,
   onSessionOpen,
   onDetachedClose,
   workspaceMode,
@@ -46,7 +48,8 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
   // destructuring the same names its render helpers / JSX / dead code already use.
   const grid = useInstructionGrid({
     homeBankingIdInitial, data, initialBlocks, socketPort, sessionId,
-    botJobIdInitial, botJobNameInitial, onSessionOpen, onDetachedClose, workspaceMode,
+    botJobIdInitial, botJobNameInitial, workspaceEpochInitial,
+    onSessionOpen, onDetachedClose, workspaceMode,
   });
 
   const {
@@ -81,6 +84,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
     editingBlockId, blockName, setBlockName,
     activeDraggedInstructionId,
     moveGraphRevision,
+    relationshipEdgesByInstruction,
     blockDeleteCapabilities,
     gridActionNotice,
     dismissGridActionNotice,
@@ -214,208 +218,6 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
     );
   };
 
-
-  const getBlockDetails = (blockId: number): [number | null, string] => {
-    const blockData = groupedData[blockId];
-    if (blockData) {
-      return [blockData.instructions[0]?.blockOrderNumber ?? null, blockData.blockName];
-    }
-    return [null, "Unknown"]; // Fallback values if blockId is not found
-  };
-
-
-  const renderOperations = (
-    instruction: BlockLoopInstructionLoadDTO,
-    allInstructions: BlockLoopInstructionLoadDTO[]
-  ) => {
-    const validActions = ["SET", "GET"];
-
-    // Handle CK / CSV CHECK / PDF CHECK actions with special formatting
-    if (
-      (instruction.actions === "CK" ||
-        instruction.actions === "CSV CHECK" ||
-        instruction.actions === "PDF CHECK") &&
-      instruction.operation
-    ) {
-      const [left, middle, right] = instruction.operation
-        .split(":")
-        .map((part) => part.trim());
-
-      if (middle === "=" || middle === ">" || middle === "<" || middle === "!=" || middle === "contains") {
-
-        const rightLabel =
-          instruction.actions === "CSV CHECK"
-            ? "CSV VALUES"
-            : instruction.actions === "PDF CHECK"
-              ? "PDF VALUES"
-              : right;
-
-        const rightDisplay = middle === "contains" ? `( ${rightLabel} )` : rightLabel;
-
-        return (
-          <span className={styles.instructionDetails}>
-            <span style={{ color: "#FFA500" }}>
-              ({instruction.variableId}){left}
-            </span>
-            {" "}
-            <span style={{ color: "#0b5394" }}>{middle}</span>
-            {" "}
-            <span style={{ color: "#FFA500" }}>{rightDisplay}</span>
-          </span>
-        );
-      }
-    }
-
-    // Special case for "GOTO" action - render only the operation without parentId or colon
-    if (instruction.actions === "GOTO" && instruction.operation) {
-
-      // Guard against null parentId
-      const parentBlockId = instruction.parentBlockId;
-      const [blockOrderNumber, blockName] = parentBlockId
-        ? getBlockDetails(parentBlockId)
-        : ["N/A", "Unknown"]; // Fallback values if parentId is null
-
-      return (
-        <span className={styles.instructionDetails}>
-          <span style={{ color: "#0b5394" }}>Block:</span>{" "}
-          <span style={{ color: "#b163ff" }}>#{blockOrderNumber} {blockName}</span>{" "}
-          <span style={{ color: "blue" }}>Limit:</span>{" "}
-          <span style={{ color: "#b163ff" }}>{instruction.operation}</span>
-        </span>
-      );
-
-    }
-
-
-
-    // Handle "REFRESH_LOOP" operation with simplified details
-    if (instruction.actions === "REFRESH_LOOP" && instruction.operation) {
-      const parts = instruction.operation.split(":").map((part) => part.trim());
-      const [refreshValue, loopValue] = parts;
-
-      // Retrieve parentValue from allInstructions
-      const parentInstruction = allInstructions.find((item) => item.id === instruction.parentId);
-
-      // Validate parentInstruction
-      if (
-        parentInstruction &&
-        (parentInstruction.blockId !== instruction.blockId ||
-          parentInstruction.instructionOrderNumber >= instruction.instructionOrderNumber)
-      ) {
-        console.log(
-          `Invalid parent instruction for REFRESH_LOOP. Parent ID: ${instruction.parentId}, ` +
-          `Block ID: ${parentInstruction?.blockId}, Instruction Order Number: ${parentInstruction?.instructionOrderNumber}`
-        );
-        return null;
-      }
-
-      const parentValue = parentInstruction?.name || "Unknown";
-
-      return (
-        <span className={styles.instructionDetails}>
-          <span style={{ color: "#0b5394" }}>Refresh</span>{" "}
-          <span style={{ color: "#FFA500" }}>{refreshValue}s</span> {" "}
-          <span style={{ color: "#0b5394" }}>Loop</span>{" "}
-          <span style={{ color: "#FFA500" }}>{loopValue} times</span> {" "}
-          <span style={{ color: "#0b5394" }}>Jump To Parent</span>{" "}
-          <span style={{ color: "#b163ff" }}>({instruction.parentId}){parentValue}</span>
-        </span>
-      );
-    }
-
-    // Handle "LOOP" operation with simplified details
-    if ((instruction.actions === "SWIPE_UP" || instruction.actions === "SWIPE_DOWN") && instruction.operation) {
-
-      return (
-        <span className={styles.instructionDetails}>
-          <span style={{ color: "#0b5394" }}>Times</span>{" "}
-          <span style={{ color: "#FFA500" }}>{instruction.operation}x</span> {" "}
-        </span>
-      );
-    }
-
-    // Handle "LOOP" operation with simplified details
-    if (instruction.actions === "LOOP" && instruction.operation) {
-      const parts = instruction.operation.split(":").map((part) => part.trim());
-      const [refreshValue, loopValue] = parts;
-
-      // Retrieve parentValue from allInstructions
-      const parentInstruction = allInstructions.find((item) => item.id === instruction.parentId);
-
-      // Validate parentInstruction
-      if (
-        parentInstruction &&
-        (parentInstruction.blockId !== instruction.blockId ||
-          parentInstruction.instructionOrderNumber >= instruction.instructionOrderNumber)
-      ) {
-        console.log(
-          `Invalid parent instruction for LOOP. Parent ID: ${instruction.parentId}, ` +
-          `Block ID: ${parentInstruction?.blockId}, Instruction Order Number: ${parentInstruction?.instructionOrderNumber}`
-        );
-        return null;
-      }
-
-      const parentValue = parentInstruction?.name || "Unknown";
-
-      return (
-        <span className={styles.instructionDetails}>
-          <span style={{ color: "#0b5394" }}>Time</span>{" "}
-          <span style={{ color: "#FFA500" }}>{refreshValue}s</span> {" "}
-          <span style={{ color: "#0b5394" }}>Loop</span>{" "}
-          <span style={{ color: "#FFA500" }}>{loopValue} times</span> {" "}
-          <span style={{ color: "#0b5394" }}>Jump To Parent</span>{" "}
-          <span style={{ color: "#b163ff" }}>({instruction.parentId}){parentValue}</span>
-        </span>
-      );
-    }
-
-    // Handle operation for other actions (SET, GET)
-    if (validActions.includes(instruction.actions) && instruction.operation) {
-      const [, right] = instruction.operation.split(":");
-
-      // Retrieve parentValue from allInstructions
-      const parentInstruction = allInstructions.find((item) => item.id === instruction.parentId);
-
-      // Validate parentInstruction
-      if (
-        parentInstruction &&
-        (parentInstruction.blockId !== instruction.blockId ||
-          parentInstruction.instructionOrderNumber >= instruction.instructionOrderNumber)
-      ) {
-        console.log(
-          `Invalid parent instruction for LOOP. Parent ID: ${instruction.parentId}, ` +
-          `Block ID: ${parentInstruction?.blockId}, Instruction Order Number: ${parentInstruction?.instructionOrderNumber}`
-        );
-        return null;
-      }
-
-      const parentValue = parentInstruction?.name || "Unknown";
-
-      return (
-        <span className={styles.instructionDetails}>
-          <span style={{ color: "#0b5394" }}>({instruction.parentId}){parentValue}</span>:
-          <span style={{ color: "#FFA500" }}>{right}</span>
-        </span>
-      );
-    }
-
-    // Handle operation for other actions (E - Excel Write)
-    if (instruction.actions === "E" && instruction.operation) {
-      return (
-        <span className={styles.instructionDetails}>
-          <span style={{ color: "#FFA500" }}>({instruction.variableId}){instruction.operation}</span>
-        </span>
-      );
-    }
-
-    // Render the action if it is valid but has no operation
-    if (validActions.includes(instruction.actions)) {
-      return <span className={styles.instructionDetails}>{instruction.actions}</span>;
-    }
-
-    // Return a blank span with a non-breaking space to maintain alignment
-    return <span className={styles.instructionDetails}>&nbsp;</span>;
-  };
 
   // Same rule everywhere: match the label the grid displays (clientNamed wins
   // over the canonical backend name), but keep matching `name` too so searching
@@ -741,7 +543,16 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                             instructionName={instructionName}
                             nameInputRef={instructionRef}
                             renderHighlighted={renderHighlighted}
-                            operations={renderOperations(instruction, instructionsData)}
+                            operations={(
+                              <InstructionRelationshipDetails
+                                instruction={instruction}
+                                allInstructions={instructionsData}
+                                workspaceBlocks={workspaceBlocks}
+                                relationshipEdges={
+                                  relationshipEdgesByInstruction.get(instruction.id) ?? []
+                                }
+                              />
+                            )}
                             deviceOptionsRow={renderDeviceOptionsRow(instruction)}
                             editButton={renderEditButton(instruction.actions, editImage, instruction)}
                             moveButtons={renderMoveButtons(instruction.id)}

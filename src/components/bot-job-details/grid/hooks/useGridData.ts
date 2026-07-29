@@ -96,6 +96,7 @@ export interface UseGridDataDeps {
   homeBankingId: number;
   botJobId: number | null;
   botJobName: string | null;
+  workspaceEpoch: number;
   setHomeBankingId: React.Dispatch<React.SetStateAction<number>>;
   setBotJobId: React.Dispatch<React.SetStateAction<number | null>>;
   setBotJobName: React.Dispatch<React.SetStateAction<string | null>>;
@@ -167,7 +168,7 @@ export function useGridData(deps: UseGridDataDeps) {
     data, initialBlocks, homeBankingIdInitial, botJobIdInitial,
     sessionId, socketPort, onSessionOpen, onDetachedClose, workspacePolicy,
     webSocket, connected, messages,
-    homeBankingId, botJobId, botJobName,
+    homeBankingId, botJobId, botJobName, workspaceEpoch,
     setHomeBankingId, setBotJobId, setBotJobName, setBlockId,
     gridScrollRef, setOpenDropdown,
     saveComponentContext, setSaveComponentContext,
@@ -218,6 +219,7 @@ export function useGridData(deps: UseGridDataDeps) {
     targetSessionId: string;
     homeBankingId: number;
     botJobId: number | null;
+    workspaceEpoch: number;
   } | null>(null);
   const pendingRowMoveRef = useRef<{
     requestId: string;
@@ -232,6 +234,7 @@ export function useGridData(deps: UseGridDataDeps) {
 
   const [activeDraggedInstructionId, setActiveDraggedInstructionId] = useState<number | null>(null);
   const [variableLinks, setVariableLinks] = useState<InstructionVariableLink[]>([]);
+  const [relationshipChipsV1, setRelationshipChipsV1] = useState(false);
   const [blockDeleteCapabilities, setBlockDeleteCapabilities] = useState<Map<number, BlockDeleteCapability>>(new Map());
   const [moveGraphRevision, setMoveGraphRevision] = useState('');
   const deleteContextRef = useRef({
@@ -302,6 +305,8 @@ export function useGridData(deps: UseGridDataDeps) {
     setMoveGraphRevision('');
     setMemoryCapabilities(new Map());
     setBlockDeleteCapabilities(new Map());
+    setVariableLinks([]);
+    setRelationshipChipsV1(false);
     pendingCapabilityRequestRef.current = null;
     pendingRowMoveRef.current = null;
     setIsDataReordered(data.length === 0);
@@ -352,6 +357,7 @@ export function useGridData(deps: UseGridDataDeps) {
       targetSessionId,
       homeBankingId,
       botJobId: botJobId == null ? null : Number(botJobId),
+      workspaceEpoch,
     };
     setMoveGraphRevision('');
     setMemoryCapabilities(new Map());
@@ -365,11 +371,12 @@ export function useGridData(deps: UseGridDataDeps) {
         targetSessionId,
         botJobId,
         homeBankingId,
+        workspaceEpoch,
         deleteContractVersion: 2,
       }),
     }));
   }, [webSocket, connected, instructionsData, workspaceBlocks, botJobId, homeBankingId,
-    sessionId, targetSessionId]);
+    sessionId, targetSessionId, workspaceEpoch]);
 
   useEffect(() => {
     if (!memoryListOpenRequestedRef.current && !memoryListOpenedRef.current) return;
@@ -965,14 +972,26 @@ export function useGridData(deps: UseGridDataDeps) {
             ? bodyData.variableLinks.map((candidate: {
                 id?: unknown;
                 instructionId?: unknown;
+                type?: unknown;
               } | null) => ({
                 id: Number(candidate?.id),
                 instructionId: candidate?.instructionId == null
                   ? null
                   : Number(candidate.instructionId),
+                type: typeof candidate?.type === 'string'
+                  ? candidate.type
+                  : null,
               }))
             : [];
           setVariableLinks(variableLinks);
+          const responseWorkspaceEpoch = Number(bodyData?.workspaceEpoch);
+          setRelationshipChipsV1(
+            workspaceKind === 'BOT_JOB'
+            && bodyData?.workspaceCapabilities?.relationshipChipsV1 === true
+            && Number.isSafeInteger(responseWorkspaceEpoch)
+            && responseWorkspaceEpoch > 0
+            && responseWorkspaceEpoch === pending.workspaceEpoch,
+          );
           const localMemorySelections = projectMemorySelections(
             instructionsData,
             variableLinks,
@@ -2573,6 +2592,8 @@ export function useGridData(deps: UseGridDataDeps) {
     // drag / capability state
     activeDraggedInstructionId,
     moveGraphRevision,
+    variableLinks,
+    relationshipChipsV1,
     blockDeleteCapabilities,
     gridActionNotice,
     dismissGridActionNotice,
