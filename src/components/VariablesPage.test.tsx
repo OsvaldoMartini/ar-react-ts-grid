@@ -160,8 +160,8 @@ test('loads the active Bot Job variable graph and keeps it visible after a refre
   await waitFor(() => expect(screen.getAllByText('VAR-189-Amount').length).toBeGreaterThan(0));
   expect(screen.getByTestId('detached-page-shell')).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'Variables' })).toBeInTheDocument();
-  expect(screen.getByText('Read Amount')).toBeInTheDocument();
-  expect(screen.getByText('Compare Amount')).toBeInTheDocument();
+  expect(screen.getAllByText('Read Amount').length).toBeGreaterThan(0);
+  expect(screen.getAllByText('Compare Amount').length).toBeGreaterThan(0);
   expect(mockSend).toHaveBeenCalledWith(expect.stringContaining('variablesWorkspace.bootstrap'));
 
   mockMessages = [

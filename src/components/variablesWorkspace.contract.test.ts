@@ -136,6 +136,222 @@ test('normalizes canonical producer, consumer, literal, and unused relationships
   expect(snapshot?.edges).toEqual([]);
 });
 
+const canonicalMutationCapability = {
+  enabled: true,
+  contractVersion: 3,
+  profile: 'VARIABLES_INDIVIDUAL_ROW_V1',
+  graphVersion: 7,
+  graphRevision: 'a'.repeat(64),
+  ownerAssertion: {
+    workspaceKind: 'BOT_JOB',
+    homeBankingId: 2,
+    botJobId: 5,
+  },
+  layoutRows: [
+    { instructionId: 189, blockId: 7, blockOrderNumber: 1, instructionOrderNumber: 2 },
+    { instructionId: 190, blockId: 7, blockOrderNumber: 1, instructionOrderNumber: 3 },
+    { instructionId: 191, blockId: 7, blockOrderNumber: 1, instructionOrderNumber: 4 },
+    { instructionId: 192, blockId: 7, blockOrderNumber: 1, instructionOrderNumber: 5 },
+    { instructionId: 200, blockId: 7, blockOrderNumber: 1, instructionOrderNumber: 6 },
+  ],
+  instructionFacts: [
+    {
+      instructionId: 189,
+      blockId: 7,
+      blockOrderNumber: 1,
+      instructionOrderNumber: 2,
+      action: 'Web Field',
+      parentId: null,
+      parentBlockId: null,
+      variableId: 12,
+    },
+    {
+      instructionId: 190,
+      blockId: 7,
+      blockOrderNumber: 1,
+      instructionOrderNumber: 3,
+      action: 'GET',
+      parentId: 189,
+      parentBlockId: 7,
+      variableId: 12,
+    },
+    {
+      instructionId: 191,
+      blockId: 7,
+      blockOrderNumber: 1,
+      instructionOrderNumber: 4,
+      action: 'CK',
+      parentId: 189,
+      parentBlockId: 7,
+      variableId: 12,
+    },
+    {
+      instructionId: 192,
+      blockId: 7,
+      blockOrderNumber: 1,
+      instructionOrderNumber: 5,
+      action: 'SET',
+      parentId: 189,
+      parentBlockId: 7,
+      variableId: 12,
+    },
+    {
+      instructionId: 200,
+      blockId: 7,
+      blockOrderNumber: 1,
+      instructionOrderNumber: 6,
+      action: 'Web Field',
+      parentId: null,
+      parentBlockId: null,
+      variableId: 13,
+    },
+  ],
+};
+
+test('normalizes a coordinate-consistent Variables mutation capability', () => {
+  const snapshot = normalizeVariablesWorkspaceSnapshot({
+    ...canonicalSnapshot,
+    mutationCapability: canonicalMutationCapability,
+  });
+
+  expect(snapshot).not.toBeNull();
+  expect(snapshot?.mutationCapability).toMatchObject({
+    enabled: true,
+    contractVersion: 3,
+    profile: 'VARIABLES_INDIVIDUAL_ROW_V1',
+    graphVersion: 7,
+    graphRevision: 'a'.repeat(64),
+  });
+  expect(snapshot?.mutationCapability?.layoutRows).toHaveLength(5);
+});
+
+test('keeps content and mutation revisions independent', () => {
+  const mutationRevision = 'b'.repeat(64);
+  const snapshot = normalizeVariablesWorkspaceSnapshot({
+    ...canonicalSnapshot,
+    mutationCapability: {
+      ...canonicalMutationCapability,
+      graphRevision: mutationRevision,
+    },
+  });
+
+  expect(snapshot?.graphRevision).toBe('a'.repeat(64));
+  expect(snapshot?.mutationCapability?.graphRevision).toBe(mutationRevision);
+});
+
+test('fails closed when the server advertises an unexpected mutation profile', () => {
+  const snapshot = normalizeVariablesWorkspaceSnapshot({
+    ...canonicalSnapshot,
+    mutationCapability: {
+      ...canonicalMutationCapability,
+      profile: 'GENERIC_GRAPH_WRITER',
+    },
+  });
+
+  expect(snapshot).not.toBeNull();
+  expect(snapshot?.mutationCapability).toBeNull();
+});
+
+test('derives structural relation kinds from raw persisted actions in React', () => {
+  const structuralRows = [
+    { instructionId: 201, instructionOrderNumber: 7, action: 'refresh_loop' },
+    { instructionId: 202, instructionOrderNumber: 8, action: 'elseif' },
+    { instructionId: 203, instructionOrderNumber: 9, action: 'excel goto' },
+  ].map(row => ({
+    ...row,
+    blockId: 7,
+    blockOrderNumber: 1,
+  }));
+  const snapshot = normalizeVariablesWorkspaceSnapshot({
+    ...canonicalSnapshot,
+    mutationCapability: {
+      ...canonicalMutationCapability,
+      layoutRows: [
+        ...canonicalMutationCapability.layoutRows,
+        ...structuralRows.map(({
+          action: _action,
+          ...layoutRow
+        }) => layoutRow),
+      ],
+      instructionFacts: [
+        ...canonicalMutationCapability.instructionFacts,
+        ...structuralRows.map(row => ({
+          ...row,
+          // A server-supplied classifier is deliberately ignored.
+          relationKind: 'ELEMENT_TARGET',
+          parentId: 189,
+          parentBlockId: 7,
+          variableId: null,
+        })),
+      ],
+    },
+  });
+
+  expect(
+    snapshot?.mutationCapability?.instructionFacts.slice(-3).map(fact => [
+      fact.action,
+      fact.relationKind,
+    ]),
+  ).toEqual([
+    ['refresh_loop', 'LOOP_ANCHOR'],
+    ['elseif', 'CONDITIONAL_ROOT'],
+    ['excel goto', 'BLOCK_TARGET'],
+  ]);
+});
+
+test('fails closed when mutation facts omit raw persisted actions', () => {
+  const snapshot = normalizeVariablesWorkspaceSnapshot({
+    ...canonicalSnapshot,
+    mutationCapability: {
+      ...canonicalMutationCapability,
+      instructionFacts: canonicalMutationCapability.instructionFacts.map(
+        ({ action: _action, ...fact }) => ({
+          ...fact,
+          relationKind: 'ELEMENT_TARGET',
+        }),
+      ),
+    },
+  });
+
+  expect(snapshot).not.toBeNull();
+  expect(snapshot?.mutationCapability).toBeNull();
+});
+
+test('fails closed when a raw action disagrees with the visible variable command', () => {
+  const snapshot = normalizeVariablesWorkspaceSnapshot({
+    ...canonicalSnapshot,
+    mutationCapability: {
+      ...canonicalMutationCapability,
+      instructionFacts: canonicalMutationCapability.instructionFacts.map(
+        fact => fact.instructionId === 190
+          ? { ...fact, action: 'SET' }
+          : fact,
+      ),
+    },
+  });
+
+  expect(snapshot).not.toBeNull();
+  expect(snapshot?.mutationCapability).toBeNull();
+});
+
+test('keeps the Variables snapshot visible but disables mutation when fact coordinates disagree', () => {
+  const snapshot = normalizeVariablesWorkspaceSnapshot({
+    ...canonicalSnapshot,
+    mutationCapability: {
+      ...canonicalMutationCapability,
+      instructionFacts: canonicalMutationCapability.instructionFacts.map(
+        fact => fact.instructionId === 191
+          ? { ...fact, instructionOrderNumber: 99 }
+          : fact,
+      ),
+    },
+  });
+
+  expect(snapshot).not.toBeNull();
+  expect(snapshot?.variables).toHaveLength(2);
+  expect(snapshot?.mutationCapability).toBeNull();
+});
+
 test('parses the WebSocket envelope without accepting a failed snapshot', () => {
   const envelope = parseVariablesWorkspaceMessage(JSON.stringify({
     operationId: 'variablesWorkspace.snapshot',

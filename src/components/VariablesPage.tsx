@@ -17,6 +17,12 @@ import DetachedPageShell from './DetachedPageShell';
 import PagesOpenButton from './PagesOpenButton';
 import SearchBox, { type SearchBoxOption } from './SearchBox';
 import { useWebSocket } from './useWebSocket';
+import VariableExecutionLane from './variables/VariableExecutionLane';
+import {
+  planVariablesInstructionMove,
+  type VariablesDropPlacement,
+} from './variables/domain/variablesInstructionMove';
+import { useVariablesGraphMutation } from './variables/useVariablesGraphMutation';
 import {
   normalizeVariablesWorkspaceSnapshot,
   parseVariablesWorkspaceMessage,
@@ -338,6 +344,15 @@ const VariablesPage: React.FC<Props> = ({
     level: 'warn',
     text: 'Waiting for Variables workspace',
   });
+  const {
+    pendingRequestId: pendingMutationRequestId,
+    submit: submitGraphMutation,
+    handleMessage: handleGraphMutationMessage,
+  } = useVariablesGraphMutation({
+    webSocket,
+    connected,
+    snapshot,
+  });
 
   const replaceSnapshot = useCallback((next: VariableWorkspaceSnapshot) => {
     snapshotRef.current = next;
@@ -442,6 +457,7 @@ const VariablesPage: React.FC<Props> = ({
     processedMessagesRef.current = messages.length;
 
     pending.forEach(raw => {
+      if (handleGraphMutationMessage(raw)) return;
       let envelope: VariablesWorkspaceEnvelope;
       try {
         envelope = parseVariablesWorkspaceMessage(raw);
@@ -509,7 +525,12 @@ const VariablesPage: React.FC<Props> = ({
         text: normalized.message || 'Variable relationships loaded',
       });
     });
-  }, [clearPendingRequest, messages, replaceSnapshot]);
+  }, [
+    clearPendingRequest,
+    handleGraphMutationMessage,
+    messages,
+    replaceSnapshot,
+  ]);
 
   useEffect(() => {
     if (error) {
@@ -584,6 +605,60 @@ const VariablesPage: React.FC<Props> = ({
   const selectedVariable = filteredVariables.find(
     variable => variable.id === selectedVariableId,
   ) ?? null;
+  const handleInstructionMove = useCallback((
+    sourceInstructionId: number,
+    targetInstructionId: number,
+    placement: VariablesDropPlacement,
+  ) => {
+    const current = snapshotRef.current;
+    if (!current) {
+      setStatus({
+        level: 'error',
+        text: 'Variables must finish loading before an instruction can move.',
+      });
+      return;
+    }
+    const planned = planVariablesInstructionMove(
+      current,
+      sourceInstructionId,
+      targetInstructionId,
+      placement,
+    );
+    if (!planned.ok) {
+      setStatus({ level: 'error', text: planned.message });
+      return;
+    }
+    setStatus({
+      level: 'warn',
+      text: `Saving instruction #${sourceInstructionId} as one independent move...`,
+    });
+    const requestId = submitGraphMutation(planned.plan.draft, {
+      committed: response => {
+        setStatus({
+          level: 'ok',
+          text: response.message || 'Instruction order saved.',
+        });
+        sendWorkspaceRequest('variablesWorkspace.refresh');
+      },
+      refused: (response, reason) => {
+        const fallback = reason === 'TIMEOUT'
+          ? 'The instruction move timed out. The current Variables graph remains visible.'
+          : reason === 'WORKSPACE_CHANGED'
+            ? 'The Variables target changed. The move was cancelled.'
+            : 'The instruction move was not saved.';
+        setStatus({
+          level: 'error',
+          text: response?.message || fallback,
+        });
+      },
+    });
+    if (!requestId) {
+      setStatus({
+        level: 'error',
+        text: 'Variables is busy or disconnected. The instruction was not moved.',
+      });
+    }
+  }, [sendWorkspaceRequest, submitGraphMutation]);
   const statusClass = status.level === 'error'
     ? styles.statusError
     : status.level === 'warn'
@@ -592,6 +667,19 @@ const VariablesPage: React.FC<Props> = ({
   const subtitle = snapshot
     ? `${snapshot.botJob.name} · Bot Job ID ${snapshot.botJob.id} · ${snapshot.botJob.organizationName || 'Organization'}`
     : 'Active Bot Job variable relationships';
+  const mutationDisabled = !connected
+    || pendingRequest !== null
+    || pendingMutationRequestId !== null
+    || !snapshot?.mutationCapability;
+  const mutationAuthorityKey = snapshot
+    ? [
+        snapshot.bindingEpoch,
+        snapshot.workspaceEpoch,
+        snapshot.graphRevision,
+        snapshot.mutationCapability?.graphVersion ?? 'read-only',
+        snapshot.mutationCapability?.graphRevision ?? 'read-only',
+      ].join(':')
+    : 'unbound';
 
   const toggleExpanded = (id: number) => {
     setExpandedIds(current => {
@@ -825,6 +913,18 @@ const VariablesPage: React.FC<Props> = ({
                         authoritative declared command graph.
                       </p>
                     </div>
+
+                    <VariableExecutionLane
+                      variable={selectedVariable}
+                      authorityKey={mutationAuthorityKey}
+                      disabled={mutationDisabled}
+                      unavailableReason={pendingMutationRequestId
+                        ? 'Saving...'
+                        : !snapshot.mutationCapability
+                          ? 'Read-only'
+                          : undefined}
+                      onMove={handleInstructionMove}
+                    />
 
                     <section className={styles.flowCanvas}>
                       <div className={styles.flowColumn}>

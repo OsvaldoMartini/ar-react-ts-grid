@@ -1,6 +1,17 @@
 import { buildVariableRelationshipGraph } from './variablesGraph';
+import type {
+  InstructionGraphLayoutRow,
+  InstructionGraphOwnerAssertion,
+  InstructionGraphRelationKind,
+} from './bot-job-details/grid/domain/instructionGraphMutation.contract';
+import {
+  canonicalInstructionAction,
+  instructionRelationshipPolicy,
+} from './bot-job-details/grid/domain/instructionRelationshipPolicy';
 
 export const VARIABLES_MANAGER_SESSION_ID = 'variablesManager';
+export const VARIABLES_INDIVIDUAL_ROW_PROFILE =
+  'VARIABLES_INDIVIDUAL_ROW_V1' as const;
 
 export type VariableCommandRole =
   | 'PRODUCER'
@@ -94,6 +105,28 @@ export interface VariableRelationshipEdge {
   type: VariableEdgeType;
 }
 
+export interface VariablesInstructionFact extends InstructionGraphLayoutRow {
+  action: string;
+  relationKind: InstructionGraphRelationKind;
+  parentId: number | null;
+  parentBlockId: number | null;
+  variableId: number | null;
+}
+
+export interface VariablesMutationCapability {
+  enabled: true;
+  contractVersion: 3;
+  profile: typeof VARIABLES_INDIVIDUAL_ROW_PROFILE;
+  graphVersion: number;
+  graphRevision: string;
+  ownerAssertion: InstructionGraphOwnerAssertion & {
+    workspaceKind: 'BOT_JOB';
+    botJobId: number;
+  };
+  layoutRows: InstructionGraphLayoutRow[];
+  instructionFacts: VariablesInstructionFact[];
+}
+
 export interface VariableWorkspaceSnapshot {
   ok: true;
   message: string;
@@ -107,6 +140,7 @@ export interface VariableWorkspaceSnapshot {
   variables: VariableGraphEntry[];
   edges: VariableRelationshipEdge[];
   diagnostics: VariableDiagnostic[];
+  mutationCapability: VariablesMutationCapability | null;
 }
 
 export interface VariablesWorkspaceEnvelope {
@@ -151,6 +185,163 @@ const positiveInteger = (...values: unknown[]): number | null => {
 const nonNegativeInteger = (...values: unknown[]): number | null => {
   const number = nullableInteger(...values);
   return number !== null && number >= 0 ? number : null;
+};
+
+const relationKindForAction = (
+  action: string,
+): InstructionGraphRelationKind => {
+  const policy = instructionRelationshipPolicy(action);
+  if (policy.requirements.includes('BLOCK_TARGET')) return 'BLOCK_TARGET';
+  if (policy.requirements.includes('LOOP_ANCHOR')) return 'LOOP_ANCHOR';
+  if (
+    policy.structuralSemantics === 'CONDITIONAL_ROOT'
+    || policy.structuralSemantics === 'CONDITIONAL_BOUNDARY'
+  ) {
+    return 'CONDITIONAL_ROOT';
+  }
+  return 'ELEMENT_TARGET';
+};
+
+const normalizeMutationCapability = (
+  value: unknown,
+  botJob: VariableWorkspaceBotJob,
+  variables: readonly VariableGraphEntry[],
+): VariablesMutationCapability | null => {
+  const candidate = asObject(value);
+  if (!candidate || candidate.enabled !== true) return null;
+  const graphVersion = nonNegativeInteger(candidate.graphVersion);
+  const capabilityRevision = textValue(candidate.graphRevision);
+  const owner = asObject(candidate.ownerAssertion);
+  if (
+    candidate.contractVersion !== 3
+    || candidate.profile !== VARIABLES_INDIVIDUAL_ROW_PROFILE
+    || graphVersion === null
+    || !/^[a-f0-9]{64}$/i.test(capabilityRevision)
+    || !owner
+    || owner.workspaceKind !== 'BOT_JOB'
+    || positiveInteger(owner.homeBankingId) !== botJob.homeBankingId
+    || positiveInteger(owner.botJobId) !== botJob.id
+    || !Array.isArray(candidate.layoutRows)
+    || !Array.isArray(candidate.instructionFacts)
+  ) {
+    return null;
+  }
+
+  const layoutRows = candidate.layoutRows.map((value: unknown) => {
+    const row = asObject(value);
+    if (!row) return null;
+    const instructionId = positiveInteger(row.instructionId);
+    const blockId = positiveInteger(row.blockId);
+    const blockOrderNumber = positiveInteger(row.blockOrderNumber);
+    const instructionOrderNumber = positiveInteger(row.instructionOrderNumber);
+    return instructionId && blockId && blockOrderNumber && instructionOrderNumber
+      ? { instructionId, blockId, blockOrderNumber, instructionOrderNumber }
+      : null;
+  });
+  const instructionFacts = candidate.instructionFacts.map((value: unknown) => {
+    const row = asObject(value);
+    if (!row) return null;
+    const instructionId = positiveInteger(row.instructionId);
+    const blockId = positiveInteger(row.blockId);
+    const blockOrderNumber = positiveInteger(row.blockOrderNumber);
+    const instructionOrderNumber = positiveInteger(row.instructionOrderNumber);
+    const action = typeof row.action === 'string' ? row.action.trim() : null;
+    return instructionId
+      && blockId
+      && blockOrderNumber
+      && instructionOrderNumber
+      && action !== null
+      ? {
+          instructionId,
+          blockId,
+          blockOrderNumber,
+          instructionOrderNumber,
+          action,
+          relationKind: relationKindForAction(action),
+          parentId: positiveInteger(row.parentId),
+          parentBlockId: positiveInteger(row.parentBlockId),
+          variableId: positiveInteger(row.variableId),
+        }
+      : null;
+  });
+  if (
+    layoutRows.some(row => row === null)
+    || instructionFacts.some(row => row === null)
+    || layoutRows.length === 0
+    || layoutRows.length !== instructionFacts.length
+  ) {
+    return null;
+  }
+  const normalizedLayout = layoutRows as InstructionGraphLayoutRow[];
+  const normalizedFacts = instructionFacts as VariablesInstructionFact[];
+  const layoutIds = new Set(normalizedLayout.map(row => row.instructionId));
+  const factIds = new Set(normalizedFacts.map(row => row.instructionId));
+  const factsById = new Map(
+    normalizedFacts.map(row => [row.instructionId, row]),
+  );
+  const occupiedOrders = new Set<string>();
+  if (
+    layoutIds.size !== normalizedLayout.length
+    || factIds.size !== normalizedFacts.length
+    || layoutIds.size !== factIds.size
+    || [...layoutIds].some(id => !factIds.has(id))
+    || normalizedLayout.some(row => {
+      const fact = factsById.get(row.instructionId);
+      const orderKey = `${row.blockId}:${row.instructionOrderNumber}`;
+      if (occupiedOrders.has(orderKey)) return true;
+      occupiedOrders.add(orderKey);
+      return !fact
+        || fact.blockId !== row.blockId
+        || fact.blockOrderNumber !== row.blockOrderNumber
+        || fact.instructionOrderNumber !== row.instructionOrderNumber;
+    })
+  ) {
+    return null;
+  }
+  const variableFactsMatch = variables.every(variable =>
+    variable.commands.every(command => {
+      if (command.id === null) return false;
+      const fact = factsById.get(command.id);
+      return Boolean(fact)
+        && fact?.blockId === command.blockId
+        && fact?.blockOrderNumber === command.blockOrder
+        && fact?.instructionOrderNumber === command.instructionOrder
+        && canonicalInstructionAction(fact?.action)
+          === canonicalInstructionAction(command.command)
+        && fact?.parentId === command.parentId
+        && fact?.parentBlockId === command.parentBlockId
+        && fact?.variableId === variable.id;
+    })
+    && (
+      variable.owner === null
+      || (
+        variable.owner.id !== null
+        && factsById.get(variable.owner.id)?.blockId === variable.owner.blockId
+        && factsById.get(variable.owner.id)?.blockOrderNumber
+          === variable.owner.blockOrder
+        && factsById.get(variable.owner.id)?.instructionOrderNumber
+          === variable.owner.instructionOrder
+        && canonicalInstructionAction(
+          factsById.get(variable.owner.id)?.action,
+        ) === canonicalInstructionAction(variable.owner.command)
+      )
+    ));
+  if (!variableFactsMatch) return null;
+
+  return {
+    enabled: true,
+    contractVersion: 3,
+    profile: VARIABLES_INDIVIDUAL_ROW_PROFILE,
+    graphVersion,
+    graphRevision: capabilityRevision,
+    ownerAssertion: {
+      workspaceKind: 'BOT_JOB',
+      homeBankingId: botJob.homeBankingId,
+      botJobId: botJob.id,
+    },
+    layoutRows: normalizedLayout,
+    instructionFacts: normalizedFacts,
+  };
 };
 
 const normalizeSeverity = (value: unknown): VariableDiagnostic['severity'] | null => {
@@ -498,6 +689,11 @@ export const normalizeVariablesWorkspaceSnapshot = (
       (left.order ?? Number.MAX_SAFE_INTEGER) - (right.order ?? Number.MAX_SAFE_INTEGER)
       || left.id - right.id);
   const edges = normalizedEdges as VariableRelationshipEdge[];
+  const mutationCapability = normalizeMutationCapability(
+    candidate.mutationCapability ?? root.mutationCapability,
+    botJob,
+    variables,
+  );
   const variableCount = nonNegativeInteger(summaryCandidate.variableCount);
   const producerCount = nonNegativeInteger(summaryCandidate.producerCount);
   const consumerCount = nonNegativeInteger(summaryCandidate.consumerCount);
@@ -536,5 +732,6 @@ export const normalizeVariablesWorkspaceSnapshot = (
     variables,
     edges,
     diagnostics,
+    mutationCapability,
   };
 };
