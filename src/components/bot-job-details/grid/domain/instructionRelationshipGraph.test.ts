@@ -390,6 +390,26 @@ describe('buildInstructionRelationshipGraph', () => {
     });
   });
 
+  it.each(['GOTO', 'EXCEL GOTO'])(
+    'rejects a %s destination equal to its containing Block',
+    (actions) => {
+      const graph = build([
+        instruction(1, 10, 1, 1, actions, {
+          parentBlockId: 10,
+        }),
+      ]);
+
+      expect(edgeFor(graph.edges, 'BLOCK_TARGET', 1)).toMatchObject({
+        state: 'RECONNECT_BLOCK',
+        code: 'BLOCK_TARGET_EQUALS_CONTAINING_BLOCK',
+        target: null,
+        compatibleTargets: [
+          { entity: 'BLOCK', id: 20 },
+        ],
+      });
+    },
+  );
+
   it('keeps ownerless memory separate from dangling or incompatible owners', () => {
     const graph = build([
       instruction(1, 10, 1, 1, 'O'),

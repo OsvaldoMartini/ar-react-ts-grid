@@ -599,7 +599,9 @@ export const buildInstructionRelationshipGraph = ({
     }
 
     if (policy.requirements.includes('BLOCK_TARGET')) {
-      const candidates = blocks.map(block => blockTarget(owner, block.id));
+      const candidates = blocks
+        .filter(block => block.id !== instruction.blockId)
+        .map(block => blockTarget(owner, block.id));
       const selected = instruction.parentBlockId === null
         ? null
         : blocksById.get(instruction.parentBlockId) ?? null;
@@ -607,12 +609,14 @@ export const buildInstructionRelationshipGraph = ({
         ? 'MISSING_BLOCK_TARGET'
         : selected === null
           ? 'DANGLING_BLOCK_TARGET'
+          : selected.id === instruction.blockId
+            ? 'BLOCK_TARGET_EQUALS_CONTAINING_BLOCK'
           : null;
       relationshipEdges.push(edge(
         owner,
         'BLOCK_TARGET',
         source,
-        selected ? blockTarget(owner, selected.id) : null,
+        selected && code === null ? blockTarget(owner, selected.id) : null,
         code === null ? 'CONNECTED' : 'RECONNECT_BLOCK',
         code,
         true,
