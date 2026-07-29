@@ -16,14 +16,14 @@ export interface BlockLoopInstructionLoadDTO {
   onHoldSeconds?: number | null;
   actions: string;
   instructionActive: boolean;
-  parentId?: number;
+  parentId?: number | null;
   operation?: string;
   preComponent?: boolean;
   exportFile?: string;
   refreshLoop?: boolean;
   loopOnly?: boolean;
-  variableId?: number;
-  parentBlockId?: number;
+  variableId?: number | null;
+  parentBlockId?: number | null;
   defaultValue?: string;
   forceCoordinates?: string | null; // F/E/T/N combinable, e.g. "FE"
   // Roadmap 3 Phase 3d. Display-only override of `name`. Null = no override; UI shows `name`.

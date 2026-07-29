@@ -6,6 +6,10 @@
  * project legal row operations without changing or partially mutating its rendered graph.
  */
 
+import { canonicalInstructionAction } from './instructionRelationshipPolicy';
+
+export { canonicalInstructionAction } from './instructionRelationshipPolicy';
+
 export type DependencyClosureMode =
   | 'COMPONENT_COPY'
   | 'BOT_JOB_COPY'
@@ -88,12 +92,6 @@ export interface InstructionDependencyResolver<
   ): DependencyClosureResult<TInstruction>;
 }
 
-const ACTION_ALIASES: Readonly<Record<string, string>> = {
-  HOLD: 'H',
-  SCREEN: 'P',
-  QUIT: 'Q',
-};
-
 const NON_WEB_FIELD_ACTIONS = new Set([
   'IF',
   'ELSEIF',
@@ -149,15 +147,6 @@ interface IndexResult<TInstruction extends DependencyInstruction> {
   graph: GraphIndex<TInstruction> | null;
   error: DependencyClosureError | null;
 }
-
-/** Match the backend CommandRegistry normalization, including its legacy aliases. */
-export const canonicalInstructionAction = (
-  action: string | null | undefined,
-): string => {
-  if (action == null) return '';
-  const base = action.split(':', 1)[0].trim().toUpperCase();
-  return ACTION_ALIASES[base] ?? base;
-};
 
 /**
  * A cross-block GOTO parent is a navigation reference, not an ordinary ownership edge.
