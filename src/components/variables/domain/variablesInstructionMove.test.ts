@@ -135,9 +135,11 @@ const snapshot = (
     { id: 10, name: 'Block 10', order: 1, active: true },
     { id: 20, name: 'Block 20', order: 2, active: true },
   ],
+  commands: [],
   variables: [variable(commands)],
   edges: [],
   diagnostics: [],
+  runtimeMemory: { revision: 0, variables: [] },
   mutationCapability: {
     enabled: true,
     contractVersion: 3,

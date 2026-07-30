@@ -129,6 +129,7 @@ export const useVariablesGraphMutation = ({
       || (
         pending.mutationProfile !== capability.profile
         && pending.mutationProfile !== capability.crossBlockProfile
+        && pending.mutationProfile !== capability.reactAuthoredProfile
       )
       || !sameInstructionGraphOwner(
         capability.ownerAssertion,
@@ -167,6 +168,7 @@ export const useVariablesGraphMutation = ({
       || (
         selectedProfile !== capability.profile
         && selectedProfile !== capability.crossBlockProfile
+        && selectedProfile !== capability.reactAuthoredProfile
       )
       || !connected
       || !webSocket

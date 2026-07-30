@@ -157,9 +157,11 @@ const snapshot = (
       active: true,
     },
   ],
+  commands: [],
   variables: [variableFor(producer, consumer)],
   edges: [],
   diagnostics: [],
+  runtimeMemory: { revision: 0, variables: [] },
   mutationCapability: {
     enabled: true,
     contractVersion: 3,

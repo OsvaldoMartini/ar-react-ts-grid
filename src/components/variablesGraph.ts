@@ -48,7 +48,8 @@ interface RawCommand {
   name: string;
   action: string;
   operation: string;
-  variableId: number;
+  variableId: number | null;
+  tagName: string;
   parentId: number | null;
   parentBlockId: number | null;
   blockId: number | null;
@@ -90,13 +91,14 @@ const parseRawCommand = (value: unknown): RawCommand | null => {
   if (!raw) return null;
   const id = intOrNull(raw.instructionId);
   const variableId = intOrNull(raw.variableId);
-  if (id === null || variableId === null) return null;
+  if (id === null) return null;
   return {
     id,
     name: text(raw.instructionName),
     action: text(raw.action),
     operation: text(raw.operation),
     variableId,
+    tagName: text(raw.tagName || raw.tag_name),
     parentId: intOrNull(raw.parentId),
     parentBlockId: intOrNull(raw.parentBlockId),
     blockId: intOrNull(raw.blockId),
@@ -162,6 +164,8 @@ const commandJson = (command: RawCommand, commandRole: string): Raw => ({
   action: canonicalInstructionAction(command.action),
   role: commandRole,
   operation: command.operation,
+  variableId: command.variableId,
+  tagName: command.tagName,
   parentId: command.parentId,
   parentBlockId: command.parentBlockId,
   blockId: command.blockId,
@@ -200,6 +204,7 @@ export const buildVariableRelationshipGraph = (payload: unknown): Raw | null => 
 
   const commandsByVariable = new Map<number, RawCommand[]>();
   rawCommands.forEach((command) => {
+    if (command.variableId === null) return;
     const rows = commandsByVariable.get(command.variableId) ?? [];
     rows.push(command);
     commandsByVariable.set(command.variableId, rows);
@@ -435,6 +440,7 @@ export const buildVariableRelationshipGraph = (payload: unknown): Raw | null => 
   }
 
   for (const command of rawCommands) {
+    if (command.variableId === null) continue;
     if (variableIds.has(command.variableId)) continue;
     graphDiagnostics.push(diagnostic(
       'DANGLING_VARIABLE_LINK',
@@ -459,6 +465,12 @@ export const buildVariableRelationshipGraph = (payload: unknown): Raw | null => 
       warningCount,
     },
     blocks: root.blocks,
+    commands: [...rawCommands]
+      .sort(commandOrder)
+      .map(command => commandJson(
+        command,
+        command.variableId === null ? 'INVALID_LINK' : role(command.action),
+      )),
     variables: variableJson,
     edges,
     diagnostics: graphDiagnostics,

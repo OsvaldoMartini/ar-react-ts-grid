@@ -14,10 +14,13 @@ export const VARIABLES_INDIVIDUAL_ROW_PROFILE =
   'VARIABLES_INDIVIDUAL_ROW_V1' as const;
 export const VARIABLES_INDIVIDUAL_CROSS_BLOCK_PROFILE =
   'VARIABLES_INDIVIDUAL_CROSS_BLOCK_V1' as const;
+export const VARIABLES_REACT_AUTHORED_PROFILE =
+  'VARIABLES_REACT_AUTHORED_V1' as const;
 
 export type VariablesMutationProfile =
   | typeof VARIABLES_INDIVIDUAL_ROW_PROFILE
-  | typeof VARIABLES_INDIVIDUAL_CROSS_BLOCK_PROFILE;
+  | typeof VARIABLES_INDIVIDUAL_CROSS_BLOCK_PROFILE
+  | typeof VARIABLES_REACT_AUTHORED_PROFILE;
 
 export type VariableCommandRole =
   | 'PRODUCER'
@@ -68,6 +71,7 @@ export interface VariableInstructionNode {
   parentId: number | null;
   parentBlockId: number | null;
   variableId: number | null;
+  tagName?: string | null;
   active: boolean | null;
   blockActive: boolean | null;
 }
@@ -117,6 +121,7 @@ export interface VariablesInstructionFact extends InstructionGraphLayoutRow {
   parentId: number | null;
   parentBlockId: number | null;
   variableId: number | null;
+  tagName?: string | null;
 }
 
 export interface VariablesMutationCapability {
@@ -126,6 +131,9 @@ export interface VariablesMutationCapability {
   crossBlockProfile:
     | typeof VARIABLES_INDIVIDUAL_CROSS_BLOCK_PROFILE
     | null;
+  reactAuthoredProfile?:
+    | typeof VARIABLES_REACT_AUTHORED_PROFILE
+    | null;
   graphVersion: number;
   graphRevision: string;
   ownerAssertion: InstructionGraphOwnerAssertion & {
@@ -134,6 +142,24 @@ export interface VariablesMutationCapability {
   };
   layoutRows: InstructionGraphLayoutRow[];
   instructionFacts: VariablesInstructionFact[];
+}
+
+export type RuntimeVariableState = 'VALUE' | 'VOID';
+
+export interface RuntimeVariableMemoryEntry {
+  variableId: number;
+  name: string;
+  type: string;
+  state: RuntimeVariableState;
+  value: string;
+  voidReason: string | null;
+  entryRevision: number;
+  source: string;
+}
+
+export interface RuntimeVariableMemorySnapshot {
+  revision: number;
+  variables: RuntimeVariableMemoryEntry[];
 }
 
 export interface VariableWorkspaceSnapshot {
@@ -146,9 +172,11 @@ export interface VariableWorkspaceSnapshot {
   botJob: VariableWorkspaceBotJob;
   summary: VariableWorkspaceSummary;
   blocks: VariableWorkspaceBlock[];
+  commands: VariableInstructionNode[];
   variables: VariableGraphEntry[];
   edges: VariableRelationshipEdge[];
   diagnostics: VariableDiagnostic[];
+  runtimeMemory: RuntimeVariableMemorySnapshot;
   mutationCapability: VariablesMutationCapability | null;
 }
 
@@ -215,6 +243,7 @@ const normalizeMutationCapability = (
   value: unknown,
   botJob: VariableWorkspaceBotJob,
   variables: readonly VariableGraphEntry[],
+  commands: readonly VariableInstructionNode[],
 ): VariablesMutationCapability | null => {
   const candidate = asObject(value);
   if (!candidate || candidate.enabled !== true) return null;
@@ -270,6 +299,7 @@ const normalizeMutationCapability = (
           parentId: positiveInteger(row.parentId),
           parentBlockId: positiveInteger(row.parentBlockId),
           variableId: positiveInteger(row.variableId),
+          tagName: textValue(row.tagName, row.tag_name) || null,
         }
       : null;
   });
@@ -286,6 +316,10 @@ const normalizeMutationCapability = (
   const crossBlockProfile = candidate.crossBlockProfile
     === VARIABLES_INDIVIDUAL_CROSS_BLOCK_PROFILE
     ? VARIABLES_INDIVIDUAL_CROSS_BLOCK_PROFILE
+    : null;
+  const reactAuthoredProfile = candidate.reactAuthoredProfile
+    === VARIABLES_REACT_AUTHORED_PROFILE
+    ? VARIABLES_REACT_AUTHORED_PROFILE
     : null;
   const layoutIds = new Set(normalizedLayout.map(row => row.instructionId));
   const factIds = new Set(normalizedFacts.map(row => row.instructionId));
@@ -339,13 +373,44 @@ const normalizeMutationCapability = (
         ) === canonicalInstructionAction(variable.owner.command)
       )
     ));
-  if (!variableFactsMatch) return null;
+  const commandFactsMatch = commands.every(command => {
+    if (command.id === null) return false;
+    const fact = factsById.get(command.id);
+    return Boolean(fact)
+      && fact?.blockId === command.blockId
+      && fact?.blockOrderNumber === command.blockOrder
+      && fact?.instructionOrderNumber === command.instructionOrder
+      && canonicalInstructionAction(fact?.action)
+        === canonicalInstructionAction(command.command)
+      && fact?.parentId === command.parentId
+      && fact?.parentBlockId === command.parentBlockId
+      && fact?.variableId === command.variableId
+      && (
+        !fact?.tagName
+        || !command.tagName
+        || fact.tagName.trim().toLocaleLowerCase()
+          === command.tagName.trim().toLocaleLowerCase()
+      );
+  });
+  const commandIds = new Set(
+    commands.flatMap(command => command.id === null ? [] : [command.id]),
+  );
+  if (
+    !variableFactsMatch
+    || !commandFactsMatch
+    || commands.length !== normalizedFacts.length
+    || commandIds.size !== normalizedFacts.length
+    || normalizedFacts.some(fact => !commandIds.has(fact.instructionId))
+  ) {
+    return null;
+  }
 
   return {
     enabled: true,
     contractVersion: 3,
     profile: VARIABLES_INDIVIDUAL_ROW_PROFILE,
     crossBlockProfile,
+    reactAuthoredProfile,
     graphVersion,
     graphRevision: capabilityRevision,
     ownerAssertion: {
@@ -437,6 +502,7 @@ const normalizeInstruction = (value: unknown): VariableInstructionNode | null =>
     parentId: positiveInteger(candidate.parentId, candidate.parentInstructionId),
     parentBlockId: positiveInteger(candidate.parentBlockId),
     variableId: positiveInteger(candidate.variableId),
+    tagName: textValue(candidate.tagName, candidate.tag_name) || null,
     active: typeof candidate.active === 'boolean' ? candidate.active : null,
     blockActive: typeof candidate.blockActive === 'boolean' ? candidate.blockActive : null,
   };
@@ -478,6 +544,102 @@ const uniqueCommands = (commands: VariableCommandLink[]): VariableCommandLink[] 
     seen.add(key);
     return true;
   });
+};
+
+const normalizeInstructions = (
+  value: unknown,
+): VariableInstructionNode[] | null => {
+  if (!Array.isArray(value)) return null;
+  const instructions = value.map(normalizeInstruction);
+  if (instructions.some(instruction => instruction?.id == null)) return null;
+  const normalized = instructions as VariableInstructionNode[];
+  const seen = new Set<number>();
+  for (const instruction of normalized) {
+    const id = instruction.id as number;
+    if (seen.has(id)) return null;
+    seen.add(id);
+  }
+  return normalized.sort((left, right) =>
+    (left.blockOrder ?? Number.MAX_SAFE_INTEGER)
+      - (right.blockOrder ?? Number.MAX_SAFE_INTEGER)
+    || (left.instructionOrder ?? Number.MAX_SAFE_INTEGER)
+      - (right.instructionOrder ?? Number.MAX_SAFE_INTEGER)
+    || (left.id ?? Number.MAX_SAFE_INTEGER)
+      - (right.id ?? Number.MAX_SAFE_INTEGER));
+};
+
+export const normalizeRuntimeVariableMemorySnapshot = (
+  value: unknown,
+  variables: readonly VariableGraphEntry[],
+): RuntimeVariableMemorySnapshot | null => {
+  const candidate = asObject(value);
+  if (!candidate) {
+    return {
+      revision: 0,
+      variables: variables.map(variable => ({
+        variableId: variable.id,
+        name: variable.name,
+        type: variable.type,
+        state: 'VOID',
+        value: '',
+        voidReason: 'NO_PRODUCER_YET',
+        entryRevision: 0,
+        source: 'DEFINED',
+      })),
+    };
+  }
+  const revision = nonNegativeInteger(candidate.revision);
+  if (revision === null || !Array.isArray(candidate.variables)) return null;
+  const entries = candidate.variables.map((value: unknown) => {
+    const row = asObject(value);
+    if (!row) return null;
+    const variableId = positiveInteger(row.variableId, row.id);
+    const state = String(row.state ?? '').trim().toUpperCase();
+    const entryRevision = nonNegativeInteger(row.entryRevision) ?? 0;
+    if (
+      variableId === null
+      || (state !== 'VALUE' && state !== 'VOID')
+    ) {
+      return null;
+    }
+    return {
+      variableId,
+      name: textValue(
+        row.name,
+        variables.find(variable => variable.id === variableId)?.name,
+        `Variable ${variableId}`,
+      ),
+      type: textValue(
+        row.type,
+        variables.find(variable => variable.id === variableId)?.type,
+      ),
+      state: state as RuntimeVariableState,
+      value: state === 'VALUE' && typeof row.value === 'string'
+        ? row.value
+        : '',
+      voidReason: state === 'VOID'
+        ? textValue(row.voidReason, 'NO_PRODUCER_YET')
+        : null,
+      entryRevision,
+      source: textValue(row.source, state === 'VOID' ? 'DEFINED' : 'COMMAND'),
+    };
+  });
+  if (entries.some(entry => entry === null)) return null;
+  const normalized = entries as RuntimeVariableMemoryEntry[];
+  const seen = new Set<number>();
+  if (normalized.some(entry => {
+    if (seen.has(entry.variableId)) return true;
+    seen.add(entry.variableId);
+    return false;
+  })) {
+    return null;
+  }
+  return {
+    revision,
+    variables: normalized.sort((left, right) =>
+      left.name.localeCompare(right.name, undefined, { sensitivity: 'base' })
+      || left.variableId - right.variableId),
+  };
 };
 
 const normalizeCommands = (candidate: Record<string, any>): VariableCommandLink[] | null => {
@@ -698,6 +860,14 @@ export const normalizeVariablesWorkspaceSnapshot = (
     .sort((left, right) =>
       left.name.localeCompare(right.name, undefined, { sensitivity: 'base' })
       || left.id - right.id);
+  const commandCandidates = Array.isArray(candidate.commands)
+    ? candidate.commands
+    : variables.flatMap(variable => [
+        ...(variable.owner ? [variable.owner] : []),
+        ...variable.commands,
+      ]);
+  const commands = normalizeInstructions(commandCandidates);
+  if (commands === null) return null;
   const blocks = (normalizedBlocks as VariableWorkspaceBlock[])
     .sort((left, right) =>
       (left.order ?? Number.MAX_SAFE_INTEGER) - (right.order ?? Number.MAX_SAFE_INTEGER)
@@ -707,7 +877,13 @@ export const normalizeVariablesWorkspaceSnapshot = (
     candidate.mutationCapability ?? root.mutationCapability,
     botJob,
     variables,
+    commands,
   );
+  const runtimeMemory = normalizeRuntimeVariableMemorySnapshot(
+    candidate.runtimeMemory ?? root.runtimeMemory,
+    variables,
+  );
+  if (runtimeMemory === null) return null;
   const variableCount = nonNegativeInteger(summaryCandidate.variableCount);
   const producerCount = nonNegativeInteger(summaryCandidate.producerCount);
   const consumerCount = nonNegativeInteger(summaryCandidate.consumerCount);
@@ -743,9 +919,11 @@ export const normalizeVariablesWorkspaceSnapshot = (
       unusedCount,
     },
     blocks,
+    commands,
     variables,
     edges,
     diagnostics,
+    runtimeMemory,
     mutationCapability,
   };
 };

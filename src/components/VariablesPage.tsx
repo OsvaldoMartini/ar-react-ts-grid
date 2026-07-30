@@ -16,22 +16,29 @@ import {
 import DetachedPageShell from './DetachedPageShell';
 import PagesOpenButton from './PagesOpenButton';
 import ReconnectRelationshipDialog from './bot-job-details/grid/ReconnectRelationshipDialog';
-import type { RelationshipTarget } from './bot-job-details/grid/domain/instructionRelationshipGraph';
+import type {
+  RelationshipTarget,
+} from './bot-job-details/grid/domain/instructionRelationshipGraph';
+import { instructionRelationshipPolicy } from './bot-job-details/grid/domain/instructionRelationshipPolicy';
 import SearchBox, { type SearchBoxOption } from './SearchBox';
 import { useWebSocket } from './useWebSocket';
-import VariableExecutionLane from './variables/VariableExecutionLane';
 import {
-  planVariablesInstructionMove,
-  type VariablesDropPlacement,
-} from './variables/domain/variablesInstructionMove';
+  planVariablesFreeMove,
+} from './variables/domain/variablesFreeMove';
 import {
-  buildVariablesCrossBlockMutationDraft,
-  planVariablesCrossBlockMove,
-  type VariablesCrossBlockMovePlan,
-} from './variables/domain/variablesCrossBlockMove';
-import { variablesCrossBlockDropZones } from './variables/domain/variablesCrossBlockTargets';
+  buildVariablesReconnectMutation,
+  planVariablesReconnect,
+  variablesReconnectGraph,
+  type VariablesReconnectPlan,
+  type VariablesReconnectRelationKind,
+} from './variables/domain/variablesReconnectMutation';
 import { variableValuePresentation } from './variables/domain/variableValuePresentation';
+import RuntimeMemoryPanel from './variables/RuntimeMemoryPanel';
+import VariablesCommandBoard, {
+  type VariablesCommandDropTarget,
+} from './variables/VariablesCommandBoard';
 import { useVariablesGraphMutation } from './variables/useVariablesGraphMutation';
+import { useVariablesRuntimeMemory } from './variables/useVariablesRuntimeMemory';
 import {
   normalizeVariablesWorkspaceSnapshot,
   parseVariablesWorkspaceMessage,
@@ -43,7 +50,6 @@ import {
   type VariableInstructionNode,
   type VariablesWorkspaceEnvelope,
   type VariableWorkspaceSnapshot,
-  VARIABLES_INDIVIDUAL_CROSS_BLOCK_PROFILE,
 } from './variablesWorkspace.contract';
 import styles from './VariablesPage.module.scss';
 
@@ -83,12 +89,13 @@ const mutationAuthorityKeyFor = (
       snapshot.mutationCapability?.ownerAssertion.homeBankingId ?? 'read-only',
       snapshot.mutationCapability?.ownerAssertion.botJobId ?? 'read-only',
       snapshot.mutationCapability?.crossBlockProfile ?? 'same-block-only',
+      snapshot.mutationCapability?.reactAuthoredProfile ?? 'legacy-only',
     ].join(':')
   : 'unbound';
 
-type PendingCrossBlockMove = {
+type PendingReconnect = {
   authorityKey: string;
-  plan: VariablesCrossBlockMovePlan;
+  plan: VariablesReconnectPlan;
 };
 
 const acceptedOperations = new Set([
@@ -172,6 +179,29 @@ const instructionLocation = (instruction: VariableInstructionNode): string => {
   const blockOrder = instruction.blockOrder ? `B${instruction.blockOrder}` : 'B?';
   const rowOrder = instruction.instructionOrder ? `#${instruction.instructionOrder}` : '#?';
   return `${blockOrder} · ${block} · ${rowOrder}`;
+};
+
+const relationshipTargetLabel = (
+  snapshot: VariableWorkspaceSnapshot,
+  target: RelationshipTarget | null,
+): string | null => {
+  if (!target) return null;
+  if (target.entity === 'VARIABLE') {
+    const variable = snapshot.variables.find(candidate => candidate.id === target.id);
+    return variable
+      ? `${variable.name} · Variable ID ${variable.id}`
+      : `Variable ID ${target.id}`;
+  }
+  if (target.entity === 'BLOCK') {
+    const block = snapshot.blocks.find(candidate => candidate.id === target.id);
+    return block
+      ? `Block #${block.order ?? block.id} ${block.name} · ID ${block.id}`
+      : `Block ID ${target.id}`;
+  }
+  const instruction = snapshot.commands.find(candidate => candidate.id === target.id);
+  return instruction
+    ? `#${instruction.instructionOrder ?? '?'} ${instruction.name || instruction.command} · ID ${target.id}`
+    : `Instruction ID ${target.id}`;
 };
 
 const InstructionCard: React.FC<{
@@ -369,12 +399,17 @@ const VariablesPage: React.FC<Props> = ({
   const [snapshot, setSnapshot] = useState<VariableWorkspaceSnapshot | null>(null);
   const [pendingRequest, setPendingRequest] = useState<PendingRequest | null>(null);
   const [selectedVariableId, setSelectedVariableId] = useState<number | null>(null);
-  const [expandedIds, setExpandedIds] = useState<Set<number>>(() => new Set());
   const [findText, setFindText] = useState('');
   const [healthFilter, setHealthFilter] = useState<HealthFilter>('ALL');
   const [blockFilter, setBlockFilter] = useState<'ALL' | number>('ALL');
-  const [pendingCrossBlockMove, setPendingCrossBlockMove] =
-    useState<PendingCrossBlockMove | null>(null);
+  const [selectedInstructionId, setSelectedInstructionId] =
+    useState<number | null>(null);
+  const [draggingInstructionId, setDraggingInstructionId] =
+    useState<number | null>(null);
+  const [activeDropTarget, setActiveDropTarget] =
+    useState<VariablesCommandDropTarget | null>(null);
+  const [pendingReconnect, setPendingReconnect] =
+    useState<PendingReconnect | null>(null);
   const [status, setStatus] = useState<Status>({
     level: 'warn',
     text: 'Waiting for Variables workspace',
@@ -396,13 +431,35 @@ const VariablesPage: React.FC<Props> = ({
       current !== null && next.variables.some(variable => variable.id === current)
         ? current
         : next.variables[0]?.id ?? null);
-    setExpandedIds(current => {
-      const available = new Set(next.variables.map(variable => variable.id));
-      const retained = new Set([...current].filter(id => available.has(id)));
-      if (retained.size === 0 && next.variables[0]) retained.add(next.variables[0].id);
-      return retained;
-    });
+    setSelectedInstructionId(current =>
+      current !== null && next.commands.some(command => command.id === current)
+        ? current
+        : next.commands[0]?.id ?? null);
   }, []);
+
+  const replaceRuntimeMemory = useCallback((
+    runtimeMemory: VariableWorkspaceSnapshot['runtimeMemory'],
+  ) => {
+    const current = snapshotRef.current;
+    if (!current) return;
+    if (runtimeMemory.revision < current.runtimeMemory.revision) return;
+    const next = { ...current, runtimeMemory };
+    snapshotRef.current = next;
+    setSnapshot(next);
+  }, []);
+
+  const {
+    pendingVariableIds,
+    updateValue: updateRuntimeValue,
+    handleMessage: handleRuntimeMemoryMessage,
+  } = useVariablesRuntimeMemory({
+    webSocket,
+    connected,
+    sessionId,
+    snapshot,
+    onMemory: replaceRuntimeMemory,
+    onStatus: setStatus,
+  });
 
   const clearPendingRequest = useCallback(() => {
     if (pendingTimeoutRef.current !== null) {
@@ -493,6 +550,7 @@ const VariablesPage: React.FC<Props> = ({
 
     pending.forEach(raw => {
       if (handleGraphMutationMessage(raw)) return;
+      if (handleRuntimeMemoryMessage(raw)) return;
       let envelope: VariablesWorkspaceEnvelope;
       try {
         envelope = parseVariablesWorkspaceMessage(raw);
@@ -563,6 +621,7 @@ const VariablesPage: React.FC<Props> = ({
   }, [
     clearPendingRequest,
     handleGraphMutationMessage,
+    handleRuntimeMemoryMessage,
     messages,
     replaceSnapshot,
   ]);
@@ -628,6 +687,24 @@ const VariablesPage: React.FC<Props> = ({
     }));
   }, [snapshot?.blocks, snapshot?.variables]);
 
+  const variableSearchOptions = useMemo<SearchBoxOption[]>(
+    () => filteredVariables.map(variable => ({
+      value: String(variable.id),
+      label: variable.name,
+      sublabel: `${variable.type || 'Variable'} · ID ${variable.id}`,
+      badges: [{
+        text: healthLabel(variable.health).toLocaleUpperCase(),
+        tone: variable.health === 'HEALTHY'
+          ? 'green' as const
+          : variable.health === 'ERROR'
+            ? 'red' as const
+            : 'blue' as const,
+      }],
+      keywords: variableSearchText(variable),
+    })),
+    [filteredVariables],
+  );
+
   useEffect(() => {
     if (
       selectedVariableId === null
@@ -643,55 +720,58 @@ const VariablesPage: React.FC<Props> = ({
   const selectedValuePresentation = selectedVariable
     ? variableValuePresentation(selectedVariable)
     : null;
+  const selectedRuntimeValue = selectedVariable
+    ? snapshot?.runtimeMemory.variables.find(
+      entry => entry.variableId === selectedVariable.id,
+    ) ?? null
+    : null;
   const mutationAuthorityKey = mutationAuthorityKeyFor(snapshot);
-  const crossBlockDropZones = useMemo(
-    () => snapshot ? variablesCrossBlockDropZones(snapshot) : [],
+  const relationshipGraph = useMemo(
+    () => snapshot ? variablesReconnectGraph(snapshot) : null,
     [snapshot],
   );
 
   useEffect(() => {
     if (
-      pendingCrossBlockMove
-      && pendingCrossBlockMove.authorityKey !== mutationAuthorityKey
+      pendingReconnect
+      && pendingReconnect.authorityKey !== mutationAuthorityKey
     ) {
-      setPendingCrossBlockMove(null);
+      setPendingReconnect(null);
       setStatus({
         level: 'error',
-        text: 'The Variables graph changed. Repeat the cross-block drop.',
+        text: 'The Variables graph changed. Open the reconnect action again.',
       });
     }
-  }, [mutationAuthorityKey, pendingCrossBlockMove]);
+  }, [mutationAuthorityKey, pendingReconnect]);
 
-  const submitInstructionMove = useCallback((
+  const submitVariablesMutation = useCallback((
     draft: Parameters<typeof submitGraphMutation>[0],
     mutationProfile: Parameters<typeof submitGraphMutation>[2],
     sourceInstructionId: number,
-    disconnected: boolean,
+    pendingText: string,
+    committedText: string,
   ) => {
-    setStatus({
-      level: 'warn',
-      text: disconnected
-        ? `Moving instruction #${sourceInstructionId} and disconnecting its parent...`
-        : `Saving instruction #${sourceInstructionId} as one independent move...`,
-    });
+    setStatus({ level: 'warn', text: pendingText });
     const requestId = submitGraphMutation(draft, {
       committed: response => {
-        setPendingCrossBlockMove(null);
+        setPendingReconnect(null);
+        setDraggingInstructionId(null);
+        setActiveDropTarget(null);
         setStatus({
-          level: disconnected ? 'warn' : 'ok',
-          text: disconnected
-            ? `${response.message || 'Instruction moved.'} Reconnect parent is required.`
-            : response.message || 'Instruction order saved.',
+          level: 'ok',
+          text: response.message || committedText,
         });
         sendWorkspaceRequest('variablesWorkspace.refresh');
       },
       refused: (response, reason) => {
-        setPendingCrossBlockMove(null);
+        setPendingReconnect(null);
+        setDraggingInstructionId(null);
+        setActiveDropTarget(null);
         const fallback = reason === 'TIMEOUT'
-          ? 'The instruction move timed out. The current Variables graph remains visible.'
+          ? 'The Variables change timed out. The current graph remains visible.'
           : reason === 'WORKSPACE_CHANGED'
-            ? 'The Variables target changed. The move was cancelled.'
-            : 'The instruction move was not saved.';
+            ? 'The Variables target changed. The change was cancelled.'
+            : 'The Variables change was not saved.';
         setStatus({
           level: 'error',
           text: response?.message || fallback,
@@ -699,130 +779,155 @@ const VariablesPage: React.FC<Props> = ({
       },
     }, mutationProfile);
     if (!requestId) {
-      setPendingCrossBlockMove(null);
+      setPendingReconnect(null);
+      setDraggingInstructionId(null);
+      setActiveDropTarget(null);
       setStatus({
         level: 'error',
-        text: 'Variables is busy or disconnected. The instruction was not moved.',
+        text: `Variables is busy or disconnected. Instruction #${sourceInstructionId} was not changed.`,
       });
     }
   }, [sendWorkspaceRequest, submitGraphMutation]);
 
-  const handleInstructionMove = useCallback((
-    sourceInstructionId: number,
-    targetInstructionId: number,
-    placement: VariablesDropPlacement,
+  const handleCommandDrop = useCallback((
+    target: VariablesCommandDropTarget,
   ) => {
     const current = snapshotRef.current;
-    if (!current) {
+    const sourceInstructionId = draggingInstructionId;
+    if (!current || sourceInstructionId === null) {
       setStatus({
         level: 'error',
         text: 'Variables must finish loading before an instruction can move.',
       });
       return;
     }
-    const sourceFact = current.mutationCapability?.instructionFacts.find(
-      fact => fact.instructionId === sourceInstructionId,
+    const source = current.mutationCapability?.layoutRows.find(
+      row => row.instructionId === sourceInstructionId,
     );
-    const targetFact = current.mutationCapability?.instructionFacts.find(
-      fact => fact.instructionId === targetInstructionId,
-    );
-    if (
-      sourceFact
-      && targetFact
-      && sourceFact.blockId !== targetFact.blockId
-    ) {
-      const crossBlockPlan = planVariablesCrossBlockMove(
-        current,
-        sourceInstructionId,
-        targetInstructionId,
-        placement,
-      );
-      if (!crossBlockPlan.ok) {
-        setStatus({ level: 'error', text: crossBlockPlan.message });
-        return;
+    let destinationIndex = target.index;
+    if (source?.blockId === target.blockId) {
+      const sourceIndex = current.mutationCapability?.layoutRows
+        .filter(row => row.blockId === source.blockId)
+        .sort((left, right) =>
+          left.instructionOrderNumber - right.instructionOrderNumber)
+        .findIndex(row => row.instructionId === sourceInstructionId) ?? -1;
+      if (sourceIndex >= 0 && sourceIndex < destinationIndex) {
+        destinationIndex -= 1;
       }
-      setPendingCrossBlockMove({
-        authorityKey: mutationAuthorityKeyFor(current),
-        plan: crossBlockPlan.plan,
-      });
-      setStatus({
-        level: 'warn',
-        text: 'Choose Disconnect or select a compatible parent before this cross-block move is saved.',
-      });
-      return;
     }
-    const planned = planVariablesInstructionMove(
-      current,
+    const planned = planVariablesFreeMove(current, {
       sourceInstructionId,
-      targetInstructionId,
-      placement,
-    );
+      destinationBlockId: target.blockId,
+      destinationIndex,
+    });
     if (!planned.ok) {
+      setDraggingInstructionId(null);
+      setActiveDropTarget(null);
       setStatus({ level: 'error', text: planned.message });
       return;
     }
-    submitInstructionMove(
+    const cleared = planned.plan.clearedRelationships.length;
+    submitVariablesMutation(
       planned.plan.draft,
-      current.mutationCapability?.profile,
+      planned.plan.mutationProfile,
       sourceInstructionId,
-      false,
+      `Moving instruction #${sourceInstructionId}${cleared > 0
+        ? ` and disconnecting ${cleared} invalid relationship(s)`
+        : ''}...`,
+      cleared > 0
+        ? `Instruction moved. ${cleared} relationship(s) now require reconnect.`
+        : 'Instruction order saved.',
     );
-  }, [submitInstructionMove]);
+  }, [draggingInstructionId, submitVariablesMutation]);
 
-  const submitCrossBlockChoice = useCallback((
+  const parentRelationKind = useCallback((
+    instructionId: number,
+  ): VariablesReconnectRelationKind | null => {
+    const current = snapshotRef.current;
+    const fact = current?.mutationCapability?.instructionFacts.find(
+      candidate => candidate.instructionId === instructionId,
+    );
+    if (!fact) return null;
+    const policy = instructionRelationshipPolicy(fact.action);
+    if (policy.requirements.includes('BLOCK_TARGET')) return 'BLOCK_TARGET';
+    if (policy.requirements.includes('LOOP_ANCHOR')) return 'LOOP_ANCHOR';
+    if (policy.requirements.includes('CONDITIONAL_ROOT')) {
+      return 'CONDITIONAL_ROOT';
+    }
+    if (policy.requirements.includes('ELEMENT_TARGET')) return 'ELEMENT_TARGET';
+    return fact.parentId !== null ? 'ELEMENT_TARGET' : null;
+  }, []);
+
+  const openReconnect = useCallback((
+    instructionId: number,
+    relationKind: VariablesReconnectRelationKind,
+  ) => {
+    const current = snapshotRef.current;
+    if (!current) return;
+    const planned = planVariablesReconnect(
+      current,
+      instructionId,
+      relationKind,
+    );
+    if (!planned.ok) {
+      setStatus({
+        level: 'error',
+        text: planned.message,
+      });
+      return;
+    }
+    setSelectedInstructionId(instructionId);
+    setPendingReconnect({
+      authorityKey: mutationAuthorityKeyFor(current),
+      plan: planned.plan,
+    });
+    setStatus({
+      level: 'warn',
+      text: relationKind === 'VARIABLE_BINDING'
+        ? 'Choose the variable to connect.'
+        : 'Choose the parent to connect.',
+    });
+  }, []);
+
+  const submitReconnectChoice = useCallback((
     target: RelationshipTarget | null,
   ) => {
     const current = snapshotRef.current;
-    const pending = pendingCrossBlockMove;
+    const pending = pendingReconnect;
     if (
       !current
       || !pending
-      || !connected
-      || pendingRequest !== null
-      || pendingMutationRequestId !== null
       || pending.authorityKey !== mutationAuthorityKeyFor(current)
-      || current.mutationCapability?.crossBlockProfile
-        !== VARIABLES_INDIVIDUAL_CROSS_BLOCK_PROFILE
     ) {
-      setPendingCrossBlockMove(null);
+      setPendingReconnect(null);
       setStatus({
         level: 'error',
-        text: 'The Variables graph changed. Repeat the cross-block drop.',
+        text: 'The Variables graph changed. Open the reconnect action again.',
       });
       return;
     }
-    if (target !== null && target.entity !== 'INSTRUCTION') {
-      setStatus({
-        level: 'error',
-        text: 'Only a compatible Web Element can be selected as parent.',
-      });
-      return;
-    }
-    const draft = buildVariablesCrossBlockMutationDraft(
+    const built = buildVariablesReconnectMutation(
       pending.plan,
       target === null
         ? { mode: 'DISCONNECT' }
-        : { mode: 'RECONNECT', targetInstructionId: target.id },
+        : { mode: 'CONNECT', target },
     );
-    if (!draft) {
-      setStatus({
-        level: 'error',
-        text: 'The selected parent is no longer compatible. Choose another target.',
-      });
+    if (!built.ok) {
+      setStatus({ level: 'error', text: built.message });
       return;
     }
-    submitInstructionMove(
-      draft,
-      VARIABLES_INDIVIDUAL_CROSS_BLOCK_PROFILE,
-      pending.plan.sourceFact.instructionId,
-      target === null,
+    submitVariablesMutation(
+      built.draft,
+      built.mutationProfile,
+      pending.plan.sourceInstructionId,
+      target === null
+        ? `Disconnecting ${pending.plan.relationKind.toLocaleLowerCase()}...`
+        : `Connecting ${pending.plan.relationKind.toLocaleLowerCase()}...`,
+      target === null ? 'Relationship disconnected.' : 'Relationship connected.',
     );
   }, [
-    connected,
-    pendingCrossBlockMove,
-    pendingMutationRequestId,
-    pendingRequest,
-    submitInstructionMove,
+    pendingReconnect,
+    submitVariablesMutation,
   ]);
   const statusClass = status.level === 'error'
     ? styles.statusError
@@ -835,17 +940,26 @@ const VariablesPage: React.FC<Props> = ({
   const mutationDisabled = !connected
     || pendingRequest !== null
     || pendingMutationRequestId !== null
-    || pendingCrossBlockMove !== null
-    || !snapshot?.mutationCapability;
-
-  const toggleExpanded = (id: number) => {
-    setExpandedIds(current => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
+    || pendingReconnect !== null
+    || snapshot?.mutationCapability?.reactAuthoredProfile == null;
+  const reconnectSource = snapshot && pendingReconnect
+    ? snapshot.commands.find(
+      command => command.id === pendingReconnect.plan.sourceInstructionId,
+    ) ?? null
+    : null;
+  const reconnectOptions = snapshot && pendingReconnect
+    ? pendingReconnect.plan.compatibleTargets.map(candidate => ({
+      target: candidate.target,
+      label: relationshipTargetLabel(snapshot, candidate.target)
+        ?? `Target ${candidate.target.id}`,
+      sublabel: candidate.target.entity.replaceAll('_', ' '),
+      keywords: [
+        candidate.target.entity,
+        candidate.target.id,
+        relationshipTargetLabel(snapshot, candidate.target),
+      ].join(' '),
+    }))
+    : [];
 
   const filterButtons: Array<{ id: HealthFilter; label: string; count?: number }> = [
     { id: 'ALL', label: 'All', count: snapshot?.summary.variableCount ?? 0 },
@@ -974,17 +1088,6 @@ const VariablesPage: React.FC<Props> = ({
               value={blockFilter === 'ALL' ? null : String(blockFilter)}
               onChange={value => setBlockFilter(value === null ? 'ALL' : Number(value))}
             />
-            <div className={styles.expandActions}>
-              <button
-                type="button"
-                onClick={() => setExpandedIds(new Set(filteredVariables.map(variable => variable.id)))}
-              >
-                Expand all
-              </button>
-              <button type="button" onClick={() => setExpandedIds(new Set())}>
-                Collapse all
-              </button>
-            </div>
           </section>
 
           {!snapshot ? (
@@ -1013,36 +1116,97 @@ const VariablesPage: React.FC<Props> = ({
               )
           ) : (
             <section className={styles.workspace}>
-              <aside className={styles.treePanel} aria-label="Variables tree">
-                <div className={styles.panelHeading}>
-                  <div>
-                    <h2>Variable tree</h2>
-                    <p>{filteredVariables.length} of {snapshot.variables.length} shown</p>
-                  </div>
-                </div>
-                <div className={styles.treeScroll}>
-                  {filteredVariables.length > 0
-                    ? filteredVariables.map(variable => (
-                      <VariableTreeRow
-                        key={variable.id}
-                        variable={variable}
-                        selected={variable.id === selectedVariableId}
-                        expanded={expandedIds.has(variable.id)}
-                        onSelect={() => setSelectedVariableId(variable.id)}
-                        onToggle={() => toggleExpanded(variable.id)}
-                      />
-                    ))
-                    : (
-                      <div className={styles.noMatches}>
-                        <Search size={22} aria-hidden="true" />
-                        <strong>No matching variables</strong>
-                        <span>Change the Find value or health filter.</span>
-                      </div>
-                    )}
-                </div>
-              </aside>
+              <VariablesCommandBoard
+                blocks={snapshot.blocks}
+                instructions={snapshot.commands}
+                relationshipEdges={relationshipGraph?.edges ?? []}
+                disabled={mutationDisabled}
+                unavailableReason={pendingMutationRequestId
+                  ? 'Saving...'
+                  : pendingReconnect
+                    ? 'Review relationship'
+                    : snapshot.mutationCapability?.reactAuthoredProfile == null
+                      ? 'Read-only'
+                      : undefined}
+                selectedInstructionId={selectedInstructionId}
+                draggingInstructionId={draggingInstructionId}
+                activeDropTarget={activeDropTarget}
+                onSelectInstruction={(instructionId) => {
+                  setSelectedInstructionId(instructionId);
+                  const command = snapshot.commands.find(
+                    candidate => candidate.id === instructionId,
+                  );
+                  if (
+                    command?.variableId != null
+                    && snapshot.variables.some(
+                      variable => variable.id === command.variableId,
+                    )
+                  ) {
+                    setSelectedVariableId(command.variableId);
+                  }
+                }}
+                onInstructionDragStart={(event, instruction) => {
+                  if (instruction.id === null) return;
+                  event.dataTransfer.effectAllowed = 'move';
+                  event.dataTransfer.setData(
+                    'application/x-ar-variables-instruction',
+                    String(instruction.id),
+                  );
+                  setDraggingInstructionId(instruction.id);
+                  setActiveDropTarget(null);
+                }}
+                onInstructionDragEnd={() => {
+                  setDraggingInstructionId(null);
+                  setActiveDropTarget(null);
+                }}
+                onDropTargetDragOver={(event, target) => {
+                  if (draggingInstructionId === null || mutationDisabled) return;
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = 'move';
+                  setActiveDropTarget(target);
+                }}
+                onDropTargetDragLeave={(event, target) => {
+                  if (event.currentTarget.contains(event.relatedTarget as Node)) return;
+                  setActiveDropTarget(current =>
+                    current?.blockId === target.blockId
+                      && current.index === target.index
+                      ? null
+                      : current);
+                }}
+                onDropTarget={(event, target) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  handleCommandDrop(target);
+                }}
+                onReconnectParent={(instructionId, edge) => {
+                  const relationKind = edge?.kind
+                    ?? parentRelationKind(instructionId);
+                  if (
+                    relationKind === 'ELEMENT_TARGET'
+                    || relationKind === 'LOOP_ANCHOR'
+                    || relationKind === 'CONDITIONAL_ROOT'
+                    || relationKind === 'BLOCK_TARGET'
+                  ) {
+                    openReconnect(instructionId, relationKind);
+                  }
+                }}
+                onReconnectVariable={(instructionId) =>
+                  openReconnect(instructionId, 'VARIABLE_BINDING')}
+              />
 
               <section className={styles.flowPanel} aria-label="Selected variable relationship flow">
+                <SearchBox
+                  label="Relationship flow"
+                  placeholder="Select a variable..."
+                  headerRight="Defined variables"
+                  countLabel={count => `${count} VARIABLE${count === 1 ? '' : 'S'}`}
+                  options={variableSearchOptions}
+                  value={selectedVariableId === null
+                    ? null
+                    : String(selectedVariableId)}
+                  onChange={value =>
+                    setSelectedVariableId(value === null ? null : Number(value))}
+                />
                 {selectedVariable ? (
                   <>
                     <div className={styles.variableHeading}>
@@ -1071,36 +1235,28 @@ const VariablesPage: React.FC<Props> = ({
                         >
                           {selectedValuePresentation?.configuredLabel}
                         </code>
-                        <span>Runtime topology</span>
+                        <span>Runtime value</span>
                         <strong
-                          className={selectedValuePresentation?.runtimeState === 'VOID'
+                          className={selectedRuntimeValue?.state !== 'VALUE'
                             ? styles.valueStateVoid
                             : styles.valueStateReady}
-                          title={selectedValuePresentation?.runtimeDetail}
+                          title={selectedRuntimeValue?.state === 'VALUE'
+                            ? 'Current independent runtime-memory value.'
+                            : selectedRuntimeValue?.voidReason
+                              ?.replaceAll('_', ' ') || 'No runtime value yet.'}
                         >
-                          {selectedValuePresentation?.runtimeLabel}
+                          {selectedRuntimeValue?.state === 'VALUE'
+                            ? selectedRuntimeValue.value === ''
+                              ? 'EMPTY'
+                              : selectedRuntimeValue.value
+                            : 'VOID'}
                         </strong>
                       </div>
                       <p>
-                        Runtime initial/current values are not streamed yet. This view shows the
-                        authoritative declared command graph.
+                        Runtime memory is independent from the definition. A command or a manual
+                        edit replaces the value; an empty string remains different from VOID.
                       </p>
                     </div>
-
-                    <VariableExecutionLane
-                      variable={selectedVariable}
-                      authorityKey={mutationAuthorityKey}
-                      disabled={mutationDisabled}
-                      unavailableReason={pendingMutationRequestId
-                        ? 'Saving...'
-                        : pendingCrossBlockMove
-                          ? 'Review relationship'
-                        : !snapshot.mutationCapability
-                          ? 'Read-only'
-                          : undefined}
-                      crossBlockDropZones={crossBlockDropZones}
-                      onMove={handleInstructionMove}
-                    />
 
                     <section className={styles.flowCanvas}>
                       <div className={styles.flowColumn}>
@@ -1162,13 +1318,15 @@ const VariablesPage: React.FC<Props> = ({
                         <small>{selectedVariable.type || 'Variable'} · ID {selectedVariable.id}</small>
                         <div className={styles.nodeValueStates}>
                           <code>{selectedValuePresentation?.configuredLabel}</code>
-                          <b className={selectedValuePresentation?.runtimeState === 'VOID'
+                          <b className={selectedRuntimeValue?.state !== 'VALUE'
                             ? styles.nodeValueVoid
                             : styles.nodeValueReady}
                           >
-                            {selectedValuePresentation?.runtimeState === 'VOID'
+                            {selectedRuntimeValue?.state !== 'VALUE'
                               ? 'VOID'
-                              : 'SOURCE DEFINED'}
+                              : selectedRuntimeValue.value === ''
+                                ? 'EMPTY'
+                                : selectedRuntimeValue.value}
                           </b>
                         </div>
                       </div>
@@ -1267,29 +1425,50 @@ const VariablesPage: React.FC<Props> = ({
                   </div>
                 )}
               </section>
+
+              <RuntimeMemoryPanel
+                items={snapshot.runtimeMemory.variables.map(entry => ({
+                  variableId: entry.variableId,
+                  name: entry.name,
+                  state: entry.state,
+                  value: entry.state === 'VALUE' ? entry.value : null,
+                  voidReason: entry.voidReason,
+                  editable: true,
+                }))}
+                disabled={!connected}
+                disabledReason={!connected
+                  ? 'Variables is reconnecting. Runtime values remain visible.'
+                  : undefined}
+                pendingVariableIds={pendingVariableIds}
+                onCommitValue={updateRuntimeValue}
+              />
             </section>
           )}
         </section>
-        {pendingCrossBlockMove && (
+        {snapshot && pendingReconnect && (
           <ReconnectRelationshipDialog
-            edge={pendingCrossBlockMove.plan.edge}
-            sourceLabel={pendingCrossBlockMove.plan.sourceLabel}
-            currentTargetLabel={pendingCrossBlockMove.plan.currentTargetLabel}
-            changeSummary={pendingCrossBlockMove.plan.destinationLabel}
-            compatibleTargets={pendingCrossBlockMove.plan.compatibleTargets}
+            edge={pendingReconnect.plan.edge}
+            sourceLabel={reconnectSource
+              ? `#${reconnectSource.instructionOrder ?? '?'} ${reconnectSource.name || reconnectSource.command} · ID ${reconnectSource.id}`
+              : `Instruction ID ${pendingReconnect.plan.sourceInstructionId}`}
+            currentTargetLabel={relationshipTargetLabel(
+              snapshot,
+              pendingReconnect.plan.currentTarget,
+            )}
+            compatibleTargets={reconnectOptions}
             pending={
               !connected
               || pendingRequest !== null
               || pendingMutationRequestId !== null
             }
-            onDisconnect={() => submitCrossBlockChoice(null)}
-            onConnect={submitCrossBlockChoice}
+            onDisconnect={() => submitReconnectChoice(null)}
+            onConnect={submitReconnectChoice}
             onCancel={() => {
               if (pendingMutationRequestId !== null) return;
-              setPendingCrossBlockMove(null);
+              setPendingReconnect(null);
               setStatus({
                 level: 'warn',
-                text: 'Cross-block move cancelled. No changes were saved.',
+                text: 'Reconnect cancelled. No relationship was changed.',
               });
             }}
           />

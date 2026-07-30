@@ -36,9 +36,11 @@ const snapshot = (
     unusedCount: 0,
   },
   blocks: [{ id: 10, name: 'Main', order: 1, active: true }],
+  commands: [],
   variables: [],
   edges: [],
   diagnostics: [],
+  runtimeMemory: { revision: 0, variables: [] },
   mutationCapability: {
     enabled: true,
     contractVersion: 3,

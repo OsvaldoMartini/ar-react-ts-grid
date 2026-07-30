@@ -54,9 +54,11 @@ const snapshot = (
     { id: 30, name: 'Structural', order: 3, active: true },
     { id: 40, name: 'Empty', order: 4, active: true },
   ],
+  commands: [],
   variables: [],
   edges: [],
   diagnostics: [],
+  runtimeMemory: { revision: 0, variables: [] },
   mutationCapability: {
     enabled: true,
     contractVersion: 3,

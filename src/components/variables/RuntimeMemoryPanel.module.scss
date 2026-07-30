@@ -1,0 +1,219 @@
+.panel {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #c8d7e7;
+  border-radius: 9px;
+  background: #ffffff;
+  box-shadow: 0 3px 10px rgba(24, 59, 94, 0.09);
+  color: #20384f;
+}
+
+.header {
+  min-height: 58px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 11px;
+  border-bottom: 1px solid #dce6f0;
+  background: linear-gradient(180deg, #fbfdff, #f3f8fd);
+}
+
+.header > div {
+  min-width: 0;
+}
+
+.header h2 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0 0;
+  color: #123e75;
+  font-size: 0.82rem;
+}
+
+.eyebrow {
+  color: #5b7187;
+  font-size: 0.57rem;
+  font-weight: 900;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.count {
+  min-width: 25px;
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: #dcecff;
+  color: #0b5394;
+  font-size: 0.64rem;
+  font-weight: 900;
+  text-align: center;
+}
+
+.disabledReason {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 7px 10px;
+  border-bottom: 1px solid #ead3a9;
+  background: #fff8e9;
+  color: #865406;
+  font-size: 0.61rem;
+  line-height: 1.35;
+}
+
+.tableScroll {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: auto;
+  scrollbar-color: #a7b8ca #edf2f7;
+  scrollbar-width: thin;
+}
+
+.table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+.table thead {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+}
+
+.table thead th {
+  padding: 7px 8px;
+  border-bottom: 1px solid #cbd9e7;
+  background: #eaf2fa;
+  color: #36536f;
+  font-size: 0.6rem;
+  font-weight: 900;
+  letter-spacing: 0.035em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.table thead th:first-child {
+  width: 42%;
+}
+
+.table tbody tr {
+  border-bottom: 1px solid #e3eaf1;
+}
+
+.table tbody tr:last-child {
+  border-bottom: 0;
+}
+
+.table tbody tr:hover {
+  background: #f8fbff;
+}
+
+.nameCell,
+.valueCell {
+  min-width: 0;
+  padding: 6px 7px;
+  text-align: left;
+}
+
+.nameCell strong {
+  display: block;
+  overflow: hidden;
+  color: #263f57;
+  font-size: 0.68rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.valueEditor {
+  position: relative;
+  min-width: 0;
+}
+
+.valueEditor input {
+  width: 100%;
+  min-width: 0;
+  height: 29px;
+  padding: 4px 27px 4px 7px;
+  border: 1px solid #bacbdd;
+  border-radius: 5px;
+  outline: 0;
+  background: #ffffff;
+  color: #173b5f;
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 0.67rem;
+  box-sizing: border-box;
+}
+
+.valueEditor input:focus {
+  border-color: #2672b6;
+  box-shadow: 0 0 0 2px rgba(38, 114, 182, 0.14);
+}
+
+.valueEditor input:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.valueEditor .voidInput {
+  border-color: #dfb66d;
+  background: #fffaf0;
+  color: #8a5607;
+  font-style: italic;
+}
+
+.valueEditor .voidInput::placeholder {
+  color: #9a6a1a;
+  opacity: 0.88;
+}
+
+.valueEditor .emptyValueInput {
+  background-image:
+    linear-gradient(135deg, rgba(55, 107, 155, 0.04) 25%, transparent 25%),
+    linear-gradient(315deg, rgba(55, 107, 155, 0.04) 25%, transparent 25%);
+  background-position: 0 0, 4px 4px;
+  background-size: 8px 8px;
+}
+
+.voidBadge {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  padding: 2px 4px;
+  border-radius: 999px;
+  background: #f8dfb4;
+  color: #8a5200;
+  font-size: 0.48rem;
+  font-weight: 900;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.pendingIcon {
+  position: absolute;
+  top: 8px;
+  right: 7px;
+  color: #0b5394;
+  animation: spin 0.9s linear infinite;
+}
+
+.empty {
+  display: grid;
+  min-height: 150px;
+  place-items: center;
+  padding: 18px;
+  color: #718397;
+  font-size: 0.66rem;
+  text-align: center;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
