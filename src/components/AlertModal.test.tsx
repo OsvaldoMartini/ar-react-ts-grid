@@ -54,9 +54,14 @@ test('keeps a long row list inside the scrollable body and actions outside it', 
   );
 
   const body = container.querySelector('.alert-body');
+  const scrollRegion = container.querySelector('.alert-scroll-region');
+  const actions = container.querySelector('.alert-actions');
   const buttons = container.querySelector('.alert-buttons');
   expect(body).toHaveClass('is-array');
   expect(body?.querySelectorAll('.complex-message-row')).toHaveLength(12);
+  expect(scrollRegion?.contains(body)).toBe(true);
+  expect(scrollRegion?.contains(buttons)).toBe(false);
+  expect(actions?.contains(buttons)).toBe(true);
   expect(body?.contains(buttons)).toBe(false);
 
   fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));

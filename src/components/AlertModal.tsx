@@ -66,56 +66,60 @@ const AlertModal: React.FC<AlertModalProps> = ({
         {/* Display message header */}
         <h3 className="alert-header">{header}</h3>
 
-        {/* Display message body */}
-        {renderBody()}
+        <div className="alert-scroll-region">
+          {/* Display message body */}
+          {renderBody()}
 
-        {/* Display message footer */}
-        <div className={`alert-footer ${error ? 'error' : 'success'}`}>
-          <p>{extraMsg}</p>
+          {/* Display message footer */}
+          <div className={`alert-footer ${error ? 'error' : 'success'}`}>
+            <p>{extraMsg}</p>
+          </div>
         </div>
 
-        {/* Buttons */}
-        {onConfirm ? (
-          <div className="alert-buttons">
-            {alternateAction ? (
-              <>
-                <RulesCard
-                  event={{
-                    color: 'green',
-                    rules: alternateAction.label,
-                    ts: 0,
-                  }}
-                  animate={false}
-                  pulse
-                  glow
-                  icon={false}
-                  onClick={alternateAction.onAction}
-                  title={alternateAction.title}
-                  disabled={alternateAction.disabled}
-                />
-                <RulesCard
-                  event={{
-                    color: 'orange',
-                    rules: alternateAction.confirmLabel ?? 'GET ALL BETWEEN',
-                    ts: 0,
-                  }}
-                  animate={false}
-                  pulse
-                  glow
-                  icon={false}
-                  onClick={onConfirm}
-                  title={alternateAction.confirmTitle
-                    ?? 'Stage the complete connected instruction group shown above'}
-                />
-              </>
-            ) : (
-              <button onClick={onConfirm} className="confirm-btn">Confirm</button>
-            )}
-            <button onClick={onClose} className="cancel-btn">Cancel</button>
-          </div>
-        ) : (
-          <button onClick={onClose} className="close-btn">Close</button>
-        )}
+        <div className="alert-actions">
+          {/* Buttons stay outside the scrollable message region. */}
+          {onConfirm ? (
+            <div className="alert-buttons">
+              {alternateAction ? (
+                <>
+                  <RulesCard
+                    event={{
+                      color: 'green',
+                      rules: alternateAction.label,
+                      ts: 0,
+                    }}
+                    animate={false}
+                    pulse
+                    glow
+                    icon={false}
+                    onClick={alternateAction.onAction}
+                    title={alternateAction.title}
+                    disabled={alternateAction.disabled}
+                  />
+                  <RulesCard
+                    event={{
+                      color: 'orange',
+                      rules: alternateAction.confirmLabel ?? 'GET ALL BETWEEN',
+                      ts: 0,
+                    }}
+                    animate={false}
+                    pulse
+                    glow
+                    icon={false}
+                    onClick={onConfirm}
+                    title={alternateAction.confirmTitle
+                      ?? 'Stage the complete connected instruction group shown above'}
+                  />
+                </>
+              ) : (
+                <button onClick={onConfirm} className="confirm-btn">Confirm</button>
+              )}
+              <button onClick={onClose} className="cancel-btn">Cancel</button>
+            </div>
+          ) : (
+            <button onClick={onClose} className="close-btn">Close</button>
+          )}
+        </div>
       </div>
     </div>
   );
