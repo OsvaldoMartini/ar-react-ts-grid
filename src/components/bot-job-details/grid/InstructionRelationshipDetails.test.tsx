@@ -47,11 +47,14 @@ const relationshipEdge = (
   code: string | null,
   kind: InstructionRelationshipKind = 'ELEMENT_TARGET',
   sourceId = 2,
+  targetId: number | null = null,
 ): InstructionRelationshipEdge => ({
   id: `${kind}:${sourceId}:${state}:${code ?? 'NONE'}`,
   kind,
   source: { entity: 'INSTRUCTION', owner: OWNER, id: sourceId },
-  target: null,
+  target: targetId === null
+    ? null
+    : { entity: 'INSTRUCTION', owner: OWNER, id: targetId },
   state,
   code,
   required: true,
@@ -70,7 +73,13 @@ test('preserves the legacy LOOP relationship text and colors', () => {
       instruction={loop}
       allInstructions={[parent, loop]}
       relationshipEdges={[
-        relationshipEdge('CONNECTED', null, 'LOOP_ANCHOR', loop.id),
+        relationshipEdge(
+          'CONNECTED',
+          null,
+          'LOOP_ANCHOR',
+          loop.id,
+          parent.id,
+        ),
       ]}
     />,
   );
@@ -82,6 +91,36 @@ test('preserves the legacy LOOP relationship text and colors', () => {
   expect(screen.getByText('(917)Pagina iniziale')).toHaveStyle({ color: '#b163ff' });
   expect(screen.queryByLabelText(/Reconnect|Repair|Fix order|Memory only/i))
     .not.toBeInTheDocument();
+});
+
+test('keeps the connected parent badge visible and identifies its exact parent', () => {
+  const parent = row(1640, 1, 'O', { name: 'User number' });
+  const instruction = row(1641, 2, 'GET', {
+    operation: 'user_number:value',
+    parentId: parent.id,
+    variableId: 100,
+  });
+  const edge = relationshipEdge(
+    'CONNECTED',
+    null,
+    'ELEMENT_TARGET',
+    instruction.id,
+    parent.id,
+  );
+  render(
+    <InstructionRelationshipDetails
+      instruction={instruction}
+      allInstructions={[parent, instruction]}
+      relationshipEdges={[edge]}
+    />,
+  );
+
+  expect(screen.getByLabelText('Parent connected (id: 1640)'))
+    .toBeInTheDocument();
+  expect(screen.queryByRole('button', {
+    name: 'Parent connected (id: 1640)',
+  })).not.toBeInTheDocument();
+  expect(screen.queryByText('Reconnect Parent')).not.toBeInTheDocument();
 });
 
 test.each([
@@ -116,7 +155,7 @@ test.each([
       'ELEMENT_TARGET',
     ),
     operationText: '(3)Future field',
-    chipName: /Fix order: Element target order/i,
+    chipName: /Reconnect parent: Element target order/i,
   },
   {
     label: 'parent in another block',

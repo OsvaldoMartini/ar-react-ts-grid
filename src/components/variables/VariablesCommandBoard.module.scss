@@ -298,6 +298,39 @@
   opacity: 0.6;
 }
 
+.reconnectRuleCard {
+  display: inline-flex;
+  min-width: 0;
+}
+
+.reconnectRuleCard > button,
+.reconnectRuleCard > div {
+  min-height: 24px;
+  gap: 4px;
+  padding: 3px 6px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 0.53rem;
+  letter-spacing: 0;
+  line-height: normal;
+  text-transform: none;
+}
+
+.connectedParent {
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  border: 1px solid #de9f43;
+  border-radius: 999px;
+  background: #fff2df;
+  color: #975000;
+  font-size: 0.53rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
 .variableButton {
   border-color: #9c7ac4;
   background: #f3ebfd;

@@ -6,6 +6,7 @@ import {
   Unplug,
   Variable,
 } from 'lucide-react';
+import { RulesCard, type RulesCardEvent } from '../RulesCard';
 import type {
   InstructionRelationshipEdge,
 } from '../bot-job-details/grid/domain/instructionRelationshipGraph';
@@ -273,35 +274,64 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                 const edges = instructionId === null
                   ? []
                   : edgesByInstruction.get(instructionId) ?? [];
-                const parentEdge = edges.find(edge =>
+                const elementParentEdge = edges.find(edge =>
+                  edge.kind === 'ELEMENT_TARGET'
+                  && edge.source.entity === 'INSTRUCTION'
+                  && edge.source.id === instructionId);
+                const otherParentEdge = edges.find(edge =>
                   edge.state !== 'CONNECTED'
                   && edge.state !== 'MEMORY_ONLY'
                   && (
-                    edge.kind === 'ELEMENT_TARGET'
-                    || edge.kind === 'LOOP_ANCHOR'
+                    edge.kind === 'LOOP_ANCHOR'
                     || edge.kind === 'CONDITIONAL_ROOT'
                     || edge.kind === 'BLOCK_TARGET'
                   ));
                 const variableEdge = edges.find(edge =>
                   edge.state === 'RECONNECT_VARIABLE'
                   && edge.kind === 'VARIABLE_BINDING');
-                const reconnectParent = Boolean(
-                  parentEdge
+                const requiresElementParent =
+                  policy.requirements.includes('ELEMENT_TARGET');
+                const configuredParentId =
+                  typeof instruction.parentId === 'number'
+                  && Number.isSafeInteger(instruction.parentId)
+                  && instruction.parentId > 0
+                    ? instruction.parentId
+                    : null;
+                // The graph wins whenever it supplies an edge. Falling back to
+                // the DTO is only for workspaces without graph capabilities.
+                const connectedParentId = elementParentEdge
+                  ? elementParentEdge.state === 'CONNECTED'
+                    && elementParentEdge.target?.entity === 'INSTRUCTION'
+                      ? elementParentEdge.target.id
+                      : null
+                  : requiresElementParent
+                    ? configuredParentId
+                    : null;
+                const reconnectParent =
+                  requiresElementParent && connectedParentId === null;
+                const reconnectOtherParent = Boolean(
+                  otherParentEdge
                   || (
-                    (
-                      instruction.parentId === null
-                      && (
-                        policy.requirements.includes('ELEMENT_TARGET')
-                        || policy.requirements.includes('LOOP_ANCHOR')
-                        || policy.requirements.includes('CONDITIONAL_ROOT')
-                      )
+                    instruction.parentId === null
+                    && (
+                      policy.requirements.includes('LOOP_ANCHOR')
+                      || policy.requirements.includes('CONDITIONAL_ROOT')
                     )
-                    || (
-                      instruction.parentBlockId === null
-                      && policy.requirements.includes('BLOCK_TARGET')
-                    )
+                  )
+                  || (
+                    instruction.parentBlockId === null
+                    && policy.requirements.includes('BLOCK_TARGET')
                   ),
                 );
+                const reconnectParentEvent: RulesCardEvent | null =
+                  reconnectParent
+                    ? {
+                        color: 'red',
+                        rules: 'Reconnect Parent',
+                        context: '',
+                        ts: instructionId ?? index,
+                      }
+                    : null;
                 const reconnectVariable = Boolean(
                   variableEdge
                   || (
@@ -366,16 +396,62 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                         </small>
                       </button>
                       <div className={styles.relationships}>
-                        {reconnectParent && instructionId !== null && (
+                        {reconnectParentEvent && instructionId !== null && (
+                          <span
+                            className={styles.reconnectRuleCard}
+                            onMouseDown={event => event.stopPropagation()}
+                          >
+                            <RulesCard
+                              event={reconnectParentEvent}
+                              ariaLabel={relationshipTitle(
+                                'Reconnect parent',
+                                elementParentEdge,
+                              )}
+                              glow
+                              border
+                              animate={false}
+                              pulse
+                              iconNode={<Link2 size={11} aria-hidden="true" />}
+                              title={relationshipTitle(
+                                'Reconnect parent',
+                                elementParentEdge,
+                              )}
+                              disabled={disabled || !onReconnectParent}
+                              onClick={onReconnectParent
+                                ? () => onReconnectParent(
+                                    instructionId,
+                                    elementParentEdge,
+                                  )
+                                : undefined}
+                            />
+                          </span>
+                        )}
+                        {connectedParentId !== null && instructionId !== null && (
+                          <span
+                            className={styles.connectedParent}
+                            aria-label={`Parent connected (id: ${connectedParentId})`}
+                            title={`Parent connected (id: ${connectedParentId})`}
+                          >
+                            <Link2 size={11} aria-hidden="true" />
+                            Parent connected (id: {connectedParentId})
+                          </span>
+                        )}
+                        {reconnectOtherParent && instructionId !== null && (
                           <button
                             type="button"
                             className={styles.reconnectButton}
                             disabled={disabled || !onReconnectParent}
-                            title={relationshipTitle('Reconnect parent', parentEdge)}
+                            title={relationshipTitle(
+                              'Reconnect parent',
+                              otherParentEdge,
+                            )}
                             onMouseDown={event => event.stopPropagation()}
                             onClick={(event) => {
                               event.stopPropagation();
-                              onReconnectParent?.(instructionId, parentEdge);
+                              onReconnectParent?.(
+                                instructionId,
+                                otherParentEdge,
+                              );
                             }}
                           >
                             <Link2 size={11} aria-hidden="true" />
@@ -408,6 +484,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                           </span>
                         )}
                         {!reconnectParent
+                          && !reconnectOtherParent
                           && !reconnectVariable
                           && instruction.parentId === null
                           && instruction.variableId === null

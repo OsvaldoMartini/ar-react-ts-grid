@@ -36,15 +36,37 @@
   opacity: 0.6;
 }
 
+.reconnectRuleCard {
+  display: inline-flex;
+  min-width: 0;
+}
+
+.reconnectRuleCard > button,
+.reconnectRuleCard > div {
+  min-height: 16px;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 0;
+  line-height: 1.2;
+  text-transform: none;
+}
+
 .reconnectParent {
   background: #fff2df;
   border-color: #de9f43;
   color: #975000;
 }
 
-.reconnectParent:hover:not(:disabled) {
+.reconnectButton.reconnectParent:hover:not(:disabled) {
   background: #ffe6c1;
   border-color: #c8780b;
+}
+
+.connectedParent {
+  cursor: default;
 }
 
 .reconnectVariable {

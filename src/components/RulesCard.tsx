@@ -14,6 +14,7 @@ export interface RulesCardEvent {
 
 interface RulesCardProps {
   event: RulesCardEvent | null;
+  ariaLabel?: string;
   glow?: boolean;
   border?: boolean;
   animate?: boolean;
@@ -28,6 +29,7 @@ interface RulesCardProps {
 
 export function RulesCard({
   event,
+  ariaLabel,
   glow = true,
   border = false,
   animate = true,
@@ -73,6 +75,7 @@ export function RulesCard({
         key={event.ts}
         type="button"
         className={className}
+        aria-label={ariaLabel}
         onClick={onClick}
         aria-pressed={ariaPressed}
         title={title}
@@ -89,6 +92,7 @@ export function RulesCard({
       className={className}
       role="status"
       aria-live="polite"
+      aria-label={ariaLabel}
       title={title}
     >
       {content}

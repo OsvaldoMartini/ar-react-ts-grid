@@ -1,12 +1,14 @@
 import React from 'react';
 import { Link2, Variable } from 'lucide-react';
 import type { BlockLoopInstructionLoadDTO } from '../../instructionsMockData';
+import { RulesCard, type RulesCardEvent } from '../../RulesCard';
 import gridStyles from '../../Griditem.module.scss';
 import type {
   InstructionRelationshipEdge,
   RelationshipMutationState,
   RelationshipState,
 } from './domain/instructionRelationshipGraph';
+import { instructionRelationshipPolicy } from './domain/instructionRelationshipPolicy';
 import type { WorkspaceBlock } from './domain/workspaceBlocks';
 import InstructionVariableStateBadge from './InstructionVariableStateBadge';
 import styles from './InstructionRelationshipDetails.module.scss';
@@ -257,9 +259,49 @@ const InstructionRelationshipDetails: React.FC<
   onReconnect,
   reconnectDisabled = false,
 }) => {
+  const elementParentEdge = relationshipEdges.find(edge =>
+    edge.source.entity === 'INSTRUCTION'
+    && edge.source.id === instruction.id
+    && edge.kind === 'ELEMENT_TARGET');
+  const requiresElementParent = instructionRelationshipPolicy(
+    instruction.actions,
+  ).requirements.includes('ELEMENT_TARGET');
+  const configuredParentId =
+    typeof instruction.parentId === 'number'
+    && Number.isSafeInteger(instruction.parentId)
+    && instruction.parentId > 0
+      ? instruction.parentId
+      : null;
+  // A supplied graph edge is authoritative. Only fall back to the DTO when
+  // relationship capabilities are unavailable and no edge exists.
+  const connectedParentId = elementParentEdge
+    ? elementParentEdge.state === 'CONNECTED'
+      && elementParentEdge.target?.entity === 'INSTRUCTION'
+        ? elementParentEdge.target.id
+        : null
+    : requiresElementParent
+      ? configuredParentId
+      : null;
+  const reconnectParentEvent: RulesCardEvent | null =
+    requiresElementParent
+    && connectedParentId === null
+      ? {
+          color: 'red',
+          rules: 'Reconnect Parent',
+          context: '',
+          ts: instruction.id,
+        }
+      : null;
+  const parentDetail = elementParentEdge?.code
+    ? humanizeCode(elementParentEdge.code)
+    : '';
+  const reconnectParentLabel = parentDetail
+    ? `Reconnect parent: ${parentDetail}`
+    : 'Reconnect parent';
+
   const chips = [
     ...relationshipEdges
-      .filter(edge => edge.state !== 'CONNECTED')
+      .filter(edge => edge !== elementParentEdge && edge.state !== 'CONNECTED')
       .map(edge => ({
         key: edge.id,
         state: edge.state as Exclude<RelationshipState, 'CONNECTED'>,
@@ -281,12 +323,53 @@ const InstructionRelationshipDetails: React.FC<
       data-testid={`instruction-relationship-details-${instruction.id}`}
     >
       {renderOperationContent(instruction, allInstructions, workspaceBlocks)}
-      {(instruction.variableId != null || chips.length > 0) && (
+      {(
+        instruction.variableId != null
+        || chips.length > 0
+        || reconnectParentEvent != null
+        || connectedParentId != null
+      ) && (
         <span className={styles.chips}>
           <InstructionVariableStateBadge
             instruction={instruction}
             allInstructions={allInstructions}
           />
+          {reconnectParentEvent && (
+            <span
+              className={styles.reconnectRuleCard}
+              onMouseDown={event => event.stopPropagation()}
+            >
+              <RulesCard
+                event={reconnectParentEvent}
+                ariaLabel={reconnectParentLabel}
+                glow
+                border
+                animate={false}
+                pulse
+                iconNode={<Link2 size={10} aria-hidden="true" />}
+                title={reconnectParentLabel}
+                disabled={reconnectDisabled}
+                onClick={onReconnect && elementParentEdge
+                  ? () => onReconnect(elementParentEdge)
+                  : undefined}
+              />
+            </span>
+          )}
+          {connectedParentId != null && (
+            <span
+              className={[
+                styles.chip,
+                styles.reconnectParent,
+                styles.connectedParent,
+              ].join(' ')}
+              aria-label={`Parent connected (id: ${connectedParentId})`}
+              title={`Parent connected (id: ${connectedParentId})`}
+              data-relationship-state="CONNECTED"
+            >
+              <Link2 size={10} aria-hidden="true" />
+              Parent connected (id: {connectedParentId})
+            </span>
+          )}
           {chips.map(({ key, state, code, edge }) => {
             const descriptor = CHIP_DESCRIPTORS[state];
             const detail = humanizeCode(code);
@@ -295,13 +378,9 @@ const InstructionRelationshipDetails: React.FC<
               : descriptor.label;
             const reconnectKind = edge?.source.entity === 'INSTRUCTION'
               && edge.source.id === instruction.id
-              && state === 'RECONNECT_PARENT'
-                ? 'PARENT'
-                : edge?.source.entity === 'INSTRUCTION'
-                    && edge.source.id === instruction.id
-                    && state === 'RECONNECT_VARIABLE'
-                  ? 'VARIABLE'
-                  : null;
+              && state === 'RECONNECT_VARIABLE'
+                ? 'VARIABLE'
+                : null;
             if (edge && reconnectKind && onReconnect) {
               return (
                 <button
@@ -310,9 +389,7 @@ const InstructionRelationshipDetails: React.FC<
                   className={[
                     styles.chip,
                     styles.reconnectButton,
-                    reconnectKind === 'VARIABLE'
-                      ? styles.reconnectVariable
-                      : styles.reconnectParent,
+                    styles.reconnectVariable,
                   ].join(' ')}
                   aria-label={accessibleLabel}
                   title={accessibleLabel}
@@ -324,9 +401,7 @@ const InstructionRelationshipDetails: React.FC<
                     onReconnect(edge);
                   }}
                 >
-                  {reconnectKind === 'VARIABLE'
-                    ? <Variable size={10} aria-hidden="true" />
-                    : <Link2 size={10} aria-hidden="true" />}
+                  <Variable size={10} aria-hidden="true" />
                   {descriptor.label}
                 </button>
               );
