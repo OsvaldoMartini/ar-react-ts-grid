@@ -104,17 +104,42 @@ describe('Bot Job single-row free-move planning', () => {
     ]);
   });
 
-  it.each([
-    { parentBlockId: null as number | null, caseLabel: 'missing' },
-    { parentBlockId: 99 as number | null, caseLabel: 'mismatched' },
-  ])(
-    'requires an explicit repair when parentBlockId is $caseLabel',
-    ({ parentBlockId }) => {
-      const rows = [
-        row(14, 10, 1, 1, 'C'),
-        row(15, 10, 1, 2, 'GET', { parentId: 14, parentBlockId }),
-        row(16, 10, 1, 3),
-      ];
+  it('preserves a valid parentId when its legacy parentBlockId projection is missing', () => {
+    const rows = [
+      row(14, 10, 1, 1, 'C'),
+      row(15, 10, 1, 2, 'GET', { parentId: 14, parentBlockId: null }),
+      row(16, 10, 1, 3),
+    ];
+
+    const plan = planBotJobInstructionFreeMove(
+      rows,
+      15,
+      10,
+      2,
+      [block(10, 1)],
+    );
+
+    expect(plan.relationshipImpacts[0]).toMatchObject({
+      instructionId: 15,
+      state: 'PRESERVED',
+      reasonCode: null,
+      keepPatch: {
+        operation: 'KEEP',
+        expectedParentId: 14,
+        expectedParentBlockId: null,
+        newParentId: 14,
+        newParentBlockId: null,
+      },
+    });
+  });
+
+  it('requires an explicit repair when parentBlockId is mismatched', () => {
+    const parentBlockId = 99;
+    const rows = [
+      row(14, 10, 1, 1, 'C'),
+      row(15, 10, 1, 2, 'GET', { parentId: 14, parentBlockId }),
+      row(16, 10, 1, 3),
+    ];
 
       const plan = planBotJobInstructionFreeMove(
         rows,
@@ -149,8 +174,7 @@ describe('Bot Job single-row free-move planning', () => {
           }),
         }),
       ]);
-    },
-  );
+  });
 
   it('moves only LOOP across Blocks, preserves variable data, and offers destination anchors', () => {
     const rows = [

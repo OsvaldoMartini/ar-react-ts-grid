@@ -210,7 +210,7 @@ const parentReason = (
       ? 'LOOP_ANCHOR_WRONG_BLOCK'
       : 'ELEMENT_TARGET_WRONG_BLOCK';
   }
-  if (row.parentBlockId == null || row.parentBlockId !== parent.blockId) {
+  if (row.parentBlockId != null && row.parentBlockId !== parent.blockId) {
     return relationKind === 'LOOP_ANCHOR'
       ? 'LOOP_ANCHOR_BLOCK_PROJECTION'
       : 'ELEMENT_TARGET_BLOCK_PROJECTION';

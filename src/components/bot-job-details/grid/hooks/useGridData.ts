@@ -89,6 +89,13 @@ export type DeleteBlocksPlan = {
 const isPositiveSafeInteger = (value: unknown): value is number =>
   typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
 
+const CONDITIONAL_FREE_MOVE_ACTIONS = new Set([
+  'IF',
+  'ELSEIF',
+  'ELSE',
+  'ENDIF',
+]);
+
 type SuccessfulInstructionDeletePlan = Extract<
   InstructionDeletePlan,
   { ok: true }
@@ -617,27 +624,15 @@ export function useGridData(deps: UseGridDataDeps) {
 
     if (plan.group.length > 1) {
       const draggedInstruction = instructionsData.find(row => row.id === instructionId);
-      const relationshipRoot = instructionsData.find(row =>
-        row.id === 1500
-        && row.blockId === draggedInstruction?.blockId
-        && row.blockOrderNumber === 2);
-      const directRootFamily = relationshipRoot
-        ? instructionsData.filter(row =>
-            row.blockId === relationshipRoot.blockId
-            && (row.id === relationshipRoot.id || row.parentId === relationshipRoot.id))
-        : [];
-      const isFocusedDetachCandidate =
+      const draggedAction = draggedInstruction
+        ? canonicalInstructionAction(draggedInstruction.actions)
+        : '';
+      const isSingleDetachCandidate =
         workspaceKind === 'BOT_JOB'
         && botJobGraphMutationCapability !== null
-        && draggedInstruction?.blockOrderNumber === 2
-        && relationshipRoot != null
-        && directRootFamily.length > 1
-        && (
-          draggedInstruction.id === relationshipRoot.id
-          || draggedInstruction.parentId === relationshipRoot.id
-        )
-        && plan.group.some(row => row.id === relationshipRoot.id);
-      const freeMovePlan = isFocusedDetachCandidate
+        && draggedInstruction != null
+        && !CONDITIONAL_FREE_MOVE_ACTIONS.has(draggedAction);
+      const freeMovePlan = isSingleDetachCandidate
         ? planBotJobInstructionFreeMove(
             instructionsData,
             instructionId,
@@ -646,10 +641,15 @@ export function useGridData(deps: UseGridDataDeps) {
             workspaceBlocks,
           )
         : null;
+      const hasUnresolvedStructuralDiagnostic =
+        freeMovePlan?.deferredDiagnostics.some(
+          diagnostic => diagnostic.kind !== 'VARIABLE_ORDER',
+        ) ?? false;
       const canMoveOnlyOne =
         freeMovePlan?.ok === true
         && freeMovePlan.changed
-        && freeMovePlan.relationshipImpacts.length > 0;
+        && freeMovePlan.relationshipImpacts.length > 0
+        && !hasUnresolvedStructuralDiagnostic;
       const visibleRows = plan.group.slice(0, 8);
       const summary = visibleRows
         .map(row => `#${row.instructionOrderNumber} ${row.name || row.actions}`)
@@ -684,12 +684,14 @@ export function useGridData(deps: UseGridDataDeps) {
               onAction: () => {
                 handleClose();
                 const choices: InstructionFreeMoveChoice[] =
-                  freeMovePlan.relationshipImpacts.map(impact => ({
-                    instructionId: impact.instructionId,
-                    relationKind: impact.relationKind,
-                    action: 'DISCONNECT',
-                  }));
-                // This focused authoring path preserves variableId exactly as-is.
+                  freeMovePlan.relationshipImpacts
+                    .filter(impact => impact.state === 'CHOICE_REQUIRED')
+                    .map(impact => ({
+                      instructionId: impact.instructionId,
+                      relationKind: impact.relationKind,
+                      action: 'DISCONNECT',
+                    }));
+                // This authoring path preserves variableId exactly as-is.
                 // An invalid producer order is presented by the existing VOID badge
                 // and never converted into an implicit variable mutation.
                 const persistablePlan = {
