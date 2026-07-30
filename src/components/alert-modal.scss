@@ -9,12 +9,17 @@
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
   z-index: 1000;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
   width: min(450px, calc(100vw - 32px));
+  min-height: min(500px, calc(100vh - 32px));
+  min-height: min(500px, calc(100dvh - 32px));
   max-height: calc(100vh - 32px);
   max-height: calc(100dvh - 32px);
   overflow: hidden;
 
   .alert-content {
+    flex: 1 1 auto;
     display: grid;  // Use grid layout for better control over spacing
     grid-template-columns: 1fr;  // Single column layout
     grid-template-rows: auto auto minmax(0, 1fr) auto;
