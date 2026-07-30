@@ -475,13 +475,6 @@ export const planInstructionMove = (
   const shapeError = validateLayoutShape(projected, rows.length, validBlockIds);
   if (shapeError) return failure(shapeError, group);
 
-  const originalErrors = new Set(
-    collectSemanticErrors(rows, variableLinks, validBlockIds).map(error => error.key),
-  );
-  const newError = collectSemanticErrors(projected, variableLinks, validBlockIds)
-    .find(error => !originalErrors.has(error.key));
-  if (newError) return failure(newError.message, group);
-
   const originalById = new Map(rows.map(row => [row.id, row]));
   const changed = projected.some(row => {
     const original = originalById.get(row.id);

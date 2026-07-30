@@ -620,7 +620,7 @@ export function useGridData(deps: UseGridDataDeps) {
       setErrorFlag(true);
       return;
     }
-    if (!plan.changed) return;
+    if (!plan.changed && plan.group.length <= 1) return;
 
     if (plan.group.length > 1) {
       const draggedInstruction = instructionsData.find(row => row.id === instructionId);
@@ -650,6 +650,7 @@ export function useGridData(deps: UseGridDataDeps) {
         && freeMovePlan.changed
         && freeMovePlan.relationshipImpacts.length > 0
         && !hasUnresolvedStructuralDiagnostic;
+      if (!plan.changed && !canMoveOnlyOne) return;
       const visibleRows = plan.group.slice(0, 8);
       const summary = visibleRows
         .map(row => `#${row.instructionOrderNumber} ${row.name || row.actions}`)
@@ -672,7 +673,7 @@ export function useGridData(deps: UseGridDataDeps) {
       setErrorFlag(false);
       setAlertOnConfirm(() => () => {
         handleClose();
-        commitDragPlan(plan);
+        if (plan.changed) commitDragPlan(plan);
       });
       setAlertAlternateAction(
         canMoveOnlyOne && freeMovePlan
