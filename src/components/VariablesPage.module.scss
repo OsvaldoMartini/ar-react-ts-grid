@@ -294,6 +294,19 @@
   padding: 10px;
 }
 
+.middleWorkspace {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 0 2px 2px 0;
+  scrollbar-color: #a7b8ca #edf2f7;
+  scrollbar-width: thin;
+}
+
 .treePanel,
 .flowPanel {
   min-width: 0;
@@ -481,7 +494,59 @@
 }
 
 .flowPanel {
-  overflow: auto;
+  flex: 0 0 auto;
+  overflow: hidden;
+}
+
+.flowPanelHeading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #ccdae8;
+  background: #ffffff;
+}
+
+.flowPanelHeading h3 {
+  margin: 2px 0 3px;
+  color: #173b5f;
+  font-size: 0.78rem;
+}
+
+.flowPanelHeading p {
+  margin: 0;
+  color: #5a6c7d;
+  font-size: 0.62rem;
+  line-height: 1.35;
+}
+
+.flowPanelEyebrow {
+  color: #0b5394;
+  font-size: 0.54rem;
+  font-weight: 900;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.flowPanelState {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 7px;
+  border: 1px solid #83b795;
+  border-radius: 999px;
+  background: #e9f7ee;
+  color: #236d3d;
+  font-size: 0.56rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.flowPanelBody {
+  min-width: 0;
+  overflow-x: auto;
   padding: 12px;
   scrollbar-color: #a7b8ca #edf2f7;
   scrollbar-width: thin;
@@ -1224,6 +1289,14 @@
 
   .flowPanel {
     min-height: 420px;
+  }
+
+  .flowPanelHeading {
+    display: block;
+  }
+
+  .flowPanelState {
+    margin-top: 7px;
   }
 
   .literalFlow {

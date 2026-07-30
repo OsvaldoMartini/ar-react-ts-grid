@@ -1463,8 +1463,46 @@ const VariablesPage: React.FC<Props> = ({
                   openReconnect(instructionId, 'VARIABLE_BINDING')}
               />
 
-              <section className={styles.flowPanel} aria-label="Selected variable relationship flow">
-                <div className={styles.flowFilters}>
+              <section
+                className={styles.middleWorkspace}
+                aria-label="Variables Block transfer and relationship workspace"
+              >
+                <VariablesBlockTransferBoard
+                  blocks={snapshot.blocks}
+                  layoutRows={snapshot.mutationCapability?.layoutRows ?? []}
+                  disabled={mutationDisabled}
+                  unavailableReason={pendingCopyRequestId
+                    ? 'Copying...'
+                    : pendingMutationRequestId
+                      ? 'Saving...'
+                      : pendingBlockTransfer
+                        ? 'Review transfer'
+                        : snapshot.mutationCapability?.reactAuthoredProfile == null
+                          ? 'Read-only'
+                          : undefined}
+                  onTransferIntent={handleBlockTransferIntent}
+                />
+
+                <section
+                  className={styles.flowPanel}
+                  aria-label="Selected variable relationship flow"
+                >
+                  <header className={styles.flowPanelHeading}>
+                    <div>
+                      <span className={styles.flowPanelEyebrow}>Relationship flow</span>
+                      <h3>Inspect variable relationships</h3>
+                      <p>
+                        Trace Web Elements, producers, runtime variables, readers,
+                        and diagnostics.
+                      </p>
+                    </div>
+                    <span className={styles.flowPanelState}>
+                      {selectedVariable ? 'Flow ready' : 'Select a variable'}
+                    </span>
+                  </header>
+
+                  <div className={styles.flowPanelBody}>
+                    <div className={styles.flowFilters}>
                   <SearchBox
                     label="Relationship flow"
                     placeholder="Select a variable..."
@@ -1714,21 +1752,8 @@ const VariablesPage: React.FC<Props> = ({
                   </div>
                 )}
 
-                <VariablesBlockTransferBoard
-                  blocks={snapshot.blocks}
-                  layoutRows={snapshot.mutationCapability?.layoutRows ?? []}
-                  disabled={mutationDisabled}
-                  unavailableReason={pendingCopyRequestId
-                    ? 'Copying...'
-                    : pendingMutationRequestId
-                      ? 'Saving...'
-                      : pendingBlockTransfer
-                        ? 'Review transfer'
-                        : snapshot.mutationCapability?.reactAuthoredProfile == null
-                          ? 'Read-only'
-                          : undefined}
-                  onTransferIntent={handleBlockTransferIntent}
-                />
+                  </div>
+                </section>
               </section>
 
               <RuntimeMemoryPanel
