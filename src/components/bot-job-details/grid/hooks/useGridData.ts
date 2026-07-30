@@ -76,6 +76,9 @@ export type DeleteBlocksPlan = {
   deleteBlockIds: number[];
 };
 
+const isPositiveSafeInteger = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
+
 type SuccessfulInstructionDeletePlan = Extract<
   InstructionDeletePlan,
   { ok: true }
@@ -2104,11 +2107,9 @@ export function useGridData(deps: UseGridDataDeps) {
   const showDeletePlanningFailure = (reason: string) => {
     setAlertImage(warningRedImage);
     setAlertClass('construction-image');
-    setAlertMessageHeader('Delete Instruction Refused');
+    setAlertMessageHeader('Delete Instruction');
     setAlertMessageBody(reason);
-    setAlertMessageFooter(
-      'The last valid rows remain visible. Refresh this workspace before deleting.',
-    );
+    setAlertMessageFooter('No instruction was deleted.');
     setErrorFlag(true);
     setAlertOnConfirm(undefined);
   };
@@ -2116,11 +2117,9 @@ export function useGridData(deps: UseGridDataDeps) {
   const showBlockDeletePlanningFailure = (reason: string) => {
     setAlertImage(warningRedImage);
     setAlertClass('construction-image');
-    setAlertMessageHeader('Delete Blocks Refused');
+    setAlertMessageHeader('Delete Blocks');
     setAlertMessageBody(reason);
-    setAlertMessageFooter(
-      'The current blocks remain unchanged. Refresh this workspace before retrying.',
-    );
+    setAlertMessageFooter('No block was deleted.');
     setErrorFlag(true);
     setAlertOnConfirm(undefined);
   };
@@ -2143,6 +2142,24 @@ export function useGridData(deps: UseGridDataDeps) {
       deleteBlockIds.length === currentBlockIds.length
       && deleteBlockIds.every(blockId => currentBlockIdSet.has(blockId));
     const expectedRetainedBlockId = deletingAllBlocks ? currentBlockIds[0] : undefined;
+    const renderedOwnerInstruction = instructionsData.find(
+      instruction =>
+        currentBlockIdSet.has(instruction.blockId)
+        && isPositiveSafeInteger(instruction.botJobId)
+        && isPositiveSafeInteger(instruction.homeBankingId),
+    );
+    const renderedBotJobId = renderedOwnerInstruction?.botJobId;
+    const renderedHomeBankingId = renderedOwnerInstruction?.homeBankingId;
+    const ownerBotJobId = isPositiveSafeInteger(renderedBotJobId)
+      ? renderedBotJobId
+      : isPositiveSafeInteger(botJobId)
+        ? botJobId
+        : botJobIdInitial;
+    const ownerHomeBankingId = isPositiveSafeInteger(renderedHomeBankingId)
+      ? renderedHomeBankingId
+      : isPositiveSafeInteger(homeBankingId)
+        ? homeBankingId
+        : homeBankingIdInitial;
 
     if (deleteBlockIds.length === 0) {
       showBlockDeletePlanningFailure(
@@ -2152,15 +2169,12 @@ export function useGridData(deps: UseGridDataDeps) {
     }
     if (
       !webSocket
-      || !connected
-      || botJobId == null
-      || !Number.isSafeInteger(botJobId)
-      || botJobId <= 0
-      || !Number.isSafeInteger(homeBankingId)
-      || homeBankingId <= 0
+      || webSocket.readyState !== WebSocket.OPEN
+      || !isPositiveSafeInteger(ownerBotJobId)
+      || !isPositiveSafeInteger(ownerHomeBankingId)
     ) {
       showBlockDeletePlanningFailure(
-        'The current workspace owner or WebSocket connection is unavailable.',
+        'The Bot Job connection is not open.',
       );
       return false;
     }
@@ -2173,9 +2187,9 @@ export function useGridData(deps: UseGridDataDeps) {
       ...(expectedRetainedBlockId === undefined
         ? {}
         : { retainBlockId: expectedRetainedBlockId }),
-      botJobId,
+      botJobId: ownerBotJobId,
       botJobName,
-      homeBankingId,
+      homeBankingId: ownerHomeBankingId,
       sessionId: targetSessionId,
     };
 
@@ -2220,22 +2234,14 @@ export function useGridData(deps: UseGridDataDeps) {
     );
     // The modal and request are deliberately projected from the same immutable plan.
     setAlertMessageBody(plan.instructions.length > 5
-      ? `All ${plan.instructions.length} explicitly linked instructions/steps `
-        + 'selected by the exact React plan will be deleted.'
+      ? `All ${plan.instructions.length} selected instructions/steps will be deleted.`
       : plan.instructions.map(row => ({
           parentNameWithId:
             `#${row.instructionOrderNumber} (${row.id}) ${row.name}`,
           connectionLabel: 'Action',
           actions: row.actions,
         })));
-    const survivorNotice = plan.survivingParentReferences.length > 0
-      ? ` ${plan.survivingParentReferences.length} preserved body row parent reference(s) `
-        + 'will be detached by this exact React plan.'
-      : '';
-    setAlertMessageFooter(
-      `Delete ${plan.deleteInstructionIds.length} explicitly linked row(s). `
-      + `Positional IF/LOOP body rows are preserved.${survivorNotice}`,
-    );
+    setAlertMessageFooter('This action cannot be undone.');
     setErrorFlag(true);
     setAlertOnConfirm(
       () => () => executeRemoveInstruction(plan),
@@ -2295,7 +2301,24 @@ export function useGridData(deps: UseGridDataDeps) {
       homeBankingId: ownerHomeBankingId,
     } = latestPlan.selectedInstruction;
 
-    if (webSocket && connected) {
+    if (webSocket && webSocket.readyState === WebSocket.OPEN) {
+      const resolvedBotJobId = isPositiveSafeInteger(ownerBotJobId)
+        ? ownerBotJobId
+        : isPositiveSafeInteger(botJobId)
+          ? botJobId
+          : botJobIdInitial;
+      const resolvedHomeBankingId = isPositiveSafeInteger(ownerHomeBankingId)
+        ? ownerHomeBankingId
+        : isPositiveSafeInteger(homeBankingId)
+          ? homeBankingId
+          : homeBankingIdInitial;
+      if (
+        !isPositiveSafeInteger(resolvedBotJobId)
+        || !isPositiveSafeInteger(resolvedHomeBankingId)
+      ) {
+        showDeletePlanningFailure('The Bot Job owner is unavailable.');
+        return;
+      }
       const message = {
         type: 'DELETE_INSTRUCTION',
         deleteContractVersion: 2,
@@ -2307,18 +2330,25 @@ export function useGridData(deps: UseGridDataDeps) {
         instructionId: id,
         actions,
         parentId,
-        botJobId: ownerBotJobId,
+        botJobId: resolvedBotJobId,
         botJobName: ownerBotJobName,
         blockId: ownerBlockId,
-        homeBankingId: ownerHomeBankingId,
+        homeBankingId: resolvedHomeBankingId,
         sessionId: targetSessionId,
       };
 
-      webSocket.send(JSON.stringify(message));
-      console.log(
-        `Sent exact delete plan [${confirmedPlan.deleteInstructionIds.join(', ')}] `
-        + `for selected instruction ID ${id} in block ID ${ownerBlockId}`,
-      );
+      try {
+        webSocket.send(JSON.stringify(message));
+        console.log(
+          `Sent exact delete plan [${confirmedPlan.deleteInstructionIds.join(', ')}] `
+          + `for selected instruction ID ${id} in block ID ${ownerBlockId}`,
+        );
+      } catch (sendError) {
+        console.error('Could not send instruction delete request:', sendError);
+        showDeletePlanningFailure('The instruction delete request could not be sent.');
+      }
+    } else {
+      showDeletePlanningFailure('The Bot Job connection is not open.');
     }
 
     setOpenDropdown(null);
