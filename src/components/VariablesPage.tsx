@@ -30,6 +30,7 @@ import {
   type VariablesCrossBlockMovePlan,
 } from './variables/domain/variablesCrossBlockMove';
 import { variablesCrossBlockDropZones } from './variables/domain/variablesCrossBlockTargets';
+import { variableValuePresentation } from './variables/domain/variableValuePresentation';
 import { useVariablesGraphMutation } from './variables/useVariablesGraphMutation';
 import {
   normalizeVariablesWorkspaceSnapshot,
@@ -274,6 +275,7 @@ const VariableTreeRow: React.FC<{
   onSelect,
   onToggle,
 }) => {
+  const valuePresentation = variableValuePresentation(variable);
   const ownerBlockLabel = variable.owner
     ? `#${variable.owner.blockOrder ?? variable.owner.blockId ?? '?'} ${variable.owner.blockName || 'Block'}`
     : 'No owner block';
@@ -331,7 +333,7 @@ const VariableTreeRow: React.FC<{
           </span>
           <span>
             <b>GET</b>
-            {variable.producers.length}
+            {valuePresentation.activeProducers.length}
           </span>
           <span>
             <b>Reads</b>
@@ -638,6 +640,9 @@ const VariablesPage: React.FC<Props> = ({
   const selectedVariable = filteredVariables.find(
     variable => variable.id === selectedVariableId,
   ) ?? null;
+  const selectedValuePresentation = selectedVariable
+    ? variableValuePresentation(selectedVariable)
+    : null;
   const mutationAuthorityKey = mutationAuthorityKeyFor(snapshot);
   const crossBlockDropZones = useMemo(
     () => snapshot ? variablesCrossBlockDropZones(snapshot) : [],
@@ -1056,9 +1061,25 @@ const VariablesPage: React.FC<Props> = ({
                     </div>
 
                     <div className={styles.valuePanel}>
-                      <div>
+                      <div className={styles.valueStateGroup}>
                         <span>Configured value</span>
-                        <code>{selectedVariable.configuredValue || 'Empty'}</code>
+                        <code
+                          className={selectedValuePresentation?.configuredState === 'EMPTY'
+                            ? styles.valueStateEmpty
+                            : undefined}
+                          title={selectedValuePresentation?.configuredDetail}
+                        >
+                          {selectedValuePresentation?.configuredLabel}
+                        </code>
+                        <span>Runtime topology</span>
+                        <strong
+                          className={selectedValuePresentation?.runtimeState === 'VOID'
+                            ? styles.valueStateVoid
+                            : styles.valueStateReady}
+                          title={selectedValuePresentation?.runtimeDetail}
+                        >
+                          {selectedValuePresentation?.runtimeLabel}
+                        </strong>
                       </div>
                       <p>
                         Runtime initial/current values are not streamed yet. This view shows the
@@ -1111,8 +1132,8 @@ const VariablesPage: React.FC<Props> = ({
                           GET producer
                         </div>
                         <div className={styles.flowStack}>
-                          {selectedVariable.producers.length > 0
-                            ? selectedVariable.producers.map(producer => (
+                          {(selectedValuePresentation?.activeProducers.length ?? 0) > 0
+                            ? selectedValuePresentation?.activeProducers.map(producer => (
                               <InstructionCard
                                 key={`producer:${producer.id ?? producer.name}`}
                                 instruction={producer}
@@ -1121,11 +1142,13 @@ const VariablesPage: React.FC<Props> = ({
                             ))
                             : (
                               <EmptyRelation
-                                title={selectedVariable.unused ? 'No producer yet' : 'GET missing'}
-                                detail={selectedVariable.unused
-                                  ? 'This declared variable is not connected to a command.'
-                                  : 'Readers exist, but no GET command produces a value.'}
-                                danger={!selectedVariable.unused}
+                                title={(selectedValuePresentation?.activeConsumers.length ?? 0) > 0
+                                  ? 'GET missing'
+                                  : 'No active GET producer'}
+                                detail={(selectedValuePresentation?.activeConsumers.length ?? 0) > 0
+                                  ? 'Active readers exist, but no active GET command produces a value.'
+                                  : 'No active GET producer is present in the declared graph.'}
+                                danger={(selectedValuePresentation?.activeConsumers.length ?? 0) > 0}
                               />
                             )}
                         </div>
@@ -1134,10 +1157,20 @@ const VariablesPage: React.FC<Props> = ({
                       <div className={styles.flowArrow} aria-hidden="true">→</div>
 
                       <div className={styles.variableNode}>
-                        <span>3 · Variable memory</span>
+                        <span>3 · Variable definition</span>
                         <strong>{selectedVariable.name}</strong>
                         <small>{selectedVariable.type || 'Variable'} · ID {selectedVariable.id}</small>
-                        <code>{selectedVariable.configuredValue || 'Empty'}</code>
+                        <div className={styles.nodeValueStates}>
+                          <code>{selectedValuePresentation?.configuredLabel}</code>
+                          <b className={selectedValuePresentation?.runtimeState === 'VOID'
+                            ? styles.nodeValueVoid
+                            : styles.nodeValueReady}
+                          >
+                            {selectedValuePresentation?.runtimeState === 'VOID'
+                              ? 'VOID'
+                              : 'SOURCE DEFINED'}
+                          </b>
+                        </div>
                       </div>
 
                       <div className={styles.flowArrow} aria-hidden="true">→</div>

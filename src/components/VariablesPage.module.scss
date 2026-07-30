@@ -577,6 +577,36 @@
   gap: 8px;
 }
 
+.valueStateGroup {
+  flex-wrap: wrap;
+}
+
+.valueStateGroup strong {
+  padding: 4px 7px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.valueStateEmpty {
+  color: #7a4d00 !important;
+  background: #fff2cc !important;
+}
+
+.valueStateVoid {
+  border-color: #e2a443 !important;
+  background: #fff4df;
+  color: #944f00;
+}
+
+.valueStateReady {
+  border-color: #76b994 !important;
+  background: #e8f7ef;
+  color: #17683e;
+}
+
 .valuePanel span {
   color: #526a82;
   font-size: 0.63rem;
@@ -855,6 +885,40 @@
   font-size: 0.61rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.nodeValueStates {
+  display: grid;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.nodeValueStates code,
+.nodeValueStates b {
+  display: block;
+  overflow: hidden;
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-size: 0.61rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nodeValueStates code {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+}
+
+.nodeValueVoid {
+  border: 1px solid rgba(255, 184, 77, 0.72);
+  background: rgba(255, 136, 0, 0.2);
+  color: #ffd18a;
+}
+
+.nodeValueReady {
+  border: 1px solid rgba(139, 224, 174, 0.7);
+  background: rgba(22, 139, 77, 0.25);
+  color: #c8f5d9;
 }
 
 .relationGroup {

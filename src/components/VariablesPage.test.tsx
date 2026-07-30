@@ -162,6 +162,9 @@ test('loads the active Bot Job variable graph and keeps it visible after a refre
   expect(screen.getByRole('heading', { name: 'Variables' })).toBeInTheDocument();
   expect(screen.getAllByText('Read Amount').length).toBeGreaterThan(0);
   expect(screen.getAllByText('Compare Amount').length).toBeGreaterThan(0);
+  expect(screen.getAllByText('EMPTY').length).toBeGreaterThan(0);
+  expect(screen.getByText('GET source defined')).toBeInTheDocument();
+  expect(screen.getByText(/Runtime initial\/current values are not streamed yet/)).toBeInTheDocument();
   expect(mockSend).toHaveBeenCalledWith(expect.stringContaining('variablesWorkspace.bootstrap'));
 
   mockMessages = [
@@ -245,6 +248,49 @@ test('shows a retry action when the first correlated bootstrap fails', async () 
   fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
   expect(mockSend).toHaveBeenCalledTimes(2);
   expect(JSON.parse(mockSend.mock.calls[1][0]).type).toBe('variablesWorkspace.bootstrap');
+  view.unmount();
+});
+
+test('renders a nullable GET as VOID while preserving configured-empty semantics', async () => {
+  const view = render(
+    <VariablesPage
+      socketPort={59772}
+      sessionId={'variablesManager'}
+    />,
+  );
+  await waitFor(() => expect(mockSend).toHaveBeenCalledTimes(1));
+  const bootstrapRequest = JSON.parse(JSON.parse(mockSend.mock.calls[0][0]).body);
+  const nullableProducerSnapshot = {
+    ...snapshot,
+    requestId: bootstrapRequest.requestId,
+    variables: snapshot.variables.map(variable => ({
+      ...variable,
+      configuredValue: '',
+      commands: variable.commands.map(command => command.action === 'GET'
+        ? { ...command, active: null }
+        : command),
+    })),
+  };
+  mockMessages = [response(
+    'variablesWorkspace.bootstrapResponse',
+    nullableProducerSnapshot,
+  )];
+  view.rerender(
+    <VariablesPage
+      socketPort={59772}
+      sessionId={'variablesManager'}
+    />,
+  );
+
+  await waitFor(() => expect(
+    screen.getByText('VOID - no active GET producer'),
+  ).toBeInTheDocument());
+  expect(screen.getAllByText('Not configured').length).toBeGreaterThan(0);
+  expect(screen.getByText('GET missing')).toBeInTheDocument();
+  expect(screen.getByText(
+    'Active readers exist, but no active GET command produces a value.',
+  )).toBeInTheDocument();
+  expect(screen.queryByText(/Variable-dependent work is bypassed/)).not.toBeInTheDocument();
   view.unmount();
 });
 
