@@ -12,6 +12,12 @@ import {
 export const VARIABLES_MANAGER_SESSION_ID = 'variablesManager';
 export const VARIABLES_INDIVIDUAL_ROW_PROFILE =
   'VARIABLES_INDIVIDUAL_ROW_V1' as const;
+export const VARIABLES_INDIVIDUAL_CROSS_BLOCK_PROFILE =
+  'VARIABLES_INDIVIDUAL_CROSS_BLOCK_V1' as const;
+
+export type VariablesMutationProfile =
+  | typeof VARIABLES_INDIVIDUAL_ROW_PROFILE
+  | typeof VARIABLES_INDIVIDUAL_CROSS_BLOCK_PROFILE;
 
 export type VariableCommandRole =
   | 'PRODUCER'
@@ -117,6 +123,9 @@ export interface VariablesMutationCapability {
   enabled: true;
   contractVersion: 3;
   profile: typeof VARIABLES_INDIVIDUAL_ROW_PROFILE;
+  crossBlockProfile:
+    | typeof VARIABLES_INDIVIDUAL_CROSS_BLOCK_PROFILE
+    | null;
   graphVersion: number;
   graphRevision: string;
   ownerAssertion: InstructionGraphOwnerAssertion & {
@@ -274,6 +283,10 @@ const normalizeMutationCapability = (
   }
   const normalizedLayout = layoutRows as InstructionGraphLayoutRow[];
   const normalizedFacts = instructionFacts as VariablesInstructionFact[];
+  const crossBlockProfile = candidate.crossBlockProfile
+    === VARIABLES_INDIVIDUAL_CROSS_BLOCK_PROFILE
+    ? VARIABLES_INDIVIDUAL_CROSS_BLOCK_PROFILE
+    : null;
   const layoutIds = new Set(normalizedLayout.map(row => row.instructionId));
   const factIds = new Set(normalizedFacts.map(row => row.instructionId));
   const factsById = new Map(
@@ -332,6 +345,7 @@ const normalizeMutationCapability = (
     enabled: true,
     contractVersion: 3,
     profile: VARIABLES_INDIVIDUAL_ROW_PROFILE,
+    crossBlockProfile,
     graphVersion,
     graphRevision: capabilityRevision,
     ownerAssertion: {

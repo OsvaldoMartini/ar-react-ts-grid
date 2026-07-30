@@ -223,6 +223,29 @@ test('normalizes a coordinate-consistent Variables mutation capability', () => {
     graphRevision: 'a'.repeat(64),
   });
   expect(snapshot?.mutationCapability?.layoutRows).toHaveLength(5);
+  expect(snapshot?.mutationCapability?.crossBlockProfile).toBeNull();
+});
+
+test('accepts only the exact separately advertised Variables cross-block profile', () => {
+  const enabled = normalizeVariablesWorkspaceSnapshot({
+    ...canonicalSnapshot,
+    mutationCapability: {
+      ...canonicalMutationCapability,
+      crossBlockProfile: 'VARIABLES_INDIVIDUAL_CROSS_BLOCK_V1',
+    },
+  });
+  const unknown = normalizeVariablesWorkspaceSnapshot({
+    ...canonicalSnapshot,
+    mutationCapability: {
+      ...canonicalMutationCapability,
+      crossBlockProfile: 'VARIABLES_CROSS_BLOCK_FUTURE',
+    },
+  });
+
+  expect(enabled?.mutationCapability?.crossBlockProfile).toBe(
+    'VARIABLES_INDIVIDUAL_CROSS_BLOCK_V1',
+  );
+  expect(unknown?.mutationCapability?.crossBlockProfile).toBeNull();
 });
 
 test('keeps content and mutation revisions independent', () => {

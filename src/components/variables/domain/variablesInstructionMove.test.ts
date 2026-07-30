@@ -142,6 +142,7 @@ const snapshot = (
     enabled: true,
     contractVersion: 3,
     profile: 'VARIABLES_INDIVIDUAL_ROW_V1',
+    crossBlockProfile: null,
     graphVersion: 7,
     graphRevision: REVISION,
     ownerAssertion: {

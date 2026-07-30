@@ -16,6 +16,7 @@ import {
 import {
   VARIABLES_MANAGER_SESSION_ID,
   type VariableWorkspaceSnapshot,
+  type VariablesMutationProfile,
 } from '../variablesWorkspace.contract';
 
 export const VARIABLES_GRAPH_MUTATION_TYPE =
@@ -43,6 +44,7 @@ type Pending = {
   bindingEpoch: string;
   webSocket: WebSocket;
   callbacks: Callbacks;
+  mutationProfile: VariablesMutationProfile;
   timeoutId: ReturnType<typeof setTimeout>;
 };
 
@@ -124,6 +126,10 @@ export const useVariablesGraphMutation = ({
       || snapshot.workspaceEpoch !== pending.request.workspaceEpoch
       || capability.graphVersion !== pending.request.baseGraphVersion
       || capability.graphRevision !== pending.request.graphRevision
+      || (
+        pending.mutationProfile !== capability.profile
+        && pending.mutationProfile !== capability.crossBlockProfile
+      )
       || !sameInstructionGraphOwner(
         capability.ownerAssertion,
         pending.request.ownerAssertion,
@@ -150,11 +156,18 @@ export const useVariablesGraphMutation = ({
   const submit = useCallback((
     draft: BotJobGraphMutationDraft,
     callbacks: Callbacks,
+    mutationProfile?: VariablesMutationProfile,
   ): string | null => {
     const capability = snapshot?.mutationCapability;
+    const selectedProfile = mutationProfile ?? capability?.profile;
     if (
       !snapshot
       || !capability
+      || !selectedProfile
+      || (
+        selectedProfile !== capability.profile
+        && selectedProfile !== capability.crossBlockProfile
+      )
       || !connected
       || !webSocket
       || webSocket.readyState !== WebSocket.OPEN
@@ -186,6 +199,7 @@ export const useVariablesGraphMutation = ({
       bindingEpoch: snapshot.bindingEpoch,
       webSocket,
       callbacks,
+      mutationProfile: selectedProfile,
       timeoutId,
     };
     setPendingRequestId(requestId);
@@ -196,6 +210,7 @@ export const useVariablesGraphMutation = ({
         body: JSON.stringify({
           ...request,
           bindingEpoch: snapshot.bindingEpoch,
+          mutationProfile: selectedProfile,
         }),
       }));
       return requestId;

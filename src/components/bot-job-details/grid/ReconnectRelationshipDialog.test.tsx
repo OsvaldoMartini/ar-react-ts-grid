@@ -79,13 +79,19 @@ const renderDialog = (
 };
 
 test('shows LOOP parentId wording and an exact current-to-selected preview', () => {
-  renderDialog();
+  renderDialog({
+    changeSummary: 'After instruction #2 in Block #3 Payment (block ID 30)',
+  });
 
   expect(screen.getByRole('heading', { name: 'Reconnect LOOP anchor' }))
     .toBeInTheDocument();
   expect(screen.getByText(/Connecting writes parentId/i)).toBeInTheDocument();
   expect(screen.getByText('Current parentId')).toBeInTheDocument();
   expect(screen.getByText('(916) Old anchor')).toBeInTheDocument();
+  expect(screen.getByText('Planned destination')).toBeInTheDocument();
+  expect(screen.getByText(
+    'After instruction #2 in Block #3 Payment (block ID 30)',
+  )).toBeInTheDocument();
   expect(screen.getByText('Select a compatible Web Element'))
     .toBeInTheDocument();
 

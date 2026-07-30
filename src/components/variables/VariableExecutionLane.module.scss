@@ -132,7 +132,8 @@
 
 .command,
 .role,
-.inactive {
+.inactive,
+.reconnectBadge {
   border-radius: 999px;
   font-size: 10px;
   font-weight: 800;
@@ -148,6 +149,15 @@
 .role {
   background: #f0e8fb;
   color: #68369e;
+}
+
+.reconnectBadge {
+  align-items: center;
+  background: #fff1dc;
+  border: 1px solid #e5a044;
+  color: #9c5200;
+  display: inline-flex;
+  gap: 4px;
 }
 
 .inactive {
@@ -225,6 +235,71 @@
   text-align: center;
 }
 
+.blockZones {
+  border-top: 1px solid #ccdae8;
+  margin-top: 10px;
+  padding-top: 10px;
+}
+
+.blockZonesHeading {
+  align-items: baseline;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  margin-bottom: 7px;
+}
+
+.blockZonesHeading strong {
+  color: #173b5f;
+  font-size: 11px;
+}
+
+.blockZonesHeading span {
+  color: #6b7d8e;
+  font-size: 10px;
+}
+
+.blockZoneGrid {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.blockZone {
+  background: #fff;
+  border: 1px dashed #8aa8c4;
+  border-radius: 7px;
+  color: #315a7d;
+  min-width: 0;
+  padding: 7px 9px;
+  transition: background 100ms ease, border-color 100ms ease, box-shadow 100ms ease;
+}
+
+.blockZone span,
+.blockZone small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.blockZone span {
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.blockZone small {
+  color: #74899d;
+  font-size: 9px;
+  margin-top: 2px;
+}
+
+.blockZoneActive {
+  background: #fff7eb;
+  border-color: #ff8800;
+  box-shadow: 0 0 8px rgba(255, 136, 0, 0.5);
+}
+
 @media (max-width: 780px) {
   .heading {
     display: block;
@@ -240,6 +315,7 @@
   }
 
   .role,
+  .reconnectBadge,
   .inactive {
     display: none;
   }

@@ -31,6 +31,8 @@ export interface ReconnectRelationshipDialogProps {
   edge: InstructionRelationshipEdge;
   sourceLabel: string;
   currentTargetLabel: string | null;
+  /** Optional exact layout/location preview supplied by the authoring page. */
+  changeSummary?: string;
   /**
    * The caller owns compatibility filtering. In particular, BLOCK_TARGET
    * candidates must already exclude the instruction's containing block.
@@ -135,6 +137,7 @@ const ReconnectRelationshipDialog: React.FC<
   edge,
   sourceLabel,
   currentTargetLabel,
+  changeSummary,
   compatibleTargets,
   pending,
   onDisconnect,
@@ -281,6 +284,12 @@ const ReconnectRelationshipDialog: React.FC<
             <span>Source instruction</span>
             <strong>{sourceLabel}</strong>
           </div>
+          {changeSummary && (
+            <div className={styles.sourceLine}>
+              <span>Planned destination</span>
+              <strong>{changeSummary}</strong>
+            </div>
+          )}
           <section
             className={styles.preview}
             aria-label="Relationship change preview"

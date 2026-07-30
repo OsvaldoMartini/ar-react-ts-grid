@@ -43,6 +43,7 @@ const snapshot = (
     enabled: true,
     contractVersion: 3,
     profile: 'VARIABLES_INDIVIDUAL_ROW_V1',
+    crossBlockProfile: null,
     graphVersion: 7,
     graphRevision: REVISION,
     ownerAssertion: {
@@ -271,4 +272,41 @@ test('cancels one pending request when a newer authoritative graph arrives', () 
   expect(refused).toHaveBeenCalledWith(null, 'WORKSPACE_CHANGED');
   expect(committed).not.toHaveBeenCalled();
   expect(result.current.pendingRequestId).toBeNull();
+});
+
+test('sends the separately advertised cross-block profile outside the v3 request core', () => {
+  const send = jest.fn();
+  const webSocket = {
+    readyState: WebSocket.OPEN,
+    send,
+  } as unknown as WebSocket;
+  const crossSnapshot = snapshot();
+  if (!crossSnapshot.mutationCapability) {
+    throw new Error('Missing mutation capability');
+  }
+  crossSnapshot.mutationCapability = {
+    ...crossSnapshot.mutationCapability,
+    crossBlockProfile: 'VARIABLES_INDIVIDUAL_CROSS_BLOCK_V1',
+  };
+  const { result } = renderHook(() => useVariablesGraphMutation({
+    webSocket,
+    connected: true,
+    snapshot: crossSnapshot,
+  }));
+
+  act(() => {
+    expect(result.current.submit(
+      draft,
+      { committed: jest.fn(), refused: jest.fn() },
+      'VARIABLES_INDIVIDUAL_CROSS_BLOCK_V1',
+    )).not.toBeNull();
+  });
+
+  const envelope = JSON.parse(send.mock.calls[0][0]);
+  const body = JSON.parse(envelope.body);
+  expect(body.mutationProfile).toBe(
+    'VARIABLES_INDIVIDUAL_CROSS_BLOCK_V1',
+  );
+  expect(body.contractVersion).toBe(3);
+  expect(body.draggedInstructionId).toBe(101);
 });

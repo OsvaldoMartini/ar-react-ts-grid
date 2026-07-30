@@ -1,11 +1,18 @@
 import React, { useMemo } from 'react';
-import { GripVertical, LockKeyhole, MoveVertical } from 'lucide-react';
+import {
+  GripVertical,
+  LockKeyhole,
+  MoveVertical,
+  Unlink,
+} from 'lucide-react';
+import { instructionRelationshipPolicy } from '../bot-job-details/grid/domain/instructionRelationshipPolicy';
 import type {
   VariableCommandLink,
   VariableGraphEntry,
   VariableInstructionNode,
 } from '../variablesWorkspace.contract';
 import type { VariablesDropPlacement } from './domain/variablesInstructionMove';
+import type { VariablesBlockDropZone } from './domain/variablesCrossBlockTargets';
 import { useVariablesInstructionDrag } from './useVariablesInstructionDrag';
 import styles from './VariableExecutionLane.module.scss';
 
@@ -20,6 +27,7 @@ type Props = {
   authorityKey: string;
   disabled: boolean;
   unavailableReason?: string;
+  crossBlockDropZones?: readonly VariablesBlockDropZone[];
   onMove: (
     sourceInstructionId: number,
     targetInstructionId: number,
@@ -44,6 +52,7 @@ const VariableExecutionLane: React.FC<Props> = ({
   authorityKey,
   disabled,
   unavailableReason,
+  crossBlockDropZones = [],
   onMove,
 }) => {
   const rows = useMemo<LaneRow[]>(() => {
@@ -99,8 +108,8 @@ const VariableExecutionLane: React.FC<Props> = ({
           <span className={styles.eyebrow}>Individual instruction movement</span>
           <h3>Execution order</h3>
           <p>
-            Drag one command to an exact gap in the same block. Parent and
-            variable links stay unchanged.
+            Drag one command to an exact gap. Cross-block consumers require an
+            explicit disconnect or reconnect choice before they are saved.
           </p>
         </div>
         <span className={disabled ? styles.lockedBadge : styles.readyBadge}>
@@ -126,6 +135,15 @@ const VariableExecutionLane: React.FC<Props> = ({
           const draggable = !disabled
             && !row.owner
             && row.command?.role !== 'INVALID_LINK';
+          const reconnectParent = Boolean(
+            row.command
+            && instructionRelationshipPolicy(row.instruction.command)
+              .requirements.includes('ELEMENT_TARGET')
+            && (
+              row.command.role === 'INVALID_LINK'
+              || row.instruction.parentId === null
+            ),
+          );
           const dragging = drag.sourceInstructionId === instructionId;
           return (
             <React.Fragment key={`lane:${instructionId}`}>
@@ -163,7 +181,21 @@ const VariableExecutionLane: React.FC<Props> = ({
                   <small>ID {instructionId}</small>
                 </span>
                 {row.command?.role && (
-                  <span className={styles.role}>{row.command.role.replaceAll('_', ' ')}</span>
+                  reconnectParent
+                    ? (
+                      <span
+                        className={styles.reconnectBadge}
+                        title="The parent relationship is disconnected."
+                      >
+                        <Unlink size={11} aria-hidden="true" />
+                        Reconnect parent
+                      </span>
+                    )
+                    : (
+                      <span className={styles.role}>
+                        {row.command.role.replaceAll('_', ' ')}
+                      </span>
+                    )
                 )}
                 {(row.instruction.active === false
                   || row.instruction.blockActive === false) && (
@@ -176,6 +208,63 @@ const VariableExecutionLane: React.FC<Props> = ({
           );
         })}
       </div>
+      {crossBlockDropZones.length > 0 && (
+        <section
+          className={styles.blockZones}
+          aria-label="Cross-block instruction destinations"
+        >
+          <div className={styles.blockZonesHeading}>
+            <strong>Move to another flat block</strong>
+            <span>Drop an eligible consumer; its parent is never inferred.</span>
+          </div>
+          <div className={styles.blockZoneGrid}>
+            {crossBlockDropZones
+              .filter(zone => {
+                if (drag.sourceInstructionId === null) return true;
+                const source = rows.find(
+                  row => row.instruction.id === drag.sourceInstructionId,
+                );
+                return source?.instruction.blockId !== zone.blockId;
+              })
+              .map((zone) => {
+                const active = drag.isDropActive(
+                  zone.anchorInstructionId,
+                  zone.placement,
+                );
+                return (
+                  <div
+                    key={`block-zone:${zone.blockId}`}
+                    className={[
+                      styles.blockZone,
+                      active ? styles.blockZoneActive : '',
+                    ].filter(Boolean).join(' ')}
+                    data-testid={`variables-block-drop-zone-${zone.blockId}`}
+                    onDragOver={event => drag.onDragOver(
+                      event,
+                      zone.anchorInstructionId,
+                      zone.placement,
+                    )}
+                    onDragLeave={event => drag.onDragLeave(
+                      event,
+                      zone.anchorInstructionId,
+                      zone.placement,
+                    )}
+                    onDrop={event => drag.onDrop(
+                      event,
+                      zone.anchorInstructionId,
+                      zone.placement,
+                    )}
+                  >
+                    <span>{active ? 'Release to review' : zone.label}</span>
+                    <small>
+                      After instruction ID {zone.anchorInstructionId}
+                    </small>
+                  </div>
+                );
+              })}
+          </div>
+        </section>
+      )}
     </section>
   );
 };

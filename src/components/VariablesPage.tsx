@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import DetachedPageShell from './DetachedPageShell';
 import PagesOpenButton from './PagesOpenButton';
+import ReconnectRelationshipDialog from './bot-job-details/grid/ReconnectRelationshipDialog';
+import type { RelationshipTarget } from './bot-job-details/grid/domain/instructionRelationshipGraph';
 import SearchBox, { type SearchBoxOption } from './SearchBox';
 import { useWebSocket } from './useWebSocket';
 import VariableExecutionLane from './variables/VariableExecutionLane';
@@ -22,6 +24,12 @@ import {
   planVariablesInstructionMove,
   type VariablesDropPlacement,
 } from './variables/domain/variablesInstructionMove';
+import {
+  buildVariablesCrossBlockMutationDraft,
+  planVariablesCrossBlockMove,
+  type VariablesCrossBlockMovePlan,
+} from './variables/domain/variablesCrossBlockMove';
+import { variablesCrossBlockDropZones } from './variables/domain/variablesCrossBlockTargets';
 import { useVariablesGraphMutation } from './variables/useVariablesGraphMutation';
 import {
   normalizeVariablesWorkspaceSnapshot,
@@ -34,6 +42,7 @@ import {
   type VariableInstructionNode,
   type VariablesWorkspaceEnvelope,
   type VariableWorkspaceSnapshot,
+  VARIABLES_INDIVIDUAL_CROSS_BLOCK_PROFILE,
 } from './variablesWorkspace.contract';
 import styles from './VariablesPage.module.scss';
 
@@ -58,6 +67,28 @@ type PendingRequest = {
 };
 
 const REQUEST_TIMEOUT_MS = 10_000;
+
+const mutationAuthorityKeyFor = (
+  snapshot: VariableWorkspaceSnapshot | null,
+): string => snapshot
+  ? [
+      snapshot.bindingEpoch,
+      snapshot.workspaceEpoch,
+      snapshot.graphRevision,
+      snapshot.botJob.homeBankingId,
+      snapshot.botJob.id,
+      snapshot.mutationCapability?.graphVersion ?? 'read-only',
+      snapshot.mutationCapability?.graphRevision ?? 'read-only',
+      snapshot.mutationCapability?.ownerAssertion.homeBankingId ?? 'read-only',
+      snapshot.mutationCapability?.ownerAssertion.botJobId ?? 'read-only',
+      snapshot.mutationCapability?.crossBlockProfile ?? 'same-block-only',
+    ].join(':')
+  : 'unbound';
+
+type PendingCrossBlockMove = {
+  authorityKey: string;
+  plan: VariablesCrossBlockMovePlan;
+};
 
 const acceptedOperations = new Set([
   'variablesWorkspace.bootstrapResponse',
@@ -340,6 +371,8 @@ const VariablesPage: React.FC<Props> = ({
   const [findText, setFindText] = useState('');
   const [healthFilter, setHealthFilter] = useState<HealthFilter>('ALL');
   const [blockFilter, setBlockFilter] = useState<'ALL' | number>('ALL');
+  const [pendingCrossBlockMove, setPendingCrossBlockMove] =
+    useState<PendingCrossBlockMove | null>(null);
   const [status, setStatus] = useState<Status>({
     level: 'warn',
     text: 'Waiting for Variables workspace',
@@ -605,6 +638,70 @@ const VariablesPage: React.FC<Props> = ({
   const selectedVariable = filteredVariables.find(
     variable => variable.id === selectedVariableId,
   ) ?? null;
+  const mutationAuthorityKey = mutationAuthorityKeyFor(snapshot);
+  const crossBlockDropZones = useMemo(
+    () => snapshot ? variablesCrossBlockDropZones(snapshot) : [],
+    [snapshot],
+  );
+
+  useEffect(() => {
+    if (
+      pendingCrossBlockMove
+      && pendingCrossBlockMove.authorityKey !== mutationAuthorityKey
+    ) {
+      setPendingCrossBlockMove(null);
+      setStatus({
+        level: 'error',
+        text: 'The Variables graph changed. Repeat the cross-block drop.',
+      });
+    }
+  }, [mutationAuthorityKey, pendingCrossBlockMove]);
+
+  const submitInstructionMove = useCallback((
+    draft: Parameters<typeof submitGraphMutation>[0],
+    mutationProfile: Parameters<typeof submitGraphMutation>[2],
+    sourceInstructionId: number,
+    disconnected: boolean,
+  ) => {
+    setStatus({
+      level: 'warn',
+      text: disconnected
+        ? `Moving instruction #${sourceInstructionId} and disconnecting its parent...`
+        : `Saving instruction #${sourceInstructionId} as one independent move...`,
+    });
+    const requestId = submitGraphMutation(draft, {
+      committed: response => {
+        setPendingCrossBlockMove(null);
+        setStatus({
+          level: disconnected ? 'warn' : 'ok',
+          text: disconnected
+            ? `${response.message || 'Instruction moved.'} Reconnect parent is required.`
+            : response.message || 'Instruction order saved.',
+        });
+        sendWorkspaceRequest('variablesWorkspace.refresh');
+      },
+      refused: (response, reason) => {
+        setPendingCrossBlockMove(null);
+        const fallback = reason === 'TIMEOUT'
+          ? 'The instruction move timed out. The current Variables graph remains visible.'
+          : reason === 'WORKSPACE_CHANGED'
+            ? 'The Variables target changed. The move was cancelled.'
+            : 'The instruction move was not saved.';
+        setStatus({
+          level: 'error',
+          text: response?.message || fallback,
+        });
+      },
+    }, mutationProfile);
+    if (!requestId) {
+      setPendingCrossBlockMove(null);
+      setStatus({
+        level: 'error',
+        text: 'Variables is busy or disconnected. The instruction was not moved.',
+      });
+    }
+  }, [sendWorkspaceRequest, submitGraphMutation]);
+
   const handleInstructionMove = useCallback((
     sourceInstructionId: number,
     targetInstructionId: number,
@@ -618,6 +715,37 @@ const VariablesPage: React.FC<Props> = ({
       });
       return;
     }
+    const sourceFact = current.mutationCapability?.instructionFacts.find(
+      fact => fact.instructionId === sourceInstructionId,
+    );
+    const targetFact = current.mutationCapability?.instructionFacts.find(
+      fact => fact.instructionId === targetInstructionId,
+    );
+    if (
+      sourceFact
+      && targetFact
+      && sourceFact.blockId !== targetFact.blockId
+    ) {
+      const crossBlockPlan = planVariablesCrossBlockMove(
+        current,
+        sourceInstructionId,
+        targetInstructionId,
+        placement,
+      );
+      if (!crossBlockPlan.ok) {
+        setStatus({ level: 'error', text: crossBlockPlan.message });
+        return;
+      }
+      setPendingCrossBlockMove({
+        authorityKey: mutationAuthorityKeyFor(current),
+        plan: crossBlockPlan.plan,
+      });
+      setStatus({
+        level: 'warn',
+        text: 'Choose Disconnect or select a compatible parent before this cross-block move is saved.',
+      });
+      return;
+    }
     const planned = planVariablesInstructionMove(
       current,
       sourceInstructionId,
@@ -628,37 +756,69 @@ const VariablesPage: React.FC<Props> = ({
       setStatus({ level: 'error', text: planned.message });
       return;
     }
-    setStatus({
-      level: 'warn',
-      text: `Saving instruction #${sourceInstructionId} as one independent move...`,
-    });
-    const requestId = submitGraphMutation(planned.plan.draft, {
-      committed: response => {
-        setStatus({
-          level: 'ok',
-          text: response.message || 'Instruction order saved.',
-        });
-        sendWorkspaceRequest('variablesWorkspace.refresh');
-      },
-      refused: (response, reason) => {
-        const fallback = reason === 'TIMEOUT'
-          ? 'The instruction move timed out. The current Variables graph remains visible.'
-          : reason === 'WORKSPACE_CHANGED'
-            ? 'The Variables target changed. The move was cancelled.'
-            : 'The instruction move was not saved.';
-        setStatus({
-          level: 'error',
-          text: response?.message || fallback,
-        });
-      },
-    });
-    if (!requestId) {
+    submitInstructionMove(
+      planned.plan.draft,
+      current.mutationCapability?.profile,
+      sourceInstructionId,
+      false,
+    );
+  }, [submitInstructionMove]);
+
+  const submitCrossBlockChoice = useCallback((
+    target: RelationshipTarget | null,
+  ) => {
+    const current = snapshotRef.current;
+    const pending = pendingCrossBlockMove;
+    if (
+      !current
+      || !pending
+      || !connected
+      || pendingRequest !== null
+      || pendingMutationRequestId !== null
+      || pending.authorityKey !== mutationAuthorityKeyFor(current)
+      || current.mutationCapability?.crossBlockProfile
+        !== VARIABLES_INDIVIDUAL_CROSS_BLOCK_PROFILE
+    ) {
+      setPendingCrossBlockMove(null);
       setStatus({
         level: 'error',
-        text: 'Variables is busy or disconnected. The instruction was not moved.',
+        text: 'The Variables graph changed. Repeat the cross-block drop.',
       });
+      return;
     }
-  }, [sendWorkspaceRequest, submitGraphMutation]);
+    if (target !== null && target.entity !== 'INSTRUCTION') {
+      setStatus({
+        level: 'error',
+        text: 'Only a compatible Web Element can be selected as parent.',
+      });
+      return;
+    }
+    const draft = buildVariablesCrossBlockMutationDraft(
+      pending.plan,
+      target === null
+        ? { mode: 'DISCONNECT' }
+        : { mode: 'RECONNECT', targetInstructionId: target.id },
+    );
+    if (!draft) {
+      setStatus({
+        level: 'error',
+        text: 'The selected parent is no longer compatible. Choose another target.',
+      });
+      return;
+    }
+    submitInstructionMove(
+      draft,
+      VARIABLES_INDIVIDUAL_CROSS_BLOCK_PROFILE,
+      pending.plan.sourceFact.instructionId,
+      target === null,
+    );
+  }, [
+    connected,
+    pendingCrossBlockMove,
+    pendingMutationRequestId,
+    pendingRequest,
+    submitInstructionMove,
+  ]);
   const statusClass = status.level === 'error'
     ? styles.statusError
     : status.level === 'warn'
@@ -670,16 +830,8 @@ const VariablesPage: React.FC<Props> = ({
   const mutationDisabled = !connected
     || pendingRequest !== null
     || pendingMutationRequestId !== null
+    || pendingCrossBlockMove !== null
     || !snapshot?.mutationCapability;
-  const mutationAuthorityKey = snapshot
-    ? [
-        snapshot.bindingEpoch,
-        snapshot.workspaceEpoch,
-        snapshot.graphRevision,
-        snapshot.mutationCapability?.graphVersion ?? 'read-only',
-        snapshot.mutationCapability?.graphRevision ?? 'read-only',
-      ].join(':')
-    : 'unbound';
 
   const toggleExpanded = (id: number) => {
     setExpandedIds(current => {
@@ -920,9 +1072,12 @@ const VariablesPage: React.FC<Props> = ({
                       disabled={mutationDisabled}
                       unavailableReason={pendingMutationRequestId
                         ? 'Saving...'
+                        : pendingCrossBlockMove
+                          ? 'Review relationship'
                         : !snapshot.mutationCapability
                           ? 'Read-only'
                           : undefined}
+                      crossBlockDropZones={crossBlockDropZones}
                       onMove={handleInstructionMove}
                     />
 
@@ -1082,6 +1237,30 @@ const VariablesPage: React.FC<Props> = ({
             </section>
           )}
         </section>
+        {pendingCrossBlockMove && (
+          <ReconnectRelationshipDialog
+            edge={pendingCrossBlockMove.plan.edge}
+            sourceLabel={pendingCrossBlockMove.plan.sourceLabel}
+            currentTargetLabel={pendingCrossBlockMove.plan.currentTargetLabel}
+            changeSummary={pendingCrossBlockMove.plan.destinationLabel}
+            compatibleTargets={pendingCrossBlockMove.plan.compatibleTargets}
+            pending={
+              !connected
+              || pendingRequest !== null
+              || pendingMutationRequestId !== null
+            }
+            onDisconnect={() => submitCrossBlockChoice(null)}
+            onConnect={submitCrossBlockChoice}
+            onCancel={() => {
+              if (pendingMutationRequestId !== null) return;
+              setPendingCrossBlockMove(null);
+              setStatus({
+                level: 'warn',
+                text: 'Cross-block move cancelled. No changes were saved.',
+              });
+            }}
+          />
+        )}
       </main>
     </DetachedPageShell>
   );
