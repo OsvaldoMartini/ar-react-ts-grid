@@ -497,9 +497,6 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, on
           <button type="button" className={styles.commandBtn} onClick={() => send('mainDashboard.openConfig')}>
             Config
           </button>
-          <button type="button" className={styles.commandBtn} onClick={() => send('mainDashboard.openTemplate')}>
-            TEMP
-          </button>
           <button type="button" className={styles.commandBtn} onClick={() => send('mainDashboard.openInfo')}>
             Info
           </button>
