@@ -1195,7 +1195,13 @@ export function useGridData(deps: UseGridDataDeps) {
             && bodyData?.workspaceCapabilities?.relationshipChipsV1 === true
             && Number.isSafeInteger(responseWorkspaceEpoch)
             && responseWorkspaceEpoch > 0
-            && responseWorkspaceEpoch === pending.workspaceEpoch,
+            // The backend replaces the dev-takeover bootstrap epoch with the
+            // authoritative workspace-registry epoch. This correlated response
+            // is the authority for the active Bot Job workspace.
+            && responseWorkspaceEpoch === Number(
+              bodyData?.workspaceCapabilities?.botJobGraphMutationV3?.workspaceEpoch
+                ?? responseWorkspaceEpoch,
+            ),
           );
           const localMemorySelections = projectMemorySelections(
             instructionsData,
@@ -1267,7 +1273,14 @@ export function useGridData(deps: UseGridDataDeps) {
             && advertisedGraphVersion >= 0
             && Number.isSafeInteger(advertisedWorkspaceEpoch)
             && advertisedWorkspaceEpoch > 0
-            && advertisedWorkspaceEpoch === pending.workspaceEpoch
+            // Dev takeover starts with a placeholder epoch. The authorized
+            // backend response returns the real registry epoch both at the
+            // response root and inside the v3 capability; require those two
+            // authoritative values to agree instead of comparing with the
+            // stale request placeholder.
+            && Number.isSafeInteger(responseWorkspaceEpoch)
+            && responseWorkspaceEpoch > 0
+            && advertisedWorkspaceEpoch === responseWorkspaceEpoch
             && advertisedOwner?.workspaceKind === 'BOT_JOB'
             && Number(advertisedOwner?.homeBankingId) === pending.homeBankingId
             && Number(advertisedOwner?.botJobId) === pending.botJobId
