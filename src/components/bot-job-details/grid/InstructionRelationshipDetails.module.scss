@@ -23,6 +23,41 @@
   user-select: none;
 }
 
+.reconnectButton {
+  appearance: none;
+  gap: 3px;
+  cursor: pointer;
+  font-family: inherit;
+  pointer-events: auto;
+}
+
+.reconnectButton:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.reconnectParent {
+  background: #fff2df;
+  border-color: #de9f43;
+  color: #975000;
+}
+
+.reconnectParent:hover:not(:disabled) {
+  background: #ffe6c1;
+  border-color: #c8780b;
+}
+
+.reconnectVariable {
+  background: #f3ebfd;
+  border-color: #9c7ac4;
+  color: #67369b;
+}
+
+.reconnectVariable:hover:not(:disabled) {
+  background: #e9dafa;
+  border-color: #7546a8;
+}
+
 .neutral {
   background: #eef2f5;
   color: #52606d;

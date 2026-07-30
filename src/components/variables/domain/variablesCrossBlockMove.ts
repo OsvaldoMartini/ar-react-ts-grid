@@ -13,7 +13,9 @@ import {
   instructionRelationshipPolicy,
   writesRuntimeVariableValue,
 } from '../../bot-job-details/grid/domain/instructionRelationshipPolicy';
-import type { ReconnectRelationshipOption } from '../../bot-job-details/grid/ReconnectRelationshipDialog';
+import type {
+  ReconnectWebElementOption as ReconnectRelationshipOption,
+} from '../../ReconnectWebElement';
 import type {
   VariableCommandLink,
   VariableGraphEntry,

@@ -834,6 +834,7 @@ export function useInstructionGrid({
     editingBlockId, blockName, setBlockName,
     activeDraggedInstructionId,
     moveGraphRevision,
+    variableLinks,
     relationshipEdgesByInstruction,
     blockDeleteCapabilities,
     gridActionNotice,

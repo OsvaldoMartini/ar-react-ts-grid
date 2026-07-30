@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link2, Variable } from 'lucide-react';
 import type { BlockLoopInstructionLoadDTO } from '../../instructionsMockData';
 import gridStyles from '../../Griditem.module.scss';
 import type {
@@ -24,6 +25,9 @@ export interface InstructionRelationshipDetailsProps {
    * mutations; accepting these states keeps the renderer complete and reusable.
    */
   relationshipStates?: readonly RelationshipMutationState[];
+  /** Opens the shared reconnect presentation for one exact graph edge. */
+  onReconnect?: (edge: InstructionRelationshipEdge) => void;
+  reconnectDisabled?: boolean;
 }
 
 type ChipDescriptor = {
@@ -250,6 +254,8 @@ const InstructionRelationshipDetails: React.FC<
   workspaceBlocks = [],
   relationshipEdges = [],
   relationshipStates = [],
+  onReconnect,
+  reconnectDisabled = false,
 }) => {
   const chips = [
     ...relationshipEdges
@@ -258,12 +264,14 @@ const InstructionRelationshipDetails: React.FC<
         key: edge.id,
         state: edge.state as Exclude<RelationshipState, 'CONNECTED'>,
         code: edge.code,
+        edge,
       })),
     ...relationshipStates
       .map((state, index) => ({
         key: `state:${state}:${index}`,
         state,
         code: null,
+        edge: null,
       })),
   ];
 
@@ -279,12 +287,50 @@ const InstructionRelationshipDetails: React.FC<
             instruction={instruction}
             allInstructions={allInstructions}
           />
-          {chips.map(({ key, state, code }) => {
+          {chips.map(({ key, state, code, edge }) => {
             const descriptor = CHIP_DESCRIPTORS[state];
             const detail = humanizeCode(code);
             const accessibleLabel = detail
               ? `${descriptor.label}: ${detail}`
               : descriptor.label;
+            const reconnectKind = edge?.source.entity === 'INSTRUCTION'
+              && edge.source.id === instruction.id
+              && state === 'RECONNECT_PARENT'
+                ? 'PARENT'
+                : edge?.source.entity === 'INSTRUCTION'
+                    && edge.source.id === instruction.id
+                    && state === 'RECONNECT_VARIABLE'
+                  ? 'VARIABLE'
+                  : null;
+            if (edge && reconnectKind && onReconnect) {
+              return (
+                <button
+                  type="button"
+                  key={key}
+                  className={[
+                    styles.chip,
+                    styles.reconnectButton,
+                    reconnectKind === 'VARIABLE'
+                      ? styles.reconnectVariable
+                      : styles.reconnectParent,
+                  ].join(' ')}
+                  aria-label={accessibleLabel}
+                  title={accessibleLabel}
+                  data-relationship-state={state}
+                  disabled={reconnectDisabled}
+                  onMouseDown={event => event.stopPropagation()}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onReconnect(edge);
+                  }}
+                >
+                  {reconnectKind === 'VARIABLE'
+                    ? <Variable size={10} aria-hidden="true" />
+                    : <Link2 size={10} aria-hidden="true" />}
+                  {descriptor.label}
+                </button>
+              );
+            }
             return (
               <span
                 key={key}

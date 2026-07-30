@@ -1,5 +1,11 @@
 import React from 'react';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import GridItem from './GridItem';
 import GridItemComp from './GridItemComp';
 import type {
@@ -95,6 +101,7 @@ const capabilityResponse = (
   sessionId: string,
   relationshipChipsV1: boolean,
   workspaceEpoch: number,
+  capabilityRows: BlockLoopInstructionLoadDTO[] = rows,
 ): string => {
   const request = latestCapabilityRequest();
   return JSON.stringify({
@@ -108,9 +115,14 @@ const capabilityResponse = (
       homeBankingId: request.body.homeBankingId,
       botJobId: request.body.botJobId,
       workspaceEpoch,
-      workspaceCapabilities: { relationshipChipsV1 },
-      graphRevision: computeInstructionGraphRevision(rows, []),
-      capabilities: rows.map(instruction => ({
+      workspaceCapabilities: {
+        relationshipChipsV1,
+        botJobGraphMutationV3: {
+          workspaceEpoch: request.body.workspaceEpoch,
+        },
+      },
+      graphRevision: computeInstructionGraphRevision(capabilityRows, []),
+      capabilities: capabilityRows.map(instruction => ({
         instructionId: instruction.id,
         canAddToMemory: true,
         canMove: true,
@@ -150,6 +162,55 @@ test('matching Bot Job capability and workspace epoch activates a nonblank relat
   expect(
     await screen.findByLabelText('Fix order: Loop anchor order'),
   ).toHaveAttribute('data-relationship-state', 'FIX_ORDER');
+});
+
+test('Bot Job reconnect parent button opens the shared design modal without mutating', async () => {
+  const webElement: BlockLoopInstructionLoadDTO = {
+    ...lateParent,
+    id: 1499,
+    instructionOrderNumber: 1,
+    name: 'User number',
+    actions: 'O',
+    tagName: 'input',
+  };
+  const missingParent: BlockLoopInstructionLoadDTO = {
+    ...loop,
+    id: 1500,
+    instructionOrderNumber: 2,
+    name: 'Get user number',
+    actions: 'GET',
+    operation: 'user_number:value',
+    parentId: null,
+    variableId: null,
+  };
+  const reconnectRows = [webElement, missingParent];
+  const reconnectProps = {
+    ...botJobProps,
+    data: reconnectRows,
+  };
+  const view = render(<GridItem {...reconnectProps} />);
+  await waitForCapabilityRequest();
+
+  mockMessages = [
+    capabilityResponse('botJobTasks', true, 9, reconnectRows),
+  ];
+  view.rerender(<GridItem {...reconnectProps} />);
+
+  fireEvent.click(await screen.findByRole('button', {
+    name: /Reconnect parent: Missing element target/i,
+  }));
+
+  expect(screen.getByRole('heading', { name: 'Reconnect Web Element' }))
+    .toBeInTheDocument();
+  expect(screen.getByText(/#1 User number · ID 1499/i))
+    .toBeInTheDocument();
+  expect(mockSend.mock.calls
+    .map(([payload]) => JSON.parse(payload).type))
+    .not.toContain('BOT_JOB_GRAPH_MUTATION');
+
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel reconnect' }));
+  expect(screen.queryByRole('heading', { name: 'Reconnect Web Element' }))
+    .not.toBeInTheDocument();
 });
 
 test.each([

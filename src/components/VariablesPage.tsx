@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import DetachedPageShell from './DetachedPageShell';
 import PagesOpenButton from './PagesOpenButton';
-import ReconnectRelationshipDialog from './bot-job-details/grid/ReconnectRelationshipDialog';
+import ReconnectWebElement from './ReconnectWebElement';
 import type {
   RelationshipTarget,
 } from './bot-job-details/grid/domain/instructionRelationshipGraph';
@@ -1446,7 +1446,7 @@ const VariablesPage: React.FC<Props> = ({
           )}
         </section>
         {snapshot && pendingReconnect && (
-          <ReconnectRelationshipDialog
+          <ReconnectWebElement
             edge={pendingReconnect.plan.edge}
             sourceLabel={reconnectSource
               ? `#${reconnectSource.instructionOrder ?? '?'} ${reconnectSource.name || reconnectSource.command} · ID ${reconnectSource.id}`

@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { BlockLoopInstructionLoadDTO } from '../../instructionsMockData';
 import InstructionRelationshipDetails from './InstructionRelationshipDetails';
 import type {
@@ -201,6 +201,44 @@ test('renders multiple supplied states as read-only chips', () => {
   expect(screen.getByLabelText('Saving')).toBeInTheDocument();
   expect(screen.getByLabelText('Refused')).toBeInTheDocument();
   expect(screen.queryByRole('button')).not.toBeInTheDocument();
+});
+
+test('opens the exact parent or variable reconnect edge from GridItem buttons', () => {
+  const instruction = row(2, 2, 'GET', {
+    operation: 'user_number:value',
+    parentId: null,
+    variableId: null,
+  });
+  const parentEdge = relationshipEdge(
+    'RECONNECT_PARENT',
+    'MISSING_ELEMENT_TARGET',
+    'ELEMENT_TARGET',
+  );
+  const variableEdge = relationshipEdge(
+    'RECONNECT_VARIABLE',
+    'MISSING_VARIABLE_BINDING',
+    'VARIABLE_BINDING',
+  );
+  const onReconnect = jest.fn();
+
+  render(
+    <InstructionRelationshipDetails
+      instruction={instruction}
+      allInstructions={[instruction]}
+      relationshipEdges={[parentEdge, variableEdge]}
+      onReconnect={onReconnect}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('button', {
+    name: /Reconnect parent: Missing element target/i,
+  }));
+  fireEvent.click(screen.getByRole('button', {
+    name: /Reconnect variable: Missing variable binding/i,
+  }));
+
+  expect(onReconnect).toHaveBeenNthCalledWith(1, parentEdge);
+  expect(onReconnect).toHaveBeenNthCalledWith(2, variableEdge);
 });
 
 test('keeps a stable third-column wrapper for an action without operation details', () => {

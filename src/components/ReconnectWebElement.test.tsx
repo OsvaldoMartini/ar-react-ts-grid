@@ -1,15 +1,15 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import ReconnectRelationshipDialog, {
-  type ReconnectRelationshipDialogProps,
-  type ReconnectRelationshipOption,
-} from './ReconnectRelationshipDialog';
+import ReconnectWebElement, {
+  type ReconnectWebElementProps,
+  type ReconnectWebElementOption,
+} from './ReconnectWebElement';
 import type {
   InstructionRelationshipEdge,
   InstructionRelationshipKind,
   RelationshipOwner,
   RelationshipTarget,
-} from './domain/instructionRelationshipGraph';
+} from './bot-job-details/grid/domain/instructionRelationshipGraph';
 
 const OWNER: RelationshipOwner = {
   workspaceKind: 'BOT_JOB',
@@ -46,7 +46,7 @@ const relationshipEdge = (
   ...overrides,
 });
 
-const loopOptions: ReconnectRelationshipOption[] = [
+const loopOptions: ReconnectWebElementOption[] = [
   {
     target: instructionTarget(917),
     label: '(917) Pagina iniziale',
@@ -61,9 +61,9 @@ const loopOptions: ReconnectRelationshipOption[] = [
 ];
 
 const renderDialog = (
-  overrides: Partial<ReconnectRelationshipDialogProps> = {},
+  overrides: Partial<ReconnectWebElementProps> = {},
 ) => {
-  const props: ReconnectRelationshipDialogProps = {
+  const props: ReconnectWebElementProps = {
     edge: relationshipEdge(),
     sourceLabel: '(918) LOOP',
     currentTargetLabel: '(916) Old anchor',
@@ -74,7 +74,7 @@ const renderDialog = (
     onCancel: jest.fn(),
     ...overrides,
   };
-  render(<ReconnectRelationshipDialog {...props} />);
+  render(<ReconnectWebElement {...props} />);
   return props;
 };
 
