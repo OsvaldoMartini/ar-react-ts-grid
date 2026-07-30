@@ -90,6 +90,7 @@ const BlockHeader: React.FC<BlockHeaderProps> = ({
 }) => (
   <div className={styles.blockHeader}>
     <BlockStatusToggle active={blockActive} onToggle={onToggleStatus} />
+    <input type="checkbox" aria-label={`Select block ${blockName}`} title="Select block" />
     <BlockCollapseToggle collapsed={collapsed} onToggle={onToggleCollapse} />
     <span className={styles.blockOrderNumber}>#{blockOrderNumber}</span>
     {isEditing ? (
