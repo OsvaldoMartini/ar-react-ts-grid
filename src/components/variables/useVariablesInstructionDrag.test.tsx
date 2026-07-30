@@ -31,6 +31,7 @@ test('keeps Variables drag state private and submits one exact drop intent', () 
 
   act(() => result.current.onDragStart(start, 101));
   expect(start.dataTransfer.setData).toHaveBeenCalledWith(DATA_TYPE, '101');
+  expect(start.dataTransfer.setData).toHaveBeenCalledWith('text/plain', '101');
   expect(result.current.sourceInstructionId).toBe(101);
 
   const over = dragEvent();
@@ -66,7 +67,7 @@ test('cancels an in-flight drag when the Variables authority changes', () => {
   expect(onDropInstruction).not.toHaveBeenCalled();
 });
 
-test('refuses missing or mismatched transfer data even with a live drag source', () => {
+test('uses its private source for missing transfer data and rejects mismatches', () => {
   const onDropInstruction = jest.fn();
   const { result } = renderHook(() => useVariablesInstructionDrag({
     authorityKey: 'binding-1:revision-1',
@@ -76,9 +77,9 @@ test('refuses missing or mismatched transfer data even with a live drag source',
 
   act(() => result.current.onDragStart(dragEvent(), 101));
   act(() => result.current.onDrop(dragEvent(), 102, 'AFTER'));
-  expect(onDropInstruction).not.toHaveBeenCalled();
+  expect(onDropInstruction).toHaveBeenCalledWith(101, 102, 'AFTER');
 
   act(() => result.current.onDragStart(dragEvent(), 101));
   act(() => result.current.onDrop(dragEvent('999'), 102, 'AFTER'));
-  expect(onDropInstruction).not.toHaveBeenCalled();
+  expect(onDropInstruction).toHaveBeenCalledTimes(1);
 });

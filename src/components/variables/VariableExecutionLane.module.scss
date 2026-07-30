@@ -100,6 +100,20 @@
   transition: border-color 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
 }
 
+.rowDropBefore {
+  border-top-color: #ff8800;
+  box-shadow:
+    0 -3px 0 #ff8800,
+    0 -5px 10px rgba(255, 136, 0, 0.42);
+}
+
+.rowDropAfter {
+  border-bottom-color: #ff8800;
+  box-shadow:
+    0 3px 0 #ff8800,
+    0 5px 10px rgba(255, 136, 0, 0.42);
+}
+
 .row:active {
   cursor: grabbing;
 }

@@ -1,5 +1,10 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import {
+  createEvent,
+  fireEvent,
+  render,
+  screen,
+} from '@testing-library/react';
 import type {
   VariableCommandLink,
   VariableGraphEntry,
@@ -71,6 +76,16 @@ const variable: VariableGraphEntry = {
   health: 'HEALTHY',
 };
 
+const dataTransfer = () => {
+  const data = new Map<string, string>();
+  return {
+    effectAllowed: 'none',
+    dropEffect: 'none',
+    setData: (type: string, value: string) => data.set(type, value),
+    getData: (type: string) => data.get(type) ?? '',
+  };
+};
+
 test('renders an exact AFTER drop gap at the end of every displayed block', () => {
   const { container } = render(
     <VariableExecutionLane
@@ -89,14 +104,64 @@ test('renders an exact AFTER drop gap at the end of every displayed block', () =
     .toHaveAttribute('draggable', 'true');
 });
 
+test('drops on the visible top or bottom half of a row with exact placement', () => {
+  const onMove = jest.fn();
+  render(
+    <VariableExecutionLane
+      variable={variable}
+      authorityKey={'binding-1:revision-1'}
+      disabled={false}
+      onMove={onMove}
+    />,
+  );
+  const source = screen.getByTestId('variables-lane-row-101');
+  const target = screen.getByTestId('variables-lane-row-201');
+  jest.spyOn(target, 'getBoundingClientRect').mockReturnValue({
+    top: 100,
+    bottom: 140,
+    height: 40,
+    left: 0,
+    right: 200,
+    width: 200,
+    x: 0,
+    y: 100,
+    toJSON: () => ({}),
+  });
+
+  const firstTransfer = dataTransfer();
+  fireEvent.dragStart(source, { dataTransfer: firstTransfer });
+  const beforeOver = createEvent.dragOver(target, {
+    dataTransfer: firstTransfer,
+  });
+  Object.defineProperty(beforeOver, 'clientY', { value: 108 });
+  fireEvent(target, beforeOver);
+  expect(target.className).toContain('rowDropBefore');
+  const beforeDrop = createEvent.drop(target, {
+    dataTransfer: firstTransfer,
+  });
+  Object.defineProperty(beforeDrop, 'clientY', { value: 108 });
+  fireEvent(target, beforeDrop);
+  expect(onMove).toHaveBeenLastCalledWith(101, 201, 'BEFORE');
+
+  const secondTransfer = dataTransfer();
+  fireEvent.dragStart(source, { dataTransfer: secondTransfer });
+  const afterOver = createEvent.dragOver(target, {
+    dataTransfer: secondTransfer,
+  });
+  Object.defineProperty(afterOver, 'clientY', { value: 132 });
+  fireEvent(target, afterOver);
+  expect(target.className).toContain('rowDropAfter');
+  const afterDrop = createEvent.drop(target, {
+    dataTransfer: secondTransfer,
+  });
+  Object.defineProperty(afterDrop, 'clientY', { value: 132 });
+  fireEvent(target, afterDrop);
+  expect(onMove).toHaveBeenLastCalledWith(101, 201, 'AFTER');
+  expect(onMove).toHaveBeenCalledTimes(2);
+});
+
 test('renders explicit cross-block zones and hides the active source block zone', () => {
-  const data = new Map<string, string>();
-  const dataTransfer = {
-    effectAllowed: 'none',
-    dropEffect: 'none',
-    setData: (type: string, value: string) => data.set(type, value),
-    getData: (type: string) => data.get(type) ?? '',
-  };
+  const transfer = dataTransfer();
   const { container } = render(
     <VariableExecutionLane
       variable={variable}
@@ -128,7 +193,7 @@ test('renders explicit cross-block zones and hides the active source block zone'
     container.querySelector(
       '[data-testid="variables-lane-row-101"]',
     ) as HTMLElement,
-    { dataTransfer },
+    { dataTransfer: transfer },
   );
 
   expect(screen.queryByTestId('variables-block-drop-zone-10'))

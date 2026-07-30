@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, type DragEvent } from 'react';
 import {
   GripVertical,
   LockKeyhole,
@@ -46,6 +46,15 @@ const rowOrder = (left: LaneRow, right: LaneRow): number =>
 const blockLabel = (instruction: VariableInstructionNode): string =>
   `#${instruction.blockOrder ?? instruction.blockId ?? '?'} `
   + (instruction.blockName || `Block ${instruction.blockId ?? '?'}`);
+
+const placementFromPointer = (
+  event: DragEvent<HTMLElement>,
+): VariablesDropPlacement => {
+  const bounds = event.currentTarget.getBoundingClientRect();
+  return event.clientY < bounds.top + (bounds.height / 2)
+    ? 'BEFORE'
+    : 'AFTER';
+};
 
 const VariableExecutionLane: React.FC<Props> = ({
   variable,
@@ -145,6 +154,8 @@ const VariableExecutionLane: React.FC<Props> = ({
             ),
           );
           const dragging = drag.sourceInstructionId === instructionId;
+          const rowDropBefore = drag.isDropActive(instructionId, 'BEFORE');
+          const rowDropAfter = drag.isDropActive(instructionId, 'AFTER');
           return (
             <React.Fragment key={`lane:${instructionId}`}>
               {startsBlock && (
@@ -158,11 +169,26 @@ const VariableExecutionLane: React.FC<Props> = ({
                   styles.row,
                   row.owner ? styles.ownerRow : '',
                   dragging ? styles.dragging : '',
+                  rowDropBefore ? styles.rowDropBefore : '',
+                  rowDropAfter ? styles.rowDropAfter : '',
                   !draggable && !row.owner ? styles.rowDisabled : '',
                 ].filter(Boolean).join(' ')}
                 draggable={draggable}
                 onDragStart={event => drag.onDragStart(event, instructionId)}
                 onDragEnd={drag.onDragEnd}
+                onDragOver={event =>
+                  drag.onDragOver(
+                    event,
+                    instructionId,
+                    placementFromPointer(event),
+                  )}
+                onDragLeave={event => drag.onDragLeave(event, instructionId)}
+                onDrop={event =>
+                  drag.onDrop(
+                    event,
+                    instructionId,
+                    placementFromPointer(event),
+                  )}
                 data-testid={`variables-lane-row-${instructionId}`}
               >
                 <span className={styles.grip} aria-hidden="true">

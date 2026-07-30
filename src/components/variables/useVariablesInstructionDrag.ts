@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useRef,
   useState,
   type DragEvent,
 } from 'react';
@@ -35,8 +36,10 @@ export const useVariablesInstructionDrag = ({
 }: Options) => {
   const [sourceInstructionId, setSourceInstructionId] = useState<number | null>(null);
   const [dropIntent, setDropIntent] = useState<DropIntent | null>(null);
+  const sourceInstructionIdRef = useRef<number | null>(null);
 
   const clear = useCallback(() => {
+    sourceInstructionIdRef.current = null;
     setSourceInstructionId(null);
     setDropIntent(null);
   }, []);
@@ -55,6 +58,8 @@ export const useVariablesInstructionDrag = ({
     }
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData(DATA_TYPE, String(instructionId));
+    event.dataTransfer.setData('text/plain', String(instructionId));
+    sourceInstructionIdRef.current = instructionId;
     setSourceInstructionId(instructionId);
     setDropIntent(null);
   }, [disabled]);
@@ -66,27 +71,28 @@ export const useVariablesInstructionDrag = ({
     targetInstructionId: number,
     placement: VariablesDropPlacement,
   ) => {
+    const source = sourceInstructionIdRef.current;
     if (
       disabled
-      || sourceInstructionId === null
-      || sourceInstructionId === targetInstructionId
+      || source === null
+      || source === targetInstructionId
     ) {
       return;
     }
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
     setDropIntent({ targetInstructionId, placement });
-  }, [disabled, sourceInstructionId]);
+  }, [disabled]);
 
   const onDragLeave = useCallback((
     event: DragEvent<HTMLElement>,
     targetInstructionId: number,
-    placement: VariablesDropPlacement,
+    placement?: VariablesDropPlacement,
   ) => {
     if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
     setDropIntent(current =>
       current?.targetInstructionId === targetInstructionId
-      && current.placement === placement
+      && (placement === undefined || current.placement === placement)
         ? null
         : current);
   }, []);
@@ -97,21 +103,25 @@ export const useVariablesInstructionDrag = ({
     placement: VariablesDropPlacement,
   ) => {
     event.preventDefault();
-    const transferred = Number(event.dataTransfer.getData(DATA_TYPE));
-    const validTransfer = Number.isSafeInteger(transferred) && transferred > 0;
-    const source = sourceInstructionId;
+    const customTransfer = event.dataTransfer.getData(DATA_TYPE);
+    const plainTransfer = event.dataTransfer.getData('text/plain');
+    const transferredValue = customTransfer || plainTransfer;
+    const transferred = transferredValue ? Number(transferredValue) : null;
+    const validTransfer = transferred === null
+      || (Number.isSafeInteger(transferred) && transferred > 0);
+    const source = sourceInstructionIdRef.current;
     clear();
     if (
       disabled
       || source === null
       || !validTransfer
-      || transferred !== source
+      || (transferred !== null && transferred !== source)
       || source === targetInstructionId
     ) {
       return;
     }
     onDropInstruction(source, targetInstructionId, placement);
-  }, [clear, disabled, onDropInstruction, sourceInstructionId]);
+  }, [clear, disabled, onDropInstruction]);
 
   const isDropActive = (
     targetInstructionId: number,
