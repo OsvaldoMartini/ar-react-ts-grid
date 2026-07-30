@@ -1,12 +1,19 @@
-import React, { useMemo, type DragEvent } from 'react';
+import React, {
+  useEffect,
+  useMemo,
+  useState,
+  type DragEvent,
+} from 'react';
 import {
   Boxes,
   GripVertical,
   Link2,
+  Search,
   Unplug,
   Variable,
 } from 'lucide-react';
 import { RulesCard, type RulesCardEvent } from '../RulesCard';
+import SearchBox, { type SearchBoxOption } from '../SearchBox';
 import type {
   InstructionRelationshipEdge,
 } from '../bot-job-details/grid/domain/instructionRelationshipGraph';
@@ -132,9 +139,76 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
   onReconnectVariable,
   className,
 }) => {
+  const [commandSearch, setCommandSearch] = useState('');
+  const [blockFilter, setBlockFilter] = useState<number | null>(null);
+  const commandSearchActive = commandSearch.trim().length > 0;
+
+  useEffect(() => {
+    if (
+      blockFilter !== null
+      && !blocks.some(block => block.id === blockFilter)
+    ) {
+      setBlockFilter(null);
+    }
+  }, [blockFilter, blocks]);
+
+  const blockSearchOptions = useMemo<SearchBoxOption[]>(() => {
+    const commandCounts = new Map<number, number>();
+    instructions.forEach((instruction) => {
+      if (instruction.blockId === null) return;
+      commandCounts.set(
+        instruction.blockId,
+        (commandCounts.get(instruction.blockId) ?? 0) + 1,
+      );
+    });
+    return blocks.map(block => ({
+      value: String(block.id),
+      label: `#${block.order ?? block.id} ${block.name}`,
+      sublabel: `${commandCounts.get(block.id) ?? 0} command(s) · block ID ${block.id}`,
+      badges: [block.active === false
+        ? { text: 'INACTIVE', tone: 'red' as const }
+        : { text: 'ACTIVE', tone: 'green' as const }],
+      keywords: String(block.id),
+    }));
+  }, [blocks, instructions]);
+
+  const visibleInstructions = useMemo(() => {
+    const tokens = commandSearch
+      .trim()
+      .toLocaleLowerCase()
+      .split(/\s+/)
+      .filter(Boolean);
+    return instructions.filter((instruction) => {
+      if (blockFilter !== null && instruction.blockId !== blockFilter) {
+        return false;
+      }
+      if (tokens.length === 0) return true;
+      const haystack = [
+        instruction.id,
+        instruction.name,
+        instruction.command,
+        instruction.operation,
+        instruction.tagName,
+        instruction.blockId,
+        instruction.blockName,
+        instruction.blockOrder,
+        instruction.instructionOrder,
+        instruction.parentId,
+        instruction.parentBlockId,
+        instruction.variableId,
+      ]
+        .filter(value => value !== null && value !== undefined)
+        .join(' ')
+        .toLocaleLowerCase();
+      return tokens.every(token => haystack.includes(token));
+    });
+  }, [blockFilter, commandSearch, instructions]);
+
   const groups = useMemo<CommandGroup[]>(() => {
     const byBlock = new Map<number, CommandGroup>();
-    blocks.forEach((block) => {
+    blocks
+      .filter(block => blockFilter === null || block.id === blockFilter)
+      .forEach((block) => {
       byBlock.set(block.id, {
         block,
         blockId: block.id,
@@ -154,7 +228,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
       instructions: [],
     };
 
-    instructions.forEach((instruction) => {
+    visibleInstructions.forEach((instruction) => {
       if (instruction.blockId === null) {
         unassigned.instructions.push(instruction);
         return;
@@ -179,6 +253,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
         ...group,
         instructions: [...group.instructions].sort(instructionOrder),
       }))
+      .filter(group => !commandSearchActive || group.instructions.length > 0)
       .sort(groupOrder);
     if (unassigned.instructions.length > 0) {
       result.push({
@@ -187,7 +262,12 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
       });
     }
     return result;
-  }, [blocks, instructions]);
+  }, [
+    blockFilter,
+    blocks,
+    commandSearchActive,
+    visibleInstructions,
+  ]);
 
   const edgesByInstruction = useMemo(
     () => relationshipByInstruction(relationshipEdges),
@@ -223,19 +303,52 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
       aria-label="All Bot Job commands by block"
     >
       <header className={styles.boardHeader}>
-        <div>
+        <div className={styles.boardIdentity}>
           <span className={styles.eyebrow}>Complete instruction sequence</span>
           <h2>
             <Boxes size={17} aria-hidden="true" />
             All commands
           </h2>
           <p>Every command remains visible, including disconnected relationships.</p>
+          <div className={styles.boardFilters}>
+            <label className={styles.commandSearch}>
+              <span>Commands</span>
+              <span className={styles.commandSearchShell}>
+                <Search size={14} aria-hidden="true" />
+                <input
+                  type="search"
+                  value={commandSearch}
+                  aria-label="Search commands"
+                  placeholder="Search command, name, ID..."
+                  onChange={event => setCommandSearch(event.target.value)}
+                />
+              </span>
+            </label>
+            <SearchBox
+              label="Block"
+              placeholder="Search block name or number..."
+              headerRight="Commands per block"
+              countLabel={count => `${count} BLOCK${count === 1 ? '' : 'S'}`}
+              allOptionLabel="All blocks"
+              options={blockSearchOptions}
+              value={blockFilter === null ? null : String(blockFilter)}
+              onChange={value =>
+                setBlockFilter(value === null ? null : Number(value))}
+            />
+          </div>
         </div>
         <div className={styles.boardStatus}>
-          <span className={styles.count}>{instructions.length}</span>
-          {disabled && (
+          <span className={styles.count}>
+            {visibleInstructions.length}
+            {visibleInstructions.length !== instructions.length
+              ? ` / ${instructions.length}`
+              : ''}
+          </span>
+          {(disabled || commandSearchActive) && (
             <small title={unavailableReason}>
-              {unavailableReason || 'Movement unavailable'}
+              {commandSearchActive
+                ? 'Clear command search to move rows'
+                : unavailableReason || 'Movement unavailable'}
             </small>
           )}
         </div>
@@ -267,6 +380,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
 
             <div className={styles.rows}>
               {group.blockId !== null
+                && !commandSearchActive
                 && dropGap(group.blockId, 0, `drop:${group.blockId}:0`)}
               {group.instructions.map((instruction, index) => {
                 const instructionId = instruction.id;
@@ -366,6 +480,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                     : null;
                 const canDrag = instructionId !== null
                   && !disabled
+                  && !commandSearchActive
                   && Boolean(onInstructionDragStart)
                   && (canDragInstruction?.(instruction) ?? true);
                 const selected = instructionId !== null
@@ -596,6 +711,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                       </div>
                     </article>
                     {group.blockId !== null
+                      && !commandSearchActive
                       && dropGap(
                         group.blockId,
                         index + 1,

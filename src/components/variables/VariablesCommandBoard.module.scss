@@ -22,8 +22,9 @@
   background: linear-gradient(180deg, #fbfdff, #f3f8fd);
 }
 
-.boardHeader > div:first-child {
+.boardIdentity {
   min-width: 0;
+  flex: 1 1 auto;
 }
 
 .boardHeader h2 {
@@ -40,6 +41,55 @@
   color: #63788d;
   font-size: 0.62rem;
   line-height: 1.35;
+}
+
+.boardFilters {
+  display: grid;
+  grid-template-columns: minmax(170px, 1fr) minmax(170px, 1fr);
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.commandSearch {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: #33517a;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.commandSearchShell {
+  min-width: 0;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 9px;
+  border: 1px solid #b9c8d9;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #64748b;
+  box-sizing: border-box;
+}
+
+.commandSearchShell:focus-within {
+  border-color: #2b6cad;
+  box-shadow: 0 0 0 2px rgba(43, 108, 173, 0.13);
+}
+
+.commandSearchShell input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #1f2937;
+  font-size: 0.73rem;
+  text-transform: none;
 }
 
 .eyebrow {
@@ -76,6 +126,20 @@
   font-size: 0.64rem;
   font-weight: 900;
   text-align: center;
+}
+
+@media (max-width: 560px) {
+  .boardHeader {
+    flex-direction: column;
+  }
+
+  .boardFilters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .boardStatus {
+    align-items: flex-start;
+  }
 }
 
 .blockScroll {

@@ -1,10 +1,11 @@
 import React, {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type KeyboardEvent,
 } from 'react';
-import { Database, Loader2 } from 'lucide-react';
+import { Database, Loader2, Search } from 'lucide-react';
 import styles from './RuntimeMemoryPanel.module.scss';
 
 export type RuntimeMemoryValueState = 'VALUE' | 'VOID';
@@ -186,57 +187,95 @@ const RuntimeMemoryPanel: React.FC<RuntimeMemoryPanelProps> = ({
   onEditStart,
   onEditCancel,
   className,
-}) => (
-  <aside
-    className={[styles.panel, className ?? ''].filter(Boolean).join(' ')}
-    aria-label="Runtime memory variables"
-  >
-    <header className={styles.header}>
-      <div>
-        <span className={styles.eyebrow}>Live runtime</span>
-        <h2>
-          <Database size={16} aria-hidden="true" />
-          Memory variables
-        </h2>
-      </div>
-      <span className={styles.count}>{items.length}</span>
-    </header>
+}) => {
+  const [memorySearch, setMemorySearch] = useState('');
+  const visibleItems = useMemo(() => {
+    const tokens = memorySearch
+      .trim()
+      .toLocaleLowerCase()
+      .split(/\s+/)
+      .filter(Boolean);
+    if (tokens.length === 0) return items;
+    return items.filter((item) => {
+      const haystack = `${item.variableId} ${item.name}`.toLocaleLowerCase();
+      return tokens.every(token => haystack.includes(token));
+    });
+  }, [items, memorySearch]);
 
-    {disabledReason && (
-      <p className={styles.disabledReason} role="status">
-        {disabledReason}
-      </p>
-    )}
-
-    <div className={styles.tableScroll}>
-      <table className={styles.table}>
-        <thead>
-          <tr>
-            <th scope="col">Name</th>
-            <th scope="col">Value</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map(item => (
-            <RuntimeMemoryRow
-              key={item.variableId}
-              item={item}
-              disabled={disabled}
-              pending={pendingVariableIds?.has(item.variableId) ?? false}
-              onCommitValue={onCommitValue}
-              onEditStart={onEditStart}
-              onEditCancel={onEditCancel}
-            />
-          ))}
-        </tbody>
-      </table>
-      {items.length === 0 && (
-        <div className={styles.empty} role="status">
-          No runtime memory variables are defined.
+  return (
+    <aside
+      className={[styles.panel, className ?? ''].filter(Boolean).join(' ')}
+      aria-label="Runtime memory variables"
+    >
+      <header className={styles.header}>
+        <div>
+          <span className={styles.eyebrow}>Live runtime</span>
+          <h2>
+            <Database size={16} aria-hidden="true" />
+            Memory variables
+          </h2>
         </div>
+        <span className={styles.count}>
+          {visibleItems.length}
+          {visibleItems.length !== items.length ? ` / ${items.length}` : ''}
+        </span>
+      </header>
+
+      <label className={styles.memorySearch}>
+        <span>Variables</span>
+        <span className={styles.memorySearchShell}>
+          <Search size={14} aria-hidden="true" />
+          <input
+            type="search"
+            value={memorySearch}
+            aria-label="Search memory variables"
+            placeholder="Search variable name or ID..."
+            onChange={event => setMemorySearch(event.target.value)}
+          />
+        </span>
+      </label>
+
+      {disabledReason && (
+        <p className={styles.disabledReason} role="status">
+          {disabledReason}
+        </p>
       )}
-    </div>
-  </aside>
-);
+
+      <div className={styles.tableScroll}>
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th scope="col">Name</th>
+              <th scope="col">Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visibleItems.map(item => (
+              <RuntimeMemoryRow
+                key={item.variableId}
+                item={item}
+                disabled={disabled}
+                pending={pendingVariableIds?.has(item.variableId) ?? false}
+                onCommitValue={onCommitValue}
+                onEditStart={onEditStart}
+                onEditCancel={onEditCancel}
+              />
+            ))}
+          </tbody>
+        </table>
+        {items.length === 0 && (
+          <div className={styles.empty} role="status">
+            No runtime memory variables are defined.
+          </div>
+        )}
+        {items.length > 0 && visibleItems.length === 0 && (
+          <div className={styles.empty} role="status">
+            No memory variables match this search.
+          </div>
+        )}
+      </div>
+    </aside>
+  );
+};
 
 export default RuntimeMemoryPanel;

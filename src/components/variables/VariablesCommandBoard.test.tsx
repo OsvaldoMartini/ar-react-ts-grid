@@ -222,3 +222,128 @@ test('uses a DTO variable fallback only when no authoritative binding edge exist
     name: /Reconnect variable: missing variable binding/i,
   })).toHaveClass(rulesCardStyles.red);
 });
+
+const filterBlocks = [
+  { id: 7, name: 'Login', order: 1, active: true },
+  { id: 8, name: 'Payment', order: 2, active: true },
+];
+
+const filterInstructions: VariableInstructionNode[] = [
+  command(1640, 'O', null, {
+    name: 'Username field',
+    blockId: 7,
+    blockName: 'Login',
+    blockOrder: 1,
+    instructionOrder: 1,
+    variableId: null,
+  }),
+  command(1641, 'GET', 1640, {
+    name: 'Read username',
+    operation: 'account owner',
+    blockId: 7,
+    blockName: 'Login',
+    blockOrder: 1,
+    instructionOrder: 2,
+  }),
+  command(1700, 'CK', null, {
+    name: 'Validate payment',
+    operation: 'beneficiary amount',
+    blockId: 8,
+    blockName: 'Payment',
+    blockOrder: 2,
+    instructionOrder: 1,
+    variableId: 12,
+  }),
+];
+
+test('filters commands by text and restores all rows when cleared', () => {
+  render(
+    <VariablesCommandBoard
+      blocks={filterBlocks}
+      instructions={filterInstructions}
+      onInstructionDragStart={jest.fn()}
+    />,
+  );
+
+  const search = screen.getByRole('searchbox', { name: 'Search commands' });
+  fireEvent.change(search, { target: { value: 'beneficiary CK' } });
+
+  expect(screen.getByText('Validate payment')).toBeInTheDocument();
+  expect(screen.queryByText('Username field')).not.toBeInTheDocument();
+  expect(screen.queryByText('Read username')).not.toBeInTheDocument();
+  expect(screen.getByText('1 / 3')).toBeInTheDocument();
+
+  fireEvent.change(search, { target: { value: '' } });
+
+  expect(screen.getByText('Username field')).toBeInTheDocument();
+  expect(screen.getByText('Read username')).toBeInTheDocument();
+  expect(screen.getByText('Validate payment')).toBeInTheDocument();
+  expect(screen.getByText('3')).toBeInTheDocument();
+});
+
+test('disables row dragging while command text is filtered', () => {
+  const onInstructionDragStart = jest.fn();
+  render(
+    <VariablesCommandBoard
+      blocks={filterBlocks}
+      instructions={filterInstructions}
+      onInstructionDragStart={onInstructionDragStart}
+    />,
+  );
+
+  const commandRow = screen.getByText('Read username').closest('article');
+  expect(commandRow).toHaveAttribute('draggable', 'true');
+
+  fireEvent.change(
+    screen.getByRole('searchbox', { name: 'Search commands' }),
+    { target: { value: 'Read username' } },
+  );
+
+  expect(screen.getByText('Read username').closest('article'))
+    .toHaveAttribute('draggable', 'false');
+  expect(screen.getByText('Clear command search to move rows'))
+    .toBeInTheDocument();
+
+  fireEvent.change(
+    screen.getByRole('searchbox', { name: 'Search commands' }),
+    { target: { value: '' } },
+  );
+  expect(screen.getByText('Read username').closest('article'))
+    .toHaveAttribute('draggable', 'true');
+});
+
+test('combines the Block selector with command text filtering', () => {
+  render(
+    <VariablesCommandBoard
+      blocks={filterBlocks}
+      instructions={filterInstructions}
+      onInstructionDragStart={jest.fn()}
+    />,
+  );
+
+  const blockSelector = screen.getByRole('combobox', { name: 'Block' });
+  fireEvent.click(blockSelector);
+  fireEvent.click(screen.getByRole('option', { name: /#2 Payment/i }));
+
+  expect(screen.getByText('Validate payment')).toBeInTheDocument();
+  expect(screen.queryByText('Username field')).not.toBeInTheDocument();
+  expect(screen.queryByText('Read username')).not.toBeInTheDocument();
+
+  fireEvent.change(
+    screen.getByRole('searchbox', { name: 'Search commands' }),
+    { target: { value: 'does-not-exist' } },
+  );
+  expect(screen.getByRole('status')).toHaveTextContent(
+    'No Bot Job blocks or commands are available.',
+  );
+
+  fireEvent.change(
+    screen.getByRole('searchbox', { name: 'Search commands' }),
+    { target: { value: '' } },
+  );
+  fireEvent.click(screen.getByRole('combobox', { name: 'Block' }));
+  fireEvent.click(screen.getByRole('option', { name: 'All blocks' }));
+
+  expect(screen.getByText('Username field')).toBeInTheDocument();
+  expect(screen.getByText('Validate payment')).toBeInTheDocument();
+});

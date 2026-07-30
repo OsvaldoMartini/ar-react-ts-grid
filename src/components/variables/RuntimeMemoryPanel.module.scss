@@ -55,6 +55,51 @@
   text-align: center;
 }
 
+.memorySearch {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #dce6f0;
+  background: #f8fbff;
+  color: #33517a;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.memorySearchShell {
+  min-width: 0;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 9px;
+  border: 1px solid #b9c8d9;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #64748b;
+  box-sizing: border-box;
+}
+
+.memorySearchShell:focus-within {
+  border-color: #2b6cad;
+  box-shadow: 0 0 0 2px rgba(43, 108, 173, 0.13);
+}
+
+.memorySearchShell input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #1f2937;
+  font-size: 0.73rem;
+  text-transform: none;
+}
+
 .disabledReason {
   flex: 0 0 auto;
   margin: 0;

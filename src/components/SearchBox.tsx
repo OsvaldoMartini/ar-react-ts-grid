@@ -63,6 +63,7 @@ const SearchBox: React.FC<SearchBoxProps> = ({
   disabled = false,
 }) => {
   const listboxId = useId();
+  const inputId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
@@ -163,12 +164,17 @@ const SearchBox: React.FC<SearchBoxProps> = ({
 
   return (
     <div className={styles.searchBox} ref={rootRef}>
-      {label && <span className={styles.boxLabel}>{label}</span>}
+      {label && (
+        <label className={styles.boxLabel} htmlFor={inputId}>
+          {label}
+        </label>
+      )}
       <div
         className={`${styles.inputShell} ${open ? styles.inputShellOpen : ''} ${disabled ? styles.inputShellDisabled : ''}`}
       >
         <Search size={14} aria-hidden="true" className={styles.searchIcon} />
         <input
+          id={inputId}
           ref={inputRef}
           type="text"
           role="combobox"

@@ -174,7 +174,6 @@
 }
 
 .toolbarActions,
-.searchControl,
 .refreshButton {
   display: flex;
   align-items: center;
@@ -183,32 +182,6 @@
 .toolbarActions {
   flex: 0 0 auto;
   gap: 8px;
-}
-
-.searchControl {
-  min-width: 240px;
-  height: 32px;
-  gap: 7px;
-  padding: 0 9px;
-  border: 1px solid #b9c8d9;
-  border-radius: 6px;
-  background: #ffffff;
-  color: #64748b;
-}
-
-.searchControl:focus-within {
-  border-color: #2b6cad;
-  box-shadow: 0 0 0 2px rgba(43, 108, 173, 0.13);
-}
-
-.searchControl input {
-  width: 100%;
-  min-width: 0;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: #1f2937;
-  font-size: 0.73rem;
 }
 
 .refreshButton {
@@ -232,18 +205,6 @@
 .refreshButton:disabled {
   cursor: default;
   opacity: 0.52;
-}
-
-.filterBar {
-  min-width: 0;
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 7px 13px;
-  border-bottom: 1px solid #d7e1ed;
-  background: #f7faff;
 }
 
 .filterButtons,
@@ -524,6 +485,21 @@
   padding: 12px;
   scrollbar-color: #a7b8ca #edf2f7;
   scrollbar-width: thin;
+}
+
+.flowFilters {
+  display: grid;
+  grid-template-columns: minmax(230px, 1fr);
+  gap: 8px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e0e8f1;
+}
+
+.flowFilters .filterButtons {
+  min-width: 0;
+  overflow-x: auto;
+  padding-bottom: 2px;
 }
 
 .variableHeading {
@@ -1177,15 +1153,6 @@
   padding: 24px;
 }
 
-.srOnly {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-}
-
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -1198,13 +1165,8 @@
     flex-direction: column;
   }
 
-  .toolbarActions,
-  .searchControl {
+  .toolbarActions {
     width: 100%;
-  }
-
-  .searchControl {
-    min-width: 0;
   }
 
   .workspace {
@@ -1240,11 +1202,6 @@
   .status {
     max-width: none;
     flex: 1;
-  }
-
-  .filterBar {
-    align-items: stretch;
-    flex-direction: column;
   }
 
   .filterButtons,

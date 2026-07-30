@@ -399,9 +399,7 @@ const VariablesPage: React.FC<Props> = ({
   const [snapshot, setSnapshot] = useState<VariableWorkspaceSnapshot | null>(null);
   const [pendingRequest, setPendingRequest] = useState<PendingRequest | null>(null);
   const [selectedVariableId, setSelectedVariableId] = useState<number | null>(null);
-  const [findText, setFindText] = useState('');
   const [healthFilter, setHealthFilter] = useState<HealthFilter>('ALL');
-  const [blockFilter, setBlockFilter] = useState<'ALL' | number>('ALL');
   const [selectedInstructionId, setSelectedInstructionId] =
     useState<number | null>(null);
   const [draggingInstructionId, setDraggingInstructionId] =
@@ -638,7 +636,6 @@ const VariablesPage: React.FC<Props> = ({
   }, [error]);
 
   const filteredVariables = useMemo(() => {
-    const query = findText.trim().toLocaleLowerCase();
     return (snapshot?.variables ?? []).filter(variable => {
       const healthMatches = healthFilter === 'ALL'
         || (healthFilter === 'ISSUES'
@@ -646,46 +643,9 @@ const VariablesPage: React.FC<Props> = ({
           : healthFilter === 'UNUSED'
             ? variable.unused
             : variable.health === healthFilter);
-      // A variable belongs to a block through its owning Web Field OR any linked command.
-      const blockMatches = blockFilter === 'ALL'
-        || variable.owner?.blockId === blockFilter
-        || variable.commands.some(command => command.blockId === blockFilter);
-      return healthMatches
-        && blockMatches
-        && (!query || variableSearchText(variable).includes(query));
+      return healthMatches;
     });
-  }, [blockFilter, findText, healthFilter, snapshot?.variables]);
-
-  useEffect(() => {
-    if (
-      blockFilter !== 'ALL'
-      && snapshot
-      && !snapshot.blocks.some(candidate => candidate.id === blockFilter)
-    ) {
-      setBlockFilter('ALL');
-    }
-  }, [blockFilter, snapshot]);
-
-  const blockSearchOptions = useMemo<SearchBoxOption[]>(() => {
-    const counts = new Map<number, number>();
-    (snapshot?.variables ?? []).forEach((variable) => {
-      const blockIds = new Set<number>();
-      if (variable.owner?.blockId != null) blockIds.add(variable.owner.blockId);
-      variable.commands.forEach((command) => {
-        if (command.blockId != null) blockIds.add(command.blockId);
-      });
-      blockIds.forEach(blockId => counts.set(blockId, (counts.get(blockId) ?? 0) + 1));
-    });
-    return (snapshot?.blocks ?? []).map(candidate => ({
-      value: String(candidate.id),
-      label: `#${candidate.order ?? candidate.id} ${candidate.name}`,
-      sublabel: `${counts.get(candidate.id) ?? 0} variable link(s) · block ID ${candidate.id}`,
-      badges: [candidate.active === false
-        ? { text: 'INACTIVE', tone: 'red' as const }
-        : { text: 'ACTIVE', tone: 'green' as const }],
-      keywords: String(candidate.id),
-    }));
-  }, [snapshot?.blocks, snapshot?.variables]);
+  }, [healthFilter, snapshot?.variables]);
 
   const variableSearchOptions = useMemo<SearchBoxOption[]>(
     () => filteredVariables.map(variable => ({
@@ -1035,16 +995,6 @@ const VariablesPage: React.FC<Props> = ({
               </span>
             </div>
             <div className={styles.toolbarActions}>
-              <label className={styles.searchControl}>
-                <Search size={15} aria-hidden="true" />
-                <span className={styles.srOnly}>Find variables or commands</span>
-                <input
-                  type="search"
-                  value={findText}
-                  placeholder="Find variable, block, command..."
-                  onChange={event => setFindText(event.target.value)}
-                />
-              </label>
               <button
                 type="button"
                 className={styles.refreshButton}
@@ -1061,33 +1011,6 @@ const VariablesPage: React.FC<Props> = ({
                   : 'Refresh'}
               </button>
             </div>
-          </section>
-
-          <section className={styles.filterBar} data-floating-drag-ignore="true">
-            <div className={styles.filterButtons} role="group" aria-label="Variable health filter">
-              {filterButtons.map(filter => (
-                <button
-                  type="button"
-                  key={filter.id}
-                  className={healthFilter === filter.id ? styles.filterActive : ''}
-                  aria-pressed={healthFilter === filter.id}
-                  onClick={() => setHealthFilter(filter.id)}
-                >
-                  {filter.label}
-                  <span>{filter.count}</span>
-                </button>
-              ))}
-            </div>
-            <SearchBox
-              label="Block"
-              placeholder="Search block name or number..."
-              headerRight="Variables per block"
-              countLabel={count => `${count} BLOCK${count === 1 ? '' : 'S'}`}
-              allOptionLabel="All blocks"
-              options={blockSearchOptions}
-              value={blockFilter === 'ALL' ? null : String(blockFilter)}
-              onChange={value => setBlockFilter(value === null ? 'ALL' : Number(value))}
-            />
           </section>
 
           {!snapshot ? (
@@ -1195,18 +1118,38 @@ const VariablesPage: React.FC<Props> = ({
               />
 
               <section className={styles.flowPanel} aria-label="Selected variable relationship flow">
-                <SearchBox
-                  label="Relationship flow"
-                  placeholder="Select a variable..."
-                  headerRight="Defined variables"
-                  countLabel={count => `${count} VARIABLE${count === 1 ? '' : 'S'}`}
-                  options={variableSearchOptions}
-                  value={selectedVariableId === null
-                    ? null
-                    : String(selectedVariableId)}
-                  onChange={value =>
-                    setSelectedVariableId(value === null ? null : Number(value))}
-                />
+                <div className={styles.flowFilters}>
+                  <SearchBox
+                    label="Relationship flow"
+                    placeholder="Select a variable..."
+                    headerRight="Defined variables"
+                    countLabel={count => `${count} VARIABLE${count === 1 ? '' : 'S'}`}
+                    options={variableSearchOptions}
+                    value={selectedVariableId === null
+                      ? null
+                      : String(selectedVariableId)}
+                    onChange={value =>
+                      setSelectedVariableId(value === null ? null : Number(value))}
+                  />
+                  <div
+                    className={styles.filterButtons}
+                    role="group"
+                    aria-label="Variable health filter"
+                  >
+                    {filterButtons.map(filter => (
+                      <button
+                        type="button"
+                        key={filter.id}
+                        className={healthFilter === filter.id ? styles.filterActive : ''}
+                        aria-pressed={healthFilter === filter.id}
+                        onClick={() => setHealthFilter(filter.id)}
+                      >
+                        {filter.label}
+                        <span>{filter.count}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 {selectedVariable ? (
                   <>
                     <div className={styles.variableHeading}>
