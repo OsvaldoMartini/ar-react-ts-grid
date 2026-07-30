@@ -74,9 +74,6 @@ export type GridActionNotice = {
 
 export type DeleteBlocksPlan = {
   deleteBlockIds: number[];
-  expectedBlockIds: number[];
-  retainBlockId?: number;
-  graphRevision: string;
 };
 
 type SuccessfulInstructionDeletePlan = Extract<
@@ -2139,29 +2136,17 @@ export function useGridData(deps: UseGridDataDeps) {
       (blockId, index, values) =>
         Number.isSafeInteger(blockId)
         && blockId > 0
+        && currentBlockIdSet.has(blockId)
         && values.indexOf(blockId) === index,
     );
-    const exactBlockSetStillCurrent =
-      plan.expectedBlockIds.length === currentBlockIds.length
-      && plan.expectedBlockIds.every(
-        (blockId, index) => blockId === currentBlockIds[index],
-      );
     const deletingAllBlocks =
       deleteBlockIds.length === currentBlockIds.length
       && deleteBlockIds.every(blockId => currentBlockIdSet.has(blockId));
     const expectedRetainedBlockId = deletingAllBlocks ? currentBlockIds[0] : undefined;
-    const exactPlanStillCurrent =
-      Boolean(plan.graphRevision)
-      && plan.graphRevision === moveGraphRevision
-      && exactBlockSetStillCurrent
-      && deleteBlockIds.length === plan.deleteBlockIds.length
-      && deleteBlockIds.length > 0
-      && deleteBlockIds.every(blockId => currentBlockIdSet.has(blockId))
-      && plan.retainBlockId === expectedRetainedBlockId;
 
-    if (!exactPlanStillCurrent) {
+    if (deleteBlockIds.length === 0) {
       showBlockDeletePlanningFailure(
-        'The block catalog, selection, or instruction graph changed while confirmation was open.',
+        'Select one or more current blocks before deleting.',
       );
       return false;
     }
@@ -2183,7 +2168,6 @@ export function useGridData(deps: UseGridDataDeps) {
     const message = {
       type: 'DELETE_BLOCKS',
       requestId: `${Date.now()}-${targetSessionId}-blocks-delete`,
-      graphRevision: plan.graphRevision,
       deleteBlockIds,
       expectedBlockIds: currentBlockIds,
       ...(expectedRetainedBlockId === undefined
@@ -2209,7 +2193,6 @@ export function useGridData(deps: UseGridDataDeps) {
   };
 
   const handleRemoveInstruction = (instructionId: number) => {
-    if (!moveGraphRevision || !memoryCapabilities.get(instructionId)?.canDelete) return;
     const plan = planInstructionDeletion(
       instructionsData,
       variableLinks,
@@ -2254,15 +2237,13 @@ export function useGridData(deps: UseGridDataDeps) {
       + `Positional IF/LOOP body rows are preserved.${survivorNotice}`,
     );
     setErrorFlag(true);
-    const sourceRevision = moveGraphRevision;
     setAlertOnConfirm(
-      () => () => executeRemoveInstruction(plan, sourceRevision),
+      () => () => executeRemoveInstruction(plan),
     );
   };
 
   const executeRemoveInstruction = (
     confirmedPlan: SuccessfulInstructionDeletePlan,
-    sourceRevision: string,
   ) => {
     handleClose();
     const latest = deleteContextRef.current;
@@ -2284,9 +2265,6 @@ export function useGridData(deps: UseGridDataDeps) {
         }))
       : [];
     const exactPlanStillCurrent = latestPlan.ok
-      && latest.moveGraphRevision === sourceRevision
-      && latest.memoryCapabilities
-        .get(confirmedPlan.selectedInstruction.id)?.canDelete === true
       && latestPlan.deleteInstructionIds.length
         === confirmedPlan.deleteInstructionIds.length
       && latestPlan.deleteInstructionIds.every(
@@ -2322,7 +2300,6 @@ export function useGridData(deps: UseGridDataDeps) {
         type: 'DELETE_INSTRUCTION',
         deleteContractVersion: 2,
         requestId: `${Date.now()}-instruction-delete-${id}`,
-        graphRevision: sourceRevision,
         selectedInstructionId: id,
         deleteInstructionIds: confirmedPlan.deleteInstructionIds,
         deleteParentRepairs: confirmedParentRepairs,
@@ -2352,7 +2329,6 @@ export function useGridData(deps: UseGridDataDeps) {
   // Function to remove a block by its blockId and reassign order numbers within each block
   const handleRemoveBlock = (blockId: number) => {
     const capability = blockDeleteCapabilities.get(blockId);
-    if (!moveGraphRevision || !capability?.canDelete) return;
 
     // Find the botJobId and blockOrderNumber associated with the blockId
     const blockInstruction = instructionsData.find(instruction => instruction.blockId === blockId);
@@ -2361,6 +2337,18 @@ export function useGridData(deps: UseGridDataDeps) {
       ?? `Block ${blockId}`;
     const clearFinalBlock =
       workspaceBlocks.length === 1 && workspaceBlocks[0]?.blockId === blockId;
+    const blockInstructions = instructionsData
+      .filter(instruction => instruction.blockId === blockId)
+      .sort((left, right) =>
+        left.instructionOrderNumber - right.instructionOrderNumber || left.id - right.id);
+    const deleteRows = capability?.deleteRows?.length
+      ? capability.deleteRows
+      : blockInstructions.map(instruction => ({
+          id: instruction.id,
+          order: instruction.instructionOrderNumber,
+          name: instruction.name,
+          action: instruction.actions,
+        }));
 
     // Show confirmation dialog using AlertModal
     setAlertImage(warningRedImage);
@@ -2378,19 +2366,16 @@ export function useGridData(deps: UseGridDataDeps) {
         ? 'The block will remain available for new instructions. Clearing its instructions cannot be undone.'
         : 'No instructions will be removed; the final block will remain available.');
       setErrorFlag(true);
-      setAlertOnConfirm(() => () => executeRemoveBlock(blockId, true));
+      setAlertOnConfirm(() => () => executeRemoveBlock(blockId));
       return;
     }
 
     setAlertMessageHeader('Delete Block');
-    const instructionCount = Math.max(
-      capability.instructionCount,
-      capability.deleteRows.length,
-    );
+    const instructionCount = blockInstructions.length;
     setAlertMessageBody(instructionCount > 5
       ? `All ${instructionCount} instructions/steps in "${blockDisplayName}" will be deleted.`
-      : capability.deleteRows.length > 0
-        ? capability.deleteRows.map(row => ({
+      : deleteRows.length > 0
+        ? deleteRows.map(row => ({
             parentNameWithId: `#${row.order} (${row.id}) ${row.name}`,
             connectionLabel: 'Action',
             actions: row.action,
@@ -2402,78 +2387,9 @@ export function useGridData(deps: UseGridDataDeps) {
     return;
   };
 
-  const executeRemoveBlock = (blockId: number, clearFinalBlock = false) => {
-    // Clear the confirmation dialog
+  const executeRemoveBlock = (blockId: number) => {
     handleClose();
-
-    const blockInstruction = instructionsData.find(instruction => instruction.blockId === blockId);
-    const workspaceBlock = workspaceBlocks.find(block => block.blockId === blockId);
-    const ownerBotJobId = blockInstruction?.botJobId ?? botJobId;
-    const removedBlockOrderNumber =
-      blockInstruction?.blockOrderNumber ?? workspaceBlock?.blockOrderNumber ?? null;
-
-    if (!ownerBotJobId || removedBlockOrderNumber === null) {
-      setAlertImage(warningRedImage);
-      setAlertClass('construction-image');
-      setAlertMessageHeader(
-        `Error Bot Job or Block Order Number`
-      );
-      setErrorFlag(true);
-      setAlertMessageBody(`No botJobId or blockOrderNumber found for Block ID: ${blockId}`);
-      return; // Exit if no botJobId or blockOrderNumber is found
-    }
-
-    // Remove the block from instructionsData
-    const retainFinalBlock = clearFinalBlock
-      && workspaceBlocks.length === 1
-      && workspaceBlocks[0]?.blockId === blockId;
-    const nextWorkspaceBlocks = retainFinalBlock
-      ? workspaceBlocks
-      : workspaceBlocks
-          .filter(block => block.blockId !== blockId)
-          .map(block => block.blockOrderNumber > removedBlockOrderNumber
-            ? { ...block, blockOrderNumber: block.blockOrderNumber - 1 }
-            : block);
-    const updatedData = instructionsData
-      .filter(instruction => instruction.blockId !== blockId)
-      .map(instruction => instruction.blockOrderNumber > removedBlockOrderNumber
-        ? { ...instruction, blockOrderNumber: instruction.blockOrderNumber - 1 }
-        : instruction);
-
-    const reassignedData = reassignInstructionOrderNumbersByBlock(updatedData);
-    setInstructionsData(reassignedData);
-    if (retainFinalBlock) setGroupedData(groupByBlock(reassignedData));
-    setWorkspaceBlocks(nextWorkspaceBlocks);
-    setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
-
-    // Prepare list of updated blocks
-    const blocksToUpdate = nextWorkspaceBlocks.map(block => ({
-      blockId: block.blockId,
-      botJobId: ownerBotJobId,
-      blockOrderNumber: block.blockOrderNumber,
-      blockName: block.blockName,
-    }));
-
-    // Send WebSocket message
-    if (webSocket && connected) {
-      const message = {
-        type: 'DELETE_BLOCK',
-        requestId: `${Date.now()}-${targetSessionId}-block-delete-${blockId}`,
-        graphRevision: moveGraphRevision,
-        blockId: blockId,
-        botJobId: ownerBotJobId,
-        botJobName: botJobName,
-        updatedBlocks: blocksToUpdate, // Include the list of updated blocks
-        homeBankingId: homeBankingId,
-        sessionId: targetSessionId,
-      };
-
-      webSocket.send(
-        JSON.stringify(message),
-      );
-
-      console.log(`Sent delete block message for Block ID: ${blockId} with updated blocks:`, message);
-    }
+    submitDeleteBlocks({ deleteBlockIds: [blockId] });
   };
 
   const handleRollbackBlock = (blockId: number) => {

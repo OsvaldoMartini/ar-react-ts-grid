@@ -165,8 +165,7 @@ const InstructionRow: React.FC<InstructionRowProps> = ({
           {moveButtons}
           {testClick}
           <DeleteButton
-            title={capability?.deleteReason || 'Delete instruction'}
-            dimmed={!capability?.canDelete}
+            title="Delete instruction"
             onClick={onRemove}
           />
         </div>

@@ -11,10 +11,12 @@ describe('DeleteButton', () => {
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 
-  it('dims to 0.35 opacity when not allowed, full opacity otherwise', () => {
-    const { rerender } = render(<DeleteButton onClick={() => {}} alt="d" dimmed />);
-    expect(screen.getByAltText('d')).toHaveStyle('opacity: 0.35');
-    rerender(<DeleteButton onClick={() => {}} alt="d" />);
-    expect(screen.getByAltText('d')).toHaveStyle('opacity: 1');
+  it('remains fully visible and clickable when a legacy caller passes dimmed', () => {
+    const onClick = jest.fn();
+    render(<DeleteButton onClick={onClick} alt="d" dimmed />);
+    const icon = screen.getByAltText('d');
+    expect(icon).not.toHaveStyle('opacity: 0.35');
+    fireEvent.click(icon);
+    expect(onClick).toHaveBeenCalledTimes(1);
   });
 });

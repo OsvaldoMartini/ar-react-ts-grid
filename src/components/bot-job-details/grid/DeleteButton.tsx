@@ -5,7 +5,7 @@ import styles from './DeleteButton.module.scss';
 export interface DeleteButtonProps {
   onClick: () => void;
   title?: string;
-  /** Dim the icon (to 0.35 opacity) when the delete is not currently allowed. */
+  /** Kept for caller compatibility; delete controls remain fully visible and clickable. */
   dimmed?: boolean;
   alt?: string;
 }
@@ -13,15 +13,14 @@ export interface DeleteButtonProps {
 /**
  * The ✕ delete icon, shared by block headers, instruction rows, and the Excel
  * GOTO row. Extracted verbatim from GridItem's `.crossButton` images. The caller
- * decides what is deleted and whether it is allowed (dimmed).
+ * decides what is deleted. Delete controls remain fully visible and clickable.
  */
-const DeleteButton: React.FC<DeleteButtonProps> = ({ onClick, title, dimmed = false, alt = '' }) => (
+const DeleteButton: React.FC<DeleteButtonProps> = ({ onClick, title, alt = '' }) => (
   <img
     src={crossImage}
     alt={alt}
     className={styles.button}
     title={title}
-    style={{ opacity: dimmed ? 0.35 : 1 }}
     onClick={onClick}
   />
 );

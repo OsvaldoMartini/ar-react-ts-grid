@@ -478,16 +478,14 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                         canAddToMemory={blockCapability?.canAddToMemory === true}
                         memoryAddTitle={blockCapability?.addReason}
                         showCreateComponent={!componentWorkspace}
-                        isFirstBlock={isFirstBlock && Boolean(moveGraphRevision)}
+                        isFirstBlock={isFirstBlock}
                         blockSelected={selectedBlockIds.has(blockId)}
                         blockDeleteTitle={isFirstBlock
                           ? selectedBlockIds.size > 0
                             ? `Delete ${selectedBlockIds.size} checked block(s)`
                             : 'Delete checked blocks'
-                          : blockCapability?.reason}
-                        blockDeleteDimmed={isFirstBlock
-                          ? !moveGraphRevision
-                          : !blockCapability?.canDelete}
+                          : 'Delete block'}
+                        blockDeleteDimmed={false}
                         renderHighlighted={renderHighlighted}
                         exportFileNode={renderExportFile(String(blockData.exportFile))}
                         excelGotoNode={excelGotoInstruction &&
@@ -508,8 +506,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                               onClick={() => handleOpenCommandEditor(excelGotoInstruction)}
                             />
                             <DeleteButton
-                              title={memoryCapabilities.get(Number(excelGotoInstruction.id))?.deleteReason || 'Delete instruction'}
-                              dimmed={!memoryCapabilities.get(Number(excelGotoInstruction.id))?.canDelete}
+                              title="Delete instruction"
                               onClick={() => handleRemoveInstruction(Number(excelGotoInstruction.id))}
                             />
                           </div>
@@ -621,16 +618,14 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                         canAddToMemory={false}
                         memoryAddTitle={capability?.addReason}
                         showCreateComponent={!componentWorkspace}
-                        isFirstBlock={isFirstBlock && Boolean(moveGraphRevision)}
+                        isFirstBlock={isFirstBlock}
                         blockSelected={selectedBlockIds.has(block.blockId)}
                         blockDeleteTitle={isFirstBlock
                           ? selectedBlockIds.size > 0
                             ? `Delete ${selectedBlockIds.size} checked block(s)`
                             : 'Delete checked blocks'
-                          : capability?.reason}
-                        blockDeleteDimmed={isFirstBlock
-                          ? !moveGraphRevision
-                          : !capability?.canDelete}
+                          : 'Delete block'}
+                        blockDeleteDimmed={false}
                         renderHighlighted={renderHighlighted}
                         exportFileNode={renderExportFile(block.exportFile || 'No Excel Export File')}
                         onToggleStatus={() => handleBlockStatus(block.blockId)}

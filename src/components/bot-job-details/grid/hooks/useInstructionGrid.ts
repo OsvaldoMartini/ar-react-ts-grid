@@ -252,25 +252,6 @@ export function useInstructionGrid({
     selectedBlockIds,
   };
 
-  const sameOrderedBlockIds = (
-    left: readonly number[],
-    right: readonly number[],
-  ) => left.length === right.length
-    && left.every((blockId, index) => blockId === right[index]);
-
-  const showBlockSelectionFailure = (reason: string) => {
-    setAlertImage(warningRedImage);
-    setAlertClass('construction-image');
-    setAlertMessageHeader('Block Selection Changed');
-    setAlertMessageBody(reason);
-    setAlertMessageFooter(
-      'Review the current blocks and make the selection again.',
-    );
-    setErrorFlag(true);
-    setAlertOnConfirm(undefined);
-    setAlertAlternateAction(undefined);
-  };
-
   const handleBlockSelectionChange = (blockId: number, checked: boolean) => {
     const selectionContext = blockSelectionContextRef.current;
     const firstBlockId = selectionContext.orderedBlockIds[0];
@@ -288,30 +269,23 @@ export function useInstructionGrid({
       return;
     }
 
-    const expectedBlockIds = [...selectionContext.orderedBlockIds];
-    const sourceRevision = selectionContext.moveGraphRevision;
     const applyScope = (scope: 'FIRST' | 'ALL') => {
       handleClose();
       const latest = blockSelectionContextRef.current;
-      if (
-        latest.moveGraphRevision !== sourceRevision
-        || !sameOrderedBlockIds(latest.orderedBlockIds, expectedBlockIds)
-      ) {
-        showBlockSelectionFailure(
-          'The block catalog or instruction graph changed while the selection dialog was open.',
-        );
-        return;
-      }
+      const latestFirstBlockId = latest.orderedBlockIds[0];
       setSelectedBlockIds(new Set(
-        scope === 'ALL' ? expectedBlockIds : [firstBlockId],
+        scope === 'ALL'
+          ? latest.orderedBlockIds
+          : latestFirstBlockId == null ? [] : [latestFirstBlockId],
       ));
     };
 
+    const blockCount = selectionContext.orderedBlockIds.length;
     setAlertImage(constructionImage);
     setAlertClass('construction-image');
     setAlertMessageHeader('Select Blocks');
     setAlertMessageBody(
-      `Choose the first block only or all ${expectedBlockIds.length} current blocks.`,
+      `Choose the first block only or all ${blockCount} current blocks.`,
     );
     setAlertMessageFooter(
       'You can adjust the other block checkboxes individually after this choice.',
@@ -351,17 +325,8 @@ export function useInstructionGrid({
       setErrorFlag(false);
       return;
     }
-    if (!selectionContext.moveGraphRevision) {
-      showBlockSelectionFailure(
-        'Wait for the authoritative grid revision before deleting checked blocks.',
-      );
-      return;
-    }
-
     const expectedBlockIds = [...selectionContext.orderedBlockIds];
-    const sourceRevision = selectionContext.moveGraphRevision;
     const deletingAllBlocks = deleteBlockIds.length === expectedBlockIds.length;
-    const retainBlockId = deletingAllBlocks ? firstBlockId : undefined;
     const selectedBlocks = selectionContext.orderedBlocks.filter(
       block => selectionContext.selectedBlockIds.has(block.blockId),
     );
@@ -374,28 +339,10 @@ export function useInstructionGrid({
     if (selectedBlocks.length > selectedNames.length) {
       selectedNames.push(`+ ${selectedBlocks.length - selectedNames.length} more block(s)`);
     }
-    const confirmedSelection = new Set(deleteBlockIds);
     const executeConfirmedDelete = () => {
       handleClose();
-      const latest = blockSelectionContextRef.current;
-      const exactSelectionStillCurrent =
-        latest.selectedBlockIds.size === confirmedSelection.size
-        && [...confirmedSelection].every(blockId => latest.selectedBlockIds.has(blockId));
-      if (
-        latest.moveGraphRevision !== sourceRevision
-        || !sameOrderedBlockIds(latest.orderedBlockIds, expectedBlockIds)
-        || !exactSelectionStillCurrent
-      ) {
-        showBlockSelectionFailure(
-          'The block catalog, checked blocks, or instruction graph changed while confirmation was open.',
-        );
-        return;
-      }
       const sent = submitDeleteBlocks({
         deleteBlockIds,
-        expectedBlockIds,
-        ...(retainBlockId === undefined ? {} : { retainBlockId }),
-        graphRevision: sourceRevision,
       });
       if (sent) setSelectedBlockIds(new Set<number>());
     };
