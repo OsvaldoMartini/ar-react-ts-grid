@@ -286,11 +286,14 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                     || edge.kind === 'CONDITIONAL_ROOT'
                     || edge.kind === 'BLOCK_TARGET'
                   ));
-                const variableEdge = edges.find(edge =>
-                  edge.state === 'RECONNECT_VARIABLE'
-                  && edge.kind === 'VARIABLE_BINDING');
+                const variableBindingEdge = edges.find(edge =>
+                  edge.kind === 'VARIABLE_BINDING'
+                  && edge.source.entity === 'INSTRUCTION'
+                  && edge.source.id === instructionId);
                 const requiresElementParent =
                   policy.requirements.includes('ELEMENT_TARGET');
+                const requiresVariableBinding =
+                  policy.requirements.includes('VARIABLE_BINDING');
                 const configuredParentId =
                   typeof instruction.parentId === 'number'
                   && Number.isSafeInteger(instruction.parentId)
@@ -302,6 +305,8 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                 const connectedParentId = elementParentEdge
                   ? elementParentEdge.state === 'CONNECTED'
                     && elementParentEdge.target?.entity === 'INSTRUCTION'
+                    && Number.isSafeInteger(elementParentEdge.target.id)
+                    && elementParentEdge.target.id > 0
                       ? elementParentEdge.target.id
                       : null
                   : requiresElementParent
@@ -309,6 +314,22 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                     : null;
                 const reconnectParent =
                   requiresElementParent && connectedParentId === null;
+                const configuredVariableId =
+                  typeof instruction.variableId === 'number'
+                  && Number.isSafeInteger(instruction.variableId)
+                  && instruction.variableId > 0
+                    ? instruction.variableId
+                    : null;
+                const connectedVariableId = variableBindingEdge
+                  ? variableBindingEdge.state === 'CONNECTED'
+                    && variableBindingEdge.target?.entity === 'VARIABLE'
+                    && Number.isSafeInteger(variableBindingEdge.target.id)
+                    && variableBindingEdge.target.id > 0
+                      ? variableBindingEdge.target.id
+                      : null
+                  : requiresVariableBinding
+                    ? configuredVariableId
+                    : null;
                 const reconnectOtherParent = Boolean(
                   otherParentEdge
                   || (
@@ -332,13 +353,17 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                         ts: instructionId ?? index,
                       }
                     : null;
-                const reconnectVariable = Boolean(
-                  variableEdge
-                  || (
-                    instruction.variableId === null
-                    && policy.requirements.includes('VARIABLE_BINDING')
-                  ),
-                );
+                const reconnectVariable =
+                  requiresVariableBinding && connectedVariableId === null;
+                const reconnectVariableEvent: RulesCardEvent | null =
+                  reconnectVariable
+                    ? {
+                        color: 'red',
+                        rules: 'Reconnect Variable',
+                        context: '',
+                        ts: instructionId ?? index,
+                      }
+                    : null;
                 const canDrag = instructionId !== null
                   && !disabled
                   && Boolean(onInstructionDragStart)
@@ -427,14 +452,37 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                           </span>
                         )}
                         {connectedParentId !== null && instructionId !== null && (
-                          <span
-                            className={styles.connectedParent}
-                            aria-label={`Parent connected (id: ${connectedParentId})`}
-                            title={`Parent connected (id: ${connectedParentId})`}
-                          >
-                            <Link2 size={11} aria-hidden="true" />
-                            Parent connected (id: {connectedParentId})
-                          </span>
+                          elementParentEdge && onReconnectParent
+                            ? (
+                                <button
+                                  type="button"
+                                  className={styles.connectedParent}
+                                  aria-label={`Parent connected (id: ${connectedParentId})`}
+                                  title="Change connected Web Element"
+                                  disabled={disabled}
+                                  onMouseDown={event => event.stopPropagation()}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    onReconnectParent(
+                                      instructionId,
+                                      elementParentEdge,
+                                    );
+                                  }}
+                                >
+                                  <Link2 size={11} aria-hidden="true" />
+                                  Parent connected (id: {connectedParentId})
+                                </button>
+                              )
+                            : (
+                                <span
+                                  className={`${styles.connectedParent} ${styles.connectedStatic}`}
+                                  aria-label={`Parent connected (id: ${connectedParentId})`}
+                                  title={`Parent connected (id: ${connectedParentId})`}
+                                >
+                                  <Link2 size={11} aria-hidden="true" />
+                                  Parent connected (id: {connectedParentId})
+                                </span>
+                              )
                         )}
                         {reconnectOtherParent && instructionId !== null && (
                           <button
@@ -458,23 +506,71 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                             Reconnect parent
                           </button>
                         )}
-                        {reconnectVariable && instructionId !== null && (
-                          <button
-                            type="button"
-                            className={`${styles.reconnectButton} ${styles.variableButton}`}
-                            disabled={disabled || !onReconnectVariable}
-                            title={relationshipTitle('Reconnect variable', variableEdge)}
+                        {reconnectVariableEvent && instructionId !== null && (
+                          <span
+                            className={styles.reconnectRuleCard}
                             onMouseDown={event => event.stopPropagation()}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              onReconnectVariable?.(instructionId, variableEdge);
-                            }}
                           >
-                            <Variable size={11} aria-hidden="true" />
-                            Reconnect variable
-                          </button>
+                            <RulesCard
+                              event={reconnectVariableEvent}
+                              ariaLabel={relationshipTitle(
+                                'Reconnect variable',
+                                variableBindingEdge,
+                              )}
+                              glow
+                              border
+                              animate={false}
+                              pulse
+                              iconNode={<Variable size={11} aria-hidden="true" />}
+                              title={relationshipTitle(
+                                'Reconnect variable',
+                                variableBindingEdge,
+                              )}
+                              disabled={disabled || !onReconnectVariable}
+                              onClick={onReconnectVariable
+                                ? () => onReconnectVariable(
+                                    instructionId,
+                                    variableBindingEdge,
+                                  )
+                                : undefined}
+                            />
+                          </span>
                         )}
-                        {!reconnectVariable && instruction.variableId !== null && (
+                        {connectedVariableId !== null && instructionId !== null && (
+                          variableBindingEdge && onReconnectVariable
+                            ? (
+                                <button
+                                  type="button"
+                                  className={`${styles.connectedVariable} ${styles.variableButton}`}
+                                  aria-label={`Variable connected (id: ${connectedVariableId})`}
+                                  title="Change connected variable"
+                                  disabled={disabled}
+                                  onMouseDown={event => event.stopPropagation()}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    onReconnectVariable(
+                                      instructionId,
+                                      variableBindingEdge,
+                                    );
+                                  }}
+                                >
+                                  <Variable size={11} aria-hidden="true" />
+                                  Variable connected (id: {connectedVariableId})
+                                </button>
+                              )
+                            : (
+                                <span
+                                  className={`${styles.connectedVariable} ${styles.variableButton} ${styles.connectedStatic}`}
+                                  aria-label={`Variable connected (id: ${connectedVariableId})`}
+                                  title={`Variable connected (id: ${connectedVariableId})`}
+                                >
+                                  <Variable size={11} aria-hidden="true" />
+                                  Variable connected (id: {connectedVariableId})
+                                </span>
+                              )
+                        )}
+                        {!requiresVariableBinding
+                          && instruction.variableId !== null && (
                           <span
                             className={styles.variableBadge}
                             title={`Connected variable ID ${instruction.variableId}`}
@@ -482,7 +578,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                             <Variable size={10} aria-hidden="true" />
                             {instruction.variableId}
                           </span>
-                        )}
+                          )}
                         {!reconnectParent
                           && !reconnectOtherParent
                           && !reconnectVariable

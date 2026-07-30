@@ -4,8 +4,10 @@ import type {
   InstructionRelationshipEdge,
   RelationshipOwner,
 } from '../bot-job-details/grid/domain/instructionRelationshipGraph';
+import rulesCardStyles from '../RulesCard.module.scss';
 import type { VariableInstructionNode } from '../variablesWorkspace.contract';
 import VariablesCommandBoard from './VariablesCommandBoard';
+import boardStyles from './VariablesCommandBoard.module.scss';
 
 const OWNER: RelationshipOwner = {
   workspaceKind: 'BOT_JOB',
@@ -17,6 +19,7 @@ const command = (
   id: number,
   action: string,
   parentId: number | null,
+  overrides: Partial<VariableInstructionNode> = {},
 ): VariableInstructionNode => ({
   id,
   name: `Instruction ${id}`,
@@ -31,6 +34,7 @@ const command = (
   variableId: action === 'GET' ? 12 : null,
   active: true,
   blockActive: true,
+  ...overrides,
 });
 
 const elementEdge = (
@@ -50,12 +54,34 @@ const elementEdge = (
   compatibleTargets: [],
 });
 
+const variableEdge = (
+  sourceId: number,
+  state: 'CONNECTED' | 'RECONNECT_VARIABLE',
+  targetId: number | null,
+): InstructionRelationshipEdge => ({
+  id: `VARIABLE_BINDING:${sourceId}:${state}`,
+  kind: 'VARIABLE_BINDING',
+  source: { entity: 'INSTRUCTION', owner: OWNER, id: sourceId },
+  target: targetId === null
+    ? null
+    : { entity: 'VARIABLE', owner: OWNER, id: targetId },
+  state,
+  code: state === 'CONNECTED' ? null : 'MISSING_VARIABLE_BINDING',
+  required: true,
+  compatibleTargets: [],
+});
+
 const block = [{ id: 7, name: 'Login', order: 1, active: true }];
 
 test('always shows the connected or reconnect parent badge in Variables', () => {
   const parent = command(1640, 'O', null);
   const connected = command(1641, 'GET', parent.id);
   const missing = command(1642, 'GET', null);
+  const connectedEdge = elementEdge(
+    connected.id!,
+    'CONNECTED',
+    parent.id,
+  );
   const missingEdge = elementEdge(missing.id!, 'RECONNECT_PARENT', null);
   const onReconnectParent = jest.fn();
 
@@ -64,23 +90,87 @@ test('always shows the connected or reconnect parent badge in Variables', () => 
       blocks={block}
       instructions={[parent, connected, missing]}
       relationshipEdges={[
-        elementEdge(connected.id!, 'CONNECTED', parent.id),
+        connectedEdge,
         missingEdge,
       ]}
       onReconnectParent={onReconnectParent}
     />,
   );
 
-  expect(screen.getByLabelText('Parent connected (id: 1640)'))
-    .toBeInTheDocument();
-  expect(screen.queryByRole('button', {
+  const connectedParent = screen.getByRole('button', {
     name: 'Parent connected (id: 1640)',
-  })).not.toBeInTheDocument();
+  });
+  expect(connectedParent).toHaveClass(boardStyles.connectedParent);
+  fireEvent.click(connectedParent);
 
   fireEvent.click(screen.getByRole('button', {
     name: /Reconnect parent: missing element target/i,
   }));
-  expect(onReconnectParent).toHaveBeenCalledWith(missing.id, missingEdge);
+  expect(onReconnectParent).toHaveBeenNthCalledWith(
+    1,
+    connected.id,
+    connectedEdge,
+  );
+  expect(onReconnectParent).toHaveBeenNthCalledWith(
+    2,
+    missing.id,
+    missingEdge,
+  );
+});
+
+test('shows clickable connected and red reconnect variable badges in Variables', () => {
+  const parent = command(1640, 'O', null);
+  const connected = command(1641, 'GET', parent.id);
+  const staleBroken = command(1642, 'GET', parent.id, { variableId: 12 });
+  const connectedEdge = variableEdge(connected.id!, 'CONNECTED', 12);
+  const brokenEdge = variableEdge(
+    staleBroken.id!,
+    'RECONNECT_VARIABLE',
+    null,
+  );
+  const onReconnectVariable = jest.fn();
+
+  render(
+    <VariablesCommandBoard
+      blocks={block}
+      instructions={[parent, connected, staleBroken]}
+      relationshipEdges={[connectedEdge, brokenEdge]}
+      onReconnectVariable={onReconnectVariable}
+    />,
+  );
+
+  const connectedVariable = screen.getByRole('button', {
+    name: 'Variable connected (id: 12)',
+  });
+  expect(connectedVariable).toHaveClass(
+    boardStyles.connectedVariable,
+    boardStyles.variableButton,
+  );
+  fireEvent.click(connectedVariable);
+
+  const reconnectVariable = screen.getByRole('button', {
+    name: /Reconnect variable: missing variable binding/i,
+  });
+  expect(reconnectVariable).toHaveClass(
+    rulesCardStyles.red,
+    rulesCardStyles.withBorder,
+    rulesCardStyles.static,
+    rulesCardStyles.pulse,
+  );
+  fireEvent.click(reconnectVariable);
+
+  expect(onReconnectVariable).toHaveBeenNthCalledWith(
+    1,
+    connected.id,
+    connectedEdge,
+  );
+  expect(onReconnectVariable).toHaveBeenNthCalledWith(
+    2,
+    staleBroken.id,
+    brokenEdge,
+  );
+  expect(screen.getAllByLabelText('Variable connected (id: 12)'))
+    .toHaveLength(1);
 });
 
 test('uses a DTO fallback only when no authoritative parent edge exists', () => {
@@ -104,4 +194,31 @@ test('uses a DTO fallback only when no authoritative parent edge exists', () => 
   expect(screen.getByRole('button', {
     name: /Reconnect parent: missing element target/i,
   })).toBeInTheDocument();
+});
+
+test('uses a DTO variable fallback only when no authoritative binding edge exists', () => {
+  const parent = command(1640, 'O', null);
+  const fallbackConnected = command(1641, 'GET', parent.id, {
+    variableId: 12,
+  });
+  const staleBroken = command(1642, 'GET', parent.id, {
+    variableId: 12,
+  });
+
+  render(
+    <VariablesCommandBoard
+      blocks={block}
+      instructions={[parent, fallbackConnected, staleBroken]}
+      relationshipEdges={[
+        variableEdge(staleBroken.id!, 'RECONNECT_VARIABLE', null),
+      ]}
+      onReconnectVariable={jest.fn()}
+    />,
+  );
+
+  expect(screen.getAllByLabelText('Variable connected (id: 12)'))
+    .toHaveLength(1);
+  expect(screen.getByRole('button', {
+    name: /Reconnect variable: missing variable binding/i,
+  })).toHaveClass(rulesCardStyles.red);
 });

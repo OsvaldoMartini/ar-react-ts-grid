@@ -1,7 +1,9 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { BlockLoopInstructionLoadDTO } from '../../instructionsMockData';
+import rulesCardStyles from '../../RulesCard.module.scss';
 import InstructionRelationshipDetails from './InstructionRelationshipDetails';
+import relationshipStyles from './InstructionRelationshipDetails.module.scss';
 import type {
   DerivedRelationshipState,
   InstructionRelationshipEdge,
@@ -48,18 +50,25 @@ const relationshipEdge = (
   kind: InstructionRelationshipKind = 'ELEMENT_TARGET',
   sourceId = 2,
   targetId: number | null = null,
-): InstructionRelationshipEdge => ({
-  id: `${kind}:${sourceId}:${state}:${code ?? 'NONE'}`,
-  kind,
-  source: { entity: 'INSTRUCTION', owner: OWNER, id: sourceId },
-  target: targetId === null
+): InstructionRelationshipEdge => {
+  const target = targetId === null
     ? null
-    : { entity: 'INSTRUCTION', owner: OWNER, id: targetId },
-  state,
-  code,
-  required: true,
-  compatibleTargets: [],
-});
+    : kind === 'VARIABLE_BINDING'
+      ? { entity: 'VARIABLE' as const, owner: OWNER, id: targetId }
+      : kind === 'BLOCK_TARGET'
+        ? { entity: 'BLOCK' as const, owner: OWNER, id: targetId }
+        : { entity: 'INSTRUCTION' as const, owner: OWNER, id: targetId };
+  return {
+    id: `${kind}:${sourceId}:${state}:${code ?? 'NONE'}`,
+    kind,
+    source: { entity: 'INSTRUCTION', owner: OWNER, id: sourceId },
+    target,
+    state,
+    code,
+    required: true,
+    compatibleTargets: [],
+  };
+};
 
 test('preserves the legacy LOOP relationship text and colors', () => {
   const parent = row(917, 1, 'O', { name: 'Pagina iniziale' });
@@ -107,20 +116,122 @@ test('keeps the connected parent badge visible and identifies its exact parent',
     instruction.id,
     parent.id,
   );
+  const onReconnect = jest.fn();
   render(
     <InstructionRelationshipDetails
       instruction={instruction}
       allInstructions={[parent, instruction]}
       relationshipEdges={[edge]}
+      onReconnect={onReconnect}
     />,
   );
 
-  expect(screen.getByLabelText('Parent connected (id: 1640)'))
-    .toBeInTheDocument();
-  expect(screen.queryByRole('button', {
+  const connectedParent = screen.getByRole('button', {
     name: 'Parent connected (id: 1640)',
-  })).not.toBeInTheDocument();
+  });
+  expect(connectedParent).toHaveClass(
+    relationshipStyles.reconnectButton,
+    relationshipStyles.connectedParent,
+  );
+  fireEvent.click(connectedParent);
+
+  expect(onReconnect).toHaveBeenCalledTimes(1);
+  expect(onReconnect).toHaveBeenCalledWith(edge);
   expect(screen.queryByText('Reconnect Parent')).not.toBeInTheDocument();
+});
+
+test('opens the exact connected variable edge from the purple badge', () => {
+  const parent = row(1640, 1, 'O', { name: 'User number' });
+  const instruction = row(1641, 2, 'GET', {
+    operation: 'user_number:value',
+    parentId: parent.id,
+    variableId: 100,
+  });
+  const parentEdge = relationshipEdge(
+    'CONNECTED',
+    null,
+    'ELEMENT_TARGET',
+    instruction.id,
+    parent.id,
+  );
+  const variableEdge = relationshipEdge(
+    'CONNECTED',
+    null,
+    'VARIABLE_BINDING',
+    instruction.id,
+    100,
+  );
+  const onReconnect = jest.fn();
+
+  render(
+    <InstructionRelationshipDetails
+      instruction={instruction}
+      allInstructions={[parent, instruction]}
+      relationshipEdges={[parentEdge, variableEdge]}
+      onReconnect={onReconnect}
+    />,
+  );
+
+  const connectedVariable = screen.getByRole('button', {
+    name: 'Variable connected (id: 100)',
+  });
+  expect(connectedVariable).toHaveClass(
+    relationshipStyles.reconnectButton,
+    relationshipStyles.reconnectVariable,
+  );
+  fireEvent.click(connectedVariable);
+
+  expect(onReconnect).toHaveBeenCalledTimes(1);
+  expect(onReconnect).toHaveBeenCalledWith(variableEdge);
+  expect(screen.queryByText('Reconnect Variable')).not.toBeInTheDocument();
+});
+
+test('an authoritative broken variable edge beats a stale DTO id and glows red', () => {
+  const parent = row(1640, 1, 'O', { name: 'User number' });
+  const instruction = row(1641, 2, 'GET', {
+    operation: 'user_number:value',
+    parentId: parent.id,
+    variableId: 100,
+  });
+  const parentEdge = relationshipEdge(
+    'CONNECTED',
+    null,
+    'ELEMENT_TARGET',
+    instruction.id,
+    parent.id,
+  );
+  const brokenVariableEdge = relationshipEdge(
+    'RECONNECT_VARIABLE',
+    'MISSING_VARIABLE_BINDING',
+    'VARIABLE_BINDING',
+    instruction.id,
+  );
+  const onReconnect = jest.fn();
+
+  render(
+    <InstructionRelationshipDetails
+      instruction={instruction}
+      allInstructions={[parent, instruction]}
+      relationshipEdges={[parentEdge, brokenVariableEdge]}
+      onReconnect={onReconnect}
+    />,
+  );
+
+  const reconnectVariable = screen.getByRole('button', {
+    name: /Reconnect variable: Missing variable binding/i,
+  });
+  expect(reconnectVariable).toHaveClass(
+    rulesCardStyles.red,
+    rulesCardStyles.withBorder,
+    rulesCardStyles.static,
+    rulesCardStyles.pulse,
+  );
+  expect(screen.queryByLabelText('Variable connected (id: 100)'))
+    .not.toBeInTheDocument();
+
+  fireEvent.click(reconnectVariable);
+  expect(onReconnect).toHaveBeenCalledTimes(1);
+  expect(onReconnect).toHaveBeenCalledWith(brokenVariableEdge);
 });
 
 test.each([

@@ -263,9 +263,17 @@ const InstructionRelationshipDetails: React.FC<
     edge.source.entity === 'INSTRUCTION'
     && edge.source.id === instruction.id
     && edge.kind === 'ELEMENT_TARGET');
-  const requiresElementParent = instructionRelationshipPolicy(
+  const variableBindingEdge = relationshipEdges.find(edge =>
+    edge.source.entity === 'INSTRUCTION'
+    && edge.source.id === instruction.id
+    && edge.kind === 'VARIABLE_BINDING');
+  const relationshipPolicy = instructionRelationshipPolicy(
     instruction.actions,
-  ).requirements.includes('ELEMENT_TARGET');
+  );
+  const requiresElementParent =
+    relationshipPolicy.requirements.includes('ELEMENT_TARGET');
+  const requiresVariableBinding =
+    relationshipPolicy.requirements.includes('VARIABLE_BINDING');
   const configuredParentId =
     typeof instruction.parentId === 'number'
     && Number.isSafeInteger(instruction.parentId)
@@ -277,10 +285,28 @@ const InstructionRelationshipDetails: React.FC<
   const connectedParentId = elementParentEdge
     ? elementParentEdge.state === 'CONNECTED'
       && elementParentEdge.target?.entity === 'INSTRUCTION'
+      && Number.isSafeInteger(elementParentEdge.target.id)
+      && elementParentEdge.target.id > 0
         ? elementParentEdge.target.id
         : null
     : requiresElementParent
       ? configuredParentId
+      : null;
+  const configuredVariableId =
+    typeof instruction.variableId === 'number'
+    && Number.isSafeInteger(instruction.variableId)
+    && instruction.variableId > 0
+      ? instruction.variableId
+      : null;
+  const connectedVariableId = variableBindingEdge
+    ? variableBindingEdge.state === 'CONNECTED'
+      && variableBindingEdge.target?.entity === 'VARIABLE'
+      && Number.isSafeInteger(variableBindingEdge.target.id)
+      && variableBindingEdge.target.id > 0
+        ? variableBindingEdge.target.id
+        : null
+    : requiresVariableBinding
+      ? configuredVariableId
       : null;
   const reconnectParentEvent: RulesCardEvent | null =
     requiresElementParent
@@ -298,10 +324,29 @@ const InstructionRelationshipDetails: React.FC<
   const reconnectParentLabel = parentDetail
     ? `Reconnect parent: ${parentDetail}`
     : 'Reconnect parent';
+  const variableDetail = variableBindingEdge?.code
+    ? humanizeCode(variableBindingEdge.code)
+    : '';
+  const reconnectVariableLabel = variableDetail
+    ? `Reconnect variable: ${variableDetail}`
+    : 'Reconnect variable';
+  const reconnectVariableEvent: RulesCardEvent | null =
+    requiresVariableBinding
+    && connectedVariableId === null
+      ? {
+          color: 'red',
+          rules: 'Reconnect Variable',
+          context: '',
+          ts: instruction.id,
+        }
+      : null;
 
   const chips = [
     ...relationshipEdges
-      .filter(edge => edge !== elementParentEdge && edge.state !== 'CONNECTED')
+      .filter(edge =>
+        edge !== elementParentEdge
+        && edge !== variableBindingEdge
+        && edge.state !== 'CONNECTED')
       .map(edge => ({
         key: edge.id,
         state: edge.state as Exclude<RelationshipState, 'CONNECTED'>,
@@ -328,6 +373,8 @@ const InstructionRelationshipDetails: React.FC<
         || chips.length > 0
         || reconnectParentEvent != null
         || connectedParentId != null
+        || reconnectVariableEvent != null
+        || connectedVariableId != null
       ) && (
         <span className={styles.chips}>
           <InstructionVariableStateBadge
@@ -356,19 +403,107 @@ const InstructionRelationshipDetails: React.FC<
             </span>
           )}
           {connectedParentId != null && (
+            elementParentEdge && onReconnect
+              ? (
+                  <button
+                    type="button"
+                    className={[
+                      styles.chip,
+                      styles.reconnectButton,
+                      styles.reconnectParent,
+                      styles.connectedParent,
+                    ].join(' ')}
+                    aria-label={`Parent connected (id: ${connectedParentId})`}
+                    title="Change connected Web Element"
+                    data-relationship-state="CONNECTED"
+                    disabled={reconnectDisabled}
+                    onMouseDown={event => event.stopPropagation()}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onReconnect(elementParentEdge);
+                    }}
+                  >
+                    <Link2 size={10} aria-hidden="true" />
+                    Parent connected (id: {connectedParentId})
+                  </button>
+                )
+              : (
+                  <span
+                    className={[
+                      styles.chip,
+                      styles.reconnectParent,
+                      styles.connectedParent,
+                      styles.connectedStatic,
+                    ].join(' ')}
+                    aria-label={`Parent connected (id: ${connectedParentId})`}
+                    title={`Parent connected (id: ${connectedParentId})`}
+                    data-relationship-state="CONNECTED"
+                  >
+                    <Link2 size={10} aria-hidden="true" />
+                    Parent connected (id: {connectedParentId})
+                  </span>
+                )
+          )}
+          {reconnectVariableEvent && (
             <span
-              className={[
-                styles.chip,
-                styles.reconnectParent,
-                styles.connectedParent,
-              ].join(' ')}
-              aria-label={`Parent connected (id: ${connectedParentId})`}
-              title={`Parent connected (id: ${connectedParentId})`}
-              data-relationship-state="CONNECTED"
+              className={styles.reconnectRuleCard}
+              onMouseDown={event => event.stopPropagation()}
             >
-              <Link2 size={10} aria-hidden="true" />
-              Parent connected (id: {connectedParentId})
+              <RulesCard
+                event={reconnectVariableEvent}
+                ariaLabel={reconnectVariableLabel}
+                glow
+                border
+                animate={false}
+                pulse
+                iconNode={<Variable size={10} aria-hidden="true" />}
+                title={reconnectVariableLabel}
+                disabled={reconnectDisabled}
+                onClick={onReconnect && variableBindingEdge
+                  ? () => onReconnect(variableBindingEdge)
+                  : undefined}
+              />
             </span>
+          )}
+          {connectedVariableId != null && (
+            variableBindingEdge && onReconnect
+              ? (
+                  <button
+                    type="button"
+                    className={[
+                      styles.chip,
+                      styles.reconnectButton,
+                      styles.reconnectVariable,
+                    ].join(' ')}
+                    aria-label={`Variable connected (id: ${connectedVariableId})`}
+                    title="Change connected variable"
+                    data-relationship-state="CONNECTED"
+                    disabled={reconnectDisabled}
+                    onMouseDown={event => event.stopPropagation()}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onReconnect(variableBindingEdge);
+                    }}
+                  >
+                    <Variable size={10} aria-hidden="true" />
+                    Variable connected (id: {connectedVariableId})
+                  </button>
+                )
+              : (
+                  <span
+                    className={[
+                      styles.chip,
+                      styles.reconnectVariable,
+                      styles.connectedStatic,
+                    ].join(' ')}
+                    aria-label={`Variable connected (id: ${connectedVariableId})`}
+                    title={`Variable connected (id: ${connectedVariableId})`}
+                    data-relationship-state="CONNECTED"
+                  >
+                    <Variable size={10} aria-hidden="true" />
+                    Variable connected (id: {connectedVariableId})
+                  </span>
+                )
           )}
           {chips.map(({ key, state, code, edge }) => {
             const descriptor = CHIP_DESCRIPTORS[state];

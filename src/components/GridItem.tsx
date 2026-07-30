@@ -134,8 +134,10 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
     botJobIdInitial, botJobNameInitial, workspaceEpochInitial,
     onSessionOpen, onDetachedClose, workspaceMode,
   });
-  const [reconnectPreviewEdge, setReconnectPreviewEdge] =
-    React.useState<InstructionRelationshipEdge | null>(null);
+  const [reconnectPreview, setReconnectPreview] = React.useState<{
+    edge: InstructionRelationshipEdge;
+    authorityKey: string | null;
+  } | null>(null);
 
   const {
     webSocket, connected, reconnectAttempts, messages, error,
@@ -171,6 +173,9 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
     moveGraphRevision,
     variableLinks,
     relationshipEdgesByInstruction,
+    botJobRelationshipMutationAuthorityKey,
+    botJobRelationshipMutationAvailable,
+    botJobRelationshipMutationPending,
     blockDeleteCapabilities,
     gridActionNotice,
     dismissGridActionNotice,
@@ -188,6 +193,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
     handleInstructionForceChange,
     handleEditInstruction,
     handleSaveInstruction,
+    submitInstructionRelationshipMutation,
     handleMoveRowUp,
     handleMoveRowDown,
     handleRowSelectedClick,
@@ -201,6 +207,24 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
     handleMoveBlockUp, handleMoveBlockDown,
   } = grid;
   const componentWorkspace = workspacePolicy.kind === 'COMPONENT';
+  const reconnectPreviewEdge = reconnectPreview?.edge ?? null;
+  const openReconnectPreview = React.useCallback((
+    edge: InstructionRelationshipEdge,
+  ) => {
+    setReconnectPreview({
+      edge,
+      authorityKey: botJobRelationshipMutationAuthorityKey,
+    });
+  }, [botJobRelationshipMutationAuthorityKey]);
+  React.useEffect(() => {
+    if (
+      reconnectPreview
+      && reconnectPreview.authorityKey
+        !== botJobRelationshipMutationAuthorityKey
+    ) {
+      setReconnectPreview(null);
+    }
+  }, [botJobRelationshipMutationAuthorityKey, reconnectPreview]);
   const reconnectPreviewInstruction =
     reconnectPreviewEdge?.source.entity === 'INSTRUCTION'
       ? instructionsData.find(
@@ -445,12 +469,37 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
           sourceLabel={reconnectPreviewSourceLabel}
           currentTargetLabel={reconnectPreviewCurrentTarget}
           compatibleTargets={reconnectPreviewOptions}
-          pending={false}
-          actionsEnabled={false}
-          actionDisabledTitle="Reconnect persistence rules will be enabled after the design review."
-          onDisconnect={() => undefined}
-          onConnect={() => undefined}
-          onCancel={() => setReconnectPreviewEdge(null)}
+          pending={botJobRelationshipMutationPending}
+          actionsEnabled={
+            !componentWorkspace
+            && botJobRelationshipMutationAvailable
+            && reconnectPreview?.authorityKey
+              === botJobRelationshipMutationAuthorityKey
+          }
+          actionDisabledTitle={
+            componentWorkspace
+              ? 'Component relationship persistence is not available from this Bot Job dialog.'
+              : 'Refresh this workspace before changing the relationship.'
+          }
+          onDisconnect={() => {
+            if (!reconnectPreview?.authorityKey) return;
+            submitInstructionRelationshipMutation(
+              reconnectPreview.edge,
+              null,
+              reconnectPreview.authorityKey,
+              { settled: () => setReconnectPreview(null) },
+            );
+          }}
+          onConnect={(target) => {
+            if (!reconnectPreview?.authorityKey) return;
+            submitInstructionRelationshipMutation(
+              reconnectPreview.edge,
+              target,
+              reconnectPreview.authorityKey,
+              { settled: () => setReconnectPreview(null) },
+            );
+          }}
+          onCancel={() => setReconnectPreview(null)}
         />
       )}
       {gridActionNotice && (
@@ -692,7 +741,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                                 relationshipEdges={
                                   relationshipEdgesByInstruction.get(instruction.id) ?? []
                                 }
-                                onReconnect={setReconnectPreviewEdge}
+                                onReconnect={openReconnectPreview}
                               />
                             )}
                             deviceOptionsRow={renderDeviceOptionsRow(instruction)}

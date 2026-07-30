@@ -28,6 +28,13 @@ import {
   buildInstructionFreeMoveMutationDraft,
   type InstructionFreeMoveChoice,
 } from '../domain/instructionFreeMoveMutationAdapter';
+import {
+  buildInstructionRelationshipMutation,
+} from '../domain/instructionRelationshipMutation';
+import type {
+  InstructionRelationshipEdge,
+  RelationshipTarget,
+} from '../domain/instructionRelationshipGraph';
 import { computeInstructionGraphRevision } from '../domain/instructionGraphRevision';
 import {
   planInstructionDeletion,
@@ -80,6 +87,10 @@ export type GridActionNotice = {
   title: string;
   message: string;
   action: string;
+};
+
+export type InstructionRelationshipMutationCallbacks = {
+  settled?: () => void;
 };
 
 export type DeleteBlocksPlan = {
@@ -378,6 +389,139 @@ export function useGridData(deps: UseGridDataDeps) {
       ? botJobGraphMutationCapability
       : null,
   });
+  const botJobRelationshipMutationAuthorityKey =
+    workspaceKind === 'BOT_JOB' && botJobGraphMutationCapability
+      ? [
+          botJobGraphMutationCapability.workspaceEpoch,
+          botJobGraphMutationCapability.graphVersion,
+          botJobGraphMutationCapability.graphRevision,
+          botJobGraphMutationCapability.ownerAssertion.homeBankingId,
+          botJobGraphMutationCapability.ownerAssertion.botJobId,
+        ].join(':')
+      : null;
+  const botJobRelationshipMutationAvailable =
+    botJobRelationshipMutationAuthorityKey !== null;
+  const submitInstructionRelationshipMutation = useCallback((
+    edge: InstructionRelationshipEdge,
+    target: RelationshipTarget | null,
+    capturedAuthorityKey: string,
+    callbacks: InstructionRelationshipMutationCallbacks = {},
+  ): boolean => {
+    if (
+      workspaceKind !== 'BOT_JOB'
+      || botJobRelationshipMutationAuthorityKey === null
+      || botJobRelationshipMutationAuthorityKey !== capturedAuthorityKey
+      || pendingBotJobGraphMutationRequestId !== null
+    ) {
+      setAlertImage(forbiddenImage);
+      setAlertClass('construction-image');
+      setAlertMessageHeader('Reconnect Not Sent');
+      setAlertMessageBody(
+        'The instruction relationship changed while the selector was open.',
+      );
+      setAlertMessageFooter(
+        'Open the current Parent or Variable badge again and choose the target.',
+      );
+      setAlertOnConfirm(undefined);
+      setAlertAlternateAction(undefined);
+      setErrorFlag(true);
+      return false;
+    }
+
+    const mutation = buildInstructionRelationshipMutation(
+      edge,
+      target === null
+        ? { mode: 'DISCONNECT' }
+        : { mode: 'CONNECT', target },
+      instructionsData,
+    );
+    if (!mutation.ok) {
+      setAlertImage(forbiddenImage);
+      setAlertClass('construction-image');
+      setAlertMessageHeader(
+        mutation.code === 'NO_CHANGE'
+          ? 'Relationship Not Changed'
+          : 'Reconnect Not Sent',
+      );
+      setAlertMessageBody(mutation.message);
+      setAlertMessageFooter(
+        'The current instruction relationship remains unchanged.',
+      );
+      setAlertOnConfirm(undefined);
+      setAlertAlternateAction(undefined);
+      setErrorFlag(mutation.code !== 'NO_CHANGE');
+      return false;
+    }
+
+    const requestId = submitBotJobGraphMutation(mutation.draft, {
+      rollback: (reason) => {
+        if (reason === 'UNMOUNTED') return;
+        callbacks.settled?.();
+        setAlertImage(warningRedImage);
+        setAlertClass('construction-image');
+        setAlertMessageHeader('Reconnect Not Confirmed');
+        setAlertMessageBody(
+          `The relationship mutation did not complete (${reason}).`,
+        );
+        setAlertMessageFooter(
+          'No Parent or Variable relationship was changed.',
+        );
+        setAlertOnConfirm(undefined);
+        setAlertAlternateAction(undefined);
+        setErrorFlag(true);
+      },
+      committed: (response) => {
+        setBotJobGraphMutationCapability(current => current
+          ? {
+              ...current,
+              graphVersion: response.committedGraphVersion,
+              graphRevision: response.graphRevision,
+            }
+          : current);
+        callbacks.settled?.();
+      },
+      refused: (response) => {
+        setAlertImage(warningRedImage);
+        setAlertClass('construction-image');
+        setAlertMessageHeader('Reconnect Refused');
+        setAlertMessageBody(response.message);
+        setAlertMessageFooter(
+          'The authoritative instruction relationship remains unchanged.',
+        );
+        setAlertOnConfirm(undefined);
+        setAlertAlternateAction(undefined);
+        setErrorFlag(true);
+      },
+    });
+    if (!requestId) {
+      setAlertImage(forbiddenImage);
+      setAlertClass('construction-image');
+      setAlertMessageHeader('Reconnect Not Sent');
+      setAlertMessageBody(
+        'The relationship mutation is not synchronized with the backend.',
+      );
+      setAlertMessageFooter('Refresh this workspace and try again.');
+      setAlertOnConfirm(undefined);
+      setAlertAlternateAction(undefined);
+      setErrorFlag(true);
+      return false;
+    }
+    return true;
+  }, [
+    botJobRelationshipMutationAuthorityKey,
+    instructionsData,
+    pendingBotJobGraphMutationRequestId,
+    setAlertAlternateAction,
+    setAlertClass,
+    setAlertImage,
+    setAlertMessageBody,
+    setAlertMessageFooter,
+    setAlertMessageHeader,
+    setAlertOnConfirm,
+    setErrorFlag,
+    submitBotJobGraphMutation,
+    workspaceKind,
+  ]);
 
   useEffect(() => {
     if (workspaceKind === 'COMPONENT') return;
@@ -2956,6 +3100,10 @@ export function useGridData(deps: UseGridDataDeps) {
     moveGraphRevision,
     variableLinks,
     relationshipChipsV1,
+    botJobRelationshipMutationAuthorityKey,
+    botJobRelationshipMutationAvailable,
+    botJobRelationshipMutationPending:
+      pendingBotJobGraphMutationRequestId !== null,
     blockDeleteCapabilities,
     gridActionNotice,
     dismissGridActionNotice,
@@ -2974,6 +3122,7 @@ export function useGridData(deps: UseGridDataDeps) {
     handleInstructionForceChange,
     handleEditInstruction,
     handleSaveInstruction,
+    submitInstructionRelationshipMutation,
     handleMoveRowUp,
     handleMoveRowDown,
     handleRowSelectedClick,

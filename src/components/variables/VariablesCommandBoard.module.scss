@@ -317,6 +317,7 @@
 }
 
 .connectedParent {
+  appearance: none;
   min-height: 24px;
   display: inline-flex;
   align-items: center;
@@ -329,6 +330,39 @@
   font-size: 0.53rem;
   font-weight: 900;
   white-space: nowrap;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.connectedParent:hover:not(:disabled) {
+  border-color: #c8780b;
+  background: #ffe6c1;
+}
+
+.connectedVariable {
+  appearance: none;
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  border: 1px solid;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 0.53rem;
+  font-weight: 900;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.connectedParent:disabled,
+.connectedVariable:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.connectedStatic {
+  cursor: default;
 }
 
 .variableButton {
