@@ -23,6 +23,11 @@ import {
   resolveInstructionDragGroup,
   type InstructionMovePlan,
 } from '../domain/instructionMove';
+import { planBotJobInstructionFreeMove } from '../domain/instructionFreeMove';
+import {
+  buildInstructionFreeMoveMutationDraft,
+  type InstructionFreeMoveChoice,
+} from '../domain/instructionFreeMoveMutationAdapter';
 import { computeInstructionGraphRevision } from '../domain/instructionGraphRevision';
 import {
   planInstructionDeletion,
@@ -50,6 +55,11 @@ import type {
   MemoryListItem,
 } from '../../../memoryList.contract';
 import type { InstructionGridWorkspacePolicy } from '../instructionGrid.policy';
+import type { AlertAlternateAction } from '../../../AlertModal';
+import {
+  useBotJobInstructionGraphMutation,
+  type BotJobGraphMutationCapability,
+} from './useBotJobInstructionGraphMutation';
 import constructionImage from '../../../../assets/construction.png';
 import forbiddenImage from '../../../../assets/forbidden.png';
 import warningRedImage from '../../../../assets/warning_red.png';
@@ -121,6 +131,9 @@ export interface UseGridDataDeps {
   setAlertMessageBody: React.Dispatch<React.SetStateAction<string | ComplexMessage[]>>;
   setAlertMessageFooter: React.Dispatch<React.SetStateAction<string | null>>;
   setAlertOnConfirm: React.Dispatch<React.SetStateAction<(() => void) | undefined>>;
+  setAlertAlternateAction: React.Dispatch<
+    React.SetStateAction<AlertAlternateAction | undefined>
+  >;
   handleClose: () => void;
   // useExecutionState setters
   setExecutionId: React.Dispatch<React.SetStateAction<number>>;
@@ -180,7 +193,8 @@ export function useGridData(deps: UseGridDataDeps) {
     gridScrollRef, setOpenDropdown,
     saveComponentContext, setSaveComponentContext,
     setErrorFlag, setAlertImage, setAlertClass,
-    setAlertMessageHeader, setAlertMessageBody, setAlertMessageFooter, setAlertOnConfirm, handleClose,
+    setAlertMessageHeader, setAlertMessageBody, setAlertMessageFooter,
+    setAlertOnConfirm, setAlertAlternateAction, handleClose,
     setExecutionId, setExecutionState,
     findText,
     memorySteps, componentMemoryItems, memoryTargetBlockId, memoryBlockOptions, memoryCapabilities,
@@ -242,6 +256,10 @@ export function useGridData(deps: UseGridDataDeps) {
   const [activeDraggedInstructionId, setActiveDraggedInstructionId] = useState<number | null>(null);
   const [variableLinks, setVariableLinks] = useState<InstructionVariableLink[]>([]);
   const [relationshipChipsV1, setRelationshipChipsV1] = useState(false);
+  const [
+    botJobGraphMutationCapability,
+    setBotJobGraphMutationCapability,
+  ] = useState<BotJobGraphMutationCapability | null>(null);
   const [blockDeleteCapabilities, setBlockDeleteCapabilities] = useState<Map<number, BlockDeleteCapability>>(new Map());
   const [moveGraphRevision, setMoveGraphRevision] = useState('');
   const deleteContextRef = useRef({
@@ -314,6 +332,7 @@ export function useGridData(deps: UseGridDataDeps) {
     setBlockDeleteCapabilities(new Map());
     setVariableLinks([]);
     setRelationshipChipsV1(false);
+    setBotJobGraphMutationCapability(null);
     pendingCapabilityRequestRef.current = null;
     pendingRowMoveRef.current = null;
     setIsDataReordered(data.length === 0);
@@ -341,6 +360,17 @@ export function useGridData(deps: UseGridDataDeps) {
   const submitInstructionMove = workspaceKind === 'COMPONENT'
     ? submitComponentInstructionMove
     : submitBotJobInstructionMove;
+  const {
+    pendingRequestId: pendingBotJobGraphMutationRequestId,
+    submitMutation: submitBotJobGraphMutation,
+    handleMutationMessage: handleBotJobGraphMutationMessage,
+  } = useBotJobInstructionGraphMutation({
+    webSocket,
+    connected,
+    capability: workspaceKind === 'BOT_JOB'
+      ? botJobGraphMutationCapability
+      : null,
+  });
 
   useEffect(() => {
     if (workspaceKind === 'COMPONENT') return;
@@ -351,7 +381,8 @@ export function useGridData(deps: UseGridDataDeps) {
   }, [instructionsData, workspaceKind]);
 
   useEffect(() => {
-    if (!webSocket || !connected
+    if (pendingBotJobGraphMutationRequestId
+      || !webSocket || !connected
       || (instructionsData.length === 0 && workspaceBlocks.length === 0)
       || !Number.isSafeInteger(homeBankingId)
       || homeBankingId <= 0
@@ -367,6 +398,7 @@ export function useGridData(deps: UseGridDataDeps) {
       workspaceEpoch,
     };
     setMoveGraphRevision('');
+    setBotJobGraphMutationCapability(null);
     setMemoryCapabilities(new Map());
     setBlockDeleteCapabilities(new Map());
     webSocket.send(JSON.stringify({
@@ -383,7 +415,7 @@ export function useGridData(deps: UseGridDataDeps) {
       }),
     }));
   }, [webSocket, connected, instructionsData, workspaceBlocks, botJobId, homeBankingId,
-    sessionId, targetSessionId, workspaceEpoch]);
+    pendingBotJobGraphMutationRequestId, sessionId, targetSessionId, workspaceEpoch]);
 
   useEffect(() => {
     if (!memoryListOpenRequestedRef.current && !memoryListOpenedRef.current) return;
@@ -522,6 +554,7 @@ export function useGridData(deps: UseGridDataDeps) {
       previousRows: instructionsData,
     };
     setMoveGraphRevision('');
+    setBotJobGraphMutationCapability(null);
     setGroupedData(groupByBlock(plan.rows));
     setInstructionsData(plan.rows);
     setIsDataReordered(false);
@@ -583,6 +616,40 @@ export function useGridData(deps: UseGridDataDeps) {
     if (!plan.changed) return;
 
     if (plan.group.length > 1) {
+      const draggedInstruction = instructionsData.find(row => row.id === instructionId);
+      const relationshipRoot = instructionsData.find(row =>
+        row.id === 1500
+        && row.blockId === draggedInstruction?.blockId
+        && row.blockOrderNumber === 2);
+      const directRootFamily = relationshipRoot
+        ? instructionsData.filter(row =>
+            row.blockId === relationshipRoot.blockId
+            && (row.id === relationshipRoot.id || row.parentId === relationshipRoot.id))
+        : [];
+      const isFocusedDetachCandidate =
+        workspaceKind === 'BOT_JOB'
+        && botJobGraphMutationCapability !== null
+        && draggedInstruction?.blockOrderNumber === 2
+        && relationshipRoot != null
+        && directRootFamily.length > 1
+        && (
+          draggedInstruction.id === relationshipRoot.id
+          || draggedInstruction.parentId === relationshipRoot.id
+        )
+        && plan.group.some(row => row.id === relationshipRoot.id);
+      const freeMovePlan = isFocusedDetachCandidate
+        ? planBotJobInstructionFreeMove(
+            instructionsData,
+            instructionId,
+            destinationBlockId,
+            destination.index,
+            workspaceBlocks,
+          )
+        : null;
+      const canMoveOnlyOne =
+        freeMovePlan?.ok === true
+        && freeMovePlan.changed
+        && freeMovePlan.relationshipImpacts.length > 0;
       const visibleRows = plan.group.slice(0, 8);
       const summary = visibleRows
         .map(row => `#${row.instructionOrderNumber} ${row.name || row.actions}`)
@@ -596,12 +663,141 @@ export function useGridData(deps: UseGridDataDeps) {
           ? `${summary}\n+ ${remaining} more connected instruction(s)`
           : summary,
       );
-      setAlertMessageFooter('The complete connected group will move together.');
+      setAlertMessageFooter(
+        canMoveOnlyOne
+          ? 'Choose Only One - Detach to move the selected instruction and leave '
+            + 'its connected rows where they are, or Move ALL to keep the current group behavior.'
+          : 'The complete connected group will move together.',
+      );
       setErrorFlag(false);
       setAlertOnConfirm(() => () => {
         handleClose();
         commitDragPlan(plan);
       });
+      setAlertAlternateAction(
+        canMoveOnlyOne && freeMovePlan
+          ? {
+              label: 'Only One - Detach',
+              confirmLabel: 'Move ALL',
+              title: 'Move only the selected instruction and disconnect its direct relationships',
+              confirmTitle: 'Move the complete connected instruction group',
+              onAction: () => {
+                handleClose();
+                const choices: InstructionFreeMoveChoice[] =
+                  freeMovePlan.relationshipImpacts.map(impact => ({
+                    instructionId: impact.instructionId,
+                    relationKind: impact.relationKind,
+                    action: 'DISCONNECT',
+                  }));
+                // This focused authoring path preserves variableId exactly as-is.
+                // An invalid producer order is presented by the existing VOID badge
+                // and never converted into an implicit variable mutation.
+                const persistablePlan = {
+                  ...freeMovePlan,
+                  deferredDiagnostics: freeMovePlan.deferredDiagnostics.filter(
+                    diagnostic => diagnostic.kind !== 'VARIABLE_ORDER',
+                  ),
+                };
+                const mutation = buildInstructionFreeMoveMutationDraft({
+                  plan: persistablePlan,
+                  choices,
+                });
+                if (!mutation.ok) {
+                  setAlertImage(forbiddenImage);
+                  setAlertClass('construction-image');
+                  setAlertMessageHeader('Move Instruction Not Sent');
+                  setAlertMessageBody(mutation.message);
+                  setAlertMessageFooter(
+                    'The selected instruction and all connected rows remain unchanged.',
+                  );
+                  setAlertOnConfirm(undefined);
+                  setErrorFlag(true);
+                  return;
+                }
+
+                const previousRows = instructionsData;
+                const relationPatches = new Map(
+                  mutation.draft.instructionRelationPatches.map(patch => [
+                    patch.instructionId,
+                    patch,
+                  ]),
+                );
+                const projectedRows = freeMovePlan.layoutRows.map(row => {
+                  const patch = relationPatches.get(row.id);
+                  return patch
+                    ? {
+                        ...row,
+                        parentId: patch.replacement.parentId,
+                        parentBlockId: patch.replacement.parentBlockId,
+                      }
+                    : row;
+                });
+                const restoreRows = () => {
+                  setInstructionsData(previousRows);
+                  setGroupedData(groupByBlock(previousRows));
+                  setIsDataReordered(false);
+                };
+                const requestId = submitBotJobGraphMutation(
+                  mutation.draft,
+                  {
+                    rollback: (reason) => {
+                      restoreRows();
+                      if (reason === 'UNMOUNTED') return;
+                      setAlertImage(warningRedImage);
+                      setAlertClass('construction-image');
+                      setAlertMessageHeader('Move Instruction Not Confirmed');
+                      setAlertMessageBody(
+                        'The selected instruction was restored because the graph mutation '
+                          + `did not complete (${reason}).`,
+                      );
+                      setAlertMessageFooter('No connected instruction was moved.');
+                      setAlertOnConfirm(undefined);
+                      setErrorFlag(true);
+                    },
+                    committed: (response) => {
+                      setBotJobGraphMutationCapability(current => current
+                        ? {
+                            ...current,
+                            graphVersion: response.committedGraphVersion,
+                            graphRevision: response.graphRevision,
+                          }
+                        : current);
+                    },
+                    refused: (response) => {
+                      setAlertImage(warningRedImage);
+                      setAlertClass('construction-image');
+                      setAlertMessageHeader('Move Instruction Refused');
+                      setAlertMessageBody(response.message);
+                      setAlertMessageFooter(
+                        'The selected instruction and all connected rows were restored.',
+                      );
+                      setAlertOnConfirm(undefined);
+                      setErrorFlag(true);
+                    },
+                  },
+                );
+                if (!requestId) {
+                  restoreRows();
+                  setAlertImage(forbiddenImage);
+                  setAlertClass('construction-image');
+                  setAlertMessageHeader('Move Instruction Not Sent');
+                  setAlertMessageBody(
+                    'The single-instruction graph mutation is not synchronized with the backend.',
+                  );
+                  setAlertMessageFooter('Refresh this workspace and try again.');
+                  setAlertOnConfirm(undefined);
+                  setErrorFlag(true);
+                  return;
+                }
+                setMoveGraphRevision('');
+                setMemoryCapabilities(new Map());
+                setGroupedData(groupByBlock(projectedRows));
+                setInstructionsData(projectedRows);
+                setIsDataReordered(false);
+              },
+            }
+          : undefined,
+      );
       return;
     }
     commitDragPlan(plan);
@@ -728,6 +924,7 @@ export function useGridData(deps: UseGridDataDeps) {
       console.log('RECEIVED -> WebSocket message ', message);
 
       try {
+        if (handleBotJobGraphMutationMessage(message)) return;
         const parsedMessage = JSON.parse(message);
         if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "memoryList.openResponse") {
           const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
@@ -964,6 +1161,7 @@ export function useGridData(deps: UseGridDataDeps) {
           pendingCapabilityRequestRef.current = null;
           if (bodyData?.ok === false) {
             setMoveGraphRevision('');
+            setBotJobGraphMutationCapability(null);
             setMemoryCapabilities(new Map());
             setBlockDeleteCapabilities(new Map());
             setGridActionNotice({
@@ -1055,6 +1253,44 @@ export function useGridData(deps: UseGridDataDeps) {
           const moveGraphSynchronized =
             capabilityCoverageSynchronized
             && renderedGraphRevision === backendGraphRevision;
+          const advertisedGraphCapability =
+            bodyData?.workspaceCapabilities?.botJobGraphMutationV3;
+          const advertisedOwner = advertisedGraphCapability?.ownerAssertion;
+          const advertisedGraphVersion = Number(advertisedGraphCapability?.graphVersion);
+          const advertisedWorkspaceEpoch =
+            Number(advertisedGraphCapability?.workspaceEpoch);
+          const usableGraphCapability =
+            workspaceKind === 'BOT_JOB'
+            && advertisedGraphCapability?.enabled === true
+            && Number(advertisedGraphCapability?.contractVersion) === 3
+            && Number.isSafeInteger(advertisedGraphVersion)
+            && advertisedGraphVersion >= 0
+            && Number.isSafeInteger(advertisedWorkspaceEpoch)
+            && advertisedWorkspaceEpoch > 0
+            && advertisedWorkspaceEpoch === pending.workspaceEpoch
+            && advertisedOwner?.workspaceKind === 'BOT_JOB'
+            && Number(advertisedOwner?.homeBankingId) === pending.homeBankingId
+            && Number(advertisedOwner?.botJobId) === pending.botJobId
+            && typeof advertisedGraphCapability?.graphRevision === 'string'
+            && advertisedGraphCapability.graphRevision.trim().toLowerCase()
+              === backendGraphRevision
+            && moveGraphSynchronized;
+          setBotJobGraphMutationCapability(
+            usableGraphCapability
+              ? {
+                  enabled: true,
+                  contractVersion: 3,
+                  workspaceEpoch: advertisedWorkspaceEpoch,
+                  graphVersion: advertisedGraphVersion,
+                  graphRevision: advertisedGraphCapability.graphRevision,
+                  ownerAssertion: {
+                    workspaceKind: 'BOT_JOB',
+                    homeBankingId: Number(advertisedOwner.homeBankingId),
+                    botJobId: Number(advertisedOwner.botJobId),
+                  },
+                }
+              : null,
+          );
           const staleMemoryReason =
             'The instruction graph changed. Refresh this workspace before adding rows or blocks to Memory List.';
           const next = new Map<number, MemoryCapability>();
@@ -1144,6 +1380,7 @@ export function useGridData(deps: UseGridDataDeps) {
           pendingCapabilityRequestRef.current = null;
           pendingRowMoveRef.current = null;
           setMoveGraphRevision('');
+          setBotJobGraphMutationCapability(null);
           setMemoryCapabilities(new Map());
           setBlockDeleteCapabilities(new Map());
           setGridActionNotice({
@@ -1202,6 +1439,7 @@ export function useGridData(deps: UseGridDataDeps) {
           ) {
             pendingCapabilityRequestRef.current = null;
             setMoveGraphRevision('');
+            setBotJobGraphMutationCapability(null);
             setMemoryCapabilities(new Map());
             setBlockDeleteCapabilities(new Map());
             setGridActionNotice({
@@ -1217,6 +1455,7 @@ export function useGridData(deps: UseGridDataDeps) {
           pendingCapabilityRequestRef.current = null;
           pendingRowMoveRef.current = null;
           setMoveGraphRevision('');
+          setBotJobGraphMutationCapability(null);
           setMemoryCapabilities(new Map());
           setBlockDeleteCapabilities(new Map());
           pendingScrollTopRef.current = gridScrollRef.current?.scrollTop ?? null;
@@ -1331,8 +1570,8 @@ export function useGridData(deps: UseGridDataDeps) {
       }
     });
   }, [
-    messages, onDetachedClose, onSessionOpen, pendingMemoryMove,
-    sessionId, socketPort, updateOperation, workspaceKind,
+    handleBotJobGraphMutationMessage, messages, onDetachedClose, onSessionOpen,
+    pendingMemoryMove, sessionId, socketPort, updateOperation, workspaceKind,
   ]);
 
   useEffect(() => {
