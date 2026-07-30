@@ -8,6 +8,9 @@ export interface AlertAlternateAction {
   onAction: () => void;
   title?: string;
   disabled?: boolean;
+  /** Optional label/title for the companion `onConfirm` action. */
+  confirmLabel?: string;
+  confirmTitle?: string;
 }
 
 interface AlertModalProps {
@@ -93,7 +96,7 @@ const AlertModal: React.FC<AlertModalProps> = ({
                 <RulesCard
                   event={{
                     color: 'orange',
-                    rules: 'GET ALL BETWEEN',
+                    rules: alternateAction.confirmLabel ?? 'GET ALL BETWEEN',
                     ts: 0,
                   }}
                   animate={false}
@@ -101,7 +104,8 @@ const AlertModal: React.FC<AlertModalProps> = ({
                   glow
                   icon={false}
                   onClick={onConfirm}
-                  title="Stage the complete connected instruction group shown above"
+                  title={alternateAction.confirmTitle
+                    ?? 'Stage the complete connected instruction group shown above'}
                 />
               </>
             ) : (

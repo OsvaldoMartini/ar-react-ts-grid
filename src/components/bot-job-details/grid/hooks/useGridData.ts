@@ -72,6 +72,13 @@ export type GridActionNotice = {
   action: string;
 };
 
+export type DeleteBlocksPlan = {
+  deleteBlockIds: number[];
+  expectedBlockIds: number[];
+  retainBlockId?: number;
+  graphRevision: string;
+};
+
 type SuccessfulInstructionDeletePlan = Extract<
   InstructionDeletePlan,
   { ok: true }
@@ -1092,9 +1099,14 @@ export function useGridData(deps: UseGridDataDeps) {
               instructionCount?: number;
               deleteRows?: BlockDeleteCapability['deleteRows'];
             }) => {
+              // Older backend instances report the former "keep one block" rule.
+              // For the final block, the delete control now clears its instructions
+              // while preserving the block itself. Keep other backend safety refusals.
+              const legacyOnlyBlockRestriction =
+                capability.reason?.trim() === 'A job must keep at least one block.';
               nextBlocks.set(capability.blockId, {
-                canDelete: capability.canDelete === true,
-                reason: capability.reason || '',
+                canDelete: capability.canDelete === true || legacyOnlyBlockRestriction,
+                reason: legacyOnlyBlockRestriction ? '' : capability.reason || '',
                 instructionCount: capability.instructionCount || 0,
                 deleteRows: Array.isArray(capability.deleteRows) ? capability.deleteRows : [],
               });
@@ -2104,6 +2116,98 @@ export function useGridData(deps: UseGridDataDeps) {
     setAlertOnConfirm(undefined);
   };
 
+  const showBlockDeletePlanningFailure = (reason: string) => {
+    setAlertImage(warningRedImage);
+    setAlertClass('construction-image');
+    setAlertMessageHeader('Delete Blocks Refused');
+    setAlertMessageBody(reason);
+    setAlertMessageFooter(
+      'The current blocks remain unchanged. Refresh this workspace before retrying.',
+    );
+    setErrorFlag(true);
+    setAlertOnConfirm(undefined);
+  };
+
+  const submitDeleteBlocks = (plan: DeleteBlocksPlan): boolean => {
+    const orderedWorkspaceBlocks = [...workspaceBlocks].sort(
+      (left, right) =>
+        left.blockOrderNumber - right.blockOrderNumber || left.blockId - right.blockId,
+    );
+    const currentBlockIds = orderedWorkspaceBlocks.map(block => block.blockId);
+    const currentBlockIdSet = new Set(currentBlockIds);
+    const deleteBlockIds = plan.deleteBlockIds.filter(
+      (blockId, index, values) =>
+        Number.isSafeInteger(blockId)
+        && blockId > 0
+        && values.indexOf(blockId) === index,
+    );
+    const exactBlockSetStillCurrent =
+      plan.expectedBlockIds.length === currentBlockIds.length
+      && plan.expectedBlockIds.every(
+        (blockId, index) => blockId === currentBlockIds[index],
+      );
+    const deletingAllBlocks =
+      deleteBlockIds.length === currentBlockIds.length
+      && deleteBlockIds.every(blockId => currentBlockIdSet.has(blockId));
+    const expectedRetainedBlockId = deletingAllBlocks ? currentBlockIds[0] : undefined;
+    const exactPlanStillCurrent =
+      Boolean(plan.graphRevision)
+      && plan.graphRevision === moveGraphRevision
+      && exactBlockSetStillCurrent
+      && deleteBlockIds.length === plan.deleteBlockIds.length
+      && deleteBlockIds.length > 0
+      && deleteBlockIds.every(blockId => currentBlockIdSet.has(blockId))
+      && plan.retainBlockId === expectedRetainedBlockId;
+
+    if (!exactPlanStillCurrent) {
+      showBlockDeletePlanningFailure(
+        'The block catalog, selection, or instruction graph changed while confirmation was open.',
+      );
+      return false;
+    }
+    if (
+      !webSocket
+      || !connected
+      || botJobId == null
+      || !Number.isSafeInteger(botJobId)
+      || botJobId <= 0
+      || !Number.isSafeInteger(homeBankingId)
+      || homeBankingId <= 0
+    ) {
+      showBlockDeletePlanningFailure(
+        'The current workspace owner or WebSocket connection is unavailable.',
+      );
+      return false;
+    }
+
+    const message = {
+      type: 'DELETE_BLOCKS',
+      requestId: `${Date.now()}-${targetSessionId}-blocks-delete`,
+      graphRevision: plan.graphRevision,
+      deleteBlockIds,
+      expectedBlockIds: currentBlockIds,
+      ...(expectedRetainedBlockId === undefined
+        ? {}
+        : { retainBlockId: expectedRetainedBlockId }),
+      botJobId,
+      botJobName,
+      homeBankingId,
+      sessionId: targetSessionId,
+    };
+
+    try {
+      webSocket.send(JSON.stringify(message));
+      console.log('Sent atomic delete-blocks plan:', message);
+      return true;
+    } catch (sendError) {
+      console.error('Could not send atomic delete-blocks plan:', sendError);
+      showBlockDeletePlanningFailure(
+        'The delete request could not be sent. Check the connection and retry.',
+      );
+      return false;
+    }
+  };
+
   const handleRemoveInstruction = (instructionId: number) => {
     if (!moveGraphRevision || !memoryCapabilities.get(instructionId)?.canDelete) return;
     const plan = planInstructionDeletion(
@@ -2255,10 +2359,29 @@ export function useGridData(deps: UseGridDataDeps) {
     const blockDisplayName = blockInstruction?.blockName
       ?? workspaceBlocks.find(block => block.blockId === blockId)?.blockName
       ?? `Block ${blockId}`;
+    const clearFinalBlock =
+      workspaceBlocks.length === 1 && workspaceBlocks[0]?.blockId === blockId;
 
     // Show confirmation dialog using AlertModal
     setAlertImage(warningRedImage);
     setAlertClass('construction-image');
+    if (clearFinalBlock) {
+      const instructionCount = instructionsData.filter(
+        instruction => instruction.blockId === blockId,
+      ).length;
+      setAlertMessageHeader('Clear Final Block');
+      setAlertMessageBody(instructionCount > 0
+        ? `All ${instructionCount} instruction(s)/step(s) in "${blockDisplayName}" will be cleared. `
+          + 'The final block itself will be kept.'
+        : `"${blockDisplayName}" is already empty. The final block will be kept.`);
+      setAlertMessageFooter(instructionCount > 0
+        ? 'The block will remain available for new instructions. Clearing its instructions cannot be undone.'
+        : 'No instructions will be removed; the final block will remain available.');
+      setErrorFlag(true);
+      setAlertOnConfirm(() => () => executeRemoveBlock(blockId, true));
+      return;
+    }
+
     setAlertMessageHeader('Delete Block');
     const instructionCount = Math.max(
       capability.instructionCount,
@@ -2279,7 +2402,7 @@ export function useGridData(deps: UseGridDataDeps) {
     return;
   };
 
-  const executeRemoveBlock = (blockId: number) => {
+  const executeRemoveBlock = (blockId: number, clearFinalBlock = false) => {
     // Clear the confirmation dialog
     handleClose();
 
@@ -2301,11 +2424,16 @@ export function useGridData(deps: UseGridDataDeps) {
     }
 
     // Remove the block from instructionsData
-    const nextWorkspaceBlocks = workspaceBlocks
-      .filter(block => block.blockId !== blockId)
-      .map(block => block.blockOrderNumber > removedBlockOrderNumber
-        ? { ...block, blockOrderNumber: block.blockOrderNumber - 1 }
-        : block);
+    const retainFinalBlock = clearFinalBlock
+      && workspaceBlocks.length === 1
+      && workspaceBlocks[0]?.blockId === blockId;
+    const nextWorkspaceBlocks = retainFinalBlock
+      ? workspaceBlocks
+      : workspaceBlocks
+          .filter(block => block.blockId !== blockId)
+          .map(block => block.blockOrderNumber > removedBlockOrderNumber
+            ? { ...block, blockOrderNumber: block.blockOrderNumber - 1 }
+            : block);
     const updatedData = instructionsData
       .filter(instruction => instruction.blockId !== blockId)
       .map(instruction => instruction.blockOrderNumber > removedBlockOrderNumber
@@ -2314,6 +2442,7 @@ export function useGridData(deps: UseGridDataDeps) {
 
     const reassignedData = reassignInstructionOrderNumbersByBlock(updatedData);
     setInstructionsData(reassignedData);
+    if (retainFinalBlock) setGroupedData(groupByBlock(reassignedData));
     setWorkspaceBlocks(nextWorkspaceBlocks);
     setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
 
@@ -2348,6 +2477,38 @@ export function useGridData(deps: UseGridDataDeps) {
   };
 
   const handleRollbackBlock = (blockId: number) => {
+    if (!moveGraphRevision.trim()) {
+      setAlertImage(warningRedImage);
+      setAlertClass('construction-image');
+      setAlertMessageHeader('Grid Refresh Required');
+      setAlertMessageBody(
+        'Wait for the authoritative grid revision, then retry the rollback.',
+      );
+      setErrorFlag(true);
+      return;
+    }
+
+    const firstInstruction = instructionsData.find(instr => instr.blockId === blockId);
+    const workspaceBlock = workspaceBlocks.find(block => block.blockId === blockId);
+    const blockDisplayName =
+      firstInstruction?.blockName ?? workspaceBlock?.blockName ?? `Block ${blockId}`;
+    const removedBlockCount = Math.max(0, workspaceBlocks.length - 1);
+
+    setAlertImage(warningRedImage);
+    setAlertClass('construction-image');
+    setAlertMessageHeader('Rollback Block');
+    setAlertMessageBody(`Rollback the Bot Job to "${blockDisplayName}"?`);
+    setAlertMessageFooter(
+      `All ${instructionsData.length} instruction(s) will be consolidated into this block`
+      + ` and ${removedBlockCount} other block(s) will be removed. This action cannot be undone.`,
+    );
+    setErrorFlag(true);
+    setAlertOnConfirm(() => () => executeRollbackBlock(blockId));
+  };
+
+  const executeRollbackBlock = (blockId: number) => {
+    handleClose();
+
     if (!moveGraphRevision.trim()) {
       setAlertImage(warningRedImage);
       setAlertClass('construction-image');
@@ -2604,6 +2765,7 @@ export function useGridData(deps: UseGridDataDeps) {
     handleEditBlock,
     handleRollbackBlock,
     handleCreateComponent,
+    submitDeleteBlocks,
     handleRemoveBlock,
     handleOpenCommandEditor,
     handleRemoveInstruction,

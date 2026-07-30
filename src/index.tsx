@@ -60,6 +60,74 @@ import {
 // Initialize the root
 const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
 
+interface BotJobDevConfig {
+  backendPort: number;
+  botJobId: number;
+  homeBankingId: number;
+  controlSession: string;
+}
+
+const botJobDevConfig = (): BotJobDevConfig | null => {
+  if (process.env.NODE_ENV !== 'development') return null;
+  const search = new URLSearchParams(window.location.search);
+  if (search.get('devTakeover') !== '1') return null;
+  const botJobId = Number(search.get('devBotJob'));
+  const backendPort = Number(search.get('backendPort'));
+  const homeBankingId = Number(search.get('homeBankingId') || 2);
+  const controlSession = search.get('botJobWindowSession') || '';
+  if (
+    !Number.isSafeInteger(botJobId)
+    || botJobId <= 0
+    || !Number.isSafeInteger(backendPort)
+    || backendPort <= 0
+    || !Number.isSafeInteger(homeBankingId)
+    || homeBankingId <= 0
+    || (controlSession.length > 0 && !isBotJobWindowSession(controlSession))
+  ) {
+    return null;
+  }
+  return { backendPort, botJobId, homeBankingId, controlSession };
+};
+
+const BotJobDevEntry: React.FC<{ config: BotJobDevConfig }> = ({ config }) => {
+  const [target, setTarget] = useState<BotJobWindowTarget | null>(() => ({
+    botJobId: config.botJobId,
+    workspaceEpoch: 1,
+  }));
+  const closeWindow = useCallback(() => window.close(), []);
+  const keepCurrentSurface = useCallback(() => {}, []);
+
+  return (
+    <>
+      {isBotJobWindowSession(config.controlSession) && (
+        <BotJobWindowControl
+          socketPort={config.backendPort}
+          sessionId={config.controlSession}
+          onTarget={setTarget}
+        />
+      )}
+      {target ? (
+        <DesktopWorkspaceShell ariaLabel="Bot Job Details" testId="bot-job-details-workspace">
+          <GridItem
+            key={`${config.controlSession}:${target.botJobId}:${target.workspaceEpoch}`}
+            homeBankingIdInitial={config.homeBankingId}
+            data={[]}
+            socketPort={config.backendPort}
+            sessionId="botJobTasks"
+            botJobIdInitial={target.botJobId}
+            botJobNameInitial=""
+            workspaceEpochInitial={target.workspaceEpoch}
+            onSessionOpen={keepCurrentSurface}
+            onDetachedClose={closeWindow}
+          />
+        </DesktopWorkspaceShell>
+      ) : (
+        <div role="status">Connecting Bot Job {config.botJobId}…</div>
+      )}
+    </>
+  );
+};
+
 const App: React.FC = () => {
   const [instructionsData, setInstructionsData] = useState<BlockLoopInstructionLoadDTO[]>([]);
   const [componentsData, setComponentsData] = useState<ComponentsInstructionsDTO[]>([]);
@@ -684,8 +752,13 @@ const App: React.FC = () => {
   );
 };
 
-// Render the App component
-root.render(<App />);
+// Render the production shell or the isolated, cross-port development workspace.
+const developmentBotJob = botJobDevConfig();
+root.render(
+  developmentBotJob
+    ? <BotJobDevEntry config={developmentBotJob} />
+    : <App />,
+);
 
 // Report web vitals
 reportWebVitals();

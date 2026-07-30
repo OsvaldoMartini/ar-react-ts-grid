@@ -29,6 +29,7 @@ export interface BlockHeaderProps {
   memoryAddTitle?: string;
   showCreateComponent?: boolean;
   isFirstBlock: boolean;
+  blockSelected?: boolean;
   blockDeleteTitle?: string;
   blockDeleteDimmed?: boolean;
   renderHighlighted: (text: string, query: string) => React.ReactNode;
@@ -46,6 +47,7 @@ export interface BlockHeaderProps {
   onEditName: () => void;
   onExcelFile: () => void;
   onCreateComponent: () => void;
+  onBlockSelectionChange?: (checked: boolean) => void;
   onDeleteBlock: () => void;
 }
 
@@ -70,6 +72,7 @@ const BlockHeader: React.FC<BlockHeaderProps> = ({
   memoryAddTitle,
   showCreateComponent = true,
   isFirstBlock,
+  blockSelected = false,
   blockDeleteTitle,
   blockDeleteDimmed,
   renderHighlighted,
@@ -86,11 +89,11 @@ const BlockHeader: React.FC<BlockHeaderProps> = ({
   onEditName,
   onExcelFile,
   onCreateComponent,
+  onBlockSelectionChange,
   onDeleteBlock,
 }) => (
   <div className={styles.blockHeader}>
     <BlockStatusToggle active={blockActive} onToggle={onToggleStatus} />
-    <input type="checkbox" aria-label={`Select block ${blockName}`} title="Select block" />
     <BlockCollapseToggle collapsed={collapsed} onToggle={onToggleCollapse} />
     <span className={styles.blockOrderNumber}>#{blockOrderNumber}</span>
     {isEditing ? (
@@ -128,6 +131,19 @@ const BlockHeader: React.FC<BlockHeaderProps> = ({
       {showCreateComponent && (
         <img src={saveImage} alt="save" className={styles.saveButton} onClick={onCreateComponent} />
       )}
+      <input
+        type="checkbox"
+        aria-label={`Select block ${blockName}`}
+        title="Select block"
+        checked={blockSelected}
+        onMouseDown={(event) => event.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
+        onDragStart={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+        }}
+        onChange={(event) => onBlockSelectionChange?.(event.target.checked)}
+      />
       <DeleteButton
         title={blockDeleteTitle || 'Delete block'}
         dimmed={blockDeleteDimmed}

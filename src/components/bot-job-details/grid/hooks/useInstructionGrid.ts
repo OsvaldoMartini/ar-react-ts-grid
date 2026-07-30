@@ -23,6 +23,8 @@ import {
 import { buildInstructionRelationshipGraph } from '../domain/instructionRelationshipGraph';
 import type { InstructionRelationshipEdge } from '../domain/instructionRelationshipGraph';
 import { buildBotJobRelationshipFacts } from '../domain/instructionRelationshipFacts';
+import constructionImage from '../../../../assets/construction.png';
+import warningRedImage from '../../../../assets/warning_red.png';
 
 // Phase 6, step 10 — the composition-root hook. GridItem's hook wiring
 // (WebSocket, identity state, controller, every sub-hook, the UI refs/state,
@@ -83,6 +85,9 @@ export function useInstructionGrid({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [openDropdown, setOpenDropdown] = useState<number | null>(null);
   const [mockData, setMockData] = useState<boolean>(false);
+  const [selectedBlockIds, setSelectedBlockIds] = useState<Set<number>>(
+    () => new Set<number>(),
+  );
 
   const {
     errorFlag, setErrorFlag,
@@ -167,6 +172,7 @@ export function useInstructionGrid({
     handleEditBlock,
     handleRollbackBlock,
     handleCreateComponent,
+    submitDeleteBlocks,
     handleRemoveBlock,
     handleOpenCommandEditor,
     handleRemoveInstruction,
@@ -204,6 +210,213 @@ export function useInstructionGrid({
     memoryListOpenRequestedRef, memoryListOpenedRef, memoryListOpenPendingRequestRef, memoryListOwnerEpochRef,
     pendingExcelExportDirectoryRequestRef, setChoosingExcelExportDirectory, setExcelExportDirectory,
   });
+
+  const orderedWorkspaceBlocks = useMemo(
+    () => [...workspaceBlocks].sort(
+      (left, right) =>
+        left.blockOrderNumber - right.blockOrderNumber || left.blockId - right.blockId,
+    ),
+    [workspaceBlocks],
+  );
+  const orderedWorkspaceBlockIds = useMemo(
+    () => orderedWorkspaceBlocks.map(block => block.blockId),
+    [orderedWorkspaceBlocks],
+  );
+  const orderedWorkspaceBlockIdsSignature = orderedWorkspaceBlockIds.join(',');
+
+  useEffect(() => {
+    setSelectedBlockIds(new Set<number>());
+  }, [workspacePolicy.kind, homeBankingId, botJobId, workspaceEpochInitial]);
+
+  useEffect(() => {
+    const currentIds = new Set(orderedWorkspaceBlockIds);
+    setSelectedBlockIds((current) => {
+      const retained = [...current].filter(blockId => currentIds.has(blockId));
+      if (retained.length === current.size) return current;
+      return new Set(retained);
+    });
+  }, [orderedWorkspaceBlockIdsSignature]);
+
+  const blockSelectionContextRef = useRef({
+    orderedBlocks: orderedWorkspaceBlocks,
+    orderedBlockIds: orderedWorkspaceBlockIds,
+    instructionsData,
+    moveGraphRevision,
+    selectedBlockIds,
+  });
+  blockSelectionContextRef.current = {
+    orderedBlocks: orderedWorkspaceBlocks,
+    orderedBlockIds: orderedWorkspaceBlockIds,
+    instructionsData,
+    moveGraphRevision,
+    selectedBlockIds,
+  };
+
+  const sameOrderedBlockIds = (
+    left: readonly number[],
+    right: readonly number[],
+  ) => left.length === right.length
+    && left.every((blockId, index) => blockId === right[index]);
+
+  const showBlockSelectionFailure = (reason: string) => {
+    setAlertImage(warningRedImage);
+    setAlertClass('construction-image');
+    setAlertMessageHeader('Block Selection Changed');
+    setAlertMessageBody(reason);
+    setAlertMessageFooter(
+      'Review the current blocks and make the selection again.',
+    );
+    setErrorFlag(true);
+    setAlertOnConfirm(undefined);
+    setAlertAlternateAction(undefined);
+  };
+
+  const handleBlockSelectionChange = (blockId: number, checked: boolean) => {
+    const selectionContext = blockSelectionContextRef.current;
+    const firstBlockId = selectionContext.orderedBlockIds[0];
+    if (blockId !== firstBlockId) {
+      setSelectedBlockIds((current) => {
+        const next = new Set(current);
+        if (checked) next.add(blockId); else next.delete(blockId);
+        return next;
+      });
+      return;
+    }
+
+    if (!checked) {
+      setSelectedBlockIds(new Set<number>());
+      return;
+    }
+
+    const expectedBlockIds = [...selectionContext.orderedBlockIds];
+    const sourceRevision = selectionContext.moveGraphRevision;
+    const applyScope = (scope: 'FIRST' | 'ALL') => {
+      handleClose();
+      const latest = blockSelectionContextRef.current;
+      if (
+        latest.moveGraphRevision !== sourceRevision
+        || !sameOrderedBlockIds(latest.orderedBlockIds, expectedBlockIds)
+      ) {
+        showBlockSelectionFailure(
+          'The block catalog or instruction graph changed while the selection dialog was open.',
+        );
+        return;
+      }
+      setSelectedBlockIds(new Set(
+        scope === 'ALL' ? expectedBlockIds : [firstBlockId],
+      ));
+    };
+
+    setAlertImage(constructionImage);
+    setAlertClass('construction-image');
+    setAlertMessageHeader('Select Blocks');
+    setAlertMessageBody(
+      `Choose the first block only or all ${expectedBlockIds.length} current blocks.`,
+    );
+    setAlertMessageFooter(
+      'You can adjust the other block checkboxes individually after this choice.',
+    );
+    setErrorFlag(false);
+    setAlertOnConfirm(() => () => applyScope('ALL'));
+    setAlertAlternateAction({
+      label: 'First block only',
+      onAction: () => applyScope('FIRST'),
+      title: 'Check only the first block',
+      confirmLabel: 'All blocks',
+      confirmTitle: 'Check every current block',
+    });
+  };
+
+  const handleBlockDelete = (blockId: number) => {
+    const selectionContext = blockSelectionContextRef.current;
+    const firstBlockId = selectionContext.orderedBlockIds[0];
+    if (blockId !== firstBlockId) {
+      handleRemoveBlock(blockId);
+      return;
+    }
+
+    const deleteBlockIds = selectionContext.orderedBlockIds.filter(
+      selectedBlockId => selectionContext.selectedBlockIds.has(selectedBlockId),
+    );
+    if (deleteBlockIds.length === 0) {
+      setAlertImage(constructionImage);
+      setAlertClass('construction-image');
+      setAlertMessageHeader('Select Blocks to Delete');
+      setAlertMessageBody(
+        'Check one or more blocks, then use the first block X to delete the checked blocks.',
+      );
+      setAlertMessageFooter(
+        'The X on every other block continues to delete only that individual block.',
+      );
+      setErrorFlag(false);
+      return;
+    }
+    if (!selectionContext.moveGraphRevision) {
+      showBlockSelectionFailure(
+        'Wait for the authoritative grid revision before deleting checked blocks.',
+      );
+      return;
+    }
+
+    const expectedBlockIds = [...selectionContext.orderedBlockIds];
+    const sourceRevision = selectionContext.moveGraphRevision;
+    const deletingAllBlocks = deleteBlockIds.length === expectedBlockIds.length;
+    const retainBlockId = deletingAllBlocks ? firstBlockId : undefined;
+    const selectedBlocks = selectionContext.orderedBlocks.filter(
+      block => selectionContext.selectedBlockIds.has(block.blockId),
+    );
+    const selectedInstructionCount = selectionContext.instructionsData.filter(
+      instruction => selectionContext.selectedBlockIds.has(instruction.blockId),
+    ).length;
+    const selectedNames = selectedBlocks
+      .slice(0, 5)
+      .map(block => `#${block.blockOrderNumber} ${block.blockName || block.blockId}`);
+    if (selectedBlocks.length > selectedNames.length) {
+      selectedNames.push(`+ ${selectedBlocks.length - selectedNames.length} more block(s)`);
+    }
+    const confirmedSelection = new Set(deleteBlockIds);
+    const executeConfirmedDelete = () => {
+      handleClose();
+      const latest = blockSelectionContextRef.current;
+      const exactSelectionStillCurrent =
+        latest.selectedBlockIds.size === confirmedSelection.size
+        && [...confirmedSelection].every(blockId => latest.selectedBlockIds.has(blockId));
+      if (
+        latest.moveGraphRevision !== sourceRevision
+        || !sameOrderedBlockIds(latest.orderedBlockIds, expectedBlockIds)
+        || !exactSelectionStillCurrent
+      ) {
+        showBlockSelectionFailure(
+          'The block catalog, checked blocks, or instruction graph changed while confirmation was open.',
+        );
+        return;
+      }
+      const sent = submitDeleteBlocks({
+        deleteBlockIds,
+        expectedBlockIds,
+        ...(retainBlockId === undefined ? {} : { retainBlockId }),
+        graphRevision: sourceRevision,
+      });
+      if (sent) setSelectedBlockIds(new Set<number>());
+    };
+
+    setAlertImage(warningRedImage);
+    setAlertClass('construction-image');
+    setAlertMessageHeader(
+      `Delete ${deleteBlockIds.length} Checked Block${deleteBlockIds.length === 1 ? '' : 's'}?`,
+    );
+    setAlertMessageBody(selectedNames.join(', '));
+    setAlertMessageFooter(
+      deletingAllBlocks
+        ? `All ${selectedInstructionCount} instruction(s) will be deleted. `
+          + 'The first block will be retained and cleared.'
+        : `${selectedInstructionCount} instruction(s) in the checked blocks will be deleted. `
+          + 'This action cannot be undone.',
+    );
+    setErrorFlag(true);
+    setAlertOnConfirm(() => executeConfirmedDelete);
+    setAlertAlternateAction(undefined);
+  };
 
   const relationshipEdgesByInstruction = useMemo(() => {
     const edgesByInstruction = new Map<number, InstructionRelationshipEdge[]>();
@@ -638,6 +851,7 @@ export function useInstructionGrid({
     gridScrollRef, instructionRef, blockRef, dropdownRef,
     // UI state
     openDropdown,
+    selectedBlockIds,
     saveComponentContext, setSaveComponentContext,
     // bot job header controller
     botJobHeader,
@@ -682,6 +896,8 @@ export function useInstructionGrid({
     handleEditBlock,
     handleRollbackBlock,
     handleCreateComponent,
+    handleBlockSelectionChange,
+    handleBlockDelete,
     handleRemoveBlock,
     handleOpenCommandEditor,
     handleRemoveInstruction,

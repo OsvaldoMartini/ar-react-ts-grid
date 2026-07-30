@@ -280,7 +280,7 @@ export const useWebSocket = (socketPort: number, sessionId: string) => {
         }
       };
 
-      socket.onclose = () => {
+      socket.onclose = (event) => {
         if (socketRef.current !== socket) return;
 
         console.warn('⚠️ WebSocket closed');
@@ -288,6 +288,16 @@ export const useWebSocket = (socketPort: number, sessionId: string) => {
         stopPing();
         setConnected(false);
         setWebSocket((current) => (current === socket ? null : current));
+
+        if (
+          event.code === 1000
+          && event.reason === 'Superseded by a newer tab'
+        ) {
+          disposedRef.current = true;
+          clearReconnectTimeout();
+          setError('This workspace was replaced by a newer tab.');
+          return;
+        }
 
         if (!disposedRef.current) {
           scheduleReconnect(connectWebSocket);

@@ -57,7 +57,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
     workspacePolicy,
     botJobId, botJobName,
     gridScrollRef, instructionRef, blockRef, dropdownRef,
-    openDropdown,
+    openDropdown, selectedBlockIds,
     saveComponentContext, setSaveComponentContext,
     botJobHeader,
     errorFlag,
@@ -94,7 +94,8 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
     handleEditBlock,
     handleRollbackBlock,
     handleCreateComponent,
-    handleRemoveBlock,
+    handleBlockSelectionChange,
+    handleBlockDelete,
     handleOpenCommandEditor,
     handleRemoveInstruction,
     handleInstructionStatus,
@@ -452,6 +453,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                     const authoritativeIndex = workspaceBlockIndex(blockId, index);
                     const displayOrder = authoritativeIndex + 1;
                     const blockCapability = blockDeleteCapabilities.get(blockId);
+                    const isFirstBlock = authoritativeIndex === 0;
                     return (
                     <BlockCard
                       key={blockGroupIndex}
@@ -476,9 +478,16 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                         canAddToMemory={blockCapability?.canAddToMemory === true}
                         memoryAddTitle={blockCapability?.addReason}
                         showCreateComponent={!componentWorkspace}
-                        isFirstBlock={authoritativeIndex === 0 && Boolean(moveGraphRevision)}
-                        blockDeleteTitle={blockCapability?.reason}
-                        blockDeleteDimmed={!blockCapability?.canDelete}
+                        isFirstBlock={isFirstBlock && Boolean(moveGraphRevision)}
+                        blockSelected={selectedBlockIds.has(blockId)}
+                        blockDeleteTitle={isFirstBlock
+                          ? selectedBlockIds.size > 0
+                            ? `Delete ${selectedBlockIds.size} checked block(s)`
+                            : 'Delete checked blocks'
+                          : blockCapability?.reason}
+                        blockDeleteDimmed={isFirstBlock
+                          ? !moveGraphRevision
+                          : !blockCapability?.canDelete}
                         renderHighlighted={renderHighlighted}
                         exportFileNode={renderExportFile(String(blockData.exportFile))}
                         excelGotoNode={excelGotoInstruction &&
@@ -524,7 +533,9 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                         onEditName={() => handleEditBlock(Number(blockData.instructions[0].blockId), blockData.blockName)}
                         onExcelFile={() => handleExcelFileBlockName(Number(blockData.instructions[0].blockId), blockData.blockName, Number(blockData.instructions[0].blockOrderNumber), blockData.exportFile)}
                         onCreateComponent={() => handleCreateComponent(Number(blockData.instructions[0].blockId))}
-                        onDeleteBlock={() => handleRemoveBlock(Number(blockData.instructions[0].blockId))}
+                        onBlockSelectionChange={(checked) =>
+                          handleBlockSelectionChange(blockId, checked)}
+                        onDeleteBlock={() => handleBlockDelete(blockId)}
                       />}
                       list={<InstructionList
                         droppableId={blockGroupIndex}
@@ -585,6 +596,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                   ...emptyWorkspaceBlocks.map((block) => {
                   const index = workspaceBlockIndex(block.blockId, block.blockOrderNumber - 1);
                   const capability = blockDeleteCapabilities.get(block.blockId);
+                  const isFirstBlock = index === 0;
                   return (
                     <BlockCard
                       key={`empty-${block.blockId}`}
@@ -609,9 +621,16 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                         canAddToMemory={false}
                         memoryAddTitle={capability?.addReason}
                         showCreateComponent={!componentWorkspace}
-                        isFirstBlock={index === 0 && Boolean(moveGraphRevision)}
-                        blockDeleteTitle={capability?.reason}
-                        blockDeleteDimmed={!capability?.canDelete}
+                        isFirstBlock={isFirstBlock && Boolean(moveGraphRevision)}
+                        blockSelected={selectedBlockIds.has(block.blockId)}
+                        blockDeleteTitle={isFirstBlock
+                          ? selectedBlockIds.size > 0
+                            ? `Delete ${selectedBlockIds.size} checked block(s)`
+                            : 'Delete checked blocks'
+                          : capability?.reason}
+                        blockDeleteDimmed={isFirstBlock
+                          ? !moveGraphRevision
+                          : !capability?.canDelete}
                         renderHighlighted={renderHighlighted}
                         exportFileNode={renderExportFile(block.exportFile || 'No Excel Export File')}
                         onToggleStatus={() => handleBlockStatus(block.blockId)}
@@ -630,7 +649,9 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                           block.exportFile,
                         )}
                         onCreateComponent={() => handleCreateComponent(block.blockId)}
-                        onDeleteBlock={() => handleRemoveBlock(block.blockId)}
+                        onBlockSelectionChange={(checked) =>
+                          handleBlockSelectionChange(block.blockId, checked)}
+                        onDeleteBlock={() => handleBlockDelete(block.blockId)}
                       />}
                       list={<InstructionList
                         droppableId={String(block.blockId)}
