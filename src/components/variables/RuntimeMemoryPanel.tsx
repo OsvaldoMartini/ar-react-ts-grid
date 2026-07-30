@@ -5,7 +5,15 @@ import React, {
   useState,
   type KeyboardEvent,
 } from 'react';
-import { Database, Loader2, Search } from 'lucide-react';
+import {
+  Database,
+  Loader2,
+  Plus,
+  Search,
+  Trash2,
+  X,
+} from 'lucide-react';
+import { RulesCard } from '../RulesCard';
 import styles from './RuntimeMemoryPanel.module.scss';
 
 export type RuntimeMemoryValueState = 'VALUE' | 'VOID';
@@ -32,6 +40,11 @@ export interface RuntimeMemoryPanelProps {
   onCommitValue?: (variableId: number, value: string) => void;
   onEditStart?: (variableId: number) => void;
   onEditCancel?: (variableId: number) => void;
+  onRequestAdd?: () => void;
+  onRequestDelete?: (variableId: number) => void;
+  onRequestDeleteAll?: () => void;
+  deletingVariableIds?: ReadonlySet<number>;
+  deleteDisabled?: boolean;
   className?: string;
 }
 
@@ -42,6 +55,9 @@ type RuntimeMemoryRowProps = {
   onCommitValue?: RuntimeMemoryPanelProps['onCommitValue'];
   onEditStart?: RuntimeMemoryPanelProps['onEditStart'];
   onEditCancel?: RuntimeMemoryPanelProps['onEditCancel'];
+  onRequestDelete?: RuntimeMemoryPanelProps['onRequestDelete'];
+  deleting: boolean;
+  deleteDisabled: boolean;
 };
 
 const inputValue = (item: RuntimeMemoryPanelItem): string =>
@@ -59,6 +75,9 @@ const RuntimeMemoryRow: React.FC<RuntimeMemoryRowProps> = ({
   onCommitValue,
   onEditStart,
   onEditCancel,
+  onRequestDelete,
+  deleting,
+  deleteDisabled,
 }) => {
   const authoritativeValue = inputValue(item);
   const [draft, setDraft] = useState(authoritativeValue);
@@ -118,7 +137,7 @@ const RuntimeMemoryRow: React.FC<RuntimeMemoryRowProps> = ({
   };
 
   const rowDisabled =
-    disabled || pending || item.editable === false || !onCommitValue;
+    disabled || deleting || pending || item.editable === false || !onCommitValue;
   const producedEmpty = item.state === 'VALUE' && authoritativeValue === '';
   const inputTitle = item.state === 'VOID'
     ? `${voidLabel(item)}. Enter a value to override runtime memory.`
@@ -132,6 +151,7 @@ const RuntimeMemoryRow: React.FC<RuntimeMemoryRowProps> = ({
       data-runtime-state={item.state}
       data-variable-id={item.variableId}
     >
+      <td className={styles.idCell}>{item.variableId}</td>
       <th scope="row" className={styles.nameCell}>
         <strong title={item.name}>{item.name || `Variable ${item.variableId}`}</strong>
       </th>
@@ -174,6 +194,18 @@ const RuntimeMemoryRow: React.FC<RuntimeMemoryRowProps> = ({
           )}
         </div>
       </td>
+      <td className={styles.deleteCell}>
+        <button
+          type="button"
+          className={styles.deleteButton}
+          aria-label={`Delete variable ${item.name || item.variableId}`}
+          title={`Delete variable ID ${item.variableId}`}
+          disabled={deleteDisabled || deleting || !onRequestDelete}
+          onClick={() => onRequestDelete?.(item.variableId)}
+        >
+          <X size={14} aria-hidden="true" />
+        </button>
+      </td>
     </tr>
   );
 };
@@ -186,6 +218,11 @@ const RuntimeMemoryPanel: React.FC<RuntimeMemoryPanelProps> = ({
   onCommitValue,
   onEditStart,
   onEditCancel,
+  onRequestAdd,
+  onRequestDelete,
+  onRequestDeleteAll,
+  deletingVariableIds,
+  deleteDisabled = false,
   className,
 }) => {
   const [memorySearch, setMemorySearch] = useState('');
@@ -221,6 +258,44 @@ const RuntimeMemoryPanel: React.FC<RuntimeMemoryPanelProps> = ({
         </span>
       </header>
 
+      <div className={styles.variableActions}>
+        <RulesCard
+          event={{
+            color: 'green',
+            rules: '+ ADD',
+            ts: 1,
+          }}
+          ariaLabel="Add variable"
+          glow={false}
+          border
+          animate={false}
+          iconNode={<Plus size={12} aria-hidden="true" />}
+          title="Define a new variable (rules are not configured yet)"
+          onClick={() => onRequestAdd?.()}
+          disabled={!onRequestAdd}
+        />
+        <RulesCard
+          event={{
+            color: 'red',
+            rules: 'Delete All',
+            ts: 2,
+          }}
+          ariaLabel="Delete all variables"
+          glow={false}
+          border
+          animate={false}
+          iconNode={<Trash2 size={12} aria-hidden="true" />}
+          title="Delete all variables from this Bot Job"
+          onClick={() => onRequestDeleteAll?.()}
+          disabled={
+            deleteDisabled
+            || items.length === 0
+            || !onRequestDeleteAll
+            || (deletingVariableIds?.size ?? 0) > 0
+          }
+        />
+      </div>
+
       <label className={styles.memorySearch}>
         <span>Variables</span>
         <span className={styles.memorySearchShell}>
@@ -245,8 +320,10 @@ const RuntimeMemoryPanel: React.FC<RuntimeMemoryPanelProps> = ({
         <table className={styles.table}>
           <thead>
             <tr>
+              <th scope="col">ID</th>
               <th scope="col">Name</th>
               <th scope="col">Value</th>
+              <th scope="col" aria-label="Actions" />
             </tr>
           </thead>
           <tbody>
@@ -259,6 +336,9 @@ const RuntimeMemoryPanel: React.FC<RuntimeMemoryPanelProps> = ({
                 onCommitValue={onCommitValue}
                 onEditStart={onEditStart}
                 onEditCancel={onEditCancel}
+                onRequestDelete={onRequestDelete}
+                deleting={deletingVariableIds?.has(item.variableId) ?? false}
+                deleteDisabled={deleteDisabled}
               />
             ))}
           </tbody>

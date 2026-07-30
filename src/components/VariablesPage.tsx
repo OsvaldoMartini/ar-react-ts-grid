@@ -13,6 +13,8 @@ import {
   Search,
   ShieldAlert,
 } from 'lucide-react';
+import warningRedImage from '../assets/warning_red.png';
+import AlertModal from './AlertModal';
 import DetachedPageShell from './DetachedPageShell';
 import PagesOpenButton from './PagesOpenButton';
 import ReconnectWebElement from './ReconnectWebElement';
@@ -33,11 +35,17 @@ import {
   type VariablesReconnectRelationKind,
 } from './variables/domain/variablesReconnectMutation';
 import { variableValuePresentation } from './variables/domain/variableValuePresentation';
+import { orderRuntimeVariablesByExecution } from './variables/domain/variableExecutionOrder';
 import RuntimeMemoryPanel from './variables/RuntimeMemoryPanel';
 import VariablesCommandBoard, {
   type VariablesCommandDropTarget,
 } from './variables/VariablesCommandBoard';
 import { useVariablesGraphMutation } from './variables/useVariablesGraphMutation';
+import {
+  useVariablesDelete,
+  type VariablesDeleteMode,
+  type VariablesDeleteResult,
+} from './variables/useVariablesDelete';
 import { useVariablesRuntimeMemory } from './variables/useVariablesRuntimeMemory';
 import {
   normalizeVariablesWorkspaceSnapshot,
@@ -71,6 +79,13 @@ type HealthFilter = 'ALL' | VariableHealth | 'ISSUES';
 type PendingRequest = {
   requestId: string;
   operation: 'variablesWorkspace.bootstrap' | 'variablesWorkspace.refresh';
+};
+
+type VariableDeleteConfirmation = {
+  mode: VariablesDeleteMode;
+  variableIds: number[];
+  title: string;
+  body: string;
 };
 
 const REQUEST_TIMEOUT_MS = 10_000;
@@ -408,6 +423,10 @@ const VariablesPage: React.FC<Props> = ({
     useState<VariablesCommandDropTarget | null>(null);
   const [pendingReconnect, setPendingReconnect] =
     useState<PendingReconnect | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] =
+    useState<VariableDeleteConfirmation | null>(null);
+  const [deletingVariableIds, setDeletingVariableIds] =
+    useState<ReadonlySet<number>>(() => new Set());
   const [status, setStatus] = useState<Status>({
     level: 'warn',
     text: 'Waiting for Variables workspace',
@@ -457,6 +476,31 @@ const VariablesPage: React.FC<Props> = ({
     snapshot,
     onMemory: replaceRuntimeMemory,
     onStatus: setStatus,
+  });
+
+  const handleVariableDeleteResult = useCallback((
+    result: VariablesDeleteResult,
+  ) => {
+    setDeletingVariableIds(new Set());
+    setStatus({
+      level: result.ok ? 'ok' : 'error',
+      text: result.ok
+        ? result.message
+          || `Deleted ${result.deletedCount} variable(s) and cleared ${result.clearedInstructionCount} instruction binding(s).`
+        : result.error || 'Variable deletion was refused.',
+    });
+  }, []);
+
+  const {
+    pendingRequestId: pendingDeleteRequestId,
+    submit: submitVariableDelete,
+    handleMessage: handleVariableDeleteMessage,
+  } = useVariablesDelete({
+    webSocket,
+    connected,
+    sessionId,
+    snapshot,
+    onResult: handleVariableDeleteResult,
   });
 
   const clearPendingRequest = useCallback(() => {
@@ -547,6 +591,7 @@ const VariablesPage: React.FC<Props> = ({
     processedMessagesRef.current = messages.length;
 
     pending.forEach(raw => {
+      if (handleVariableDeleteMessage(raw)) return;
       if (handleGraphMutationMessage(raw)) return;
       if (handleRuntimeMemoryMessage(raw)) return;
       let envelope: VariablesWorkspaceEnvelope;
@@ -620,6 +665,7 @@ const VariablesPage: React.FC<Props> = ({
     clearPendingRequest,
     handleGraphMutationMessage,
     handleRuntimeMemoryMessage,
+    handleVariableDeleteMessage,
     messages,
     replaceSnapshot,
   ]);
@@ -685,6 +731,15 @@ const VariablesPage: React.FC<Props> = ({
       entry => entry.variableId === selectedVariable.id,
     ) ?? null
     : null;
+  const orderedRuntimeMemory = useMemo(
+    () => snapshot
+      ? orderRuntimeVariablesByExecution(
+          snapshot.runtimeMemory.variables,
+          snapshot.variables,
+        )
+      : [],
+    [snapshot],
+  );
   const mutationAuthorityKey = mutationAuthorityKeyFor(snapshot);
   const relationshipGraph = useMemo(
     () => snapshot ? variablesReconnectGraph(snapshot) : null,
@@ -889,6 +944,64 @@ const VariablesPage: React.FC<Props> = ({
     pendingReconnect,
     submitVariablesMutation,
   ]);
+
+  const requestDeleteVariable = useCallback((variableId: number) => {
+    const current = snapshotRef.current;
+    const variable = current?.variables.find(candidate => candidate.id === variableId);
+    if (!current || !variable) {
+      setStatus({
+        level: 'error',
+        text: `Variable #${variableId} is no longer in the current Variables snapshot.`,
+      });
+      return;
+    }
+    setDeleteConfirmation({
+      mode: 'SINGLE',
+      variableIds: [variableId],
+      title: 'Delete Variable?',
+      body: `Delete variable #${variableId} “${variable.name}”? Its instruction bindings will be cleared, while all instructions and Web Elements remain available for reconnection.`,
+    });
+  }, []);
+
+  const requestDeleteAllVariables = useCallback(() => {
+    const current = snapshotRef.current;
+    const variableIds = current?.variables.map(variable => variable.id) ?? [];
+    if (variableIds.length === 0) {
+      setStatus({ level: 'warn', text: 'No variables are available to delete.' });
+      return;
+    }
+    setDeleteConfirmation({
+      mode: 'ALL',
+      variableIds,
+      title: 'Delete All Variables?',
+      body: `Delete all ${variableIds.length} variables from this Bot Job? Every instruction and Web Element will remain, and affected commands will show Reconnect Variable.`,
+    });
+  }, []);
+
+  const confirmVariableDelete = useCallback(() => {
+    const confirmation = deleteConfirmation;
+    if (!confirmation) return;
+    const requestId = submitVariableDelete(
+      confirmation.mode,
+      confirmation.variableIds,
+    );
+    if (!requestId) {
+      setStatus({
+        level: 'error',
+        text: 'Variables is busy, disconnected, or read-only. Nothing was deleted.',
+      });
+      return;
+    }
+    setDeletingVariableIds(new Set(confirmation.variableIds));
+    setDeleteConfirmation(null);
+    setStatus({
+      level: 'warn',
+      text: confirmation.mode === 'ALL'
+        ? `Deleting ${confirmation.variableIds.length} variables...`
+        : `Deleting variable #${confirmation.variableIds[0]}...`,
+    });
+  }, [deleteConfirmation, submitVariableDelete]);
+
   const statusClass = status.level === 'error'
     ? styles.statusError
     : status.level === 'warn'
@@ -900,6 +1013,7 @@ const VariablesPage: React.FC<Props> = ({
   const mutationDisabled = !connected
     || pendingRequest !== null
     || pendingMutationRequestId !== null
+    || pendingDeleteRequestId !== null
     || pendingReconnect !== null
     || snapshot?.mutationCapability?.reactAuthoredProfile == null;
   const reconnectSource = snapshot && pendingReconnect
@@ -1370,7 +1484,7 @@ const VariablesPage: React.FC<Props> = ({
               </section>
 
               <RuntimeMemoryPanel
-                items={snapshot.runtimeMemory.variables.map(entry => ({
+                items={orderedRuntimeMemory.map(entry => ({
                   variableId: entry.variableId,
                   name: entry.name,
                   state: entry.state,
@@ -1384,6 +1498,18 @@ const VariablesPage: React.FC<Props> = ({
                   : undefined}
                 pendingVariableIds={pendingVariableIds}
                 onCommitValue={updateRuntimeValue}
+                deletingVariableIds={deletingVariableIds}
+                deleteDisabled={
+                  !connected
+                  || pendingDeleteRequestId !== null
+                  || snapshot.mutationCapability === null
+                }
+                onRequestAdd={() => setStatus({
+                  level: 'warn',
+                  text: 'Add Variable is reserved for the next variable-definition rules.',
+                })}
+                onRequestDelete={requestDeleteVariable}
+                onRequestDeleteAll={requestDeleteAllVariables}
               />
             </section>
           )}
@@ -1414,6 +1540,18 @@ const VariablesPage: React.FC<Props> = ({
                 text: 'Reconnect cancelled. No relationship was changed.',
               });
             }}
+          />
+        )}
+        {deleteConfirmation && (
+          <AlertModal
+            header={deleteConfirmation.title}
+            body={deleteConfirmation.body}
+            extraMsg="This operation changes variable definitions only. Instructions and Web Elements are preserved."
+            onClose={() => setDeleteConfirmation(null)}
+            onConfirm={confirmVariableDelete}
+            imageSrc={warningRedImage}
+            imageClass="construction-image"
+            error
           />
         )}
       </main>

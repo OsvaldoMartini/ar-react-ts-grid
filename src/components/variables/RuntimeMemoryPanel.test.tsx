@@ -67,3 +67,80 @@ test('clearing runtime memory search restores all rows', () => {
   expect(screen.queryByText('No memory variables match this search.'))
     .not.toBeInTheDocument();
 });
+
+test('renders the ID, Name, Value, and row-action columns', () => {
+  render(
+    <RuntimeMemoryPanel
+      items={items}
+      onCommitValue={jest.fn()}
+      onRequestDelete={jest.fn()}
+    />,
+  );
+
+  expect(screen.getByRole('columnheader', { name: 'ID' }))
+    .toBeInTheDocument();
+  expect(screen.getByRole('columnheader', { name: 'Name' }))
+    .toBeInTheDocument();
+  expect(screen.getByRole('columnheader', { name: 'Value' }))
+    .toBeInTheDocument();
+  expect(screen.getByRole('columnheader', { name: 'Actions' }))
+    .toBeInTheDocument();
+  expect(screen.getByRole('button', {
+    name: 'Delete variable Account owner',
+  })).toBeInTheDocument();
+});
+
+test('routes per-row delete, Delete All, and + ADD through independent callbacks', () => {
+  const onRequestAdd = jest.fn();
+  const onRequestDelete = jest.fn();
+  const onRequestDeleteAll = jest.fn();
+  render(
+    <RuntimeMemoryPanel
+      items={items}
+      onCommitValue={jest.fn()}
+      onRequestAdd={onRequestAdd}
+      onRequestDelete={onRequestDelete}
+      onRequestDeleteAll={onRequestDeleteAll}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('button', {
+    name: 'Delete variable Account owner',
+  }));
+  expect(onRequestDelete).toHaveBeenCalledTimes(1);
+  expect(onRequestDelete).toHaveBeenCalledWith(12);
+  expect(onRequestDeleteAll).not.toHaveBeenCalled();
+  expect(onRequestAdd).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByRole('button', {
+    name: 'Delete all variables',
+  }));
+  expect(onRequestDeleteAll).toHaveBeenCalledTimes(1);
+  expect(onRequestDelete).toHaveBeenCalledTimes(1);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Add variable' }));
+  expect(onRequestAdd).toHaveBeenCalledTimes(1);
+  expect(onRequestDeleteAll).toHaveBeenCalledTimes(1);
+});
+
+test('disables destructive actions while deletion is pending', () => {
+  render(
+    <RuntimeMemoryPanel
+      items={items}
+      onCommitValue={jest.fn()}
+      onRequestDelete={jest.fn()}
+      onRequestDeleteAll={jest.fn()}
+      deletingVariableIds={new Set([12])}
+    />,
+  );
+
+  expect(screen.getByRole('button', {
+    name: 'Delete variable Account owner',
+  })).toBeDisabled();
+  expect(screen.getByRole('button', {
+    name: 'Delete all variables',
+  })).toBeDisabled();
+  expect(screen.getByRole('button', {
+    name: 'Delete variable Payment amount',
+  })).toBeEnabled();
+});

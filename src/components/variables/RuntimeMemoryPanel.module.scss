@@ -55,6 +55,21 @@
   text-align: center;
 }
 
+.variableActions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px;
+  border-bottom: 1px solid #dce6f0;
+  background: #ffffff;
+}
+
+.variableActions > * {
+  min-height: 27px;
+}
+
 .memorySearch {
   flex: 0 0 auto;
   display: flex;
@@ -143,8 +158,16 @@
   text-transform: uppercase;
 }
 
-.table thead th:first-child {
-  width: 42%;
+.table thead th:nth-child(1) {
+  width: 44px;
+}
+
+.table thead th:nth-child(2) {
+  width: 31%;
+}
+
+.table thead th:nth-child(4) {
+  width: 38px;
 }
 
 .table tbody tr {
@@ -159,11 +182,19 @@
   background: #f8fbff;
 }
 
+.idCell,
 .nameCell,
 .valueCell {
   min-width: 0;
   padding: 6px 7px;
   text-align: left;
+}
+
+.idCell {
+  color: #52708d;
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 0.65rem;
+  font-weight: 800;
 }
 
 .nameCell strong {
@@ -173,6 +204,33 @@
   font-size: 0.68rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.deleteCell {
+  padding: 4px;
+  text-align: center;
+}
+
+.deleteButton {
+  width: 25px;
+  height: 25px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid #d63636;
+  border-radius: 5px;
+  background: #ffffff;
+  color: #c62828;
+  cursor: pointer;
+}
+
+.deleteButton:hover:not(:disabled) {
+  background: #ffebee;
+}
+
+.deleteButton:disabled {
+  cursor: default;
+  opacity: 0.45;
 }
 
 .valueEditor {
