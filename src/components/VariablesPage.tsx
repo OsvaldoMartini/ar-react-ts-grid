@@ -37,10 +37,22 @@ import {
 import { variableValuePresentation } from './variables/domain/variableValuePresentation';
 import { orderRuntimeVariablesByExecution } from './variables/domain/variableExecutionOrder';
 import RuntimeMemoryPanel from './variables/RuntimeMemoryPanel';
+import VariablesBlockTransferBoard, {
+  type VariablesBlockTransferIntent,
+} from './variables/VariablesBlockTransferBoard';
 import VariablesCommandBoard, {
   type VariablesCommandDropTarget,
 } from './variables/VariablesCommandBoard';
+import {
+  planVariablesBlockMove,
+  selectVariablesBlockTransferSources,
+  type VariablesBlockTransferScope,
+} from './variables/domain/variablesBlockTransfer';
 import { useVariablesGraphMutation } from './variables/useVariablesGraphMutation';
+import {
+  useVariablesInstructionCopy,
+  type VariablesInstructionCopyResult,
+} from './variables/useVariablesInstructionCopy';
 import {
   useVariablesDelete,
   type VariablesDeleteMode,
@@ -86,6 +98,16 @@ type VariableDeleteConfirmation = {
   variableIds: number[];
   title: string;
   body: string;
+};
+
+type VariablesBlockTransferAction = 'MOVE' | 'COPY';
+
+type PendingBlockTransfer = {
+  authorityKey: string;
+  sourceInstructionId: number;
+  targetBlockId: number;
+  stage: 'ACTION' | 'SCOPE';
+  action: VariablesBlockTransferAction | null;
 };
 
 const REQUEST_TIMEOUT_MS = 10_000;
@@ -423,6 +445,8 @@ const VariablesPage: React.FC<Props> = ({
     useState<VariablesCommandDropTarget | null>(null);
   const [pendingReconnect, setPendingReconnect] =
     useState<PendingReconnect | null>(null);
+  const [pendingBlockTransfer, setPendingBlockTransfer] =
+    useState<PendingBlockTransfer | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] =
     useState<VariableDeleteConfirmation | null>(null);
   const [deletingVariableIds, setDeletingVariableIds] =
@@ -568,6 +592,35 @@ const VariablesPage: React.FC<Props> = ({
     return true;
   }, [clearPendingRequest, sessionId, webSocket]);
 
+  const handleInstructionCopyResult = useCallback((
+    result: VariablesInstructionCopyResult,
+  ) => {
+    setDraggingInstructionId(null);
+    setActiveDropTarget(null);
+    setStatus({
+      level: result.ok ? 'ok' : 'error',
+      text: result.ok
+        ? result.message
+          || `Created ${result.createdInstructionIds.length} new instruction(s).`
+        : result.error || 'The instruction copy was refused.',
+    });
+    if (result.ok) {
+      sendWorkspaceRequest('variablesWorkspace.refresh');
+    }
+  }, [sendWorkspaceRequest]);
+
+  const {
+    pendingRequestId: pendingCopyRequestId,
+    submit: submitInstructionCopy,
+    handleMessage: handleInstructionCopyMessage,
+  } = useVariablesInstructionCopy({
+    webSocket,
+    connected,
+    sessionId,
+    snapshot,
+    onResult: handleInstructionCopyResult,
+  });
+
   useEffect(() => {
     if (!connected) {
       clearPendingRequest();
@@ -591,6 +644,7 @@ const VariablesPage: React.FC<Props> = ({
     processedMessagesRef.current = messages.length;
 
     pending.forEach(raw => {
+      if (handleInstructionCopyMessage(raw)) return;
       if (handleVariableDeleteMessage(raw)) return;
       if (handleGraphMutationMessage(raw)) return;
       if (handleRuntimeMemoryMessage(raw)) return;
@@ -664,6 +718,7 @@ const VariablesPage: React.FC<Props> = ({
   }, [
     clearPendingRequest,
     handleGraphMutationMessage,
+    handleInstructionCopyMessage,
     handleRuntimeMemoryMessage,
     handleVariableDeleteMessage,
     messages,
@@ -759,6 +814,21 @@ const VariablesPage: React.FC<Props> = ({
     }
   }, [mutationAuthorityKey, pendingReconnect]);
 
+  useEffect(() => {
+    if (
+      pendingBlockTransfer
+      && pendingBlockTransfer.authorityKey !== mutationAuthorityKey
+    ) {
+      setPendingBlockTransfer(null);
+      setDraggingInstructionId(null);
+      setActiveDropTarget(null);
+      setStatus({
+        level: 'error',
+        text: 'The Variables graph changed. Drop the command into a Block again.',
+      });
+    }
+  }, [mutationAuthorityKey, pendingBlockTransfer]);
+
   const submitVariablesMutation = useCallback((
     draft: Parameters<typeof submitGraphMutation>[0],
     mutationProfile: Parameters<typeof submitGraphMutation>[2],
@@ -770,6 +840,7 @@ const VariablesPage: React.FC<Props> = ({
     const requestId = submitGraphMutation(draft, {
       committed: response => {
         setPendingReconnect(null);
+        setPendingBlockTransfer(null);
         setDraggingInstructionId(null);
         setActiveDropTarget(null);
         setStatus({
@@ -780,6 +851,7 @@ const VariablesPage: React.FC<Props> = ({
       },
       refused: (response, reason) => {
         setPendingReconnect(null);
+        setPendingBlockTransfer(null);
         setDraggingInstructionId(null);
         setActiveDropTarget(null);
         const fallback = reason === 'TIMEOUT'
@@ -795,6 +867,7 @@ const VariablesPage: React.FC<Props> = ({
     }, mutationProfile);
     if (!requestId) {
       setPendingReconnect(null);
+      setPendingBlockTransfer(null);
       setDraggingInstructionId(null);
       setActiveDropTarget(null);
       setStatus({
@@ -854,6 +927,145 @@ const VariablesPage: React.FC<Props> = ({
         : 'Instruction order saved.',
     );
   }, [draggingInstructionId, submitVariablesMutation]);
+
+  const handleBlockTransferIntent = useCallback((
+    intent: VariablesBlockTransferIntent,
+  ) => {
+    const current = snapshotRef.current;
+    const capability = current?.mutationCapability;
+    const source = capability?.layoutRows.find(
+      row => row.instructionId === intent.sourceInstructionId,
+    );
+    const target = current?.blocks.find(
+      block => block.id === intent.targetBlockId,
+    );
+    setDraggingInstructionId(null);
+    setActiveDropTarget(null);
+    if (!current || !capability || !source || !target) {
+      setStatus({
+        level: 'error',
+        text: 'The command or target Block is no longer authoritative. Refresh Variables and try again.',
+      });
+      return;
+    }
+    if (source.blockId === intent.targetBlockId) {
+      setStatus({
+        level: 'warn',
+        text: `Instruction #${intent.sourceInstructionId} is already in Block #${target.order ?? target.id}.`,
+      });
+      return;
+    }
+    setPendingBlockTransfer({
+      authorityKey: mutationAuthorityKeyFor(current),
+      sourceInstructionId: intent.sourceInstructionId,
+      targetBlockId: intent.targetBlockId,
+      stage: 'ACTION',
+      action: null,
+    });
+    setStatus({
+      level: 'warn',
+      text: 'Choose whether to move the instruction or create a new copy.',
+    });
+  }, []);
+
+  const chooseBlockTransferAction = useCallback((
+    action: VariablesBlockTransferAction,
+  ) => {
+    setPendingBlockTransfer(current => current
+      ? {
+          ...current,
+          stage: 'SCOPE',
+          action,
+        }
+      : null);
+    setStatus({
+      level: 'warn',
+      text: action === 'MOVE'
+        ? 'Choose whether to move only the instruction or include its parents.'
+        : 'Choose whether to copy only the instruction or include its parents.',
+    });
+  }, []);
+
+  const submitBlockTransferScope = useCallback((
+    scope: VariablesBlockTransferScope,
+  ) => {
+    const current = snapshotRef.current;
+    const pending = pendingBlockTransfer;
+    if (
+      !current
+      || !pending
+      || pending.stage !== 'SCOPE'
+      || pending.action === null
+      || pending.authorityKey !== mutationAuthorityKeyFor(current)
+    ) {
+      setPendingBlockTransfer(null);
+      setStatus({
+        level: 'error',
+        text: 'The Variables graph changed. Drop the command into a Block again.',
+      });
+      return;
+    }
+    const selection = selectVariablesBlockTransferSources(
+      current,
+      pending.sourceInstructionId,
+      scope,
+    );
+    if (!selection.ok) {
+      setPendingBlockTransfer(null);
+      setStatus({ level: 'error', text: selection.message });
+      return;
+    }
+
+    if (pending.action === 'MOVE') {
+      const planned = planVariablesBlockMove(
+        current,
+        pending.sourceInstructionId,
+        pending.targetBlockId,
+        scope,
+      );
+      if (!planned.ok) {
+        setPendingBlockTransfer(null);
+        setStatus({ level: 'error', text: planned.message });
+        return;
+      }
+      const movedCount = planned.plan.sourceInstructionIds.length;
+      const disconnectedCount = planned.plan.clearedRelationships.length;
+      submitVariablesMutation(
+        planned.plan.draft,
+        planned.plan.mutationProfile,
+        pending.sourceInstructionId,
+        `Moving ${movedCount} instruction${movedCount === 1 ? '' : 's'} to the selected Block...`,
+        disconnectedCount > 0
+          ? `${movedCount} instruction(s) moved. ${disconnectedCount} relationship(s) now require reconnect.`
+          : `${movedCount} instruction${movedCount === 1 ? '' : 's'} moved to the selected Block.`,
+      );
+      return;
+    }
+
+    const requestId = submitInstructionCopy({
+      targetBlockId: pending.targetBlockId,
+      selectedInstructionId: pending.sourceInstructionId,
+      scope,
+      sourceInstructionIds: selection.selection.sourceInstructionIds,
+    });
+    if (!requestId) {
+      setStatus({
+        level: 'error',
+        text: 'Variables is busy, disconnected, or read-only. No copy was created.',
+      });
+      return;
+    }
+    setPendingBlockTransfer(null);
+    const copyCount = selection.selection.sourceInstructionIds.length;
+    setStatus({
+      level: 'warn',
+      text: `Creating ${copyCount} new instruction ${copyCount === 1 ? 'copy' : 'copies'}...`,
+    });
+  }, [
+    pendingBlockTransfer,
+    submitInstructionCopy,
+    submitVariablesMutation,
+  ]);
 
   const parentRelationKind = useCallback((
     instructionId: number,
@@ -1013,9 +1225,29 @@ const VariablesPage: React.FC<Props> = ({
   const mutationDisabled = !connected
     || pendingRequest !== null
     || pendingMutationRequestId !== null
+    || pendingCopyRequestId !== null
     || pendingDeleteRequestId !== null
     || pendingReconnect !== null
+    || pendingBlockTransfer !== null
     || snapshot?.mutationCapability?.reactAuthoredProfile == null;
+  const blockTransferSource = snapshot && pendingBlockTransfer
+    ? snapshot.commands.find(
+      command => command.id === pendingBlockTransfer.sourceInstructionId,
+    ) ?? null
+    : null;
+  const blockTransferTarget = snapshot && pendingBlockTransfer
+    ? snapshot.blocks.find(
+      block => block.id === pendingBlockTransfer.targetBlockId,
+    ) ?? null
+    : null;
+  const blockTransferSelection = snapshot
+    && pendingBlockTransfer?.stage === 'SCOPE'
+    ? selectVariablesBlockTransferSources(
+        snapshot,
+        pendingBlockTransfer.sourceInstructionId,
+        'WITH_PARENTS',
+      )
+    : null;
   const reconnectSource = snapshot && pendingReconnect
     ? snapshot.commands.find(
       command => command.id === pendingReconnect.plan.sourceInstructionId,
@@ -1481,6 +1713,22 @@ const VariablesPage: React.FC<Props> = ({
                     <span>Choose a matching variable to inspect its complete relationship flow.</span>
                   </div>
                 )}
+
+                <VariablesBlockTransferBoard
+                  blocks={snapshot.blocks}
+                  layoutRows={snapshot.mutationCapability?.layoutRows ?? []}
+                  disabled={mutationDisabled}
+                  unavailableReason={pendingCopyRequestId
+                    ? 'Copying...'
+                    : pendingMutationRequestId
+                      ? 'Saving...'
+                      : pendingBlockTransfer
+                        ? 'Review transfer'
+                        : snapshot.mutationCapability?.reactAuthoredProfile == null
+                          ? 'Read-only'
+                          : undefined}
+                  onTransferIntent={handleBlockTransferIntent}
+                />
               </section>
 
               <RuntimeMemoryPanel
@@ -1540,6 +1788,70 @@ const VariablesPage: React.FC<Props> = ({
                 text: 'Reconnect cancelled. No relationship was changed.',
               });
             }}
+          />
+        )}
+        {pendingBlockTransfer?.stage === 'ACTION' && (
+          <AlertModal
+            header="Move or Copy Instruction?"
+            body={`Instruction #${pendingBlockTransfer.sourceInstructionId} `
+              + `${blockTransferSource?.name || blockTransferSource?.command || ''} `
+              + `was dropped on Block #${blockTransferTarget?.order ?? pendingBlockTransfer.targetBlockId} `
+              + `${blockTransferTarget?.name || ''}. Choose the operation.`}
+            extraMsg="Move changes the existing instruction. New Copy creates fresh database rows and leaves the source unchanged."
+            onClose={() => {
+              setPendingBlockTransfer(null);
+              setStatus({
+                level: 'warn',
+                text: 'Block transfer cancelled. Nothing was changed.',
+              });
+            }}
+            onConfirm={() => chooseBlockTransferAction('MOVE')}
+            alternateAction={{
+              label: 'NEW COPY',
+              title: 'Create fresh instruction rows in the selected Block',
+              onAction: () => chooseBlockTransferAction('COPY'),
+              confirmLabel: 'MOVE',
+              confirmTitle: 'Move the existing instruction to the selected Block',
+            }}
+            imageSrc={warningRedImage}
+            imageClass="construction-image"
+            error={false}
+          />
+        )}
+        {pendingBlockTransfer?.stage === 'SCOPE' && (
+          <AlertModal
+            header={pendingBlockTransfer.action === 'COPY'
+              ? 'Choose Copy Scope'
+              : 'Choose Move Scope'}
+            body={`Instruction #${pendingBlockTransfer.sourceInstructionId} has `
+              + `${blockTransferSelection?.ok
+                ? Math.max(
+                    0,
+                    blockTransferSelection.selection.sourceInstructionIds.length - 1,
+                  )
+                : 0} explicit parent/dependency instruction(s) available. `
+              + 'Choose only this instruction or include all of those parents.'}
+            extraMsg={pendingBlockTransfer.action === 'COPY'
+              ? 'Every copied instruction receives a fresh ID. Internal parent and variable links are remapped to the new rows.'
+              : 'Move keeps the existing IDs. Relationships that cannot remain valid will become available for reconnect.'}
+            onClose={() => {
+              setPendingBlockTransfer(null);
+              setStatus({
+                level: 'warn',
+                text: 'Block transfer cancelled. Nothing was changed.',
+              });
+            }}
+            onConfirm={() => submitBlockTransferScope('WITH_PARENTS')}
+            alternateAction={{
+              label: 'ONLY INSTRUCTION',
+              title: 'Transfer only the command that was dropped',
+              onAction: () => submitBlockTransferScope('ONLY_INSTRUCTION'),
+              confirmLabel: 'WITH ALL PARENTS',
+              confirmTitle: 'Transfer the command and its explicit dependency parents',
+            }}
+            imageSrc={warningRedImage}
+            imageClass="construction-image"
+            error={false}
           />
         )}
         {deleteConfirmation && (

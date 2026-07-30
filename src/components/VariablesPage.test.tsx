@@ -330,3 +330,142 @@ test('unlocks retry when a Variables request times out', () => {
   jest.clearAllTimers();
   jest.useRealTimers();
 });
+
+test('opens the two-step Block transfer flow and sends the exact React copy selection', async () => {
+  const graphRevision = 'c'.repeat(64);
+  const mutableSnapshot = {
+    ...snapshot,
+    graphRevision,
+    variables: snapshot.variables.map(variable => ({
+      ...variable,
+      commands: variable.commands.map(command => ({
+        ...command,
+        variableId: variable.id,
+      })),
+    })),
+    blocks: [
+      ...snapshot.blocks,
+      { id: 8, order: 2, name: 'Payment', active: true },
+    ],
+    mutationCapability: {
+      enabled: true,
+      contractVersion: 3,
+      profile: 'VARIABLES_INDIVIDUAL_ROW_V1',
+      crossBlockProfile: null,
+      reactAuthoredProfile: 'VARIABLES_REACT_AUTHORED_V1',
+      graphVersion: 9,
+      graphRevision,
+      ownerAssertion: {
+        workspaceKind: 'BOT_JOB',
+        homeBankingId: 2,
+        botJobId: 5,
+      },
+      layoutRows: [{
+        instructionId: 189,
+        blockId: 7,
+        blockOrderNumber: 1,
+        instructionOrderNumber: 2,
+      }, {
+        instructionId: 190,
+        blockId: 7,
+        blockOrderNumber: 1,
+        instructionOrderNumber: 3,
+      }, {
+        instructionId: 191,
+        blockId: 7,
+        blockOrderNumber: 1,
+        instructionOrderNumber: 4,
+      }],
+      instructionFacts: [{
+        instructionId: 189,
+        blockId: 7,
+        blockOrderNumber: 1,
+        instructionOrderNumber: 2,
+        action: 'Web Field',
+        relationKind: 'ELEMENT_TARGET',
+        parentId: null,
+        parentBlockId: null,
+        variableId: null,
+      }, {
+        instructionId: 190,
+        blockId: 7,
+        blockOrderNumber: 1,
+        instructionOrderNumber: 3,
+        action: 'GET',
+        relationKind: 'ELEMENT_TARGET',
+        parentId: 189,
+        parentBlockId: 7,
+        variableId: 12,
+      }, {
+        instructionId: 191,
+        blockId: 7,
+        blockOrderNumber: 1,
+        instructionOrderNumber: 4,
+        action: 'CK',
+        relationKind: 'ELEMENT_TARGET',
+        parentId: 189,
+        parentBlockId: 7,
+        variableId: 12,
+      }],
+    },
+  };
+  const view = render(
+    <VariablesPage socketPort={59772} sessionId="variablesManager" />,
+  );
+  await waitFor(() => expect(mockSend).toHaveBeenCalledTimes(1));
+  const bootstrapRequest = JSON.parse(JSON.parse(mockSend.mock.calls[0][0]).body);
+  mockMessages = [response('variablesWorkspace.bootstrapResponse', {
+    ...mutableSnapshot,
+    requestId: bootstrapRequest.requestId,
+  })];
+  view.rerender(
+    <VariablesPage socketPort={59772} sessionId="variablesManager" />,
+  );
+
+  await waitFor(() =>
+    expect(screen.getByTestId('variables-transfer-block-8')).toBeInTheDocument());
+  const source = screen.getAllByText('Compare Amount')
+    .map(element => element.closest('article'))
+    .find((element): element is HTMLElement =>
+      element?.getAttribute('draggable') === 'true');
+  expect(source).toBeDefined();
+  const data = new Map<string, string>();
+  const dataTransfer = {
+    types: ['application/x-ar-variables-instruction'],
+    effectAllowed: 'move',
+    dropEffect: 'move',
+    setData: (type: string, value: string) => data.set(type, value),
+    getData: (type: string) => data.get(type) ?? '',
+  };
+  fireEvent.dragStart(source as HTMLElement, { dataTransfer });
+  fireEvent.drop(screen.getByTestId('variables-transfer-block-8'), {
+    dataTransfer,
+  });
+
+  expect(screen.getByRole('heading', {
+    name: 'Move or Copy Instruction?',
+  })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'NEW COPY' }));
+  expect(screen.getByRole('heading', {
+    name: 'Choose Copy Scope',
+  })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', {
+    name: 'ONLY INSTRUCTION',
+  }));
+
+  const sent = JSON.parse(mockSend.mock.calls.at(-1)?.[0] as string);
+  const body = JSON.parse(sent.body);
+  expect(sent.type).toBe('variablesWorkspace.instructions.copy');
+  expect(body).toMatchObject({
+    contractVersion: 1,
+    bindingEpoch: 'binding-1',
+    workspaceEpoch: 4,
+    baseGraphVersion: 9,
+    graphRevision,
+    targetBlockId: 8,
+    selectedInstructionId: 191,
+    scope: 'ONLY_INSTRUCTION',
+    sourceInstructionIds: [191],
+  });
+  view.unmount();
+});
