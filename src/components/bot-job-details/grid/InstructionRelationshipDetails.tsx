@@ -7,6 +7,7 @@ import type {
   RelationshipState,
 } from './domain/instructionRelationshipGraph';
 import type { WorkspaceBlock } from './domain/workspaceBlocks';
+import InstructionVariableStateBadge from './InstructionVariableStateBadge';
 import styles from './InstructionRelationshipDetails.module.scss';
 
 export interface InstructionRelationshipDetailsProps {
@@ -272,8 +273,12 @@ const InstructionRelationshipDetails: React.FC<
       data-testid={`instruction-relationship-details-${instruction.id}`}
     >
       {renderOperationContent(instruction, allInstructions, workspaceBlocks)}
-      {chips.length > 0 && (
+      {(instruction.variableId != null || chips.length > 0) && (
         <span className={styles.chips}>
+          <InstructionVariableStateBadge
+            instruction={instruction}
+            allInstructions={allInstructions}
+          />
           {chips.map(({ key, state, code }) => {
             const descriptor = CHIP_DESCRIPTORS[state];
             const detail = humanizeCode(code);
