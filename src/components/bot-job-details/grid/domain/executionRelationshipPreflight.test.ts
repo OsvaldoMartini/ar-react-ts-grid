@@ -252,11 +252,13 @@ describe('executionRelationshipPreflight', () => {
     );
     const all = run(rows, { kind: 'ALL' }, variables);
 
+    expect(one.status).toBe('WARN');
+    expect(one.ready).toBe(true);
     expect(issueFor(
       one,
       4,
       'RUNTIME_VALUE_WRITER_OUTSIDE_SCOPE',
-    )).toBeDefined();
+    )).toMatchObject({ disposition: 'VARIABLE_DIAGNOSTIC' });
     expect(issueFor(
       one,
       5,
@@ -266,7 +268,7 @@ describe('executionRelationshipPreflight', () => {
       one,
       7,
       'MISSING_RUNTIME_VALUE_WRITER',
-    )).toBeDefined();
+    )).toMatchObject({ disposition: 'VARIABLE_DIAGNOSTIC' });
     expect(issueFor(
       all,
       4,
@@ -305,6 +307,7 @@ describe('executionRelationshipPreflight', () => {
     expect(result.issues).toEqual([
       expect.objectContaining({
         code: 'SELECTED_BLOCK_NOT_FOUND',
+        disposition: 'STRUCTURAL_START_FAILURE',
         blockId: 999,
         instructionId: null,
       }),

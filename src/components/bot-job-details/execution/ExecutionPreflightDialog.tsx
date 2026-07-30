@@ -15,6 +15,7 @@ import type {
   ExecutionPreflightIssue,
   ExecutionPreflightReport,
 } from '../BotJobDetails.types';
+import { executionPreflightOutcome } from './executionPreflightOutcome';
 import styles from './ExecutionPreflightDialog.module.scss';
 
 const MAX_VISIBLE_ISSUES = 25;
@@ -54,8 +55,18 @@ const ExecutionPreflightDialog: React.FC<ExecutionPreflightDialogProps> = ({
     0,
     report.totalIssues - visibleIssues.length,
   );
-  const unavailable = report.status === 'UNAVAILABLE';
-  const ready = report.status === 'READY';
+  const outcome = executionPreflightOutcome(report);
+  const unavailable = outcome === 'UNAVAILABLE';
+  const ready = outcome === 'READY';
+  const blocked = outcome === 'BLOCKED';
+  const variableDiagnosticCount = report.variableDiagnosticCount
+    ?? report.issues.filter(
+      issue => issue.disposition === 'VARIABLE_DIAGNOSTIC',
+    ).length;
+  const structuralFailureCount = report.structuralStartFailureCount
+    ?? report.issues.filter(
+      issue => issue.disposition === 'STRUCTURAL_START_FAILURE',
+    ).length;
 
   useEffect(() => {
     closeButtonRef.current?.focus();
@@ -111,7 +122,9 @@ const ExecutionPreflightDialog: React.FC<ExecutionPreflightDialogProps> = ({
                 ? 'The authoritative execution snapshot is ready.'
                 : unavailable
                   ? 'The authoritative execution check was unavailable.'
-                  : `${report.totalIssues} execution relationship ${report.totalIssues === 1 ? 'issue was' : 'issues were'} detected.`}
+                  : blocked
+                    ? `${structuralFailureCount || report.totalIssues} structural start ${structuralFailureCount === 1 ? 'failure was' : 'failures were'} detected.`
+                    : `${variableDiagnosticCount || report.totalIssues} variable ${variableDiagnosticCount === 1 ? 'diagnostic was' : 'diagnostics were'} reported.`}
             </p>
           </div>
           <button
@@ -131,9 +144,19 @@ const ExecutionPreflightDialog: React.FC<ExecutionPreflightDialogProps> = ({
             className={`${styles.modeNotice} ${unavailable ? styles.unavailableNotice : ''}`}
             role="status"
           >
-            <strong>Observation mode</strong>
+            <strong>
+              {blocked
+                ? 'Structural start safety'
+                : unavailable
+                  ? 'Observation unavailable'
+                  : 'Warning only'}
+            </strong>
             <span>
-              Execution was started because observation mode is active.
+              {blocked
+                ? 'A structural start failure was classified separately; WARN observation does not cancel the requested execution.'
+                : unavailable
+                  ? 'No variable-health decision can be inferred from an unavailable observation.'
+                  : 'Variable diagnostics never resend, pause, cancel, or block execution.'}
             </span>
           </div>
 
@@ -194,7 +217,11 @@ const ExecutionPreflightDialog: React.FC<ExecutionPreflightDialogProps> = ({
         </div>
 
         <footer className={styles.footer}>
-          <span>WARN mode does not resend, pause, or cancel execution.</span>
+          <span>
+            {blocked
+              ? 'Structural safety can be enforced separately after versioned start checks are enabled.'
+              : 'WARN mode does not resend, pause, cancel, or block execution.'}
+          </span>
           <button
             type="button"
             className={styles.closeButton}

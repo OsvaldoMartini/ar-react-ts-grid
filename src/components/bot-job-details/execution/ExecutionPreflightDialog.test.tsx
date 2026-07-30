@@ -9,6 +9,8 @@ import type {
 const issue = (index: number): ExecutionPreflightIssue => ({
   code: `ISSUE_${index}`,
   kind: 'ELEMENT_TARGET',
+  severity: 'WARNING',
+  disposition: 'VARIABLE_DIAGNOSTIC',
   blockId: 10,
   instructionId: 100 + index,
   message: `Preflight problem ${index}`,
@@ -19,6 +21,7 @@ const report = (
 ): ExecutionPreflightReport => ({
   enforcement: 'WARN',
   status: 'WOULD_BLOCK',
+  outcome: 'WARN',
   stage: 'BOT_JOB_TEST_RUN',
   owner: { homeBankingId: 2, botJobId: 5 },
   runScope: { kind: 'ONE', selectedBlockId: 10 },
@@ -46,8 +49,9 @@ test('renders a close-only WARN observation and closes with Escape', () => {
   expect(screen.getByRole('heading', { name: 'Test Run preflight' }))
     .toBeInTheDocument();
   expect(screen.getByText(
-    'Execution was started because observation mode is active.',
+    'Variable diagnostics never resend, pause, cancel, or block execution.',
   )).toBeInTheDocument();
+  expect(screen.queryByText(/would.?block|blocked/i)).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /continue/i }))
     .not.toBeInTheDocument();
 
@@ -107,6 +111,33 @@ test('does not render Focus controls when no focus callback is supplied', () => 
   );
 
   expect(screen.queryByRole('button', { name: 'Focus' }))
+    .not.toBeInTheDocument();
+});
+
+test('keeps structural start failures separate from variable warning copy', () => {
+  render(
+    <ExecutionPreflightDialog
+      action="LAUNCH"
+      report={report({
+        outcome: 'BLOCKED',
+        variableDiagnosticCount: 0,
+        structuralStartFailureCount: 1,
+        issues: [{
+          ...issue(1),
+          code: 'MISSING_LOOP_ANCHOR',
+          kind: 'LOOP_ANCHOR',
+          severity: 'BLOCKING',
+          disposition: 'STRUCTURAL_START_FAILURE',
+          message: 'LOOP has no Web Element anchor.',
+        }],
+      })}
+      onClose={jest.fn()}
+    />,
+  );
+
+  expect(screen.getByText('Structural start safety')).toBeInTheDocument();
+  expect(screen.getByText(/WARN observation does not cancel/)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /continue|launch|run/i }))
     .not.toBeInTheDocument();
 });
 

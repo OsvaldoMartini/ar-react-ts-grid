@@ -37,6 +37,20 @@ export type ExecutionPreflightStatus =
   | 'WOULD_BLOCK'
   | 'UNAVAILABLE';
 
+export type ExecutionPreflightOutcome =
+  | 'READY'
+  | 'WARN'
+  | 'BLOCKED'
+  | 'UNAVAILABLE';
+
+export type ExecutionPreflightIssueDisposition =
+  | 'VARIABLE_DIAGNOSTIC'
+  | 'STRUCTURAL_START_FAILURE';
+
+export type ExecutionPreflightIssueSeverity =
+  | 'WARNING'
+  | 'BLOCKING';
+
 export type ExecutionPreflightRunScopeKind =
   | 'ALL'
   | 'ONE'
@@ -58,6 +72,8 @@ export interface ExecutionPreflightIssue {
   blockId: number | null;
   instructionId: number | null;
   message: string;
+  severity?: ExecutionPreflightIssueSeverity;
+  disposition?: ExecutionPreflightIssueDisposition;
 }
 
 /**
@@ -70,6 +86,7 @@ export interface ExecutionPreflightIssue {
 export interface ExecutionPreflightReport {
   enforcement: ExecutionPreflightEnforcement;
   status: ExecutionPreflightStatus;
+  outcome?: ExecutionPreflightOutcome;
   stage: string;
   owner: ExecutionPreflightOwner | null;
   runScope: ExecutionPreflightRunScope | null;
@@ -78,6 +95,8 @@ export interface ExecutionPreflightReport {
   reachableBlockIds: number[];
   reachableInstructionIds: number[];
   totalIssues: number;
+  variableDiagnosticCount?: number;
+  structuralStartFailureCount?: number;
   issues: ExecutionPreflightIssue[];
   unavailableReason: string | null;
 }

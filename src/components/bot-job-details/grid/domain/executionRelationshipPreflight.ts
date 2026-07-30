@@ -23,9 +23,14 @@ export type ExecutionPreflightIssueKind =
   | InstructionRelationshipKind
   | 'RUN_SCOPE';
 
+export type ExecutionPreflightIssueDisposition =
+  | 'VARIABLE_DIAGNOSTIC'
+  | 'STRUCTURAL_START_FAILURE';
+
 export interface ExecutionRelationshipPreflightIssue {
   readonly code: string;
   readonly kind: ExecutionPreflightIssueKind;
+  readonly disposition: ExecutionPreflightIssueDisposition;
   readonly blockId: number | null;
   readonly instructionId: number | null;
   readonly message: string;
@@ -33,7 +38,7 @@ export interface ExecutionRelationshipPreflightIssue {
 }
 
 export interface ExecutionRelationshipPreflightResult {
-  readonly status: 'READY' | 'BLOCKED';
+  readonly status: 'READY' | 'WARN' | 'BLOCKED';
   readonly ready: boolean;
   readonly owner: RelationshipOwner;
   readonly runScope: RunScope;
@@ -83,6 +88,17 @@ const edgeFor = (
 
 const actionOf = (row: RelationshipInstructionFact): string =>
   instructionRelationshipPolicy(row.actions).canonicalAction;
+
+const issueDisposition = (
+  code: string,
+  kind: ExecutionPreflightIssueKind,
+): ExecutionPreflightIssueDisposition =>
+  code === 'DUPLICATE_VARIABLE_ID'
+  || kind === 'ELEMENT_TARGET'
+  || kind === 'VARIABLE_BINDING'
+  || kind === 'VARIABLE_ORDER'
+    ? 'VARIABLE_DIAGNOSTIC'
+    : 'STRUCTURAL_START_FAILURE';
 
 const issueMessage = (
   code: string,
@@ -182,6 +198,7 @@ const initialReachableBlocks = (
       scopeIssue: Object.freeze({
         code: 'SELECTED_BLOCK_NOT_FOUND',
         kind: 'RUN_SCOPE',
+        disposition: 'STRUCTURAL_START_FAILURE',
         blockId: runScope.selectedBlockId,
         instructionId: null,
         message: issueMessage(
@@ -274,6 +291,7 @@ const conditionalIssues = (
     issues.push(Object.freeze({
       code,
       kind: 'CONDITIONAL_ROOT',
+      disposition: 'STRUCTURAL_START_FAILURE',
       blockId: row.blockId,
       instructionId: row.id,
       message: issueMessage(code, row, row.blockId),
@@ -358,6 +376,7 @@ export const executionRelationshipPreflight = (
     collected.set(key, Object.freeze({
       code,
       kind,
+      disposition: issueDisposition(code, kind),
       blockId: row.blockId,
       instructionId: row.id,
       message: issueMessage(code, row, row.blockId),
@@ -484,10 +503,13 @@ export const executionRelationshipPreflight = (
     .filter(block => reachableBlockIdSet.has(block.id))
     .map(block => block.id);
   const reachableInstructionIds = reachableRows.map(row => row.id);
-  const ready = issues.length === 0;
+  const blocked = issues.some(
+    issue => issue.disposition === 'STRUCTURAL_START_FAILURE',
+  );
+  const clean = issues.length === 0;
   return Object.freeze({
-    status: ready ? 'READY' : 'BLOCKED',
-    ready,
+    status: clean ? 'READY' : blocked ? 'BLOCKED' : 'WARN',
+    ready: !blocked,
     owner: graph.owner,
     runScope: Object.freeze({ ...runScope }) as RunScope,
     reachableBlockIds: Object.freeze(reachableBlockIds),

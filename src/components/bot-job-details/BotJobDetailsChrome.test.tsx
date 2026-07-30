@@ -188,11 +188,13 @@ test('renders the authoritative WARN preflight and delegates row focus without a
   const dismissExecutionPreflight = jest.fn();
   const onFocusPreflightIssue = jest.fn();
   const issue = {
-    code: 'MISSING_LOOP_ANCHOR',
-    kind: 'LOOP_ANCHOR',
+    code: 'MISSING_RUNTIME_VALUE_WRITER',
+    kind: 'VARIABLE_ORDER',
+    severity: 'WARNING' as const,
+    disposition: 'VARIABLE_DIAGNOSTIC' as const,
     blockId: 12,
     instructionId: 101,
-    message: 'LOOP has no Web Element anchor.',
+    message: 'CK has no active GET or SET writer.',
   };
   const controller: BotJobDetailsControllerState = {
     state: botJobDetailsTestState,
@@ -211,6 +213,7 @@ test('renders the authoritative WARN preflight and delegates row focus without a
       report: {
         enforcement: 'WARN',
         status: 'WOULD_BLOCK',
+        outcome: 'WARN',
         stage: 'BOT_JOB_DETAILS_TEST_RUN',
         owner: { homeBankingId: 7, botJobId: 42 },
         runScope: { kind: 'ONE', selectedBlockId: 12 },
@@ -219,6 +222,8 @@ test('renders the authoritative WARN preflight and delegates row focus without a
         reachableBlockIds: [12],
         reachableInstructionIds: [101],
         totalIssues: 1,
+        variableDiagnosticCount: 1,
+        structuralStartFailureCount: 0,
         issues: [issue],
         unavailableReason: null,
       },
@@ -244,8 +249,9 @@ test('renders the authoritative WARN preflight and delegates row focus without a
   );
 
   expect(screen.getByRole('dialog', { name: 'Test Run preflight' })).toHaveTextContent(
-    'Execution was started because observation mode is active.',
+    'Variable diagnostics never resend, pause, cancel, or block execution.',
   );
+  expect(screen.getByRole('dialog')).not.toHaveTextContent(/would.?block|blocked/i);
   fireEvent.click(screen.getByRole('button', { name: 'Focus' }));
   expect(onFocusPreflightIssue).toHaveBeenCalledWith(issue);
   expect(dismissExecutionPreflight).toHaveBeenCalledTimes(1);

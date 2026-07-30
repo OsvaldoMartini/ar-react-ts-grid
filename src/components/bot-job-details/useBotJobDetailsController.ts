@@ -15,6 +15,7 @@ import type {
   BotJobWorkspaceAction,
   BotJobWorkspaceStatusTone,
 } from './BotJobDetails.types';
+import { executionPreflightOutcome } from './execution/executionPreflightOutcome';
 
 interface ControllerOptions {
   webSocket: WebSocket | null;
@@ -399,11 +400,14 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
         const executionAction = body.action === 'TEST_RUN' || body.action === 'LAUNCH'
           ? body.action
           : null;
-        const preflightWarning = body.ok !== false
+        const preflightOutcome = body.executionPreflight?.enforcement === 'WARN'
+          ? executionPreflightOutcome(body.executionPreflight)
+          : null;
+        const preflightNotice = body.ok !== false
           && executionAction !== null
-          && body.executionPreflight?.enforcement === 'WARN'
-          && body.executionPreflight.status !== 'READY';
-        if (preflightWarning && executionAction) {
+          && preflightOutcome !== null
+          && preflightOutcome !== 'READY';
+        if (preflightNotice && executionAction) {
           setExecutionPreflight({
             action: executionAction,
             report: body.executionPreflight!,
@@ -420,7 +424,11 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
           : body.message || (body.ok === false ? 'Toolbar action failed' : 'Toolbar action completed');
         setTransientStatus(
           toolbarStatus,
-          body.ok === false ? 'error' : preflightWarning ? 'warning' : 'success',
+          body.ok === false || preflightOutcome === 'BLOCKED'
+            ? 'error'
+            : preflightNotice
+              ? 'warning'
+              : 'success',
         );
         if (body.errorCode === 'LICENSE_REQUIRED') invalidateLicenseCapabilities();
         return;

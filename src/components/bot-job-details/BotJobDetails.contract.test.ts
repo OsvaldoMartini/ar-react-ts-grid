@@ -89,7 +89,7 @@ test('rejects incomplete state and malformed capabilities before Chrome can cons
   expect(parseBotJobDetailsEnvelope(malformedCapabilitiesEnvelope, 'botJobTasks', 42)).toBeNull();
 });
 
-test('accepts a strictly correlated execution preflight observation', () => {
+test('accepts a strictly correlated legacy execution preflight observation', () => {
   const executionPreflight = {
     enforcement: 'WARN',
     status: 'WOULD_BLOCK',
@@ -118,6 +118,47 @@ test('accepts a strictly correlated execution preflight observation', () => {
 
   expect(parseBotJobDetailsEnvelope(envelope, 'botJobTasks', 42)
     ?.body.executionPreflight).toEqual(executionPreflight);
+});
+
+test('accepts additive variable diagnostics and normalizes a transient WARN wire status', () => {
+  const executionPreflight = {
+    enforcement: 'WARN',
+    status: 'WARN',
+    outcome: 'WARN',
+    stage: 'BOT_JOB_TEST_RUN',
+    owner: { homeBankingId: 7, botJobId: 42 },
+    runScope: { kind: 'ONE', selectedBlockId: 9 },
+    graphVersion: 13,
+    contentRevision: 'revision-b',
+    reachableBlockIds: [9],
+    reachableInstructionIds: [101],
+    totalIssues: 1,
+    variableDiagnosticCount: 1,
+    structuralStartFailureCount: 0,
+    issues: [{
+      code: 'MISSING_RUNTIME_VALUE_WRITER',
+      kind: 'VARIABLE_ORDER',
+      severity: 'WARNING',
+      disposition: 'VARIABLE_DIAGNOSTIC',
+      blockId: 9,
+      instructionId: 101,
+      message: 'CK has no active GET or SET writer.',
+    }],
+    unavailableReason: null,
+  };
+  const envelope = JSON.stringify({
+    sessionId: 'botJobTasks',
+    operationId: 'botJobDetails.toolbar.actionResponse',
+    body: JSON.stringify({ ok: true, botJobId: 42, executionPreflight }),
+  });
+
+  expect(parseBotJobDetailsEnvelope(envelope, 'botJobTasks', 42)
+    ?.body.executionPreflight).toMatchObject({
+    status: 'WOULD_BLOCK',
+    outcome: 'WARN',
+    variableDiagnosticCount: 1,
+    structuralStartFailureCount: 0,
+  });
 });
 
 test('rejects malformed or internally inconsistent execution preflight observations', () => {

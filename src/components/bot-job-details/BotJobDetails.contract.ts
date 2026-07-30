@@ -73,15 +73,43 @@ function isExecutionPreflightIssue(value: unknown): value is ExecutionPreflightI
     && isNullablePositiveInteger(value.blockId)
     && isNullablePositiveInteger(value.instructionId)
     && typeof value.message === 'string'
-    && value.message.trim().length > 0;
+    && value.message.trim().length > 0
+    && (
+      value.severity === undefined
+      || value.severity === 'WARNING'
+      || value.severity === 'BLOCKING'
+    )
+    && (
+      value.disposition === undefined
+      || value.disposition === 'VARIABLE_DIAGNOSTIC'
+      || value.disposition === 'STRUCTURAL_START_FAILURE'
+    );
 }
 
-export function isExecutionPreflightReport(
+/**
+ * Accept the additive semantic preflight fields while keeping the original
+ * status contract available to older clients. A short-lived wire `WARN`
+ * status is normalized to legacy `WOULD_BLOCK` plus canonical outcome WARN.
+ */
+export function normalizeExecutionPreflightReport(
   value: unknown,
-): value is ExecutionPreflightReport {
-  if (!isRecord(value)
-    || value.enforcement !== 'WARN'
-    || !['READY', 'WOULD_BLOCK', 'UNAVAILABLE'].includes(value.status)
+): ExecutionPreflightReport | null {
+  if (!isRecord(value)) return null;
+  const wireStatus = value.status;
+  const normalizedStatus = wireStatus === 'WARN' ? 'WOULD_BLOCK' : wireStatus;
+  const normalizedOutcome = value.outcome === undefined && wireStatus === 'WARN'
+    ? 'WARN'
+    : value.outcome;
+  const variableDiagnosticCount = value.variableDiagnosticCount;
+  const structuralStartFailureCount = value.structuralStartFailureCount;
+  if (
+    value.enforcement !== 'WARN'
+    || !['READY', 'WOULD_BLOCK', 'UNAVAILABLE'].includes(normalizedStatus)
+    || (
+      normalizedOutcome !== undefined
+      && !['READY', 'WARN', 'BLOCKED', 'UNAVAILABLE'].includes(normalizedOutcome)
+    )
+    || (wireStatus === 'WARN' && normalizedOutcome !== 'WARN')
     || typeof value.stage !== 'string'
     || value.stage.trim().length === 0
     || !isIntegerArray(value.reachableBlockIds)
@@ -92,8 +120,56 @@ export function isExecutionPreflightReport(
     || value.totalIssues < value.issues.length
     || !(value.graphVersion === null || isInteger(value.graphVersion, 0))
     || !(value.contentRevision === null || typeof value.contentRevision === 'string')
-    || !(value.unavailableReason === null || typeof value.unavailableReason === 'string')) {
-    return false;
+    || !(value.unavailableReason === null || typeof value.unavailableReason === 'string')
+    || !(
+      variableDiagnosticCount === undefined
+      || isInteger(variableDiagnosticCount, 0)
+    )
+    || !(
+      structuralStartFailureCount === undefined
+      || isInteger(structuralStartFailureCount, 0)
+    )
+  ) {
+    return null;
+  }
+  if (
+    variableDiagnosticCount !== undefined
+    && variableDiagnosticCount > value.totalIssues
+  ) {
+    return null;
+  }
+  if (
+    structuralStartFailureCount !== undefined
+    && structuralStartFailureCount > value.totalIssues
+  ) {
+    return null;
+  }
+  if (
+    variableDiagnosticCount !== undefined
+    && structuralStartFailureCount !== undefined
+    && variableDiagnosticCount + structuralStartFailureCount !== value.totalIssues
+  ) {
+    return null;
+  }
+  const reportedVariableIssues = value.issues.filter(
+    (issue: ExecutionPreflightIssue) =>
+      issue.disposition === 'VARIABLE_DIAGNOSTIC',
+  ).length;
+  const reportedStructuralIssues = value.issues.filter(
+    (issue: ExecutionPreflightIssue) =>
+      issue.disposition === 'STRUCTURAL_START_FAILURE',
+  ).length;
+  if (
+    variableDiagnosticCount !== undefined
+    && reportedVariableIssues > variableDiagnosticCount
+  ) {
+    return null;
+  }
+  if (
+    structuralStartFailureCount !== undefined
+    && reportedStructuralIssues > structuralStartFailureCount
+  ) {
+    return null;
   }
 
   const ownerValid = value.owner === null
@@ -107,10 +183,19 @@ export function isExecutionPreflightReport(
       && (value.runScope.kind === 'ALL'
         ? value.runScope.selectedBlockId === null
         : isInteger(value.runScope.selectedBlockId, 1)));
-  if (!ownerValid || !scopeValid) return false;
+  if (!ownerValid || !scopeValid) return null;
 
-  if (value.status === 'UNAVAILABLE') {
-    return value.owner === null
+  const normalized = {
+    ...value,
+    status: normalizedStatus,
+    ...(normalizedOutcome === undefined ? {} : { outcome: normalizedOutcome }),
+  } as ExecutionPreflightReport;
+
+  if (normalizedStatus === 'UNAVAILABLE') {
+    if (normalizedOutcome !== undefined && normalizedOutcome !== 'UNAVAILABLE') {
+      return null;
+    }
+    const validUnavailable = value.owner === null
       && value.runScope === null
       && value.contentRevision === null
       && value.graphVersion === null
@@ -119,17 +204,50 @@ export function isExecutionPreflightReport(
       && value.totalIssues === 0
       && value.issues.length === 0
       && typeof value.unavailableReason === 'string'
-      && value.unavailableReason.trim().length > 0;
+      && value.unavailableReason.trim().length > 0
+      && (variableDiagnosticCount === undefined || variableDiagnosticCount === 0)
+      && (
+        structuralStartFailureCount === undefined
+        || structuralStartFailureCount === 0
+      );
+    return validUnavailable ? normalized : null;
   }
 
-  return value.owner !== null
+  const validAvailable = value.owner !== null
     && value.runScope !== null
     && typeof value.contentRevision === 'string'
     && value.contentRevision.trim().length > 0
     && value.unavailableReason === null
-    && (value.status === 'READY'
+    && (normalizedStatus === 'READY'
       ? value.totalIssues === 0 && value.issues.length === 0
       : value.totalIssues > 0);
+  if (!validAvailable) return null;
+  if (
+    normalizedStatus === 'READY'
+    && normalizedOutcome !== undefined
+    && normalizedOutcome !== 'READY'
+  ) {
+    return null;
+  }
+  if (
+    normalizedStatus === 'READY'
+    && (
+      (variableDiagnosticCount !== undefined && variableDiagnosticCount !== 0)
+      || (
+        structuralStartFailureCount !== undefined
+        && structuralStartFailureCount !== 0
+      )
+    )
+  ) {
+    return null;
+  }
+  if (
+    normalizedStatus === 'WOULD_BLOCK'
+    && (normalizedOutcome === 'READY' || normalizedOutcome === 'UNAVAILABLE')
+  ) {
+    return null;
+  }
+  return normalized;
 }
 
 function isBotJobDetailsState(value: unknown, expectedBotJobId: number): value is BotJobDetailsState {
@@ -193,11 +311,21 @@ export function parseBotJobDetailsEnvelope(
   if (!outer || outer.sessionId !== expectedSessionId) return null;
   const operationId = typeof outer.operationId === 'string' ? outer.operationId : '';
   if (!BOT_JOB_DETAILS_OPERATIONS.has(operationId)) return null;
-  const body = parseJsonObject(outer.body) as BotJobDetailsResponse | null;
-  if (!body || !isInteger(body.botJobId, 1) || body.botJobId !== expectedBotJobId) return null;
+  const rawBody = parseJsonObject(outer.body);
+  if (!rawBody || !isInteger(rawBody.botJobId, 1) || rawBody.botJobId !== expectedBotJobId) {
+    return null;
+  }
+  const normalizedPreflight = rawBody.executionPreflight === undefined
+    ? undefined
+    : normalizeExecutionPreflightReport(rawBody.executionPreflight);
+  if (rawBody.executionPreflight !== undefined && normalizedPreflight === null) return null;
+  const body = {
+    ...rawBody,
+    ...(normalizedPreflight === undefined
+      ? {}
+      : { executionPreflight: normalizedPreflight }),
+  } as BotJobDetailsResponse;
   if (body.state != null && !isBotJobDetailsState(body.state, expectedBotJobId)) return null;
-  if (body.executionPreflight !== undefined
-    && !isExecutionPreflightReport(body.executionPreflight)) return null;
   if (body.executionPreflight?.owner
     && body.executionPreflight.owner.botJobId !== expectedBotJobId) return null;
   if (body.executionPreflight?.owner
