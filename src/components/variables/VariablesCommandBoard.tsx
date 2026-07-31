@@ -17,6 +17,7 @@ import SearchBox, { type SearchBoxOption } from '../SearchBox';
 import type {
   InstructionRelationshipEdge,
 } from '../bot-job-details/grid/domain/instructionRelationshipGraph';
+import { instructionCommandPresentation } from '../bot-job-details/grid/domain/instructionCommandPresentation';
 import { instructionRelationshipPolicy } from '../bot-job-details/grid/domain/instructionRelationshipPolicy';
 import InstructionCommandBadge from '../bot-job-details/grid/InstructionCommandBadge';
 import type {
@@ -209,10 +210,15 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
         return false;
       }
       if (tokens.length === 0) return true;
+      const commandPresentation = instructionCommandPresentation(
+        instruction.command,
+        instruction.tagName,
+      );
       const haystack = [
         instruction.id,
         instruction.name,
         instruction.command,
+        commandPresentation.label,
         instruction.operation,
         instruction.tagName,
         instruction.blockId,
