@@ -51,16 +51,6 @@ import VariablesConnectionsModal, {
   type VariablesConnectionReviewItem,
   type VariablesConnectionsModalSubmission,
 } from './variables/VariablesConnectionsModal';
-import VariablesExecutionFlowReviewModal from './variables/VariablesExecutionFlowReviewModal';
-import VariableFlowRepairModal from './variables/VariableFlowRepairModal';
-import {
-  buildVariableFlowRepairMutation,
-  planVariableFlowRepair,
-  reviewVariableFlowRepair,
-  validateVariableFlowRepairAuthority,
-  type VariableFlowRepairChoice,
-  type VariableFlowRepairPlan,
-} from './variables/domain/variableFlowRepair';
 import {
   buildVariablesBatchResolveMutation,
   planVariablesBatchRelease,
@@ -73,11 +63,6 @@ import {
   type VariablesBatchResolvePlan,
   type VariablesBatchResolveReview,
 } from './variables/domain/variablesBatchConnections';
-import {
-  buildVariablesExecutionFlowReview,
-  variablesExecutionFlowReviewAuthorityKey,
-  type VariablesExecutionFlowReview,
-} from './variables/domain/variablesExecutionFlowReview';
 import {
   planVariablesBlockMove,
   selectVariablesBlockTransferSources,
@@ -174,11 +159,6 @@ type PendingReconnect = {
   plan: VariablesReconnectPlan;
 };
 
-type PendingVariableFlowRepair = {
-  authorityKey: string;
-  plan: VariableFlowRepairPlan;
-};
-
 type PendingConnectionsResolve = {
   mode: 'RESOLVE';
   authorityKey: string;
@@ -197,17 +177,9 @@ type PendingConnectionsRelease = {
   items: readonly VariablesConnectionReviewItem[];
 };
 
-type PendingConnectionsReview = {
-  mode: 'REVIEW';
-  authorityKey: string;
-  scope: VariablesConnectionScope;
-  review: VariablesExecutionFlowReview;
-};
-
 type PendingConnections =
   | PendingConnectionsResolve
-  | PendingConnectionsRelease
-  | PendingConnectionsReview;
+  | PendingConnectionsRelease;
 
 const acceptedOperations = new Set([
   'variablesWorkspace.bootstrapResponse',
@@ -336,10 +308,6 @@ const batchRelationshipLabel = (
       return 'Conditional root';
     case 'BLOCK_TARGET':
       return 'GOTO Block';
-    case 'VARIABLE_OWNER':
-      return 'Variable declaration Web Element';
-    case 'VARIABLE_ORDER':
-      return 'Execution order';
     default:
       return kind;
   }
@@ -367,21 +335,7 @@ const batchResolveModalItems = (
   snapshot: VariableWorkspaceSnapshot,
   review: VariablesBatchResolveReview,
 ): VariablesConnectionReviewItem[] => review.items.map((item) => {
-  const source = item.sourceEntity === 'VARIABLE'
-    ? (() => {
-        const variable = snapshot.variables.find(candidate =>
-          candidate.id === item.sourceVariableId);
-        return variable
-          ? {
-              label: `${variable.name} · Variable ID ${variable.id}`,
-              sublabel: 'Variable definition',
-            }
-          : {
-              label: `Variable ID ${item.sourceId}`,
-              sublabel: 'Current Bot Job',
-            };
-      })()
-    : batchSourceLabels(snapshot, item.sourceInstructionId ?? item.sourceId);
+  const source = batchSourceLabels(snapshot, item.sourceInstructionId);
   const stateTone: VariablesConnectionReviewItem['stateTone'] =
     item.resolution === 'AUTO' || item.resolution === 'REVIEWED'
       ? 'green'
@@ -485,30 +439,7 @@ const batchReleaseModalItems = (
       currentTargetLabel: relationshipTargetLabel(snapshot, currentTarget),
     };
   });
-  const ownerItems = plan.draft.variableOwnerPatches.map((patch) => {
-    const variable = snapshot.variables.find(candidate =>
-      candidate.id === patch.variableId);
-    const currentTarget: RelationshipTarget | null =
-      patch.expected.value === null
-        ? null
-        : {
-            entity: 'INSTRUCTION',
-            owner,
-            id: patch.expected.value,
-          };
-    return {
-      id: `VARIABLE:${patch.variableId}:VARIABLE_OWNER`,
-      sourceLabel: variable
-        ? `${variable.name} · Variable ID ${variable.id}`
-        : `Variable ID ${patch.variableId}`,
-      sourceSublabel: 'Variable definition',
-      relationLabel: batchRelationshipLabel('VARIABLE_OWNER'),
-      state: 'WILL RELEASE',
-      stateTone: 'red' as const,
-      currentTargetLabel: relationshipTargetLabel(snapshot, currentTarget),
-    };
-  });
-  return [...relationItems, ...variableItems, ...ownerItems];
+  return [...relationItems, ...variableItems];
 };
 
 const InstructionCard: React.FC<{
@@ -543,42 +474,12 @@ const EmptyRelation: React.FC<{
   title: string;
   detail: string;
   danger?: boolean;
-  actionLabel?: string;
-  disabled?: boolean;
-  onActivate?: () => void;
-}> = ({
-  title,
-  detail,
-  danger = false,
-  actionLabel,
-  disabled = false,
-  onActivate,
-}) => {
-  const className = [
-    styles.emptyRelation,
-    danger ? styles.emptyDanger : '',
-    onActivate ? styles.emptyRelationAction : '',
-  ].filter(Boolean).join(' ');
-  const content = (
-    <>
-      <strong>{title}</strong>
-      <span>{detail}</span>
-      {actionLabel && <b>{actionLabel}</b>}
-    </>
-  );
-  return onActivate
-    ? (
-        <button
-          type="button"
-          className={className}
-          disabled={disabled}
-          onClick={onActivate}
-        >
-          {content}
-        </button>
-      )
-    : <div className={className}>{content}</div>;
-};
+}> = ({ title, detail, danger = false }) => (
+  <div className={`${styles.emptyRelation} ${danger ? styles.emptyDanger : ''}`}>
+    <strong>{title}</strong>
+    <span>{detail}</span>
+  </div>
+);
 
 const RelationGroup: React.FC<{
   title: string;
@@ -745,8 +646,6 @@ const VariablesPage: React.FC<Props> = ({
     useState<VariablesCommandDropTarget | null>(null);
   const [pendingReconnect, setPendingReconnect] =
     useState<PendingReconnect | null>(null);
-  const [pendingVariableFlowRepair, setPendingVariableFlowRepair] =
-    useState<PendingVariableFlowRepair | null>(null);
   const [pendingConnections, setPendingConnections] =
     useState<PendingConnections | null>(null);
   const [pendingBlockTransfer, setPendingBlockTransfer] =
@@ -1033,12 +932,8 @@ const VariablesPage: React.FC<Props> = ({
       }
 
       const current = snapshotRef.current;
-      const sameBotJob = current !== null
-        && current.botJob.homeBankingId === normalized.botJob.homeBankingId
-        && current.botJob.id === normalized.botJob.id;
       if (
         current
-        && sameBotJob
         && normalized.workspaceEpoch < current.workspaceEpoch
       ) {
         return;
@@ -1138,6 +1033,7 @@ const VariablesPage: React.FC<Props> = ({
     () => snapshot ? variablesReconnectGraph(snapshot) : null,
     [snapshot],
   );
+
   useEffect(() => {
     if (
       pendingReconnect
@@ -1154,55 +1050,12 @@ const VariablesPage: React.FC<Props> = ({
   useEffect(() => {
     if (
       snapshot
-      && pendingVariableFlowRepair
-      && !validateVariableFlowRepairAuthority(
-        pendingVariableFlowRepair.plan,
+      && pendingConnections
+      && !validateVariablesBatchConnectionsAuthority(
+        pendingConnections.authorityKey,
         snapshot,
       )
     ) {
-      setPendingVariableFlowRepair(null);
-      setStatus({
-        level: 'error',
-        text: 'The Variables graph changed. Open the variable flow repair again.',
-      });
-    }
-  }, [pendingVariableFlowRepair, snapshot]);
-
-  useEffect(() => {
-    if (!snapshot || !pendingConnections) return;
-    if (pendingConnections.mode === 'REVIEW') {
-      const sameOwner = pendingConnections.review.homeBankingId
-        === snapshot.botJob.homeBankingId
-        && pendingConnections.review.botJobId === snapshot.botJob.id;
-      if (!sameOwner) {
-        setPendingConnections(null);
-        setStatus({
-          level: 'error',
-          text: 'The active Bot Job changed. Open connection review again.',
-        });
-        return;
-      }
-      const authorityKey = variablesExecutionFlowReviewAuthorityKey(snapshot);
-      const nextReview = buildVariablesExecutionFlowReview(snapshot);
-      if (
-        pendingConnections.authorityKey !== authorityKey
-        || pendingConnections.review.runtimeMemoryRevision
-          !== snapshot.runtimeMemory.revision
-        || pendingConnections.review.relationshipsAvailable
-          !== nextReview.relationshipsAvailable
-      ) {
-        setPendingConnections({
-          ...pendingConnections,
-          authorityKey,
-          review: nextReview,
-        });
-      }
-      return;
-    }
-    if (!validateVariablesBatchConnectionsAuthority(
-      pendingConnections.authorityKey,
-      snapshot,
-    )) {
       setPendingConnections(null);
       setStatus({
         level: 'error',
@@ -1229,7 +1082,7 @@ const VariablesPage: React.FC<Props> = ({
   const submitVariablesMutation = useCallback((
     draft: Parameters<typeof submitGraphMutation>[0],
     mutationProfile: Parameters<typeof submitGraphMutation>[2],
-    sourceInstructionId: number | null,
+    sourceInstructionId: number,
     pendingText: string,
     committedText: string,
   ) => {
@@ -1237,7 +1090,6 @@ const VariablesPage: React.FC<Props> = ({
     const requestId = submitGraphMutation(draft, {
       committed: response => {
         setPendingReconnect(null);
-        setPendingVariableFlowRepair(null);
         setPendingConnections(null);
         setPendingBlockTransfer(null);
         setDraggingInstructionId(null);
@@ -1250,7 +1102,6 @@ const VariablesPage: React.FC<Props> = ({
       },
       refused: (response, reason) => {
         setPendingReconnect(null);
-        setPendingVariableFlowRepair(null);
         setPendingConnections(null);
         setPendingBlockTransfer(null);
         setDraggingInstructionId(null);
@@ -1268,16 +1119,13 @@ const VariablesPage: React.FC<Props> = ({
     }, mutationProfile);
     if (!requestId) {
       setPendingReconnect(null);
-      setPendingVariableFlowRepair(null);
       setPendingConnections(null);
       setPendingBlockTransfer(null);
       setDraggingInstructionId(null);
       setActiveDropTarget(null);
       setStatus({
         level: 'error',
-        text: sourceInstructionId === null
-          ? 'Variables is busy or disconnected. The graph was not changed.'
-          : `Variables is busy or disconnected. Instruction #${sourceInstructionId} was not changed.`,
+        text: `Variables is busy or disconnected. Instruction #${sourceInstructionId} was not changed.`,
       });
     }
   }, [sendWorkspaceRequest, submitGraphMutation]);
@@ -1319,8 +1167,7 @@ const VariablesPage: React.FC<Props> = ({
       setStatus({ level: 'error', text: planned.message });
       return;
     }
-    const cleared = planned.plan.clearedRelationships.length
-      + planned.plan.clearedVariableBindings.length;
+    const cleared = planned.plan.clearedRelationships.length;
     submitVariablesMutation(
       planned.plan.draft,
       planned.plan.mutationProfile,
@@ -1563,99 +1410,6 @@ const VariablesPage: React.FC<Props> = ({
     submitVariablesMutation,
   ]);
 
-  const openVariableFlowRepair = useCallback((variableId: number) => {
-    const current = snapshotRef.current;
-    if (!current) {
-      setStatus({
-        level: 'error',
-        text: 'Variables must finish loading before the flow can be repaired.',
-      });
-      return;
-    }
-    const planned = planVariableFlowRepair(current, variableId);
-    if (!planned.ok) {
-      setStatus({ level: 'error', text: planned.message });
-      return;
-    }
-    setSelectedVariableId(variableId);
-    setPendingVariableFlowRepair({
-      authorityKey: planned.plan.authorityKey,
-      plan: planned.plan,
-    });
-    setStatus({
-      level: 'warn',
-      text: 'Choose the Web Element and GET producer for this variable.',
-    });
-  }, []);
-
-  const submitVariableFlowRepair = useCallback((
-    choice: VariableFlowRepairChoice,
-  ) => {
-    const current = snapshotRef.current;
-    const pending = pendingVariableFlowRepair;
-    if (
-      !current
-      || !pending
-      || !validateVariableFlowRepairAuthority(pending.plan, current)
-    ) {
-      setPendingVariableFlowRepair(null);
-      setStatus({
-        level: 'error',
-        text: 'The Variables graph changed. Open the variable flow repair again.',
-      });
-      return;
-    }
-    const built = buildVariableFlowRepairMutation(pending.plan, choice);
-    if (!built.ok) {
-      if (built.code === 'NO_CHANGES') {
-        setPendingVariableFlowRepair(null);
-        setStatus({ level: 'ok', text: built.message });
-        return;
-      }
-      setStatus({ level: 'error', text: built.message });
-      return;
-    }
-    const orderWarning = built.review.executionOrderIssueInstructionIds.length;
-    submitVariablesMutation(
-      built.draft,
-      built.mutationProfile,
-      built.changedInstructionIds[0] ?? choice.getInstructionId,
-      'Connecting Web Element, GET producer, and variable...',
-      orderWarning > 0
-        ? `Variable flow connected. ${orderWarning} reader(s) still require execution-order review.`
-        : 'Web Element, GET producer, and variable connected.',
-    );
-  }, [
-    pendingVariableFlowRepair,
-    submitVariablesMutation,
-  ]);
-
-  const openReviewVisibleConnections = useCallback((
-    scope: VariablesConnectionScope,
-  ) => {
-    const current = snapshotRef.current;
-    if (!current) {
-      setStatus({
-        level: 'error',
-        text: 'Variables must finish loading before connections can be reviewed.',
-      });
-      return;
-    }
-    const executionReview = buildVariablesExecutionFlowReview(current);
-    setPendingConnections({
-      mode: 'REVIEW',
-      authorityKey: variablesExecutionFlowReviewAuthorityKey(current),
-      scope,
-      review: executionReview,
-    });
-    setStatus({
-      level: executionReview.relationshipsAvailable ? 'ok' : 'warn',
-      text: executionReview.relationshipsAvailable
-        ? `Reviewing the complete ${executionReview.steps.length}-command Bot Job execution flow. No database change will be made.`
-        : `Reviewing ${executionReview.steps.length} command(s) in read-only mode. Relationship authority is currently unavailable.`,
-    });
-  }, []);
-
   const openResolveVisibleConnections = useCallback((
     scope: VariablesConnectionScope,
   ) => {
@@ -1665,16 +1419,6 @@ const VariablesPage: React.FC<Props> = ({
         level: 'error',
         text: 'Variables must finish loading before connections can be resolved.',
       });
-      return;
-    }
-    if (
-      scope.visibleCount === 0
-      || current.mutationCapability?.reactAuthoredProfile == null
-    ) {
-      // Resolve must never become a dead action. When there is no writable
-      // scope, open the complete read-only flow so the client can still
-      // inspect every relationship and decide what to repair next.
-      openReviewVisibleConnections(scope);
       return;
     }
     const planned = planVariablesBatchResolve(
@@ -1691,7 +1435,10 @@ const VariablesPage: React.FC<Props> = ({
       return;
     }
     if (reviewed.review.items.length === 0) {
-      openReviewVisibleConnections(scope);
+      setStatus({
+        level: 'ok',
+        text: `All ${scope.visibleCount} visible command(s) already have valid direct connections.`,
+      });
       return;
     }
     setPendingConnections({
@@ -1705,9 +1452,9 @@ const VariablesPage: React.FC<Props> = ({
     });
     setStatus({
       level: 'warn',
-      text: `Reviewing connections, variable ownership, and execution order for ${scope.visibleCount} visible command(s).`,
+      text: `Reviewing direct connections for ${scope.visibleCount} visible command(s).`,
     });
-  }, [openReviewVisibleConnections]);
+  }, []);
 
   const openReleaseVisibleConnections = useCallback((
     scope: VariablesConnectionScope,
@@ -1732,7 +1479,7 @@ const VariablesPage: React.FC<Props> = ({
     if (items.length === 0) {
       setStatus({
         level: 'ok',
-        text: `The ${scope.visibleCount} visible command(s) have no reviewed connections to release.`,
+        text: `The ${scope.visibleCount} visible command(s) have no direct connections to release.`,
       });
       return;
     }
@@ -1745,7 +1492,7 @@ const VariablesPage: React.FC<Props> = ({
     });
     setStatus({
       level: 'warn',
-      text: `Reviewing ${items.length} connection(s) before release.`,
+      text: `Reviewing ${items.length} direct connection(s) before release.`,
     });
   }, []);
 
@@ -1754,32 +1501,18 @@ const VariablesPage: React.FC<Props> = ({
   ) => {
     const current = snapshotRef.current;
     const pending = pendingConnections;
-    const authorityValid = current && pending
-      ? pending.mode === 'REVIEW'
-        ? pending.authorityKey
-          === variablesExecutionFlowReviewAuthorityKey(current)
-        : validateVariablesBatchConnectionsAuthority(
-            pending.authorityKey,
-            current,
-          )
-      : false;
     if (
       !current
       || !pending
-      || !authorityValid
+      || !validateVariablesBatchConnectionsAuthority(
+        pending.authorityKey,
+        current,
+      )
     ) {
       setPendingConnections(null);
       setStatus({
         level: 'error',
         text: 'The Variables graph changed. Open the bulk connection action again.',
-      });
-      return;
-    }
-
-    if (pending.mode === 'REVIEW') {
-      setStatus({
-        level: 'warn',
-        text: 'Connection review is read-only. No graph mutation was submitted.',
       });
       return;
     }
@@ -1806,9 +1539,9 @@ const VariablesPage: React.FC<Props> = ({
       submitVariablesMutation(
         pending.plan.draft,
         pending.plan.mutationProfile,
-        pending.plan.changedInstructionIds[0] ?? null,
-        `Releasing ${pending.items.length} connection(s)...`,
-        `${pending.items.length} connection(s) released.`,
+        pending.plan.changedInstructionIds[0] ?? 0,
+        `Releasing ${pending.items.length} direct connection(s)...`,
+        `${pending.items.length} direct connection(s) released.`,
       );
       return;
     }
@@ -1869,22 +1602,12 @@ const VariablesPage: React.FC<Props> = ({
       setStatus({ level: 'error', text: built.message });
       return;
     }
-    const appliedCount = built.mutation.review.items.filter(item =>
-      item.selectedTarget !== null
-      && (
-        item.resolution === 'AUTO'
-        || item.resolution === 'REVIEWED'
-      )).length;
-    const unchangedCount =
-      built.mutation.review.items.length - appliedCount;
     submitVariablesMutation(
       built.mutation.draft,
       built.mutation.mutationProfile,
-      built.mutation.changedInstructionIds[0] ?? null,
-      `Resolving ${appliedCount} reviewed relationship(s)...`,
-      `${appliedCount} reviewed relationship(s) resolved.${unchangedCount > 0
-        ? ` ${unchangedCount} unavailable or skipped relationship(s) remained unchanged.`
-        : ''}`,
+      built.mutation.changedInstructionIds[0] ?? 0,
+      `Resolving ${built.mutation.changedInstructionIds.length} visible command(s)...`,
+      `${built.mutation.changedInstructionIds.length} visible command(s) resolved.`,
     );
   }, [
     pendingConnections,
@@ -1989,18 +1712,8 @@ const VariablesPage: React.FC<Props> = ({
     || pendingCreateRequestId !== null
     || pendingDeleteRequestId !== null
     || pendingReconnect !== null
-    || pendingVariableFlowRepair !== null
     || pendingConnections !== null
     || pendingBlockTransfer !== null
-    || snapshot?.mutationCapability?.reactAuthoredProfile == null;
-  // Movement has its own authority. Relationship issues and open connection
-  // review/repair state never decide whether a row is draggable.
-  const movementDisabled = !connected
-    || pendingRequest !== null
-    || pendingMutationRequestId !== null
-    || pendingCopyRequestId !== null
-    || pendingCreateRequestId !== null
-    || pendingDeleteRequestId !== null
     || snapshot?.mutationCapability?.reactAuthoredProfile == null;
   const blockTransferSource = snapshot && pendingBlockTransfer
     ? snapshot.commands.find(
@@ -2038,68 +1751,6 @@ const VariablesPage: React.FC<Props> = ({
       ].join(' '),
     }))
     : [];
-  const variableFlowPlan = pendingVariableFlowRepair?.plan ?? null;
-  const variableFlowWebElementOptions = variableFlowPlan
-    ? variableFlowPlan.webElementCandidates
-      .filter(candidate => candidate.compatibleGetInstructionIds.length > 0)
-      .map(candidate => ({
-        instructionId: candidate.instructionId,
-        label: `#${candidate.instructionOrderNumber} ${candidate.name} · ID ${candidate.instructionId}`,
-        sublabel: `Block #${candidate.blockOrderNumber} · Block ID ${candidate.blockId}`,
-        badges: [
-          { text: 'WEB ELEMENT', tone: 'blue' as const },
-          ...(candidate.instructionId
-            === variableFlowPlan.currentOwnerInstructionId
-            ? [{ text: 'CURRENT OWNER', tone: 'green' as const }]
-            : []),
-        ],
-        keywords: [
-          candidate.instructionId,
-          candidate.name,
-          candidate.action,
-          candidate.tagName,
-          candidate.blockId,
-          candidate.blockOrderNumber,
-          candidate.instructionOrderNumber,
-        ].join(' '),
-      }))
-    : [];
-  const variableFlowGetOptions = variableFlowPlan
-    ? variableFlowPlan.getCandidates.map(candidate => ({
-        instructionId: candidate.instructionId,
-        label: `#${candidate.instructionOrderNumber} ${candidate.name} · ID ${candidate.instructionId}`,
-        sublabel: `Block #${candidate.blockOrderNumber} · Block ID ${candidate.blockId}`,
-        badges: [{ text: 'GET', tone: 'blue' as const }],
-        keywords: [
-          candidate.instructionId,
-          candidate.name,
-          candidate.blockId,
-          candidate.blockOrderNumber,
-          candidate.instructionOrderNumber,
-          candidate.currentParentId,
-          candidate.currentVariableId,
-        ].join(' '),
-        compatibleWebElementInstructionIds:
-          variableFlowPlan.webElementCandidates
-            .filter(webElement =>
-              webElement.compatibleGetInstructionIds.includes(
-                candidate.instructionId,
-              ))
-            .map(webElement => webElement.instructionId),
-      }))
-    : [];
-  const variableFlowCurrentOwnerLabel = snapshot && variableFlowPlan
-    && variableFlowPlan.currentOwnerInstructionId !== null
-    ? relationshipTargetLabel(snapshot, {
-        entity: 'INSTRUCTION',
-        owner: {
-          workspaceKind: 'BOT_JOB',
-          homeBankingId: snapshot.botJob.homeBankingId,
-          botJobId: snapshot.botJob.id,
-        },
-        id: variableFlowPlan.currentOwnerInstructionId,
-      })
-    : null;
 
   const filterButtons: Array<{ id: HealthFilter; label: string; count?: number }> = [
     { id: 'ALL', label: 'All', count: snapshot?.summary.variableCount ?? 0 },
@@ -2220,21 +1871,16 @@ const VariablesPage: React.FC<Props> = ({
           ) : (
             <section className={styles.workspace}>
               <VariablesCommandBoard
-                workspaceIdentityKey={`${snapshot.botJob.homeBankingId}:${snapshot.botJob.id}`}
                 blocks={snapshot.blocks}
                 instructions={snapshot.commands}
                 relationshipEdges={relationshipGraph?.edges ?? []}
-                disabled={movementDisabled}
+                disabled={mutationDisabled}
                 unavailableReason={pendingMutationRequestId
                   ? 'Saving...'
-                  : pendingRequest
-                    ? 'Refreshing workspace...'
-                    : pendingCopyRequestId
-                      ? 'Copying instruction...'
-                      : pendingCreateRequestId
-                        ? 'Creating variable...'
-                        : pendingDeleteRequestId
-                          ? 'Deleting variable...'
+                  : pendingReconnect
+                    ? 'Review relationship'
+                    : pendingConnections
+                      ? 'Review bulk connections'
                     : snapshot.mutationCapability?.reactAuthoredProfile == null
                       ? 'Read-only'
                       : undefined}
@@ -2270,7 +1916,7 @@ const VariablesPage: React.FC<Props> = ({
                   setActiveDropTarget(null);
                 }}
                 onDropTargetDragOver={(event, target) => {
-                  if (draggingInstructionId === null || movementDisabled) return;
+                  if (draggingInstructionId === null || mutationDisabled) return;
                   event.preventDefault();
                   event.dataTransfer.dropEffect = 'move';
                   setActiveDropTarget(target);
@@ -2303,7 +1949,6 @@ const VariablesPage: React.FC<Props> = ({
                 onReconnectVariable={(instructionId) =>
                   openReconnect(instructionId, 'VARIABLE_BINDING')}
                 onResolveVisibleConnections={openResolveVisibleConnections}
-                onReviewVisibleConnections={openReviewVisibleConnections}
                 onReleaseVisibleConnections={openReleaseVisibleConnections}
               />
 
@@ -2447,10 +2092,6 @@ const VariablesPage: React.FC<Props> = ({
                               title="Owner missing"
                               detail="The declaration no longer resolves to a Web Field."
                               danger
-                              actionLabel="Connect Web Element → GET → Variable"
-                              disabled={mutationDisabled}
-                              onActivate={() =>
-                                openVariableFlowRepair(selectedVariable.id)}
                             />
                           )}
                       </div>
@@ -2479,11 +2120,7 @@ const VariablesPage: React.FC<Props> = ({
                                 detail={(selectedValuePresentation?.activeConsumers.length ?? 0) > 0
                                   ? 'Active readers exist, but no active GET command produces a value.'
                                   : 'No active GET producer is present in the declared graph.'}
-                                danger
-                                actionLabel="Connect Web Element → GET → Variable"
-                                disabled={mutationDisabled}
-                                onActivate={() =>
-                                  openVariableFlowRepair(selectedVariable.id)}
+                                danger={(selectedValuePresentation?.activeConsumers.length ?? 0) > 0}
                               />
                             )}
                         </div>
@@ -2644,10 +2281,7 @@ const VariablesPage: React.FC<Props> = ({
             </section>
           )}
         </section>
-        {snapshot
-          && pendingConnections
-          && pendingConnections.mode !== 'REVIEW'
-          && (
+        {snapshot && pendingConnections && (
           <VariablesConnectionsModal
             key={[
               pendingConnections.authorityKey,
@@ -2670,71 +2304,6 @@ const VariablesPage: React.FC<Props> = ({
               setStatus({
                 level: 'warn',
                 text: 'Bulk connection action cancelled. No relationship was changed.',
-              });
-            }}
-          />
-        )}
-        {pendingConnections?.mode === 'REVIEW' && (
-          <VariablesExecutionFlowReviewModal
-            key={pendingConnections.authorityKey}
-            review={pendingConnections.review}
-            scopeLabel={pendingConnections.scope.label}
-            onClose={() => {
-              setPendingConnections(null);
-              setStatus({
-                level: 'ok',
-                text: 'Connection review closed. No relationship was changed.',
-              });
-            }}
-          />
-        )}
-        {snapshot && variableFlowPlan && (
-          <VariableFlowRepairModal
-            key={pendingVariableFlowRepair?.authorityKey}
-            variableId={variableFlowPlan.variable.id}
-            variableName={variableFlowPlan.variable.name}
-            variableType={variableFlowPlan.variable.type}
-            currentOwnerLabel={variableFlowCurrentOwnerLabel}
-            webElementOptions={variableFlowWebElementOptions}
-            getOptions={variableFlowGetOptions}
-            pending={
-              !connected
-              || pendingRequest !== null
-              || pendingMutationRequestId !== null
-            }
-            reviewWarnings={(choice) => {
-              const reviewed = reviewVariableFlowRepair(
-                variableFlowPlan,
-                choice,
-              );
-              if (!reviewed.ok) return [reviewed.message];
-              const warnings: string[] = [];
-              if (reviewed.review.reassignedVariableId !== null) {
-                warnings.push(
-                  `GET #${reviewed.review.get.instructionId} currently writes variable #${reviewed.review.reassignedVariableId}; it will be reassigned.`,
-                );
-              }
-              if (reviewed.review.duplicateOwnerVariableIds.length > 0) {
-                warnings.push(
-                  `Web Element #${reviewed.review.webElement.instructionId} already owns variable(s) ${reviewed.review.duplicateOwnerVariableIds.map(id => `#${id}`).join(', ')}.`,
-                );
-              }
-              if (
-                reviewed.review.executionOrderIssueInstructionIds.length > 0
-              ) {
-                warnings.push(
-                  `${reviewed.review.executionOrderIssueInstructionIds.length} reader(s) run before this GET and will still require execution-order repair.`,
-                );
-              }
-              return warnings;
-            }}
-            onConfirm={submitVariableFlowRepair}
-            onCancel={() => {
-              if (pendingMutationRequestId !== null) return;
-              setPendingVariableFlowRepair(null);
-              setStatus({
-                level: 'warn',
-                text: 'Variable flow repair cancelled. No relationship was changed.',
               });
             }}
           />

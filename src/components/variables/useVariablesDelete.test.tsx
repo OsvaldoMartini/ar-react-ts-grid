@@ -53,7 +53,6 @@ const snapshot = (
     },
     layoutRows: [],
     instructionFacts: [],
-    variableFacts: [],
   },
   ...overrides,
 });

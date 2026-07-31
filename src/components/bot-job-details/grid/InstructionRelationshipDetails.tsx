@@ -5,7 +5,6 @@ import { RulesCard, type RulesCardEvent } from '../../RulesCard';
 import gridStyles from '../../Griditem.module.scss';
 import type {
   InstructionRelationshipEdge,
-  InstructionRelationshipKind,
   RelationshipMutationState,
   RelationshipState,
 } from './domain/instructionRelationshipGraph';
@@ -249,24 +248,6 @@ const chipClassName = (tone: ChipDescriptor['tone']): string => {
   }
 };
 
-type StructuralParentKind = Extract<
-  InstructionRelationshipKind,
-  'LOOP_ANCHOR' | 'CONDITIONAL_ROOT' | 'BLOCK_TARGET'
->;
-
-const structuralRelationshipLabel = (
-  kind: StructuralParentKind,
-  connected: boolean,
-): string => {
-  if (kind === 'LOOP_ANCHOR') {
-    return connected ? 'Loop connected' : 'Reconnect Loop';
-  }
-  if (kind === 'CONDITIONAL_ROOT') {
-    return connected ? 'Conditional connected' : 'Repair Conditional';
-  }
-  return connected ? 'Block connected' : 'Reconnect Block';
-};
-
 const InstructionRelationshipDetails: React.FC<
   InstructionRelationshipDetailsProps
 > = ({
@@ -286,14 +267,6 @@ const InstructionRelationshipDetails: React.FC<
     edge.source.entity === 'INSTRUCTION'
     && edge.source.id === instruction.id
     && edge.kind === 'VARIABLE_BINDING');
-  const structuralParentEdge = relationshipEdges.find(edge =>
-    edge.source.entity === 'INSTRUCTION'
-    && edge.source.id === instruction.id
-    && (
-      edge.kind === 'LOOP_ANCHOR'
-      || edge.kind === 'CONDITIONAL_ROOT'
-      || edge.kind === 'BLOCK_TARGET'
-    ));
   const relationshipPolicy = instructionRelationshipPolicy(
     instruction.actions,
   );
@@ -367,37 +340,12 @@ const InstructionRelationshipDetails: React.FC<
           ts: instruction.id,
         }
       : null;
-  const structuralKind: StructuralParentKind | null =
-    structuralParentEdge?.kind === 'LOOP_ANCHOR'
-    || structuralParentEdge?.kind === 'CONDITIONAL_ROOT'
-    || structuralParentEdge?.kind === 'BLOCK_TARGET'
-      ? structuralParentEdge.kind
-      : null;
-  const connectedStructuralTargetId =
-    structuralParentEdge?.state === 'CONNECTED'
-    && typeof structuralParentEdge.target?.id === 'number'
-    && Number.isSafeInteger(structuralParentEdge.target.id)
-    && structuralParentEdge.target.id > 0
-      ? structuralParentEdge.target.id
-      : null;
-  const reconnectStructuralEvent: RulesCardEvent | null =
-    structuralKind !== null
-    && structuralParentEdge?.state !== 'CONNECTED'
-    && structuralParentEdge?.state !== 'MEMORY_ONLY'
-      ? {
-          color: 'red',
-          rules: structuralRelationshipLabel(structuralKind, false),
-          context: '',
-          ts: instruction.id,
-        }
-      : null;
 
   const chips = [
     ...relationshipEdges
       .filter(edge =>
         edge !== elementParentEdge
         && edge !== variableBindingEdge
-        && edge !== structuralParentEdge
         && edge.state !== 'CONNECTED')
       .map(edge => ({
         key: edge.id,
@@ -425,8 +373,6 @@ const InstructionRelationshipDetails: React.FC<
         || chips.length > 0
         || reconnectParentEvent != null
         || connectedParentId != null
-        || reconnectStructuralEvent != null
-        || connectedStructuralTargetId != null
         || reconnectVariableEvent != null
         || connectedVariableId != null
       ) && (
@@ -495,75 +441,6 @@ const InstructionRelationshipDetails: React.FC<
                   >
                     <Link2 size={10} aria-hidden="true" />
                     Parent connected (id: {connectedParentId})
-                  </span>
-                )
-          )}
-          {reconnectStructuralEvent && structuralKind && structuralParentEdge && (
-            <span
-              className={styles.reconnectRuleCard}
-              onMouseDown={event => event.stopPropagation()}
-            >
-              <RulesCard
-                event={reconnectStructuralEvent}
-                ariaLabel={humanizeCode(structuralParentEdge.code)
-                  ? `${reconnectStructuralEvent.rules}: ${humanizeCode(structuralParentEdge.code)}`
-                  : reconnectStructuralEvent.rules}
-                glow
-                border
-                animate={false}
-                pulse
-                iconNode={<Link2 size={10} aria-hidden="true" />}
-                title={humanizeCode(structuralParentEdge.code)
-                  ? `${reconnectStructuralEvent.rules}: ${humanizeCode(structuralParentEdge.code)}`
-                  : reconnectStructuralEvent.rules}
-                disabled={reconnectDisabled}
-                onClick={onReconnect
-                  ? () => onReconnect(structuralParentEdge)
-                  : undefined}
-              />
-            </span>
-          )}
-          {connectedStructuralTargetId != null
-            && structuralKind
-            && structuralParentEdge && (
-            onReconnect
-              ? (
-                  <button
-                    type="button"
-                    className={[
-                      styles.chip,
-                      styles.reconnectButton,
-                      styles.reconnectParent,
-                      styles.connectedParent,
-                    ].join(' ')}
-                    aria-label={`${structuralRelationshipLabel(structuralKind, true)} (id: ${connectedStructuralTargetId})`}
-                    title={`Change ${structuralRelationshipLabel(structuralKind, true).toLocaleLowerCase()}`}
-                    data-relationship-state="CONNECTED"
-                    disabled={reconnectDisabled}
-                    onMouseDown={event => event.stopPropagation()}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onReconnect(structuralParentEdge);
-                    }}
-                  >
-                    <Link2 size={10} aria-hidden="true" />
-                    {structuralRelationshipLabel(structuralKind, true)} (id: {connectedStructuralTargetId})
-                  </button>
-                )
-              : (
-                  <span
-                    className={[
-                      styles.chip,
-                      styles.reconnectParent,
-                      styles.connectedParent,
-                      styles.connectedStatic,
-                    ].join(' ')}
-                    aria-label={`${structuralRelationshipLabel(structuralKind, true)} (id: ${connectedStructuralTargetId})`}
-                    title={`${structuralRelationshipLabel(structuralKind, true)} (id: ${connectedStructuralTargetId})`}
-                    data-relationship-state="CONNECTED"
-                  >
-                    <Link2 size={10} aria-hidden="true" />
-                    {structuralRelationshipLabel(structuralKind, true)} (id: {connectedStructuralTargetId})
                   </span>
                 )
           )}

@@ -1,12 +1,5 @@
 import React from 'react';
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import VariablesPage from './VariablesPage';
 
 const mockSend = jest.fn();
@@ -218,10 +211,6 @@ const mutableRelationshipSnapshot = (graphRevision = 'd'.repeat(64)) => ({
       parentBlockId: 7,
       variableId: 12,
     }],
-    variableFacts: [{
-      variableId: 12,
-      ownerInstructionId: 189,
-    }],
   },
 });
 
@@ -345,73 +334,6 @@ test('shows a retry action when the first correlated bootstrap fails', async () 
   fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
   expect(mockSend).toHaveBeenCalledTimes(2);
   expect(JSON.parse(mockSend.mock.calls[1][0]).type).toBe('variablesWorkspace.bootstrap');
-  view.unmount();
-});
-
-test('accepts a lower workspace epoch when the authoritative Bot Job changes', async () => {
-  const view = render(
-    <VariablesPage socketPort={59772} sessionId="variablesManager" />,
-  );
-  await waitFor(() => expect(mockSend).toHaveBeenCalledTimes(1));
-  const bootstrapRequest = JSON.parse(JSON.parse(mockSend.mock.calls[0][0]).body);
-  mockMessages = [response('variablesWorkspace.bootstrapResponse', {
-    ...snapshot,
-    workspaceEpoch: 9,
-    requestId: bootstrapRequest.requestId,
-  })];
-  view.rerender(
-    <VariablesPage socketPort={59772} sessionId="variablesManager" />,
-  );
-  await waitFor(() => expect(screen.getByText(/Saldo Banca Stato/))
-    .toBeInTheDocument());
-
-  mockMessages = [
-    ...mockMessages,
-    response('variablesWorkspace.snapshot', {
-      ...snapshot,
-      bindingEpoch: 'binding-other',
-      workspaceEpoch: 1,
-      graphRevision: 'c'.repeat(64),
-      botJob: {
-        ...snapshot.botJob,
-        id: 32,
-        name: 'Lower Epoch Bot',
-      },
-    }),
-  ];
-  view.rerender(
-    <VariablesPage socketPort={59772} sessionId="variablesManager" />,
-  );
-
-  await waitFor(() => expect(screen.getByText(/Lower Epoch Bot/))
-    .toBeInTheDocument());
-  view.unmount();
-});
-
-test('opens a partial read-only review without mutation capability', async () => {
-  const view = render(
-    <VariablesPage socketPort={59772} sessionId="variablesManager" />,
-  );
-  await waitFor(() => expect(mockSend).toHaveBeenCalledTimes(1));
-  const bootstrapRequest = JSON.parse(JSON.parse(mockSend.mock.calls[0][0]).body);
-  mockMessages = [response('variablesWorkspace.bootstrapResponse', {
-    ...snapshot,
-    requestId: bootstrapRequest.requestId,
-  })];
-  view.rerender(
-    <VariablesPage socketPort={59772} sessionId="variablesManager" />,
-  );
-
-  const reviewButton = await screen.findByRole('button', {
-    name: 'REVIEW ALL CONNECTIONS',
-  });
-  expect(reviewButton).toBeEnabled();
-  const sentBeforeReview = mockSend.mock.calls.length;
-  fireEvent.click(reviewButton);
-  expect(screen.getByText('Relationship graph unavailable'))
-    .toBeInTheDocument();
-  expect(screen.getAllByText('Read Amount').length).toBeGreaterThan(0);
-  expect(mockSend).toHaveBeenCalledTimes(sentBeforeReview);
   view.unmount();
 });
 
@@ -558,10 +480,6 @@ test('opens the two-step Block transfer flow and sends the exact React copy sele
         parentBlockId: 7,
         variableId: 12,
       }],
-      variableFacts: [{
-        variableId: 12,
-        ownerInstructionId: 189,
-      }],
     },
   };
   const view = render(
@@ -650,7 +568,7 @@ test('releases only visible direct connections in one atomic v3 request', async 
   expect(screen.getByRole('heading', { name: 'Release Connections' }))
     .toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', {
-    name: 'Release 5 Connections',
+    name: 'Release 4 Connections',
   }));
 
   const sent = JSON.parse(mockSend.mock.calls.at(-1)?.[0] as string);
@@ -661,12 +579,7 @@ test('releases only visible direct connections in one atomic v3 request', async 
     baseGraphVersion: 9,
     graphRevision: mutableSnapshot.graphRevision,
     draggedInstructionId: null,
-    variableOwnerPatches: [{
-      variableId: 12,
-      operation: 'CLEAR',
-      expected: { value: 189 },
-      replacement: { value: null },
-    }],
+    variableOwnerPatches: [],
   });
   expect(body.instructionRelationPatches).toEqual([
     expect.objectContaining({
@@ -734,22 +647,12 @@ test('resolves a unique visible Web Element connection through the new modal', a
   await waitFor(() => expect(screen.getByRole('button', {
     name: 'RESOLVE ALL CONNECTIONS',
   })).toBeEnabled());
-  expect(screen.getByRole('button', {
-    name: 'REVIEW ALL CONNECTIONS',
-  })).toBeEnabled();
-  const disconnectedCommandRow = screen.getAllByText('Read Amount')
-    .map(element => element.closest('article'))
-    .find((element): element is HTMLElement =>
-      element?.getAttribute('data-instruction-id') === '190');
-  expect(disconnectedCommandRow).toBeDefined();
-  expect(disconnectedCommandRow).toHaveAttribute('draggable', 'true');
   fireEvent.click(screen.getByRole('button', {
     name: 'RESOLVE ALL CONNECTIONS',
   }));
 
   expect(screen.getByRole('heading', { name: 'Resolve Connections' }))
     .toBeInTheDocument();
-  expect(disconnectedCommandRow).toHaveAttribute('draggable', 'true');
   fireEvent.click(screen.getByRole('button', {
     name: 'Resolve 1 Connection',
   }));
@@ -768,177 +671,5 @@ test('resolves a unique visible Web Element connection through the new modal', a
   ]);
   expect(body.variableBindingPatches).toEqual([]);
   expect(body.variableOwnerPatches).toEqual([]);
-  view.unmount();
-});
-
-test('reviews a healthy complete execution flow without submitting a mutation', async () => {
-  const healthySnapshot = mutableRelationshipSnapshot('8'.repeat(64));
-  const view = render(
-    <VariablesPage socketPort={59772} sessionId="variablesManager" />,
-  );
-  await waitFor(() => expect(mockSend).toHaveBeenCalledTimes(1));
-  const bootstrapRequest = JSON.parse(JSON.parse(mockSend.mock.calls[0][0]).body);
-  mockMessages = [response('variablesWorkspace.bootstrapResponse', {
-    ...healthySnapshot,
-    requestId: bootstrapRequest.requestId,
-  })];
-  view.rerender(
-    <VariablesPage socketPort={59772} sessionId="variablesManager" />,
-  );
-
-  const reviewButton = await screen.findByRole('button', {
-    name: 'REVIEW ALL CONNECTIONS',
-  });
-  expect(screen.getByRole('button', {
-    name: 'RESOLVE ALL CONNECTIONS',
-  })).toBeEnabled();
-  const sentBeforeReview = mockSend.mock.calls.length;
-  fireEvent.click(reviewButton);
-
-  const dialog = screen.getByRole('dialog', {
-    name: 'Review All Connections',
-  });
-  expect(within(dialog).getByText('Bot Job execution flow'))
-    .toBeInTheDocument();
-  expect(within(dialog).getAllByText('Amount').length).toBeGreaterThan(0);
-  expect(within(dialog).getAllByText('Read Amount').length).toBeGreaterThan(0);
-  expect(within(dialog).getAllByText('Compare Amount').length).toBeGreaterThan(0);
-  expect(within(dialog).queryByRole('combobox')).not.toBeInTheDocument();
-  expect(mockSend).toHaveBeenCalledTimes(sentBeforeReview);
-
-  mockMessages = [
-    ...mockMessages,
-    response('variablesWorkspace.snapshot', {
-      ...healthySnapshot,
-      runtimeMemory: {
-        revision: healthySnapshot.runtimeMemory.revision + 1,
-        variables: healthySnapshot.runtimeMemory.variables.map(entry => ({
-          ...entry,
-          value: '999.00',
-          entryRevision: entry.entryRevision + 1,
-        })),
-      },
-    }),
-  ];
-  view.rerender(
-    <VariablesPage socketPort={59772} sessionId="variablesManager" />,
-  );
-  await waitFor(() => expect(within(screen.getByRole('dialog', {
-    name: 'Review All Connections',
-  })).getByText('Runtime VALUE: 999.00')).toBeInTheDocument());
-
-  fireEvent.click(within(screen.getByRole('dialog', {
-    name: 'Review All Connections',
-  })).getByRole('button', { name: 'Close' }));
-  expect(mockSend).toHaveBeenCalledTimes(sentBeforeReview);
-  view.unmount();
-});
-
-test('repairs Web Element, GET, and variable ownership in one atomic v3 request', async () => {
-  const base = mutableRelationshipSnapshot('f'.repeat(64));
-  const disconnectedFlowSnapshot = {
-    ...base,
-    variables: base.variables.map(variable => ({
-      ...variable,
-      owner: null,
-      commands: [{
-        instructionId: 189,
-        instructionName: 'Amount',
-        action: 'Web Field',
-        role: 'INVALID_LINK',
-        operation: '',
-        parentId: null,
-        parentBlockId: null,
-        variableId: 12,
-        blockId: 7,
-        blockName: 'Login',
-        blockOrder: 1,
-        instructionOrder: 2,
-        active: true,
-        blockActive: true,
-      }, ...variable.commands.map(command =>
-        command.instructionId === 190
-          ? {
-              ...command,
-              parentId: null,
-              parentBlockId: null,
-            }
-          : command)],
-    })),
-    mutationCapability: {
-      ...base.mutationCapability,
-      instructionFacts: base.mutationCapability.instructionFacts.map(fact =>
-        fact.instructionId === 189
-          ? {
-              ...fact,
-              variableId: 12,
-            }
-          : fact.instructionId === 190
-          ? {
-              ...fact,
-              parentId: null,
-              parentBlockId: null,
-            }
-          : fact),
-      variableFacts: [{
-        variableId: 12,
-        ownerInstructionId: null,
-      }],
-    },
-  };
-  const view = render(
-    <VariablesPage socketPort={59772} sessionId="variablesManager" />,
-  );
-  await waitFor(() => expect(mockSend).toHaveBeenCalledTimes(1));
-  const bootstrapRequest = JSON.parse(
-    JSON.parse(mockSend.mock.calls[0][0]).body,
-  );
-  mockMessages = [response('variablesWorkspace.bootstrapResponse', {
-    ...disconnectedFlowSnapshot,
-    requestId: bootstrapRequest.requestId,
-  })];
-  view.rerender(
-    <VariablesPage socketPort={59772} sessionId="variablesManager" />,
-  );
-
-  const ownerMissing = await screen.findByRole('button', {
-    name: /Owner missing.*Connect Web Element/i,
-  });
-  fireEvent.click(ownerMissing);
-  expect(screen.getByRole('heading', { name: 'Repair Variable Flow' }))
-    .toBeInTheDocument();
-  fireEvent.click(screen.getByRole('combobox', {
-    name: 'Compatible Web Element',
-  }));
-  fireEvent.click(screen.getByRole('option', {
-    name: /Amount.*ID 189/i,
-  }));
-  fireEvent.click(screen.getByRole('combobox', {
-    name: 'Compatible GET producer',
-  }));
-  fireEvent.click(screen.getByRole('option', {
-    name: /Read Amount.*ID 190/i,
-  }));
-  fireEvent.click(screen.getByRole('button', {
-    name: 'Connect Variable Flow',
-  }));
-
-  const sent = JSON.parse(mockSend.mock.calls.at(-1)?.[0] as string);
-  const body = JSON.parse(sent.body);
-  expect(sent.type).toBe('variablesWorkspace.graphMutationV3');
-  expect(body.instructionRelationPatches).toEqual([{
-    instructionId: 190,
-    relationKind: 'ELEMENT_TARGET',
-    operation: 'SET',
-    expected: { parentId: null, parentBlockId: null },
-    replacement: { parentId: 189, parentBlockId: 7 },
-  }]);
-  expect(body.variableBindingPatches).toEqual([]);
-  expect(body.variableOwnerPatches).toEqual([{
-    variableId: 12,
-    operation: 'SET',
-    expected: { value: null },
-    replacement: { value: 189 },
-  }]);
   view.unmount();
 });

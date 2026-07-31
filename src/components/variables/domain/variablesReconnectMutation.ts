@@ -160,9 +160,6 @@ export const variablesReconnectGraph = (
     snapshot.commands.flatMap(command =>
       command.id === null ? [] : [[command.id, command] as const]),
   );
-  const variableFactsById = new Map(
-    capability.variableFacts.map(fact => [fact.variableId, fact]),
-  );
   const instructions = capability.instructionFacts.map((fact) => {
     if (
       !positiveInteger(fact.instructionId)
@@ -208,8 +205,7 @@ export const variablesReconnectGraph = (
       owner,
       id: variable.id,
       type: variable.type || null,
-      ownerInstructionId:
-        variableFactsById.get(variable.id)?.ownerInstructionId ?? null,
+      ownerInstructionId: variable.owner?.id ?? null,
     })),
   });
 };

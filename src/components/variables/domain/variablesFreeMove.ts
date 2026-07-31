@@ -3,7 +3,6 @@ import type {
   InstructionGraphLayoutRow,
   InstructionGraphRelationKind,
   InstructionGraphRelationPatch,
-  InstructionGraphVariableBindingPatch,
 } from '../../bot-job-details/grid/domain/instructionGraphMutation.contract';
 import { instructionRelationshipPolicy } from '../../bot-job-details/grid/domain/instructionRelationshipPolicy';
 import {
@@ -53,12 +52,6 @@ export type VariablesFreeMoveClearedRelationship = {
   expectedParentBlockId: number | null;
 };
 
-export type VariablesFreeMoveClearedVariableBinding = {
-  instructionId: number;
-  variableId: number;
-  reason: 'VARIABLE_TARGET_MISSING';
-};
-
 export type VariablesFreeMovePlan = {
   mutationProfile: VariablesReactAuthoredProfile;
   sourceInstructionId: number;
@@ -67,7 +60,6 @@ export type VariablesFreeMovePlan = {
   destinationIndex: number;
   preservedVariableId: number | null;
   clearedRelationships: readonly VariablesFreeMoveClearedRelationship[];
-  clearedVariableBindings: readonly VariablesFreeMoveClearedVariableBinding[];
   draft: BotJobGraphMutationDraft;
 };
 
@@ -239,10 +231,10 @@ const clearPatch = (
 /**
  * Plans one exact, ungrouped instruction move from the Variables workspace.
  *
- * Every instruction is eligible. The planner preserves every valid variable
- * binding and relationship that remains structurally valid in the final
- * layout. A relationship made invalid by the move, or a malformed legacy link
- * that would otherwise deadlock persistence, is explicitly disconnected.
+ * Every instruction is eligible. The planner preserves variableId and every
+ * relationship that remains structurally valid in the final layout. A parent
+ * or Block relationship receives an explicit CLEAR patch only when it is valid
+ * before the move and the submitted final layout makes it invalid.
  */
 export const planVariablesFreeMove = (
   snapshot: VariableWorkspaceSnapshot,
@@ -403,13 +395,9 @@ export const planVariablesFreeMove = (
   const clearedRelationships: VariablesFreeMoveClearedRelationship[] = [];
   const instructionRelationPatches: InstructionGraphRelationPatch[] = [];
   capability.instructionFacts.forEach((fact) => {
+    const before = relationValidity(fact, layoutById, workspaceBlockIds);
     const after = relationValidity(fact, finalLayoutById, workspaceBlockIds);
-    const hasStoredRelationship = fact.parentId !== null
-      || fact.parentBlockId !== null;
-    // A pre-existing malformed relationship must never deadlock an unrelated
-    // drag. Canonicalize it to the explicit disconnected state that the
-    // persistence contract accepts. Null/null is already disconnected.
-    if (after.valid || !hasStoredRelationship) return;
+    if (!before.valid || after.valid) return;
     clearedRelationships.push({
       instructionId: fact.instructionId,
       relationKind: fact.relationKind,
@@ -426,43 +414,13 @@ export const planVariablesFreeMove = (
     left.instructionId - right.instructionId
     || left.relationKind.localeCompare(right.relationKind));
 
-  const authoritativeVariableIds = new Set(
-    capability.variableFacts.map(fact => fact.variableId),
-  );
-  const clearedVariableBindings: VariablesFreeMoveClearedVariableBinding[] = [];
-  const variableBindingPatches: InstructionGraphVariableBindingPatch[] = [];
-  capability.instructionFacts.forEach((fact) => {
-    if (
-      fact.variableId === null
-      || authoritativeVariableIds.has(fact.variableId)
-    ) {
-      return;
-    }
-    clearedVariableBindings.push({
-      instructionId: fact.instructionId,
-      variableId: fact.variableId,
-      reason: 'VARIABLE_TARGET_MISSING',
-    });
-    variableBindingPatches.push({
-      instructionId: fact.instructionId,
-      operation: 'CLEAR',
-      expected: { value: fact.variableId },
-      replacement: { value: null },
-    });
-  });
-  clearedVariableBindings.sort((left, right) =>
-    left.instructionId - right.instructionId);
-  variableBindingPatches.sort((left, right) =>
-    left.instructionId - right.instructionId);
-
   const draft: BotJobGraphMutationDraft = {
     mutationKind: 'ROW_MOVE',
     draggedInstructionId: request.sourceInstructionId,
     layoutRows: finalLayout,
     instructionRelationPatches,
-    // Valid bindings are preserved. Only a dangling legacy ID is normalized
-    // to the explicit disconnected state so it cannot block movement.
-    variableBindingPatches,
+    // Movement never reconnects, disconnects, or otherwise rewrites variableId.
+    variableBindingPatches: [],
     variableOwnerPatches: [],
   };
   return {
@@ -473,13 +431,8 @@ export const planVariablesFreeMove = (
       sourceBlockId: source.blockId,
       destinationBlockId: request.destinationBlockId,
       destinationIndex: request.destinationIndex,
-      preservedVariableId: clearedVariableBindings.some(
-        binding => binding.instructionId === sourceFact.instructionId,
-      )
-        ? null
-        : sourceFact.variableId,
+      preservedVariableId: sourceFact.variableId,
       clearedRelationships,
-      clearedVariableBindings,
       draft,
     },
   };

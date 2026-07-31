@@ -41,7 +41,6 @@ const canonicalSnapshot = {
         blockName: 'Login',
         blockOrder: 1,
         instructionOrder: 2,
-        variableId: 12,
         active: true,
         blockActive: true,
       },
@@ -58,7 +57,6 @@ const canonicalSnapshot = {
           blockName: 'Login',
           blockOrder: 1,
           instructionOrder: 3,
-          variableId: 12,
           active: true,
           blockActive: true,
         },
@@ -74,7 +72,6 @@ const canonicalSnapshot = {
           blockName: 'Login',
           blockOrder: 1,
           instructionOrder: 4,
-          variableId: 12,
           active: true,
           blockActive: true,
         },
@@ -90,7 +87,6 @@ const canonicalSnapshot = {
           blockName: 'Login',
           blockOrder: 1,
           instructionOrder: 5,
-          variableId: 12,
           active: true,
           blockActive: true,
         },
@@ -113,7 +109,6 @@ const canonicalSnapshot = {
         blockName: 'Login',
         blockOrder: 1,
         instructionOrder: 6,
-        variableId: 13,
         active: true,
         blockActive: true,
       },
@@ -211,10 +206,6 @@ const canonicalMutationCapability = {
       variableId: 13,
     },
   ],
-  variableFacts: [
-    { variableId: 12, ownerInstructionId: 189 },
-    { variableId: 13, ownerInstructionId: 200 },
-  ],
 };
 
 test('normalizes a coordinate-consistent Variables mutation capability', () => {
@@ -232,180 +223,7 @@ test('normalizes a coordinate-consistent Variables mutation capability', () => {
     graphRevision: 'a'.repeat(64),
   });
   expect(snapshot?.mutationCapability?.layoutRows).toHaveLength(5);
-  expect(snapshot?.mutationCapability?.variableFacts).toEqual([
-    { variableId: 12, ownerInstructionId: 189 },
-    { variableId: 13, ownerInstructionId: 200 },
-  ]);
   expect(snapshot?.mutationCapability?.crossBlockProfile).toBeNull();
-});
-
-test('keeps React-authored mutation authority when relationship projections need repair', () => {
-  const presentationVariables = canonicalSnapshot.variables.map(variable => {
-    if (variable.id !== 12) return variable;
-    return {
-      ...variable,
-      owner: null,
-      commands: variable.commands.map(command => command.instructionId === 190
-        ? {
-            ...command,
-            parentId: null,
-            parentBlockId: null,
-            variableId: 13,
-          }
-        : command),
-    };
-  });
-  const presentationCommands = canonicalSnapshot.variables.flatMap(variable => [
-    variable.owner,
-    ...variable.commands,
-  ]).map(command => command.instructionId === 190
-    ? {
-        ...command,
-        parentId: null,
-        parentBlockId: null,
-        variableId: 13,
-      }
-    : command);
-
-  const snapshot = normalizeVariablesWorkspaceSnapshot({
-    ...canonicalSnapshot,
-    variables: presentationVariables,
-    commands: presentationCommands,
-    mutationCapability: {
-      ...canonicalMutationCapability,
-      reactAuthoredProfile: 'VARIABLES_REACT_AUTHORED_V1',
-    },
-  });
-
-  expect(snapshot?.mutationCapability?.reactAuthoredProfile).toBe(
-    'VARIABLES_REACT_AUTHORED_V1',
-  );
-  expect(snapshot?.mutationCapability?.instructionFacts.find(
-    fact => fact.instructionId === 190,
-  )).toMatchObject({
-    parentId: 189,
-    parentBlockId: 7,
-    variableId: 12,
-  });
-  expect(snapshot?.mutationCapability?.variableFacts).toContainEqual({
-    variableId: 12,
-    ownerInstructionId: 189,
-  });
-});
-
-test('still rejects malformed authoritative layout for a React-authored capability', () => {
-  const snapshot = normalizeVariablesWorkspaceSnapshot({
-    ...canonicalSnapshot,
-    mutationCapability: {
-      ...canonicalMutationCapability,
-      reactAuthoredProfile: 'VARIABLES_REACT_AUTHORED_V1',
-      layoutRows: canonicalMutationCapability.layoutRows.map(row =>
-        row.instructionId === 191
-          ? { ...row, instructionOrderNumber: 3 }
-          : row),
-    },
-  });
-
-  expect(snapshot).not.toBeNull();
-  expect(snapshot?.mutationCapability).toBeNull();
-});
-
-const ownerlessUnusedSnapshot = (
-  ownerInstructionId: number | null,
-) => ({
-  ...canonicalSnapshot,
-  variables: canonicalSnapshot.variables.map(variable =>
-    variable.id === 13
-      ? { ...variable, owner: null }
-      : variable),
-  mutationCapability: {
-    ...canonicalMutationCapability,
-    layoutRows: canonicalMutationCapability.layoutRows.filter(
-      row => row.instructionId !== 200,
-    ),
-    instructionFacts: canonicalMutationCapability.instructionFacts.filter(
-      fact => fact.instructionId !== 200,
-    ),
-    variableFacts: canonicalMutationCapability.variableFacts.map(fact =>
-      fact.variableId === 13
-        ? { ...fact, ownerInstructionId }
-        : fact),
-  },
-});
-
-test('preserves exact null and dangling variable owner authority', () => {
-  const withoutOwner = normalizeVariablesWorkspaceSnapshot(
-    ownerlessUnusedSnapshot(null),
-  );
-  const danglingOwner = normalizeVariablesWorkspaceSnapshot(
-    ownerlessUnusedSnapshot(999),
-  );
-
-  expect(withoutOwner?.mutationCapability?.variableFacts).toContainEqual({
-    variableId: 13,
-    ownerInstructionId: null,
-  });
-  expect(danglingOwner?.mutationCapability?.variableFacts).toContainEqual({
-    variableId: 13,
-    ownerInstructionId: 999,
-  });
-  expect(danglingOwner?.variables.find(variable => variable.id === 13)?.owner)
-    .toBeNull();
-});
-
-test('fails closed for missing, malformed, duplicate, or parity-breaking variable facts', () => {
-  const {
-    variableFacts: _omittedVariableFacts,
-    ...capabilityWithoutVariableFacts
-  } = canonicalMutationCapability;
-  const invalidCapabilities = [
-    capabilityWithoutVariableFacts,
-    {
-      ...canonicalMutationCapability,
-      variableFacts: [
-        ...canonicalMutationCapability.variableFacts,
-        canonicalMutationCapability.variableFacts[0],
-      ],
-    },
-    {
-      ...canonicalMutationCapability,
-      variableFacts: canonicalMutationCapability.variableFacts.slice(0, 1),
-    },
-    {
-      ...canonicalMutationCapability,
-      variableFacts: canonicalMutationCapability.variableFacts.map(fact =>
-        fact.variableId === 12
-          ? { ...fact, ownerInstructionId: 0 }
-          : fact),
-    },
-    {
-      ...canonicalMutationCapability,
-      variableFacts: canonicalMutationCapability.variableFacts.map((fact) => {
-        if (fact.variableId !== 12) return fact;
-        const {
-          ownerInstructionId: _omittedOwnerInstructionId,
-          ...withoutOwnerInstructionId
-        } = fact;
-        return withoutOwnerInstructionId;
-      }),
-    },
-    {
-      ...canonicalMutationCapability,
-      variableFacts: canonicalMutationCapability.variableFacts.map(fact =>
-        fact.variableId === 12
-          ? { ...fact, ownerInstructionId: null }
-          : fact),
-    },
-  ];
-
-  invalidCapabilities.forEach((mutationCapability) => {
-    const snapshot = normalizeVariablesWorkspaceSnapshot({
-      ...canonicalSnapshot,
-      mutationCapability,
-    });
-    expect(snapshot).not.toBeNull();
-    expect(snapshot?.mutationCapability).toBeNull();
-  });
 });
 
 test('accepts only the exact separately advertised Variables cross-block profile', () => {
@@ -469,27 +287,6 @@ test('derives structural relation kinds from raw persisted actions in React', ()
   }));
   const snapshot = normalizeVariablesWorkspaceSnapshot({
     ...canonicalSnapshot,
-    commands: [
-      ...canonicalSnapshot.variables.flatMap(variable => [
-        variable.owner,
-        ...variable.commands,
-      ]),
-      ...structuralRows.map(row => ({
-        instructionId: row.instructionId,
-        instructionName: row.action,
-        action: row.action,
-        operation: '',
-        blockId: row.blockId,
-        blockName: 'Login',
-        blockOrder: row.blockOrderNumber,
-        instructionOrder: row.instructionOrderNumber,
-        parentId: 189,
-        parentBlockId: 7,
-        variableId: null,
-        active: true,
-        blockActive: true,
-      })),
-    ],
     mutationCapability: {
       ...canonicalMutationCapability,
       layoutRows: [
