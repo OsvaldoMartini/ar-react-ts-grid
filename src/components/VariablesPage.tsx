@@ -939,8 +939,12 @@ const VariablesPage: React.FC<Props> = ({
       }
 
       const current = snapshotRef.current;
+      const sameBotJob = current !== null
+        && current.botJob.homeBankingId === normalized.botJob.homeBankingId
+        && current.botJob.id === normalized.botJob.id;
       if (
         current
+        && sameBotJob
         && normalized.workspaceEpoch < current.workspaceEpoch
       ) {
         return;
