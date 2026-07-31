@@ -405,6 +405,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
               </span>
             </label>
             <SearchBox
+              key={`variables-command-block-search:${workspaceIdentityKey ?? 'unbound'}`}
               label="Block"
               placeholder="Search block name or number..."
               headerRight="Commands per block"

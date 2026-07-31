@@ -346,5 +346,6 @@ export const useVariablesInstructionCopy = ({
     pendingRequestId,
     submit,
     handleMessage,
+    resetPending: clearPending,
   };
 };

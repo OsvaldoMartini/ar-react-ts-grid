@@ -255,5 +255,6 @@ export const useVariablesGraphMutation = ({
     pendingRequestId,
     submit,
     handleMessage,
+    resetPending: clearPending,
   };
 };

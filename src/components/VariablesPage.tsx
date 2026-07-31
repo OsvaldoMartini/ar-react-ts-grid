@@ -666,6 +666,7 @@ const VariablesPage: React.FC<Props> = ({
     pendingRequestId: pendingMutationRequestId,
     submit: submitGraphMutation,
     handleMessage: handleGraphMutationMessage,
+    resetPending: resetGraphMutation,
   } = useVariablesGraphMutation({
     webSocket,
     connected,
@@ -677,15 +678,22 @@ const VariablesPage: React.FC<Props> = ({
     closeReview: closeExecutionFlowReview,
   } = useVariablesExecutionFlowReview(snapshot);
 
-  const replaceSnapshot = useCallback((next: VariableWorkspaceSnapshot) => {
+  const replaceSnapshot = useCallback((
+    next: VariableWorkspaceSnapshot,
+    ownerChanged = false,
+  ) => {
     snapshotRef.current = next;
     setSnapshot(next);
     setSelectedVariableId(current =>
-      current !== null && next.variables.some(variable => variable.id === current)
+      !ownerChanged
+      && current !== null
+      && next.variables.some(variable => variable.id === current)
         ? current
         : next.variables[0]?.id ?? null);
     setSelectedInstructionId(current =>
-      current !== null && next.commands.some(command => command.id === current)
+      !ownerChanged
+      && current !== null
+      && next.commands.some(command => command.id === current)
         ? current
         : next.commands[0]?.id ?? null);
   }, []);
@@ -707,6 +715,7 @@ const VariablesPage: React.FC<Props> = ({
     updateValue: updateRuntimeValue,
     clearAllValues,
     handleMessage: handleRuntimeMemoryMessage,
+    resetPending: resetRuntimeMemory,
   } = useVariablesRuntimeMemory({
     webSocket,
     connected,
@@ -732,6 +741,7 @@ const VariablesPage: React.FC<Props> = ({
     pendingRequestId: pendingCreateRequestId,
     submit: submitVariableCreate,
     handleMessage: handleVariableCreateMessage,
+    resetPending: resetVariableCreate,
   } = useVariablesCreate({
     webSocket,
     connected,
@@ -757,6 +767,7 @@ const VariablesPage: React.FC<Props> = ({
     pendingRequestId: pendingDeleteRequestId,
     submit: submitVariableDelete,
     handleMessage: handleVariableDeleteMessage,
+    resetPending: resetVariableDelete,
   } = useVariablesDelete({
     webSocket,
     connected,
@@ -851,6 +862,7 @@ const VariablesPage: React.FC<Props> = ({
     pendingRequestId: pendingCopyRequestId,
     submit: submitInstructionCopy,
     handleMessage: handleInstructionCopyMessage,
+    resetPending: resetInstructionCopy,
   } = useVariablesInstructionCopy({
     webSocket,
     connected,
@@ -858,6 +870,34 @@ const VariablesPage: React.FC<Props> = ({
     snapshot,
     onResult: handleInstructionCopyResult,
   });
+
+  const resetOwnerScopedUi = useCallback(() => {
+    clearPendingRequest();
+    resetGraphMutation();
+    resetInstructionCopy();
+    resetVariableCreate();
+    resetVariableDelete();
+    resetRuntimeMemory();
+    closeExecutionFlowReview();
+    setHealthFilter('ALL');
+    setDraggingInstructionId(null);
+    setActiveDropTarget(null);
+    setPendingReconnect(null);
+    setPendingConnections(null);
+    setPendingBlockTransfer(null);
+    setDeleteConfirmation(null);
+    setAddVariableOpen(false);
+    setClearValuesConfirmation(false);
+    setDeletingVariableIds(new Set());
+  }, [
+    clearPendingRequest,
+    closeExecutionFlowReview,
+    resetGraphMutation,
+    resetInstructionCopy,
+    resetRuntimeMemory,
+    resetVariableCreate,
+    resetVariableDelete,
+  ]);
 
   useEffect(() => {
     if (!connected) {
@@ -952,7 +992,9 @@ const VariablesPage: React.FC<Props> = ({
       if (envelope.operationId === 'variablesWorkspace.snapshot') {
         clearPendingRequest();
       }
-      replaceSnapshot(normalized);
+      const ownerChanged = current !== null && !sameBotJob;
+      if (ownerChanged) resetOwnerScopedUi();
+      replaceSnapshot(normalized, ownerChanged);
       setStatus({
         level: normalized.summary.warningCount > 0 ? 'warn' : 'ok',
         text: normalized.message || 'Variable relationships loaded',
@@ -967,6 +1009,7 @@ const VariablesPage: React.FC<Props> = ({
     handleVariableDeleteMessage,
     messages,
     replaceSnapshot,
+    resetOwnerScopedUi,
   ]);
 
   useEffect(() => {
@@ -1039,6 +1082,9 @@ const VariablesPage: React.FC<Props> = ({
       : [],
     [snapshot],
   );
+  const workspaceIdentityKey = snapshot
+    ? `${snapshot.botJob.homeBankingId}:${snapshot.botJob.id}`
+    : 'unbound';
   const mutationAuthorityKey = mutationAuthorityKeyFor(snapshot);
   const relationshipGraph = useMemo(
     () => snapshot ? variablesReconnectGraph(snapshot) : null,
@@ -1909,7 +1955,7 @@ const VariablesPage: React.FC<Props> = ({
           ) : (
             <section className={styles.workspace}>
               <VariablesCommandBoard
-                workspaceIdentityKey={`${snapshot.botJob.homeBankingId}:${snapshot.botJob.id}`}
+                workspaceIdentityKey={workspaceIdentityKey}
                 blocks={snapshot.blocks}
                 instructions={snapshot.commands}
                 relationshipEdges={relationshipGraph?.edges ?? []}
@@ -1997,6 +2043,7 @@ const VariablesPage: React.FC<Props> = ({
                 aria-label="Variables Block transfer and relationship workspace"
               >
                 <VariablesBlockTransferBoard
+                  key={`variables-block-transfer:${workspaceIdentityKey}`}
                   blocks={snapshot.blocks}
                   layoutRows={snapshot.mutationCapability?.layoutRows ?? []}
                   disabled={mutationDisabled}
@@ -2033,6 +2080,7 @@ const VariablesPage: React.FC<Props> = ({
                   <div className={styles.flowPanelBody}>
                     <div className={styles.flowFilters}>
                   <SearchBox
+                    key={`variables-relationship-search:${workspaceIdentityKey}`}
                     label="Relationship flow"
                     placeholder="Select a variable..."
                     headerRight="Defined variables"
@@ -2286,6 +2334,7 @@ const VariablesPage: React.FC<Props> = ({
               </section>
 
               <RuntimeMemoryPanel
+                key={`variables-runtime-memory:${workspaceIdentityKey}`}
                 items={orderedRuntimeMemory.map(entry => ({
                   variableId: entry.variableId,
                   name: entry.name,

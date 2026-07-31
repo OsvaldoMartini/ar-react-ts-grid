@@ -96,6 +96,17 @@ export const useVariablesRuntimeMemory = ({
     return pending;
   }, [syncPendingIds]);
 
+  const resetPending = useCallback(() => {
+    pendingRef.current.forEach(edit => clearTimeout(edit.timeoutId));
+    pendingRef.current.clear();
+    if (pendingClearAllRef.current) {
+      clearTimeout(pendingClearAllRef.current.timeoutId);
+      pendingClearAllRef.current = null;
+    }
+    setPendingClearAll(false);
+    syncPendingIds();
+  }, [syncPendingIds]);
+
   useEffect(() => () => {
     pendingRef.current.forEach(edit => clearTimeout(edit.timeoutId));
     pendingRef.current.clear();
@@ -107,15 +118,8 @@ export const useVariablesRuntimeMemory = ({
 
   useEffect(() => {
     if (connected && webSocket?.readyState === WebSocket.OPEN) return;
-    pendingRef.current.forEach(edit => clearTimeout(edit.timeoutId));
-    pendingRef.current.clear();
-    if (pendingClearAllRef.current) {
-      clearTimeout(pendingClearAllRef.current.timeoutId);
-      pendingClearAllRef.current = null;
-      setPendingClearAll(false);
-    }
-    syncPendingIds();
-  }, [connected, syncPendingIds, webSocket]);
+    resetPending();
+  }, [connected, resetPending, webSocket]);
 
   const updateValue = useCallback((variableId: number, value: string): boolean => {
     if (
@@ -343,5 +347,6 @@ export const useVariablesRuntimeMemory = ({
     updateValue,
     clearAllValues,
     handleMessage,
+    resetPending,
   };
 };

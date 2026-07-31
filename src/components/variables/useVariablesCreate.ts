@@ -232,5 +232,6 @@ export const useVariablesCreate = ({
     pendingRequestId,
     submit,
     handleMessage,
+    resetPending: clearPending,
   };
 };

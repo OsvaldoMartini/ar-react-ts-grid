@@ -258,5 +258,6 @@ export const useVariablesDelete = ({
     pendingRequestId,
     submit,
     handleMessage,
+    resetPending: clearPending,
   };
 };
