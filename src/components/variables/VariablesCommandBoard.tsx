@@ -18,6 +18,7 @@ import type {
   InstructionRelationshipEdge,
 } from '../bot-job-details/grid/domain/instructionRelationshipGraph';
 import { instructionRelationshipPolicy } from '../bot-job-details/grid/domain/instructionRelationshipPolicy';
+import InstructionCommandBadge from '../bot-job-details/grid/InstructionCommandBadge';
 import type {
   VariableInstructionNode,
   VariableWorkspaceBlock,
@@ -663,9 +664,11 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                       <span className={styles.order}>
                         #{instruction.instructionOrder ?? '?'}
                       </span>
-                      <span className={styles.command}>
-                        {instruction.command || 'UNKNOWN'}
-                      </span>
+                      <InstructionCommandBadge
+                        action={instruction.command}
+                        tagName={instruction.tagName}
+                        className={styles.command}
+                      />
                       <button
                         type="button"
                         className={styles.identity}
