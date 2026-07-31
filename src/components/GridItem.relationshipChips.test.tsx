@@ -173,7 +173,7 @@ test('matching Bot Job capability and workspace epoch activates a nonblank relat
   view.rerender(<GridItem {...botJobProps} />);
 
   const details = await screen.findByTestId('instruction-relationship-details-918');
-  expect(details).toHaveTextContent('(917)Pagina iniziale');
+  expect(details).toHaveTextContent('Loop connected (id: 917) Pagina iniziale');
   expect(
     await screen.findByLabelText('Fix order: Loop anchor order'),
   ).toHaveAttribute('data-relationship-state', 'FIX_ORDER');
@@ -308,7 +308,7 @@ test.each([
     screen.getByLabelText('Move instruction 1'),
   ).toBeEnabled());
   expect(screen.getByTestId('instruction-relationship-details-918'))
-    .toHaveTextContent('(917)Pagina iniziale');
+    .toHaveTextContent('Loop connected (id: 917) Pagina iniziale');
   expect(screen.queryByLabelText('Fix order: Loop anchor order'))
     .not.toBeInTheDocument();
 });
@@ -334,7 +334,7 @@ test('Components ignores relationshipChipsV1 even when a response advertises it'
     screen.getByLabelText('Move instruction 1'),
   ).toBeEnabled());
   expect(screen.getByTestId('instruction-relationship-details-918'))
-    .toHaveTextContent('(917)Pagina iniziale');
+    .toHaveTextContent('Loop connected (id: 917) Pagina iniziale');
   expect(screen.queryByLabelText('Fix order: Loop anchor order'))
     .not.toBeInTheDocument();
 });

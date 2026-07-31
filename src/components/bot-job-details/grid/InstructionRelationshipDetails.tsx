@@ -62,17 +62,6 @@ const humanizeCode = (code: string | null): string =>
         .join(' ')
     : '';
 
-const parentLabel = (
-  instruction: BlockLoopInstructionLoadDTO,
-  allInstructions: readonly BlockLoopInstructionLoadDTO[],
-): { id: number | 'N/A'; name: string } => {
-  const parent = allInstructions.find(candidate => candidate.id === instruction.parentId);
-  return {
-    id: instruction.parentId ?? 'N/A',
-    name: parent?.name || 'Unknown',
-  };
-};
-
 const blockLabel = (
   blockId: number | null | undefined,
   allInstructions: readonly BlockLoopInstructionLoadDTO[],
@@ -167,15 +156,15 @@ const renderOperationContent = (
     const [refreshValue, loopValue] = instruction.operation
       .split(':')
       .map(part => part.trim());
-    const parent = parentLabel(instruction, allInstructions);
+    // The parent reference is rendered exclusively by the relationship chip
+    // ("Loop connected (id: N) Name" / red "Reconnect Loop") — never as
+    // "(N/A)Unknown" text here.
     return (
       <>
         <span style={{ color: '#0b5394' }}>Refresh</span>{' '}
         <span style={{ color: '#FFA500' }}>{refreshValue}s</span>{' '}
         <span style={{ color: '#0b5394' }}>Loop</span>{' '}
-        <span style={{ color: '#FFA500' }}>{loopValue} times</span>{' '}
-        <span style={{ color: '#0b5394' }}>Jump To Parent</span>{' '}
-        <span style={{ color: '#b163ff' }}>({parent.id}){parent.name}</span>
+        <span style={{ color: '#FFA500' }}>{loopValue} times</span>
       </>
     );
   }
@@ -196,27 +185,25 @@ const renderOperationContent = (
     const [refreshValue, loopValue] = instruction.operation
       .split(':')
       .map(part => part.trim());
-    const parent = parentLabel(instruction, allInstructions);
+    // The parent reference is rendered exclusively by the relationship chip
+    // ("Loop connected (id: N) Name" / red "Reconnect Loop") — never as
+    // "(N/A)Unknown" text here.
     return (
       <>
         <span style={{ color: '#0b5394' }}>Time</span>{' '}
         <span style={{ color: '#FFA500' }}>{refreshValue}s</span>{' '}
         <span style={{ color: '#0b5394' }}>Loop</span>{' '}
-        <span style={{ color: '#FFA500' }}>{loopValue} times</span>{' '}
-        <span style={{ color: '#0b5394' }}>Jump To Parent</span>{' '}
-        <span style={{ color: '#b163ff' }}>({parent.id}){parent.name}</span>
+        <span style={{ color: '#FFA500' }}>{loopValue} times</span>
       </>
     );
   }
 
   if (validActions.includes(instruction.actions) && instruction.operation) {
     const [, right] = instruction.operation.split(':');
-    const parent = parentLabel(instruction, allInstructions);
+    // The parent reference is rendered exclusively by the relationship chip
+    // ("Parent connected (id: N) Name" / red "Reconnect Parent").
     return (
-      <>
-        <span style={{ color: '#0b5394' }}>({parent.id}){parent.name}</span>:
-        <span style={{ color: '#FFA500' }}>{right}</span>
-      </>
+      <span style={{ color: '#FFA500' }}>{right}</span>
     );
   }
 
@@ -347,6 +334,19 @@ const InstructionRelationshipDetails: React.FC<
     : requiresVariableBinding
       ? configuredVariableId
       : null;
+  // The chip is the single parent display: "Parent connected (id: N) Name".
+  const connectedParentName = connectedParentId === null
+    ? ''
+    : structuralKind === 'BLOCK_TARGET'
+      ? (workspaceBlocks.find(block => block.blockId === connectedParentId)
+          ?.blockName
+        ?? allInstructions.find(row => row.blockId === connectedParentId)
+          ?.blockName
+        ?? '')
+      : (allInstructions.find(row => row.id === connectedParentId)?.name ?? '');
+  const connectedParentText = connectedParentName
+    ? `${structuralLabels.connected} (id: ${connectedParentId}) ${connectedParentName}`
+    : `${structuralLabels.connected} (id: ${connectedParentId})`;
   const reconnectParentEvent: RulesCardEvent | null =
     requiresElementParent
     && connectedParentId === null
@@ -452,7 +452,7 @@ const InstructionRelationshipDetails: React.FC<
                       styles.reconnectParent,
                       styles.connectedParent,
                     ].join(' ')}
-                    aria-label={`${structuralLabels.connected} (id: ${connectedParentId})`}
+                    aria-label={connectedParentText}
                     title={structuralLabels.change}
                     data-relationship-state="CONNECTED"
                     disabled={reconnectDisabled}
@@ -463,7 +463,7 @@ const InstructionRelationshipDetails: React.FC<
                     }}
                   >
                     <Link2 size={10} aria-hidden="true" />
-                    {structuralLabels.connected} (id: {connectedParentId})
+                    {connectedParentText}
                   </button>
                 )
               : (
@@ -474,12 +474,12 @@ const InstructionRelationshipDetails: React.FC<
                       styles.connectedParent,
                       styles.connectedStatic,
                     ].join(' ')}
-                    aria-label={`${structuralLabels.connected} (id: ${connectedParentId})`}
-                    title={`${structuralLabels.connected} (id: ${connectedParentId})`}
+                    aria-label={connectedParentText}
+                    title={connectedParentText}
                     data-relationship-state="CONNECTED"
                   >
                     <Link2 size={10} aria-hidden="true" />
-                    {structuralLabels.connected} (id: {connectedParentId})
+                    {connectedParentText}
                   </span>
                 )
           )}

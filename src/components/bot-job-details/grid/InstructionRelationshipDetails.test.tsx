@@ -94,10 +94,12 @@ test('preserves the legacy LOOP relationship text and colors', () => {
   );
 
   expect(screen.getByTestId('instruction-relationship-details-918'))
-    .toHaveTextContent('Time 5s Loop 100 times Jump To Parent (917)Pagina iniziale');
+    .toHaveTextContent('Time 5s Loop 100 times');
   expect(screen.getByText('Time')).toHaveStyle({ color: '#0b5394' });
   expect(screen.getByText('5s')).toHaveStyle({ color: '#FFA500' });
-  expect(screen.getByText('(917)Pagina iniziale')).toHaveStyle({ color: '#b163ff' });
+  expect(
+    screen.getByLabelText('Loop connected (id: 917) Pagina iniziale'),
+  ).toBeInTheDocument();
   expect(screen.queryByLabelText(/Reconnect|Repair|Fix order|Memory only/i))
     .not.toBeInTheDocument();
 });
@@ -127,7 +129,7 @@ test('keeps the connected parent badge visible and identifies its exact parent',
   );
 
   const connectedParent = screen.getByRole('button', {
-    name: 'Parent connected (id: 1640)',
+    name: 'Parent connected (id: 1640) User number',
   });
   expect(connectedParent).toHaveClass(
     relationshipStyles.reconnectButton,
@@ -247,7 +249,7 @@ test.each([
       'MISSING_LOOP_ANCHOR',
       'LOOP_ANCHOR',
     ),
-    operationText: '(N/A)Unknown',
+    operationText: 'Time 5s Loop 10 times',
     chipName: /Reconnect loop: Missing loop anchor/i,
   },
   {
@@ -265,7 +267,7 @@ test.each([
       'ELEMENT_TARGET_ORDER',
       'ELEMENT_TARGET',
     ),
-    operationText: '(3)Future field',
+    operationText: 'value',
     chipName: /Reconnect parent: Element target order/i,
   },
   {
@@ -287,7 +289,7 @@ test.each([
       'LOOP_ANCHOR_WRONG_BLOCK',
       'LOOP_ANCHOR',
     ),
-    operationText: '(4)Other Block Field',
+    operationText: 'Refresh 3s Loop 20 times',
     chipName: /Reconnect loop: Loop anchor wrong block/i,
   },
 ])(
