@@ -17,9 +17,11 @@ const workspaceSnapshot = (
     getVariableId?: number | null;
     graphRevision?: string;
     includeVariableFacts?: boolean;
+    otherOwnerInstructionId?: number | null;
   } = {},
 ): VariableWorkspaceSnapshot => {
   const ownerInstructionId = overrides.ownerInstructionId ?? null;
+  const otherOwnerInstructionId = overrides.otherOwnerInstructionId ?? null;
   const facts = [
     {
       instructionId: 10,
@@ -141,7 +143,7 @@ const workspaceSnapshot = (
       : {
           variableFacts: [
             { variableId: 7, ownerInstructionId },
-            { variableId: 9, ownerInstructionId: 10 },
+            { variableId: 9, ownerInstructionId: otherOwnerInstructionId },
           ],
         }),
   };
@@ -196,7 +198,9 @@ const workspaceSnapshot = (
         configuredValue: '',
         localFormat: '',
         delimiter: '',
-        owner: commands[0],
+        owner: otherOwnerInstructionId === null
+          ? null
+          : commands.find(command => command.id === otherOwnerInstructionId) ?? null,
         commands: [],
         producers: [],
         consumers: [],
@@ -230,7 +234,42 @@ test('plans searchable Web Element and active GET candidates from frozen facts',
   expect(getVariableFlowGetCandidates(result.plan, 10).map(item =>
     item.instructionId)).toEqual([11, 13]);
   expect(getVariableFlowGetCandidates(result.plan, 20)).toEqual([]);
-  expect(result.plan.webElementCandidates[0].existingVariableIds).toEqual([9]);
+  expect(result.plan.webElementCandidates[0].existingVariableIds).toEqual([]);
+});
+
+test('excludes a Web Element owned by another variable from repair choices', () => {
+  const result = planVariableFlowRepair(workspaceSnapshot({
+    otherOwnerInstructionId: 10,
+  }), 7);
+  if (!result.ok) throw new Error(result.message);
+
+  expect(result.plan.webElementCandidates.map(item => item.instructionId))
+    .toEqual([20]);
+  expect(reviewVariableFlowRepair(result.plan, {
+    webElementInstructionId: 10,
+    getInstructionId: 11,
+  })).toMatchObject({
+    ok: false,
+    code: 'INCOMPATIBLE_WEB_ELEMENT',
+  });
+  expect(buildVariableFlowRepairMutation(result.plan, {
+    webElementInstructionId: 10,
+    getInstructionId: 11,
+  })).toMatchObject({
+    ok: false,
+    code: 'INCOMPATIBLE_WEB_ELEMENT',
+  });
+});
+
+test('keeps the variable existing Web Element owner eligible', () => {
+  const result = planVariableFlowRepair(workspaceSnapshot({
+    ownerInstructionId: 10,
+  }), 7);
+  if (!result.ok) throw new Error(result.message);
+
+  expect(result.plan.webElementCandidates.map(item => item.instructionId))
+    .toEqual([10, 20]);
+  expect(result.plan.webElementCandidates[0].existingVariableIds).toEqual([7]);
 });
 
 test('requires explicit compatible Web Element and GET choices', () => {
@@ -295,7 +334,7 @@ test('builds one atomic owner, GET parent, and GET variable-binding draft', () =
   }]);
 });
 
-test('reviews reassignment, duplicate ownership, and remaining execution order', () => {
+test('reviews reassignment and remaining execution order', () => {
   const result = planVariableFlowRepair(workspaceSnapshot(), 7);
   if (!result.ok) throw new Error(result.message);
 
@@ -307,7 +346,7 @@ test('reviews reassignment, duplicate ownership, and remaining execution order',
     ok: true,
     review: {
       reassignedVariableId: 9,
-      duplicateOwnerVariableIds: [9],
+      duplicateOwnerVariableIds: [],
       executionOrderIssueInstructionIds: [12],
     },
   });

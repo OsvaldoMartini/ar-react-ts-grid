@@ -323,7 +323,9 @@ export const planVariableFlowRepair = (
 
   const webElementFacts = capability.instructionFacts
     .filter(fact =>
-      instructionRelationshipPolicy(fact.action).role === 'WEB_ELEMENT')
+      instructionRelationshipPolicy(fact.action).role === 'WEB_ELEMENT'
+      && (existingVariableIdsByOwner.get(fact.instructionId) ?? [])
+        .every(existingVariableId => existingVariableId === variableId))
     .sort(compareFact);
   const getCandidates: VariableFlowGetCandidate[] = getFacts
     .slice()

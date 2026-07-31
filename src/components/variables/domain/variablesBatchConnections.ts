@@ -11,6 +11,7 @@ import type {
   RelationshipOwner,
   RelationshipTarget,
 } from '../../bot-job-details/grid/domain/instructionRelationshipGraph';
+import { instructionRelationshipPolicy } from '../../bot-job-details/grid/domain/instructionRelationshipPolicy';
 import type {
   VariablesInstructionFact,
   VariablesVariableFact,
@@ -42,6 +43,7 @@ export type VariablesBatchConnectionErrorCode =
   | 'INCOMPATIBLE_REVIEW_TARGET'
   | 'PARENT_REVIEW_REQUIRED'
   | 'REVIEW_REQUIRED'
+  | 'ORDER_REPAIR_CONFLICT'
   | 'NO_CHANGES';
 
 export type VariablesBatchConnectionFailure = {
@@ -787,84 +789,144 @@ const deriveResolveReview = (
   );
   const items: VariablesBatchResolveReviewItem[] = [];
   const unresolvedParentBySource = new Map<number, string>();
-
-  const ownerEdges = variableOwnerIssueEdges(
-    baseGraph,
-    scopedVariableIds(basis),
-  );
-  for (const edge of ownerEdges) {
-    const sourceVariableId = edge.source.id;
-    const reviewId = reviewIdFor(
-      'VARIABLE',
-      sourceVariableId,
-      'VARIABLE_OWNER',
+  const processedOwnerVariableIds = new Set<number>();
+  const ownerVariableIdsByInstruction = new Map<number, Set<number>>();
+  projectedVariableFacts.forEach((fact) => {
+    if (fact.ownerInstructionId === null) return;
+    const ownerVariables =
+      ownerVariableIdsByInstruction.get(fact.ownerInstructionId)
+      ?? new Set<number>();
+    ownerVariables.add(fact.variableId);
+    ownerVariableIdsByInstruction.set(
+      fact.ownerInstructionId,
+      ownerVariables,
     );
-    const authoritative = projectedVariableFacts.get(sourceVariableId);
-    if (!authoritative) {
-      return failure(
-        'AUTHORITATIVE_GRAPH_INVALID',
-        `Variable #${sourceVariableId} has no authoritative owner fact.`,
+  });
+
+  const appendOwnerReviews = (
+    graph: NonNullable<ReturnType<typeof variablesReconnectGraph>>,
+    scopedIds: ReadonlySet<number>,
+  ): VariablesBatchConnectionFailure | null => {
+    const ownerEdges = variableOwnerIssueEdges(graph, scopedIds)
+      .filter(edge => !processedOwnerVariableIds.has(edge.source.id));
+    for (const edge of ownerEdges) {
+      const sourceVariableId = edge.source.id;
+      processedOwnerVariableIds.add(sourceVariableId);
+      const reviewId = reviewIdFor(
+        'VARIABLE',
+        sourceVariableId,
+        'VARIABLE_OWNER',
       );
-    }
-    const compatibleTargets = Object.freeze(
-      edge.compatibleTargets.filter(target =>
-        target.entity === 'INSTRUCTION'
-        && target.id !== authoritative.ownerInstructionId),
-    );
-    const selection = selectReviewTarget(
-      reviewId,
-      compatibleTargets,
-      indexed.choices,
-    );
-    if ('ok' in selection) return selection;
-    remainingChoiceIds.delete(reviewId);
-    const currentTarget: RelationshipTarget | null =
-      authoritative.ownerInstructionId === null
-        ? null
-        : {
-            entity: 'INSTRUCTION',
-            owner: edge.source.owner,
-            id: authoritative.ownerInstructionId,
-          };
-    items.push(Object.freeze({
-      reviewId,
-      sourceEntity: 'VARIABLE',
-      sourceId: sourceVariableId,
-      sourceInstructionId: null,
-      sourceVariableId,
-      kind: 'VARIABLE_OWNER',
-      state: edge.state,
-      code: edge.code,
-      currentTarget,
-      compatibleTargets,
-      selectedTarget: selection.selectedTarget,
-      resolution: selection.resolution,
-      blockedByReviewId: null,
-    }));
-    if (selection.selectedTarget?.entity === 'INSTRUCTION') {
-      projectedVariableFacts.set(sourceVariableId, {
-        ...authoritative,
-        ownerInstructionId: selection.selectedTarget.id,
-      });
-    }
-  }
+      const authoritative = projectedVariableFacts.get(sourceVariableId);
+      if (!authoritative) {
+        return failure(
+          'AUTHORITATIVE_GRAPH_INVALID',
+          `Variable #${sourceVariableId} has no authoritative owner fact.`,
+        );
+      }
 
-  const graphAfterOwners = variablesReconnectGraph(
-    projectedSnapshot(
-      basis,
-      projectedFacts,
-      projectedVariableFacts,
-      projectedLayout,
-    ),
-  );
-  if (!graphAfterOwners) {
-    return failure(
-      'AUTHORITATIVE_GRAPH_INVALID',
-      'The projected variable-owner graph could not be constructed.',
-    );
-  }
+      const boundOwnerFacts = [...projectedFacts.values()].filter((fact) => {
+        const semantics = instructionRelationshipPolicy(fact.action)
+          .variableSemantics;
+        return fact.variableId === sourceVariableId
+          && (
+            semantics === 'PRODUCER'
+            || semantics === 'LITERAL_ASSIGNMENT'
+          );
+      });
+      const requiredOwnerIds = new Set(
+        boundOwnerFacts
+          .map(fact => fact.parentId)
+          .filter((id): id is number => id !== null),
+      );
+      const hasCompleteOwnerProjection = boundOwnerFacts.length === 0
+        || (
+          requiredOwnerIds.size === 1
+          && boundOwnerFacts.every(fact => fact.parentId !== null)
+        );
+      const requiredOwnerId = boundOwnerFacts.length > 0
+        && hasCompleteOwnerProjection
+        ? [...requiredOwnerIds][0]
+        : null;
+      const compatibleTargets = Object.freeze(
+        edge.compatibleTargets.filter((target) => {
+          if (
+            target.entity !== 'INSTRUCTION'
+            || target.id === authoritative.ownerInstructionId
+            || !hasCompleteOwnerProjection
+            || (
+              requiredOwnerId !== null
+              && target.id !== requiredOwnerId
+            )
+          ) {
+            return false;
+          }
+          const occupyingVariables =
+            ownerVariableIdsByInstruction.get(target.id) ?? new Set<number>();
+          return [...occupyingVariables].every(id => id === sourceVariableId);
+        }),
+      );
+      const selection = selectReviewTarget(
+        reviewId,
+        compatibleTargets,
+        indexed.choices,
+      );
+      if ('ok' in selection) return selection;
+      remainingChoiceIds.delete(reviewId);
+      const currentTarget: RelationshipTarget | null =
+        authoritative.ownerInstructionId === null
+          ? null
+          : {
+              entity: 'INSTRUCTION',
+              owner: edge.source.owner,
+              id: authoritative.ownerInstructionId,
+            };
+      items.push(Object.freeze({
+        reviewId,
+        sourceEntity: 'VARIABLE',
+        sourceId: sourceVariableId,
+        sourceInstructionId: null,
+        sourceVariableId,
+        kind: 'VARIABLE_OWNER',
+        state: edge.state,
+        code: edge.code,
+        currentTarget,
+        compatibleTargets,
+        selectedTarget: selection.selectedTarget,
+        resolution: selection.resolution,
+        blockedByReviewId: null,
+      }));
+      if (selection.selectedTarget?.entity === 'INSTRUCTION') {
+        if (authoritative.ownerInstructionId !== null) {
+          const formerOwnerVariables = ownerVariableIdsByInstruction.get(
+            authoritative.ownerInstructionId,
+          );
+          formerOwnerVariables?.delete(sourceVariableId);
+          if (formerOwnerVariables?.size === 0) {
+            ownerVariableIdsByInstruction.delete(
+              authoritative.ownerInstructionId,
+            );
+          }
+        }
+        const selectedOwnerVariables = ownerVariableIdsByInstruction.get(
+          selection.selectedTarget.id,
+        ) ?? new Set<number>();
+        selectedOwnerVariables.add(sourceVariableId);
+        ownerVariableIdsByInstruction.set(
+          selection.selectedTarget.id,
+          selectedOwnerVariables,
+        );
+        projectedVariableFacts.set(sourceVariableId, {
+          ...authoritative,
+          ownerInstructionId: selection.selectedTarget.id,
+        });
+      }
+    }
+    return null;
+  };
+
   const parentEdges = editableIssueEdges(
-    graphAfterOwners,
+    baseGraph,
     visibleSet,
     PARENT_KINDS,
   );
@@ -938,8 +1000,28 @@ const deriveResolveReview = (
       'The projected relationship graph could not be constructed.',
     );
   }
-  const variableEdges = editableIssueEdges(
+  const initialOwnerFailure = appendOwnerReviews(
     graphAfterParents,
+    scopedVariableIds(basis),
+  );
+  if (initialOwnerFailure) return initialOwnerFailure;
+
+  const graphAfterParentsAndOwners = variablesReconnectGraph(
+    projectedSnapshot(
+      basis,
+      projectedFacts,
+      projectedVariableFacts,
+      projectedLayout,
+    ),
+  );
+  if (!graphAfterParentsAndOwners) {
+    return failure(
+      'AUTHORITATIVE_GRAPH_INVALID',
+      'The projected variable-owner graph could not be constructed.',
+    );
+  }
+  const variableEdges = editableIssueEdges(
+    graphAfterParentsAndOwners,
     visibleSet,
     new Set<VariablesBatchEditableRelationshipKind>(['VARIABLE_BINDING']),
   );
@@ -1030,12 +1112,50 @@ const deriveResolveReview = (
       'The projected variable-binding graph could not be constructed.',
     );
   }
+  const projectedScopedVariableIds = new Set<number>();
+  projectedFacts.forEach((fact) => {
+    if (visibleSet.has(fact.instructionId) && fact.variableId !== null) {
+      projectedScopedVariableIds.add(fact.variableId);
+    }
+  });
+  projectedVariableFacts.forEach((fact) => {
+    if (
+      fact.ownerInstructionId !== null
+      && visibleSet.has(fact.ownerInstructionId)
+    ) {
+      projectedScopedVariableIds.add(fact.variableId);
+    }
+  });
+  const lateOwnerFailure = appendOwnerReviews(
+    graphAfterBindings,
+    projectedScopedVariableIds,
+  );
+  if (lateOwnerFailure) return lateOwnerFailure;
+
+  const graphAfterBindingsAndOwners = variablesReconnectGraph(
+    projectedSnapshot(
+      basis,
+      projectedFacts,
+      projectedVariableFacts,
+      projectedLayout,
+    ),
+  );
+  if (!graphAfterBindingsAndOwners) {
+    return failure(
+      'AUTHORITATIVE_GRAPH_INVALID',
+      'The final projected variable-owner graph could not be constructed.',
+    );
+  }
   const orderSelections: Array<{
     sourceInstructionId: number;
     targetInstructionId: number;
+    kind: Extract<
+      VariablesBatchEditableRelationshipKind,
+      'ELEMENT_TARGET' | 'LOOP_ANCHOR' | 'VARIABLE_ORDER'
+    >;
   }> = [];
   const orderEdges = executionOrderIssueEdges(
-    graphAfterBindings,
+    graphAfterBindingsAndOwners,
     visibleSet,
   );
   const orderLayout = projectedLayout;
@@ -1104,22 +1224,268 @@ const deriveResolveReview = (
       orderSelections.push({
         sourceInstructionId,
         targetInstructionId: selection.selectedTarget.id,
+        kind,
       });
     }
   }
 
   if (orderSelections.length > 0) {
+    const layoutByInstruction = new Map(
+      projectedLayout.map(row => [row.instructionId, row] as const),
+    );
+    const affectedBlockIds = new Set(
+      orderSelections
+        .map(selection =>
+          layoutByInstruction.get(selection.sourceInstructionId)?.blockId)
+        .filter((id): id is number => id !== undefined),
+    );
+    const protectedConnectedDependencies =
+      graphAfterBindingsAndOwners.edges.filter(
+      (edge): edge is InstructionRelationshipEdge & {
+        source: Extract<RelationshipTarget, { entity: 'INSTRUCTION' }>;
+        target: Extract<RelationshipTarget, { entity: 'INSTRUCTION' }>;
+      } => edge.state === 'CONNECTED'
+        && edge.source.entity === 'INSTRUCTION'
+        && edge.target?.entity === 'INSTRUCTION'
+        && edge.source.id !== edge.target.id
+        && (
+          affectedBlockIds.has(
+            layoutByInstruction.get(edge.source.id)?.blockId ?? -1,
+          )
+          || (
+            edge.kind === 'VARIABLE_ORDER'
+            && (
+              affectedBlockIds.has(
+                layoutByInstruction.get(edge.target.id)?.blockId ?? -1,
+              )
+              || edge.compatibleTargets.some(target =>
+                target.entity === 'INSTRUCTION'
+                && affectedBlockIds.has(
+                  layoutByInstruction.get(target.id)?.blockId ?? -1,
+                ))
+            )
+          )
+        ),
+    );
+    const connectedDependencies = protectedConnectedDependencies.filter(
+      edge => layoutByInstruction.get(edge.source.id)?.blockId
+        === layoutByInstruction.get(edge.target.id)?.blockId,
+    );
+    const preservationConstraints: InstructionOrderConstraint[] = [];
+    connectedDependencies.forEach((edge) => {
+      const source = layoutByInstruction.get(edge.source.id)!;
+      const target = layoutByInstruction.get(edge.target.id)!;
+      if (source.instructionOrderNumber < target.instructionOrderNumber) {
+        preservationConstraints.push({
+          sourceInstructionId: target.instructionId,
+          targetInstructionId: source.instructionId,
+        });
+      } else {
+        preservationConstraints.push({
+          sourceInstructionId: source.instructionId,
+          targetInstructionId: target.instructionId,
+        });
+      }
+
+      if (edge.kind !== 'VARIABLE_ORDER') return;
+      edge.compatibleTargets.forEach((candidate) => {
+        if (
+          candidate.entity !== 'INSTRUCTION'
+          || candidate.id === edge.target.id
+        ) {
+          return;
+        }
+        const writer = layoutByInstruction.get(candidate.id);
+        if (!writer || writer.blockId !== source.blockId) return;
+        if (writer.instructionOrderNumber < source.instructionOrderNumber) {
+          preservationConstraints.push({
+            sourceInstructionId: target.instructionId,
+            targetInstructionId: writer.instructionId,
+          });
+        } else {
+          preservationConstraints.push({
+            sourceInstructionId: writer.instructionId,
+            targetInstructionId: source.instructionId,
+          });
+        }
+      });
+    });
+    protectedConnectedDependencies
+      .filter(edge => edge.kind === 'VARIABLE_ORDER')
+      .forEach((edge) => {
+        const source = layoutByInstruction.get(edge.source.id)!;
+        const selectedWriter = layoutByInstruction.get(edge.target.id)!;
+        edge.compatibleTargets.forEach((candidate) => {
+          if (
+            candidate.entity !== 'INSTRUCTION'
+            || candidate.id === selectedWriter.instructionId
+          ) {
+            return;
+          }
+          const writer = layoutByInstruction.get(candidate.id);
+          if (!writer) return;
+          if (
+            writer.blockId === selectedWriter.blockId
+            && affectedBlockIds.has(selectedWriter.blockId)
+          ) {
+            preservationConstraints.push(
+              writer.instructionOrderNumber
+                < selectedWriter.instructionOrderNumber
+                ? {
+                    sourceInstructionId: selectedWriter.instructionId,
+                    targetInstructionId: writer.instructionId,
+                  }
+                : {
+                    sourceInstructionId: writer.instructionId,
+                    targetInstructionId: selectedWriter.instructionId,
+                  },
+            );
+          }
+          if (
+            writer.blockId === source.blockId
+            && affectedBlockIds.has(source.blockId)
+          ) {
+            preservationConstraints.push(
+              writer.instructionOrderNumber < source.instructionOrderNumber
+                ? {
+                    sourceInstructionId: source.instructionId,
+                    targetInstructionId: writer.instructionId,
+                  }
+                : {
+                    sourceInstructionId: writer.instructionId,
+                    targetInstructionId: source.instructionId,
+                  },
+            );
+          }
+        });
+      });
+    const selectedOrderSourceIds = new Set(
+      orderSelections.map(selection => selection.sourceInstructionId),
+    );
+    projectedLayout.forEach((boundary) => {
+      if (
+        !affectedBlockIds.has(boundary.blockId)
+        || selectedOrderSourceIds.has(boundary.instructionId)
+      ) {
+        return;
+      }
+      const boundaryFact = projectedFacts.get(boundary.instructionId);
+      if (
+        !boundaryFact
+        || instructionRelationshipPolicy(boundaryFact.action)
+          .structuralSemantics === 'NONE'
+      ) {
+        return;
+      }
+      projectedLayout.forEach((row) => {
+        if (
+          row.blockId !== boundary.blockId
+          || row.instructionId === boundary.instructionId
+        ) {
+          return;
+        }
+        preservationConstraints.push(
+          row.instructionOrderNumber < boundary.instructionOrderNumber
+            ? {
+                sourceInstructionId: boundary.instructionId,
+                targetInstructionId: row.instructionId,
+              }
+            : {
+                sourceInstructionId: row.instructionId,
+                targetInstructionId: boundary.instructionId,
+              },
+        );
+      });
+    });
+    const connectedDependencyKeys = new Set(
+      protectedConnectedDependencies.map(edge =>
+        `${edge.kind}:${edge.source.id}:${edge.target.id}`),
+    );
+    const positionalScopeKeys = new Set(
+      connectedDependencies
+        .filter(edge => edge.kind === 'POSITIONAL_SCOPE')
+        .map(edge => `${edge.source.id}:${edge.target.id}`),
+    );
+    const existingIssueKeys = new Set(
+      graphAfterBindingsAndOwners.issues.map(issue =>
+        `${issue.kind}:${issue.source.entity}:${issue.source.id}:${issue.code}`),
+    );
     const ordered = applyStableOrderConstraints(
       projectedLayout,
-      orderSelections,
+      [...preservationConstraints, ...orderSelections],
     );
     if (!ordered) {
       return failure(
-        'AUTHORITATIVE_GRAPH_INVALID',
-        'The reviewed execution-order relationships are cyclic or cross Block boundaries.',
+        'ORDER_REPAIR_CONFLICT',
+        'The reviewed execution-order relationships conflict with an existing dependency or cross Block boundaries.',
       );
     }
     projectedLayout = ordered;
+    const graphAfterOrder = variablesReconnectGraph(
+      projectedSnapshot(
+        basis,
+        projectedFacts,
+        projectedVariableFacts,
+        projectedLayout,
+      ),
+    );
+    if (!graphAfterOrder) {
+      return failure(
+        'AUTHORITATIVE_GRAPH_INVALID',
+        'The reordered relationship graph could not be constructed.',
+      );
+    }
+    const reorderedConnectedDependencyKeys = new Set(
+      graphAfterOrder.edges
+        .filter(edge => edge.state === 'CONNECTED'
+          && edge.source.entity === 'INSTRUCTION'
+          && edge.target?.entity === 'INSTRUCTION')
+        .map(edge => `${edge.kind}:${edge.source.id}:${edge.target!.id}`),
+    );
+    const lostDependency = [...connectedDependencyKeys].find(key =>
+      !reorderedConnectedDependencyKeys.has(key));
+    const reorderedPositionalScopeKeys = new Set(
+      graphAfterOrder.edges
+        .filter(edge => edge.kind === 'POSITIONAL_SCOPE'
+          && edge.state === 'CONNECTED'
+          && edge.source.entity === 'INSTRUCTION'
+          && edge.target?.entity === 'INSTRUCTION'
+          && affectedBlockIds.has(
+            layoutByInstruction.get(edge.source.id)?.blockId ?? -1,
+          ))
+        .map(edge => `${edge.source.id}:${edge.target!.id}`),
+    );
+    const changedPositionalScope =
+      positionalScopeKeys.size !== reorderedPositionalScopeKeys.size
+      || [...positionalScopeKeys].some(key =>
+        !reorderedPositionalScopeKeys.has(key));
+    const unfulfilledSelection = orderSelections.find(selection =>
+      !graphAfterOrder.edges.some(edge =>
+        edge.kind === selection.kind
+        && edge.state === 'CONNECTED'
+        && edge.source.entity === 'INSTRUCTION'
+        && edge.source.id === selection.sourceInstructionId
+        && edge.target?.entity === 'INSTRUCTION'
+        && edge.target.id === selection.targetInstructionId));
+    const introducedIssue = graphAfterOrder.issues.find(issue =>
+      issue.source.entity === 'INSTRUCTION'
+      && affectedBlockIds.has(
+        layoutByInstruction.get(issue.source.id)?.blockId ?? -1,
+      )
+      && !existingIssueKeys.has(
+        `${issue.kind}:${issue.source.entity}:${issue.source.id}:${issue.code}`,
+      ));
+    if (
+      lostDependency
+      || changedPositionalScope
+      || unfulfilledSelection
+      || introducedIssue
+    ) {
+      return failure(
+        'ORDER_REPAIR_CONFLICT',
+        'The reviewed order would break an existing hidden relationship.',
+      );
+    }
   }
 
   const unknownChoice = [...remainingChoiceIds][0];
