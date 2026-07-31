@@ -51,6 +51,7 @@ import VariablesConnectionsModal, {
   type VariablesConnectionReviewItem,
   type VariablesConnectionsModalSubmission,
 } from './variables/VariablesConnectionsModal';
+import VariablesExecutionFlowReviewModal from './variables/VariablesExecutionFlowReviewModal';
 import VariableFlowRepairModal from './variables/VariableFlowRepairModal';
 import {
   buildVariableFlowRepairMutation,
@@ -72,6 +73,11 @@ import {
   type VariablesBatchResolvePlan,
   type VariablesBatchResolveReview,
 } from './variables/domain/variablesBatchConnections';
+import {
+  buildVariablesExecutionFlowReview,
+  variablesExecutionFlowReviewAuthorityKey,
+  type VariablesExecutionFlowReview,
+} from './variables/domain/variablesExecutionFlowReview';
 import {
   planVariablesBlockMove,
   selectVariablesBlockTransferSources,
@@ -191,9 +197,17 @@ type PendingConnectionsRelease = {
   items: readonly VariablesConnectionReviewItem[];
 };
 
+type PendingConnectionsReview = {
+  mode: 'REVIEW';
+  authorityKey: string;
+  scope: VariablesConnectionScope;
+  review: VariablesExecutionFlowReview;
+};
+
 type PendingConnections =
   | PendingConnectionsResolve
-  | PendingConnectionsRelease;
+  | PendingConnectionsRelease
+  | PendingConnectionsReview;
 
 const acceptedOperations = new Set([
   'variablesWorkspace.bootstrapResponse',
@@ -1019,8 +1033,12 @@ const VariablesPage: React.FC<Props> = ({
       }
 
       const current = snapshotRef.current;
+      const sameBotJob = current !== null
+        && current.botJob.homeBankingId === normalized.botJob.homeBankingId
+        && current.botJob.id === normalized.botJob.id;
       if (
         current
+        && sameBotJob
         && normalized.workspaceEpoch < current.workspaceEpoch
       ) {
         return;
@@ -1120,6 +1138,38 @@ const VariablesPage: React.FC<Props> = ({
     () => snapshot ? variablesReconnectGraph(snapshot) : null,
     [snapshot],
   );
+  const completeExecutionFlowReview = useMemo(
+    () => snapshot ? buildVariablesExecutionFlowReview(snapshot) : null,
+    [snapshot],
+  );
+  const resolveConnectionsMode = useMemo<'RESOLVE' | 'REVIEW'>(() => {
+    if (!snapshot || !completeExecutionFlowReview) return 'RESOLVE';
+    if (snapshot.mutationCapability?.reactAuthoredProfile == null) {
+      return 'REVIEW';
+    }
+    const instructionIds = snapshot.commands.flatMap(command =>
+      command.id !== null
+      && Number.isSafeInteger(command.id)
+      && command.id > 0
+        ? [command.id]
+        : []);
+    const planned = planVariablesBatchResolve(snapshot, instructionIds);
+    return planned.ok && planned.plan.reviewItems.length === 0
+      ? 'REVIEW'
+      : 'RESOLVE';
+  }, [completeExecutionFlowReview, snapshot]);
+  const resolveConnectionsModeForScope = useCallback((
+    scope: VariablesConnectionScope,
+  ): 'RESOLVE' | 'REVIEW' => {
+    if (!snapshot || !completeExecutionFlowReview) return 'RESOLVE';
+    if (snapshot.mutationCapability?.reactAuthoredProfile == null) {
+      return 'REVIEW';
+    }
+    const planned = planVariablesBatchResolve(snapshot, scope.instructionIds);
+    return planned.ok && planned.plan.reviewItems.length === 0
+      ? 'REVIEW'
+      : 'RESOLVE';
+  }, [completeExecutionFlowReview, snapshot]);
 
   useEffect(() => {
     if (
@@ -1152,14 +1202,40 @@ const VariablesPage: React.FC<Props> = ({
   }, [pendingVariableFlowRepair, snapshot]);
 
   useEffect(() => {
-    if (
-      snapshot
-      && pendingConnections
-      && !validateVariablesBatchConnectionsAuthority(
-        pendingConnections.authorityKey,
-        snapshot,
-      )
-    ) {
+    if (!snapshot || !pendingConnections) return;
+    if (pendingConnections.mode === 'REVIEW') {
+      const sameOwner = pendingConnections.review.homeBankingId
+        === snapshot.botJob.homeBankingId
+        && pendingConnections.review.botJobId === snapshot.botJob.id;
+      if (!sameOwner) {
+        setPendingConnections(null);
+        setStatus({
+          level: 'error',
+          text: 'The active Bot Job changed. Open connection review again.',
+        });
+        return;
+      }
+      const authorityKey = variablesExecutionFlowReviewAuthorityKey(snapshot);
+      const nextReview = buildVariablesExecutionFlowReview(snapshot);
+      if (
+        pendingConnections.authorityKey !== authorityKey
+        || pendingConnections.review.runtimeMemoryRevision
+          !== snapshot.runtimeMemory.revision
+        || pendingConnections.review.relationshipsAvailable
+          !== nextReview.relationshipsAvailable
+      ) {
+        setPendingConnections({
+          ...pendingConnections,
+          authorityKey,
+          review: nextReview,
+        });
+      }
+      return;
+    }
+    if (!validateVariablesBatchConnectionsAuthority(
+      pendingConnections.authorityKey,
+      snapshot,
+    )) {
       setPendingConnections(null);
       setStatus({
         level: 'error',
@@ -1597,6 +1673,20 @@ const VariablesPage: React.FC<Props> = ({
       });
       return;
     }
+    if (current.mutationCapability?.reactAuthoredProfile == null) {
+      const executionReview = buildVariablesExecutionFlowReview(current);
+      setPendingConnections({
+        mode: 'REVIEW',
+        authorityKey: variablesExecutionFlowReviewAuthorityKey(current),
+        scope,
+        review: executionReview,
+      });
+      setStatus({
+        level: 'warn',
+        text: `Reviewing ${executionReview.steps.length} command(s) in read-only mode. Relationship authority is currently unavailable.`,
+      });
+      return;
+    }
     const planned = planVariablesBatchResolve(
       current,
       scope.instructionIds,
@@ -1611,9 +1701,16 @@ const VariablesPage: React.FC<Props> = ({
       return;
     }
     if (reviewed.review.items.length === 0) {
+      const executionReview = buildVariablesExecutionFlowReview(current);
+      setPendingConnections({
+        mode: 'REVIEW',
+        authorityKey: variablesExecutionFlowReviewAuthorityKey(current),
+        scope,
+        review: executionReview,
+      });
       setStatus({
         level: 'ok',
-        text: `All ${scope.visibleCount} visible command(s) already have valid connections and execution order.`,
+        text: `Reviewing the complete ${executionReview.steps.length}-command Bot Job execution flow. No database change will be made.`,
       });
       return;
     }
@@ -1677,18 +1774,32 @@ const VariablesPage: React.FC<Props> = ({
   ) => {
     const current = snapshotRef.current;
     const pending = pendingConnections;
+    const authorityValid = current && pending
+      ? pending.mode === 'REVIEW'
+        ? pending.authorityKey
+          === variablesExecutionFlowReviewAuthorityKey(current)
+        : validateVariablesBatchConnectionsAuthority(
+            pending.authorityKey,
+            current,
+          )
+      : false;
     if (
       !current
       || !pending
-      || !validateVariablesBatchConnectionsAuthority(
-        pending.authorityKey,
-        current,
-      )
+      || !authorityValid
     ) {
       setPendingConnections(null);
       setStatus({
         level: 'error',
         text: 'The Variables graph changed. Open the bulk connection action again.',
+      });
+      return;
+    }
+
+    if (pending.mode === 'REVIEW') {
+      setStatus({
+        level: 'warn',
+        text: 'Connection review is read-only. No graph mutation was submitted.',
       });
       return;
     }
@@ -2120,9 +2231,14 @@ const VariablesPage: React.FC<Props> = ({
           ) : (
             <section className={styles.workspace}>
               <VariablesCommandBoard
+                workspaceIdentityKey={`${snapshot.botJob.homeBankingId}:${snapshot.botJob.id}`}
                 blocks={snapshot.blocks}
                 instructions={snapshot.commands}
                 relationshipEdges={relationshipGraph?.edges ?? []}
+                resolveConnectionsMode={resolveConnectionsMode}
+                resolveConnectionsModeForScope={resolveConnectionsModeForScope}
+                resolveConnectionsDisabled={mutationDisabled}
+                reviewConnectionsDisabled={completeExecutionFlowReview === null}
                 disabled={mutationDisabled}
                 unavailableReason={pendingMutationRequestId
                   ? 'Saving...'
@@ -2538,7 +2654,10 @@ const VariablesPage: React.FC<Props> = ({
             </section>
           )}
         </section>
-        {snapshot && pendingConnections && (
+        {snapshot
+          && pendingConnections
+          && pendingConnections.mode !== 'REVIEW'
+          && (
           <VariablesConnectionsModal
             key={[
               pendingConnections.authorityKey,
@@ -2561,6 +2680,20 @@ const VariablesPage: React.FC<Props> = ({
               setStatus({
                 level: 'warn',
                 text: 'Bulk connection action cancelled. No relationship was changed.',
+              });
+            }}
+          />
+        )}
+        {pendingConnections?.mode === 'REVIEW' && (
+          <VariablesExecutionFlowReviewModal
+            key={pendingConnections.authorityKey}
+            review={pendingConnections.review}
+            scopeLabel={pendingConnections.scope.label}
+            onClose={() => {
+              setPendingConnections(null);
+              setStatus({
+                level: 'ok',
+                text: 'Connection review closed. No relationship was changed.',
               });
             }}
           />

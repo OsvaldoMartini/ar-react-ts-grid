@@ -45,8 +45,16 @@ export interface VariablesCommandBoardProps {
   blocks: readonly VariableWorkspaceBlock[];
   instructions: readonly VariableInstructionNode[];
   relationshipEdges?: readonly InstructionRelationshipEdge[];
+  /** Stable Bot Job/workspace owner key. Changing it clears local filters. */
+  workspaceIdentityKey?: string | number | null;
   disabled?: boolean;
   unavailableReason?: string;
+  resolveConnectionsMode?: 'RESOLVE' | 'REVIEW';
+  resolveConnectionsModeForScope?: (
+    scope: VariablesConnectionScope,
+  ) => 'RESOLVE' | 'REVIEW';
+  resolveConnectionsDisabled?: boolean;
+  reviewConnectionsDisabled?: boolean;
   selectedInstructionId?: number | null;
   draggingInstructionId?: number | null;
   activeDropTarget?: VariablesCommandDropTarget | null;
@@ -164,8 +172,13 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
   blocks,
   instructions,
   relationshipEdges = [],
+  workspaceIdentityKey,
   disabled = false,
   unavailableReason,
+  resolveConnectionsMode = 'RESOLVE',
+  resolveConnectionsModeForScope,
+  resolveConnectionsDisabled,
+  reviewConnectionsDisabled = false,
   selectedInstructionId = null,
   draggingInstructionId = null,
   activeDropTarget = null,
@@ -185,6 +198,11 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
   const [commandSearch, setCommandSearch] = useState('');
   const [blockFilter, setBlockFilter] = useState<number | null>(null);
   const commandSearchActive = commandSearch.trim().length > 0;
+
+  useEffect(() => {
+    setCommandSearch('');
+    setBlockFilter(null);
+  }, [workspaceIdentityKey]);
 
   useEffect(() => {
     if (
@@ -284,11 +302,20 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
     visibleInstructions,
   ]);
 
+  const effectiveResolveConnectionsMode = resolveConnectionsModeForScope?.(
+    visibleConnectionScope,
+  ) ?? resolveConnectionsMode;
+  const resolveActionDisabled = effectiveResolveConnectionsMode === 'REVIEW'
+    ? reviewConnectionsDisabled
+    : resolveConnectionsDisabled ?? disabled;
+
   const resolveConnectionsEvent = useMemo<RulesCardEvent>(() => ({
     color: 'green',
-    rules: 'RESOLVE ALL CONNECTIONS',
+    rules: effectiveResolveConnectionsMode === 'REVIEW'
+      ? 'REVIEW ALL CONNECTIONS'
+      : 'RESOLVE ALL CONNECTIONS',
     ts: 0,
-  }), []);
+  }), [effectiveResolveConnectionsMode]);
   const releaseConnectionsEvent = useMemo<RulesCardEvent>(() => ({
     color: 'red',
     rules: 'RELEASE ALL CONNECTIONS',
@@ -365,6 +392,27 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
     [relationshipEdges],
   );
 
+  const authoritativeIndicesByBlock = useMemo(() => {
+    const rowsByBlock = new Map<number, VariableInstructionNode[]>();
+    instructions.forEach((instruction) => {
+      if (instruction.blockId === null) return;
+      const current = rowsByBlock.get(instruction.blockId) ?? [];
+      current.push(instruction);
+      rowsByBlock.set(instruction.blockId, current);
+    });
+    const result = new Map<number, Map<number, number>>();
+    rowsByBlock.forEach((rows, blockId) => {
+      const rowIndices = new Map<number, number>();
+      [...rows].sort(instructionOrder).forEach((instruction, index) => {
+        if (instruction.id !== null) {
+          rowIndices.set(instruction.id, index);
+        }
+      });
+      result.set(blockId, rowIndices);
+    });
+    return result;
+  }, [instructions]);
+
   const dropGap = (
     blockId: number,
     index: number,
@@ -438,10 +486,13 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                   animate={false}
                   pulse={false}
                   glow={false}
-                  onClick={() =>
-                    onResolveVisibleConnections(visibleConnectionScope)}
-                  disabled={disabled || visibleConnectionScope.visibleCount === 0}
-                  title={`Resolve connections for ${visibleConnectionScope.label}`}
+                  onClick={(event) => {
+                    // Keep a deterministic focus return target for the modal.
+                    event.currentTarget.focus();
+                    onResolveVisibleConnections(visibleConnectionScope);
+                  }}
+                  disabled={resolveActionDisabled || visibleConnectionScope.visibleCount === 0}
+                  title={`${effectiveResolveConnectionsMode === 'REVIEW' ? 'Review' : 'Resolve'} connections for ${visibleConnectionScope.label}`}
                 />
               )}
               {onReleaseVisibleConnections && (
@@ -466,11 +517,9 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
               ? ` / ${instructions.length}`
               : ''}
           </span>
-          {(disabled || commandSearchActive) && (
+          {disabled && (
             <small title={unavailableReason}>
-              {commandSearchActive
-                ? 'Clear command search to move rows'
-                : unavailableReason || 'Movement unavailable'}
+              {unavailableReason || 'Workspace changes are currently unavailable'}
             </small>
           )}
         </div>
@@ -501,11 +550,15 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
             </header>
 
             <div className={styles.rows}>
-              {group.blockId !== null
-                && !commandSearchActive
-                && dropGap(group.blockId, 0, `drop:${group.blockId}:0`)}
               {group.instructions.map((instruction, index) => {
                 const instructionId = instruction.id;
+                const authoritativeIndex = group.blockId === null
+                  ? index
+                  : instructionId === null
+                    ? index
+                    : authoritativeIndicesByBlock
+                      .get(group.blockId)
+                      ?.get(instructionId) ?? index;
                 const policy = instructionRelationshipPolicy(instruction.command);
                 const edges = instructionId === null
                   ? []
@@ -624,7 +677,6 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                     : null;
                 const canDrag = instructionId !== null
                   && !disabled
-                  && !commandSearchActive
                   && Boolean(onInstructionDragStart)
                   && (canDragInstruction?.(instruction) ?? true);
                 const selected = instructionId !== null
@@ -638,6 +690,12 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                   <React.Fragment
                     key={`command:${instructionId ?? `${group.blockId}:${index}`}`}
                   >
+                    {group.blockId !== null
+                      && dropGap(
+                        group.blockId,
+                        authoritativeIndex,
+                        `drop:${group.blockId}:${authoritativeIndex}:before:${instructionId ?? index}`,
+                      )}
                     <article
                       className={[
                         styles.row,
@@ -647,10 +705,36 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                       ].filter(Boolean).join(' ')}
                       draggable={canDrag}
                       data-instruction-id={instructionId ?? undefined}
-                      onDragStart={event =>
-                        onInstructionDragStart?.(event, instruction)}
+                      onDragStart={(event) => {
+                        if (instructionId !== null) {
+                          onSelectInstruction?.(instructionId);
+                        }
+                        onInstructionDragStart?.(event, instruction);
+                      }}
                       onDragEnd={event =>
                         onInstructionDragEnd?.(event, instruction)}
+                      title={!canDrag
+                        ? instructionId === null
+                          ? 'This command cannot move because its instruction ID is missing.'
+                          : disabled
+                            ? unavailableReason || 'Workspace changes are currently unavailable.'
+                            : !onInstructionDragStart
+                              ? 'Drag-and-drop is not connected for this workspace.'
+                              : 'This command is not eligible to move.'
+                        : undefined}
+                      onClick={(event) => {
+                        if (instructionId === null || !onSelectInstruction) return;
+                        const target = event.target;
+                        if (
+                          target instanceof Element
+                          && target.closest(
+                            'button, a, input, select, textarea, [role="button"]',
+                          )
+                        ) {
+                          return;
+                        }
+                        onSelectInstruction(instructionId);
+                      }}
                     >
                       <span className={styles.grip} aria-hidden="true">
                         <GripVertical size={16} />
@@ -907,11 +991,11 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                       </div>
                     </article>
                     {group.blockId !== null
-                      && !commandSearchActive
+                      && index === group.instructions.length - 1
                       && dropGap(
                         group.blockId,
-                        index + 1,
-                        `drop:${group.blockId}:${index + 1}`,
+                        authoritativeIndex + 1,
+                        `drop:${group.blockId}:${authoritativeIndex + 1}:after:${instructionId ?? index}`,
                       )}
                   </React.Fragment>
                 );

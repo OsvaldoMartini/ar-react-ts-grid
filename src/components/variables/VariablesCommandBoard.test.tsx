@@ -438,13 +438,15 @@ test('filters commands by text and restores all rows when cleared', () => {
   expect(screen.getByText('3')).toBeInTheDocument();
 });
 
-test('disables row dragging while command text is filtered', () => {
+test('keeps filtered rows draggable and submits authoritative drop indices', () => {
   const onInstructionDragStart = jest.fn();
-  render(
+  const onDropTarget = jest.fn();
+  const { container } = render(
     <VariablesCommandBoard
       blocks={filterBlocks}
       instructions={filterInstructions}
       onInstructionDragStart={onInstructionDragStart}
+      onDropTarget={onDropTarget}
     />,
   );
 
@@ -457,9 +459,27 @@ test('disables row dragging while command text is filtered', () => {
   );
 
   expect(screen.getByText('Read username').closest('article'))
-    .toHaveAttribute('draggable', 'false');
-  expect(screen.getByText('Clear command search to move rows'))
-    .toBeInTheDocument();
+    .toHaveAttribute('draggable', 'true');
+  expect(screen.queryByText('Clear command search to move rows'))
+    .not.toBeInTheDocument();
+  expect(
+    Array.from(container.querySelectorAll('[data-drop-index]'))
+      .map(element => element.getAttribute('data-drop-index')),
+  ).toEqual(['1', '2']);
+
+  const row = screen.getByText('Read username').closest('article')!;
+  fireEvent.dragStart(row);
+  expect(onInstructionDragStart).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.objectContaining({ id: 1641 }),
+  );
+
+  const afterFilteredRow = container.querySelector('[data-drop-index="2"]')!;
+  fireEvent.drop(afterFilteredRow);
+  expect(onDropTarget).toHaveBeenCalledWith(
+    expect.anything(),
+    { blockId: 7, index: 2 },
+  );
 
   fireEvent.change(
     screen.getByRole('searchbox', { name: 'Search commands' }),
@@ -467,6 +487,123 @@ test('disables row dragging while command text is filtered', () => {
   );
   expect(screen.getByText('Read username').closest('article'))
     .toHaveAttribute('draggable', 'true');
+});
+
+test('clears command and Block filters when the workspace owner changes', () => {
+  const { rerender } = render(
+    <VariablesCommandBoard
+      workspaceIdentityKey="2:30"
+      blocks={filterBlocks}
+      instructions={filterInstructions}
+    />,
+  );
+
+  fireEvent.change(
+    screen.getByRole('searchbox', { name: 'Search commands' }),
+    { target: { value: 'beneficiary' } },
+  );
+  fireEvent.click(screen.getByRole('combobox', { name: 'Block' }));
+  fireEvent.click(screen.getByRole('option', { name: /#2 Payment/i }));
+  expect(screen.queryByText('Username field')).not.toBeInTheDocument();
+
+  rerender(
+    <VariablesCommandBoard
+      workspaceIdentityKey="2:32"
+      blocks={filterBlocks}
+      instructions={filterInstructions}
+    />,
+  );
+
+  expect(screen.getByRole('searchbox', { name: 'Search commands' }))
+    .toHaveValue('');
+  expect(screen.getByRole('combobox', { name: 'Block' }))
+    .toHaveValue('');
+  expect(screen.getByText('Username field')).toBeInTheDocument();
+  expect(screen.getByText('Validate payment')).toBeInTheDocument();
+});
+
+test('selects from the whole row without double-triggering nested actions', () => {
+  const instruction = command(1641, 'GET', 1640);
+  const edge = elementEdge(instruction.id!, 'CONNECTED', 1640);
+  const onSelectInstruction = jest.fn();
+  const onReconnectParent = jest.fn();
+  render(
+    <VariablesCommandBoard
+      blocks={block}
+      instructions={[instruction]}
+      relationshipEdges={[edge]}
+      onSelectInstruction={onSelectInstruction}
+      onReconnectParent={onReconnectParent}
+    />,
+  );
+
+  fireEvent.click(screen.getByText('#2'));
+  expect(onSelectInstruction).toHaveBeenCalledTimes(1);
+  expect(onSelectInstruction).toHaveBeenLastCalledWith(1641);
+
+  fireEvent.click(screen.getByText('Instruction 1641'));
+  expect(onSelectInstruction).toHaveBeenCalledTimes(2);
+
+  fireEvent.click(screen.getByRole('button', {
+    name: 'Parent connected (id: 1640)',
+  }));
+  expect(onReconnectParent).toHaveBeenCalledTimes(1);
+  expect(onSelectInstruction).toHaveBeenCalledTimes(2);
+});
+
+test('shows the review label when all visible connections are reviewable', () => {
+  const onResolveVisibleConnections = jest.fn();
+  render(
+    <VariablesCommandBoard
+      blocks={filterBlocks}
+      instructions={filterInstructions}
+      resolveConnectionsMode="REVIEW"
+      onResolveVisibleConnections={onResolveVisibleConnections}
+    />,
+  );
+
+  const review = screen.getByRole('button', {
+    name: /REVIEW ALL CONNECTIONS/i,
+  });
+  expect(review).toHaveAttribute(
+    'title',
+    expect.stringContaining('Review connections for All Blocks'),
+  );
+  fireEvent.click(review);
+  expect(onResolveVisibleConnections).toHaveBeenCalledWith(
+    expect.objectContaining({ instructionIds: [1640, 1641, 1700] }),
+  );
+});
+
+test('allows snapshot review while mutation actions remain disabled', () => {
+  const onResolveVisibleConnections = jest.fn();
+  const onReleaseVisibleConnections = jest.fn();
+  render(
+    <VariablesCommandBoard
+      blocks={filterBlocks}
+      instructions={filterInstructions}
+      disabled
+      unavailableReason="Read-only snapshot"
+      resolveConnectionsMode="REVIEW"
+      resolveConnectionsDisabled={false}
+      onResolveVisibleConnections={onResolveVisibleConnections}
+      onReleaseVisibleConnections={onReleaseVisibleConnections}
+    />,
+  );
+
+  const review = screen.getByRole('button', {
+    name: /REVIEW ALL CONNECTIONS/i,
+  });
+  const release = screen.getByRole('button', {
+    name: /RELEASE ALL CONNECTIONS/i,
+  });
+  expect(review).toBeEnabled();
+  expect(release).toBeDisabled();
+
+  fireEvent.click(review);
+  expect(onResolveVisibleConnections).toHaveBeenCalledTimes(1);
+  fireEvent.click(release);
+  expect(onReleaseVisibleConnections).not.toHaveBeenCalled();
 });
 
 test('combines the Block selector with command text filtering', () => {

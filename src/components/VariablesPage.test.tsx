@@ -1,5 +1,12 @@
 import React from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import VariablesPage from './VariablesPage';
 
 const mockSend = jest.fn();
@@ -338,6 +345,73 @@ test('shows a retry action when the first correlated bootstrap fails', async () 
   fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
   expect(mockSend).toHaveBeenCalledTimes(2);
   expect(JSON.parse(mockSend.mock.calls[1][0]).type).toBe('variablesWorkspace.bootstrap');
+  view.unmount();
+});
+
+test('accepts a lower workspace epoch when the authoritative Bot Job changes', async () => {
+  const view = render(
+    <VariablesPage socketPort={59772} sessionId="variablesManager" />,
+  );
+  await waitFor(() => expect(mockSend).toHaveBeenCalledTimes(1));
+  const bootstrapRequest = JSON.parse(JSON.parse(mockSend.mock.calls[0][0]).body);
+  mockMessages = [response('variablesWorkspace.bootstrapResponse', {
+    ...snapshot,
+    workspaceEpoch: 9,
+    requestId: bootstrapRequest.requestId,
+  })];
+  view.rerender(
+    <VariablesPage socketPort={59772} sessionId="variablesManager" />,
+  );
+  await waitFor(() => expect(screen.getByText(/Saldo Banca Stato/))
+    .toBeInTheDocument());
+
+  mockMessages = [
+    ...mockMessages,
+    response('variablesWorkspace.snapshot', {
+      ...snapshot,
+      bindingEpoch: 'binding-other',
+      workspaceEpoch: 1,
+      graphRevision: 'c'.repeat(64),
+      botJob: {
+        ...snapshot.botJob,
+        id: 32,
+        name: 'Lower Epoch Bot',
+      },
+    }),
+  ];
+  view.rerender(
+    <VariablesPage socketPort={59772} sessionId="variablesManager" />,
+  );
+
+  await waitFor(() => expect(screen.getByText(/Lower Epoch Bot/))
+    .toBeInTheDocument());
+  view.unmount();
+});
+
+test('opens a partial read-only review without mutation capability', async () => {
+  const view = render(
+    <VariablesPage socketPort={59772} sessionId="variablesManager" />,
+  );
+  await waitFor(() => expect(mockSend).toHaveBeenCalledTimes(1));
+  const bootstrapRequest = JSON.parse(JSON.parse(mockSend.mock.calls[0][0]).body);
+  mockMessages = [response('variablesWorkspace.bootstrapResponse', {
+    ...snapshot,
+    requestId: bootstrapRequest.requestId,
+  })];
+  view.rerender(
+    <VariablesPage socketPort={59772} sessionId="variablesManager" />,
+  );
+
+  const reviewButton = await screen.findByRole('button', {
+    name: 'REVIEW ALL CONNECTIONS',
+  });
+  expect(reviewButton).toBeEnabled();
+  const sentBeforeReview = mockSend.mock.calls.length;
+  fireEvent.click(reviewButton);
+  expect(screen.getByText('Relationship graph unavailable'))
+    .toBeInTheDocument();
+  expect(screen.getAllByText('Read Amount').length).toBeGreaterThan(0);
+  expect(mockSend).toHaveBeenCalledTimes(sentBeforeReview);
   view.unmount();
 });
 
@@ -684,6 +758,66 @@ test('resolves a unique visible Web Element connection through the new modal', a
   ]);
   expect(body.variableBindingPatches).toEqual([]);
   expect(body.variableOwnerPatches).toEqual([]);
+  view.unmount();
+});
+
+test('reviews a healthy complete execution flow without submitting a mutation', async () => {
+  const healthySnapshot = mutableRelationshipSnapshot('8'.repeat(64));
+  const view = render(
+    <VariablesPage socketPort={59772} sessionId="variablesManager" />,
+  );
+  await waitFor(() => expect(mockSend).toHaveBeenCalledTimes(1));
+  const bootstrapRequest = JSON.parse(JSON.parse(mockSend.mock.calls[0][0]).body);
+  mockMessages = [response('variablesWorkspace.bootstrapResponse', {
+    ...healthySnapshot,
+    requestId: bootstrapRequest.requestId,
+  })];
+  view.rerender(
+    <VariablesPage socketPort={59772} sessionId="variablesManager" />,
+  );
+
+  const reviewButton = await screen.findByRole('button', {
+    name: 'REVIEW ALL CONNECTIONS',
+  });
+  const sentBeforeReview = mockSend.mock.calls.length;
+  fireEvent.click(reviewButton);
+
+  const dialog = screen.getByRole('dialog', {
+    name: 'Review All Connections',
+  });
+  expect(within(dialog).getByText('Bot Job execution flow'))
+    .toBeInTheDocument();
+  expect(within(dialog).getAllByText('Amount').length).toBeGreaterThan(0);
+  expect(within(dialog).getAllByText('Read Amount').length).toBeGreaterThan(0);
+  expect(within(dialog).getAllByText('Compare Amount').length).toBeGreaterThan(0);
+  expect(within(dialog).queryByRole('combobox')).not.toBeInTheDocument();
+  expect(mockSend).toHaveBeenCalledTimes(sentBeforeReview);
+
+  mockMessages = [
+    ...mockMessages,
+    response('variablesWorkspace.snapshot', {
+      ...healthySnapshot,
+      runtimeMemory: {
+        revision: healthySnapshot.runtimeMemory.revision + 1,
+        variables: healthySnapshot.runtimeMemory.variables.map(entry => ({
+          ...entry,
+          value: '999.00',
+          entryRevision: entry.entryRevision + 1,
+        })),
+      },
+    }),
+  ];
+  view.rerender(
+    <VariablesPage socketPort={59772} sessionId="variablesManager" />,
+  );
+  await waitFor(() => expect(within(screen.getByRole('dialog', {
+    name: 'Review All Connections',
+  })).getByText('Runtime VALUE: 999.00')).toBeInTheDocument());
+
+  fireEvent.click(within(screen.getByRole('dialog', {
+    name: 'Review All Connections',
+  })).getByRole('button', { name: 'Close' }));
+  expect(mockSend).toHaveBeenCalledTimes(sentBeforeReview);
   view.unmount();
 });
 

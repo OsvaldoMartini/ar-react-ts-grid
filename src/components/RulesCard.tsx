@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { MouseEvent, ReactNode } from 'react';
 import { CheckCircle2, XCircle } from 'lucide-react';
 import styles from './RulesCard.module.scss';
 
@@ -21,7 +21,7 @@ interface RulesCardProps {
   pulse?: boolean;
   icon?: boolean;
   iconNode?: ReactNode;
-  onClick?: () => void;
+  onClick?: (event: MouseEvent<HTMLButtonElement>) => void;
   ariaPressed?: boolean;
   title?: string;
   disabled?: boolean;
