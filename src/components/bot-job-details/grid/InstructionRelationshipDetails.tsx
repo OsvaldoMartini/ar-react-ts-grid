@@ -10,7 +10,6 @@ import type {
 } from './domain/instructionRelationshipGraph';
 import { instructionRelationshipPolicy } from './domain/instructionRelationshipPolicy';
 import type { WorkspaceBlock } from './domain/workspaceBlocks';
-import InstructionVariableStateBadge from './InstructionVariableStateBadge';
 import styles from './InstructionRelationshipDetails.module.scss';
 
 export interface InstructionRelationshipDetailsProps {
@@ -408,18 +407,13 @@ const InstructionRelationshipDetails: React.FC<
     >
       {renderOperationContent(instruction, allInstructions, workspaceBlocks)}
       {(
-        instruction.variableId != null
-        || chips.length > 0
+        chips.length > 0
         || reconnectParentEvent != null
         || connectedParentId != null
         || reconnectVariableEvent != null
         || connectedVariableId != null
       ) && (
         <span className={styles.chips}>
-          <InstructionVariableStateBadge
-            instruction={instruction}
-            allInstructions={allInstructions}
-          />
           {reconnectParentEvent && (
             <span
               className={styles.reconnectRuleCard}
