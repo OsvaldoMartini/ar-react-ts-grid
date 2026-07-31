@@ -49,8 +49,6 @@ export interface VariablesCommandBoardProps {
   workspaceIdentityKey?: string | number | null;
   disabled?: boolean;
   unavailableReason?: string;
-  resolveConnectionsDisabled?: boolean;
-  reviewConnectionsDisabled?: boolean;
   selectedInstructionId?: number | null;
   draggingInstructionId?: number | null;
   activeDropTarget?: VariablesCommandDropTarget | null;
@@ -172,8 +170,6 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
   workspaceIdentityKey,
   disabled = false,
   unavailableReason,
-  resolveConnectionsDisabled,
-  reviewConnectionsDisabled = false,
   selectedInstructionId = null,
   draggingInstructionId = null,
   activeDropTarget = null,
@@ -297,8 +293,6 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
     instructions.length,
     visibleInstructions,
   ]);
-
-  const resolveActionDisabled = resolveConnectionsDisabled ?? disabled;
 
   const resolveConnectionsEvent = useMemo<RulesCardEvent>(() => ({
     color: 'orange',
@@ -491,7 +485,6 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                     event.currentTarget.focus();
                     onResolveVisibleConnections(visibleConnectionScope);
                   }}
-                  disabled={resolveActionDisabled || visibleConnectionScope.visibleCount === 0}
                   title={`Resolve connections for ${visibleConnectionScope.label}`}
                 />
               )}
@@ -507,7 +500,6 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                     event.currentTarget.focus();
                     onReviewVisibleConnections(visibleConnectionScope);
                   }}
-                  disabled={reviewConnectionsDisabled || visibleConnectionScope.visibleCount === 0}
                   title={`Review connections for ${visibleConnectionScope.label}`}
                 />
               )}

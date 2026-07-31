@@ -597,7 +597,8 @@ test('renders resolve and review as independent fixed glowing actions', () => {
   );
 });
 
-test('allows snapshot review while mutation actions remain disabled', () => {
+test('keeps resolve and review enabled while mutation actions remain disabled', () => {
+  const onResolveVisibleConnections = jest.fn();
   const onReviewVisibleConnections = jest.fn();
   const onReleaseVisibleConnections = jest.fn();
   render(
@@ -606,22 +607,28 @@ test('allows snapshot review while mutation actions remain disabled', () => {
       instructions={filterInstructions}
       disabled
       unavailableReason="Read-only snapshot"
-      reviewConnectionsDisabled={false}
+      onResolveVisibleConnections={onResolveVisibleConnections}
       onReviewVisibleConnections={onReviewVisibleConnections}
       onReleaseVisibleConnections={onReleaseVisibleConnections}
     />,
   );
 
+  const resolve = screen.getByRole('button', {
+    name: /RESOLVE ALL CONNECTIONS/i,
+  });
   const review = screen.getByRole('button', {
     name: /REVIEW ALL CONNECTIONS/i,
   });
   const release = screen.getByRole('button', {
     name: /RELEASE ALL CONNECTIONS/i,
   });
+  expect(resolve).toBeEnabled();
   expect(review).toBeEnabled();
   expect(release).toBeDisabled();
 
+  fireEvent.click(resolve);
   fireEvent.click(review);
+  expect(onResolveVisibleConnections).toHaveBeenCalledTimes(1);
   expect(onReviewVisibleConnections).toHaveBeenCalledTimes(1);
   fireEvent.click(release);
   expect(onReleaseVisibleConnections).not.toHaveBeenCalled();

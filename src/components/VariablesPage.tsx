@@ -1138,11 +1138,6 @@ const VariablesPage: React.FC<Props> = ({
     () => snapshot ? variablesReconnectGraph(snapshot) : null,
     [snapshot],
   );
-  const completeExecutionFlowReview = useMemo(
-    () => snapshot ? buildVariablesExecutionFlowReview(snapshot) : null,
-    [snapshot],
-  );
-
   useEffect(() => {
     if (
       pendingReconnect
@@ -1672,11 +1667,14 @@ const VariablesPage: React.FC<Props> = ({
       });
       return;
     }
-    if (current.mutationCapability?.reactAuthoredProfile == null) {
-      setStatus({
-        level: 'error',
-        text: 'Connection resolution is temporarily unavailable. REVIEW ALL CONNECTIONS remains available.',
-      });
+    if (
+      scope.visibleCount === 0
+      || current.mutationCapability?.reactAuthoredProfile == null
+    ) {
+      // Resolve must never become a dead action. When there is no writable
+      // scope, open the complete read-only flow so the client can still
+      // inspect every relationship and decide what to repair next.
+      openReviewVisibleConnections(scope);
       return;
     }
     const planned = planVariablesBatchResolve(
@@ -1693,10 +1691,7 @@ const VariablesPage: React.FC<Props> = ({
       return;
     }
     if (reviewed.review.items.length === 0) {
-      setStatus({
-        level: 'ok',
-        text: `All ${scope.visibleCount} visible command(s) already have valid connections and execution order. Use REVIEW ALL CONNECTIONS to inspect the complete flow.`,
-      });
+      openReviewVisibleConnections(scope);
       return;
     }
     setPendingConnections({
@@ -1712,7 +1707,7 @@ const VariablesPage: React.FC<Props> = ({
       level: 'warn',
       text: `Reviewing connections, variable ownership, and execution order for ${scope.visibleCount} visible command(s).`,
     });
-  }, []);
+  }, [openReviewVisibleConnections]);
 
   const openReleaseVisibleConnections = useCallback((
     scope: VariablesConnectionScope,
@@ -2229,8 +2224,6 @@ const VariablesPage: React.FC<Props> = ({
                 blocks={snapshot.blocks}
                 instructions={snapshot.commands}
                 relationshipEdges={relationshipGraph?.edges ?? []}
-                resolveConnectionsDisabled={mutationDisabled}
-                reviewConnectionsDisabled={completeExecutionFlowReview === null}
                 disabled={movementDisabled}
                 unavailableReason={pendingMutationRequestId
                   ? 'Saving...'
