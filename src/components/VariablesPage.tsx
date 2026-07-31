@@ -44,8 +44,25 @@ import VariablesBlockTransferBoard, {
   type VariablesBlockTransferIntent,
 } from './variables/VariablesBlockTransferBoard';
 import VariablesCommandBoard, {
+  type VariablesConnectionScope,
   type VariablesCommandDropTarget,
 } from './variables/VariablesCommandBoard';
+import VariablesConnectionsModal, {
+  type VariablesConnectionReviewItem,
+  type VariablesConnectionsModalSubmission,
+} from './variables/VariablesConnectionsModal';
+import {
+  buildVariablesBatchResolveMutation,
+  planVariablesBatchRelease,
+  planVariablesBatchResolve,
+  reviewVariablesBatchResolve,
+  validateVariablesBatchConnectionsAuthority,
+  type VariablesBatchEditableRelationshipKind,
+  type VariablesBatchReleasePlan,
+  type VariablesBatchResolveChoice,
+  type VariablesBatchResolvePlan,
+  type VariablesBatchResolveReview,
+} from './variables/domain/variablesBatchConnections';
 import {
   planVariablesBlockMove,
   selectVariablesBlockTransferSources,
@@ -141,6 +158,28 @@ type PendingReconnect = {
   authorityKey: string;
   plan: VariablesReconnectPlan;
 };
+
+type PendingConnectionsResolve = {
+  mode: 'RESOLVE';
+  authorityKey: string;
+  scope: VariablesConnectionScope;
+  plan: VariablesBatchResolvePlan;
+  review: VariablesBatchResolveReview;
+  choices: readonly VariablesBatchResolveChoice[];
+  reviewRevision: number;
+};
+
+type PendingConnectionsRelease = {
+  mode: 'RELEASE';
+  authorityKey: string;
+  scope: VariablesConnectionScope;
+  plan: VariablesBatchReleasePlan;
+  items: readonly VariablesConnectionReviewItem[];
+};
+
+type PendingConnections =
+  | PendingConnectionsResolve
+  | PendingConnectionsRelease;
 
 const acceptedOperations = new Set([
   'variablesWorkspace.bootstrapResponse',
@@ -246,6 +285,161 @@ const relationshipTargetLabel = (
   return instruction
     ? `#${instruction.instructionOrder ?? '?'} ${instruction.name || instruction.command} · ID ${target.id}`
     : `Instruction ID ${target.id}`;
+};
+
+const relationshipTargetValue = (target: RelationshipTarget): string => {
+  const owner = target.owner.workspaceKind === 'BOT_JOB'
+    ? `BOT_JOB:${target.owner.homeBankingId}:${target.owner.botJobId}`
+    : `COMPONENT:${target.owner.homeBankingId}`;
+  return `${target.entity}:${owner}:${target.id}`;
+};
+
+const batchRelationshipLabel = (
+  kind: VariablesBatchEditableRelationshipKind,
+): string => {
+  switch (kind) {
+    case 'ELEMENT_TARGET':
+      return 'Web Element';
+    case 'VARIABLE_BINDING':
+      return 'Variable';
+    case 'LOOP_ANCHOR':
+      return 'LOOP anchor';
+    case 'CONDITIONAL_ROOT':
+      return 'Conditional root';
+    case 'BLOCK_TARGET':
+      return 'GOTO Block';
+    default:
+      return kind;
+  }
+};
+
+const batchSourceLabels = (
+  snapshot: VariableWorkspaceSnapshot,
+  instructionId: number,
+): { label: string; sublabel: string } => {
+  const command = snapshot.commands.find(candidate =>
+    candidate.id === instructionId);
+  if (!command) {
+    return {
+      label: `Instruction ID ${instructionId}`,
+      sublabel: 'Current Bot Job',
+    };
+  }
+  return {
+    label: `#${command.instructionOrder ?? '?'} ${command.name || command.command} · ID ${instructionId}`,
+    sublabel: `Block #${command.blockOrder ?? '?'} ${command.blockName || command.blockId || 'Unavailable'}`,
+  };
+};
+
+const batchResolveModalItems = (
+  snapshot: VariableWorkspaceSnapshot,
+  review: VariablesBatchResolveReview,
+): VariablesConnectionReviewItem[] => review.items.map((item) => {
+  const source = batchSourceLabels(snapshot, item.sourceInstructionId);
+  const stateTone: VariablesConnectionReviewItem['stateTone'] =
+    item.resolution === 'AUTO' || item.resolution === 'REVIEWED'
+      ? 'green'
+      : item.resolution === 'REVIEW_REQUIRED'
+        ? 'orange'
+        : item.resolution === 'SKIPPED'
+          ? 'gray'
+          : 'red';
+  const state = item.resolution === 'AUTO'
+    ? 'AUTO SELECTED'
+    : item.resolution === 'REVIEWED'
+      ? 'REVIEWED'
+      : item.resolution === 'REVIEW_REQUIRED'
+        ? 'SELECT TARGET'
+        : item.resolution === 'UNAVAILABLE'
+          ? 'NO COMPATIBLE TARGET'
+          : item.resolution === 'BLOCKED'
+            ? 'SELECT PARENT FIRST'
+            : 'SKIPPED';
+  return {
+    id: item.reviewId,
+    sourceLabel: source.label,
+    sourceSublabel: source.sublabel,
+    relationLabel: batchRelationshipLabel(item.kind),
+    state,
+    stateTone,
+    currentTargetLabel: relationshipTargetLabel(
+      snapshot,
+      item.currentTarget,
+    ),
+    compatibleOptions: item.compatibleTargets.map(target => ({
+      value: relationshipTargetValue(target),
+      label: relationshipTargetLabel(snapshot, target)
+        ?? `${target.entity} ID ${target.id}`,
+      sublabel: target.entity.replaceAll('_', ' '),
+      badges: [{ text: target.entity, tone: 'blue' as const }],
+      keywords: [
+        target.entity,
+        target.id,
+        relationshipTargetLabel(snapshot, target),
+      ].join(' '),
+    })),
+    initialOptionValue: item.selectedTarget
+      ? relationshipTargetValue(item.selectedTarget)
+      : null,
+  };
+});
+
+const batchReleaseModalItems = (
+  snapshot: VariableWorkspaceSnapshot,
+  plan: VariablesBatchReleasePlan,
+): VariablesConnectionReviewItem[] => {
+  const owner = {
+    workspaceKind: 'BOT_JOB' as const,
+    homeBankingId: snapshot.botJob.homeBankingId,
+    botJobId: snapshot.botJob.id,
+  };
+  const relationItems = plan.draft.instructionRelationPatches.map((patch) => {
+    const source = batchSourceLabels(snapshot, patch.instructionId);
+    const currentTarget: RelationshipTarget | null =
+      patch.expected.parentId !== null
+        ? {
+            entity: 'INSTRUCTION',
+            owner,
+            id: patch.expected.parentId,
+          }
+        : patch.expected.parentBlockId !== null
+          ? {
+              entity: 'BLOCK',
+              owner,
+              id: patch.expected.parentBlockId,
+            }
+          : null;
+    return {
+      id: `${patch.instructionId}:${patch.relationKind}`,
+      sourceLabel: source.label,
+      sourceSublabel: source.sublabel,
+      relationLabel: batchRelationshipLabel(patch.relationKind),
+      state: 'WILL RELEASE',
+      stateTone: 'red' as const,
+      currentTargetLabel: relationshipTargetLabel(snapshot, currentTarget),
+    };
+  });
+  const variableItems = plan.draft.variableBindingPatches.map((patch) => {
+    const source = batchSourceLabels(snapshot, patch.instructionId);
+    const currentTarget: RelationshipTarget | null =
+      patch.expected.value === null
+        ? null
+        : {
+            entity: 'VARIABLE',
+            owner,
+            id: patch.expected.value,
+          };
+    return {
+      id: `${patch.instructionId}:VARIABLE_BINDING`,
+      sourceLabel: source.label,
+      sourceSublabel: source.sublabel,
+      relationLabel: batchRelationshipLabel('VARIABLE_BINDING'),
+      state: 'WILL RELEASE',
+      stateTone: 'red' as const,
+      currentTargetLabel: relationshipTargetLabel(snapshot, currentTarget),
+    };
+  });
+  return [...relationItems, ...variableItems];
 };
 
 const InstructionCard: React.FC<{
@@ -452,6 +646,8 @@ const VariablesPage: React.FC<Props> = ({
     useState<VariablesCommandDropTarget | null>(null);
   const [pendingReconnect, setPendingReconnect] =
     useState<PendingReconnect | null>(null);
+  const [pendingConnections, setPendingConnections] =
+    useState<PendingConnections | null>(null);
   const [pendingBlockTransfer, setPendingBlockTransfer] =
     useState<PendingBlockTransfer | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] =
@@ -853,6 +1049,23 @@ const VariablesPage: React.FC<Props> = ({
 
   useEffect(() => {
     if (
+      snapshot
+      && pendingConnections
+      && !validateVariablesBatchConnectionsAuthority(
+        pendingConnections.authorityKey,
+        snapshot,
+      )
+    ) {
+      setPendingConnections(null);
+      setStatus({
+        level: 'error',
+        text: 'The Variables graph changed. Open the bulk connection action again.',
+      });
+    }
+  }, [pendingConnections, snapshot]);
+
+  useEffect(() => {
+    if (
       pendingBlockTransfer
       && pendingBlockTransfer.authorityKey !== mutationAuthorityKey
     ) {
@@ -877,6 +1090,7 @@ const VariablesPage: React.FC<Props> = ({
     const requestId = submitGraphMutation(draft, {
       committed: response => {
         setPendingReconnect(null);
+        setPendingConnections(null);
         setPendingBlockTransfer(null);
         setDraggingInstructionId(null);
         setActiveDropTarget(null);
@@ -888,6 +1102,7 @@ const VariablesPage: React.FC<Props> = ({
       },
       refused: (response, reason) => {
         setPendingReconnect(null);
+        setPendingConnections(null);
         setPendingBlockTransfer(null);
         setDraggingInstructionId(null);
         setActiveDropTarget(null);
@@ -904,6 +1119,7 @@ const VariablesPage: React.FC<Props> = ({
     }, mutationProfile);
     if (!requestId) {
       setPendingReconnect(null);
+      setPendingConnections(null);
       setPendingBlockTransfer(null);
       setDraggingInstructionId(null);
       setActiveDropTarget(null);
@@ -1194,6 +1410,210 @@ const VariablesPage: React.FC<Props> = ({
     submitVariablesMutation,
   ]);
 
+  const openResolveVisibleConnections = useCallback((
+    scope: VariablesConnectionScope,
+  ) => {
+    const current = snapshotRef.current;
+    if (!current) {
+      setStatus({
+        level: 'error',
+        text: 'Variables must finish loading before connections can be resolved.',
+      });
+      return;
+    }
+    const planned = planVariablesBatchResolve(
+      current,
+      scope.instructionIds,
+    );
+    if (!planned.ok) {
+      setStatus({ level: 'error', text: planned.message });
+      return;
+    }
+    const reviewed = reviewVariablesBatchResolve(planned.plan, []);
+    if (!reviewed.ok) {
+      setStatus({ level: 'error', text: reviewed.message });
+      return;
+    }
+    if (reviewed.review.items.length === 0) {
+      setStatus({
+        level: 'ok',
+        text: `All ${scope.visibleCount} visible command(s) already have valid direct connections.`,
+      });
+      return;
+    }
+    setPendingConnections({
+      mode: 'RESOLVE',
+      authorityKey: planned.plan.authorityKey,
+      scope,
+      plan: planned.plan,
+      review: reviewed.review,
+      choices: [],
+      reviewRevision: 0,
+    });
+    setStatus({
+      level: 'warn',
+      text: `Reviewing direct connections for ${scope.visibleCount} visible command(s).`,
+    });
+  }, []);
+
+  const openReleaseVisibleConnections = useCallback((
+    scope: VariablesConnectionScope,
+  ) => {
+    const current = snapshotRef.current;
+    if (!current) {
+      setStatus({
+        level: 'error',
+        text: 'Variables must finish loading before connections can be released.',
+      });
+      return;
+    }
+    const planned = planVariablesBatchRelease(
+      current,
+      scope.instructionIds,
+    );
+    if (!planned.ok) {
+      setStatus({ level: 'error', text: planned.message });
+      return;
+    }
+    const items = batchReleaseModalItems(current, planned.plan);
+    if (items.length === 0) {
+      setStatus({
+        level: 'ok',
+        text: `The ${scope.visibleCount} visible command(s) have no direct connections to release.`,
+      });
+      return;
+    }
+    setPendingConnections({
+      mode: 'RELEASE',
+      authorityKey: planned.plan.authorityKey,
+      scope,
+      plan: planned.plan,
+      items,
+    });
+    setStatus({
+      level: 'warn',
+      text: `Reviewing ${items.length} direct connection(s) before release.`,
+    });
+  }, []);
+
+  const submitVisibleConnections = useCallback((
+    submission: VariablesConnectionsModalSubmission,
+  ) => {
+    const current = snapshotRef.current;
+    const pending = pendingConnections;
+    if (
+      !current
+      || !pending
+      || !validateVariablesBatchConnectionsAuthority(
+        pending.authorityKey,
+        current,
+      )
+    ) {
+      setPendingConnections(null);
+      setStatus({
+        level: 'error',
+        text: 'The Variables graph changed. Open the bulk connection action again.',
+      });
+      return;
+    }
+
+    if (pending.mode === 'RELEASE') {
+      if (submission.mode !== 'RELEASE') {
+        setStatus({
+          level: 'error',
+          text: 'The connection action changed before confirmation.',
+        });
+        return;
+      }
+      const expectedIds = new Set(pending.items.map(item => item.id));
+      if (
+        submission.itemIds.length !== expectedIds.size
+        || submission.itemIds.some(itemId => !expectedIds.has(itemId))
+      ) {
+        setStatus({
+          level: 'error',
+          text: 'The reviewed release scope is incomplete. Open it again.',
+        });
+        return;
+      }
+      submitVariablesMutation(
+        pending.plan.draft,
+        pending.plan.mutationProfile,
+        pending.plan.changedInstructionIds[0] ?? 0,
+        `Releasing ${pending.items.length} direct connection(s)...`,
+        `${pending.items.length} direct connection(s) released.`,
+      );
+      return;
+    }
+
+    if (submission.mode !== 'RESOLVE') {
+      setStatus({
+        level: 'error',
+        text: 'The connection action changed before confirmation.',
+      });
+      return;
+    }
+    const choicesById = new Map(
+      pending.choices.map(choice => [choice.reviewId, choice]),
+    );
+    for (const resolution of submission.resolutions) {
+      const item = pending.review.items.find(candidate =>
+        candidate.reviewId === resolution.itemId);
+      const target = item?.compatibleTargets.find(candidate =>
+        relationshipTargetValue(candidate) === resolution.optionValue);
+      if (!item || !target) {
+        setStatus({
+          level: 'error',
+          text: 'A selected connection target is no longer compatible.',
+        });
+        return;
+      }
+      choicesById.set(item.reviewId, {
+        reviewId: item.reviewId,
+        mode: 'CONNECT',
+        target,
+      });
+    }
+    const choices = [...choicesById.values()];
+    const built = buildVariablesBatchResolveMutation(
+      pending.plan,
+      choices,
+    );
+    if (!built.ok) {
+      if (built.code === 'REVIEW_REQUIRED') {
+        const reviewed = reviewVariablesBatchResolve(
+          pending.plan,
+          choices,
+        );
+        if (reviewed.ok) {
+          setPendingConnections({
+            ...pending,
+            review: reviewed.review,
+            choices,
+            reviewRevision: pending.reviewRevision + 1,
+          });
+          setStatus({
+            level: 'warn',
+            text: 'Parent choices are ready. Review the remaining compatible connections.',
+          });
+          return;
+        }
+      }
+      setStatus({ level: 'error', text: built.message });
+      return;
+    }
+    submitVariablesMutation(
+      built.mutation.draft,
+      built.mutation.mutationProfile,
+      built.mutation.changedInstructionIds[0] ?? 0,
+      `Resolving ${built.mutation.changedInstructionIds.length} visible command(s)...`,
+      `${built.mutation.changedInstructionIds.length} visible command(s) resolved.`,
+    );
+  }, [
+    pendingConnections,
+    submitVariablesMutation,
+  ]);
+
   const requestDeleteVariable = useCallback((variableId: number) => {
     const current = snapshotRef.current;
     const variable = current?.variables.find(candidate => candidate.id === variableId);
@@ -1292,6 +1712,7 @@ const VariablesPage: React.FC<Props> = ({
     || pendingCreateRequestId !== null
     || pendingDeleteRequestId !== null
     || pendingReconnect !== null
+    || pendingConnections !== null
     || pendingBlockTransfer !== null
     || snapshot?.mutationCapability?.reactAuthoredProfile == null;
   const blockTransferSource = snapshot && pendingBlockTransfer
@@ -1458,6 +1879,8 @@ const VariablesPage: React.FC<Props> = ({
                   ? 'Saving...'
                   : pendingReconnect
                     ? 'Review relationship'
+                    : pendingConnections
+                      ? 'Review bulk connections'
                     : snapshot.mutationCapability?.reactAuthoredProfile == null
                       ? 'Read-only'
                       : undefined}
@@ -1525,6 +1948,8 @@ const VariablesPage: React.FC<Props> = ({
                 }}
                 onReconnectVariable={(instructionId) =>
                   openReconnect(instructionId, 'VARIABLE_BINDING')}
+                onResolveVisibleConnections={openResolveVisibleConnections}
+                onReleaseVisibleConnections={openReleaseVisibleConnections}
               />
 
               <section
@@ -1856,6 +2281,33 @@ const VariablesPage: React.FC<Props> = ({
             </section>
           )}
         </section>
+        {snapshot && pendingConnections && (
+          <VariablesConnectionsModal
+            key={[
+              pendingConnections.authorityKey,
+              pendingConnections.mode,
+              pendingConnections.mode === 'RESOLVE'
+                ? pendingConnections.reviewRevision
+                : 0,
+            ].join(':')}
+            mode={pendingConnections.mode}
+            scopeLabel={pendingConnections.scope.label}
+            scopeCount={pendingConnections.scope.visibleCount}
+            items={pendingConnections.mode === 'RESOLVE'
+              ? batchResolveModalItems(snapshot, pendingConnections.review)
+              : pendingConnections.items}
+            pending={pendingMutationRequestId !== null}
+            onConfirm={submitVisibleConnections}
+            onCancel={() => {
+              if (pendingMutationRequestId !== null) return;
+              setPendingConnections(null);
+              setStatus({
+                level: 'warn',
+                text: 'Bulk connection action cancelled. No relationship was changed.',
+              });
+            }}
+          />
+        )}
         {snapshot && pendingReconnect && (
           <ReconnectWebElement
             edge={pendingReconnect.plan.edge}

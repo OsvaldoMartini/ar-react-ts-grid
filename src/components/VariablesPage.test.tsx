@@ -141,6 +141,79 @@ const snapshot = {
   },
 };
 
+const mutableRelationshipSnapshot = (graphRevision = 'd'.repeat(64)) => ({
+  ...snapshot,
+  graphRevision,
+  variables: snapshot.variables.map(variable => ({
+    ...variable,
+    commands: variable.commands.map(command => ({
+      ...command,
+      variableId: variable.id,
+    })),
+  })),
+  mutationCapability: {
+    enabled: true,
+    contractVersion: 3,
+    profile: 'VARIABLES_INDIVIDUAL_ROW_V1',
+    crossBlockProfile: null,
+    reactAuthoredProfile: 'VARIABLES_REACT_AUTHORED_V1',
+    graphVersion: 9,
+    graphRevision,
+    ownerAssertion: {
+      workspaceKind: 'BOT_JOB',
+      homeBankingId: 2,
+      botJobId: 5,
+    },
+    layoutRows: [{
+      instructionId: 189,
+      blockId: 7,
+      blockOrderNumber: 1,
+      instructionOrderNumber: 2,
+    }, {
+      instructionId: 190,
+      blockId: 7,
+      blockOrderNumber: 1,
+      instructionOrderNumber: 3,
+    }, {
+      instructionId: 191,
+      blockId: 7,
+      blockOrderNumber: 1,
+      instructionOrderNumber: 4,
+    }],
+    instructionFacts: [{
+      instructionId: 189,
+      blockId: 7,
+      blockOrderNumber: 1,
+      instructionOrderNumber: 2,
+      action: 'Web Field',
+      relationKind: 'ELEMENT_TARGET',
+      parentId: null,
+      parentBlockId: null,
+      variableId: null,
+    }, {
+      instructionId: 190,
+      blockId: 7,
+      blockOrderNumber: 1,
+      instructionOrderNumber: 3,
+      action: 'GET',
+      relationKind: 'ELEMENT_TARGET',
+      parentId: 189,
+      parentBlockId: 7,
+      variableId: 12,
+    }, {
+      instructionId: 191,
+      blockId: 7,
+      blockOrderNumber: 1,
+      instructionOrderNumber: 4,
+      action: 'CK',
+      relationKind: 'ELEMENT_TARGET',
+      parentId: 189,
+      parentBlockId: 7,
+      variableId: 12,
+    }],
+  },
+});
+
 beforeEach(() => {
   mockSend.mockClear();
   mockMessages = [];
@@ -467,5 +540,136 @@ test('opens the two-step Block transfer flow and sends the exact React copy sele
     scope: 'ONLY_INSTRUCTION',
     sourceInstructionIds: [191],
   });
+  view.unmount();
+});
+
+test('releases only visible direct connections in one atomic v3 request', async () => {
+  const mutableSnapshot = mutableRelationshipSnapshot();
+  const view = render(
+    <VariablesPage socketPort={59772} sessionId="variablesManager" />,
+  );
+  await waitFor(() => expect(mockSend).toHaveBeenCalledTimes(1));
+  const bootstrapRequest = JSON.parse(JSON.parse(mockSend.mock.calls[0][0]).body);
+  mockMessages = [response('variablesWorkspace.bootstrapResponse', {
+    ...mutableSnapshot,
+    requestId: bootstrapRequest.requestId,
+  })];
+  view.rerender(
+    <VariablesPage socketPort={59772} sessionId="variablesManager" />,
+  );
+
+  await waitFor(() => expect(screen.getByRole('button', {
+    name: 'RELEASE ALL CONNECTIONS',
+  })).toBeEnabled());
+  fireEvent.click(screen.getByRole('button', {
+    name: 'RELEASE ALL CONNECTIONS',
+  }));
+
+  expect(screen.getByRole('heading', { name: 'Release Connections' }))
+    .toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', {
+    name: 'Release 4 Connections',
+  }));
+
+  const sent = JSON.parse(mockSend.mock.calls.at(-1)?.[0] as string);
+  const body = JSON.parse(sent.body);
+  expect(sent.type).toBe('variablesWorkspace.graphMutationV3');
+  expect(body).toMatchObject({
+    mutationKind: 'RELATIONSHIP_UPDATE',
+    baseGraphVersion: 9,
+    graphRevision: mutableSnapshot.graphRevision,
+    draggedInstructionId: null,
+    variableOwnerPatches: [],
+  });
+  expect(body.instructionRelationPatches).toEqual([
+    expect.objectContaining({
+      instructionId: 190,
+      operation: 'CLEAR',
+      expected: { parentId: 189, parentBlockId: 7 },
+      replacement: { parentId: null, parentBlockId: null },
+    }),
+    expect.objectContaining({
+      instructionId: 191,
+      operation: 'CLEAR',
+      expected: { parentId: 189, parentBlockId: 7 },
+      replacement: { parentId: null, parentBlockId: null },
+    }),
+  ]);
+  expect(body.variableBindingPatches).toEqual([
+    expect.objectContaining({
+      instructionId: 190,
+      operation: 'CLEAR',
+      expected: { value: 12 },
+      replacement: { value: null },
+    }),
+    expect.objectContaining({
+      instructionId: 191,
+      operation: 'CLEAR',
+      expected: { value: 12 },
+      replacement: { value: null },
+    }),
+  ]);
+  view.unmount();
+});
+
+test('resolves a unique visible Web Element connection through the new modal', async () => {
+  const base = mutableRelationshipSnapshot('e'.repeat(64));
+  const reconnectSnapshot = {
+    ...base,
+    variables: base.variables.map(variable => ({
+      ...variable,
+      commands: variable.commands.map(command =>
+        command.instructionId === 190
+          ? { ...command, parentId: null, parentBlockId: null }
+          : command),
+    })),
+    mutationCapability: {
+      ...base.mutationCapability,
+      instructionFacts: base.mutationCapability.instructionFacts.map(fact =>
+        fact.instructionId === 190
+          ? { ...fact, parentId: null, parentBlockId: null }
+          : fact),
+    },
+  };
+  const view = render(
+    <VariablesPage socketPort={59772} sessionId="variablesManager" />,
+  );
+  await waitFor(() => expect(mockSend).toHaveBeenCalledTimes(1));
+  const bootstrapRequest = JSON.parse(JSON.parse(mockSend.mock.calls[0][0]).body);
+  mockMessages = [response('variablesWorkspace.bootstrapResponse', {
+    ...reconnectSnapshot,
+    requestId: bootstrapRequest.requestId,
+  })];
+  view.rerender(
+    <VariablesPage socketPort={59772} sessionId="variablesManager" />,
+  );
+
+  await waitFor(() => expect(screen.getByRole('button', {
+    name: 'RESOLVE ALL CONNECTIONS',
+  })).toBeEnabled());
+  fireEvent.click(screen.getByRole('button', {
+    name: 'RESOLVE ALL CONNECTIONS',
+  }));
+
+  expect(screen.getByRole('heading', { name: 'Resolve Connections' }))
+    .toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', {
+    name: 'Resolve 1 Connection',
+  }));
+
+  const sent = JSON.parse(mockSend.mock.calls.at(-1)?.[0] as string);
+  const body = JSON.parse(sent.body);
+  expect(sent.type).toBe('variablesWorkspace.graphMutationV3');
+  expect(body.instructionRelationPatches).toEqual([
+    expect.objectContaining({
+      instructionId: 190,
+      relationKind: 'ELEMENT_TARGET',
+      operation: 'SET',
+      expected: { parentId: null, parentBlockId: null },
+      replacement: { parentId: 189, parentBlockId: 7 },
+    }),
+  ]);
+  expect(body.variableBindingPatches).toEqual([]);
+  expect(body.variableOwnerPatches).toEqual([]);
   view.unmount();
 });

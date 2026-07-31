@@ -50,6 +50,18 @@
   margin-top: 8px;
 }
 
+.connectionActions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.connectionActions > * {
+  min-height: 30px;
+}
+
 .commandSearch {
   min-width: 0;
   display: flex;

@@ -29,6 +29,16 @@ export type VariablesCommandDropTarget = {
   index: number;
 };
 
+export type VariablesConnectionScope = {
+  instructionIds: readonly number[];
+  visibleCount: number;
+  totalCount: number;
+  commandSearch: string;
+  blockId: number | null;
+  blockLabel: string;
+  label: string;
+};
+
 export interface VariablesCommandBoardProps {
   blocks: readonly VariableWorkspaceBlock[];
   instructions: readonly VariableInstructionNode[];
@@ -68,6 +78,8 @@ export interface VariablesCommandBoardProps {
     instructionId: number,
     edge?: InstructionRelationshipEdge,
   ) => void;
+  onResolveVisibleConnections?: (scope: VariablesConnectionScope) => void;
+  onReleaseVisibleConnections?: (scope: VariablesConnectionScope) => void;
   className?: string;
 }
 
@@ -137,6 +149,8 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
   onDropTarget,
   onReconnectParent,
   onReconnectVariable,
+  onResolveVisibleConnections,
+  onReleaseVisibleConnections,
   className,
 }) => {
   const [commandSearch, setCommandSearch] = useState('');
@@ -203,6 +217,54 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
       return tokens.every(token => haystack.includes(token));
     });
   }, [blockFilter, commandSearch, instructions]);
+
+  const visibleConnectionScope = useMemo<VariablesConnectionScope>(() => {
+    const selectedBlock = blockFilter === null
+      ? null
+      : blocks.find(block => block.id === blockFilter) ?? null;
+    const blockLabel = selectedBlock
+      ? `Block #${selectedBlock.order ?? selectedBlock.id} ${selectedBlock.name}`
+      : 'All Blocks';
+    const normalizedSearch = commandSearch.trim();
+    const instructionIds = Array.from(new Set(
+      visibleInstructions.flatMap(instruction =>
+        instruction.id !== null
+        && Number.isSafeInteger(instruction.id)
+        && instruction.id > 0
+          ? [instruction.id]
+          : []),
+    ));
+    return {
+      instructionIds,
+      visibleCount: instructionIds.length,
+      totalCount: instructions.length,
+      commandSearch: normalizedSearch,
+      blockId: blockFilter,
+      blockLabel,
+      label: [
+        blockLabel,
+        normalizedSearch ? `Search "${normalizedSearch}"` : null,
+        `${instructionIds.length} visible command${instructionIds.length === 1 ? '' : 's'}`,
+      ].filter(Boolean).join(' · '),
+    };
+  }, [
+    blockFilter,
+    blocks,
+    commandSearch,
+    instructions.length,
+    visibleInstructions,
+  ]);
+
+  const resolveConnectionsEvent = useMemo<RulesCardEvent>(() => ({
+    color: 'green',
+    rules: 'RESOLVE ALL CONNECTIONS',
+    ts: 0,
+  }), []);
+  const releaseConnectionsEvent = useMemo<RulesCardEvent>(() => ({
+    color: 'red',
+    rules: 'RELEASE ALL CONNECTIONS',
+    ts: 0,
+  }), []);
 
   const groups = useMemo<CommandGroup[]>(() => {
     const byBlock = new Map<number, CommandGroup>();
@@ -336,6 +398,37 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                 setBlockFilter(value === null ? null : Number(value))}
             />
           </div>
+          {(onResolveVisibleConnections || onReleaseVisibleConnections) && (
+            <div
+              className={styles.connectionActions}
+              aria-label="Visible command connection actions"
+            >
+              {onResolveVisibleConnections && (
+                <RulesCard
+                  event={resolveConnectionsEvent}
+                  animate={false}
+                  pulse={false}
+                  glow={false}
+                  onClick={() =>
+                    onResolveVisibleConnections(visibleConnectionScope)}
+                  disabled={disabled || visibleConnectionScope.visibleCount === 0}
+                  title={`Resolve connections for ${visibleConnectionScope.label}`}
+                />
+              )}
+              {onReleaseVisibleConnections && (
+                <RulesCard
+                  event={releaseConnectionsEvent}
+                  animate={false}
+                  pulse={false}
+                  glow={false}
+                  onClick={() =>
+                    onReleaseVisibleConnections(visibleConnectionScope)}
+                  disabled={disabled || visibleConnectionScope.visibleCount === 0}
+                  title={`Release connections for ${visibleConnectionScope.label}`}
+                />
+              )}
+            </div>
+          )}
         </div>
         <div className={styles.boardStatus}>
           <span className={styles.count}>

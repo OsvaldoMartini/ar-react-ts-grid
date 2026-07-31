@@ -347,3 +347,58 @@ test('combines the Block selector with command text filtering', () => {
   expect(screen.getByText('Username field')).toBeInTheDocument();
   expect(screen.getByText('Validate payment')).toBeInTheDocument();
 });
+
+test('places bulk connection actions after both filters and submits the visible scope', () => {
+  const onResolveVisibleConnections = jest.fn();
+  const onReleaseVisibleConnections = jest.fn();
+  render(
+    <VariablesCommandBoard
+      blocks={filterBlocks}
+      instructions={filterInstructions}
+      onResolveVisibleConnections={onResolveVisibleConnections}
+      onReleaseVisibleConnections={onReleaseVisibleConnections}
+    />,
+  );
+
+  const commandSearch = screen.getByRole('searchbox', {
+    name: 'Search commands',
+  });
+  const blockSearch = screen.getByRole('combobox', { name: 'Block' });
+  const resolve = screen.getByRole('button', {
+    name: /RESOLVE ALL CONNECTIONS/i,
+  });
+  const release = screen.getByRole('button', {
+    name: /RELEASE ALL CONNECTIONS/i,
+  });
+
+  expect(
+    blockSearch.compareDocumentPosition(resolve)
+      & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  fireEvent.click(blockSearch);
+  fireEvent.click(screen.getByRole('option', { name: /#2 Payment/i }));
+  fireEvent.change(commandSearch, {
+    target: { value: 'beneficiary CK' },
+  });
+
+  fireEvent.click(resolve);
+  fireEvent.click(release);
+
+  expect(onResolveVisibleConnections).toHaveBeenCalledWith(
+    expect.objectContaining({
+      instructionIds: [1700],
+      visibleCount: 1,
+      totalCount: 3,
+      commandSearch: 'beneficiary CK',
+      blockId: 8,
+      blockLabel: 'Block #2 Payment',
+    }),
+  );
+  expect(onReleaseVisibleConnections).toHaveBeenCalledWith(
+    expect.objectContaining({
+      instructionIds: [1700],
+      visibleCount: 1,
+      blockId: 8,
+    }),
+  );
+});
