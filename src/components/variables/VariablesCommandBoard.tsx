@@ -22,6 +22,7 @@ import type {
   VariableInstructionNode,
   VariableWorkspaceBlock,
 } from '../variablesWorkspace.contract';
+import VariablesConnectionsPrimaryAction from './VariablesConnectionsPrimaryAction';
 import styles from './VariablesCommandBoard.module.scss';
 
 export type VariablesCommandDropTarget = {
@@ -79,6 +80,7 @@ export interface VariablesCommandBoardProps {
     edge?: InstructionRelationshipEdge,
   ) => void;
   onResolveVisibleConnections?: (scope: VariablesConnectionScope) => void;
+  onReviewVisibleConnections?: (scope: VariablesConnectionScope) => void;
   onReleaseVisibleConnections?: (scope: VariablesConnectionScope) => void;
   className?: string;
 }
@@ -150,6 +152,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
   onReconnectParent,
   onReconnectVariable,
   onResolveVisibleConnections,
+  onReviewVisibleConnections,
   onReleaseVisibleConnections,
   className,
 }) => {
@@ -398,7 +401,11 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                 setBlockFilter(value === null ? null : Number(value))}
             />
           </div>
-          {(onResolveVisibleConnections || onReleaseVisibleConnections) && (
+          {(
+            onResolveVisibleConnections
+            || onReviewVisibleConnections
+            || onReleaseVisibleConnections
+          ) && (
             <div
               className={styles.connectionActions}
               aria-label="Visible command connection actions"
@@ -413,6 +420,13 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                     onResolveVisibleConnections(visibleConnectionScope)}
                   disabled={disabled || visibleConnectionScope.visibleCount === 0}
                   title={`Resolve connections for ${visibleConnectionScope.label}`}
+                />
+              )}
+              {onReviewVisibleConnections && (
+                <VariablesConnectionsPrimaryAction
+                  scopeLabel={visibleConnectionScope.label}
+                  onReview={() =>
+                    onReviewVisibleConnections(visibleConnectionScope)}
                 />
               )}
               {onReleaseVisibleConnections && (

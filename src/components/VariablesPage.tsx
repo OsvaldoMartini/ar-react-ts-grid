@@ -51,6 +51,7 @@ import VariablesConnectionsModal, {
   type VariablesConnectionReviewItem,
   type VariablesConnectionsModalSubmission,
 } from './variables/VariablesConnectionsModal';
+import VariablesExecutionFlowReviewModal from './variables/VariablesExecutionFlowReviewModal';
 import {
   buildVariablesBatchResolveMutation,
   planVariablesBatchRelease,
@@ -83,6 +84,7 @@ import {
   type VariablesDeleteResult,
 } from './variables/useVariablesDelete';
 import { useVariablesRuntimeMemory } from './variables/useVariablesRuntimeMemory';
+import { useVariablesExecutionFlowReview } from './variables/useVariablesExecutionFlowReview';
 import {
   normalizeVariablesWorkspaceSnapshot,
   parseVariablesWorkspaceMessage,
@@ -669,6 +671,11 @@ const VariablesPage: React.FC<Props> = ({
     connected,
     snapshot,
   });
+  const {
+    reviewState: executionFlowReview,
+    openReview: openExecutionFlowReview,
+    closeReview: closeExecutionFlowReview,
+  } = useVariablesExecutionFlowReview(snapshot);
 
   const replaceSnapshot = useCallback((next: VariableWorkspaceSnapshot) => {
     snapshotRef.current = next;
@@ -1410,6 +1417,33 @@ const VariablesPage: React.FC<Props> = ({
     submitVariablesMutation,
   ]);
 
+  const openReviewVisibleConnections = useCallback((
+    scope: VariablesConnectionScope,
+  ) => {
+    const opened = openExecutionFlowReview(scope.label);
+    if (!opened) {
+      setStatus({
+        level: 'error',
+        text: 'Variables must finish loading before connections can be reviewed.',
+      });
+      return;
+    }
+    setStatus({
+      level: opened.review.relationshipsAvailable ? 'ok' : 'warn',
+      text: opened.review.relationshipsAvailable
+        ? `Reviewing the complete ${opened.review.steps.length}-command Bot Job execution flow. No database change will be made.`
+        : `Reviewing ${opened.review.steps.length} command(s) in read-only mode. Relationship authority is currently unavailable.`,
+    });
+  }, [openExecutionFlowReview]);
+
+  const closeExecutionFlowReviewModal = useCallback(() => {
+    closeExecutionFlowReview();
+    setStatus({
+      level: 'ok',
+      text: 'Connection review closed. No relationship was changed.',
+    });
+  }, [closeExecutionFlowReview]);
+
   const openResolveVisibleConnections = useCallback((
     scope: VariablesConnectionScope,
   ) => {
@@ -1949,6 +1983,7 @@ const VariablesPage: React.FC<Props> = ({
                 onReconnectVariable={(instructionId) =>
                   openReconnect(instructionId, 'VARIABLE_BINDING')}
                 onResolveVisibleConnections={openResolveVisibleConnections}
+                onReviewVisibleConnections={openReviewVisibleConnections}
                 onReleaseVisibleConnections={openReleaseVisibleConnections}
               />
 
@@ -2306,6 +2341,14 @@ const VariablesPage: React.FC<Props> = ({
                 text: 'Bulk connection action cancelled. No relationship was changed.',
               });
             }}
+          />
+        )}
+        {executionFlowReview && (
+          <VariablesExecutionFlowReviewModal
+            key={executionFlowReview.authorityKey}
+            review={executionFlowReview.review}
+            scopeLabel={executionFlowReview.scopeLabel}
+            onClose={closeExecutionFlowReviewModal}
           />
         )}
         {snapshot && pendingReconnect && (
