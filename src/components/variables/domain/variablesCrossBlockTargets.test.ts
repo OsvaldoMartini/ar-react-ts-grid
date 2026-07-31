@@ -83,7 +83,6 @@ const snapshot = (
       instructionOrderNumber,
     })),
     instructionFacts: facts,
-    variableFacts: [],
   },
 });
 

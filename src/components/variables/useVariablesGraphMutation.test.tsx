@@ -70,7 +70,6 @@ const snapshot = (
       parentBlockId: null,
       variableId: null,
     }],
-    variableFacts: [],
   },
   ...overrides,
 });

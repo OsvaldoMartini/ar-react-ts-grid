@@ -885,38 +885,6 @@
   color: #9b3030;
 }
 
-.emptyRelationAction {
-  width: 100%;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition:
-    border-color 120ms ease,
-    box-shadow 120ms ease,
-    transform 120ms ease;
-}
-
-.emptyRelationAction:hover:not(:disabled),
-.emptyRelationAction:focus-visible {
-  border-color: #d45353;
-  box-shadow: 0 0 0 2px rgba(212, 83, 83, 0.13);
-  outline: none;
-  transform: translateY(-1px);
-}
-
-.emptyRelationAction:disabled {
-  cursor: default;
-  opacity: 0.62;
-}
-
-.emptyRelationAction b {
-  color: #b3261e;
-  font-size: 0.56rem;
-  font-weight: 900;
-  letter-spacing: 0.025em;
-  text-transform: uppercase;
-}
-
 .variableNode {
   margin-top: 32px;
   padding: 13px 10px;
