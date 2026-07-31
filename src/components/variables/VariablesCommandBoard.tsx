@@ -485,9 +485,11 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                   edge.kind === 'ELEMENT_TARGET'
                   && edge.source.entity === 'INSTRUCTION'
                   && edge.source.id === instructionId);
+                // Structural anchors (loop, conditional, GOTO block) are chips in
+                // EVERY state: red when broken, styled when connected — and both
+                // open the same reconnect dialog to connect/modify/disconnect.
                 const otherParentEdge = edges.find(edge =>
-                  edge.state !== 'CONNECTED'
-                  && edge.state !== 'MEMORY_ONLY'
+                  edge.state !== 'MEMORY_ONLY'
                   && (
                     edge.kind === 'LOOP_ANCHOR'
                     || edge.kind === 'CONDITIONAL_ROOT'
@@ -537,20 +539,53 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                   : requiresVariableBinding
                     ? configuredVariableId
                     : null;
-                const reconnectOtherParent = Boolean(
-                  otherParentEdge
-                  || (
-                    instruction.parentId === null
-                    && (
-                      policy.requirements.includes('LOOP_ANCHOR')
-                      || policy.requirements.includes('CONDITIONAL_ROOT')
-                    )
-                  )
-                  || (
-                    instruction.parentBlockId === null
-                    && policy.requirements.includes('BLOCK_TARGET')
-                  ),
-                );
+                const structuralKind = otherParentEdge?.kind
+                  ?? (policy.requirements.includes('LOOP_ANCHOR')
+                    ? 'LOOP_ANCHOR' as const
+                    : policy.requirements.includes('CONDITIONAL_ROOT')
+                      ? 'CONDITIONAL_ROOT' as const
+                      : policy.requirements.includes('BLOCK_TARGET')
+                        ? 'BLOCK_TARGET' as const
+                        : null);
+                const structuralLabels = structuralKind === 'LOOP_ANCHOR'
+                  ? { broken: 'Reconnect Loop', connected: 'Loop connected', change: 'Change loop anchor' }
+                  : structuralKind === 'CONDITIONAL_ROOT'
+                    ? { broken: 'Repair Conditional', connected: 'Conditional connected', change: 'Change conditional root' }
+                    : { broken: 'Reconnect Block', connected: 'Block connected', change: 'Change destination block' };
+                const configuredStructuralId = structuralKind === 'BLOCK_TARGET'
+                  ? (typeof instruction.parentBlockId === 'number'
+                    && Number.isSafeInteger(instruction.parentBlockId)
+                    && instruction.parentBlockId > 0
+                      ? instruction.parentBlockId
+                      : null)
+                  : (typeof instruction.parentId === 'number'
+                    && Number.isSafeInteger(instruction.parentId)
+                    && instruction.parentId > 0
+                      ? instruction.parentId
+                      : null);
+                const structuralTargetEntity =
+                  structuralKind === 'BLOCK_TARGET' ? 'BLOCK' : 'INSTRUCTION';
+                const connectedStructuralId = otherParentEdge
+                  ? otherParentEdge.state === 'CONNECTED'
+                    && otherParentEdge.target?.entity === structuralTargetEntity
+                    && Number.isSafeInteger(otherParentEdge.target.id)
+                    && otherParentEdge.target.id > 0
+                      ? otherParentEdge.target.id
+                      : null
+                  : structuralKind !== null
+                    ? configuredStructuralId
+                    : null;
+                const reconnectOtherParent =
+                  structuralKind !== null && connectedStructuralId === null;
+                const reconnectOtherParentEvent: RulesCardEvent | null =
+                  reconnectOtherParent
+                    ? {
+                        color: 'red',
+                        rules: structuralLabels.broken,
+                        context: '',
+                        ts: instructionId ?? index,
+                      }
+                    : null;
                 const reconnectParentEvent: RulesCardEvent | null =
                   reconnectParent
                     ? {
@@ -692,27 +727,68 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                                 </span>
                               )
                         )}
-                        {reconnectOtherParent && instructionId !== null && (
-                          <button
-                            type="button"
-                            className={styles.reconnectButton}
-                            disabled={disabled || !onReconnectParent}
-                            title={relationshipTitle(
-                              'Reconnect parent',
-                              otherParentEdge,
-                            )}
+                        {reconnectOtherParentEvent && instructionId !== null && (
+                          <span
+                            className={styles.reconnectRuleCard}
                             onMouseDown={event => event.stopPropagation()}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              onReconnectParent?.(
-                                instructionId,
-                                otherParentEdge,
-                              );
-                            }}
                           >
-                            <Link2 size={11} aria-hidden="true" />
-                            Reconnect parent
-                          </button>
+                            <RulesCard
+                              event={reconnectOtherParentEvent}
+                              ariaLabel={relationshipTitle(
+                                structuralLabels.broken,
+                                otherParentEdge,
+                              )}
+                              glow
+                              border
+                              animate={false}
+                              pulse
+                              iconNode={<Link2 size={11} aria-hidden="true" />}
+                              title={relationshipTitle(
+                                structuralLabels.broken,
+                                otherParentEdge,
+                              )}
+                              disabled={disabled || !onReconnectParent}
+                              onClick={onReconnectParent
+                                ? () => onReconnectParent(
+                                    instructionId,
+                                    otherParentEdge,
+                                  )
+                                : undefined}
+                            />
+                          </span>
+                        )}
+                        {connectedStructuralId !== null && instructionId !== null && (
+                          otherParentEdge && onReconnectParent
+                            ? (
+                                <button
+                                  type="button"
+                                  className={styles.connectedParent}
+                                  aria-label={`${structuralLabels.connected} (id: ${connectedStructuralId})`}
+                                  title={structuralLabels.change}
+                                  disabled={disabled}
+                                  onMouseDown={event => event.stopPropagation()}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    onReconnectParent(
+                                      instructionId,
+                                      otherParentEdge,
+                                    );
+                                  }}
+                                >
+                                  <Link2 size={11} aria-hidden="true" />
+                                  {structuralLabels.connected} (id: {connectedStructuralId})
+                                </button>
+                              )
+                            : (
+                                <span
+                                  className={`${styles.connectedParent} ${styles.connectedStatic}`}
+                                  aria-label={`${structuralLabels.connected} (id: ${connectedStructuralId})`}
+                                  title={`${structuralLabels.connected} (id: ${connectedStructuralId})`}
+                                >
+                                  <Link2 size={11} aria-hidden="true" />
+                                  {structuralLabels.connected} (id: {connectedStructuralId})
+                                </span>
+                              )
                         )}
                         {reconnectVariableEvent && instructionId !== null && (
                           <span

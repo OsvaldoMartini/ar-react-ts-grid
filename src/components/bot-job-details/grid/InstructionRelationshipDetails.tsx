@@ -259,10 +259,17 @@ const InstructionRelationshipDetails: React.FC<
   onReconnect,
   reconnectDisabled = false,
 }) => {
-  const elementParentEdge = relationshipEdges.find(edge =>
+  // Every structural attachment a command can carry via parent_id/parent_block_id
+  // (Web Field parent, loop anchor, conditional root, GOTO destination block) uses
+  // ONE chip contract: broken = red clickable chip, connected = styled clickable
+  // chip that opens the same reconnect dialog to modify or disconnect.
+  const structuralParentEdge = relationshipEdges.find(edge =>
     edge.source.entity === 'INSTRUCTION'
     && edge.source.id === instruction.id
-    && edge.kind === 'ELEMENT_TARGET');
+    && (edge.kind === 'ELEMENT_TARGET'
+      || edge.kind === 'LOOP_ANCHOR'
+      || edge.kind === 'CONDITIONAL_ROOT'
+      || edge.kind === 'BLOCK_TARGET'));
   const variableBindingEdge = relationshipEdges.find(edge =>
     edge.source.entity === 'INSTRUCTION'
     && edge.source.id === instruction.id
@@ -270,24 +277,47 @@ const InstructionRelationshipDetails: React.FC<
   const relationshipPolicy = instructionRelationshipPolicy(
     instruction.actions,
   );
-  const requiresElementParent =
-    relationshipPolicy.requirements.includes('ELEMENT_TARGET');
+  const structuralKind = structuralParentEdge?.kind
+    ?? (relationshipPolicy.requirements.includes('ELEMENT_TARGET')
+      ? 'ELEMENT_TARGET' as const
+      : relationshipPolicy.requirements.includes('LOOP_ANCHOR')
+        ? 'LOOP_ANCHOR' as const
+        : relationshipPolicy.requirements.includes('CONDITIONAL_ROOT')
+          ? 'CONDITIONAL_ROOT' as const
+          : relationshipPolicy.requirements.includes('BLOCK_TARGET')
+            ? 'BLOCK_TARGET' as const
+            : null);
+  const structuralLabels = structuralKind === 'LOOP_ANCHOR'
+    ? { broken: 'Reconnect Loop', connected: 'Loop connected', change: 'Change loop anchor' }
+    : structuralKind === 'CONDITIONAL_ROOT'
+      ? { broken: 'Repair Conditional', connected: 'Conditional connected', change: 'Change conditional root' }
+      : structuralKind === 'BLOCK_TARGET'
+        ? { broken: 'Reconnect Block', connected: 'Block connected', change: 'Change destination block' }
+        : { broken: 'Reconnect Parent', connected: 'Parent connected', change: 'Change connected Web Element' };
+  const requiresElementParent = structuralKind !== null;
   const requiresVariableBinding =
     relationshipPolicy.requirements.includes('VARIABLE_BINDING');
-  const configuredParentId =
-    typeof instruction.parentId === 'number'
-    && Number.isSafeInteger(instruction.parentId)
-    && instruction.parentId > 0
-      ? instruction.parentId
-      : null;
+  const configuredParentId = structuralKind === 'BLOCK_TARGET'
+    ? (typeof instruction.parentBlockId === 'number'
+      && Number.isSafeInteger(instruction.parentBlockId)
+      && instruction.parentBlockId > 0
+        ? instruction.parentBlockId
+        : null)
+    : (typeof instruction.parentId === 'number'
+      && Number.isSafeInteger(instruction.parentId)
+      && instruction.parentId > 0
+        ? instruction.parentId
+        : null);
+  const structuralTargetEntity =
+    structuralKind === 'BLOCK_TARGET' ? 'BLOCK' : 'INSTRUCTION';
   // A supplied graph edge is authoritative. Only fall back to the DTO when
   // relationship capabilities are unavailable and no edge exists.
-  const connectedParentId = elementParentEdge
-    ? elementParentEdge.state === 'CONNECTED'
-      && elementParentEdge.target?.entity === 'INSTRUCTION'
-      && Number.isSafeInteger(elementParentEdge.target.id)
-      && elementParentEdge.target.id > 0
-        ? elementParentEdge.target.id
+  const connectedParentId = structuralParentEdge
+    ? structuralParentEdge.state === 'CONNECTED'
+      && structuralParentEdge.target?.entity === structuralTargetEntity
+      && Number.isSafeInteger(structuralParentEdge.target.id)
+      && structuralParentEdge.target.id > 0
+        ? structuralParentEdge.target.id
         : null
     : requiresElementParent
       ? configuredParentId
@@ -313,17 +343,17 @@ const InstructionRelationshipDetails: React.FC<
     && connectedParentId === null
       ? {
           color: 'red',
-          rules: 'Reconnect Parent',
+          rules: structuralLabels.broken,
           context: '',
           ts: instruction.id,
         }
       : null;
-  const parentDetail = elementParentEdge?.code
-    ? humanizeCode(elementParentEdge.code)
+  const parentDetail = structuralParentEdge?.code
+    ? humanizeCode(structuralParentEdge.code)
     : '';
   const reconnectParentLabel = parentDetail
-    ? `Reconnect parent: ${parentDetail}`
-    : 'Reconnect parent';
+    ? `${structuralLabels.broken}: ${parentDetail}`
+    : structuralLabels.broken;
   const variableDetail = variableBindingEdge?.code
     ? humanizeCode(variableBindingEdge.code)
     : '';
@@ -344,7 +374,7 @@ const InstructionRelationshipDetails: React.FC<
   const chips = [
     ...relationshipEdges
       .filter(edge =>
-        edge !== elementParentEdge
+        edge !== structuralParentEdge
         && edge !== variableBindingEdge
         && edge.state !== 'CONNECTED')
       .map(edge => ({
@@ -396,14 +426,14 @@ const InstructionRelationshipDetails: React.FC<
                 iconNode={<Link2 size={10} aria-hidden="true" />}
                 title={reconnectParentLabel}
                 disabled={reconnectDisabled}
-                onClick={onReconnect && elementParentEdge
-                  ? () => onReconnect(elementParentEdge)
+                onClick={onReconnect && structuralParentEdge
+                  ? () => onReconnect(structuralParentEdge)
                   : undefined}
               />
             </span>
           )}
           {connectedParentId != null && (
-            elementParentEdge && onReconnect
+            structuralParentEdge && onReconnect
               ? (
                   <button
                     type="button"
@@ -413,18 +443,18 @@ const InstructionRelationshipDetails: React.FC<
                       styles.reconnectParent,
                       styles.connectedParent,
                     ].join(' ')}
-                    aria-label={`Parent connected (id: ${connectedParentId})`}
-                    title="Change connected Web Element"
+                    aria-label={`${structuralLabels.connected} (id: ${connectedParentId})`}
+                    title={structuralLabels.change}
                     data-relationship-state="CONNECTED"
                     disabled={reconnectDisabled}
                     onMouseDown={event => event.stopPropagation()}
                     onClick={(event) => {
                       event.stopPropagation();
-                      onReconnect(elementParentEdge);
+                      onReconnect(structuralParentEdge);
                     }}
                   >
                     <Link2 size={10} aria-hidden="true" />
-                    Parent connected (id: {connectedParentId})
+                    {structuralLabels.connected} (id: {connectedParentId})
                   </button>
                 )
               : (
@@ -435,12 +465,12 @@ const InstructionRelationshipDetails: React.FC<
                       styles.connectedParent,
                       styles.connectedStatic,
                     ].join(' ')}
-                    aria-label={`Parent connected (id: ${connectedParentId})`}
-                    title={`Parent connected (id: ${connectedParentId})`}
+                    aria-label={`${structuralLabels.connected} (id: ${connectedParentId})`}
+                    title={`${structuralLabels.connected} (id: ${connectedParentId})`}
                     data-relationship-state="CONNECTED"
                   >
                     <Link2 size={10} aria-hidden="true" />
-                    Parent connected (id: {connectedParentId})
+                    {structuralLabels.connected} (id: {connectedParentId})
                   </span>
                 )
           )}
@@ -511,10 +541,20 @@ const InstructionRelationshipDetails: React.FC<
             const accessibleLabel = detail
               ? `${descriptor.label}: ${detail}`
               : descriptor.label;
+            // Broken = red AND clickable for every reconnectable relationship,
+            // not only variables: the chip is the entry point to the reconnect
+            // dialog in both directions (connect / modify / disconnect).
+            const reconnectableStates: readonly string[] = [
+              'RECONNECT_PARENT',
+              'RECONNECT_VARIABLE',
+              'RECONNECT_LOOP',
+              'REPAIR_CONDITIONAL',
+              'RECONNECT_BLOCK',
+            ];
             const reconnectKind = edge?.source.entity === 'INSTRUCTION'
               && edge.source.id === instruction.id
-              && state === 'RECONNECT_VARIABLE'
-                ? 'VARIABLE'
+              && reconnectableStates.includes(state)
+                ? state === 'RECONNECT_VARIABLE' ? 'VARIABLE' : 'STRUCTURAL'
                 : null;
             if (edge && reconnectKind && onReconnect) {
               return (
@@ -524,7 +564,7 @@ const InstructionRelationshipDetails: React.FC<
                   className={[
                     styles.chip,
                     styles.reconnectButton,
-                    styles.reconnectVariable,
+                    styles.repair,
                   ].join(' ')}
                   aria-label={accessibleLabel}
                   title={accessibleLabel}
@@ -536,7 +576,9 @@ const InstructionRelationshipDetails: React.FC<
                     onReconnect(edge);
                   }}
                 >
-                  <Variable size={10} aria-hidden="true" />
+                  {reconnectKind === 'VARIABLE'
+                    ? <Variable size={10} aria-hidden="true" />
+                    : <Link2 size={10} aria-hidden="true" />}
                   {descriptor.label}
                 </button>
               );

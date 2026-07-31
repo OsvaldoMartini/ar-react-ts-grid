@@ -90,9 +90,16 @@
   color: #52606d;
 }
 
+/* Broken relationship = RED everywhere (parent, variable, loop, conditional, block). */
 .repair {
-  background: #f8ecff;
-  color: #8b1e62;
+  background: #fdeaea;
+  border-color: #d24a4a;
+  color: #b31c1c;
+}
+
+.reconnectButton.repair:hover:not(:disabled) {
+  background: #fbd9d9;
+  border-color: #a61b1b;
 }
 
 .warning {
