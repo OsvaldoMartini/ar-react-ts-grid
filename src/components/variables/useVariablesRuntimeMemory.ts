@@ -38,6 +38,11 @@ const MEMORY_UPDATE_RESPONSE =
   'variablesWorkspace.runtimeMemory.updateResponse';
 const MEMORY_UPDATE_OPERATION =
   'variablesWorkspace.runtimeMemory.update';
+export const MEMORY_CLEAR_ALL_OPERATION =
+  'variablesWorkspace.runtimeMemory.clearAll' as const;
+export const MEMORY_CLEAR_ALL_RESPONSE =
+  'variablesWorkspace.runtimeMemory.clearAllResponse' as const;
+export const RUNTIME_MEMORY_CONTRACT_VERSION = 1 as const;
 const DEFAULT_TIMEOUT_MS = 10_000;
 
 const bodyObject = (value: unknown): Record<string, any> | null =>
@@ -68,8 +73,13 @@ export const useVariablesRuntimeMemory = ({
   timeoutMs = DEFAULT_TIMEOUT_MS,
 }: Context) => {
   const pendingRef = useRef<Map<string, PendingEdit>>(new Map());
+  const pendingClearAllRef = useRef<{
+    requestId: string;
+    timeoutId: ReturnType<typeof setTimeout>;
+  } | null>(null);
   const [pendingVariableIds, setPendingVariableIds] =
     useState<ReadonlySet<number>>(() => new Set());
+  const [pendingClearAll, setPendingClearAll] = useState(false);
 
   const syncPendingIds = useCallback(() => {
     setPendingVariableIds(new Set(
@@ -89,12 +99,21 @@ export const useVariablesRuntimeMemory = ({
   useEffect(() => () => {
     pendingRef.current.forEach(edit => clearTimeout(edit.timeoutId));
     pendingRef.current.clear();
+    if (pendingClearAllRef.current) {
+      clearTimeout(pendingClearAllRef.current.timeoutId);
+      pendingClearAllRef.current = null;
+    }
   }, []);
 
   useEffect(() => {
     if (connected && webSocket?.readyState === WebSocket.OPEN) return;
     pendingRef.current.forEach(edit => clearTimeout(edit.timeoutId));
     pendingRef.current.clear();
+    if (pendingClearAllRef.current) {
+      clearTimeout(pendingClearAllRef.current.timeoutId);
+      pendingClearAllRef.current = null;
+      setPendingClearAll(false);
+    }
     syncPendingIds();
   }, [connected, syncPendingIds, webSocket]);
 
@@ -104,7 +123,10 @@ export const useVariablesRuntimeMemory = ({
       || !connected
       || !webSocket
       || webSocket.readyState !== WebSocket.OPEN
-      || pendingVariableIds.has(variableId)
+      || pendingClearAllRef.current !== null
+      || [...pendingRef.current.values()].some(
+        edit => edit.variableId === variableId,
+      )
     ) {
       return false;
     }
@@ -119,14 +141,21 @@ export const useVariablesRuntimeMemory = ({
     pendingRef.current.set(requestId, { requestId, variableId, timeoutId });
     syncPendingIds();
     try {
+      const entryRevision = snapshot.runtimeMemory.variables.find(
+        entry => entry.variableId === variableId,
+      )?.entryRevision ?? 0;
       webSocket.send(JSON.stringify({
         type: MEMORY_UPDATE_OPERATION,
         sessionId,
         body: JSON.stringify({
           requestId,
           bindingEpoch: snapshot.bindingEpoch,
+          workspaceEpoch: snapshot.workspaceEpoch,
+          contractVersion: RUNTIME_MEMORY_CONTRACT_VERSION,
+          baseRuntimeRevision: snapshot.runtimeMemory.revision,
           variableId,
           operation: 'SET',
+          expectedEntryRevision: entryRevision,
           value,
         }),
       }));
@@ -147,10 +176,68 @@ export const useVariablesRuntimeMemory = ({
     clearPending,
     connected,
     onStatus,
-    pendingVariableIds,
     sessionId,
     snapshot,
     syncPendingIds,
+    timeoutMs,
+    webSocket,
+  ]);
+
+  const clearAllValues = useCallback((): boolean => {
+    if (
+      !snapshot
+      || !connected
+      || !webSocket
+      || webSocket.readyState !== WebSocket.OPEN
+      || pendingClearAllRef.current !== null
+      || pendingRef.current.size > 0
+    ) {
+      return false;
+    }
+    const requestId = nextRequestId();
+    const timeoutId = setTimeout(() => {
+      if (pendingClearAllRef.current?.requestId !== requestId) return;
+      pendingClearAllRef.current = null;
+      setPendingClearAll(false);
+      onStatus({
+        level: 'error',
+        text: 'Runtime values were not cleared. The request timed out.',
+      });
+    }, timeoutMs);
+    pendingClearAllRef.current = { requestId, timeoutId };
+    setPendingClearAll(true);
+    try {
+      webSocket.send(JSON.stringify({
+        type: MEMORY_CLEAR_ALL_OPERATION,
+        sessionId,
+        body: JSON.stringify({
+          contractVersion: RUNTIME_MEMORY_CONTRACT_VERSION,
+          requestId,
+          bindingEpoch: snapshot.bindingEpoch,
+          workspaceEpoch: snapshot.workspaceEpoch,
+          baseRuntimeRevision: snapshot.runtimeMemory.revision,
+        }),
+      }));
+      onStatus({
+        level: 'warn',
+        text: 'Clearing all runtime values to VOID...',
+      });
+      return true;
+    } catch (_) {
+      clearTimeout(timeoutId);
+      pendingClearAllRef.current = null;
+      setPendingClearAll(false);
+      onStatus({
+        level: 'error',
+        text: 'Clear All Values could not be sent.',
+      });
+      return false;
+    }
+  }, [
+    connected,
+    onStatus,
+    sessionId,
+    snapshot,
     timeoutMs,
     webSocket,
   ]);
@@ -165,6 +252,7 @@ export const useVariablesRuntimeMemory = ({
     if (
       envelope.operationId !== MEMORY_SNAPSHOT_OPERATION
       && envelope.operationId !== MEMORY_UPDATE_RESPONSE
+      && envelope.operationId !== MEMORY_CLEAR_ALL_RESPONSE
     ) {
       return false;
     }
@@ -176,6 +264,39 @@ export const useVariablesRuntimeMemory = ({
       && Number(body?.botJobId) === snapshot.botJob.id
       && Number(body?.homeBankingId) === snapshot.botJob.homeBankingId,
     );
+    if (envelope.operationId === MEMORY_CLEAR_ALL_RESPONSE) {
+      const requestId = typeof body?.requestId === 'string'
+        ? body.requestId.trim()
+        : '';
+      const pending = pendingClearAllRef.current;
+      if (!pending || requestId !== pending.requestId) return true;
+      clearTimeout(pending.timeoutId);
+      pendingClearAllRef.current = null;
+      setPendingClearAll(false);
+      if (body?.ok === false) {
+        onStatus({
+          level: 'error',
+          text: typeof body.error === 'string' && body.error.trim()
+            ? body.error.trim()
+            : 'Runtime values were not cleared.',
+        });
+      } else {
+        if (matchesCurrentScope) {
+          const normalized = normalizeRuntimeVariableMemorySnapshot(
+            body?.runtimeMemory,
+            snapshot?.variables ?? [],
+          );
+          if (normalized) onMemory(normalized);
+        }
+        onStatus({
+          level: 'ok',
+          text: typeof body?.message === 'string' && body.message.trim()
+            ? body.message.trim()
+            : 'All runtime values were cleared to VOID.',
+        });
+      }
+      return true;
+    }
     if (envelope.operationId === MEMORY_UPDATE_RESPONSE) {
       const requestId = typeof body?.requestId === 'string'
         ? body.requestId.trim()
@@ -218,7 +339,9 @@ export const useVariablesRuntimeMemory = ({
 
   return {
     pendingVariableIds,
+    pendingClearAll,
     updateValue,
+    clearAllValues,
     handleMessage,
   };
 };

@@ -7,8 +7,8 @@ import React, {
 } from 'react';
 import {
   Database,
+  Eraser,
   Loader2,
-  Plus,
   Search,
   Trash2,
   X,
@@ -41,8 +41,10 @@ export interface RuntimeMemoryPanelProps {
   onEditStart?: (variableId: number) => void;
   onEditCancel?: (variableId: number) => void;
   onRequestAdd?: () => void;
+  onRequestClearAll?: () => void;
   onRequestDelete?: (variableId: number) => void;
   onRequestDeleteAll?: () => void;
+  clearingValues?: boolean;
   deletingVariableIds?: ReadonlySet<number>;
   deleteDisabled?: boolean;
   className?: string;
@@ -219,8 +221,10 @@ const RuntimeMemoryPanel: React.FC<RuntimeMemoryPanelProps> = ({
   onEditStart,
   onEditCancel,
   onRequestAdd,
+  onRequestClearAll,
   onRequestDelete,
   onRequestDeleteAll,
+  clearingValues = false,
   deletingVariableIds,
   deleteDisabled = false,
   className,
@@ -269,10 +273,29 @@ const RuntimeMemoryPanel: React.FC<RuntimeMemoryPanelProps> = ({
           glow={false}
           border
           animate={false}
-          iconNode={<Plus size={12} aria-hidden="true" />}
-          title="Define a new variable (rules are not configured yet)"
+          title="Define a new Bot Job variable"
           onClick={() => onRequestAdd?.()}
-          disabled={!onRequestAdd}
+          disabled={disabled || clearingValues || !onRequestAdd}
+        />
+        <RulesCard
+          event={{
+            color: 'orange',
+            rules: 'CLEAR ALL VALUES',
+            ts: 2,
+          }}
+          ariaLabel="Clear all variable values"
+          glow={false}
+          border
+          animate={false}
+          iconNode={<Eraser size={12} aria-hidden="true" />}
+          title="Reset every runtime value to VOID without deleting variables"
+          onClick={() => onRequestClearAll?.()}
+          disabled={
+            disabled
+            || clearingValues
+            || items.length === 0
+            || !onRequestClearAll
+          }
         />
         <RulesCard
           event={{
@@ -289,6 +312,7 @@ const RuntimeMemoryPanel: React.FC<RuntimeMemoryPanelProps> = ({
           onClick={() => onRequestDeleteAll?.()}
           disabled={
             deleteDisabled
+            || clearingValues
             || items.length === 0
             || !onRequestDeleteAll
             || (deletingVariableIds?.size ?? 0) > 0

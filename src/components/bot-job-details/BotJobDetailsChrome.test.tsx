@@ -257,3 +257,104 @@ test('renders the authoritative WARN preflight and delegates row focus without a
   expect(dismissExecutionPreflight).toHaveBeenCalledTimes(1);
   expect(controller.sendToolbarAction).not.toHaveBeenCalled();
 });
+
+test('requires a runtime-memory policy before TEST RUN and defaults to KEEP', () => {
+  const sendToolbarAction = jest.fn();
+  const controller: BotJobDetailsControllerState = {
+    state: botJobDetailsTestState,
+    loadingState: false,
+    savingMetadata: false,
+    fieldErrors: {},
+    metadataSavedRevision: null,
+    pendingAction: null,
+    pendingToolbarAction: null,
+    transferPath: '',
+    status: 'Ready',
+    statusTone: 'neutral',
+    executionPause: null,
+    executionPreflight: null,
+    resolveExecutionPause: jest.fn(),
+    dismissExecutionPreflight: jest.fn(),
+    sendAction: jest.fn(),
+    sendToolbarAction,
+    saveMetadata: jest.fn(),
+    refreshEnvironments: jest.fn(),
+    retryBootstrap: jest.fn(),
+  };
+
+  render(
+    <BotJobDetailsChrome
+      fallbackBotJobId={42}
+      fallbackBotJobName="Payments"
+      fallbackSurface="botJob"
+      connected
+      controller={controller}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: 'Test run' }));
+  expect(sendToolbarAction).not.toHaveBeenCalled();
+  expect(screen.getByRole('heading', {
+    name: 'Test Run Variable Values',
+  })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', {
+    name: 'Run with Current Values',
+  }));
+  expect(sendToolbarAction).toHaveBeenCalledWith('TEST_RUN', {
+    executionMode: 'ALL',
+    blockId: 0,
+    runtimeMemoryPolicy: 'KEEP',
+  });
+});
+
+test('can reset all runtime values before LAUNCH or cancel without dispatching', () => {
+  const sendToolbarAction = jest.fn();
+  const controller: BotJobDetailsControllerState = {
+    state: botJobDetailsTestState,
+    loadingState: false,
+    savingMetadata: false,
+    fieldErrors: {},
+    metadataSavedRevision: null,
+    pendingAction: null,
+    pendingToolbarAction: null,
+    transferPath: '',
+    status: 'Ready',
+    statusTone: 'neutral',
+    executionPause: null,
+    executionPreflight: null,
+    resolveExecutionPause: jest.fn(),
+    dismissExecutionPreflight: jest.fn(),
+    sendAction: jest.fn(),
+    sendToolbarAction,
+    saveMetadata: jest.fn(),
+    refreshEnvironments: jest.fn(),
+    retryBootstrap: jest.fn(),
+  };
+
+  const view = render(
+    <BotJobDetailsChrome
+      fallbackBotJobId={42}
+      fallbackBotJobName="Payments"
+      fallbackSurface="botJob"
+      connected
+      controller={controller}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: 'Launch' }));
+  expect(screen.getByRole('heading', {
+    name: 'Launch Variable Values',
+  })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+  expect(sendToolbarAction).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Launch' }));
+  fireEvent.click(screen.getByRole('button', {
+    name: 'Reset Values & Run',
+  }));
+  expect(sendToolbarAction).toHaveBeenCalledWith('LAUNCH', {
+    runtimeMemoryPolicy: 'RESET',
+  });
+  view.unmount();
+});

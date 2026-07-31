@@ -26,6 +26,8 @@ export type BotJobToolbarAction =
 
 export type BotJobExecutionMode = 'ALL' | 'ONE';
 
+export type BotJobRuntimeMemoryPolicy = 'KEEP' | 'RESET';
+
 export type BotJobToolbarPayload = Record<string, string | number | boolean | null | undefined>;
 
 export type BotJobWorkspaceStatusTone = 'neutral' | 'success' | 'warning' | 'error';

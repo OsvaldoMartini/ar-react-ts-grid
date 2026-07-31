@@ -37,6 +37,9 @@ import {
 import { variableValuePresentation } from './variables/domain/variableValuePresentation';
 import { orderRuntimeVariablesByExecution } from './variables/domain/variableExecutionOrder';
 import RuntimeMemoryPanel from './variables/RuntimeMemoryPanel';
+import AddVariableModal, {
+  type AddVariableDraft,
+} from './variables/AddVariableModal';
 import VariablesBlockTransferBoard, {
   type VariablesBlockTransferIntent,
 } from './variables/VariablesBlockTransferBoard';
@@ -53,6 +56,10 @@ import {
   useVariablesInstructionCopy,
   type VariablesInstructionCopyResult,
 } from './variables/useVariablesInstructionCopy';
+import {
+  useVariablesCreate,
+  type VariablesCreateResult,
+} from './variables/useVariablesCreate';
 import {
   useVariablesDelete,
   type VariablesDeleteMode,
@@ -449,6 +456,8 @@ const VariablesPage: React.FC<Props> = ({
     useState<PendingBlockTransfer | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] =
     useState<VariableDeleteConfirmation | null>(null);
+  const [addVariableOpen, setAddVariableOpen] = useState(false);
+  const [clearValuesConfirmation, setClearValuesConfirmation] = useState(false);
   const [deletingVariableIds, setDeletingVariableIds] =
     useState<ReadonlySet<number>>(() => new Set());
   const [status, setStatus] = useState<Status>({
@@ -491,7 +500,9 @@ const VariablesPage: React.FC<Props> = ({
 
   const {
     pendingVariableIds,
+    pendingClearAll,
     updateValue: updateRuntimeValue,
+    clearAllValues,
     handleMessage: handleRuntimeMemoryMessage,
   } = useVariablesRuntimeMemory({
     webSocket,
@@ -500,6 +511,30 @@ const VariablesPage: React.FC<Props> = ({
     snapshot,
     onMemory: replaceRuntimeMemory,
     onStatus: setStatus,
+  });
+
+  const handleVariableCreateResult = useCallback((
+    result: VariablesCreateResult,
+  ) => {
+    setStatus({
+      level: result.ok ? 'ok' : 'error',
+      text: result.ok
+        ? result.message || `Variable #${result.variableId ?? '?'} created.`
+        : result.error || 'Variable creation was refused.',
+    });
+    if (result.ok) setAddVariableOpen(false);
+  }, []);
+
+  const {
+    pendingRequestId: pendingCreateRequestId,
+    submit: submitVariableCreate,
+    handleMessage: handleVariableCreateMessage,
+  } = useVariablesCreate({
+    webSocket,
+    connected,
+    sessionId,
+    snapshot,
+    onResult: handleVariableCreateResult,
   });
 
   const handleVariableDeleteResult = useCallback((
@@ -645,6 +680,7 @@ const VariablesPage: React.FC<Props> = ({
 
     pending.forEach(raw => {
       if (handleInstructionCopyMessage(raw)) return;
+      if (handleVariableCreateMessage(raw)) return;
       if (handleVariableDeleteMessage(raw)) return;
       if (handleGraphMutationMessage(raw)) return;
       if (handleRuntimeMemoryMessage(raw)) return;
@@ -720,6 +756,7 @@ const VariablesPage: React.FC<Props> = ({
     handleGraphMutationMessage,
     handleInstructionCopyMessage,
     handleRuntimeMemoryMessage,
+    handleVariableCreateMessage,
     handleVariableDeleteMessage,
     messages,
     replaceSnapshot,
@@ -1214,6 +1251,32 @@ const VariablesPage: React.FC<Props> = ({
     });
   }, [deleteConfirmation, submitVariableDelete]);
 
+  const submitNewVariable = useCallback((draft: AddVariableDraft) => {
+    const requestId = submitVariableCreate(draft);
+    if (!requestId) {
+      setStatus({
+        level: 'error',
+        text: 'Variables is busy, disconnected, or read-only. No variable was created.',
+      });
+      return;
+    }
+    setStatus({
+      level: 'warn',
+      text: `Creating variable “${draft.name}”...`,
+    });
+  }, [submitVariableCreate]);
+
+  const confirmClearAllValues = useCallback(() => {
+    if (!clearAllValues()) {
+      setStatus({
+        level: 'error',
+        text: 'Variables is busy or disconnected. Runtime values were not cleared.',
+      });
+      return;
+    }
+    setClearValuesConfirmation(false);
+  }, [clearAllValues]);
+
   const statusClass = status.level === 'error'
     ? styles.statusError
     : status.level === 'warn'
@@ -1226,6 +1289,7 @@ const VariablesPage: React.FC<Props> = ({
     || pendingRequest !== null
     || pendingMutationRequestId !== null
     || pendingCopyRequestId !== null
+    || pendingCreateRequestId !== null
     || pendingDeleteRequestId !== null
     || pendingReconnect !== null
     || pendingBlockTransfer !== null
@@ -1777,10 +1841,15 @@ const VariablesPage: React.FC<Props> = ({
                   || pendingDeleteRequestId !== null
                   || snapshot.mutationCapability === null
                 }
-                onRequestAdd={() => setStatus({
-                  level: 'warn',
-                  text: 'Add Variable is reserved for the next variable-definition rules.',
-                })}
+                onRequestAdd={() => {
+                  setStatus({
+                    level: 'warn',
+                    text: 'Define a new Bot Job variable.',
+                  });
+                  setAddVariableOpen(true);
+                }}
+                onRequestClearAll={() => setClearValuesConfirmation(true)}
+                clearingValues={pendingClearAll}
                 onRequestDelete={requestDeleteVariable}
                 onRequestDeleteAll={requestDeleteAllVariables}
               />
@@ -1813,6 +1882,28 @@ const VariablesPage: React.FC<Props> = ({
                 text: 'Reconnect cancelled. No relationship was changed.',
               });
             }}
+          />
+        )}
+        {snapshot && addVariableOpen && (
+          <AddVariableModal
+            existingNames={snapshot.variables.map(variable => variable.name)}
+            pending={pendingCreateRequestId !== null}
+            onSubmit={submitNewVariable}
+            onCancel={() => {
+              if (pendingCreateRequestId === null) setAddVariableOpen(false);
+            }}
+          />
+        )}
+        {snapshot && clearValuesConfirmation && (
+          <AlertModal
+            header="Clear All Variable Values?"
+            body={`Reset all ${snapshot.runtimeMemory.variables.length} runtime value(s) to VOID?`}
+            extraMsg={'Variable definitions and instruction relationships are preserved. Empty VALUE("") is different from VOID.'}
+            onClose={() => setClearValuesConfirmation(false)}
+            onConfirm={confirmClearAllValues}
+            imageSrc={warningRedImage}
+            imageClass="construction-image"
+            error
           />
         )}
         {pendingBlockTransfer?.stage === 'ACTION' && (

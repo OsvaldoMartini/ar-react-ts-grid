@@ -90,8 +90,9 @@ test('renders the ID, Name, Value, and row-action columns', () => {
   })).toBeInTheDocument();
 });
 
-test('routes per-row delete, Delete All, and + ADD through independent callbacks', () => {
+test('routes row delete, Clear All Values, Delete All, and + ADD independently', () => {
   const onRequestAdd = jest.fn();
+  const onRequestClearAll = jest.fn();
   const onRequestDelete = jest.fn();
   const onRequestDeleteAll = jest.fn();
   render(
@@ -99,6 +100,7 @@ test('routes per-row delete, Delete All, and + ADD through independent callbacks
       items={items}
       onCommitValue={jest.fn()}
       onRequestAdd={onRequestAdd}
+      onRequestClearAll={onRequestClearAll}
       onRequestDelete={onRequestDelete}
       onRequestDeleteAll={onRequestDeleteAll}
     />,
@@ -111,6 +113,13 @@ test('routes per-row delete, Delete All, and + ADD through independent callbacks
   expect(onRequestDelete).toHaveBeenCalledWith(12);
   expect(onRequestDeleteAll).not.toHaveBeenCalled();
   expect(onRequestAdd).not.toHaveBeenCalled();
+  expect(onRequestClearAll).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByRole('button', {
+    name: 'Clear all variable values',
+  }));
+  expect(onRequestClearAll).toHaveBeenCalledTimes(1);
+  expect(onRequestDeleteAll).not.toHaveBeenCalled();
 
   fireEvent.click(screen.getByRole('button', {
     name: 'Delete all variables',
@@ -121,6 +130,8 @@ test('routes per-row delete, Delete All, and + ADD through independent callbacks
   fireEvent.click(screen.getByRole('button', { name: 'Add variable' }));
   expect(onRequestAdd).toHaveBeenCalledTimes(1);
   expect(onRequestDeleteAll).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole('button', { name: 'Add variable' }))
+    .not.toHaveTextContent('++');
 });
 
 test('disables destructive actions while deletion is pending', () => {
