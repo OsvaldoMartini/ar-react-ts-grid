@@ -18,8 +18,10 @@
   display: grid;
   font-family: Arial, Helvetica, sans-serif;
   grid-template-rows: auto minmax(0, 1fr) auto;
+  min-height: min(500px, calc(100vh - 32px));
   max-height: calc(100vh - 32px);
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   width: min(640px, calc(100vw - 32px));
 }
 
