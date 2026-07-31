@@ -239,6 +239,77 @@ test('normalizes a coordinate-consistent Variables mutation capability', () => {
   expect(snapshot?.mutationCapability?.crossBlockProfile).toBeNull();
 });
 
+test('keeps React-authored mutation authority when relationship projections need repair', () => {
+  const presentationVariables = canonicalSnapshot.variables.map(variable => {
+    if (variable.id !== 12) return variable;
+    return {
+      ...variable,
+      owner: null,
+      commands: variable.commands.map(command => command.instructionId === 190
+        ? {
+            ...command,
+            parentId: null,
+            parentBlockId: null,
+            variableId: 13,
+          }
+        : command),
+    };
+  });
+  const presentationCommands = canonicalSnapshot.variables.flatMap(variable => [
+    variable.owner,
+    ...variable.commands,
+  ]).map(command => command.instructionId === 190
+    ? {
+        ...command,
+        parentId: null,
+        parentBlockId: null,
+        variableId: 13,
+      }
+    : command);
+
+  const snapshot = normalizeVariablesWorkspaceSnapshot({
+    ...canonicalSnapshot,
+    variables: presentationVariables,
+    commands: presentationCommands,
+    mutationCapability: {
+      ...canonicalMutationCapability,
+      reactAuthoredProfile: 'VARIABLES_REACT_AUTHORED_V1',
+    },
+  });
+
+  expect(snapshot?.mutationCapability?.reactAuthoredProfile).toBe(
+    'VARIABLES_REACT_AUTHORED_V1',
+  );
+  expect(snapshot?.mutationCapability?.instructionFacts.find(
+    fact => fact.instructionId === 190,
+  )).toMatchObject({
+    parentId: 189,
+    parentBlockId: 7,
+    variableId: 12,
+  });
+  expect(snapshot?.mutationCapability?.variableFacts).toContainEqual({
+    variableId: 12,
+    ownerInstructionId: 189,
+  });
+});
+
+test('still rejects malformed authoritative layout for a React-authored capability', () => {
+  const snapshot = normalizeVariablesWorkspaceSnapshot({
+    ...canonicalSnapshot,
+    mutationCapability: {
+      ...canonicalMutationCapability,
+      reactAuthoredProfile: 'VARIABLES_REACT_AUTHORED_V1',
+      layoutRows: canonicalMutationCapability.layoutRows.map(row =>
+        row.instructionId === 191
+          ? { ...row, instructionOrderNumber: 3 }
+          : row),
+    },
+  });
+
+  expect(snapshot).not.toBeNull();
+  expect(snapshot?.mutationCapability).toBeNull();
+});
+
 const ownerlessUnusedSnapshot = (
   ownerInstructionId: number | null,
 ) => ({

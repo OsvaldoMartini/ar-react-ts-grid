@@ -551,32 +551,54 @@ test('selects from the whole row without double-triggering nested actions', () =
   expect(onSelectInstruction).toHaveBeenCalledTimes(2);
 });
 
-test('shows the review label when all visible connections are reviewable', () => {
+test('renders resolve and review as independent fixed glowing actions', () => {
   const onResolveVisibleConnections = jest.fn();
+  const onReviewVisibleConnections = jest.fn();
   render(
     <VariablesCommandBoard
       blocks={filterBlocks}
       instructions={filterInstructions}
-      resolveConnectionsMode="REVIEW"
       onResolveVisibleConnections={onResolveVisibleConnections}
+      onReviewVisibleConnections={onReviewVisibleConnections}
     />,
   );
 
+  const resolve = screen.getByRole('button', {
+    name: /RESOLVE ALL CONNECTIONS/i,
+  });
   const review = screen.getByRole('button', {
     name: /REVIEW ALL CONNECTIONS/i,
   });
+  expect(resolve).toHaveClass(
+    rulesCardStyles.orange,
+    rulesCardStyles.withBorder,
+    rulesCardStyles.static,
+    rulesCardStyles.pulse,
+    boardStyles.resolveConnectionsAction,
+  );
+  expect(review).toHaveClass(
+    rulesCardStyles.green,
+    rulesCardStyles.withBorder,
+    rulesCardStyles.static,
+    rulesCardStyles.pulse,
+    boardStyles.reviewConnectionsAction,
+  );
   expect(review).toHaveAttribute(
     'title',
     expect.stringContaining('Review connections for All Blocks'),
   );
+  fireEvent.click(resolve);
   fireEvent.click(review);
   expect(onResolveVisibleConnections).toHaveBeenCalledWith(
+    expect.objectContaining({ instructionIds: [1640, 1641, 1700] }),
+  );
+  expect(onReviewVisibleConnections).toHaveBeenCalledWith(
     expect.objectContaining({ instructionIds: [1640, 1641, 1700] }),
   );
 });
 
 test('allows snapshot review while mutation actions remain disabled', () => {
-  const onResolveVisibleConnections = jest.fn();
+  const onReviewVisibleConnections = jest.fn();
   const onReleaseVisibleConnections = jest.fn();
   render(
     <VariablesCommandBoard
@@ -584,9 +606,8 @@ test('allows snapshot review while mutation actions remain disabled', () => {
       instructions={filterInstructions}
       disabled
       unavailableReason="Read-only snapshot"
-      resolveConnectionsMode="REVIEW"
-      resolveConnectionsDisabled={false}
-      onResolveVisibleConnections={onResolveVisibleConnections}
+      reviewConnectionsDisabled={false}
+      onReviewVisibleConnections={onReviewVisibleConnections}
       onReleaseVisibleConnections={onReleaseVisibleConnections}
     />,
   );
@@ -601,7 +622,7 @@ test('allows snapshot review while mutation actions remain disabled', () => {
   expect(release).toBeDisabled();
 
   fireEvent.click(review);
-  expect(onResolveVisibleConnections).toHaveBeenCalledTimes(1);
+  expect(onReviewVisibleConnections).toHaveBeenCalledTimes(1);
   fireEvent.click(release);
   expect(onReleaseVisibleConnections).not.toHaveBeenCalled();
 });

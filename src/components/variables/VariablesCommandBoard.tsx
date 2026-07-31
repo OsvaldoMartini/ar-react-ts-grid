@@ -49,10 +49,6 @@ export interface VariablesCommandBoardProps {
   workspaceIdentityKey?: string | number | null;
   disabled?: boolean;
   unavailableReason?: string;
-  resolveConnectionsMode?: 'RESOLVE' | 'REVIEW';
-  resolveConnectionsModeForScope?: (
-    scope: VariablesConnectionScope,
-  ) => 'RESOLVE' | 'REVIEW';
   resolveConnectionsDisabled?: boolean;
   reviewConnectionsDisabled?: boolean;
   selectedInstructionId?: number | null;
@@ -89,6 +85,7 @@ export interface VariablesCommandBoardProps {
     edge?: InstructionRelationshipEdge,
   ) => void;
   onResolveVisibleConnections?: (scope: VariablesConnectionScope) => void;
+  onReviewVisibleConnections?: (scope: VariablesConnectionScope) => void;
   onReleaseVisibleConnections?: (scope: VariablesConnectionScope) => void;
   className?: string;
 }
@@ -175,8 +172,6 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
   workspaceIdentityKey,
   disabled = false,
   unavailableReason,
-  resolveConnectionsMode = 'RESOLVE',
-  resolveConnectionsModeForScope,
   resolveConnectionsDisabled,
   reviewConnectionsDisabled = false,
   selectedInstructionId = null,
@@ -192,6 +187,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
   onReconnectParent,
   onReconnectVariable,
   onResolveVisibleConnections,
+  onReviewVisibleConnections,
   onReleaseVisibleConnections,
   className,
 }) => {
@@ -302,20 +298,18 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
     visibleInstructions,
   ]);
 
-  const effectiveResolveConnectionsMode = resolveConnectionsModeForScope?.(
-    visibleConnectionScope,
-  ) ?? resolveConnectionsMode;
-  const resolveActionDisabled = effectiveResolveConnectionsMode === 'REVIEW'
-    ? reviewConnectionsDisabled
-    : resolveConnectionsDisabled ?? disabled;
+  const resolveActionDisabled = resolveConnectionsDisabled ?? disabled;
 
   const resolveConnectionsEvent = useMemo<RulesCardEvent>(() => ({
-    color: 'green',
-    rules: effectiveResolveConnectionsMode === 'REVIEW'
-      ? 'REVIEW ALL CONNECTIONS'
-      : 'RESOLVE ALL CONNECTIONS',
+    color: 'orange',
+    rules: 'RESOLVE ALL CONNECTIONS',
     ts: 0,
-  }), [effectiveResolveConnectionsMode]);
+  }), []);
+  const reviewConnectionsEvent = useMemo<RulesCardEvent>(() => ({
+    color: 'green',
+    rules: 'REVIEW ALL CONNECTIONS',
+    ts: 0,
+  }), []);
   const releaseConnectionsEvent = useMemo<RulesCardEvent>(() => ({
     color: 'red',
     rules: 'RELEASE ALL CONNECTIONS',
@@ -475,7 +469,11 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                 setBlockFilter(value === null ? null : Number(value))}
             />
           </div>
-          {(onResolveVisibleConnections || onReleaseVisibleConnections) && (
+          {(
+            onResolveVisibleConnections
+            || onReviewVisibleConnections
+            || onReleaseVisibleConnections
+          ) && (
             <div
               className={styles.connectionActions}
               aria-label="Visible command connection actions"
@@ -483,16 +481,34 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
               {onResolveVisibleConnections && (
                 <RulesCard
                   event={resolveConnectionsEvent}
+                  className={styles.resolveConnectionsAction}
                   animate={false}
-                  pulse={false}
-                  glow={false}
+                  pulse
+                  glow
+                  border
                   onClick={(event) => {
                     // Keep a deterministic focus return target for the modal.
                     event.currentTarget.focus();
                     onResolveVisibleConnections(visibleConnectionScope);
                   }}
                   disabled={resolveActionDisabled || visibleConnectionScope.visibleCount === 0}
-                  title={`${effectiveResolveConnectionsMode === 'REVIEW' ? 'Review' : 'Resolve'} connections for ${visibleConnectionScope.label}`}
+                  title={`Resolve connections for ${visibleConnectionScope.label}`}
+                />
+              )}
+              {onReviewVisibleConnections && (
+                <RulesCard
+                  event={reviewConnectionsEvent}
+                  className={styles.reviewConnectionsAction}
+                  animate={false}
+                  pulse
+                  glow
+                  border
+                  onClick={(event) => {
+                    event.currentTarget.focus();
+                    onReviewVisibleConnections(visibleConnectionScope);
+                  }}
+                  disabled={reviewConnectionsDisabled || visibleConnectionScope.visibleCount === 0}
+                  title={`Review connections for ${visibleConnectionScope.label}`}
                 />
               )}
               {onReleaseVisibleConnections && (

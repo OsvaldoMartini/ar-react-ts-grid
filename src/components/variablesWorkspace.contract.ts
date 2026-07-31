@@ -380,9 +380,12 @@ const normalizeMutationCapability = (
   ) {
     return null;
   }
-  const variableFactsMatch =
+  const variableFactIdsMatch =
     variableFactsById.size === normalizedVariableFacts.length
     && normalizedVariableFacts.length === variables.length
+    && variables.every(variable => variableFactsById.has(variable.id));
+  const variableProjectionMatches =
+    variableFactIdsMatch
     && variables.every(variable => {
       const authoritativeVariable = variableFactsById.get(variable.id);
       if (!authoritativeVariable) return false;
@@ -413,7 +416,7 @@ const normalizeMutationCapability = (
         && fact?.variableId === variable.id;
       });
     });
-  const commandFactsMatch = commands.every(command => {
+  const commandStructureMatches = commands.every(command => {
     if (command.id === null) return false;
     const fact = factsById.get(command.id);
     return Boolean(fact)
@@ -422,9 +425,6 @@ const normalizeMutationCapability = (
       && fact?.instructionOrderNumber === command.instructionOrder
       && canonicalInstructionAction(fact?.action)
         === canonicalInstructionAction(command.command)
-      && fact?.parentId === command.parentId
-      && fact?.parentBlockId === command.parentBlockId
-      && fact?.variableId === command.variableId
       && (
         !fact?.tagName
         || !command.tagName
@@ -432,12 +432,30 @@ const normalizeMutationCapability = (
           === command.tagName.trim().toLocaleLowerCase()
       );
   });
+  const commandRelationshipProjectionMatches = commands.every(command => {
+    if (command.id === null) return false;
+    const fact = factsById.get(command.id);
+    return Boolean(fact)
+      && fact?.parentId === command.parentId
+      && fact?.parentBlockId === command.parentBlockId
+      && fact?.variableId === command.variableId;
+  });
   const commandIds = new Set(
     commands.flatMap(command => command.id === null ? [] : [command.id]),
   );
+  // A React-authored workspace uses the authoritative fact arrays to repair
+  // relationship projections. Presentation owner/parent/variable fields may be
+  // stale or deliberately disconnected, so they must not disable mutation.
+  // Coordinates, actions, command parity, and fact completeness remain strict.
+  const allowsRepairableProjectionMismatch = reactAuthoredProfile
+    === VARIABLES_REACT_AUTHORED_PROFILE;
   if (
-    !variableFactsMatch
-    || !commandFactsMatch
+    !variableFactIdsMatch
+    || !commandStructureMatches
+    || (!allowsRepairableProjectionMismatch && (
+      !variableProjectionMatches
+      || !commandRelationshipProjectionMatches
+    ))
     || commands.length !== normalizedFacts.length
     || commandIds.size !== normalizedFacts.length
     || normalizedFacts.some(fact => !commandIds.has(fact.instructionId))

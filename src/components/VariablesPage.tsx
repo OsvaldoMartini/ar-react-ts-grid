@@ -1142,34 +1142,6 @@ const VariablesPage: React.FC<Props> = ({
     () => snapshot ? buildVariablesExecutionFlowReview(snapshot) : null,
     [snapshot],
   );
-  const resolveConnectionsMode = useMemo<'RESOLVE' | 'REVIEW'>(() => {
-    if (!snapshot || !completeExecutionFlowReview) return 'RESOLVE';
-    if (snapshot.mutationCapability?.reactAuthoredProfile == null) {
-      return 'REVIEW';
-    }
-    const instructionIds = snapshot.commands.flatMap(command =>
-      command.id !== null
-      && Number.isSafeInteger(command.id)
-      && command.id > 0
-        ? [command.id]
-        : []);
-    const planned = planVariablesBatchResolve(snapshot, instructionIds);
-    return planned.ok && planned.plan.reviewItems.length === 0
-      ? 'REVIEW'
-      : 'RESOLVE';
-  }, [completeExecutionFlowReview, snapshot]);
-  const resolveConnectionsModeForScope = useCallback((
-    scope: VariablesConnectionScope,
-  ): 'RESOLVE' | 'REVIEW' => {
-    if (!snapshot || !completeExecutionFlowReview) return 'RESOLVE';
-    if (snapshot.mutationCapability?.reactAuthoredProfile == null) {
-      return 'REVIEW';
-    }
-    const planned = planVariablesBatchResolve(snapshot, scope.instructionIds);
-    return planned.ok && planned.plan.reviewItems.length === 0
-      ? 'REVIEW'
-      : 'RESOLVE';
-  }, [completeExecutionFlowReview, snapshot]);
 
   useEffect(() => {
     if (
@@ -1352,7 +1324,8 @@ const VariablesPage: React.FC<Props> = ({
       setStatus({ level: 'error', text: planned.message });
       return;
     }
-    const cleared = planned.plan.clearedRelationships.length;
+    const cleared = planned.plan.clearedRelationships.length
+      + planned.plan.clearedVariableBindings.length;
     submitVariablesMutation(
       planned.plan.draft,
       planned.plan.mutationProfile,
@@ -1662,6 +1635,32 @@ const VariablesPage: React.FC<Props> = ({
     submitVariablesMutation,
   ]);
 
+  const openReviewVisibleConnections = useCallback((
+    scope: VariablesConnectionScope,
+  ) => {
+    const current = snapshotRef.current;
+    if (!current) {
+      setStatus({
+        level: 'error',
+        text: 'Variables must finish loading before connections can be reviewed.',
+      });
+      return;
+    }
+    const executionReview = buildVariablesExecutionFlowReview(current);
+    setPendingConnections({
+      mode: 'REVIEW',
+      authorityKey: variablesExecutionFlowReviewAuthorityKey(current),
+      scope,
+      review: executionReview,
+    });
+    setStatus({
+      level: executionReview.relationshipsAvailable ? 'ok' : 'warn',
+      text: executionReview.relationshipsAvailable
+        ? `Reviewing the complete ${executionReview.steps.length}-command Bot Job execution flow. No database change will be made.`
+        : `Reviewing ${executionReview.steps.length} command(s) in read-only mode. Relationship authority is currently unavailable.`,
+    });
+  }, []);
+
   const openResolveVisibleConnections = useCallback((
     scope: VariablesConnectionScope,
   ) => {
@@ -1674,16 +1673,9 @@ const VariablesPage: React.FC<Props> = ({
       return;
     }
     if (current.mutationCapability?.reactAuthoredProfile == null) {
-      const executionReview = buildVariablesExecutionFlowReview(current);
-      setPendingConnections({
-        mode: 'REVIEW',
-        authorityKey: variablesExecutionFlowReviewAuthorityKey(current),
-        scope,
-        review: executionReview,
-      });
       setStatus({
-        level: 'warn',
-        text: `Reviewing ${executionReview.steps.length} command(s) in read-only mode. Relationship authority is currently unavailable.`,
+        level: 'error',
+        text: 'Connection resolution is temporarily unavailable. REVIEW ALL CONNECTIONS remains available.',
       });
       return;
     }
@@ -1701,16 +1693,9 @@ const VariablesPage: React.FC<Props> = ({
       return;
     }
     if (reviewed.review.items.length === 0) {
-      const executionReview = buildVariablesExecutionFlowReview(current);
-      setPendingConnections({
-        mode: 'REVIEW',
-        authorityKey: variablesExecutionFlowReviewAuthorityKey(current),
-        scope,
-        review: executionReview,
-      });
       setStatus({
         level: 'ok',
-        text: `Reviewing the complete ${executionReview.steps.length}-command Bot Job execution flow. No database change will be made.`,
+        text: `All ${scope.visibleCount} visible command(s) already have valid connections and execution order. Use REVIEW ALL CONNECTIONS to inspect the complete flow.`,
       });
       return;
     }
@@ -2013,6 +1998,15 @@ const VariablesPage: React.FC<Props> = ({
     || pendingConnections !== null
     || pendingBlockTransfer !== null
     || snapshot?.mutationCapability?.reactAuthoredProfile == null;
+  // Movement has its own authority. Relationship issues and open connection
+  // review/repair state never decide whether a row is draggable.
+  const movementDisabled = !connected
+    || pendingRequest !== null
+    || pendingMutationRequestId !== null
+    || pendingCopyRequestId !== null
+    || pendingCreateRequestId !== null
+    || pendingDeleteRequestId !== null
+    || snapshot?.mutationCapability?.reactAuthoredProfile == null;
   const blockTransferSource = snapshot && pendingBlockTransfer
     ? snapshot.commands.find(
       command => command.id === pendingBlockTransfer.sourceInstructionId,
@@ -2235,17 +2229,19 @@ const VariablesPage: React.FC<Props> = ({
                 blocks={snapshot.blocks}
                 instructions={snapshot.commands}
                 relationshipEdges={relationshipGraph?.edges ?? []}
-                resolveConnectionsMode={resolveConnectionsMode}
-                resolveConnectionsModeForScope={resolveConnectionsModeForScope}
                 resolveConnectionsDisabled={mutationDisabled}
                 reviewConnectionsDisabled={completeExecutionFlowReview === null}
-                disabled={mutationDisabled}
+                disabled={movementDisabled}
                 unavailableReason={pendingMutationRequestId
                   ? 'Saving...'
-                  : pendingReconnect
-                    ? 'Review relationship'
-                    : pendingConnections
-                      ? 'Review bulk connections'
+                  : pendingRequest
+                    ? 'Refreshing workspace...'
+                    : pendingCopyRequestId
+                      ? 'Copying instruction...'
+                      : pendingCreateRequestId
+                        ? 'Creating variable...'
+                        : pendingDeleteRequestId
+                          ? 'Deleting variable...'
                     : snapshot.mutationCapability?.reactAuthoredProfile == null
                       ? 'Read-only'
                       : undefined}
@@ -2281,7 +2277,7 @@ const VariablesPage: React.FC<Props> = ({
                   setActiveDropTarget(null);
                 }}
                 onDropTargetDragOver={(event, target) => {
-                  if (draggingInstructionId === null || mutationDisabled) return;
+                  if (draggingInstructionId === null || movementDisabled) return;
                   event.preventDefault();
                   event.dataTransfer.dropEffect = 'move';
                   setActiveDropTarget(target);
@@ -2314,6 +2310,7 @@ const VariablesPage: React.FC<Props> = ({
                 onReconnectVariable={(instructionId) =>
                   openReconnect(instructionId, 'VARIABLE_BINDING')}
                 onResolveVisibleConnections={openResolveVisibleConnections}
+                onReviewVisibleConnections={openReviewVisibleConnections}
                 onReleaseVisibleConnections={openReleaseVisibleConnections}
               />
 

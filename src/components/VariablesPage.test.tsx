@@ -734,12 +734,22 @@ test('resolves a unique visible Web Element connection through the new modal', a
   await waitFor(() => expect(screen.getByRole('button', {
     name: 'RESOLVE ALL CONNECTIONS',
   })).toBeEnabled());
+  expect(screen.getByRole('button', {
+    name: 'REVIEW ALL CONNECTIONS',
+  })).toBeEnabled();
+  const disconnectedCommandRow = screen.getAllByText('Read Amount')
+    .map(element => element.closest('article'))
+    .find((element): element is HTMLElement =>
+      element?.getAttribute('data-instruction-id') === '190');
+  expect(disconnectedCommandRow).toBeDefined();
+  expect(disconnectedCommandRow).toHaveAttribute('draggable', 'true');
   fireEvent.click(screen.getByRole('button', {
     name: 'RESOLVE ALL CONNECTIONS',
   }));
 
   expect(screen.getByRole('heading', { name: 'Resolve Connections' }))
     .toBeInTheDocument();
+  expect(disconnectedCommandRow).toHaveAttribute('draggable', 'true');
   fireEvent.click(screen.getByRole('button', {
     name: 'Resolve 1 Connection',
   }));
@@ -779,6 +789,9 @@ test('reviews a healthy complete execution flow without submitting a mutation', 
   const reviewButton = await screen.findByRole('button', {
     name: 'REVIEW ALL CONNECTIONS',
   });
+  expect(screen.getByRole('button', {
+    name: 'RESOLVE ALL CONNECTIONS',
+  })).toBeEnabled();
   const sentBeforeReview = mockSend.mock.calls.length;
   fireEvent.click(reviewButton);
 

@@ -14,6 +14,7 @@ export interface RulesCardEvent {
 
 interface RulesCardProps {
   event: RulesCardEvent | null;
+  className?: string;
   ariaLabel?: string;
   glow?: boolean;
   border?: boolean;
@@ -29,6 +30,7 @@ interface RulesCardProps {
 
 export function RulesCard({
   event,
+  className,
   ariaLabel,
   glow = true,
   border = false,
@@ -44,7 +46,7 @@ export function RulesCard({
   if (!event) return null;
 
   const DefaultIcon = event.color === 'red' ? XCircle : CheckCircle2;
-  const className = [
+  const rootClassName = [
     styles.badge,
     styles[event.color],
     !glow && styles.noGlow,
@@ -52,6 +54,7 @@ export function RulesCard({
     !animate && styles.static,
     pulse && styles.pulse,
     onClick && styles.interactive,
+    className,
   ].filter(Boolean).join(' ');
   const iconElement = icon ? (
     iconNode != null
@@ -74,7 +77,7 @@ export function RulesCard({
       <button
         key={event.ts}
         type="button"
-        className={className}
+        className={rootClassName}
         aria-label={ariaLabel}
         onClick={onClick}
         aria-pressed={ariaPressed}
@@ -89,7 +92,7 @@ export function RulesCard({
   return (
     <div
       key={event.ts}
-      className={className}
+      className={rootClassName}
       role="status"
       aria-live="polite"
       aria-label={ariaLabel}
