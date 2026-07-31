@@ -1,7 +1,9 @@
 import type {
   BotJobGraphMutationDraft,
+  InstructionGraphLayoutRow,
   InstructionGraphRelationPatch,
   InstructionGraphVariableBindingPatch,
+  InstructionGraphVariableOwnerPatch,
 } from '../../bot-job-details/grid/domain/instructionGraphMutation.contract';
 import type {
   InstructionRelationshipEdge,
@@ -11,6 +13,7 @@ import type {
 } from '../../bot-job-details/grid/domain/instructionRelationshipGraph';
 import type {
   VariablesInstructionFact,
+  VariablesVariableFact,
   VariableWorkspaceSnapshot,
 } from '../../variablesWorkspace.contract';
 import {
@@ -18,14 +21,17 @@ import {
   variablesReconnectGraph,
 } from './variablesReconnectMutation';
 
-export type VariablesBatchEditableRelationshipKind = Extract<
-  InstructionRelationshipKind,
-  | 'ELEMENT_TARGET'
-  | 'VARIABLE_BINDING'
-  | 'LOOP_ANCHOR'
-  | 'CONDITIONAL_ROOT'
-  | 'BLOCK_TARGET'
->;
+export type VariablesBatchEditableRelationshipKind =
+  | Extract<
+      InstructionRelationshipKind,
+      | 'ELEMENT_TARGET'
+      | 'VARIABLE_BINDING'
+      | 'LOOP_ANCHOR'
+      | 'CONDITIONAL_ROOT'
+      | 'BLOCK_TARGET'
+    >
+  | 'VARIABLE_OWNER'
+  | 'VARIABLE_ORDER';
 
 export type VariablesBatchConnectionErrorCode =
   | 'MUTATION_UNAVAILABLE'
@@ -77,7 +83,10 @@ export type VariablesBatchResolveResolution =
 
 export type VariablesBatchResolveReviewItem = {
   reviewId: string;
-  sourceInstructionId: number;
+  sourceEntity: 'INSTRUCTION' | 'VARIABLE';
+  sourceId: number;
+  sourceInstructionId: number | null;
+  sourceVariableId: number | null;
   kind: VariablesBatchEditableRelationshipKind;
   state: InstructionRelationshipEdge['state'];
   code: string | null;
@@ -92,6 +101,7 @@ type FrozenResolveBasis = {
   snapshot: VariableWorkspaceSnapshot;
   visibleInstructionIds: readonly number[];
   factsById: ReadonlyMap<number, VariablesInstructionFact>;
+  variableFactsById: ReadonlyMap<number, VariablesVariableFact>;
 };
 
 export type VariablesBatchResolvePlan = VariablesBatchAuthority & {
@@ -137,6 +147,8 @@ const PARENT_KINDS = new Set<VariablesBatchEditableRelationshipKind>([
 const EDITABLE_KINDS = new Set<VariablesBatchEditableRelationshipKind>([
   ...PARENT_KINDS,
   'VARIABLE_BINDING',
+  'VARIABLE_OWNER',
+  'VARIABLE_ORDER',
 ]);
 
 const failure = (
@@ -170,9 +182,12 @@ const sameTarget = (
     : targetKey(left) === targetKey(right);
 
 const reviewIdFor = (
-  sourceInstructionId: number,
+  sourceEntity: 'INSTRUCTION' | 'VARIABLE',
+  sourceId: number,
   kind: VariablesBatchEditableRelationshipKind,
-): string => `${sourceInstructionId}:${kind}`;
+): string => sourceEntity === 'INSTRUCTION'
+  ? `${sourceId}:${kind}`
+  : `VARIABLE:${sourceId}:${kind}`;
 
 /**
  * Stable authority key for a frozen Variables batch plan.
@@ -282,6 +297,8 @@ const frozenSnapshot = (
         Object.freeze({ ...row }))),
       instructionFacts: Object.freeze(capability.instructionFacts.map(fact =>
         Object.freeze({ ...fact }))),
+      variableFacts: Object.freeze(capability.variableFacts.map(fact =>
+        Object.freeze({ ...fact }))),
     }),
   }) as unknown as VariableWorkspaceSnapshot;
 };
@@ -295,7 +312,9 @@ const unchangedLayout = (
  * RELEASE clears only relationships carried by visible instruction facts.
  *
  * One instruction may receive one parent patch and one variable-binding patch.
- * Layout and variable ownership are always preserved.
+ * A variable owner is released only when that exact owner instruction is in
+ * the frozen visible scope. Hidden owners, definitions, and runtime values are
+ * preserved.
  */
 export const planVariablesBatchRelease = (
   snapshot: VariableWorkspaceSnapshot,
@@ -316,7 +335,13 @@ export const planVariablesBatchRelease = (
   const relationPatches = new Map<number, InstructionGraphRelationPatch>();
   const bindingPatches =
     new Map<number, InstructionGraphVariableBindingPatch>();
+  const ownerPatches =
+    new Map<number, InstructionGraphVariableOwnerPatch>();
   const changedInstructionIds = new Set<number>();
+  const authoritativeInstructionIds = new Set(
+    capability.instructionFacts.map(fact => fact.instructionId),
+  );
+  const visibleBindingsByVariable = new Map<number, number[]>();
 
   capability.instructionFacts.forEach((fact) => {
     if (!visibleSet.has(fact.instructionId)) return;
@@ -337,6 +362,10 @@ export const planVariablesBatchRelease = (
       changedInstructionIds.add(fact.instructionId);
     }
     if (fact.variableId !== null) {
+      const boundInstructions =
+        visibleBindingsByVariable.get(fact.variableId) ?? [];
+      boundInstructions.push(fact.instructionId);
+      visibleBindingsByVariable.set(fact.variableId, boundInstructions);
       bindingPatches.set(fact.instructionId, {
         instructionId: fact.instructionId,
         operation: 'CLEAR',
@@ -344,6 +373,26 @@ export const planVariablesBatchRelease = (
         replacement: { value: null },
       });
       changedInstructionIds.add(fact.instructionId);
+    }
+  });
+  capability.variableFacts.forEach((fact) => {
+    if (fact.ownerInstructionId === null) return;
+    const visibleOwner = visibleSet.has(fact.ownerInstructionId);
+    const danglingOwner =
+      !authoritativeInstructionIds.has(fact.ownerInstructionId);
+    const visibleBindings =
+      visibleBindingsByVariable.get(fact.variableId) ?? [];
+    if (!visibleOwner && !(danglingOwner && visibleBindings.length > 0)) return;
+    ownerPatches.set(fact.variableId, {
+      variableId: fact.variableId,
+      operation: 'CLEAR',
+      expected: { value: fact.ownerInstructionId },
+      replacement: { value: null },
+    });
+    if (visibleOwner) {
+      changedInstructionIds.add(fact.ownerInstructionId);
+    } else {
+      visibleBindings.forEach(id => changedInstructionIds.add(id));
     }
   });
 
@@ -363,7 +412,7 @@ export const planVariablesBatchRelease = (
         layoutRows: unchangedLayout(snapshot),
         instructionRelationPatches: [...relationPatches.values()],
         variableBindingPatches: [...bindingPatches.values()],
-        variableOwnerPatches: [],
+        variableOwnerPatches: [...ownerPatches.values()],
       },
     },
   };
@@ -373,18 +422,50 @@ const cloneFact = (
   fact: VariablesInstructionFact,
 ): VariablesInstructionFact => ({ ...fact });
 
+const cloneVariableFact = (
+  fact: VariablesVariableFact,
+): VariablesVariableFact => ({ ...fact });
+
 const projectedSnapshot = (
   basis: FrozenResolveBasis,
   projectedFacts: ReadonlyMap<number, VariablesInstructionFact>,
-): VariableWorkspaceSnapshot => ({
-  ...basis.snapshot,
-  mutationCapability: {
-    ...basis.snapshot.mutationCapability!,
-    instructionFacts: basis.snapshot.mutationCapability!.instructionFacts.map(
-      fact => cloneFact(projectedFacts.get(fact.instructionId) ?? fact),
-    ),
-  },
-});
+  projectedVariableFacts: ReadonlyMap<number, VariablesVariableFact> =
+    basis.variableFactsById,
+  projectedLayout: readonly InstructionGraphLayoutRow[] =
+    basis.snapshot.mutationCapability!.layoutRows,
+): VariableWorkspaceSnapshot => {
+  const layoutById = new Map(
+    projectedLayout.map(row => [row.instructionId, row]),
+  );
+  return {
+    ...basis.snapshot,
+    mutationCapability: {
+      ...basis.snapshot.mutationCapability!,
+      layoutRows: projectedLayout.map(row => ({ ...row })),
+      instructionFacts: basis.snapshot.mutationCapability!.instructionFacts.map(
+        (fact) => {
+          const projected = cloneFact(
+            projectedFacts.get(fact.instructionId) ?? fact,
+          );
+          const layout = layoutById.get(fact.instructionId);
+          return layout
+            ? {
+                ...projected,
+                blockId: layout.blockId,
+                blockOrderNumber: layout.blockOrderNumber,
+                instructionOrderNumber: layout.instructionOrderNumber,
+              }
+            : projected;
+        },
+      ),
+      variableFacts: basis.snapshot.mutationCapability!.variableFacts.map(
+        fact => cloneVariableFact(
+          projectedVariableFacts.get(fact.variableId) ?? fact,
+        ),
+      ),
+    },
+  };
+};
 
 const editableIssueEdges = (
   graph: NonNullable<ReturnType<typeof variablesReconnectGraph>>,
@@ -402,6 +483,159 @@ const editableIssueEdges = (
     && kinds.has(edge.kind as VariablesBatchEditableRelationshipKind)
     && edge.state !== 'CONNECTED'
     && edge.state !== 'FIX_ORDER');
+
+const scopedVariableIds = (
+  basis: FrozenResolveBasis,
+): ReadonlySet<number> => {
+  const visible = new Set(basis.visibleInstructionIds);
+  const ids = new Set<number>();
+  basis.factsById.forEach((fact) => {
+    if (visible.has(fact.instructionId) && fact.variableId !== null) {
+      ids.add(fact.variableId);
+    }
+  });
+  basis.variableFactsById.forEach((fact) => {
+    if (
+      fact.ownerInstructionId !== null
+      && visible.has(fact.ownerInstructionId)
+    ) {
+      ids.add(fact.variableId);
+    }
+  });
+  return ids;
+};
+
+const variableOwnerIssueEdges = (
+  graph: NonNullable<ReturnType<typeof variablesReconnectGraph>>,
+  variableIds: ReadonlySet<number>,
+): InstructionRelationshipEdge[] =>
+  graph.edges.filter(edge =>
+    edge.kind === 'VARIABLE_OWNER'
+    && edge.source.entity === 'VARIABLE'
+    && variableIds.has(edge.source.id)
+    && (
+      edge.state === 'RECONNECT_PARENT'
+      || edge.state === 'MEMORY_ONLY'
+    ));
+
+const executionOrderIssueEdges = (
+  graph: NonNullable<ReturnType<typeof variablesReconnectGraph>>,
+  visibleInstructionIds: ReadonlySet<number>,
+): InstructionRelationshipEdge[] =>
+  graph.edges.filter(edge =>
+    edge.source.entity === 'INSTRUCTION'
+    && visibleInstructionIds.has(edge.source.id)
+    && edge.state === 'FIX_ORDER'
+    && (
+      edge.kind === 'ELEMENT_TARGET'
+      || edge.kind === 'LOOP_ANCHOR'
+      || edge.kind === 'VARIABLE_ORDER'
+    ));
+
+type InstructionOrderConstraint = Readonly<{
+  sourceInstructionId: number;
+  targetInstructionId: number;
+}>;
+
+/**
+ * Apply every reviewed "target before source" constraint together.
+ *
+ * The sort is stable inside each Block, never changes block ownership, and
+ * refuses cycles. Applying all constraints as one graph prevents a later move
+ * from invalidating an order repair applied earlier in the same mutation.
+ */
+const applyStableOrderConstraints = (
+  rows: readonly InstructionGraphLayoutRow[],
+  constraints: readonly InstructionOrderConstraint[],
+): InstructionGraphLayoutRow[] | null => {
+  const rowByInstruction = new Map(
+    rows.map(row => [row.instructionId, row] as const),
+  );
+  const rowsByBlock = new Map<number, InstructionGraphLayoutRow[]>();
+  rows.forEach((row) => {
+    const blockRows = rowsByBlock.get(row.blockId) ?? [];
+    blockRows.push({ ...row });
+    rowsByBlock.set(row.blockId, blockRows);
+  });
+  const constraintsByBlock =
+    new Map<number, InstructionOrderConstraint[]>();
+  for (const constraint of constraints) {
+    const source = rowByInstruction.get(constraint.sourceInstructionId);
+    const target = rowByInstruction.get(constraint.targetInstructionId);
+    if (
+      !source
+      || !target
+      || source.instructionId === target.instructionId
+      || source.blockId !== target.blockId
+    ) {
+      return null;
+    }
+    const blockConstraints = constraintsByBlock.get(source.blockId) ?? [];
+    blockConstraints.push(constraint);
+    constraintsByBlock.set(source.blockId, blockConstraints);
+  }
+
+  const orderedByBlock = new Map<number, InstructionGraphLayoutRow[]>();
+  for (const [blockId, blockRows] of rowsByBlock) {
+    const blockConstraints = constraintsByBlock.get(blockId) ?? [];
+    if (blockConstraints.length === 0) {
+      orderedByBlock.set(blockId, blockRows);
+      continue;
+    }
+    const originalIndex = new Map(
+      blockRows.map((row, index) => [row.instructionId, index] as const),
+    );
+    const successors = new Map<number, Set<number>>();
+    const indegree = new Map<number, number>(
+      blockRows.map(row => [row.instructionId, 0] as const),
+    );
+    blockConstraints.forEach(({ sourceInstructionId, targetInstructionId }) => {
+      const targetSuccessors =
+        successors.get(targetInstructionId) ?? new Set<number>();
+      if (!targetSuccessors.has(sourceInstructionId)) {
+        targetSuccessors.add(sourceInstructionId);
+        successors.set(targetInstructionId, targetSuccessors);
+        indegree.set(
+          sourceInstructionId,
+          (indegree.get(sourceInstructionId) ?? 0) + 1,
+        );
+      }
+    });
+    const ready = blockRows
+      .filter(row => indegree.get(row.instructionId) === 0)
+      .map(row => row.instructionId);
+    const sortedIds: number[] = [];
+    while (ready.length > 0) {
+      ready.sort((left, right) =>
+        (originalIndex.get(left) ?? Number.MAX_SAFE_INTEGER)
+        - (originalIndex.get(right) ?? Number.MAX_SAFE_INTEGER));
+      const current = ready.shift()!;
+      sortedIds.push(current);
+      (successors.get(current) ?? []).forEach((successor) => {
+        const nextIndegree = (indegree.get(successor) ?? 0) - 1;
+        indegree.set(successor, nextIndegree);
+        if (nextIndegree === 0) ready.push(successor);
+      });
+    }
+    if (sortedIds.length !== blockRows.length) return null;
+    orderedByBlock.set(
+      blockId,
+      sortedIds.map((instructionId, index) => ({
+        ...rowByInstruction.get(instructionId)!,
+        instructionOrderNumber: index + 1,
+      })),
+    );
+  }
+
+  const emittedBlocks = new Set<number>();
+  const result: InstructionGraphLayoutRow[] = [];
+  rows.forEach((row) => {
+    if (emittedBlocks.has(row.blockId)) return;
+    emittedBlocks.add(row.blockId);
+    result.push(...(orderedByBlock.get(row.blockId) ?? []));
+  });
+  return result;
+};
 
 const replacementParent = (
   edge: InstructionRelationshipEdge,
@@ -519,6 +753,8 @@ type DerivedReviewResult =
       ok: true;
       review: VariablesBatchResolveReview;
       projectedFacts: ReadonlyMap<number, VariablesInstructionFact>;
+      projectedVariableFacts: ReadonlyMap<number, VariablesVariableFact>;
+      projectedLayout: readonly InstructionGraphLayoutRow[];
     }
   | VariablesBatchConnectionFailure;
 
@@ -541,13 +777,105 @@ const deriveResolveReview = (
   const projectedFacts = new Map(
     [...basis.factsById].map(([id, fact]) => [id, cloneFact(fact)]),
   );
+  const projectedVariableFacts = new Map(
+    [...basis.variableFactsById].map(
+      ([id, fact]) => [id, cloneVariableFact(fact)],
+    ),
+  );
+  let projectedLayout = basis.snapshot.mutationCapability!.layoutRows.map(
+    row => ({ ...row }),
+  );
   const items: VariablesBatchResolveReviewItem[] = [];
   const unresolvedParentBySource = new Map<number, string>();
-  const parentEdges = editableIssueEdges(baseGraph, visibleSet, PARENT_KINDS);
+
+  const ownerEdges = variableOwnerIssueEdges(
+    baseGraph,
+    scopedVariableIds(basis),
+  );
+  for (const edge of ownerEdges) {
+    const sourceVariableId = edge.source.id;
+    const reviewId = reviewIdFor(
+      'VARIABLE',
+      sourceVariableId,
+      'VARIABLE_OWNER',
+    );
+    const authoritative = projectedVariableFacts.get(sourceVariableId);
+    if (!authoritative) {
+      return failure(
+        'AUTHORITATIVE_GRAPH_INVALID',
+        `Variable #${sourceVariableId} has no authoritative owner fact.`,
+      );
+    }
+    const compatibleTargets = Object.freeze(
+      edge.compatibleTargets.filter(target =>
+        target.entity === 'INSTRUCTION'
+        && target.id !== authoritative.ownerInstructionId),
+    );
+    const selection = selectReviewTarget(
+      reviewId,
+      compatibleTargets,
+      indexed.choices,
+    );
+    if ('ok' in selection) return selection;
+    remainingChoiceIds.delete(reviewId);
+    const currentTarget: RelationshipTarget | null =
+      authoritative.ownerInstructionId === null
+        ? null
+        : {
+            entity: 'INSTRUCTION',
+            owner: edge.source.owner,
+            id: authoritative.ownerInstructionId,
+          };
+    items.push(Object.freeze({
+      reviewId,
+      sourceEntity: 'VARIABLE',
+      sourceId: sourceVariableId,
+      sourceInstructionId: null,
+      sourceVariableId,
+      kind: 'VARIABLE_OWNER',
+      state: edge.state,
+      code: edge.code,
+      currentTarget,
+      compatibleTargets,
+      selectedTarget: selection.selectedTarget,
+      resolution: selection.resolution,
+      blockedByReviewId: null,
+    }));
+    if (selection.selectedTarget?.entity === 'INSTRUCTION') {
+      projectedVariableFacts.set(sourceVariableId, {
+        ...authoritative,
+        ownerInstructionId: selection.selectedTarget.id,
+      });
+    }
+  }
+
+  const graphAfterOwners = variablesReconnectGraph(
+    projectedSnapshot(
+      basis,
+      projectedFacts,
+      projectedVariableFacts,
+      projectedLayout,
+    ),
+  );
+  if (!graphAfterOwners) {
+    return failure(
+      'AUTHORITATIVE_GRAPH_INVALID',
+      'The projected variable-owner graph could not be constructed.',
+    );
+  }
+  const parentEdges = editableIssueEdges(
+    graphAfterOwners,
+    visibleSet,
+    PARENT_KINDS,
+  );
 
   for (const edge of parentEdges) {
     const sourceInstructionId = edge.source.id;
-    const reviewId = reviewIdFor(sourceInstructionId, edge.kind);
+    const reviewId = reviewIdFor(
+      'INSTRUCTION',
+      sourceInstructionId,
+      edge.kind,
+    );
     const compatibleTargets =
       compatibleChangingTargets(edge, basis.factsById);
     const selection = selectReviewTarget(
@@ -559,7 +887,10 @@ const deriveResolveReview = (
     remainingChoiceIds.delete(reviewId);
     const item: VariablesBatchResolveReviewItem = {
       reviewId,
+      sourceEntity: 'INSTRUCTION',
+      sourceId: sourceInstructionId,
       sourceInstructionId,
+      sourceVariableId: null,
       kind: edge.kind as VariablesBatchEditableRelationshipKind,
       state: edge.state,
       code: edge.code,
@@ -594,7 +925,12 @@ const deriveResolveReview = (
   }
 
   const graphAfterParents = variablesReconnectGraph(
-    projectedSnapshot(basis, projectedFacts),
+    projectedSnapshot(
+      basis,
+      projectedFacts,
+      projectedVariableFacts,
+      projectedLayout,
+    ),
   );
   if (!graphAfterParents) {
     return failure(
@@ -609,7 +945,11 @@ const deriveResolveReview = (
   );
   for (const edge of variableEdges) {
     const sourceInstructionId = edge.source.id;
-    const reviewId = reviewIdFor(sourceInstructionId, 'VARIABLE_BINDING');
+    const reviewId = reviewIdFor(
+      'INSTRUCTION',
+      sourceInstructionId,
+      'VARIABLE_BINDING',
+    );
     const blockedByReviewId =
       unresolvedParentBySource.get(sourceInstructionId) ?? null;
     if (blockedByReviewId !== null) {
@@ -621,7 +961,10 @@ const deriveResolveReview = (
       }
       items.push(Object.freeze({
         reviewId,
+        sourceEntity: 'INSTRUCTION',
+        sourceId: sourceInstructionId,
         sourceInstructionId,
+        sourceVariableId: null,
         kind: 'VARIABLE_BINDING',
         state: edge.state,
         code: edge.code,
@@ -645,7 +988,10 @@ const deriveResolveReview = (
     remainingChoiceIds.delete(reviewId);
     items.push(Object.freeze({
       reviewId,
+      sourceEntity: 'INSTRUCTION',
+      sourceId: sourceInstructionId,
       sourceInstructionId,
+      sourceVariableId: null,
       kind: 'VARIABLE_BINDING',
       state: edge.state,
       code: edge.code,
@@ -655,6 +1001,125 @@ const deriveResolveReview = (
       resolution: selection.resolution,
       blockedByReviewId: null,
     }));
+    if (selection.selectedTarget?.entity === 'VARIABLE') {
+      const fact = projectedFacts.get(sourceInstructionId);
+      if (!fact) {
+        return failure(
+          'AUTHORITATIVE_GRAPH_INVALID',
+          `Instruction #${sourceInstructionId} has no authoritative fact.`,
+        );
+      }
+      projectedFacts.set(sourceInstructionId, {
+        ...fact,
+        variableId: selection.selectedTarget.id,
+      });
+    }
+  }
+
+  const graphAfterBindings = variablesReconnectGraph(
+    projectedSnapshot(
+      basis,
+      projectedFacts,
+      projectedVariableFacts,
+      projectedLayout,
+    ),
+  );
+  if (!graphAfterBindings) {
+    return failure(
+      'AUTHORITATIVE_GRAPH_INVALID',
+      'The projected variable-binding graph could not be constructed.',
+    );
+  }
+  const orderSelections: Array<{
+    sourceInstructionId: number;
+    targetInstructionId: number;
+  }> = [];
+  const orderEdges = executionOrderIssueEdges(
+    graphAfterBindings,
+    visibleSet,
+  );
+  const orderLayout = projectedLayout;
+  for (const edge of orderEdges) {
+    const sourceInstructionId = edge.source.id;
+    const sourceLayout = orderLayout.find(row =>
+      row.instructionId === sourceInstructionId);
+    const kind = edge.kind === 'VARIABLE_ORDER'
+      ? 'VARIABLE_ORDER'
+      : edge.kind as Extract<
+          VariablesBatchEditableRelationshipKind,
+          'ELEMENT_TARGET' | 'LOOP_ANCHOR'
+        >;
+    const reviewId = reviewIdFor(
+      'INSTRUCTION',
+      sourceInstructionId,
+      kind,
+    );
+    const targets = new Map<string, RelationshipTarget>();
+    if (
+      edge.target?.entity === 'INSTRUCTION'
+      && sourceLayout
+      && orderLayout.find(row =>
+        row.instructionId === edge.target?.id)?.blockId
+        === sourceLayout.blockId
+    ) {
+      targets.set(targetKey(edge.target), edge.target);
+    }
+    edge.compatibleTargets.forEach((target) => {
+      const targetLayout = target.entity === 'INSTRUCTION'
+        ? orderLayout.find(row => row.instructionId === target.id)
+        : null;
+      if (
+        target.entity === 'INSTRUCTION'
+        && target.id !== sourceInstructionId
+        && sourceLayout
+        && targetLayout?.blockId === sourceLayout.blockId
+      ) {
+        targets.set(targetKey(target), target);
+      }
+    });
+    const compatibleTargets = Object.freeze([...targets.values()]);
+    const selection = selectReviewTarget(
+      reviewId,
+      compatibleTargets,
+      indexed.choices,
+    );
+    if ('ok' in selection) return selection;
+    remainingChoiceIds.delete(reviewId);
+    items.push(Object.freeze({
+      reviewId,
+      sourceEntity: 'INSTRUCTION',
+      sourceId: sourceInstructionId,
+      sourceInstructionId,
+      sourceVariableId: null,
+      kind,
+      state: edge.state,
+      code: edge.code,
+      currentTarget: edge.target,
+      compatibleTargets,
+      selectedTarget: selection.selectedTarget,
+      resolution: selection.resolution,
+      blockedByReviewId: null,
+    }));
+    if (selection.selectedTarget?.entity === 'INSTRUCTION') {
+      orderSelections.push({
+        sourceInstructionId,
+        targetInstructionId: selection.selectedTarget.id,
+      });
+    }
+  }
+
+  if (orderSelections.length > 0) {
+    const ordered = applyStableOrderConstraints(
+      projectedLayout,
+      orderSelections,
+    );
+    if (!ordered) {
+      return failure(
+        'AUTHORITATIVE_GRAPH_INVALID',
+        'The reviewed execution-order relationships are cyclic or cross Block boundaries.',
+      );
+    }
+    projectedLayout = ordered;
   }
 
   const unknownChoice = [...remainingChoiceIds][0];
@@ -681,6 +1146,9 @@ const deriveResolveReview = (
       ).length,
     },
     projectedFacts,
+    projectedVariableFacts,
+    projectedLayout: Object.freeze(projectedLayout.map(row =>
+      Object.freeze({ ...row }))),
   };
 };
 
@@ -703,10 +1171,16 @@ export const planVariablesBatchResolve = (
       fact => [fact.instructionId, fact],
     ),
   );
+  const variableFactsById = new Map(
+    basisSnapshot.mutationCapability!.variableFacts.map(
+      fact => [fact.variableId, fact],
+    ),
+  );
   const basis: FrozenResolveBasis = Object.freeze({
     snapshot: basisSnapshot,
     visibleInstructionIds: visible,
     factsById,
+    variableFactsById,
   });
   const derived = deriveResolveReview(basis, []);
   if (!derived.ok) return derived;
@@ -749,11 +1223,48 @@ export const buildVariablesBatchResolveMutation = (
   const relationPatches = new Map<number, InstructionGraphRelationPatch>();
   const bindingPatches =
     new Map<number, InstructionGraphVariableBindingPatch>();
+  const ownerPatches =
+    new Map<number, InstructionGraphVariableOwnerPatch>();
   const changedInstructionIds = new Set<number>();
 
   derived.review.items.forEach((item) => {
     const target = item.selectedTarget;
     if (target === null) return;
+    if (item.state === 'FIX_ORDER' && item.sourceInstructionId !== null) {
+      changedInstructionIds.add(item.sourceInstructionId);
+    }
+    if (item.kind === 'VARIABLE_OWNER') {
+      if (
+        item.sourceVariableId === null
+        || target.entity !== 'INSTRUCTION'
+      ) {
+        return;
+      }
+      const sourceVariable = plan.basis.variableFactsById.get(
+        item.sourceVariableId,
+      );
+      if (
+        !sourceVariable
+        || sourceVariable.ownerInstructionId === target.id
+      ) {
+        return;
+      }
+      ownerPatches.set(item.sourceVariableId, {
+        variableId: item.sourceVariableId,
+        operation: 'SET',
+        expected: { value: sourceVariable.ownerInstructionId },
+        replacement: { value: target.id },
+      });
+      changedInstructionIds.add(target.id);
+      return;
+    }
+    if (item.kind === 'VARIABLE_ORDER') {
+      if (item.sourceInstructionId !== null) {
+        changedInstructionIds.add(item.sourceInstructionId);
+      }
+      return;
+    }
+    if (item.sourceInstructionId === null) return;
     const source = plan.basis.factsById.get(item.sourceInstructionId);
     if (!source) return;
     if (item.kind === 'VARIABLE_BINDING') {
@@ -801,7 +1312,28 @@ export const buildVariablesBatchResolveMutation = (
     changedInstructionIds.add(item.sourceInstructionId);
   });
 
-  if (relationPatches.size === 0 && bindingPatches.size === 0) {
+  const authoritativeLayout =
+    plan.basis.snapshot.mutationCapability!.layoutRows;
+  const layoutChanged =
+    derived.projectedLayout.length === authoritativeLayout.length
+    && derived.projectedLayout.some((row, index) => {
+      const before = authoritativeLayout[index];
+      return before.instructionId !== row.instructionId
+        || before.blockId !== row.blockId
+        || before.blockOrderNumber !== row.blockOrderNumber
+        || before.instructionOrderNumber !== row.instructionOrderNumber;
+    });
+  const firstMovedInstructionId = derived.review.items.find(item =>
+    item.state === 'FIX_ORDER'
+    && item.selectedTarget !== null
+    && item.sourceInstructionId !== null)?.sourceInstructionId ?? null;
+
+  if (
+    relationPatches.size === 0
+    && bindingPatches.size === 0
+    && ownerPatches.size === 0
+    && !layoutChanged
+  ) {
     return failure(
       'NO_CHANGES',
       'No reviewed visible relationship requires an update.',
@@ -812,18 +1344,20 @@ export const buildVariablesBatchResolveMutation = (
     mutation: {
       mutationProfile: VARIABLES_REACT_AUTHORED_PROFILE,
       draft: {
-        mutationKind: 'RELATIONSHIP_UPDATE',
-        draggedInstructionId: null,
-        layoutRows: plan.basis.snapshot.mutationCapability!.layoutRows.map(
-          row => ({ ...row }),
-        ),
+        mutationKind: layoutChanged ? 'ROW_MOVE' : 'RELATIONSHIP_UPDATE',
+        draggedInstructionId: layoutChanged
+          ? firstMovedInstructionId
+          : null,
+        layoutRows: derived.projectedLayout.map(row => ({ ...row })),
         instructionRelationPatches: [...relationPatches.values()],
         variableBindingPatches: [...bindingPatches.values()],
-        variableOwnerPatches: [],
+        variableOwnerPatches: [...ownerPatches.values()],
       },
       review: derived.review,
       changedInstructionIds: Object.freeze(
-        plan.visibleInstructionIds.filter(id => changedInstructionIds.has(id)),
+        authoritativeLayout
+          .map(row => row.instructionId)
+          .filter(id => changedInstructionIds.has(id)),
       ),
     },
   };

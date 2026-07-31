@@ -86,6 +86,7 @@ const snapshot = (
       variableId: null,
       tagName: null,
     })),
+    variableFacts: [],
   },
   ...overrides,
 });

@@ -1,7 +1,9 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import type {
+  DerivedRelationshipState,
   InstructionRelationshipEdge,
+  InstructionRelationshipKind,
   RelationshipOwner,
 } from '../bot-job-details/grid/domain/instructionRelationshipGraph';
 import rulesCardStyles from '../RulesCard.module.scss';
@@ -71,7 +73,162 @@ const variableEdge = (
   compatibleTargets: [],
 });
 
+const structuralEdge = (
+  sourceId: number,
+  kind: Extract<
+    InstructionRelationshipKind,
+    'LOOP_ANCHOR' | 'CONDITIONAL_ROOT' | 'BLOCK_TARGET'
+  >,
+  state: Extract<
+    DerivedRelationshipState,
+    | 'CONNECTED'
+    | 'RECONNECT_LOOP'
+    | 'REPAIR_CONDITIONAL'
+    | 'RECONNECT_BLOCK'
+  >,
+  code: string | null,
+  targetId: number | null,
+): InstructionRelationshipEdge => ({
+  id: `${kind}:${sourceId}:${state}`,
+  kind,
+  source: { entity: 'INSTRUCTION', owner: OWNER, id: sourceId },
+  target: targetId === null
+    ? null
+    : kind === 'BLOCK_TARGET'
+      ? { entity: 'BLOCK', owner: OWNER, id: targetId }
+      : { entity: 'INSTRUCTION', owner: OWNER, id: targetId },
+  state,
+  code,
+  required: true,
+  compatibleTargets: [],
+});
+
 const block = [{ id: 7, name: 'Login', order: 1, active: true }];
+
+test.each([
+  {
+    label: 'LOOP',
+    action: 'LOOP',
+    kind: 'LOOP_ANCHOR' as const,
+    state: 'RECONNECT_LOOP' as const,
+    code: 'MISSING_LOOP_ANCHOR',
+    accessibleName: /Reconnect Loop: missing loop anchor/i,
+  },
+  {
+    label: 'conditional',
+    action: 'ELSE',
+    kind: 'CONDITIONAL_ROOT' as const,
+    state: 'REPAIR_CONDITIONAL' as const,
+    code: 'CONDITIONAL_ROOT_MISMATCH',
+    accessibleName: /Repair Conditional: conditional root mismatch/i,
+  },
+  {
+    label: 'Block navigation',
+    action: 'GOTO',
+    kind: 'BLOCK_TARGET' as const,
+    state: 'RECONNECT_BLOCK' as const,
+    code: 'MISSING_BLOCK_TARGET',
+    accessibleName: /Reconnect Block: missing block target/i,
+  },
+])(
+  'renders a red glowing clickable reconnect action for a missing $label relationship',
+  ({ action, kind, state, code, accessibleName }) => {
+    const instruction = command(1700, action, null, {
+      parentBlockId: null,
+      variableId: null,
+    });
+    const edge = structuralEdge(
+      instruction.id!,
+      kind,
+      state,
+      code,
+      null,
+    );
+    const onReconnectParent = jest.fn();
+
+    render(
+      <VariablesCommandBoard
+        blocks={block}
+        instructions={[instruction]}
+        relationshipEdges={[edge]}
+        onReconnectParent={onReconnectParent}
+      />,
+    );
+
+    const reconnect = screen.getByRole('button', {
+      name: accessibleName,
+    });
+    expect(reconnect).toHaveClass(
+      rulesCardStyles.red,
+      rulesCardStyles.withBorder,
+      rulesCardStyles.static,
+      rulesCardStyles.pulse,
+    );
+    fireEvent.click(reconnect);
+
+    expect(onReconnectParent).toHaveBeenCalledTimes(1);
+    expect(onReconnectParent).toHaveBeenCalledWith(instruction.id, edge);
+  },
+);
+
+test.each([
+  {
+    label: 'LOOP',
+    action: 'LOOP',
+    kind: 'LOOP_ANCHOR' as const,
+    targetId: 1699,
+    accessibleName: 'Loop connected (id: 1699)',
+  },
+  {
+    label: 'conditional',
+    action: 'ELSE',
+    kind: 'CONDITIONAL_ROOT' as const,
+    targetId: 1698,
+    accessibleName: 'Conditional connected (id: 1698)',
+  },
+  {
+    label: 'Block navigation',
+    action: 'EXCEL GOTO',
+    kind: 'BLOCK_TARGET' as const,
+    targetId: 8,
+    accessibleName: 'Block connected (id: 8)',
+  },
+])(
+  'keeps a connected $label badge orange, visible, clickable, and non-independent',
+  ({ action, kind, targetId, accessibleName }) => {
+    const instruction = command(1700, action, targetId, {
+      parentBlockId: kind === 'BLOCK_TARGET' ? targetId : 7,
+      variableId: null,
+    });
+    const edge = structuralEdge(
+      instruction.id!,
+      kind,
+      'CONNECTED',
+      null,
+      targetId,
+    );
+    const onReconnectParent = jest.fn();
+
+    render(
+      <VariablesCommandBoard
+        blocks={block}
+        instructions={[instruction]}
+        relationshipEdges={[edge]}
+        onReconnectParent={onReconnectParent}
+      />,
+    );
+
+    const connected = screen.getByRole('button', {
+      name: accessibleName,
+    });
+    expect(connected).toHaveClass(boardStyles.connectedParent);
+    expect(screen.queryByText('Independent')).not.toBeInTheDocument();
+    fireEvent.click(connected);
+
+    expect(onReconnectParent).toHaveBeenCalledTimes(1);
+    expect(onReconnectParent).toHaveBeenCalledWith(instruction.id, edge);
+  },
+);
 
 test('always shows the connected or reconnect parent badge in Variables', () => {
   const parent = command(1640, 'O', null);

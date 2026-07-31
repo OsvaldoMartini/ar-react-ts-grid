@@ -124,6 +124,16 @@ export interface VariablesInstructionFact extends InstructionGraphLayoutRow {
   tagName?: string | null;
 }
 
+export interface VariablesVariableFact {
+  variableId: number;
+  /**
+   * Exact persisted owner ID. A dangling positive ID is intentionally
+   * preserved so React can build a compare-and-set repair instead of
+   * overwriting authority inferred from a resolved presentation card.
+   */
+  ownerInstructionId: number | null;
+}
+
 export interface VariablesMutationCapability {
   enabled: true;
   contractVersion: 3;
@@ -142,6 +152,7 @@ export interface VariablesMutationCapability {
   };
   layoutRows: InstructionGraphLayoutRow[];
   instructionFacts: VariablesInstructionFact[];
+  variableFacts: VariablesVariableFact[];
 }
 
 export type RuntimeVariableState = 'VALUE' | 'VOID';
@@ -261,6 +272,7 @@ const normalizeMutationCapability = (
     || positiveInteger(owner.botJobId) !== botJob.id
     || !Array.isArray(candidate.layoutRows)
     || !Array.isArray(candidate.instructionFacts)
+    || !Array.isArray(candidate.variableFacts)
   ) {
     return null;
   }
@@ -303,9 +315,28 @@ const normalizeMutationCapability = (
         }
       : null;
   });
+  const variableFacts = candidate.variableFacts.map((value: unknown) => {
+    const row = asObject(value);
+    if (
+      !row
+      || !Object.prototype.hasOwnProperty.call(row, 'ownerInstructionId')
+    ) {
+      return null;
+    }
+    const variableId = positiveInteger(row.variableId);
+    const ownerValue = row.ownerInstructionId;
+    const ownerInstructionId = ownerValue == null
+      ? null
+      : positiveInteger(ownerValue);
+    return variableId !== null
+      && (ownerValue == null || ownerInstructionId !== null)
+      ? { variableId, ownerInstructionId }
+      : null;
+  });
   if (
     layoutRows.some(row => row === null)
     || instructionFacts.some(row => row === null)
+    || variableFacts.some(row => row === null)
     || layoutRows.length === 0
     || layoutRows.length !== instructionFacts.length
   ) {
@@ -313,6 +344,7 @@ const normalizeMutationCapability = (
   }
   const normalizedLayout = layoutRows as InstructionGraphLayoutRow[];
   const normalizedFacts = instructionFacts as VariablesInstructionFact[];
+  const normalizedVariableFacts = variableFacts as VariablesVariableFact[];
   const crossBlockProfile = candidate.crossBlockProfile
     === VARIABLES_INDIVIDUAL_CROSS_BLOCK_PROFILE
     ? VARIABLES_INDIVIDUAL_CROSS_BLOCK_PROFILE
@@ -325,6 +357,9 @@ const normalizeMutationCapability = (
   const factIds = new Set(normalizedFacts.map(row => row.instructionId));
   const factsById = new Map(
     normalizedFacts.map(row => [row.instructionId, row]),
+  );
+  const variableFactsById = new Map(
+    normalizedVariableFacts.map(row => [row.variableId, row]),
   );
   const occupiedOrders = new Set<string>();
   if (
@@ -345,8 +380,26 @@ const normalizeMutationCapability = (
   ) {
     return null;
   }
-  const variableFactsMatch = variables.every(variable =>
-    variable.commands.every(command => {
+  const variableFactsMatch =
+    variableFactsById.size === normalizedVariableFacts.length
+    && normalizedVariableFacts.length === variables.length
+    && variables.every(variable => {
+      const authoritativeVariable = variableFactsById.get(variable.id);
+      if (!authoritativeVariable) return false;
+      const ownerMatches = variable.owner === null
+        ? authoritativeVariable.ownerInstructionId === null
+          || !factsById.has(authoritativeVariable.ownerInstructionId)
+        : variable.owner.id !== null
+          && authoritativeVariable.ownerInstructionId === variable.owner.id
+          && factsById.get(variable.owner.id)?.blockId === variable.owner.blockId
+          && factsById.get(variable.owner.id)?.blockOrderNumber
+            === variable.owner.blockOrder
+          && factsById.get(variable.owner.id)?.instructionOrderNumber
+            === variable.owner.instructionOrder
+          && canonicalInstructionAction(
+            factsById.get(variable.owner.id)?.action,
+          ) === canonicalInstructionAction(variable.owner.command);
+      return ownerMatches && variable.commands.every(command => {
       if (command.id === null) return false;
       const fact = factsById.get(command.id);
       return Boolean(fact)
@@ -358,21 +411,8 @@ const normalizeMutationCapability = (
         && fact?.parentId === command.parentId
         && fact?.parentBlockId === command.parentBlockId
         && fact?.variableId === variable.id;
-    })
-    && (
-      variable.owner === null
-      || (
-        variable.owner.id !== null
-        && factsById.get(variable.owner.id)?.blockId === variable.owner.blockId
-        && factsById.get(variable.owner.id)?.blockOrderNumber
-          === variable.owner.blockOrder
-        && factsById.get(variable.owner.id)?.instructionOrderNumber
-          === variable.owner.instructionOrder
-        && canonicalInstructionAction(
-          factsById.get(variable.owner.id)?.action,
-        ) === canonicalInstructionAction(variable.owner.command)
-      )
-    ));
+      });
+    });
   const commandFactsMatch = commands.every(command => {
     if (command.id === null) return false;
     const fact = factsById.get(command.id);
@@ -420,6 +460,7 @@ const normalizeMutationCapability = (
     },
     layoutRows: normalizedLayout,
     instructionFacts: normalizedFacts,
+    variableFacts: normalizedVariableFacts,
   };
 };
 

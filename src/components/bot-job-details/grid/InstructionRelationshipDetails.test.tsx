@@ -70,6 +70,125 @@ const relationshipEdge = (
   };
 };
 
+test.each([
+  {
+    label: 'LOOP',
+    action: 'LOOP',
+    state: 'RECONNECT_LOOP' as const,
+    code: 'MISSING_LOOP_ANCHOR',
+    kind: 'LOOP_ANCHOR' as const,
+    accessibleName: /Reconnect Loop: Missing loop anchor/i,
+  },
+  {
+    label: 'conditional',
+    action: 'ELSE',
+    state: 'REPAIR_CONDITIONAL' as const,
+    code: 'CONDITIONAL_ROOT_MISMATCH',
+    kind: 'CONDITIONAL_ROOT' as const,
+    accessibleName: /Repair Conditional: Conditional root mismatch/i,
+  },
+  {
+    label: 'Block navigation',
+    action: 'GOTO',
+    state: 'RECONNECT_BLOCK' as const,
+    code: 'MISSING_BLOCK_TARGET',
+    kind: 'BLOCK_TARGET' as const,
+    accessibleName: /Reconnect Block: Missing block target/i,
+  },
+])(
+  'renders a red glowing clickable reconnect action for a missing $label relationship',
+  ({ action, state, code, kind, accessibleName }) => {
+    const instruction = row(2, 2, action);
+    const edge = relationshipEdge(state, code, kind);
+    const onReconnect = jest.fn();
+
+    render(
+      <InstructionRelationshipDetails
+        instruction={instruction}
+        allInstructions={[instruction]}
+        relationshipEdges={[edge]}
+        onReconnect={onReconnect}
+      />,
+    );
+
+    const reconnect = screen.getByRole('button', {
+      name: accessibleName,
+    });
+    expect(reconnect).toHaveClass(
+      rulesCardStyles.red,
+      rulesCardStyles.withBorder,
+      rulesCardStyles.static,
+      rulesCardStyles.pulse,
+    );
+    fireEvent.click(reconnect);
+
+    expect(onReconnect).toHaveBeenCalledTimes(1);
+    expect(onReconnect).toHaveBeenCalledWith(edge);
+  },
+);
+
+test.each([
+  {
+    label: 'LOOP',
+    action: 'LOOP',
+    kind: 'LOOP_ANCHOR' as const,
+    targetId: 1,
+    accessibleName: 'Loop connected (id: 1)',
+  },
+  {
+    label: 'conditional',
+    action: 'ELSE',
+    kind: 'CONDITIONAL_ROOT' as const,
+    targetId: 1,
+    accessibleName: 'Conditional connected (id: 1)',
+  },
+  {
+    label: 'Block navigation',
+    action: 'EXCEL GOTO',
+    kind: 'BLOCK_TARGET' as const,
+    targetId: 20,
+    accessibleName: 'Block connected (id: 20)',
+  },
+])(
+  'keeps a connected $label badge orange, visible, and clickable',
+  ({ action, kind, targetId, accessibleName }) => {
+    const instruction = row(2, 2, action, {
+      parentId: kind === 'BLOCK_TARGET' ? null : targetId,
+      parentBlockId: kind === 'BLOCK_TARGET' ? targetId : 10,
+    });
+    const edge = relationshipEdge(
+      'CONNECTED',
+      null,
+      kind,
+      instruction.id,
+      targetId,
+    );
+    const onReconnect = jest.fn();
+
+    render(
+      <InstructionRelationshipDetails
+        instruction={instruction}
+        allInstructions={[row(1, 1, 'O'), instruction]}
+        relationshipEdges={[edge]}
+        onReconnect={onReconnect}
+      />,
+    );
+
+    const connected = screen.getByRole('button', {
+      name: accessibleName,
+    });
+    expect(connected).toHaveClass(
+      relationshipStyles.reconnectButton,
+      relationshipStyles.reconnectParent,
+      relationshipStyles.connectedParent,
+    );
+    fireEvent.click(connected);
+
+    expect(onReconnect).toHaveBeenCalledTimes(1);
+    expect(onReconnect).toHaveBeenCalledWith(edge);
+  },
+);
+
 test('preserves the legacy LOOP relationship text and colors', () => {
   const parent = row(917, 1, 'O', { name: 'Pagina iniziale' });
   const loop = row(918, 2, 'LOOP', {

@@ -161,6 +161,10 @@ const snapshot = (
         instructionOrderNumber: row.instructionOrderNumber,
       })),
       instructionFacts: facts.map(row => ({ ...row })),
+      variableFacts: variables.map(entry => ({
+        variableId: entry.id,
+        ownerInstructionId: entry.owner?.id ?? null,
+      })),
     },
   };
 };
@@ -325,7 +329,7 @@ test('RESOLVE never guesses an ambiguous parent and refreshes variable choices a
     }));
 });
 
-test('RESOLVE ignores FIX_ORDER, VARIABLE_ORDER, and positional edges', () => {
+test('RESOLVE repairs FIX_ORDER while leaving positional scope derived-only', () => {
   const current = snapshot([
     fact(1, 'GET', 10, 1, 1, {
       parentId: 2,
@@ -343,9 +347,180 @@ test('RESOLVE ignores FIX_ORDER, VARIABLE_ORDER, and positional edges', () => {
   const planned = planVariablesBatchResolve(current, [1, 3]);
   expect(planned.ok).toBe(true);
   if (!planned.ok) return;
-  expect(planned.plan.reviewItems).toEqual([]);
-  expect(buildVariablesBatchResolveMutation(planned.plan, []))
-    .toEqual(expect.objectContaining({ ok: false, code: 'NO_CHANGES' }));
+  expect(planned.plan.reviewItems).toEqual([
+    expect.objectContaining({
+      reviewId: '1:ELEMENT_TARGET',
+      sourceInstructionId: 1,
+      state: 'FIX_ORDER',
+      resolution: 'AUTO',
+      selectedTarget: expect.objectContaining({ id: 2 }),
+    }),
+  ]);
+  const built = buildVariablesBatchResolveMutation(planned.plan, []);
+  expect(built.ok).toBe(true);
+  if (!built.ok) return;
+  expect(built.mutation.draft.mutationKind).toBe('ROW_MOVE');
+  expect(built.mutation.draft.draggedInstructionId).toBe(1);
+  expect(built.mutation.draft.layoutRows.map(row => row.instructionId))
+    .toEqual([2, 1, 3]);
+  expect(built.mutation.draft.instructionRelationPatches).toEqual([]);
+});
+
+test('RESOLVE moves a variable reader after its reviewed runtime writer', () => {
+  const owner = ownerNode(1, 10, 1, 1);
+  const current = snapshot([
+    fact(1, 'O', 10, 1, 1),
+    fact(2, 'E', 10, 1, 2, {
+      parentId: 1,
+      parentBlockId: 10,
+      variableId: 100,
+    }),
+    fact(3, 'GET', 10, 1, 3, {
+      parentId: 1,
+      parentBlockId: 10,
+      variableId: 100,
+    }),
+  ], [variable(100, owner)]);
+
+  const planned = planVariablesBatchResolve(current, [2]);
+  expect(planned.ok).toBe(true);
+  if (!planned.ok) return;
+  expect(planned.plan.reviewItems).toEqual([
+    expect.objectContaining({
+      reviewId: '2:VARIABLE_ORDER',
+      kind: 'VARIABLE_ORDER',
+      state: 'FIX_ORDER',
+      resolution: 'AUTO',
+      selectedTarget: expect.objectContaining({ id: 3 }),
+    }),
+  ]);
+  const built = buildVariablesBatchResolveMutation(planned.plan, []);
+  expect(built.ok).toBe(true);
+  if (!built.ok) return;
+  expect(built.mutation.draft.layoutRows.map(row => row.instructionId))
+    .toEqual([1, 3, 2]);
+});
+
+test('RESOLVE repairs a dangling variable owner with an exact owner patch', () => {
+  const current = snapshot([
+    fact(1, 'O', 10, 1, 1),
+    fact(2, 'GET', 10, 1, 2, {
+      parentId: 1,
+      parentBlockId: 10,
+      variableId: 100,
+    }),
+  ], [variable(100, null)]);
+  current.mutationCapability!.variableFacts = [{
+    variableId: 100,
+    ownerInstructionId: 999,
+  }];
+
+  const planned = planVariablesBatchResolve(current, [1, 2]);
+  expect(planned.ok).toBe(true);
+  if (!planned.ok) return;
+  expect(planned.plan.reviewItems).toEqual(expect.arrayContaining([
+    expect.objectContaining({
+      reviewId: 'VARIABLE:100:VARIABLE_OWNER',
+      sourceEntity: 'VARIABLE',
+      sourceVariableId: 100,
+      kind: 'VARIABLE_OWNER',
+      currentTarget: expect.objectContaining({ id: 999 }),
+      selectedTarget: expect.objectContaining({ id: 1 }),
+    }),
+  ]));
+  const built = buildVariablesBatchResolveMutation(planned.plan, []);
+  expect(built.ok).toBe(true);
+  if (!built.ok) return;
+  expect(built.mutation.draft.variableOwnerPatches).toEqual([{
+    variableId: 100,
+    operation: 'SET',
+    expected: { value: 999 },
+    replacement: { value: 1 },
+  }]);
+});
+
+test('RESOLVE offers ownership for a visible bound command with a null owner', () => {
+  const current = snapshot([
+    fact(1, 'O', 10, 1, 1),
+    fact(2, 'GET', 10, 1, 2, {
+      parentId: 1,
+      parentBlockId: 10,
+      variableId: 100,
+    }),
+  ], [variable(100, null)]);
+
+  const planned = planVariablesBatchResolve(current, [2]);
+  expect(planned.ok).toBe(true);
+  if (!planned.ok) return;
+  expect(planned.plan.reviewItems).toEqual(expect.arrayContaining([
+    expect.objectContaining({
+      reviewId: 'VARIABLE:100:VARIABLE_OWNER',
+      sourceVariableId: 100,
+      state: 'MEMORY_ONLY',
+      selectedTarget: expect.objectContaining({ id: 1 }),
+    }),
+  ]));
+  const built = buildVariablesBatchResolveMutation(planned.plan, []);
+  expect(built.ok).toBe(true);
+  if (!built.ok) return;
+  expect(built.mutation.draft.variableOwnerPatches).toEqual([{
+    variableId: 100,
+    operation: 'SET',
+    expected: { value: null },
+    replacement: { value: 1 },
+  }]);
+});
+
+test('RELEASE clears only variable owners whose owner row is visible', () => {
+  const owner = ownerNode(1, 10, 1, 1);
+  const current = snapshot([
+    fact(1, 'O', 10, 1, 1),
+    fact(2, 'GET', 10, 1, 2, {
+      parentId: 1,
+      parentBlockId: 10,
+      variableId: 100,
+    }),
+  ], [variable(100, owner)]);
+
+  const hiddenOwner = planVariablesBatchRelease(current, [2]);
+  expect(hiddenOwner.ok).toBe(true);
+  if (!hiddenOwner.ok) return;
+  expect(hiddenOwner.plan.draft.variableOwnerPatches).toEqual([]);
+
+  const visibleOwner = planVariablesBatchRelease(current, [1]);
+  expect(visibleOwner.ok).toBe(true);
+  if (!visibleOwner.ok) return;
+  expect(visibleOwner.plan.draft.variableOwnerPatches).toEqual([{
+    variableId: 100,
+    operation: 'CLEAR',
+    expected: { value: 1 },
+    replacement: { value: null },
+  }]);
+});
+
+test('RELEASE clears a dangling owner when a visible command uses its variable', () => {
+  const current = snapshot([
+    fact(1, 'O', 10, 1, 1),
+    fact(2, 'GET', 10, 1, 2, {
+      parentId: 1,
+      parentBlockId: 10,
+      variableId: 100,
+    }),
+  ], [variable(100, null)]);
+  current.mutationCapability!.variableFacts = [{
+    variableId: 100,
+    ownerInstructionId: 999,
+  }];
+
+  const release = planVariablesBatchRelease(current, [2]);
+  expect(release.ok).toBe(true);
+  if (!release.ok) return;
+  expect(release.plan.draft.variableOwnerPatches).toEqual([{
+    variableId: 100,
+    operation: 'CLEAR',
+    expected: { value: 999 },
+    replacement: { value: null },
+  }]);
 });
 
 test('authority validator rejects any changed frozen graph authority', () => {

@@ -159,6 +159,10 @@ const snapshot = (
       instructionOrderNumber: row.instructionOrderNumber,
     })),
     instructionFacts: facts,
+    variableFacts: [{
+      variableId: 1,
+      ownerInstructionId: 100,
+    }],
   },
 });
 

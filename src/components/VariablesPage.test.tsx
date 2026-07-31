@@ -211,6 +211,10 @@ const mutableRelationshipSnapshot = (graphRevision = 'd'.repeat(64)) => ({
       parentBlockId: 7,
       variableId: 12,
     }],
+    variableFacts: [{
+      variableId: 12,
+      ownerInstructionId: 189,
+    }],
   },
 });
 
@@ -480,6 +484,10 @@ test('opens the two-step Block transfer flow and sends the exact React copy sele
         parentBlockId: 7,
         variableId: 12,
       }],
+      variableFacts: [{
+        variableId: 12,
+        ownerInstructionId: 189,
+      }],
     },
   };
   const view = render(
@@ -568,7 +576,7 @@ test('releases only visible direct connections in one atomic v3 request', async 
   expect(screen.getByRole('heading', { name: 'Release Connections' }))
     .toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', {
-    name: 'Release 4 Connections',
+    name: 'Release 5 Connections',
   }));
 
   const sent = JSON.parse(mockSend.mock.calls.at(-1)?.[0] as string);
@@ -579,7 +587,12 @@ test('releases only visible direct connections in one atomic v3 request', async 
     baseGraphVersion: 9,
     graphRevision: mutableSnapshot.graphRevision,
     draggedInstructionId: null,
-    variableOwnerPatches: [],
+    variableOwnerPatches: [{
+      variableId: 12,
+      operation: 'CLEAR',
+      expected: { value: 189 },
+      replacement: { value: null },
+    }],
   });
   expect(body.instructionRelationPatches).toEqual([
     expect.objectContaining({
@@ -671,5 +684,114 @@ test('resolves a unique visible Web Element connection through the new modal', a
   ]);
   expect(body.variableBindingPatches).toEqual([]);
   expect(body.variableOwnerPatches).toEqual([]);
+  view.unmount();
+});
+
+test('repairs Web Element, GET, and variable ownership in one atomic v3 request', async () => {
+  const base = mutableRelationshipSnapshot('f'.repeat(64));
+  const disconnectedFlowSnapshot = {
+    ...base,
+    variables: base.variables.map(variable => ({
+      ...variable,
+      owner: null,
+      commands: [{
+        instructionId: 189,
+        instructionName: 'Amount',
+        action: 'Web Field',
+        role: 'INVALID_LINK',
+        operation: '',
+        parentId: null,
+        parentBlockId: null,
+        variableId: 12,
+        blockId: 7,
+        blockName: 'Login',
+        blockOrder: 1,
+        instructionOrder: 2,
+        active: true,
+        blockActive: true,
+      }, ...variable.commands.map(command =>
+        command.instructionId === 190
+          ? {
+              ...command,
+              parentId: null,
+              parentBlockId: null,
+            }
+          : command)],
+    })),
+    mutationCapability: {
+      ...base.mutationCapability,
+      instructionFacts: base.mutationCapability.instructionFacts.map(fact =>
+        fact.instructionId === 189
+          ? {
+              ...fact,
+              variableId: 12,
+            }
+          : fact.instructionId === 190
+          ? {
+              ...fact,
+              parentId: null,
+              parentBlockId: null,
+            }
+          : fact),
+      variableFacts: [{
+        variableId: 12,
+        ownerInstructionId: null,
+      }],
+    },
+  };
+  const view = render(
+    <VariablesPage socketPort={59772} sessionId="variablesManager" />,
+  );
+  await waitFor(() => expect(mockSend).toHaveBeenCalledTimes(1));
+  const bootstrapRequest = JSON.parse(
+    JSON.parse(mockSend.mock.calls[0][0]).body,
+  );
+  mockMessages = [response('variablesWorkspace.bootstrapResponse', {
+    ...disconnectedFlowSnapshot,
+    requestId: bootstrapRequest.requestId,
+  })];
+  view.rerender(
+    <VariablesPage socketPort={59772} sessionId="variablesManager" />,
+  );
+
+  const ownerMissing = await screen.findByRole('button', {
+    name: /Owner missing.*Connect Web Element/i,
+  });
+  fireEvent.click(ownerMissing);
+  expect(screen.getByRole('heading', { name: 'Repair Variable Flow' }))
+    .toBeInTheDocument();
+  fireEvent.click(screen.getByRole('combobox', {
+    name: 'Compatible Web Element',
+  }));
+  fireEvent.click(screen.getByRole('option', {
+    name: /Amount.*ID 189/i,
+  }));
+  fireEvent.click(screen.getByRole('combobox', {
+    name: 'Compatible GET producer',
+  }));
+  fireEvent.click(screen.getByRole('option', {
+    name: /Read Amount.*ID 190/i,
+  }));
+  fireEvent.click(screen.getByRole('button', {
+    name: 'Connect Variable Flow',
+  }));
+
+  const sent = JSON.parse(mockSend.mock.calls.at(-1)?.[0] as string);
+  const body = JSON.parse(sent.body);
+  expect(sent.type).toBe('variablesWorkspace.graphMutationV3');
+  expect(body.instructionRelationPatches).toEqual([{
+    instructionId: 190,
+    relationKind: 'ELEMENT_TARGET',
+    operation: 'SET',
+    expected: { parentId: null, parentBlockId: null },
+    replacement: { parentId: 189, parentBlockId: 7 },
+  }]);
+  expect(body.variableBindingPatches).toEqual([]);
+  expect(body.variableOwnerPatches).toEqual([{
+    variableId: 12,
+    operation: 'SET',
+    expected: { value: null },
+    replacement: { value: 189 },
+  }]);
   view.unmount();
 });

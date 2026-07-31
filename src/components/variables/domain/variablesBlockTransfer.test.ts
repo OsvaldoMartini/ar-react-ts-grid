@@ -184,6 +184,10 @@ const snapshot = (): VariableWorkspaceSnapshot => {
         instructionOrderNumber,
       })),
       instructionFacts,
+      variableFacts: [{
+        variableId: 1,
+        ownerInstructionId: 100,
+      }],
     },
   };
 };
