@@ -45,6 +45,8 @@ export interface VariablesCommandBoardProps {
   blocks: readonly VariableWorkspaceBlock[];
   instructions: readonly VariableInstructionNode[];
   relationshipEdges?: readonly InstructionRelationshipEdge[];
+  /** Stable Bot Job owner key. Changing it clears command-list filters. */
+  workspaceIdentityKey?: string | number | null;
   disabled?: boolean;
   unavailableReason?: string;
   selectedInstructionId?: number | null;
@@ -138,6 +140,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
   blocks,
   instructions,
   relationshipEdges = [],
+  workspaceIdentityKey,
   disabled = false,
   unavailableReason,
   selectedInstructionId = null,
@@ -160,6 +163,11 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
   const [commandSearch, setCommandSearch] = useState('');
   const [blockFilter, setBlockFilter] = useState<number | null>(null);
   const commandSearchActive = commandSearch.trim().length > 0;
+
+  useEffect(() => {
+    setCommandSearch('');
+    setBlockFilter(null);
+  }, [workspaceIdentityKey]);
 
   useEffect(() => {
     if (

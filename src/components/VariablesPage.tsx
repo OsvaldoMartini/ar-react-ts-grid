@@ -1909,6 +1909,7 @@ const VariablesPage: React.FC<Props> = ({
           ) : (
             <section className={styles.workspace}>
               <VariablesCommandBoard
+                workspaceIdentityKey={`${snapshot.botJob.homeBankingId}:${snapshot.botJob.id}`}
                 blocks={snapshot.blocks}
                 instructions={snapshot.commands}
                 relationshipEdges={relationshipGraph?.edges ?? []}
