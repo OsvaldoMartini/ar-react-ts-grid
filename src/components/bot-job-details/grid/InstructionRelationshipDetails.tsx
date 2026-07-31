@@ -263,13 +263,22 @@ const InstructionRelationshipDetails: React.FC<
   // (Web Field parent, loop anchor, conditional root, GOTO destination block) uses
   // ONE chip contract: broken = red clickable chip, connected = styled clickable
   // chip that opens the same reconnect dialog to modify or disconnect.
+  // ELEMENT_TARGET edges always own the parent-chip pathway (legacy behavior).
+  // Structural kinds (loop/conditional/block) join it only when CONNECTED or
+  // broken; their other states (FIX_ORDER, SAVING, REFUSED) keep their own
+  // dedicated chips below.
   const structuralParentEdge = relationshipEdges.find(edge =>
     edge.source.entity === 'INSTRUCTION'
     && edge.source.id === instruction.id
     && (edge.kind === 'ELEMENT_TARGET'
-      || edge.kind === 'LOOP_ANCHOR'
-      || edge.kind === 'CONDITIONAL_ROOT'
-      || edge.kind === 'BLOCK_TARGET'));
+      || ((edge.kind === 'LOOP_ANCHOR'
+        || edge.kind === 'CONDITIONAL_ROOT'
+        || edge.kind === 'BLOCK_TARGET')
+        && (edge.state === 'CONNECTED'
+          || edge.state === 'RECONNECT_PARENT'
+          || edge.state === 'RECONNECT_LOOP'
+          || edge.state === 'REPAIR_CONDITIONAL'
+          || edge.state === 'RECONNECT_BLOCK'))));
   const variableBindingEdge = relationshipEdges.find(edge =>
     edge.source.entity === 'INSTRUCTION'
     && edge.source.id === instruction.id

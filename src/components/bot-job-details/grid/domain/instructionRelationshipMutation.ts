@@ -65,7 +65,13 @@ export const buildInstructionRelationshipMutation = (
   choice: InstructionRelationshipMutationChoice,
   instructions: readonly BlockLoopInstructionLoadDTO[],
 ): InstructionRelationshipMutationResult => {
-  if (edge.kind !== 'ELEMENT_TARGET' && edge.kind !== 'VARIABLE_BINDING') {
+  if (
+    edge.kind !== 'ELEMENT_TARGET'
+    && edge.kind !== 'LOOP_ANCHOR'
+    && edge.kind !== 'CONDITIONAL_ROOT'
+    && edge.kind !== 'BLOCK_TARGET'
+    && edge.kind !== 'VARIABLE_BINDING'
+  ) {
     return refusal(
       'UNSUPPORTED_RELATIONSHIP',
       `${edge.kind} cannot be changed from this instruction badge.`,
@@ -143,31 +149,21 @@ export const buildInstructionRelationshipMutation = (
   const expectedVariableId = nullablePositiveInteger(source.variableId);
   let draft: BotJobGraphMutationDraft;
 
-  if (edge.kind === 'ELEMENT_TARGET') {
-    if (selected && selected.entity !== 'INSTRUCTION') {
+  if (edge.kind === 'BLOCK_TARGET') {
+    // GOTO / EXCEL GOTO destination. The v3 contract restricts block-target
+    // patches to parentBlockId; a legacy non-null parentId cannot be asserted
+    // here and is refused by the Java compare-and-set with a clear message.
+    if (selected && selected.entity !== 'BLOCK') {
       return refusal(
         'TARGET_TYPE_MISMATCH',
-        'A Web Element relationship requires an instruction target.',
+        'A destination-block relationship requires a Block target.',
       );
     }
-    const targetInstruction = selected
-      ? instructionById.get(selected.id)
-      : null;
-    if (selected && !targetInstruction) {
-      return refusal(
-        'TARGET_NOT_FOUND',
-        `Web Element instruction #${selected.id} is no longer in the rendered graph.`,
-      );
-    }
-    const replacementParentId = targetInstruction?.id ?? null;
-    const replacementParentBlockId = targetInstruction?.blockId ?? null;
-    if (
-      replacementParentId === expectedParentId
-      && replacementParentBlockId === expectedParentBlockId
-    ) {
+    const replacementParentBlockId = selected?.id ?? null;
+    if (replacementParentBlockId === expectedParentBlockId) {
       return refusal(
         'NO_CHANGE',
-        'The instruction already uses that Web Element.',
+        'The instruction already targets that Block.',
       );
     }
     draft = {
@@ -181,7 +177,68 @@ export const buildInstructionRelationshipMutation = (
       })),
       instructionRelationPatches: [{
         instructionId: source.id,
-        relationKind: 'ELEMENT_TARGET',
+        relationKind: 'BLOCK_TARGET',
+        operation: selected ? 'SET' : 'CLEAR',
+        expected: {
+          parentId: null,
+          parentBlockId: expectedParentBlockId,
+        },
+        replacement: {
+          parentId: null,
+          parentBlockId: replacementParentBlockId,
+        },
+      }],
+      variableBindingPatches: [],
+      variableOwnerPatches: [],
+    };
+  } else if (
+    edge.kind === 'ELEMENT_TARGET'
+    || edge.kind === 'LOOP_ANCHOR'
+    || edge.kind === 'CONDITIONAL_ROOT'
+  ) {
+    const targetNoun = edge.kind === 'LOOP_ANCHOR'
+      ? 'loop anchor'
+      : edge.kind === 'CONDITIONAL_ROOT'
+        ? 'conditional root'
+        : 'Web Element';
+    if (selected && selected.entity !== 'INSTRUCTION') {
+      return refusal(
+        'TARGET_TYPE_MISMATCH',
+        `A ${targetNoun} relationship requires an instruction target.`,
+      );
+    }
+    const targetInstruction = selected
+      ? instructionById.get(selected.id)
+      : null;
+    if (selected && !targetInstruction) {
+      return refusal(
+        'TARGET_NOT_FOUND',
+        `Target instruction #${selected.id} is no longer in the rendered graph.`,
+      );
+    }
+    const replacementParentId = targetInstruction?.id ?? null;
+    const replacementParentBlockId = targetInstruction?.blockId ?? null;
+    if (
+      replacementParentId === expectedParentId
+      && replacementParentBlockId === expectedParentBlockId
+    ) {
+      return refusal(
+        'NO_CHANGE',
+        `The instruction already uses that ${targetNoun}.`,
+      );
+    }
+    draft = {
+      mutationKind: 'RELATIONSHIP_UPDATE',
+      draggedInstructionId: null,
+      layoutRows: instructions.map(instruction => ({
+        instructionId: instruction.id,
+        blockId: instruction.blockId,
+        blockOrderNumber: instruction.blockOrderNumber,
+        instructionOrderNumber: instruction.instructionOrderNumber,
+      })),
+      instructionRelationPatches: [{
+        instructionId: source.id,
+        relationKind: edge.kind,
         operation: targetInstruction ? 'SET' : 'CLEAR',
         expected: {
           parentId: expectedParentId,

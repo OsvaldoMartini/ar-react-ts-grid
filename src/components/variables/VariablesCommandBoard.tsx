@@ -485,11 +485,18 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                   edge.kind === 'ELEMENT_TARGET'
                   && edge.source.entity === 'INSTRUCTION'
                   && edge.source.id === instructionId);
-                // Structural anchors (loop, conditional, GOTO block) are chips in
-                // EVERY state: red when broken, styled when connected — and both
-                // open the same reconnect dialog to connect/modify/disconnect.
+                // Structural anchors (loop, conditional, GOTO block) are chips
+                // when CONNECTED and when broken — both open the same reconnect
+                // dialog. Other states (FIX_ORDER, SAVING, REFUSED) keep their
+                // own dedicated chips.
                 const otherParentEdge = edges.find(edge =>
-                  edge.state !== 'MEMORY_ONLY'
+                  (
+                    edge.state === 'CONNECTED'
+                    || edge.state === 'RECONNECT_PARENT'
+                    || edge.state === 'RECONNECT_LOOP'
+                    || edge.state === 'REPAIR_CONDITIONAL'
+                    || edge.state === 'RECONNECT_BLOCK'
+                  )
                   && (
                     edge.kind === 'LOOP_ANCHOR'
                     || edge.kind === 'CONDITIONAL_ROOT'
