@@ -14,8 +14,10 @@ import {
 } from 'lucide-react';
 import { RulesCard, type RulesCardEvent } from '../RulesCard';
 import SearchBox, { type SearchBoxOption } from '../SearchBox';
+import InstructionCommandBadge from '../bot-job-details/grid/InstructionCommandBadge';
 import type {
   InstructionRelationshipEdge,
+  InstructionRelationshipKind,
 } from '../bot-job-details/grid/domain/instructionRelationshipGraph';
 import { instructionRelationshipPolicy } from '../bot-job-details/grid/domain/instructionRelationshipPolicy';
 import type {
@@ -43,6 +45,8 @@ export interface VariablesCommandBoardProps {
   blocks: readonly VariableWorkspaceBlock[];
   instructions: readonly VariableInstructionNode[];
   relationshipEdges?: readonly InstructionRelationshipEdge[];
+  /** Stable Bot Job/workspace owner key. Changing it clears local filters. */
+  workspaceIdentityKey?: string | number | null;
   disabled?: boolean;
   unavailableReason?: string;
   selectedInstructionId?: number | null;
@@ -79,6 +83,7 @@ export interface VariablesCommandBoardProps {
     edge?: InstructionRelationshipEdge,
   ) => void;
   onResolveVisibleConnections?: (scope: VariablesConnectionScope) => void;
+  onReviewVisibleConnections?: (scope: VariablesConnectionScope) => void;
   onReleaseVisibleConnections?: (scope: VariablesConnectionScope) => void;
   className?: string;
 }
@@ -131,10 +136,38 @@ const relationshipTitle = (
   return `${label}: ${detail}`;
 };
 
+type StructuralParentKind = Extract<
+  InstructionRelationshipKind,
+  'LOOP_ANCHOR' | 'CONDITIONAL_ROOT' | 'BLOCK_TARGET'
+>;
+
+const structuralRelationshipLabel = (
+  kind: StructuralParentKind,
+  connected: boolean,
+): string => {
+  if (kind === 'LOOP_ANCHOR') {
+    return connected ? 'Loop connected' : 'Reconnect Loop';
+  }
+  if (kind === 'CONDITIONAL_ROOT') {
+    return connected ? 'Conditional connected' : 'Repair Conditional';
+  }
+  return connected ? 'Block connected' : 'Reconnect Block';
+};
+
+const structuralTargetId = (
+  edge: InstructionRelationshipEdge | undefined,
+): number | null => {
+  const id = edge?.state === 'CONNECTED' ? edge.target?.id : null;
+  return typeof id === 'number' && Number.isSafeInteger(id) && id > 0
+    ? id
+    : null;
+};
+
 const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
   blocks,
   instructions,
   relationshipEdges = [],
+  workspaceIdentityKey,
   disabled = false,
   unavailableReason,
   selectedInstructionId = null,
@@ -150,12 +183,18 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
   onReconnectParent,
   onReconnectVariable,
   onResolveVisibleConnections,
+  onReviewVisibleConnections,
   onReleaseVisibleConnections,
   className,
 }) => {
   const [commandSearch, setCommandSearch] = useState('');
   const [blockFilter, setBlockFilter] = useState<number | null>(null);
   const commandSearchActive = commandSearch.trim().length > 0;
+
+  useEffect(() => {
+    setCommandSearch('');
+    setBlockFilter(null);
+  }, [workspaceIdentityKey]);
 
   useEffect(() => {
     if (
@@ -256,8 +295,13 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
   ]);
 
   const resolveConnectionsEvent = useMemo<RulesCardEvent>(() => ({
-    color: 'green',
+    color: 'orange',
     rules: 'RESOLVE ALL CONNECTIONS',
+    ts: 0,
+  }), []);
+  const reviewConnectionsEvent = useMemo<RulesCardEvent>(() => ({
+    color: 'green',
+    rules: 'REVIEW ALL CONNECTIONS',
     ts: 0,
   }), []);
   const releaseConnectionsEvent = useMemo<RulesCardEvent>(() => ({
@@ -336,6 +380,27 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
     [relationshipEdges],
   );
 
+  const authoritativeIndicesByBlock = useMemo(() => {
+    const rowsByBlock = new Map<number, VariableInstructionNode[]>();
+    instructions.forEach((instruction) => {
+      if (instruction.blockId === null) return;
+      const current = rowsByBlock.get(instruction.blockId) ?? [];
+      current.push(instruction);
+      rowsByBlock.set(instruction.blockId, current);
+    });
+    const result = new Map<number, Map<number, number>>();
+    rowsByBlock.forEach((rows, blockId) => {
+      const rowIndices = new Map<number, number>();
+      [...rows].sort(instructionOrder).forEach((instruction, index) => {
+        if (instruction.id !== null) {
+          rowIndices.set(instruction.id, index);
+        }
+      });
+      result.set(blockId, rowIndices);
+    });
+    return result;
+  }, [instructions]);
+
   const dropGap = (
     blockId: number,
     index: number,
@@ -398,7 +463,11 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                 setBlockFilter(value === null ? null : Number(value))}
             />
           </div>
-          {(onResolveVisibleConnections || onReleaseVisibleConnections) && (
+          {(
+            onResolveVisibleConnections
+            || onReviewVisibleConnections
+            || onReleaseVisibleConnections
+          ) && (
             <div
               className={styles.connectionActions}
               aria-label="Visible command connection actions"
@@ -406,13 +475,32 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
               {onResolveVisibleConnections && (
                 <RulesCard
                   event={resolveConnectionsEvent}
+                  className={styles.resolveConnectionsAction}
                   animate={false}
-                  pulse={false}
-                  glow={false}
-                  onClick={() =>
-                    onResolveVisibleConnections(visibleConnectionScope)}
-                  disabled={disabled || visibleConnectionScope.visibleCount === 0}
+                  pulse
+                  glow
+                  border
+                  onClick={(event) => {
+                    // Keep a deterministic focus return target for the modal.
+                    event.currentTarget.focus();
+                    onResolveVisibleConnections(visibleConnectionScope);
+                  }}
                   title={`Resolve connections for ${visibleConnectionScope.label}`}
+                />
+              )}
+              {onReviewVisibleConnections && (
+                <RulesCard
+                  event={reviewConnectionsEvent}
+                  className={styles.reviewConnectionsAction}
+                  animate={false}
+                  pulse
+                  glow
+                  border
+                  onClick={(event) => {
+                    event.currentTarget.focus();
+                    onReviewVisibleConnections(visibleConnectionScope);
+                  }}
+                  title={`Review connections for ${visibleConnectionScope.label}`}
                 />
               )}
               {onReleaseVisibleConnections && (
@@ -437,11 +525,9 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
               ? ` / ${instructions.length}`
               : ''}
           </span>
-          {(disabled || commandSearchActive) && (
+          {disabled && (
             <small title={unavailableReason}>
-              {commandSearchActive
-                ? 'Clear command search to move rows'
-                : unavailableReason || 'Movement unavailable'}
+              {unavailableReason || 'Workspace changes are currently unavailable'}
             </small>
           )}
         </div>
@@ -472,11 +558,15 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
             </header>
 
             <div className={styles.rows}>
-              {group.blockId !== null
-                && !commandSearchActive
-                && dropGap(group.blockId, 0, `drop:${group.blockId}:0`)}
               {group.instructions.map((instruction, index) => {
                 const instructionId = instruction.id;
+                const authoritativeIndex = group.blockId === null
+                  ? index
+                  : instructionId === null
+                    ? index
+                    : authoritativeIndicesByBlock
+                      .get(group.blockId)
+                      ?.get(instructionId) ?? index;
                 const policy = instructionRelationshipPolicy(instruction.command);
                 const edges = instructionId === null
                   ? []
@@ -486,9 +576,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                   && edge.source.entity === 'INSTRUCTION'
                   && edge.source.id === instructionId);
                 const otherParentEdge = edges.find(edge =>
-                  edge.state !== 'CONNECTED'
-                  && edge.state !== 'MEMORY_ONLY'
-                  && (
+                  (
                     edge.kind === 'LOOP_ANCHOR'
                     || edge.kind === 'CONDITIONAL_ROOT'
                     || edge.kind === 'BLOCK_TARGET'
@@ -537,8 +625,26 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                   : requiresVariableBinding
                     ? configuredVariableId
                     : null;
+                const structuralKind: StructuralParentKind | null =
+                  otherParentEdge?.kind === 'LOOP_ANCHOR'
+                  || otherParentEdge?.kind === 'CONDITIONAL_ROOT'
+                  || otherParentEdge?.kind === 'BLOCK_TARGET'
+                    ? otherParentEdge.kind
+                    : policy.requirements.includes('LOOP_ANCHOR')
+                      ? 'LOOP_ANCHOR'
+                      : policy.requirements.includes('CONDITIONAL_ROOT')
+                        ? 'CONDITIONAL_ROOT'
+                        : policy.requirements.includes('BLOCK_TARGET')
+                          ? 'BLOCK_TARGET'
+                          : null;
+                const connectedStructuralTargetId =
+                  structuralTargetId(otherParentEdge);
                 const reconnectOtherParent = Boolean(
-                  otherParentEdge
+                  (
+                    otherParentEdge
+                    && otherParentEdge.state !== 'CONNECTED'
+                    && otherParentEdge.state !== 'MEMORY_ONLY'
+                  )
                   || (
                     instruction.parentId === null
                     && (
@@ -551,6 +657,12 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                     && policy.requirements.includes('BLOCK_TARGET')
                   ),
                 );
+                const structuralReconnectLabel = structuralKind
+                  ? structuralRelationshipLabel(structuralKind, false)
+                  : 'Reconnect Parent';
+                const structuralConnectedLabel = structuralKind
+                  ? structuralRelationshipLabel(structuralKind, true)
+                  : 'Parent connected';
                 const reconnectParentEvent: RulesCardEvent | null =
                   reconnectParent
                     ? {
@@ -573,7 +685,6 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                     : null;
                 const canDrag = instructionId !== null
                   && !disabled
-                  && !commandSearchActive
                   && Boolean(onInstructionDragStart)
                   && (canDragInstruction?.(instruction) ?? true);
                 const selected = instructionId !== null
@@ -587,6 +698,12 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                   <React.Fragment
                     key={`command:${instructionId ?? `${group.blockId}:${index}`}`}
                   >
+                    {group.blockId !== null
+                      && dropGap(
+                        group.blockId,
+                        authoritativeIndex,
+                        `drop:${group.blockId}:${authoritativeIndex}:before:${instructionId ?? index}`,
+                      )}
                     <article
                       className={[
                         styles.row,
@@ -596,10 +713,36 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                       ].filter(Boolean).join(' ')}
                       draggable={canDrag}
                       data-instruction-id={instructionId ?? undefined}
-                      onDragStart={event =>
-                        onInstructionDragStart?.(event, instruction)}
+                      onDragStart={(event) => {
+                        if (instructionId !== null) {
+                          onSelectInstruction?.(instructionId);
+                        }
+                        onInstructionDragStart?.(event, instruction);
+                      }}
                       onDragEnd={event =>
                         onInstructionDragEnd?.(event, instruction)}
+                      title={!canDrag
+                        ? instructionId === null
+                          ? 'This command cannot move because its instruction ID is missing.'
+                          : disabled
+                            ? unavailableReason || 'Workspace changes are currently unavailable.'
+                            : !onInstructionDragStart
+                              ? 'Drag-and-drop is not connected for this workspace.'
+                              : 'This command is not eligible to move.'
+                        : undefined}
+                      onClick={(event) => {
+                        if (instructionId === null || !onSelectInstruction) return;
+                        const target = event.target;
+                        if (
+                          target instanceof Element
+                          && target.closest(
+                            'button, a, input, select, textarea, [role="button"]',
+                          )
+                        ) {
+                          return;
+                        }
+                        onSelectInstruction(instructionId);
+                      }}
                     >
                       <span className={styles.grip} aria-hidden="true">
                         <GripVertical size={16} />
@@ -607,9 +750,11 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                       <span className={styles.order}>
                         #{instruction.instructionOrder ?? '?'}
                       </span>
-                      <span className={styles.command}>
-                        {instruction.command || 'UNKNOWN'}
-                      </span>
+                      <InstructionCommandBadge
+                        action={instruction.command}
+                        tagName={instruction.tagName}
+                        className={styles.command}
+                      />
                       <button
                         type="button"
                         className={styles.identity}
@@ -693,26 +838,73 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                               )
                         )}
                         {reconnectOtherParent && instructionId !== null && (
-                          <button
-                            type="button"
-                            className={styles.reconnectButton}
-                            disabled={disabled || !onReconnectParent}
-                            title={relationshipTitle(
-                              'Reconnect parent',
-                              otherParentEdge,
-                            )}
+                          <span
+                            className={styles.reconnectRuleCard}
                             onMouseDown={event => event.stopPropagation()}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              onReconnectParent?.(
-                                instructionId,
-                                otherParentEdge,
-                              );
-                            }}
                           >
-                            <Link2 size={11} aria-hidden="true" />
-                            Reconnect parent
-                          </button>
+                            <RulesCard
+                              event={{
+                                color: 'red',
+                                rules: structuralReconnectLabel,
+                                context: '',
+                                ts: instructionId,
+                              }}
+                              ariaLabel={relationshipTitle(
+                                structuralReconnectLabel,
+                                otherParentEdge,
+                              )}
+                              glow
+                              border
+                              animate={false}
+                              pulse
+                              iconNode={<Link2 size={11} aria-hidden="true" />}
+                              title={relationshipTitle(
+                                structuralReconnectLabel,
+                                otherParentEdge,
+                              )}
+                              disabled={disabled || !onReconnectParent}
+                              onClick={onReconnectParent
+                                ? () => onReconnectParent(
+                                    instructionId,
+                                    otherParentEdge,
+                                  )
+                                : undefined}
+                            />
+                          </span>
+                        )}
+                        {connectedStructuralTargetId !== null
+                          && instructionId !== null && (
+                          otherParentEdge && onReconnectParent
+                            ? (
+                                <button
+                                  type="button"
+                                  className={styles.connectedParent}
+                                  aria-label={`${structuralConnectedLabel} (id: ${connectedStructuralTargetId})`}
+                                  title={`Change ${structuralConnectedLabel.toLocaleLowerCase()}`}
+                                  disabled={disabled}
+                                  onMouseDown={event => event.stopPropagation()}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    onReconnectParent(
+                                      instructionId,
+                                      otherParentEdge,
+                                    );
+                                  }}
+                                >
+                                  <Link2 size={11} aria-hidden="true" />
+                                  {structuralConnectedLabel} (id: {connectedStructuralTargetId})
+                                </button>
+                              )
+                            : (
+                                <span
+                                  className={`${styles.connectedParent} ${styles.connectedStatic}`}
+                                  aria-label={`${structuralConnectedLabel} (id: ${connectedStructuralTargetId})`}
+                                  title={`${structuralConnectedLabel} (id: ${connectedStructuralTargetId})`}
+                                >
+                                  <Link2 size={11} aria-hidden="true" />
+                                  {structuralConnectedLabel} (id: {connectedStructuralTargetId})
+                                </span>
+                              )
                         )}
                         {reconnectVariableEvent && instructionId !== null && (
                           <span
@@ -790,7 +982,10 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                         {!reconnectParent
                           && !reconnectOtherParent
                           && !reconnectVariable
+                          && connectedStructuralTargetId === null
+                          && structuralKind === null
                           && instruction.parentId === null
+                          && instruction.parentBlockId === null
                           && instruction.variableId === null
                           && (
                             <span className={styles.independentBadge}>
@@ -804,11 +999,11 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                       </div>
                     </article>
                     {group.blockId !== null
-                      && !commandSearchActive
+                      && index === group.instructions.length - 1
                       && dropGap(
                         group.blockId,
-                        index + 1,
-                        `drop:${group.blockId}:${index + 1}`,
+                        authoritativeIndex + 1,
+                        `drop:${group.blockId}:${authoritativeIndex + 1}:after:${instructionId ?? index}`,
                       )}
                   </React.Fragment>
                 );
