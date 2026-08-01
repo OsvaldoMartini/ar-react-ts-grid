@@ -630,6 +630,11 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                   : structuralKind === 'CONDITIONAL_ROOT'
                     ? { broken: 'Repair Conditional', connected: 'Conditional connected', change: 'Change conditional root' }
                     : { broken: 'Reconnect Block', connected: 'Block connected', change: 'Change destination block' };
+                const structuralCompactLabel = structuralKind === 'LOOP_ANCHOR'
+                  ? 'LOOP'
+                  : structuralKind === 'CONDITIONAL_ROOT'
+                    ? 'COND'
+                    : 'BLOCK';
                 const configuredStructuralId = structuralKind === 'BLOCK_TARGET'
                   ? (typeof instruction.parentBlockId === 'number'
                     && Number.isSafeInteger(instruction.parentBlockId)
@@ -763,6 +768,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                           >
                             <RulesCard
                               event={reconnectParentEvent}
+                              compactLabel="PARENT"
                               ariaLabel={relationshipTitle(
                                 'Reconnect parent',
                                 elementParentEdge,
@@ -805,7 +811,12 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                                   }}
                                 >
                                   <Link2 size={11} aria-hidden="true" />
-                                  Parent connected (id: {connectedParentId})
+                                  <span className={styles.relationshipLabelFull}>
+                                    Parent connected (id: {connectedParentId})
+                                  </span>
+                                  <span className={styles.relationshipLabelCompact}>
+                                    ID {connectedParentId}
+                                  </span>
                                 </button>
                               )
                             : (
@@ -815,7 +826,12 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                                   title={`Parent connected (id: ${connectedParentId})`}
                                 >
                                   <Link2 size={11} aria-hidden="true" />
-                                  Parent connected (id: {connectedParentId})
+                                  <span className={styles.relationshipLabelFull}>
+                                    Parent connected (id: {connectedParentId})
+                                  </span>
+                                  <span className={styles.relationshipLabelCompact}>
+                                    ID {connectedParentId}
+                                  </span>
                                 </span>
                               )
                         )}
@@ -826,6 +842,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                           >
                             <RulesCard
                               event={reconnectOtherParentEvent}
+                              compactLabel={structuralCompactLabel}
                               ariaLabel={relationshipTitle(
                                 structuralLabels.broken,
                                 otherParentEdge,
@@ -868,7 +885,12 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                                   }}
                                 >
                                   <Link2 size={11} aria-hidden="true" />
-                                  {structuralLabels.connected} (id: {connectedStructuralId})
+                                  <span className={styles.relationshipLabelFull}>
+                                    {structuralLabels.connected} (id: {connectedStructuralId})
+                                  </span>
+                                  <span className={styles.relationshipLabelCompact}>
+                                    ID {connectedStructuralId}
+                                  </span>
                                 </button>
                               )
                             : (
@@ -878,7 +900,12 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                                   title={`${structuralLabels.connected} (id: ${connectedStructuralId})`}
                                 >
                                   <Link2 size={11} aria-hidden="true" />
-                                  {structuralLabels.connected} (id: {connectedStructuralId})
+                                  <span className={styles.relationshipLabelFull}>
+                                    {structuralLabels.connected} (id: {connectedStructuralId})
+                                  </span>
+                                  <span className={styles.relationshipLabelCompact}>
+                                    ID {connectedStructuralId}
+                                  </span>
                                 </span>
                               )
                         )}
@@ -889,6 +916,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                           >
                             <RulesCard
                               event={reconnectVariableEvent}
+                              compactLabel="VAR"
                               ariaLabel={relationshipTitle(
                                 'Reconnect variable',
                                 variableBindingEdge,
@@ -931,7 +959,12 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                                   }}
                                 >
                                   <Variable size={11} aria-hidden="true" />
-                                  Variable connected (id: {connectedVariableId})
+                                  <span className={styles.relationshipLabelFull}>
+                                    Variable connected (id: {connectedVariableId})
+                                  </span>
+                                  <span className={styles.relationshipLabelCompact}>
+                                    ID {connectedVariableId}
+                                  </span>
                                 </button>
                               )
                             : (
@@ -941,7 +974,12 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                                   title={`Variable connected (id: ${connectedVariableId})`}
                                 >
                                   <Variable size={11} aria-hidden="true" />
-                                  Variable connected (id: {connectedVariableId})
+                                  <span className={styles.relationshipLabelFull}>
+                                    Variable connected (id: {connectedVariableId})
+                                  </span>
+                                  <span className={styles.relationshipLabelCompact}>
+                                    ID {connectedVariableId}
+                                  </span>
                                 </span>
                               )
                         )}

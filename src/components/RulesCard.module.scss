@@ -208,6 +208,22 @@
   text-transform: none;
 }
 
+.compactRules {
+  display: none;
+  font-weight: 800;
+  text-transform: none;
+}
+
+@media (max-width: 800px) {
+  .rulesWithCompact {
+    display: none;
+  }
+
+  .compactRules {
+    display: inline;
+  }
+}
+
 @media (max-width: 767px) {
   .icon {
     width: 12px;

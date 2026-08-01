@@ -445,6 +445,10 @@
   cursor: default;
 }
 
+.relationshipLabelCompact {
+  display: none;
+}
+
 .variableButton {
   border-color: #9c7ac4;
   background: #f3ebfd;
@@ -552,5 +556,46 @@
   .relationships {
     grid-column: 2 / -1;
     justify-content: flex-start;
+  }
+}
+
+@media (max-width: 800px) {
+  .relationships {
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+
+  .connectedParent,
+  .connectedVariable,
+  .reconnectRuleCard {
+    box-sizing: border-box;
+    flex: 0 0 60px;
+    max-width: 60px;
+    min-width: 60px;
+    width: 60px;
+  }
+
+  .connectedParent,
+  .connectedVariable,
+  .reconnectRuleCard > button,
+  .reconnectRuleCard > div {
+    box-sizing: border-box;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .reconnectRuleCard > button,
+  .reconnectRuleCard > div {
+    max-width: 100%;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .relationshipLabelFull {
+    display: none;
+  }
+
+  .relationshipLabelCompact {
+    display: inline;
   }
 }

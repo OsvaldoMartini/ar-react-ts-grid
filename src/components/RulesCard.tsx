@@ -16,6 +16,7 @@ interface RulesCardProps {
   event: RulesCardEvent | null;
   className?: string;
   ariaLabel?: string;
+  compactLabel?: string;
   glow?: boolean;
   border?: boolean;
   animate?: boolean;
@@ -32,6 +33,7 @@ export function RulesCard({
   event,
   className,
   ariaLabel,
+  compactLabel,
   glow = true,
   border = false,
   animate = true,
@@ -66,7 +68,14 @@ export function RulesCard({
       {iconElement}
       <span className={styles.label}>
         {event.context && <strong>{event.context}</strong>}
-        <span className={styles.rules}>{event.rules}</span>
+        <span
+          className={`${styles.rules} ${compactLabel ? styles.rulesWithCompact : ''}`}
+        >
+          {event.rules}
+        </span>
+        {compactLabel && (
+          <span className={styles.compactRules}>{compactLabel}</span>
+        )}
         {event.label && <span>{event.label}</span>}
       </span>
     </>
