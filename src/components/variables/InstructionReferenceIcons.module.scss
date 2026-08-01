@@ -7,10 +7,37 @@
   gap: 3px;
 }
 
+.iconButton {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.iconButton:hover:not(:disabled) {
+  background: #dcecff;
+  box-shadow: 0 0 0 1px #7fa9d1;
+}
+
+.iconButton:focus-visible {
+  outline: 2px solid #0b5394;
+  outline-offset: 1px;
+}
+
+.iconButton:disabled {
+  cursor: default;
+}
+
 .icon {
   width: 20px;
   height: 20px;
   display: block;
   object-fit: contain;
-  pointer-events: auto;
+  pointer-events: none;
 }

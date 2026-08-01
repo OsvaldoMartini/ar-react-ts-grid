@@ -10,6 +10,8 @@ export interface InstructionReferenceIcon {
 
 interface InstructionReferenceIconsProps {
   references: readonly InstructionReferenceIcon[];
+  disabled?: boolean;
+  onReferenceClick?: (reference: InstructionReferenceIcon) => void;
 }
 
 const REFERENCE_PRESENTATION = {
@@ -27,6 +29,8 @@ const REFERENCE_PRESENTATION = {
 
 const InstructionReferenceIcons: React.FC<InstructionReferenceIconsProps> = ({
   references,
+  disabled = false,
+  onReferenceClick,
 }) => {
   if (references.length === 0) return null;
 
@@ -35,14 +39,26 @@ const InstructionReferenceIcons: React.FC<InstructionReferenceIconsProps> = ({
       {references.map((reference) => {
         const presentation = REFERENCE_PRESENTATION[reference.action];
         return (
-          <img
+          <button
             key={`${reference.action}:${reference.instructionId}`}
-            src={presentation.image}
-            alt=""
-            className={styles.icon}
-            data-command-icon={presentation.icon}
+            type="button"
+            className={styles.iconButton}
+            aria-label={`Change ${presentation.label} connection for instruction ${reference.instructionId}`}
             title={`${presentation.label} (ID ${reference.instructionId}) connected to this Web Element`}
-          />
+            disabled={disabled || !onReferenceClick}
+            onMouseDown={event => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              onReferenceClick?.(reference);
+            }}
+          >
+            <img
+              src={presentation.image}
+              alt=""
+              className={styles.icon}
+              data-command-icon={presentation.icon}
+            />
+          </button>
         );
       })}
     </span>

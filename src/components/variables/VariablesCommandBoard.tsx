@@ -815,6 +815,18 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                           references={instructionId === null
                             ? []
                             : referenceIconsByParentId.get(instructionId) ?? []}
+                          disabled={disabled}
+                          onReferenceClick={onReconnectParent
+                            ? (reference) => {
+                                const referenceEdge = edgesByInstruction
+                                  .get(reference.instructionId)
+                                  ?.find(edge => edge.kind === 'LOOP_ANCHOR');
+                                onReconnectParent(
+                                  reference.instructionId,
+                                  referenceEdge,
+                                );
+                              }
+                            : undefined}
                         />
                       </div>
                       <div className={styles.relationships}>
