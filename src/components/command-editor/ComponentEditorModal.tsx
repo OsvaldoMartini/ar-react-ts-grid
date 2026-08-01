@@ -6,6 +6,15 @@ import type {
   ComponentEditorCommand,
 } from './componentEditor.types';
 import { commandEditorPlacementOptions } from './commandEditorPlacement';
+import { commandEditorPlacementFromValue } from './commandEditorPlacement';
+import {
+  commandEditorBaseDraft,
+  isCommandEditorBaseDraftValid,
+} from './commandEditorDraft';
+import type {
+  CommandEditorMutationAction,
+  CommandEditorMutationIntent,
+} from './commandEditorMutation';
 import styles from './ComponentEditorModal.module.scss';
 
 export interface ComponentEditorModalProps {
@@ -19,6 +28,8 @@ export interface ComponentEditorModalProps {
   commands: readonly ComponentEditorCommand[];
   returnFocusElement?: HTMLElement | null;
   children?: React.ReactNode;
+  pending?: boolean;
+  onSubmit?: (intent: CommandEditorMutationIntent) => void;
   onClose: () => void;
 }
 
@@ -42,6 +53,8 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
   commands,
   returnFocusElement = null,
   children,
+  pending = false,
+  onSubmit,
   onClose,
 }) => {
   const titleId = useId();
@@ -51,6 +64,7 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
   const initialTargetBlockId = command.blockId ?? 0;
   const [targetBlockId, setTargetBlockId] = useState(initialTargetBlockId);
   const [placementValue, setPlacementValue] = useState('KEEP');
+  const [draft, setDraft] = useState(() => commandEditorBaseDraft(command));
   const returnFocusRef = useRef<HTMLElement | null>(
     returnFocusElement
     ?? (typeof document !== 'undefined'
@@ -81,7 +95,40 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
     const nextTargetBlockId = command.blockId ?? 0;
     setTargetBlockId(nextTargetBlockId);
     setPlacementValue('KEEP');
-  }, [command.blockId, command.instructionId]);
+    setDraft({
+      name: command.instructionName,
+      action: command.action,
+      operation: command.operation,
+    });
+  }, [
+    command.action,
+    command.blockId,
+    command.instructionId,
+    command.instructionName,
+    command.operation,
+  ]);
+
+  const placement = commandEditorPlacementFromValue(
+    placementOptions,
+    placementValue,
+  );
+  const canSubmit = Boolean(
+    onSubmit
+    && !pending
+    && targetBlockId > 0
+    && placement
+    && isCommandEditorBaseDraftValid(draft),
+  );
+  const submit = (action: CommandEditorMutationAction) => {
+    if (!canSubmit || !placement || !onSubmit) return;
+    onSubmit({
+      action,
+      sourceInstructionId: command.instructionId,
+      targetBlockId,
+      placement,
+      draft: { ...draft, name: draft.name.trim() },
+    });
+  };
 
   useEffect(() => {
     const returnFocusTarget = returnFocusRef.current;
@@ -216,12 +263,49 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
             </div>
           </section>
 
+          <label className={styles.nameField}>
+            <span>Command name</span>
+            <input
+              type="text"
+              value={draft.name}
+              disabled={pending}
+              onChange={(event) => setDraft(current => ({
+                ...current,
+                name: event.target.value,
+              }))}
+            />
+          </label>
+
           {children && (
             <section className={styles.editorContent} aria-label="Command configuration">
               {children}
             </section>
           )}
         </div>
+
+        <footer className={styles.footer}>
+          <button type="button" className={styles.cancelButton} disabled={pending} onClick={onClose}>
+            CANCEL
+          </button>
+          <button
+            type="button"
+            className={styles.copyButton}
+            disabled={!canSubmit}
+            title={onSubmit ? 'Create a disconnected copy with a new instruction ID' : 'Command persistence is not connected yet'}
+            onClick={() => submit('COPY_NEW')}
+          >
+            COPY NEW
+          </button>
+          <button
+            type="button"
+            className={styles.updateButton}
+            disabled={!canSubmit}
+            title={onSubmit ? 'Update the selected instruction' : 'Command persistence is not connected yet'}
+            onClick={() => submit('UPDATE')}
+          >
+            UPDATE
+          </button>
+        </footer>
       </section>
     </div>
   );
