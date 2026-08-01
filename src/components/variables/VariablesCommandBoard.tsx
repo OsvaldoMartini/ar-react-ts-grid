@@ -29,6 +29,7 @@ import VariablesConnectionsPrimaryAction from './VariablesConnectionsPrimaryActi
 import InstructionReferenceIcons, {
   type InstructionReferenceIcon,
 } from './InstructionReferenceIcons';
+import { isVariablesCommandEditorEligible } from '../command-editor/commandEditorEligibility';
 import styles from './VariablesCommandBoard.module.scss';
 
 export type VariablesCommandDropTarget = {
@@ -724,7 +725,9 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                         ts: instructionId ?? index,
                       }
                     : null;
-                const editableCommand = policy.role !== 'WEB_ELEMENT';
+                const editableCommand = isVariablesCommandEditorEligible(
+                  instruction.command,
+                );
                 const editCommandEvent: RulesCardEvent | null = editableCommand
                   ? {
                       color: 'green',
