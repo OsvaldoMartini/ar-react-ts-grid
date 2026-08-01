@@ -475,7 +475,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                   glow={false}
                   onClick={() =>
                     onResolveVisibleConnections(visibleConnectionScope)}
-                  disabled={disabled || visibleConnectionScope.visibleCount === 0}
+                  disabled={disabled}
                   title={`Resolve connections for ${visibleConnectionScope.label}`}
                 />
               )}

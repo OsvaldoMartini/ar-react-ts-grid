@@ -1633,17 +1633,12 @@ const VariablesPage: React.FC<Props> = ({
       setStatus({ level: 'error', text: built.message });
       return;
     }
-    if (built.pending.review.items.length === 0) {
-      setStatus({
-        level: 'ok',
-        text: `All ${scope.visibleCount} visible command(s) already have valid direct connections.`,
-      });
-      return;
-    }
     setPendingConnections(built.pending);
     setStatus({
-      level: 'warn',
-      text: `Reviewing direct connections for ${scope.visibleCount} visible command(s).`,
+      level: built.pending.review.items.length > 0 ? 'warn' : 'ok',
+      text: built.pending.review.items.length > 0
+        ? `Reviewing direct connections for ${scope.visibleCount} visible command(s).`
+        : `No pending connections in ${scope.blockLabel}. Select another Block to continue.`,
     });
   }, []);
 
