@@ -138,9 +138,6 @@ const InstructionRow: React.FC<InstructionRowProps> = ({
         />
       ) : (
         <span className={styles.instructionLine}>
-          <span className={styles.instructionDetails}>
-            #{instruction.instructionOrderNumber} (ID) {instruction.id}
-          </span>
           <BlockStatusToggle active={instruction.instructionActive} onToggle={onToggleStatus} />
           <InstructionTypeBadge
             instruction={instruction}
