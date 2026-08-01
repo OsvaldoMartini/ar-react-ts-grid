@@ -16,6 +16,7 @@ import SearchBox, {
 } from '../SearchBox';
 import { RulesCard, type RulesCardEvent } from '../RulesCard';
 import type { VariableWorkspaceBlock } from '../variablesWorkspace.contract';
+import VariablesConnectionsHelpModal from './VariablesConnectionsHelpModal';
 import styles from './VariablesConnectionsModal.module.scss';
 
 export type VariablesConnectionsModalMode = 'RESOLVE' | 'RELEASE';
@@ -57,6 +58,7 @@ export type VariablesConnectionsModalSubmission =
   | {
       mode: 'RESOLVE';
       resolutions: VariablesConnectionResolution[];
+      itemIds: string[];
     }
   | {
       mode: 'RELEASE';
@@ -131,6 +133,7 @@ const VariablesConnectionsModal: React.FC<
   }
   const frozenScope = frozenScopeRef.current;
   const [localBlockFilter, setLocalBlockFilter] = useState<number | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
   const blockFilter = controlledBlockFilter === undefined
     ? localBlockFilter
     : controlledBlockFilter;
@@ -144,30 +147,10 @@ const VariablesConnectionsModal: React.FC<
         && (item.compatibleOptions ?? []).some(
           option => option.value === initial,
         );
-      return [item.id, valid ? initial : null];
+      const firstAvailable = item.compatibleOptions?.[0]?.value ?? null;
+      return [item.id, valid ? initial : firstAvailable];
     }),
   ));
-
-  const resolutions = useMemo<VariablesConnectionResolution[]>(
-    () => items.flatMap((item) => {
-      const optionValue = selectionByItem[item.id] ?? null;
-      if (
-        optionValue === null
-        || !(item.compatibleOptions ?? []).some(
-          option => option.value === optionValue,
-        )
-      ) {
-        return [];
-      }
-      return [{ itemId: item.id, optionValue }];
-    }),
-    [items, selectionByItem],
-  );
-  const noTargetCount = useMemo(
-    () => items.filter(item =>
-      (item.compatibleOptions ?? []).length === 0).length,
-    [items],
-  );
   const blockSearchOptions = useMemo<SearchBoxOption[]>(() => {
     const connectionCounts = new Map<number, number>();
     items.forEach((item) => {
@@ -189,9 +172,30 @@ const VariablesConnectionsModal: React.FC<
   }, [blocks, items]);
   const visibleItems = useMemo(() => mode !== 'RESOLVE' || blockFilter === null
     ? items
-    : items.filter(item => item.blockId == null || item.blockId === blockFilter), [blockFilter, items, mode]);
+    : items.filter(item => item.blockId === blockFilter), [blockFilter, items, mode]);
+  const resolutionItems = mode === 'RESOLVE' ? visibleItems : items;
+  const resolutions = useMemo<VariablesConnectionResolution[]>(
+    () => resolutionItems.flatMap((item) => {
+      const optionValue = selectionByItem[item.id] ?? null;
+      if (
+        optionValue === null
+        || !(item.compatibleOptions ?? []).some(
+          option => option.value === optionValue,
+        )
+      ) {
+        return [];
+      }
+      return [{ itemId: item.id, optionValue }];
+    }),
+    [resolutionItems, selectionByItem],
+  );
+  const noTargetCount = useMemo(
+    () => visibleItems.filter(item =>
+      (item.compatibleOptions ?? []).length === 0).length,
+    [visibleItems],
+  );
   const selectedCount = resolutions.length;
-  const remainingCount = Math.max(items.length - selectedCount, 0);
+  const remainingCount = Math.max(visibleItems.length - selectedCount, 0);
   const confirmCount = mode === 'RESOLVE' ? selectedCount : items.length;
   const confirmDisabled = pending || confirmCount === 0;
 
@@ -211,7 +215,11 @@ const VariablesConnectionsModal: React.FC<
   const confirm = () => {
     if (confirmDisabled) return;
     if (mode === 'RESOLVE') {
-      onConfirm({ mode, resolutions });
+      onConfirm({
+        mode,
+        resolutions,
+        itemIds: visibleItems.map(item => item.id),
+      });
       return;
     }
     onConfirm({ mode, itemIds: items.map(item => item.id) });
@@ -292,7 +300,7 @@ const VariablesConnectionsModal: React.FC<
           </button>
         </header>
 
-        <div className={styles.body}>
+        <div className={`${styles.body} ${resolving ? styles.bodyWithHelp : ''}`}>
           <section className={styles.scope} aria-label="Frozen connection scope">
             <div>
               <span>Frozen scope</span>
@@ -304,7 +312,7 @@ const VariablesConnectionsModal: React.FC<
           <section className={styles.summary} aria-label="Connection summary">
             <div>
               <span>Connections</span>
-              <strong>{items.length}</strong>
+              <strong>{resolving ? visibleItems.length : items.length}</strong>
             </div>
             <div>
               <span>{resolving ? 'Ready' : 'To release'}</span>
@@ -442,6 +450,22 @@ const VariablesConnectionsModal: React.FC<
             />
           </div>
         </footer>
+        {resolving && (
+          <button
+            type="button"
+            className={styles.helpButton}
+            aria-label="How Resolve Connections works"
+            title="How Resolve Connections works"
+            onClick={() => setHelpOpen(true)}
+          >
+            ?
+          </button>
+        )}
+        {helpOpen && (
+          <VariablesConnectionsHelpModal
+            onClose={() => setHelpOpen(false)}
+          />
+        )}
       </section>
     </div>
   );

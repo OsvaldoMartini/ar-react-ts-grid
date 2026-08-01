@@ -1644,12 +1644,40 @@ const VariablesPage: React.FC<Props> = ({
       });
       return;
     }
-    const choicesById = new Map(
-      pending.choices.map(choice => [choice.reviewId, choice]),
+    const reviewedItemsById = new Map(
+      pending.review.items.map(item => [item.reviewId, item]),
     );
+    const submittedItemIds = new Set(submission.itemIds);
+    if (
+      submittedItemIds.size !== submission.itemIds.length
+      || submittedItemIds.size === 0
+      || submission.itemIds.some(itemId => !reviewedItemsById.has(itemId))
+      || submission.resolutions.some(resolution =>
+        !submittedItemIds.has(resolution.itemId))
+    ) {
+      setStatus({
+        level: 'error',
+        text: 'The filtered connection scope is invalid. Open it again.',
+      });
+      return;
+    }
+    const scopedInstructionIds = [...new Set(
+      submission.itemIds.flatMap(itemId => {
+        const item = reviewedItemsById.get(itemId);
+        return item ? [item.sourceInstructionId] : [];
+      }),
+    )];
+    const scopedPlan = planVariablesBatchResolve(
+      current,
+      scopedInstructionIds,
+    );
+    if (!scopedPlan.ok) {
+      setStatus({ level: 'error', text: scopedPlan.message });
+      return;
+    }
+    const choicesById = new Map<string, VariablesBatchResolveChoice>();
     for (const resolution of submission.resolutions) {
-      const item = pending.review.items.find(candidate =>
-        candidate.reviewId === resolution.itemId);
+      const item = reviewedItemsById.get(resolution.itemId);
       const target = item?.compatibleTargets.find(candidate =>
         relationshipTargetValue(candidate) === resolution.optionValue);
       if (!item || !target) {
@@ -1667,18 +1695,19 @@ const VariablesPage: React.FC<Props> = ({
     }
     const choices = [...choicesById.values()];
     const built = buildVariablesBatchResolveMutation(
-      pending.plan,
+      scopedPlan.plan,
       choices,
     );
     if (!built.ok) {
       if (built.code === 'REVIEW_REQUIRED') {
         const reviewed = reviewVariablesBatchResolve(
-          pending.plan,
+          scopedPlan.plan,
           choices,
         );
         if (reviewed.ok) {
           setPendingConnections({
             ...pending,
+            plan: scopedPlan.plan,
             review: reviewed.review,
             choices,
             reviewRevision: pending.reviewRevision + 1,
