@@ -88,6 +88,72 @@ const VariablesExecutionFlowReviewModal: React.FC<
   const visibleBlocks = useMemo(() => blockFilter === null
     ? review.blocks
     : review.blocks.filter(block => block.blockId === blockFilter), [blockFilter, review.blocks]);
+  const visibleSteps = useMemo(
+    () => visibleBlocks.flatMap(block => block.steps),
+    [visibleBlocks],
+  );
+  const visibleStepIds = useMemo(() => new Set(
+    visibleSteps.flatMap(step => step.instructionId === null
+      ? []
+      : [step.instructionId]),
+  ), [visibleSteps]);
+  const visibleVariableFlows = useMemo(() => blockFilter === null
+    ? review.variableFlows
+    : review.variableFlows.filter(flow =>
+        (flow.ownerInstructionId !== null
+          && visibleStepIds.has(flow.ownerInstructionId))
+        || flow.producerInstructionIds.some(id => visibleStepIds.has(id))
+        || flow.readerInstructionIds.some(id => visibleStepIds.has(id))), [
+    blockFilter,
+    review.variableFlows,
+    visibleStepIds,
+  ]);
+  const visibleVariableIds = useMemo(
+    () => new Set(visibleVariableFlows.map(flow => flow.variableId)),
+    [visibleVariableFlows],
+  );
+  const visibleUnassignedConnections = useMemo(() => blockFilter === null
+    ? review.unassignedConnections
+    : review.unassignedConnections.filter(connection => {
+        const targetVisible = connection.target?.entity === 'INSTRUCTION'
+          ? visibleStepIds.has(connection.target.id)
+          : connection.target?.entity === 'VARIABLE'
+            ? visibleVariableIds.has(connection.target.id)
+            : false;
+        const sourceVisible = connection.source.entity === 'INSTRUCTION'
+          ? visibleStepIds.has(connection.source.id)
+          : connection.source.entity === 'VARIABLE'
+            ? visibleVariableIds.has(connection.source.id)
+            : false;
+        return sourceVisible || targetVisible;
+      }), [
+    blockFilter,
+    review.unassignedConnections,
+    visibleStepIds,
+    visibleVariableIds,
+  ]);
+  const visibleConnectionCount = useMemo(() => {
+    if (blockFilter === null) return review.connectionCount;
+    const connectionIds = new Set(
+      visibleSteps.flatMap(step => step.connections.map(connection => connection.id)),
+    );
+    visibleUnassignedConnections.forEach(connection =>
+      connectionIds.add(connection.id));
+    return connectionIds.size;
+  }, [
+    blockFilter,
+    review.connectionCount,
+    visibleSteps,
+    visibleUnassignedConnections,
+  ]);
+  const selectedBlock = blockFilter === null
+    ? null
+    : review.blocks.find(block => block.blockId === blockFilter) ?? null;
+  const visibleScopeLabel = blockFilter === null
+    ? `All Blocks Â· ${visibleSteps.length} visible command${visibleSteps.length === 1 ? '' : 's'}`
+    : selectedBlock
+      ? `Block #${selectedBlock.blockOrder ?? selectedBlock.blockId} ${selectedBlock.blockName} Â· ${visibleSteps.length} visible command${visibleSteps.length === 1 ? '' : 's'}`
+      : scopeLabel;
   const visibleDiagnostics = useMemo(() => blockFilter === null
     ? review.diagnostics
     : review.diagnostics.filter(diagnostic =>
@@ -187,16 +253,16 @@ const VariablesExecutionFlowReviewModal: React.FC<
               <strong>#{review.botJobId} {review.botJobName}</strong>
             </div>
             <div>
-              <span>Clicked scope</span>
-              <strong>{scopeLabel}</strong>
+              <span>Review scope</span>
+              <strong>{visibleScopeLabel}</strong>
             </div>
             <b>READ ONLY</b>
           </section>
 
           <section className={styles.summary} aria-label="Execution flow summary">
-            <div><span>Blocks</span><strong>{review.blocks.length}</strong></div>
-            <div><span>Commands</span><strong>{review.steps.length}</strong></div>
-            <div><span>Connections</span><strong>{review.connectionCount}</strong></div>
+            <div><span>Blocks</span><strong>{visibleBlocks.length}</strong></div>
+            <div><span>Commands</span><strong>{visibleSteps.length}</strong></div>
+            <div><span>Connections</span><strong>{visibleConnectionCount}</strong></div>
             <div>
               <span>Diagnostics</span>
               <strong>{visibleDiagnostics.length}</strong>
@@ -231,7 +297,7 @@ const VariablesExecutionFlowReviewModal: React.FC<
             }}
           />
 
-          {review.variableFlows.length > 0 && (
+          {visibleVariableFlows.length > 0 && (
             <section className={styles.variableSection} aria-label="Variable flows">
               <header className={styles.sectionHeading}>
                 <Variable size={17} aria-hidden="true" />
@@ -241,7 +307,7 @@ const VariablesExecutionFlowReviewModal: React.FC<
                 </div>
               </header>
               <div className={styles.variableList}>
-                {review.variableFlows.map((flow) => {
+                {visibleVariableFlows.map((flow) => {
                   const owner = flow.ownerInstructionId === null
                     ? null
                     : stepsById.get(flow.ownerInstructionId) ?? null;
@@ -393,7 +459,7 @@ const VariablesExecutionFlowReviewModal: React.FC<
             </section>
           )}
 
-          {review.unassignedConnections.length > 0 && (
+          {visibleUnassignedConnections.length > 0 && (
             <section className={styles.unassigned} aria-label="Unassigned graph connections">
               <header className={styles.sectionHeading}>
                 <AlertTriangle size={17} aria-hidden="true" />
@@ -402,7 +468,7 @@ const VariablesExecutionFlowReviewModal: React.FC<
                   <p>Variable-memory or unresolved edges without an execution-row owner.</p>
                 </div>
               </header>
-              {review.unassignedConnections.map(connection => (
+              {visibleUnassignedConnections.map(connection => (
                 <div
                   className={`${styles.connection} ${stateClass(connection)}`}
                   key={connection.id}
@@ -417,7 +483,7 @@ const VariablesExecutionFlowReviewModal: React.FC<
             </section>
           )}
 
-          {review.steps.length === 0 && (
+          {visibleSteps.length === 0 && (
             <div className={styles.empty} role="status">
               <AlertTriangle size={18} aria-hidden="true" />
               This Bot Job does not contain an authoritative execution sequence.
@@ -427,7 +493,7 @@ const VariablesExecutionFlowReviewModal: React.FC<
 
         <footer className={styles.actions}>
           <span>
-            {review.issueCount === 0
+            {visibleDiagnostics.length === 0
               ? <CheckCircle2 size={16} aria-hidden="true" />
               : <AlertTriangle size={16} aria-hidden="true" />}
             No database change is made by this review.
