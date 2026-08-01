@@ -354,6 +354,34 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
     [relationshipEdges],
   );
 
+  const rowDropTarget = (
+    event: DragEvent<HTMLElement>,
+    blockId: number,
+    rowIndex: number,
+  ): VariablesCommandDropTarget => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const placementIndex = event.clientY < bounds.top + bounds.height / 2
+      ? rowIndex
+      : rowIndex + 1;
+    return { blockId, index: placementIndex };
+  };
+
+  const dropPositionNumber = (blockId: number, index: number) => {
+    if (draggingInstructionId === null) return index + 1;
+    const sourceGroup = groups.find(group => group.instructions.some(
+      instruction => instruction.id === draggingInstructionId,
+    ));
+    const sourceIndex = sourceGroup?.instructions.findIndex(
+      instruction => instruction.id === draggingInstructionId,
+    ) ?? -1;
+    const adjustedIndex = sourceGroup?.blockId === blockId
+      && sourceIndex >= 0
+      && sourceIndex < index
+      ? index - 1
+      : index;
+    return adjustedIndex + 1;
+  };
+
   const dropGap = (
     blockId: number,
     index: number,
@@ -372,7 +400,9 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
         onDragLeave={event => onDropTargetDragLeave?.(event, target)}
         onDrop={event => onDropTarget?.(event, target)}
       >
-        <span>{active ? 'Release to move here' : ''}</span>
+        <span>
+          {active ? `New position #${dropPositionNumber(blockId, index)} - release to move` : ''}
+        </span>
       </div>
     );
   };
@@ -672,6 +702,18 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                         onInstructionDragStart?.(event, instruction)}
                       onDragEnd={event =>
                         onInstructionDragEnd?.(event, instruction)}
+                      onDragOver={group.blockId === null
+                        ? undefined
+                        : event => onDropTargetDragOver?.(
+                            event,
+                            rowDropTarget(event, group.blockId as number, index),
+                          )}
+                      onDrop={group.blockId === null
+                        ? undefined
+                        : event => onDropTarget?.(
+                            event,
+                            rowDropTarget(event, group.blockId as number, index),
+                          )}
                     >
                       <span className={styles.grip} aria-hidden="true">
                         <GripVertical size={16} />
