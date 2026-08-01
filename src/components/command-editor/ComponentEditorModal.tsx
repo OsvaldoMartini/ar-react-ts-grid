@@ -308,19 +308,6 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
             </div>
           </section>
 
-          <label className={styles.nameField}>
-            <span>Command name</span>
-            <input
-              type="text"
-              value={draft.name}
-              disabled={pending}
-              onChange={(event) => setDraft(current => ({
-                ...current,
-                name: event.target.value,
-              }))}
-            />
-          </label>
-
           {(configurationEditor || children) && (
             <section className={styles.editorContent} aria-label="Command configuration">
               {configurationEditor}
