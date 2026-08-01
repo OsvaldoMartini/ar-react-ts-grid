@@ -75,10 +75,10 @@ const relationshipCopy: Readonly<Record<
   },
   LOOP_ANCHOR: {
     title: 'Reconnect LOOP anchor',
-    description: 'Select the Web Element that should anchor this LOOP. Connecting writes parentId.',
+    description: 'Select the Web Element or compatible command that should anchor this LOOP. Connecting writes parentId.',
     relationLabel: 'parentId',
     selectorLabel: 'Compatible LOOP anchors',
-    emptySelectionLabel: 'Select a compatible Web Element',
+    emptySelectionLabel: 'Select a compatible LOOP anchor',
   },
   CONDITIONAL_ROOT: {
     title: 'Reconnect conditional root',

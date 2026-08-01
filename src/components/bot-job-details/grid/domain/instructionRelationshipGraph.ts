@@ -1,4 +1,5 @@
 import {
+  isCompatibleLoopAnchorAction,
   instructionRelationshipPolicy,
   writesRuntimeVariableValue,
   type InstructionActionPolicy,
@@ -521,7 +522,7 @@ export const buildInstructionRelationshipGraph = ({
       const candidates = instructions.filter(candidate =>
         candidate.blockId === instruction.blockId
         && isBefore(candidate, instruction)
-        && instructionRelationshipPolicy(candidate.actions).role === 'WEB_ELEMENT');
+        && isCompatibleLoopAnchorAction(candidate.actions));
       const selected = instruction.parentId === null
         ? null
         : instructionsById.get(instruction.parentId) ?? null;
@@ -529,9 +530,7 @@ export const buildInstructionRelationshipGraph = ({
       if (instruction.parentId === null) code = 'MISSING_LOOP_ANCHOR';
       else if (!selected) code = 'DANGLING_LOOP_ANCHOR';
       else if (selected.blockId !== instruction.blockId) code = 'LOOP_ANCHOR_WRONG_BLOCK';
-      else if (
-        instructionRelationshipPolicy(selected.actions).role !== 'WEB_ELEMENT'
-      ) {
+      else if (!isCompatibleLoopAnchorAction(selected.actions)) {
         code = 'INCOMPATIBLE_LOOP_ANCHOR';
       } else if (!isBefore(selected, instruction)) code = 'LOOP_ANCHOR_ORDER';
       relationshipEdges.push(edge(

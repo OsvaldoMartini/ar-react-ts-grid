@@ -138,15 +138,15 @@ const issueMessage = (
     case 'RUNTIME_VALUE_WRITER_OUTSIDE_SCOPE':
       return `${action} ${instruction} has an active GET or SET writer outside this run scope.`;
     case 'MISSING_LOOP_ANCHOR':
-      return `${action} ${instruction} has no Web Element anchor.`;
+      return `${action} ${instruction} has no compatible anchor.`;
     case 'DANGLING_LOOP_ANCHOR':
       return `${action} ${instruction} references missing anchor instruction #${row.parentId}.`;
     case 'LOOP_ANCHOR_WRONG_BLOCK':
       return `${action} ${instruction} references an anchor in another Block.`;
     case 'INCOMPATIBLE_LOOP_ANCHOR':
-      return `${action} ${instruction} does not reference a Web Element anchor.`;
+      return `${action} ${instruction} does not reference a compatible anchor.`;
     case 'INACTIVE_LOOP_ANCHOR':
-      return `${action} ${instruction} references an inactive Web Element anchor.`;
+      return `${action} ${instruction} references an inactive anchor.`;
     case 'LOOP_ANCHOR_ORDER':
       return `${action} ${instruction} requires its anchor to execute first.`;
     case 'CONDITIONAL_ROOT_NOT_SELF':
