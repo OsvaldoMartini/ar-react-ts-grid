@@ -9,7 +9,7 @@ export type VariablesConnectionsPrimaryActionProps = Readonly<{
 
 const reviewConnectionsEvent: RulesCardEvent = Object.freeze({
   color: 'green',
-  rules: 'REVIEW ALL CONNECTIONS',
+  rules: 'REVIEW CONNECTIONS',
   ts: 0,
 });
 

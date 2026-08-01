@@ -181,6 +181,19 @@
   margin-top: 12px;
 }
 
+.webElementTargetLabel,
+.variableTargetLabel {
+  font-weight: 900;
+}
+
+.webElementTargetLabel {
+  color: #0b5394;
+}
+
+.variableTargetLabel {
+  color: rgb(103, 54, 155);
+}
+
 .releaseSummary {
   background: #fff0f0;
   border: 1px solid #e49a9a;

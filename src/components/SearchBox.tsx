@@ -36,6 +36,8 @@ export interface SearchBoxProps {
   placeholder?: string;
   /** Small uppercase heading above the input (e.g. "EXACT BOT AND ACCOUNT"). */
   label?: string;
+  /** Optional presentation class applied only to the heading label. */
+  labelClassName?: string;
   /** Right side of the results header row, rendered uppercase. */
   headerRight?: string;
   /** Results header count text; defaults to "N RESULTS". */
@@ -57,6 +59,7 @@ const SearchBox: React.FC<SearchBoxProps> = ({
   onChange,
   placeholder = 'Search...',
   label,
+  labelClassName,
   headerRight,
   countLabel,
   allOptionLabel,
@@ -165,7 +168,10 @@ const SearchBox: React.FC<SearchBoxProps> = ({
   return (
     <div className={styles.searchBox} ref={rootRef}>
       {label && (
-        <label className={styles.boxLabel} htmlFor={inputId}>
+        <label
+          className={`${styles.boxLabel} ${labelClassName ?? ''}`.trim()}
+          htmlFor={inputId}
+        >
           {label}
         </label>
       )}

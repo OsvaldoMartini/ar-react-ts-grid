@@ -283,12 +283,12 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
 
   const resolveConnectionsEvent = useMemo<RulesCardEvent>(() => ({
     color: 'green',
-    rules: 'RESOLVE ALL CONNECTIONS',
+    rules: 'RESOLVE CONNECTIONS',
     ts: 0,
   }), []);
   const releaseConnectionsEvent = useMemo<RulesCardEvent>(() => ({
     color: 'red',
-    rules: 'RELEASE ALL CONNECTIONS',
+    rules: 'RELEASE CONNECTIONS',
     ts: 0,
   }), []);
 

@@ -385,6 +385,11 @@ const VariablesConnectionsModal: React.FC<
                           }));
                         }}
                         label={`${item.relationLabel} target for ${item.sourceLabel}`}
+                        labelClassName={item.relationLabel === 'Variable'
+                          ? styles.variableTargetLabel
+                          : item.relationLabel === 'Web Element'
+                            ? styles.webElementTargetLabel
+                            : undefined}
                         placeholder={`Search compatible ${item.relationLabel.toLocaleLowerCase()}...`}
                         headerRight={item.state}
                         countLabel={count =>
