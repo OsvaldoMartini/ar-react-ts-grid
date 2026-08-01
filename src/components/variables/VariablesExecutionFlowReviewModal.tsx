@@ -87,6 +87,11 @@ const VariablesExecutionFlowReviewModal: React.FC<
   const visibleBlocks = useMemo(() => blockFilter === null
     ? review.blocks
     : review.blocks.filter(block => block.blockId === blockFilter), [blockFilter, review.blocks]);
+  const visibleDiagnostics = useMemo(() => blockFilter === null
+    ? review.diagnostics
+    : review.diagnostics.filter(diagnostic =>
+        diagnostic.blockIds.length === 0
+        || diagnostic.blockIds.includes(blockFilter)), [blockFilter, review.diagnostics]);
 
   useEffect(() => {
     const returnFocusTarget = returnFocusRef.current;
@@ -178,7 +183,7 @@ const VariablesExecutionFlowReviewModal: React.FC<
             <div><span>Connections</span><strong>{review.connectionCount}</strong></div>
             <div>
               <span>Diagnostics</span>
-              <strong>{review.issueCount}</strong>
+              <strong>{visibleDiagnostics.length}</strong>
             </div>
           </section>
 
@@ -348,7 +353,7 @@ const VariablesExecutionFlowReviewModal: React.FC<
             </div>
           </section>
 
-          {review.diagnostics.length > 0 && (
+          {visibleDiagnostics.length > 0 && (
             <section className={styles.diagnostics} aria-label="Graph diagnostics">
               <header className={styles.sectionHeading}>
                 <AlertTriangle size={17} aria-hidden="true" />
@@ -358,7 +363,7 @@ const VariablesExecutionFlowReviewModal: React.FC<
                 </div>
               </header>
               <div className={styles.diagnosticList}>
-                {review.diagnostics.map(diagnostic => (
+                {visibleDiagnostics.map(diagnostic => (
                   <article className={styles.diagnostic} key={diagnostic.id}>
                     <span>{diagnostic.severity}</span>
                     <strong>{diagnostic.code}</strong>

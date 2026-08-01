@@ -59,6 +59,7 @@ export type VariablesExecutionVariableFlow = {
 export type VariablesExecutionFlowDiagnostic = {
   id: string;
   sourceLabel: string;
+  blockIds: readonly number[];
   code: string;
   message: string;
   severity: 'INFO' | 'WARNING' | 'ERROR';
@@ -148,6 +149,23 @@ export const buildVariablesExecutionFlowReview = (
     return variable
       ? `${variable.name} (Variable ID ${target.id})`
       : `Variable ID ${target.id}`;
+  };
+  const diagnosticBlockIds = (target: RelationshipTarget): readonly number[] => {
+    if (target.entity === 'BLOCK') return Object.freeze([target.id]);
+    if (target.entity === 'INSTRUCTION') {
+      const blockId = commandsById.get(target.id)?.blockId;
+      return Object.freeze(positiveInteger(blockId) ? [blockId] : []);
+    }
+    const variable = variablesById.get(target.id);
+    if (!variable) return Object.freeze([]);
+    const blockIds = new Set<number>();
+    [variable.owner, ...variable.commands].forEach((instruction) => {
+      const blockId = instruction?.blockId;
+      if (positiveInteger(blockId)) {
+        blockIds.add(blockId);
+      }
+    });
+    return Object.freeze([...blockIds].sort((left, right) => left - right));
   };
   const connections = (graph?.edges ?? []).map(edge => frozenConnection({
     id: edge.id,
@@ -334,6 +352,7 @@ export const buildVariablesExecutionFlowReview = (
     .map(issue => ({
       id: `GRAPH:${issue.edgeId}:${issue.code}`,
       sourceLabel: targetLabel(issue.source),
+      blockIds: diagnosticBlockIds(issue.source),
       code: issue.code,
       message: `${issue.kind.replaceAll('_', ' ')} is ${issue.state.replaceAll('_', ' ').toLocaleLowerCase()}.`,
       severity: 'ERROR' as const,
@@ -362,6 +381,27 @@ export const buildVariablesExecutionFlowReview = (
               id: diagnostic.variableId,
             })
           : 'Bot Job graph',
+      blockIds: diagnostic.instructionId !== null
+        ? diagnosticBlockIds({
+            entity: 'INSTRUCTION',
+            owner: {
+              workspaceKind: 'BOT_JOB',
+              homeBankingId: snapshot.botJob.homeBankingId,
+              botJobId: snapshot.botJob.id,
+            },
+            id: diagnostic.instructionId,
+          })
+        : diagnostic.variableId !== null
+          ? diagnosticBlockIds({
+              entity: 'VARIABLE',
+              owner: {
+                workspaceKind: 'BOT_JOB',
+                homeBankingId: snapshot.botJob.homeBankingId,
+                botJobId: snapshot.botJob.id,
+              },
+              id: diagnostic.variableId,
+            })
+          : Object.freeze([]),
       code: diagnostic.code,
       message: diagnostic.message,
       severity: diagnostic.severity,
