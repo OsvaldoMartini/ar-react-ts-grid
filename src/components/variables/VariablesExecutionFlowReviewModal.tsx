@@ -44,16 +44,6 @@ const relationshipLabel = (
   connection: VariablesExecutionFlowConnection,
 ): string => connection.kind.replaceAll('_', ' ');
 
-const diagnosticSourceTypeLabel = (
-  diagnostic: VariablesExecutionFlowDiagnostic,
-): string => diagnostic.sourceType === 'INSTRUCTION'
-  ? 'step'
-  : diagnostic.sourceType === 'VARIABLE'
-    ? 'variable'
-    : diagnostic.sourceType === 'BLOCK'
-      ? 'block'
-      : 'graph';
-
 const VariablesExecutionFlowReviewModal: React.FC<
   VariablesExecutionFlowReviewModalProps
 > = ({
@@ -110,12 +100,12 @@ const VariablesExecutionFlowReviewModal: React.FC<
       && diagnostic.blockIds.includes(blockFilter)
       ? [blockFilter]
       : diagnostic.blockIds;
-    if (visibleBlockIds.length === 0) return '<Bot Job>';
+    if (visibleBlockIds.length === 0) return 'Bot Job';
     return visibleBlockIds.map((blockId) => {
       const block = blocksById.get(blockId);
       return block
-        ? `<${block.blockOrder ?? blockId}# ${block.blockName}>`
-        : `<${blockId}# Block>`;
+        ? `${block.blockOrder ?? blockId}# ${block.blockName}`
+        : `${blockId}# Block`;
     }).join(', ');
   };
 
@@ -394,7 +384,7 @@ const VariablesExecutionFlowReviewModal: React.FC<
                     <span>{diagnostic.severity}</span>
                     <strong>{diagnostic.code}</strong>
                     <b>
-                      {diagnosticBlockLabel(diagnostic)} - {diagnosticSourceTypeLabel(diagnostic)}: {diagnostic.sourceLabel}
+                      {diagnosticBlockLabel(diagnostic)} - {diagnostic.sourceLabel}
                     </b>
                     <p>{diagnostic.message}</p>
                   </article>
