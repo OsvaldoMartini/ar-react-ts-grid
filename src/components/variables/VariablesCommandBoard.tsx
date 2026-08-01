@@ -48,6 +48,8 @@ export interface VariablesCommandBoardProps {
   relationshipEdges?: readonly InstructionRelationshipEdge[];
   /** Stable Bot Job owner key. Changing it clears command-list filters. */
   workspaceIdentityKey?: string | number | null;
+  blockFilter?: number | null;
+  onBlockFilterChange?: (blockId: number | null) => void;
   disabled?: boolean;
   unavailableReason?: string;
   selectedInstructionId?: number | null;
@@ -142,6 +144,8 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
   instructions,
   relationshipEdges = [],
   workspaceIdentityKey,
+  blockFilter: controlledBlockFilter,
+  onBlockFilterChange,
   disabled = false,
   unavailableReason,
   selectedInstructionId = null,
@@ -162,12 +166,15 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
   className,
 }) => {
   const [commandSearch, setCommandSearch] = useState('');
-  const [blockFilter, setBlockFilter] = useState<number | null>(null);
+  const [localBlockFilter, setLocalBlockFilter] = useState<number | null>(null);
+  const blockFilter = controlledBlockFilter === undefined
+    ? localBlockFilter
+    : controlledBlockFilter;
   const commandSearchActive = commandSearch.trim().length > 0;
 
   useEffect(() => {
     setCommandSearch('');
-    setBlockFilter(null);
+    setLocalBlockFilter(null);
   }, [workspaceIdentityKey]);
 
   useEffect(() => {
@@ -175,9 +182,10 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
       blockFilter !== null
       && !blocks.some(block => block.id === blockFilter)
     ) {
-      setBlockFilter(null);
+      setLocalBlockFilter(null);
+      onBlockFilterChange?.(null);
     }
-  }, [blockFilter, blocks]);
+  }, [blockFilter, blocks, onBlockFilterChange]);
 
   const blockSearchOptions = useMemo<SearchBoxOption[]>(() => {
     const commandCounts = new Map<number, number>();
@@ -443,8 +451,11 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
               allOptionLabel="All blocks"
               options={blockSearchOptions}
               value={blockFilter === null ? null : String(blockFilter)}
-              onChange={value =>
-                setBlockFilter(value === null ? null : Number(value))}
+              onChange={(value) => {
+                const nextBlockFilter = value === null ? null : Number(value);
+                setLocalBlockFilter(nextBlockFilter);
+                onBlockFilterChange?.(nextBlockFilter);
+              }}
             />
           </div>
           {(

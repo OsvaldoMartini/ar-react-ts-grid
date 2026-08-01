@@ -642,6 +642,7 @@ const VariablesPage: React.FC<Props> = ({
   const [healthFilter, setHealthFilter] = useState<HealthFilter>('ALL');
   const [selectedInstructionId, setSelectedInstructionId] =
     useState<number | null>(null);
+  const [sharedBlockFilter, setSharedBlockFilter] = useState<number | null>(null);
   const [draggingInstructionId, setDraggingInstructionId] =
     useState<number | null>(null);
   const [activeDropTarget, setActiveDropTarget] =
@@ -880,6 +881,7 @@ const VariablesPage: React.FC<Props> = ({
     resetRuntimeMemory();
     closeExecutionFlowReview();
     setHealthFilter('ALL');
+    setSharedBlockFilter(null);
     setDraggingInstructionId(null);
     setActiveDropTarget(null);
     setPendingReconnect(null);
@@ -1956,6 +1958,8 @@ const VariablesPage: React.FC<Props> = ({
             <section className={styles.workspace}>
               <VariablesCommandBoard
                 workspaceIdentityKey={workspaceIdentityKey}
+                blockFilter={sharedBlockFilter}
+                onBlockFilterChange={setSharedBlockFilter}
                 blocks={snapshot.blocks}
                 instructions={snapshot.commands}
                 relationshipEdges={relationshipGraph?.edges ?? []}
@@ -2402,6 +2406,8 @@ const VariablesPage: React.FC<Props> = ({
             key={executionFlowReview.authorityKey}
             review={executionFlowReview.review}
             scopeLabel={executionFlowReview.scopeLabel}
+            blockFilter={sharedBlockFilter}
+            onBlockFilterChange={setSharedBlockFilter}
             onClose={closeExecutionFlowReviewModal}
           />
         )}

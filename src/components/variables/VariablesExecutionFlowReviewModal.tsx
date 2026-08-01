@@ -19,6 +19,8 @@ import styles from './VariablesExecutionFlowReviewModal.module.scss';
 export interface VariablesExecutionFlowReviewModalProps {
   review: VariablesExecutionFlowReview;
   scopeLabel: string;
+  blockFilter?: number | null;
+  onBlockFilterChange?: (blockId: number | null) => void;
   returnFocusElement?: HTMLElement | null;
   onClose: () => void;
 }
@@ -43,12 +45,22 @@ const relationshipLabel = (
 
 const VariablesExecutionFlowReviewModal: React.FC<
   VariablesExecutionFlowReviewModalProps
-> = ({ review, scopeLabel, returnFocusElement = null, onClose }) => {
+> = ({
+  review,
+  scopeLabel,
+  blockFilter: controlledBlockFilter,
+  onBlockFilterChange,
+  returnFocusElement = null,
+  onClose,
+}) => {
   const titleId = useId();
   const descriptionId = useId();
   const dialogRef = useRef<HTMLElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
-  const [blockFilter, setBlockFilter] = useState<number | null>(null);
+  const [localBlockFilter, setLocalBlockFilter] = useState<number | null>(null);
+  const blockFilter = controlledBlockFilter === undefined
+    ? localBlockFilter
+    : controlledBlockFilter;
   const returnFocusRef = useRef<HTMLElement | null>(
     returnFocusElement
     ?? (typeof document !== 'undefined'
@@ -191,7 +203,11 @@ const VariablesExecutionFlowReviewModal: React.FC<
             allOptionLabel="All blocks"
             options={blockSearchOptions}
             value={blockFilter === null ? null : String(blockFilter)}
-            onChange={value => setBlockFilter(value === null ? null : Number(value))}
+            onChange={(value) => {
+              const nextBlockFilter = value === null ? null : Number(value);
+              setLocalBlockFilter(nextBlockFilter);
+              onBlockFilterChange?.(nextBlockFilter);
+            }}
           />
 
           {review.variableFlows.length > 0 && (
