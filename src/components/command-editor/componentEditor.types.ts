@@ -12,6 +12,7 @@ export interface ComponentEditorCommand {
   instructionName: string;
   action: string;
   operation: string;
+  onHoldSeconds: number | null;
   blockId: number | null;
   blockOrder: number | null;
   blockName: string;

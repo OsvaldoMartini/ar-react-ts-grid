@@ -1,0 +1,7 @@
+.editor { display: grid; gap: 10px; }
+.editor header { display: grid; gap: 3px; }
+.editor header > span { color: #0b5394; font-size: .78rem; font-weight: 900; text-transform: uppercase; }
+.editor header > small { color: #66788a; font-size: .7rem; }
+.editor label { display: grid; gap: 5px; max-width: 240px; }
+.editor label > span { color: #40566c; font-size: .7rem; font-weight: 800; }
+.editor input { background: #fff; border: 1px solid #aebfd0; border-radius: 6px; color: #1f2933; font: inherit; min-height: 34px; padding: 5px 8px; }

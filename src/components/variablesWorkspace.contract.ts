@@ -64,6 +64,7 @@ export interface VariableInstructionNode {
   name: string;
   command: string;
   operation: string;
+  onHoldSeconds?: number | null;
   blockId: number | null;
   blockName: string;
   blockOrder: number | null;
@@ -486,6 +487,7 @@ const normalizeInstruction = (value: unknown): VariableInstructionNode | null =>
     name: name || 'Unknown instruction',
     command: command || 'UNKNOWN',
     operation: textValue(candidate.operation, candidate.value, candidate.configuredValue),
+    onHoldSeconds: positiveInteger(candidate.onHoldSeconds, candidate.on_hold_seconds),
     blockId: positiveInteger(candidate.blockId, candidate.sourceBlockId),
     blockName: textValue(candidate.blockName, candidate.sourceBlockName),
     blockOrder: positiveInteger(

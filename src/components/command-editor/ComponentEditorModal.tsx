@@ -9,8 +9,12 @@ import { commandEditorPlacementOptions } from './commandEditorPlacement';
 import { commandEditorPlacementFromValue } from './commandEditorPlacement';
 import {
   commandEditorBaseDraft,
+  commandEditorConfiguration,
   isCommandEditorBaseDraftValid,
 } from './commandEditorDraft';
+import LoopCommandEditor from './editors/LoopCommandEditor';
+import RefreshLoopCommandEditor from './editors/RefreshLoopCommandEditor';
+import WaitCommandEditor from './editors/WaitCommandEditor';
 import type {
   CommandEditorMutationAction,
   CommandEditorMutationIntent,
@@ -99,14 +103,55 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
       name: command.instructionName,
       action: command.action,
       operation: command.operation,
+      configuration: commandEditorConfiguration(
+        command.action,
+        command.operation,
+        command.onHoldSeconds,
+      ),
     });
   }, [
     command.action,
     command.blockId,
     command.instructionId,
     command.instructionName,
+    command.onHoldSeconds,
     command.operation,
   ]);
+
+  const configurationEditor = draft.configuration.kind === 'LOOP'
+    ? (
+        <LoopCommandEditor
+          value={draft.configuration}
+          disabled={pending}
+          onChange={(configuration) => setDraft(current => ({
+            ...current,
+            configuration,
+          }))}
+        />
+      )
+    : draft.configuration.kind === 'REFRESH_LOOP'
+      ? (
+          <RefreshLoopCommandEditor
+            value={draft.configuration}
+            disabled={pending}
+            onChange={(configuration) => setDraft(current => ({
+              ...current,
+              configuration,
+            }))}
+          />
+        )
+      : draft.configuration.kind === 'WAIT'
+        ? (
+            <WaitCommandEditor
+              value={draft.configuration}
+              disabled={pending}
+              onChange={(configuration) => setDraft(current => ({
+                ...current,
+                configuration,
+              }))}
+            />
+          )
+        : null;
 
   const placement = commandEditorPlacementFromValue(
     placementOptions,
@@ -276,8 +321,9 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
             />
           </label>
 
-          {children && (
+          {(configurationEditor || children) && (
             <section className={styles.editorContent} aria-label="Command configuration">
+              {configurationEditor}
               {children}
             </section>
           )}

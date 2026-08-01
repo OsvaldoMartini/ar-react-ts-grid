@@ -48,6 +48,7 @@ interface RawCommand {
   name: string;
   action: string;
   operation: string;
+  onHoldSeconds: number | null;
   variableId: number | null;
   tagName: string;
   parentId: number | null;
@@ -97,6 +98,7 @@ const parseRawCommand = (value: unknown): RawCommand | null => {
     name: text(raw.instructionName),
     action: text(raw.action),
     operation: text(raw.operation),
+    onHoldSeconds: intOrNull(raw.onHoldSeconds ?? raw.on_hold_seconds),
     variableId,
     tagName: text(raw.tagName || raw.tag_name),
     parentId: intOrNull(raw.parentId),
@@ -164,6 +166,7 @@ const commandJson = (command: RawCommand, commandRole: string): Raw => ({
   action: canonicalInstructionAction(command.action),
   role: commandRole,
   operation: command.operation,
+  onHoldSeconds: command.onHoldSeconds,
   variableId: command.variableId,
   tagName: command.tagName,
   parentId: command.parentId,
