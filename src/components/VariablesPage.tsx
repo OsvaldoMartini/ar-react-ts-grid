@@ -53,6 +53,8 @@ import VariablesConnectionsModal, {
   type VariablesConnectionsModalSubmission,
 } from './variables/VariablesConnectionsModal';
 import VariablesExecutionFlowReviewModal from './variables/VariablesExecutionFlowReviewModal';
+import ComponentEditorModal from './command-editor/ComponentEditorModal';
+import type { ComponentEditorCommand } from './command-editor/componentEditor.types';
 import {
   buildVariablesBatchResolveMutation,
   planVariablesBatchRelease,
@@ -742,6 +744,7 @@ const VariablesPage: React.FC<Props> = ({
   const [healthFilter, setHealthFilter] = useState<HealthFilter>('ALL');
   const [selectedInstructionId, setSelectedInstructionId] =
     useState<number | null>(null);
+  const [editingCommandId, setEditingCommandId] = useState<number | null>(null);
   const [sharedBlockFilter, setSharedBlockFilter] = useState<number | null>(null);
   const [draggingInstructionId, setDraggingInstructionId] =
     useState<number | null>(null);
@@ -1192,6 +1195,44 @@ const VariablesPage: React.FC<Props> = ({
     () => snapshot ? variablesReconnectGraph(snapshot) : null,
     [snapshot],
   );
+  const editingCommandNode = snapshot && editingCommandId !== null
+    ? snapshot.commands.find(command => command.id === editingCommandId) ?? null
+    : null;
+  const editingCommand: ComponentEditorCommand | null = editingCommandNode?.id == null
+    ? null
+    : {
+        instructionId: editingCommandNode.id,
+        instructionOrder: editingCommandNode.instructionOrder,
+        instructionName: editingCommandNode.name,
+        action: editingCommandNode.command,
+        operation: editingCommandNode.operation,
+        blockId: editingCommandNode.blockId,
+        blockOrder: editingCommandNode.blockOrder,
+        blockName: editingCommandNode.blockName,
+        active: editingCommandNode.active,
+      };
+  const editorVisibleCommands = snapshot?.commands.filter(command =>
+    sharedBlockFilter === null || command.blockId === sharedBlockFilter) ?? [];
+  const editorVisibleInstructionIds = new Set(editorVisibleCommands.flatMap(command =>
+    command.id === null ? [] : [command.id]));
+  const editorConnectionCount = relationshipGraph?.edges.filter(edge =>
+    edge.source.entity === 'INSTRUCTION'
+      && editorVisibleInstructionIds.has(edge.source.id)).length ?? 0;
+  const editorDiagnosticCount = snapshot?.diagnostics.filter(diagnostic =>
+    diagnostic.instructionId === null
+      || editorVisibleInstructionIds.has(diagnostic.instructionId)).length ?? 0;
+  const editorSelectedBlock = sharedBlockFilter === null
+    ? null
+    : snapshot?.blocks.find(block => block.id === sharedBlockFilter) ?? null;
+  const editorScopeLabel = editorSelectedBlock
+    ? `Block #${editorSelectedBlock.order ?? editorSelectedBlock.id} ${editorSelectedBlock.name} · ${editorVisibleCommands.length} visible command${editorVisibleCommands.length === 1 ? '' : 's'}`
+    : `All Blocks · ${editorVisibleCommands.length} visible command${editorVisibleCommands.length === 1 ? '' : 's'}`;
+
+  useEffect(() => {
+    if (editingCommandId !== null && !editingCommandNode) {
+      setEditingCommandId(null);
+    }
+  }, [editingCommandId, editingCommandNode]);
 
   useEffect(() => {
     if (
@@ -2200,6 +2241,11 @@ const VariablesPage: React.FC<Props> = ({
                 }}
                 onReconnectVariable={(instructionId) =>
                   openReconnect(instructionId, 'VARIABLE_BINDING')}
+                onEditCommand={(instruction) => {
+                  if (instruction.id === null) return;
+                  setSelectedInstructionId(instruction.id);
+                  setEditingCommandId(instruction.id);
+                }}
                 onResolveVisibleConnections={openResolveVisibleConnections}
                 onReviewVisibleConnections={openReviewVisibleConnections}
                 onReleaseVisibleConnections={openReleaseVisibleConnections}
@@ -2575,6 +2621,29 @@ const VariablesPage: React.FC<Props> = ({
             blockFilter={sharedBlockFilter}
             onBlockFilterChange={setSharedBlockFilter}
             onClose={closeExecutionFlowReviewModal}
+          />
+        )}
+        {snapshot && editingCommand && (
+          <ComponentEditorModal
+            command={editingCommand}
+            botJobId={snapshot.botJob.id}
+            botJobName={snapshot.botJob.name}
+            scopeLabel={editorScopeLabel}
+            blocks={snapshot.blocks.map(block => ({
+              blockId: block.id,
+              blockOrder: block.order ?? block.id,
+              blockName: block.name,
+              commandCount: snapshot.commands.filter(
+                command => command.blockId === block.id,
+              ).length,
+              active: block.active ?? undefined,
+            }))}
+            commandCount={editorVisibleCommands.length}
+            connectionCount={editorConnectionCount}
+            diagnosticCount={editorDiagnosticCount}
+            blockFilter={sharedBlockFilter}
+            onBlockFilterChange={setSharedBlockFilter}
+            onClose={() => setEditingCommandId(null)}
           />
         )}
         {snapshot && pendingReconnect && (

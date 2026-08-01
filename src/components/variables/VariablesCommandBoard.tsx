@@ -8,6 +8,7 @@ import {
   Boxes,
   GripVertical,
   Link2,
+  SquarePen,
   Search,
   Unplug,
   Variable,
@@ -88,6 +89,7 @@ export interface VariablesCommandBoardProps {
     instructionId: number,
     edge?: InstructionRelationshipEdge,
   ) => void;
+  onEditCommand?: (instruction: VariableInstructionNode) => void;
   onResolveVisibleConnections?: (scope: VariablesConnectionScope) => void;
   onReviewVisibleConnections?: (scope: VariablesConnectionScope) => void;
   onReleaseVisibleConnections?: (scope: VariablesConnectionScope) => void;
@@ -163,6 +165,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
   onDropTarget,
   onReconnectParent,
   onReconnectVariable,
+  onEditCommand,
   onResolveVisibleConnections,
   onReviewVisibleConnections,
   onReleaseVisibleConnections,
@@ -721,24 +724,15 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                         ts: instructionId ?? index,
                       }
                     : null;
-                const quickReconnect = instructionId === null
-                  ? null
-                  : reconnectParentEvent && onReconnectParent
-                    ? () => onReconnectParent(instructionId, elementParentEdge)
-                    : reconnectOtherParentEvent && onReconnectParent
-                      ? () => onReconnectParent(instructionId, otherParentEdge)
-                      : reconnectVariableEvent && onReconnectVariable
-                        ? () => onReconnectVariable(instructionId, variableBindingEdge)
-                        : null;
-                const quickReconnectEvent: RulesCardEvent | null =
-                  reconnectParentEvent || reconnectOtherParentEvent || reconnectVariableEvent
-                    ? {
-                        color: 'green',
-                        rules: 'Connect',
-                        context: '',
-                        ts: instructionId ?? index,
-                      }
-                    : null;
+                const editableCommand = policy.role !== 'WEB_ELEMENT';
+                const editCommandEvent: RulesCardEvent | null = editableCommand
+                  ? {
+                      color: 'green',
+                      rules: 'Edit',
+                      context: '',
+                      ts: instructionId ?? index,
+                    }
+                  : null;
                 const canDrag = instructionId !== null
                   && !disabled
                   && !commandSearchActive
@@ -830,20 +824,22 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                         />
                       </div>
                       <div className={styles.relationships}>
-                        {quickReconnectEvent && (
+                        {editCommandEvent && (
                           <span
                             className={styles.quickReconnectRuleCard}
                             onMouseDown={event => event.stopPropagation()}
                           >
                             <RulesCard
-                              event={quickReconnectEvent}
+                              event={editCommandEvent}
                               className={styles.quickReconnectButton}
-                              ariaLabel="Connect the first missing relationship"
-                              title="Connect the first missing relationship"
-                              glow
+                              ariaLabel={`Edit ${instruction.name || instruction.command}`}
+                              title="Edit this command"
+                              iconNode={<SquarePen size={14} aria-hidden="true" />}
                               animate={false}
-                              disabled={disabled || !quickReconnect}
-                              onClick={quickReconnect ?? undefined}
+                              disabled={instructionId === null || !onEditCommand}
+                              onClick={onEditCommand
+                                ? () => onEditCommand(instruction)
+                                : undefined}
                             />
                           </span>
                         )}

@@ -1,15 +1,11 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { PencilLine, X } from 'lucide-react';
 import SearchBox, { type SearchBoxOption } from '../SearchBox';
+import type {
+  ComponentEditorBlockOption,
+  ComponentEditorCommand,
+} from './componentEditor.types';
 import styles from './ComponentEditorModal.module.scss';
-
-export interface ComponentEditorBlockOption {
-  blockId: number;
-  blockOrder: number;
-  blockName: string;
-  commandCount: number;
-  active?: boolean;
-}
 
 export interface ComponentEditorModalProps {
   botJobId: number;
@@ -19,6 +15,7 @@ export interface ComponentEditorModalProps {
   commandCount: number;
   connectionCount: number;
   diagnosticCount: number;
+  command: ComponentEditorCommand;
   blockFilter?: number | null;
   onBlockFilterChange?: (blockId: number | null) => void;
   returnFocusElement?: HTMLElement | null;
@@ -43,6 +40,7 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
   commandCount,
   connectionCount,
   diagnosticCount,
+  command,
   blockFilter: controlledBlockFilter,
   onBlockFilterChange,
   returnFocusElement = null,
@@ -172,6 +170,29 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
               onBlockFilterChange?.(nextBlockFilter);
             }}
           />
+
+          <section className={styles.selectedCommand} aria-label="Selected command">
+            <div>
+              <span>Selected command</span>
+              <strong>
+                #{command.instructionOrder ?? '?'} {command.instructionName}
+              </strong>
+            </div>
+            <div>
+              <span>Command</span>
+              <strong>{command.action || 'Unknown'}</strong>
+            </div>
+            <div>
+              <span>Instruction ID</span>
+              <strong>{command.instructionId}</strong>
+            </div>
+            <div>
+              <span>Block</span>
+              <strong>
+                #{command.blockOrder ?? '?'} {command.blockName || 'Unknown Block'}
+              </strong>
+            </div>
+          </section>
 
           {children && (
             <section className={styles.editorContent} aria-label="Command configuration">
