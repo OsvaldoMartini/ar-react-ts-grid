@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import type {
   VariablesExecutionFlowConnection,
+  VariablesExecutionFlowDiagnostic,
   VariablesExecutionFlowReview,
 } from './domain/variablesExecutionFlowReview';
 import SearchBox, { type SearchBoxOption } from '../SearchBox';
@@ -42,6 +43,16 @@ const stateClass = (
 const relationshipLabel = (
   connection: VariablesExecutionFlowConnection,
 ): string => connection.kind.replaceAll('_', ' ');
+
+const diagnosticSourceTypeLabel = (
+  diagnostic: VariablesExecutionFlowDiagnostic,
+): string => diagnostic.sourceType === 'INSTRUCTION'
+  ? 'step'
+  : diagnostic.sourceType === 'VARIABLE'
+    ? 'variable'
+    : diagnostic.sourceType === 'BLOCK'
+      ? 'block'
+      : 'graph';
 
 const VariablesExecutionFlowReviewModal: React.FC<
   VariablesExecutionFlowReviewModalProps
@@ -92,6 +103,21 @@ const VariablesExecutionFlowReviewModal: React.FC<
     : review.diagnostics.filter(diagnostic =>
         diagnostic.blockIds.length === 0
         || diagnostic.blockIds.includes(blockFilter)), [blockFilter, review.diagnostics]);
+  const blocksById = useMemo(() => new Map(review.blocks.flatMap(block =>
+    block.blockId === null ? [] : [[block.blockId, block] as const])), [review.blocks]);
+  const diagnosticBlockLabel = (diagnostic: VariablesExecutionFlowDiagnostic) => {
+    const visibleBlockIds = blockFilter !== null
+      && diagnostic.blockIds.includes(blockFilter)
+      ? [blockFilter]
+      : diagnostic.blockIds;
+    if (visibleBlockIds.length === 0) return '<Bot Job>';
+    return visibleBlockIds.map((blockId) => {
+      const block = blocksById.get(blockId);
+      return block
+        ? `<${block.blockOrder ?? blockId}# ${block.blockName}>`
+        : `<${blockId}# Block>`;
+    }).join(', ');
+  };
 
   useEffect(() => {
     const returnFocusTarget = returnFocusRef.current;
@@ -367,7 +393,9 @@ const VariablesExecutionFlowReviewModal: React.FC<
                   <article className={styles.diagnostic} key={diagnostic.id}>
                     <span>{diagnostic.severity}</span>
                     <strong>{diagnostic.code}</strong>
-                    <b>{diagnostic.sourceLabel}</b>
+                    <b>
+                      {diagnosticBlockLabel(diagnostic)} - {diagnosticSourceTypeLabel(diagnostic)}: {diagnostic.sourceLabel}
+                    </b>
                     <p>{diagnostic.message}</p>
                   </article>
                 ))}

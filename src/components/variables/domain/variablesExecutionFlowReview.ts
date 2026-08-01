@@ -59,6 +59,7 @@ export type VariablesExecutionVariableFlow = {
 export type VariablesExecutionFlowDiagnostic = {
   id: string;
   sourceLabel: string;
+  sourceType: RelationshipTarget['entity'] | 'BOT_JOB';
   blockIds: readonly number[];
   code: string;
   message: string;
@@ -352,6 +353,7 @@ export const buildVariablesExecutionFlowReview = (
     .map(issue => ({
       id: `GRAPH:${issue.edgeId}:${issue.code}`,
       sourceLabel: targetLabel(issue.source),
+      sourceType: issue.source.entity,
       blockIds: diagnosticBlockIds(issue.source),
       code: issue.code,
       message: `${issue.kind.replaceAll('_', ' ')} is ${issue.state.replaceAll('_', ' ').toLocaleLowerCase()}.`,
@@ -381,6 +383,11 @@ export const buildVariablesExecutionFlowReview = (
               id: diagnostic.variableId,
             })
           : 'Bot Job graph',
+      sourceType: diagnostic.instructionId !== null
+        ? 'INSTRUCTION' as const
+        : diagnostic.variableId !== null
+          ? 'VARIABLE' as const
+          : 'BOT_JOB' as const,
       blockIds: diagnostic.instructionId !== null
         ? diagnosticBlockIds({
             entity: 'INSTRUCTION',
