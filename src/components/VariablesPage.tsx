@@ -318,18 +318,20 @@ const batchRelationshipLabel = (
 const batchSourceLabels = (
   snapshot: VariableWorkspaceSnapshot,
   instructionId: number,
-): { label: string; sublabel: string } => {
+): { label: string; sublabel: string; blockId: number | null } => {
   const command = snapshot.commands.find(candidate =>
     candidate.id === instructionId);
   if (!command) {
     return {
       label: `Instruction ID ${instructionId}`,
       sublabel: 'Current Bot Job',
+      blockId: null,
     };
   }
   return {
     label: `#${command.instructionOrder ?? '?'} ${command.name || command.command} · ID ${instructionId}`,
     sublabel: `Block #${command.blockOrder ?? '?'} ${command.blockName || command.blockId || 'Unavailable'}`,
+    blockId: command.blockId,
   };
 };
 
@@ -359,6 +361,7 @@ const batchResolveModalItems = (
             : 'SKIPPED';
   return {
     id: item.reviewId,
+    blockId: source.blockId,
     sourceLabel: source.label,
     sourceSublabel: source.sublabel,
     relationLabel: batchRelationshipLabel(item.kind),
@@ -413,6 +416,7 @@ const batchReleaseModalItems = (
           : null;
     return {
       id: `${patch.instructionId}:${patch.relationKind}`,
+      blockId: source.blockId,
       sourceLabel: source.label,
       sourceSublabel: source.sublabel,
       relationLabel: batchRelationshipLabel(patch.relationKind),
@@ -433,6 +437,7 @@ const batchReleaseModalItems = (
           };
     return {
       id: `${patch.instructionId}:VARIABLE_BINDING`,
+      blockId: source.blockId,
       sourceLabel: source.label,
       sourceSublabel: source.sublabel,
       relationLabel: batchRelationshipLabel('VARIABLE_BINDING'),
@@ -2389,6 +2394,9 @@ const VariablesPage: React.FC<Props> = ({
             items={pendingConnections.mode === 'RESOLVE'
               ? batchResolveModalItems(snapshot, pendingConnections.review)
               : pendingConnections.items}
+            blocks={snapshot.blocks}
+            blockFilter={sharedBlockFilter}
+            onBlockFilterChange={setSharedBlockFilter}
             pending={pendingMutationRequestId !== null}
             onConfirm={submitVisibleConnections}
             onCancel={() => {

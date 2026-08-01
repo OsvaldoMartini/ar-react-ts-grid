@@ -15,6 +15,7 @@ import SearchBox, {
   type SearchBoxOption,
 } from '../SearchBox';
 import { RulesCard, type RulesCardEvent } from '../RulesCard';
+import type { VariableWorkspaceBlock } from '../variablesWorkspace.contract';
 import styles from './VariablesConnectionsModal.module.scss';
 
 export type VariablesConnectionsModalMode = 'RESOLVE' | 'RELEASE';
@@ -36,6 +37,7 @@ export interface VariablesConnectionOption {
 
 export interface VariablesConnectionReviewItem {
   id: string;
+  blockId?: number | null;
   sourceLabel: string;
   sourceSublabel?: string;
   relationLabel: string;
@@ -66,6 +68,9 @@ export interface VariablesConnectionsModalProps {
   scopeLabel: string;
   scopeCount: number;
   items: readonly VariablesConnectionReviewItem[];
+  blocks?: readonly VariableWorkspaceBlock[];
+  blockFilter?: number | null;
+  onBlockFilterChange?: (blockId: number | null) => void;
   pending?: boolean;
   onCancel: () => void;
   onConfirm: (submission: VariablesConnectionsModalSubmission) => void;
@@ -104,6 +109,9 @@ const VariablesConnectionsModal: React.FC<
   scopeLabel,
   scopeCount,
   items,
+  blocks = [],
+  blockFilter: controlledBlockFilter,
+  onBlockFilterChange,
   pending = false,
   onCancel,
   onConfirm,
@@ -122,6 +130,10 @@ const VariablesConnectionsModal: React.FC<
     };
   }
   const frozenScope = frozenScopeRef.current;
+  const [localBlockFilter, setLocalBlockFilter] = useState<number | null>(null);
+  const blockFilter = controlledBlockFilter === undefined
+    ? localBlockFilter
+    : controlledBlockFilter;
 
   const [selectionByItem, setSelectionByItem] = useState<
     Record<string, string | null>
@@ -156,6 +168,28 @@ const VariablesConnectionsModal: React.FC<
       (item.compatibleOptions ?? []).length === 0).length,
     [items],
   );
+  const blockSearchOptions = useMemo<SearchBoxOption[]>(() => {
+    const connectionCounts = new Map<number, number>();
+    items.forEach((item) => {
+      if (item.blockId == null) return;
+      connectionCounts.set(
+        item.blockId,
+        (connectionCounts.get(item.blockId) ?? 0) + 1,
+      );
+    });
+    return blocks.map(block => ({
+      value: String(block.id),
+      label: `#${block.order ?? block.id} ${block.name}`,
+      sublabel: `${connectionCounts.get(block.id) ?? 0} connection(s) · block ID ${block.id}`,
+      badges: [block.active === false
+        ? { text: 'INACTIVE', tone: 'red' as const }
+        : { text: 'ACTIVE', tone: 'green' as const }],
+      keywords: String(block.id),
+    }));
+  }, [blocks, items]);
+  const visibleItems = useMemo(() => mode !== 'RESOLVE' || blockFilter === null
+    ? items
+    : items.filter(item => item.blockId == null || item.blockId === blockFilter), [blockFilter, items, mode]);
   const selectedCount = resolutions.length;
   const remainingCount = Math.max(items.length - selectedCount, 0);
   const confirmCount = mode === 'RESOLVE' ? selectedCount : items.length;
@@ -289,6 +323,23 @@ const VariablesConnectionsModal: React.FC<
               </>
             )}
           </section>
+          {resolving && (
+            <SearchBox
+              label="Block"
+              placeholder="Search block name or number..."
+              headerRight="Connections per block"
+              countLabel={count => `${count} BLOCK${count === 1 ? '' : 'S'}`}
+              allOptionLabel="All blocks"
+              options={blockSearchOptions}
+              value={blockFilter === null ? null : String(blockFilter)}
+              onChange={(value) => {
+                const nextBlockFilter = value === null ? null : Number(value);
+                setLocalBlockFilter(nextBlockFilter);
+                onBlockFilterChange?.(nextBlockFilter);
+              }}
+              disabled={pending}
+            />
+          )}
           {!resolving && (
             <p className={styles.releaseSummary}>
               Release will disconnect all {items.length} reviewed connection
@@ -297,7 +348,7 @@ const VariablesConnectionsModal: React.FC<
           )}
 
           <div className={styles.reviewList}>
-            {items.map((item, index) => {
+            {visibleItems.map((item, index) => {
               const options = [...(item.compatibleOptions ?? [])];
               const searchOptions: SearchBoxOption[] = options.map(
                 option => ({ ...option }),
@@ -353,7 +404,7 @@ const VariablesConnectionsModal: React.FC<
                 </article>
               );
             })}
-            {items.length === 0 && (
+            {visibleItems.length === 0 && (
               <p className={styles.emptyList} role="status">
                 No connections are present in the frozen scope.
               </p>
