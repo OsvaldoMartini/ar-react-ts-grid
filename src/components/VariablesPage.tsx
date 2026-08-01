@@ -56,6 +56,10 @@ import VariablesExecutionFlowReviewModal from './variables/VariablesExecutionFlo
 import ComponentEditorModal from './command-editor/ComponentEditorModal';
 import type { ComponentEditorCommand } from './command-editor/componentEditor.types';
 import {
+  useVariablesCommandEditorUpdate,
+  type VariablesCommandUpdateResult,
+} from './command-editor/useVariablesCommandEditorUpdate';
+import {
   buildVariablesBatchResolveMutation,
   planVariablesBatchRelease,
   planVariablesBatchResolve,
@@ -975,10 +979,35 @@ const VariablesPage: React.FC<Props> = ({
     onResult: handleInstructionCopyResult,
   });
 
+  const handleCommandUpdateResult = useCallback((
+    result: VariablesCommandUpdateResult,
+  ) => {
+    setStatus({
+      level: result.ok ? 'ok' : 'error',
+      text: result.message || (result.ok
+        ? 'Command updated.'
+        : 'The command update was refused.'),
+    });
+    if (result.ok) sendWorkspaceRequest('variablesWorkspace.refresh');
+  }, [sendWorkspaceRequest]);
+
+  const {
+    pendingRequestId: pendingCommandUpdateRequestId,
+    submit: submitCommandUpdate,
+    handleMessage: handleCommandUpdateMessage,
+    resetPending: resetCommandUpdate,
+  } = useVariablesCommandEditorUpdate({
+    webSocket,
+    connected,
+    snapshot,
+    onResult: handleCommandUpdateResult,
+  });
+
   const resetOwnerScopedUi = useCallback(() => {
     clearPendingRequest();
     resetGraphMutation();
     resetInstructionCopy();
+    resetCommandUpdate();
     resetVariableCreate();
     resetVariableDelete();
     resetRuntimeMemory();
@@ -999,6 +1028,7 @@ const VariablesPage: React.FC<Props> = ({
     closeExecutionFlowReview,
     resetGraphMutation,
     resetInstructionCopy,
+    resetCommandUpdate,
     resetRuntimeMemory,
     resetVariableCreate,
     resetVariableDelete,
@@ -1027,6 +1057,7 @@ const VariablesPage: React.FC<Props> = ({
     processedMessagesRef.current = messages.length;
 
     pending.forEach(raw => {
+      if (handleCommandUpdateMessage(raw)) return;
       if (handleInstructionCopyMessage(raw)) return;
       if (handleVariableCreateMessage(raw)) return;
       if (handleVariableDeleteMessage(raw)) return;
@@ -1108,6 +1139,7 @@ const VariablesPage: React.FC<Props> = ({
   }, [
     clearPendingRequest,
     handleGraphMutationMessage,
+    handleCommandUpdateMessage,
     handleInstructionCopyMessage,
     handleRuntimeMemoryMessage,
     handleVariableCreateMessage,
@@ -2642,6 +2674,18 @@ const VariablesPage: React.FC<Props> = ({
             }))}
             connectionCount={relationshipGraph?.edges.length ?? 0}
             diagnosticCount={snapshot.diagnostics.length}
+            pending={pendingCommandUpdateRequestId !== null}
+            enabledActions={['UPDATE']}
+            onSubmit={(intent) => {
+              if (submitCommandUpdate(intent)) {
+                setStatus({ level: 'warn', text: 'Updating command...' });
+              } else {
+                setStatus({
+                  level: 'error',
+                  text: 'The command update could not be started.',
+                });
+              }
+            }}
             onClose={() => setEditingCommandId(null)}
           />
         )}

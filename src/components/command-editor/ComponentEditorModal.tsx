@@ -34,6 +34,7 @@ export interface ComponentEditorModalProps {
   children?: React.ReactNode;
   pending?: boolean;
   onSubmit?: (intent: CommandEditorMutationIntent) => void;
+  enabledActions?: readonly CommandEditorMutationAction[];
   onClose: () => void;
 }
 
@@ -59,6 +60,7 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
   children,
   pending = false,
   onSubmit,
+  enabledActions = ['UPDATE', 'COPY_NEW'],
   onClose,
 }) => {
   const titleId = useId();
@@ -165,7 +167,7 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
     && isCommandEditorBaseDraftValid(draft),
   );
   const submit = (action: CommandEditorMutationAction) => {
-    if (!canSubmit || !placement || !onSubmit) return;
+    if (!canSubmit || !placement || !onSubmit || !enabledActions.includes(action)) return;
     onSubmit({
       action,
       sourceInstructionId: command.instructionId,
@@ -323,7 +325,7 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
           <button
             type="button"
             className={styles.copyButton}
-            disabled={!canSubmit}
+            disabled={!canSubmit || !enabledActions.includes('COPY_NEW')}
             title={onSubmit ? 'Create a disconnected copy with a new instruction ID' : 'Command persistence is not connected yet'}
             onClick={() => submit('COPY_NEW')}
           >
@@ -332,7 +334,7 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
           <button
             type="button"
             className={styles.updateButton}
-            disabled={!canSubmit}
+            disabled={!canSubmit || !enabledActions.includes('UPDATE')}
             title={onSubmit ? 'Update the selected instruction' : 'Command persistence is not connected yet'}
             onClick={() => submit('UPDATE')}
           >
