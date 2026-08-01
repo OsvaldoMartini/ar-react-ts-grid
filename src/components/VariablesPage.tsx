@@ -21,6 +21,7 @@ import ReconnectWebElement from './ReconnectWebElement';
 import type {
   RelationshipTarget,
 } from './bot-job-details/grid/domain/instructionRelationshipGraph';
+import { instructionCommandPresentation } from './bot-job-details/grid/domain/instructionCommandPresentation';
 import { instructionRelationshipPolicy } from './bot-job-details/grid/domain/instructionRelationshipPolicy';
 import SearchBox, { type SearchBoxOption } from './SearchBox';
 import { useWebSocket } from './useWebSocket';
@@ -182,6 +183,100 @@ type PendingConnectionsRelease = {
 type PendingConnections =
   | PendingConnectionsResolve
   | PendingConnectionsRelease;
+
+type PendingResolveBuildResult =
+  | { ok: true; pending: PendingConnectionsResolve }
+  | { ok: false; message: string };
+
+const variablesConnectionScopeForBlock = (
+  snapshot: VariableWorkspaceSnapshot,
+  requestedBlockId: number | null,
+  commandSearch = '',
+): VariablesConnectionScope => {
+  const selectedBlock = requestedBlockId === null
+    ? null
+    : snapshot.blocks.find(block => block.id === requestedBlockId) ?? null;
+  const blockId = selectedBlock?.id ?? null;
+  const normalizedSearch = commandSearch.trim();
+  const tokens = normalizedSearch
+    .toLocaleLowerCase()
+    .split(/\s+/)
+    .filter(Boolean);
+  const visibleCommands = snapshot.commands.filter((instruction) => {
+    if (blockId !== null && instruction.blockId !== blockId) return false;
+    if (tokens.length === 0) return true;
+    const commandPresentation = instructionCommandPresentation(
+      instruction.command,
+      instruction.tagName,
+    );
+    const haystack = [
+      instruction.id,
+      instruction.name,
+      instruction.command,
+      commandPresentation.label,
+      instruction.operation,
+      instruction.tagName,
+      instruction.blockId,
+      instruction.blockName,
+      instruction.blockOrder,
+      instruction.instructionOrder,
+      instruction.parentId,
+      instruction.parentBlockId,
+      instruction.variableId,
+    ]
+      .filter(value => value !== null && value !== undefined)
+      .join(' ')
+      .toLocaleLowerCase();
+    return tokens.every(token => haystack.includes(token));
+  });
+  const instructionIds = Array.from(new Set(
+    visibleCommands.flatMap(instruction =>
+      instruction.id !== null
+      && Number.isSafeInteger(instruction.id)
+      && instruction.id > 0
+        ? [instruction.id]
+        : []),
+  ));
+  const blockLabel = selectedBlock
+    ? `Block #${selectedBlock.order ?? selectedBlock.id} ${selectedBlock.name}`
+    : 'All Blocks';
+  return {
+    instructionIds,
+    visibleCount: instructionIds.length,
+    totalCount: snapshot.commands.length,
+    commandSearch: normalizedSearch,
+    blockId,
+    blockLabel,
+    label: [
+      blockLabel,
+      normalizedSearch ? `Search "${normalizedSearch}"` : null,
+      `${instructionIds.length} visible command${instructionIds.length === 1 ? '' : 's'}`,
+    ].filter(Boolean).join(' Â· '),
+  };
+};
+
+const buildPendingResolveConnections = (
+  snapshot: VariableWorkspaceSnapshot,
+  scope: VariablesConnectionScope,
+  reviewRevision: number,
+): PendingResolveBuildResult => {
+  const planned = planVariablesBatchResolve(snapshot, scope.instructionIds);
+  if (!planned.ok) return { ok: false, message: planned.message };
+  const reviewed = reviewVariablesBatchResolve(planned.plan, []);
+  if (!reviewed.ok) return { ok: false, message: reviewed.message };
+  return {
+    ok: true,
+    pending: {
+      mode: 'RESOLVE',
+      authorityKey: planned.plan.authorityKey,
+      scope,
+      plan: planned.plan,
+      review: reviewed.review,
+      choices: [],
+      reviewRevision,
+    },
+  };
+};
 
 const acceptedOperations = new Set([
   'variablesWorkspace.bootstrapResponse',
@@ -1120,6 +1215,25 @@ const VariablesPage: React.FC<Props> = ({
         snapshot,
       )
     ) {
+      if (pendingConnections.mode === 'RESOLVE') {
+        const refreshedScope = variablesConnectionScopeForBlock(
+          snapshot,
+          pendingConnections.scope.blockId,
+          pendingConnections.scope.commandSearch,
+        );
+        const rebuilt = buildPendingResolveConnections(
+          snapshot,
+          refreshedScope,
+          pendingConnections.reviewRevision + 1,
+        );
+        if (rebuilt.ok) {
+          setPendingConnections(rebuilt.pending);
+          return;
+        }
+        setPendingConnections(null);
+        setStatus({ level: 'error', text: rebuilt.message });
+        return;
+      }
       setPendingConnections(null);
       setStatus({
         level: 'error',
@@ -1149,12 +1263,14 @@ const VariablesPage: React.FC<Props> = ({
     sourceInstructionId: number,
     pendingText: string,
     committedText: string,
+    options: { keepConnectionsOpen?: boolean } = {},
   ) => {
+    const keepConnectionsOpen = options.keepConnectionsOpen === true;
     setStatus({ level: 'warn', text: pendingText });
     const requestId = submitGraphMutation(draft, {
       committed: response => {
         setPendingReconnect(null);
-        setPendingConnections(null);
+        if (!keepConnectionsOpen) setPendingConnections(null);
         setPendingBlockTransfer(null);
         setDraggingInstructionId(null);
         setActiveDropTarget(null);
@@ -1166,7 +1282,7 @@ const VariablesPage: React.FC<Props> = ({
       },
       refused: (response, reason) => {
         setPendingReconnect(null);
-        setPendingConnections(null);
+        if (!keepConnectionsOpen) setPendingConnections(null);
         setPendingBlockTransfer(null);
         setDraggingInstructionId(null);
         setActiveDropTarget(null);
@@ -1183,7 +1299,7 @@ const VariablesPage: React.FC<Props> = ({
     }, mutationProfile);
     if (!requestId) {
       setPendingReconnect(null);
-      setPendingConnections(null);
+      if (!keepConnectionsOpen) setPendingConnections(null);
       setPendingBlockTransfer(null);
       setDraggingInstructionId(null);
       setActiveDropTarget(null);
@@ -1512,40 +1628,57 @@ const VariablesPage: React.FC<Props> = ({
       });
       return;
     }
-    const planned = planVariablesBatchResolve(
-      current,
-      scope.instructionIds,
-    );
-    if (!planned.ok) {
-      setStatus({ level: 'error', text: planned.message });
+    const built = buildPendingResolveConnections(current, scope, 0);
+    if (!built.ok) {
+      setStatus({ level: 'error', text: built.message });
       return;
     }
-    const reviewed = reviewVariablesBatchResolve(planned.plan, []);
-    if (!reviewed.ok) {
-      setStatus({ level: 'error', text: reviewed.message });
-      return;
-    }
-    if (reviewed.review.items.length === 0) {
+    if (built.pending.review.items.length === 0) {
       setStatus({
         level: 'ok',
         text: `All ${scope.visibleCount} visible command(s) already have valid direct connections.`,
       });
       return;
     }
-    setPendingConnections({
-      mode: 'RESOLVE',
-      authorityKey: planned.plan.authorityKey,
-      scope,
-      plan: planned.plan,
-      review: reviewed.review,
-      choices: [],
-      reviewRevision: 0,
-    });
+    setPendingConnections(built.pending);
     setStatus({
       level: 'warn',
       text: `Reviewing direct connections for ${scope.visibleCount} visible command(s).`,
     });
   }, []);
+
+  const changeResolveConnectionsBlockFilter = useCallback((
+    nextBlockId: number | null,
+  ) => {
+    const current = snapshotRef.current;
+    const pending = pendingConnections;
+    if (!current || pending?.mode !== 'RESOLVE') {
+      setSharedBlockFilter(nextBlockId);
+      return;
+    }
+    const nextScope = variablesConnectionScopeForBlock(
+      current,
+      nextBlockId,
+      pending.scope.commandSearch,
+    );
+    const rebuilt = buildPendingResolveConnections(
+      current,
+      nextScope,
+      pending.reviewRevision + 1,
+    );
+    if (!rebuilt.ok) {
+      setStatus({ level: 'error', text: rebuilt.message });
+      return;
+    }
+    setSharedBlockFilter(nextScope.blockId);
+    setPendingConnections(rebuilt.pending);
+    setStatus({
+      level: rebuilt.pending.review.items.length > 0 ? 'warn' : 'ok',
+      text: rebuilt.pending.review.items.length > 0
+        ? `Reviewing direct connections for ${nextScope.visibleCount} visible command(s).`
+        : `All ${nextScope.visibleCount} visible command(s) already have valid direct connections.`,
+    });
+  }, [pendingConnections]);
 
   const openReleaseVisibleConnections = useCallback((
     scope: VariablesConnectionScope,
@@ -1728,6 +1861,7 @@ const VariablesPage: React.FC<Props> = ({
       built.mutation.changedInstructionIds[0] ?? 0,
       `Resolving ${built.mutation.changedInstructionIds.length} visible command(s)...`,
       `${built.mutation.changedInstructionIds.length} visible command(s) resolved.`,
+      { keepConnectionsOpen: true },
     );
   }, [
     pendingConnections,
@@ -2425,7 +2559,7 @@ const VariablesPage: React.FC<Props> = ({
               : pendingConnections.items}
             blocks={snapshot.blocks}
             blockFilter={sharedBlockFilter}
-            onBlockFilterChange={setSharedBlockFilter}
+            onBlockFilterChange={changeResolveConnectionsBlockFilter}
             pending={pendingMutationRequestId !== null}
             onConfirm={submitVisibleConnections}
             onCancel={() => {

@@ -69,7 +69,7 @@ const VariablesConnectionsHelpModal: React.FC<
             <ul>
               <li>
                 <strong>AUTO SELECTED:</strong> Exactly one compatible target
-                exists, so React selects it automatically.
+                exists, so it selects automatically.
               </li>
               <li>
                 <strong>SELECT TARGET:</strong> Multiple compatible targets

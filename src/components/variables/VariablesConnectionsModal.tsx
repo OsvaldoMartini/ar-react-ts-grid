@@ -121,17 +121,6 @@ const VariablesConnectionsModal: React.FC<
   const titleId = useId();
   const descriptionId = useId();
   const dialogRef = useRef<HTMLElement>(null);
-  const frozenScopeRef = useRef<{
-    label: string;
-    count: number;
-  } | null>(null);
-  if (frozenScopeRef.current === null) {
-    frozenScopeRef.current = {
-      label: scopeLabel,
-      count: scopeCount,
-    };
-  }
-  const frozenScope = frozenScopeRef.current;
   const [localBlockFilter, setLocalBlockFilter] = useState<number | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const blockFilter = controlledBlockFilter === undefined
@@ -304,9 +293,9 @@ const VariablesConnectionsModal: React.FC<
           <section className={styles.scope} aria-label="Frozen connection scope">
             <div>
               <span>Frozen scope</span>
-              <strong>{frozenScope.label}</strong>
+              <strong>{scopeLabel}</strong>
             </div>
-            <b>{frozenScope.count}</b>
+            <b>{scopeCount}</b>
           </section>
 
           <section className={styles.summary} aria-label="Connection summary">
