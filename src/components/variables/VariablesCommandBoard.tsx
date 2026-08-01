@@ -25,6 +25,9 @@ import type {
   VariableWorkspaceBlock,
 } from '../variablesWorkspace.contract';
 import VariablesConnectionsPrimaryAction from './VariablesConnectionsPrimaryAction';
+import InstructionReferenceIcons, {
+  type InstructionReferenceIcon,
+} from './InstructionReferenceIcons';
 import styles from './VariablesCommandBoard.module.scss';
 
 export type VariablesCommandDropTarget = {
@@ -361,6 +364,35 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
     () => relationshipByInstruction(relationshipEdges),
     [relationshipEdges],
   );
+
+  const referenceIconsByParentId = useMemo(() => {
+    const instructionsById = new Map<number, VariableInstructionNode>();
+    instructions.forEach((instruction) => {
+      if (instruction.id !== null) instructionsById.set(instruction.id, instruction);
+    });
+    const references = new Map<number, InstructionReferenceIcon[]>();
+    relationshipEdges.forEach((edge) => {
+      if (
+        edge.kind !== 'LOOP_ANCHOR'
+        || edge.state !== 'CONNECTED'
+        || edge.source.entity !== 'INSTRUCTION'
+        || edge.target?.entity !== 'INSTRUCTION'
+      ) return;
+      const child = instructionsById.get(edge.source.id);
+      if (!child) return;
+      const action = instructionCommandPresentation(
+        child.command,
+        child.tagName,
+      ).canonicalAction;
+      if (action !== 'LOOP' && action !== 'REFRESH_LOOP') return;
+      const existing = references.get(edge.target.id) ?? [];
+      if (!existing.some(reference => reference.instructionId === edge.source.id)) {
+        existing.push({ instructionId: edge.source.id, action });
+        references.set(edge.target.id, existing);
+      }
+    });
+    return references;
+  }, [instructions, relationshipEdges]);
 
   const rowDropTarget = (
     event: DragEvent<HTMLElement>,
@@ -760,24 +792,31 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                         tagName={instruction.tagName}
                         className={styles.command}
                       />
-                      <button
-                        type="button"
-                        className={styles.identity}
-                        disabled={instructionId === null || !onSelectInstruction}
-                        aria-pressed={selected}
-                        onClick={() => {
-                          if (instructionId !== null) {
-                            onSelectInstruction?.(instructionId);
-                          }
-                        }}
-                      >
-                        <strong title={instruction.name}>
-                          {instruction.name || 'Unnamed instruction'}
-                        </strong>
-                        <small>
-                          {instructionId === null ? 'Missing ID' : `ID ${instructionId}`}
-                        </small>
-                      </button>
+                      <div className={styles.identityContent}>
+                        <button
+                          type="button"
+                          className={styles.identity}
+                          disabled={instructionId === null || !onSelectInstruction}
+                          aria-pressed={selected}
+                          onClick={() => {
+                            if (instructionId !== null) {
+                              onSelectInstruction?.(instructionId);
+                            }
+                          }}
+                        >
+                          <strong title={instruction.name}>
+                            {instruction.name || 'Unnamed instruction'}
+                          </strong>
+                          <small>
+                            {instructionId === null ? 'Missing ID' : `ID ${instructionId}`}
+                          </small>
+                        </button>
+                        <InstructionReferenceIcons
+                          references={instructionId === null
+                            ? []
+                            : referenceIconsByParentId.get(instructionId) ?? []}
+                        />
+                      </div>
                       <div className={styles.relationships}>
                         {quickReconnectEvent && (
                           <span
