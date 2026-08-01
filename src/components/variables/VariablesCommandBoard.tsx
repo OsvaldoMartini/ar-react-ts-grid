@@ -689,6 +689,24 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                         ts: instructionId ?? index,
                       }
                     : null;
+                const quickReconnect = instructionId === null
+                  ? null
+                  : reconnectParentEvent && onReconnectParent
+                    ? () => onReconnectParent(instructionId, elementParentEdge)
+                    : reconnectOtherParentEvent && onReconnectParent
+                      ? () => onReconnectParent(instructionId, otherParentEdge)
+                      : reconnectVariableEvent && onReconnectVariable
+                        ? () => onReconnectVariable(instructionId, variableBindingEdge)
+                        : null;
+                const quickReconnectEvent: RulesCardEvent | null =
+                  reconnectParentEvent || reconnectOtherParentEvent || reconnectVariableEvent
+                    ? {
+                        color: 'green',
+                        rules: 'Connect',
+                        context: '',
+                        ts: instructionId ?? index,
+                      }
+                    : null;
                 const canDrag = instructionId !== null
                   && !disabled
                   && !commandSearchActive
@@ -761,6 +779,23 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                         </small>
                       </button>
                       <div className={styles.relationships}>
+                        {quickReconnectEvent && (
+                          <span
+                            className={styles.quickReconnectRuleCard}
+                            onMouseDown={event => event.stopPropagation()}
+                          >
+                            <RulesCard
+                              event={quickReconnectEvent}
+                              className={styles.quickReconnectButton}
+                              ariaLabel="Connect the first missing relationship"
+                              title="Connect the first missing relationship"
+                              glow
+                              animate={false}
+                              disabled={disabled || !quickReconnect}
+                              onClick={quickReconnect ?? undefined}
+                            />
+                          </span>
+                        )}
                         {reconnectParentEvent && instructionId !== null && (
                           <span
                             className={styles.reconnectRuleCard}
