@@ -5,6 +5,7 @@ import type {
   ComponentEditorBlockOption,
   ComponentEditorCommand,
 } from './componentEditor.types';
+import { commandEditorPlacementOptions } from './commandEditorPlacement';
 import styles from './ComponentEditorModal.module.scss';
 
 export interface ComponentEditorModalProps {
@@ -12,12 +13,10 @@ export interface ComponentEditorModalProps {
   botJobName: string;
   scopeLabel: string;
   blocks: readonly ComponentEditorBlockOption[];
-  commandCount: number;
   connectionCount: number;
   diagnosticCount: number;
   command: ComponentEditorCommand;
-  blockFilter?: number | null;
-  onBlockFilterChange?: (blockId: number | null) => void;
+  commands: readonly ComponentEditorCommand[];
   returnFocusElement?: HTMLElement | null;
   children?: React.ReactNode;
   onClose: () => void;
@@ -37,12 +36,10 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
   botJobName,
   scopeLabel,
   blocks,
-  commandCount,
   connectionCount,
   diagnosticCount,
   command,
-  blockFilter: controlledBlockFilter,
-  onBlockFilterChange,
+  commands,
   returnFocusElement = null,
   children,
   onClose,
@@ -51,10 +48,9 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
   const descriptionId = useId();
   const dialogRef = useRef<HTMLElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
-  const [localBlockFilter, setLocalBlockFilter] = useState<number | null>(null);
-  const blockFilter = controlledBlockFilter === undefined
-    ? localBlockFilter
-    : controlledBlockFilter;
+  const initialTargetBlockId = command.blockId ?? 0;
+  const [targetBlockId, setTargetBlockId] = useState(initialTargetBlockId);
+  const [placementValue, setPlacementValue] = useState('KEEP');
   const returnFocusRef = useRef<HTMLElement | null>(
     returnFocusElement
     ?? (typeof document !== 'undefined'
@@ -72,9 +68,20 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
       : { text: 'ACTIVE', tone: 'green' as const }],
     keywords: `${block.blockId} ${block.blockOrder} ${block.blockName}`,
   })), [blocks]);
-  const visibleBlockCount = blockFilter === null
-    ? blocks.length
-    : blocks.some(block => block.blockId === blockFilter) ? 1 : 0;
+  const targetBlock = blocks.find(block => block.blockId === targetBlockId) ?? null;
+  const targetCommandCount = commands.filter(
+    candidate => candidate.blockId === targetBlockId,
+  ).length;
+  const placementOptions = useMemo(
+    () => commandEditorPlacementOptions(command, targetBlockId, commands),
+    [command, commands, targetBlockId],
+  );
+
+  useEffect(() => {
+    const nextTargetBlockId = command.blockId ?? 0;
+    setTargetBlockId(nextTargetBlockId);
+    setPlacementValue('KEEP');
+  }, [command.blockId, command.instructionId]);
 
   useEffect(() => {
     const returnFocusTarget = returnFocusRef.current;
@@ -145,31 +152,46 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
         <div className={styles.body}>
           <section className={styles.context} aria-label="Command Editor context">
             <div><span>Bot Job</span><strong>#{botJobId} {botJobName}</strong></div>
-            <div><span>Editor scope</span><strong>{scopeLabel}</strong></div>
+            <div><span>Original position</span><strong>{scopeLabel}</strong></div>
             <b>EDIT MODE</b>
           </section>
 
           <section className={styles.summary} aria-label="Command Editor summary">
-            <div><span>Blocks</span><strong>{visibleBlockCount}</strong></div>
-            <div><span>Commands</span><strong>{commandCount}</strong></div>
+            <div><span>Target Block</span><strong>{targetBlock ? `#${targetBlock.blockOrder}` : '-'}</strong></div>
+            <div><span>Target commands</span><strong>{targetCommandCount}</strong></div>
             <div><span>Connections</span><strong>{connectionCount}</strong></div>
             <div><span>Diagnostics</span><strong>{diagnosticCount}</strong></div>
           </section>
 
           <SearchBox
-            label="Block"
-            placeholder="Search block name or number..."
+            label="Target Block"
+            placeholder="Search target block name or number..."
             headerRight="Commands per block"
             countLabel={count => `${count} BLOCK${count === 1 ? '' : 'S'}`}
-            allOptionLabel="All blocks"
             options={blockSearchOptions}
-            value={blockFilter === null ? null : String(blockFilter)}
+            value={targetBlockId > 0 ? String(targetBlockId) : null}
             onChange={(value) => {
-              const nextBlockFilter = value === null ? null : Number(value);
-              setLocalBlockFilter(nextBlockFilter);
-              onBlockFilterChange?.(nextBlockFilter);
+              if (value === null) return;
+              const nextTargetBlockId = Number(value);
+              if (!Number.isSafeInteger(nextTargetBlockId) || nextTargetBlockId <= 0) return;
+              setTargetBlockId(nextTargetBlockId);
+              setPlacementValue(nextTargetBlockId === command.blockId ? 'KEEP' : 'END');
             }}
           />
+
+          <label className={styles.placementField}>
+            <span>Placement</span>
+            <select
+              value={placementValue}
+              onChange={(event) => setPlacementValue(event.target.value)}
+            >
+              {placementOptions.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
 
           <section className={styles.selectedCommand} aria-label="Selected command">
             <div>

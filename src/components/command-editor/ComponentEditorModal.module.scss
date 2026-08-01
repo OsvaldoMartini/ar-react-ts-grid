@@ -106,6 +106,34 @@
 .summary span { color: #6b7280; font-size: 0.61rem; font-weight: 900; text-transform: uppercase; }
 .summary strong { color: #17324d; font-size: 1rem; }
 
+.placementField {
+  display: grid;
+  gap: 5px;
+  margin-top: 12px;
+}
+.placementField > span {
+  color: #52718e;
+  font-size: 0.65rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.placementField select {
+  background: #fff;
+  border: 1px solid #aebfce;
+  border-radius: 7px;
+  color: #17324d;
+  font: inherit;
+  min-height: 38px;
+  padding: 7px 10px;
+  width: 100%;
+}
+.placementField select:focus {
+  border-color: #0b5394;
+  box-shadow: 0 0 0 2px rgba(11, 83, 148, 0.15);
+  outline: none;
+}
+
 .selectedCommand {
   background: linear-gradient(135deg, #f8fbff, #eef6fd);
   border: 1px solid #b9cee0;

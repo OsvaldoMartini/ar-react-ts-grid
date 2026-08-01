@@ -1211,22 +1211,21 @@ const VariablesPage: React.FC<Props> = ({
         blockName: editingCommandNode.blockName,
         active: editingCommandNode.active,
       };
-  const editorVisibleCommands = snapshot?.commands.filter(command =>
-    sharedBlockFilter === null || command.blockId === sharedBlockFilter) ?? [];
-  const editorVisibleInstructionIds = new Set(editorVisibleCommands.flatMap(command =>
-    command.id === null ? [] : [command.id]));
-  const editorConnectionCount = relationshipGraph?.edges.filter(edge =>
-    edge.source.entity === 'INSTRUCTION'
-      && editorVisibleInstructionIds.has(edge.source.id)).length ?? 0;
-  const editorDiagnosticCount = snapshot?.diagnostics.filter(diagnostic =>
-    diagnostic.instructionId === null
-      || editorVisibleInstructionIds.has(diagnostic.instructionId)).length ?? 0;
-  const editorSelectedBlock = sharedBlockFilter === null
-    ? null
-    : snapshot?.blocks.find(block => block.id === sharedBlockFilter) ?? null;
-  const editorScopeLabel = editorSelectedBlock
-    ? `Block #${editorSelectedBlock.order ?? editorSelectedBlock.id} ${editorSelectedBlock.name} · ${editorVisibleCommands.length} visible command${editorVisibleCommands.length === 1 ? '' : 's'}`
-    : `All Blocks · ${editorVisibleCommands.length} visible command${editorVisibleCommands.length === 1 ? '' : 's'}`;
+  const editorCommands: ComponentEditorCommand[] = snapshot?.commands.flatMap(command =>
+    command.id === null ? [] : [{
+      instructionId: command.id,
+      instructionOrder: command.instructionOrder,
+      instructionName: command.name,
+      action: command.command,
+      operation: command.operation,
+      blockId: command.blockId,
+      blockOrder: command.blockOrder,
+      blockName: command.blockName,
+      active: command.active,
+    }]) ?? [];
+  const editorScopeLabel = editingCommand
+    ? `#${editingCommand.blockOrder ?? '?'} ${editingCommand.blockName || 'Unknown Block'} · #${editingCommand.instructionOrder ?? '?'} instruction`
+    : 'No command selected';
 
   useEffect(() => {
     if (editingCommandId !== null && !editingCommandNode) {
@@ -2626,6 +2625,7 @@ const VariablesPage: React.FC<Props> = ({
         {snapshot && editingCommand && (
           <ComponentEditorModal
             command={editingCommand}
+            commands={editorCommands}
             botJobId={snapshot.botJob.id}
             botJobName={snapshot.botJob.name}
             scopeLabel={editorScopeLabel}
@@ -2638,11 +2638,8 @@ const VariablesPage: React.FC<Props> = ({
               ).length,
               active: block.active ?? undefined,
             }))}
-            commandCount={editorVisibleCommands.length}
-            connectionCount={editorConnectionCount}
-            diagnosticCount={editorDiagnosticCount}
-            blockFilter={sharedBlockFilter}
-            onBlockFilterChange={setSharedBlockFilter}
+            connectionCount={relationshipGraph?.edges.length ?? 0}
+            diagnosticCount={snapshot.diagnostics.length}
             onClose={() => setEditingCommandId(null)}
           />
         )}
