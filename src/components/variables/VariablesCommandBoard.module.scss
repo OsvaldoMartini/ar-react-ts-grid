@@ -408,6 +408,8 @@
   white-space: nowrap;
   cursor: pointer;
   font-family: inherit;
+  position: relative;
+  z-index: 1000;
 }
 
 .connectedParent:hover:not(:disabled) {
@@ -429,6 +431,8 @@
   font-weight: 900;
   white-space: nowrap;
   cursor: pointer;
+  position: relative;
+  z-index: 1000;
 }
 
 .connectedParent:disabled,
