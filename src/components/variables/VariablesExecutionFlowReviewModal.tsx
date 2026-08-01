@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useMemo, useRef } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   ArrowRight,
@@ -13,6 +13,7 @@ import type {
   VariablesExecutionFlowConnection,
   VariablesExecutionFlowReview,
 } from './domain/variablesExecutionFlowReview';
+import SearchBox, { type SearchBoxOption } from '../SearchBox';
 import styles from './VariablesExecutionFlowReviewModal.module.scss';
 
 export interface VariablesExecutionFlowReviewModalProps {
@@ -47,6 +48,7 @@ const VariablesExecutionFlowReviewModal: React.FC<
   const descriptionId = useId();
   const dialogRef = useRef<HTMLElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const [blockFilter, setBlockFilter] = useState<number | null>(null);
   const returnFocusRef = useRef<HTMLElement | null>(
     returnFocusElement
     ?? (typeof document !== 'undefined'
@@ -59,6 +61,20 @@ const VariablesExecutionFlowReviewModal: React.FC<
       ? []
       : [[step.instructionId, step] as const]),
   ), [review.steps]);
+  const blockSearchOptions = useMemo<SearchBoxOption[]>(() => review.blocks
+    .filter(block => block.blockId !== null)
+    .map(block => ({
+      value: String(block.blockId),
+      label: `#${block.blockOrder ?? block.blockId} ${block.blockName}`,
+      sublabel: `${block.steps.length} command(s) · block ID ${block.blockId}`,
+      badges: [block.active
+        ? { text: 'ACTIVE', tone: 'green' as const }
+        : { text: 'INACTIVE', tone: 'red' as const }],
+      keywords: String(block.blockId),
+    })), [review.blocks]);
+  const visibleBlocks = useMemo(() => blockFilter === null
+    ? review.blocks
+    : review.blocks.filter(block => block.blockId === blockFilter), [blockFilter, review.blocks]);
 
   useEffect(() => {
     const returnFocusTarget = returnFocusRef.current;
@@ -167,6 +183,17 @@ const VariablesExecutionFlowReviewModal: React.FC<
             </div>
           )}
 
+          <SearchBox
+            label="Block"
+            placeholder="Search block name or number..."
+            headerRight="Commands per block"
+            countLabel={count => `${count} BLOCK${count === 1 ? '' : 'S'}`}
+            allOptionLabel="All blocks"
+            options={blockSearchOptions}
+            value={blockFilter === null ? null : String(blockFilter)}
+            onChange={value => setBlockFilter(value === null ? null : Number(value))}
+          />
+
           {review.variableFlows.length > 0 && (
             <section className={styles.variableSection} aria-label="Variable flows">
               <header className={styles.sectionHeading}>
@@ -245,7 +272,7 @@ const VariablesExecutionFlowReviewModal: React.FC<
               </div>
             </header>
             <div className={styles.blockList}>
-              {review.blocks.map(block => (
+              {visibleBlocks.map(block => (
                 <section
                   className={`${styles.block} ${!block.active ? styles.inactive : ''}`}
                   key={`${block.blockOrder ?? 'NONE'}:${block.blockId ?? 'NONE'}:${block.blockName}`}
