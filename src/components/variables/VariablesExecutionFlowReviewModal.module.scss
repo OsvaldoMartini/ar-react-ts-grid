@@ -387,6 +387,18 @@
   }
 }
 
+.stepIdentityHeading {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+  justify-content: space-between;
+  min-width: 0;
+
+  > strong {
+    min-width: 0;
+  }
+}
+
 .operation {
   background: #f4f6f8;
   border: 1px solid #d7e0e8;

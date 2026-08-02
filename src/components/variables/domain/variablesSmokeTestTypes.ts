@@ -17,6 +17,7 @@ export type VariablesSmokeTestStep = {
   instructionName: string;
   action: string;
   operation: string;
+  onHoldSeconds: number | null;
   blockId: number | null;
   blockName: string;
   blockOrder: number | null;

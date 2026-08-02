@@ -38,6 +38,7 @@ export type VariablesExecutionFlowStep = {
   instructionName: string;
   action: string;
   operation: string;
+  onHoldSeconds: number | null;
   blockId: number | null;
   blockName: string;
   blockOrder: number | null;
@@ -351,6 +352,7 @@ export const buildVariablesExecutionFlowReview = (
       operation: variableIds.length > 0
         ? ''
         : command.operation,
+      onHoldSeconds: command.onHoldSeconds ?? null,
       blockId: command.blockId,
       blockName: command.blockName
         || block?.name

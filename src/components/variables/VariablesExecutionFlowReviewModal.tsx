@@ -20,6 +20,7 @@ import BlockMultiSelectSearchBox, {
   type BlockMultiSelectOption,
 } from '../BlockMultiSelectSearchBox';
 import VariablesSmokeTestPanel from './VariablesSmokeTestPanel';
+import InstructionIntrinsicValues from './InstructionIntrinsicValues';
 import styles from './VariablesExecutionFlowReviewModal.module.scss';
 
 export interface VariablesExecutionFlowReviewModalProps {
@@ -441,7 +442,14 @@ const VariablesExecutionFlowReviewModal: React.FC<
                           <b>{step.instructionOrder ?? '?'}</b>
                         </div>
                         <div className={styles.stepIdentity}>
-                          <strong>{step.instructionName}</strong>
+                          <div className={styles.stepIdentityHeading}>
+                            <strong>{step.instructionName}</strong>
+                            <InstructionIntrinsicValues
+                              action={step.action}
+                              operation={step.operation}
+                              onHoldSeconds={step.onHoldSeconds}
+                            />
+                          </div>
                           <small>{step.action} · Instruction ID {step.instructionId ?? 'Missing'}</small>
                           {step.operation && (
                             <code className={styles.operation} title={step.operation}>
