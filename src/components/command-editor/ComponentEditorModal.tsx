@@ -272,7 +272,6 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
   const canSubmit = Boolean(
     onSubmit
     && !pending
-    && !commandChanged
     && targetBlockId > 0
     && placement
     && isCommandEditorBaseDraftValid(draft),
@@ -428,15 +427,6 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
             onChange={selectCommand}
           />
 
-          {commandChanged && (
-            <p className={styles.commandChangeNotice} role="status">
-              Command type change is a design preview: the editor below already
-              switches to the selected command, but UPDATE / COPY NEW for a
-              changed command will be enabled in the next step. Select the
-              CURRENT command to submit again.
-            </p>
-          )}
-
           <section className={styles.selectedCommand} aria-label="Selected command">
             <div>
               <span>Selected command</span>
@@ -479,7 +469,7 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
             type="button"
             className={styles.copyButton}
             disabled={!canSubmit || !enabledActions.includes('COPY_NEW')}
-            title={commandChanged ? 'Command type change persistence arrives in the next step' : onSubmit ? 'Create a disconnected copy with a new instruction ID' : 'Command persistence is not connected yet'}
+            title={onSubmit ? 'Create a disconnected copy with a new instruction ID' : 'Command persistence is not connected yet'}
             onClick={() => submit('COPY_NEW')}
           >
             COPY NEW
@@ -488,7 +478,7 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
             type="button"
             className={styles.updateButton}
             disabled={!canSubmit || !enabledActions.includes('UPDATE')}
-            title={commandChanged ? 'Command type change persistence arrives in the next step' : onSubmit ? 'Update the selected instruction' : 'Command persistence is not connected yet'}
+            title={onSubmit ? 'Update the selected instruction' : 'Command persistence is not connected yet'}
             onClick={() => submit('UPDATE')}
           >
             UPDATE

@@ -211,15 +211,3 @@
   .summary { grid-template-columns: repeat(2, minmax(100px, 1fr)); }
   .selectedCommand { grid-template-columns: 1fr 1fr; }
 }
-
-.commandChangeNotice {
-  background: #fff4df;
-  border: 1px solid #de9f43;
-  border-radius: 8px;
-  color: #8a4b00;
-  font-size: 0.72rem;
-  font-weight: 700;
-  line-height: 1.35;
-  margin: 10px 0 0;
-  padding: 8px 11px;
-}

@@ -99,9 +99,13 @@ export const useVariablesCommandEditorUpdate = ({
   const submit = useCallback((intent: CommandEditorMutationIntent): string | null => {
     const capability = snapshot?.mutationCapability;
     const configuration = intent.draft.configuration;
+    // LEGACY drafts (no-config commands such as GET/REFRESH) travel as the
+    // wire kind NONE so command transformations into them can persist.
+    const wireConfiguration = configuration.kind === 'LEGACY'
+      ? { kind: 'NONE' }
+      : configuration;
     if (
       intent.action !== 'UPDATE'
-      || configuration.kind === 'LEGACY'
       || !snapshot
       || !capability
       || !connected
@@ -149,7 +153,8 @@ export const useVariablesCommandEditorUpdate = ({
               : null,
           },
           allowRelationshipDisconnect: intent.allowRelationshipDisconnect,
-          configuration,
+          configuration: wireConfiguration,
+          targetAction: intent.draft.action,
         }),
       }));
       return requestId;

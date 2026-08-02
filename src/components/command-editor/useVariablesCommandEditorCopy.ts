@@ -81,7 +81,12 @@ export const useVariablesCommandEditorCopy = ({
   const submit = useCallback((intent: CommandEditorMutationIntent): string | null => {
     const capability = snapshot?.mutationCapability;
     const configuration = intent.draft.configuration;
-    if (intent.action !== 'COPY_NEW' || configuration.kind === 'LEGACY'
+    // LEGACY drafts (no-config commands such as GET/REFRESH) travel as the
+    // wire kind NONE so command transformations into them can persist.
+    const wireConfiguration = configuration.kind === 'LEGACY'
+      ? { kind: 'NONE' }
+      : configuration;
+    if (intent.action !== 'COPY_NEW'
       || !snapshot || !capability || !connected || !webSocket
       || webSocket.readyState !== WebSocket.OPEN || pendingRef.current) return null;
     sequence = sequence >= Number.MAX_SAFE_INTEGER ? 1 : sequence + 1;
@@ -115,7 +120,8 @@ export const useVariablesCommandEditorCopy = ({
             referenceInstructionId: intent.placement.kind === 'AFTER_INSTRUCTION'
               ? intent.placement.instructionId : null,
           },
-          configuration,
+          configuration: wireConfiguration,
+          targetAction: intent.draft.action,
         }),
       }));
       return requestId;
