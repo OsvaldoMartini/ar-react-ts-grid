@@ -12,6 +12,7 @@ import {
   Search,
   Unplug,
   Variable,
+  X,
 } from 'lucide-react';
 import { RulesCard, type RulesCardEvent } from '../RulesCard';
 import SearchBox, { type SearchBoxOption } from '../SearchBox';
@@ -91,6 +92,7 @@ export interface VariablesCommandBoardProps {
     edge?: InstructionRelationshipEdge,
   ) => void;
   onEditCommand?: (instruction: VariableInstructionNode) => void;
+  onDeleteCommand?: (instruction: VariableInstructionNode) => void;
   onResolveVisibleConnections?: (scope: VariablesConnectionScope) => void;
   onReviewVisibleConnections?: (scope: VariablesConnectionScope) => void;
   onReleaseVisibleConnections?: (scope: VariablesConnectionScope) => void;
@@ -167,6 +169,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
   onReconnectParent,
   onReconnectVariable,
   onEditCommand,
+  onDeleteCommand,
   onResolveVisibleConnections,
   onReviewVisibleConnections,
   onReleaseVisibleConnections,
@@ -827,6 +830,24 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                         />
                       </div>
                       <div className={styles.relationships}>
+                        {instructionId !== null && (
+                          <button
+                            type="button"
+                            className={styles.deleteCommandButton}
+                            aria-label={`Delete command ${instruction.name || instruction.command} ID ${instructionId}`}
+                            title="Delete only this command"
+                            draggable={false}
+                            disabled={disabled || !onDeleteCommand}
+                            onMouseDown={event => event.stopPropagation()}
+                            onDragStart={event => event.preventDefault()}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onDeleteCommand?.(instruction);
+                            }}
+                          >
+                            <X size={15} aria-hidden="true" />
+                          </button>
+                        )}
                         {editCommandEvent && (
                           <span
                             className={styles.quickReconnectRuleCard}

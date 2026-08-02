@@ -95,6 +95,14 @@ import {
   type VariablesDeleteMode,
   type VariablesDeleteResult,
 } from './variables/useVariablesDelete';
+import {
+  useVariablesCommandDelete,
+  type VariablesCommandDeleteResult,
+} from './variables/useVariablesCommandDelete';
+import {
+  planVariablesCommandDelete,
+  type VariablesCommandDeletePlan,
+} from './variables/domain/variablesCommandDelete';
 import { useVariablesRuntimeMemory } from './variables/useVariablesRuntimeMemory';
 import { useVariablesExecutionFlowReview } from './variables/useVariablesExecutionFlowReview';
 import {
@@ -136,6 +144,13 @@ type VariableDeleteConfirmation = {
   variableIds: number[];
   title: string;
   body: string;
+};
+
+type CommandDeleteConfirmation = {
+  plan: VariablesCommandDeletePlan;
+  title: string;
+  body: string;
+  details: string;
 };
 
 type VariablesBlockTransferAction = 'MOVE' | 'COPY';
@@ -789,6 +804,8 @@ const VariablesPage: React.FC<Props> = ({
     useState<PendingBlockTransfer | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] =
     useState<VariableDeleteConfirmation | null>(null);
+  const [commandDeleteConfirmation, setCommandDeleteConfirmation] =
+    useState<CommandDeleteConfirmation | null>(null);
   const [addVariableOpen, setAddVariableOpen] = useState(false);
   const [addVariableSuccessVersion, setAddVariableSuccessVersion] = useState(0);
   const [clearValuesConfirmation, setClearValuesConfirmation] = useState(false);
@@ -954,6 +971,37 @@ const VariablesPage: React.FC<Props> = ({
     onResult: handleVariableDeleteResult,
   });
 
+  const handleCommandDeleteResult = useCallback((
+    result: VariablesCommandDeleteResult,
+  ) => {
+    if (result.ok && result.instructionId !== null) {
+      setSelectedInstructionId(current =>
+        current === result.instructionId ? null : current);
+      setEditingCommandId(current =>
+        current === result.instructionId ? null : current);
+    }
+    setStatus({
+      level: result.ok ? 'ok' : 'error',
+      text: result.ok
+        ? result.message
+          || `Command deleted. ${result.disconnectedInstructionCount} command connection(s) and ${result.disconnectedVariableCount} variable owner connection(s) were cleared.`
+        : result.error || 'Command deletion was refused.',
+    });
+  }, []);
+
+  const {
+    pendingRequestId: pendingCommandDeleteRequestId,
+    submit: submitCommandDelete,
+    handleMessage: handleCommandDeleteMessage,
+    resetPending: resetCommandDelete,
+  } = useVariablesCommandDelete({
+    webSocket,
+    connected,
+    sessionId,
+    snapshot,
+    onResult: handleCommandDeleteResult,
+  });
+
   const clearPendingRequest = useCallback(() => {
     if (pendingTimeoutRef.current !== null) {
       clearTimeout(pendingTimeoutRef.current);
@@ -1106,6 +1154,7 @@ const VariablesPage: React.FC<Props> = ({
     resetCommandCopy();
     resetVariableCreate();
     resetVariableDelete();
+    resetCommandDelete();
     resetRuntimeMemory();
     closeExecutionFlowReview();
     setHealthFilter('ALL');
@@ -1116,6 +1165,7 @@ const VariablesPage: React.FC<Props> = ({
     setPendingConnections(null);
     setPendingBlockTransfer(null);
     setDeleteConfirmation(null);
+    setCommandDeleteConfirmation(null);
     setAddVariableOpen(false);
     setClearValuesConfirmation(false);
     setDeletingVariableIds(new Set());
@@ -1129,6 +1179,7 @@ const VariablesPage: React.FC<Props> = ({
     resetRuntimeMemory,
     resetVariableCreate,
     resetVariableDelete,
+    resetCommandDelete,
   ]);
 
   useEffect(() => {
@@ -1159,6 +1210,7 @@ const VariablesPage: React.FC<Props> = ({
       if (handleInstructionCopyMessage(raw)) return;
       if (handleVariableCreateMessage(raw)) return;
       if (handleVariableDeleteMessage(raw)) return;
+      if (handleCommandDeleteMessage(raw)) return;
       if (handleGraphMutationMessage(raw)) return;
       if (handleRuntimeMemoryMessage(raw)) return;
       let envelope: VariablesWorkspaceEnvelope;
@@ -1243,6 +1295,7 @@ const VariablesPage: React.FC<Props> = ({
     handleRuntimeMemoryMessage,
     handleVariableCreateMessage,
     handleVariableDeleteMessage,
+    handleCommandDeleteMessage,
     messages,
     replaceSnapshot,
     resetOwnerScopedUi,
@@ -2099,6 +2152,48 @@ const VariablesPage: React.FC<Props> = ({
     });
   }, [deleteConfirmation, submitVariableDelete]);
 
+  const requestDeleteCommand = useCallback((instructionId: number) => {
+    const current = snapshotRef.current;
+    const plan = current
+      ? planVariablesCommandDelete(current, instructionId)
+      : null;
+    if (!plan) {
+      setStatus({
+        level: 'error',
+        text: `Command #${instructionId} is no longer in the current Variables snapshot.`,
+      });
+      return;
+    }
+    const linkedCount = plan.parentRepairInstructionIds.length;
+    const variableCount = plan.variableOwnerIds.length;
+    setCommandDeleteConfirmation({
+      plan,
+      title: 'Delete Command?',
+      body: `Delete only #${plan.instruction.instructionOrder ?? '?'} ${plan.instruction.name || plan.instruction.command} (ID ${plan.instruction.id}) from Block ${plan.instruction.blockName || `#${plan.instruction.blockId}`}?`,
+      details: linkedCount === 0 && variableCount === 0
+        ? 'Only the selected command will be deleted. No other command or variable will be removed.'
+        : `Only the selected command will be deleted. ${linkedCount} directly connected command(s) and ${variableCount} variable owner connection(s) will be disconnected and remain available for reconnection.`,
+    });
+  }, []);
+
+  const confirmCommandDelete = useCallback(() => {
+    const confirmation = commandDeleteConfirmation;
+    if (!confirmation) return;
+    const requestId = submitCommandDelete(confirmation.plan);
+    if (!requestId) {
+      setStatus({
+        level: 'error',
+        text: 'Variables is busy, disconnected, or read-only. The command was not deleted.',
+      });
+      return;
+    }
+    setCommandDeleteConfirmation(null);
+    setStatus({
+      level: 'warn',
+      text: `Deleting command ID ${confirmation.plan.instruction.id}...`,
+    });
+  }, [commandDeleteConfirmation, submitCommandDelete]);
+
   const submitNewVariable = useCallback((draft: AddVariableBatchDraft) => {
     const names = draft.variables
       .map(variable => variable.name.trim())
@@ -2154,6 +2249,7 @@ const VariablesPage: React.FC<Props> = ({
     || pendingCopyRequestId !== null
     || pendingCreateRequestId !== null
     || pendingDeleteRequestId !== null
+    || pendingCommandDeleteRequestId !== null
     || pendingReconnect !== null
     || pendingConnections !== null
     || pendingBlockTransfer !== null
@@ -2398,6 +2494,9 @@ const VariablesPage: React.FC<Props> = ({
                   if (instruction.id === null) return;
                   setSelectedInstructionId(instruction.id);
                   setEditingCommandId(instruction.id);
+                }}
+                onDeleteCommand={(instruction) => {
+                  if (instruction.id !== null) requestDeleteCommand(instruction.id);
                 }}
                 onResolveVisibleConnections={openResolveVisibleConnections}
                 onReviewVisibleConnections={openReviewVisibleConnections}
@@ -2949,6 +3048,18 @@ const VariablesPage: React.FC<Props> = ({
             extraMsg="This operation changes variable definitions only. Instructions and Web Elements are preserved."
             onClose={() => setDeleteConfirmation(null)}
             onConfirm={confirmVariableDelete}
+            imageSrc={warningRedImage}
+            imageClass="construction-image"
+            error
+          />
+        )}
+        {commandDeleteConfirmation && (
+          <AlertModal
+            header={commandDeleteConfirmation.title}
+            body={commandDeleteConfirmation.body}
+            extraMsg={commandDeleteConfirmation.details}
+            onClose={() => setCommandDeleteConfirmation(null)}
+            onConfirm={confirmCommandDelete}
             imageSrc={warningRedImage}
             imageClass="construction-image"
             error
