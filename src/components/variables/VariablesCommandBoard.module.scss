@@ -576,6 +576,38 @@
   color: #9b3030 !important;
 }
 
+.statusToggle {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 22px;
+  padding: 3px 7px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 0.54rem;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.statusToggleActive {
+  background: #e5f4ea;
+  color: #24733f;
+}
+
+.statusToggleInactive {
+  background: #f5e3e3;
+  color: #9b3030;
+}
+
+.statusToggle:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
 .dropGap {
   position: relative;
   height: 7px;

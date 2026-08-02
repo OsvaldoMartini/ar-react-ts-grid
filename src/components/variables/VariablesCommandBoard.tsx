@@ -98,6 +98,11 @@ export interface VariablesCommandBoardProps {
   ) => void;
   onEditCommand?: (instruction: VariableInstructionNode) => void;
   onDeleteCommand?: (instruction: VariableInstructionNode) => void;
+  pendingStatusInstructionId?: number | null;
+  onToggleInstructionStatus?: (
+    instruction: VariableInstructionNode,
+    active: boolean,
+  ) => void;
   onResolveVisibleConnections?: (scope: VariablesConnectionScope) => void;
   onReviewVisibleConnections?: (scope: VariablesConnectionScope) => void;
   onReleaseVisibleConnections?: (scope: VariablesConnectionScope) => void;
@@ -175,6 +180,8 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
   onReconnectVariable,
   onEditCommand,
   onDeleteCommand,
+  pendingStatusInstructionId = null,
+  onToggleInstructionStatus,
   onResolveVisibleConnections,
   onReviewVisibleConnections,
   onReleaseVisibleConnections,
@@ -815,8 +822,10 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                   && instructionId === selectedInstructionId;
                 const dragging = instructionId !== null
                   && instructionId === draggingInstructionId;
-                const inactive = instruction.active === false
-                  || instruction.blockActive === false;
+                const instructionActive = instruction.active !== false;
+                const blockInactive = instruction.blockActive === false;
+                const statusPending = instructionId !== null
+                  && pendingStatusInstructionId === instructionId;
 
                 return (
                   <React.Fragment
@@ -1239,8 +1248,34 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                               Independent
                             </span>
                           )}
-                        {inactive && (
-                          <span className={styles.inactiveBadge}>Inactive</span>
+                        {instructionId !== null && (
+                          <button
+                            type="button"
+                            className={`${styles.statusToggle} ${instructionActive
+                              ? styles.statusToggleActive
+                              : styles.statusToggleInactive}`}
+                            aria-pressed={instructionActive}
+                            aria-label={`${instructionActive ? 'Deactivate' : 'Activate'} command ${instruction.name || instruction.command}`}
+                            title={`${instructionActive ? 'Deactivate' : 'Activate'} this command`}
+                            disabled={disabled || statusPending || !onToggleInstructionStatus}
+                            onMouseDown={event => event.stopPropagation()}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onToggleInstructionStatus?.(
+                                instruction,
+                                !instructionActive,
+                              );
+                            }}
+                          >
+                            {statusPending
+                              ? 'Saving...'
+                              : instructionActive
+                                ? 'Active'
+                                : 'Inactive'}
+                          </button>
+                        )}
+                        {blockInactive && (
+                          <span className={styles.inactiveBadge}>Block inactive</span>
                         )}
                         {instructionId !== null && (
                           <button

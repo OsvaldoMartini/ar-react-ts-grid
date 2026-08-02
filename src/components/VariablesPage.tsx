@@ -100,6 +100,10 @@ import {
   type VariablesCommandDeleteResult,
 } from './variables/useVariablesCommandDelete';
 import {
+  useVariablesInstructionStatus,
+  type VariablesInstructionStatusResult,
+} from './variables/useVariablesInstructionStatus';
+import {
   planVariablesCommandDelete,
   type VariablesCommandDeletePlan,
 } from './variables/domain/variablesCommandDelete';
@@ -1008,6 +1012,30 @@ const VariablesPage: React.FC<Props> = ({
     onResult: handleCommandDeleteResult,
   });
 
+  const handleInstructionStatusResult = useCallback((
+    result: VariablesInstructionStatusResult,
+  ) => {
+    setStatus({
+      level: result.ok ? 'ok' : 'error',
+      text: result.message || (result.ok
+        ? `Command ${result.active ? 'activated' : 'deactivated'}.`
+        : 'The command status was not changed.'),
+    });
+  }, []);
+
+  const {
+    pendingInstructionId: pendingStatusInstructionId,
+    submit: submitInstructionStatus,
+    handleMessage: handleInstructionStatusMessage,
+    resetPending: resetInstructionStatus,
+  } = useVariablesInstructionStatus({
+    webSocket,
+    connected,
+    sessionId,
+    snapshot,
+    onResult: handleInstructionStatusResult,
+  });
+
   const clearPendingRequest = useCallback(() => {
     if (pendingTimeoutRef.current !== null) {
       clearTimeout(pendingTimeoutRef.current);
@@ -1161,6 +1189,7 @@ const VariablesPage: React.FC<Props> = ({
     resetVariableCreate();
     resetVariableDelete();
     resetCommandDelete();
+    resetInstructionStatus();
     resetRuntimeMemory();
     closeExecutionFlowReview();
     setHealthFilter('ALL');
@@ -1186,6 +1215,7 @@ const VariablesPage: React.FC<Props> = ({
     resetVariableCreate,
     resetVariableDelete,
     resetCommandDelete,
+    resetInstructionStatus,
   ]);
 
   useEffect(() => {
@@ -1217,6 +1247,7 @@ const VariablesPage: React.FC<Props> = ({
       if (handleVariableCreateMessage(raw)) return;
       if (handleVariableDeleteMessage(raw)) return;
       if (handleCommandDeleteMessage(raw)) return;
+      if (handleInstructionStatusMessage(raw)) return;
       if (handleGraphMutationMessage(raw)) return;
       if (handleRuntimeMemoryMessage(raw)) return;
       let envelope: VariablesWorkspaceEnvelope;
@@ -1302,6 +1333,7 @@ const VariablesPage: React.FC<Props> = ({
     handleVariableCreateMessage,
     handleVariableDeleteMessage,
     handleCommandDeleteMessage,
+    handleInstructionStatusMessage,
     messages,
     replaceSnapshot,
     resetOwnerScopedUi,
@@ -2258,6 +2290,7 @@ const VariablesPage: React.FC<Props> = ({
     || pendingCreateRequestId !== null
     || pendingDeleteRequestId !== null
     || pendingCommandDeleteRequestId !== null
+    || pendingStatusInstructionId !== null
     || pendingReconnect !== null
     || pendingConnections !== null
     || pendingBlockTransfer !== null
@@ -2505,6 +2538,15 @@ const VariablesPage: React.FC<Props> = ({
                 }}
                 onDeleteCommand={(instruction) => {
                   if (instruction.id !== null) requestDeleteCommand(instruction.id);
+                }}
+                pendingStatusInstructionId={pendingStatusInstructionId}
+                onToggleInstructionStatus={(instruction, active) => {
+                  if (!submitInstructionStatus(instruction, active)) {
+                    setStatus({
+                      level: 'error',
+                      text: 'Variables is busy or disconnected. The command status was not changed.',
+                    });
+                  }
                 }}
                 onResolveVisibleConnections={openResolveVisibleConnections}
                 onReviewVisibleConnections={openReviewVisibleConnections}
