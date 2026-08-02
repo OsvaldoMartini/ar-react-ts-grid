@@ -21,7 +21,7 @@
   max-height: calc(100vh - 24px);
   min-height: min(620px, calc(100vh - 24px));
   overflow: hidden;
-  width: min(1180px, calc(100vw - 24px));
+  width: min(1500px, calc(100vw - 24px));
 }
 
 .header {
@@ -77,10 +77,19 @@
 }
 
 .body {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) minmax(290px, 340px);
+  min-height: 0;
+  overflow: hidden;
+  padding: 12px;
+}
+
+.reviewContent {
   min-height: 0;
   overscroll-behavior: contain;
   overflow-y: auto;
-  padding: 17px;
+  padding: 5px;
 }
 
 .context {
@@ -532,6 +541,15 @@
 }
 
 @media (max-width: 900px) {
+  .body {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+  }
+
+  .reviewContent {
+    overflow: visible;
+  }
+
   .variableFlow {
     grid-template-columns: 1fr;
 

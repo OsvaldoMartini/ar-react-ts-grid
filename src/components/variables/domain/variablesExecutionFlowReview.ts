@@ -70,6 +70,7 @@ export type VariablesExecutionFlowReview = {
   homeBankingId: number;
   botJobId: number;
   botJobName: string;
+  graphRevision: string;
   runtimeMemoryRevision: number;
   relationshipsAvailable: boolean;
   blocks: readonly VariablesExecutionFlowBlock[];
@@ -419,6 +420,7 @@ export const buildVariablesExecutionFlowReview = (
     homeBankingId: snapshot.botJob.homeBankingId,
     botJobId: snapshot.botJob.id,
     botJobName: snapshot.botJob.name,
+    graphRevision: snapshot.graphRevision,
     runtimeMemoryRevision: snapshot.runtimeMemory.revision,
     relationshipsAvailable: graph !== null,
     blocks: Object.freeze(blocks),

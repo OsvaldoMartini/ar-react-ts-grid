@@ -15,6 +15,7 @@ import type {
   VariablesExecutionFlowReview,
 } from './domain/variablesExecutionFlowReview';
 import SearchBox, { type SearchBoxOption } from '../SearchBox';
+import VariablesSmokeTestPanel from './VariablesSmokeTestPanel';
 import styles from './VariablesExecutionFlowReviewModal.module.scss';
 
 export interface VariablesExecutionFlowReviewModalProps {
@@ -247,6 +248,7 @@ const VariablesExecutionFlowReviewModal: React.FC<
         </header>
 
         <div className={styles.body}>
+          <div className={styles.reviewContent}>
           <section className={styles.context} aria-label="Review context">
             <div>
               <span>Bot Job</span>
@@ -489,6 +491,12 @@ const VariablesExecutionFlowReviewModal: React.FC<
               This Bot Job does not contain an authoritative execution sequence.
             </div>
           )}
+          </div>
+
+          <VariablesSmokeTestPanel
+            review={review}
+            blockFilter={blockFilter}
+          />
         </div>
 
         <footer className={styles.actions}>
