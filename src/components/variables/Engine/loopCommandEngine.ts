@@ -1,6 +1,8 @@
 import { canonicalInstructionAction } from '../../bot-job-details/grid/domain/instructionRelationshipPolicy';
 import type { VariablesSmokeTestStep } from '../domain/variablesSmokeTestTypes';
 import type { SmokeExecutionProgram } from './smokeExecutionProgram';
+import type { PlaywrightBrowserCommand } from './playwrightCommandBridge';
+import { refreshLoopPlaywrightCommand } from './refreshLoopCommandEngine';
 
 export type LoopCommandConfiguration = {
   intervalSeconds: number;
@@ -14,6 +16,7 @@ export type LoopCommandTransition = {
   waitMs: number;
   message: string;
   warning: string | null;
+  playwrightCommand: PlaywrightBrowserCommand | null;
 };
 
 export type LoopRemainingByInstructionId = Readonly<Record<number, number>>;
@@ -88,6 +91,7 @@ export const resolveLoopCommandTransition = (
       waitMs: 0,
       message: 'LOOP configuration is invalid; continuing to the next command.',
       warning: 'LOOP requires operation interval:count with interval >= 0 and count >= 1',
+      playwrightCommand: refreshLoopPlaywrightCommand(item.step),
     };
   }
 
@@ -103,6 +107,7 @@ export const resolveLoopCommandTransition = (
       waitMs: 0,
       message: 'LOOP anchor is unavailable in the selected Smoke scope; continuing.',
       warning: 'LOOP requires a connected preceding instruction inside the selected scope',
+      playwrightCommand: refreshLoopPlaywrightCommand(item.step),
     };
   }
 
@@ -122,6 +127,7 @@ export const resolveLoopCommandTransition = (
       waitMs,
       message: `waited ${configuration.intervalSeconds}s; ${nextRemaining} loop(s) remaining; returning to ${anchorLabel}.`,
       warning: null,
+      playwrightCommand: refreshLoopPlaywrightCommand(item.step),
     };
   }
 
@@ -132,5 +138,6 @@ export const resolveLoopCommandTransition = (
     waitMs,
     message: `waited ${configuration.intervalSeconds}s; all ${configuration.repetitions} loop pass(es) completed; continuing.`,
     warning: null,
+    playwrightCommand: refreshLoopPlaywrightCommand(item.step),
   };
 };

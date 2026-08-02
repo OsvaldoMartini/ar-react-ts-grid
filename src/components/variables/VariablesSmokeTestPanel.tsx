@@ -24,6 +24,10 @@ import {
   resolveLoopCommandTransition,
   type LoopRemainingByInstructionId,
 } from './Engine/loopCommandEngine';
+import {
+  smokePlaywrightCommandBridge,
+  type PlaywrightCommandResult,
+} from './Engine/playwrightCommandBridge';
 import styles from './VariablesSmokeTestPanel.module.scss';
 
 export interface VariablesSmokeTestPanelProps {
@@ -177,7 +181,11 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     );
     const executionDelayMs = stepIntervalMs + (loopTransition?.waitMs ?? 0);
 
-    const timer = window.setTimeout(() => {
+    let cancelled = false;
+    let timer: number | null = null;
+    let playwrightResult: PlaywrightCommandResult | null = null;
+
+    const completeCurrentItem = () => {
       if (item.kind === 'INACTIVE_BLOCK') {
         const skipped = item.block.steps.length;
         setEntries(current => [
@@ -201,13 +209,23 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
           ? result
           : {
               ...result,
-              tone: loopTransition.warning === null ? result.tone : 'WARNING' as const,
-              counter: loopTransition.warning === null ? result.counter : 'warning' as const,
+              tone: loopTransition.warning === null
+                && playwrightResult?.status !== 'FAILED'
+                  ? result.tone
+                  : 'WARNING' as const,
+              counter: loopTransition.warning === null
+                && playwrightResult?.status !== 'FAILED'
+                  ? result.counter
+                  : 'warning' as const,
               message: replaceSmokeStepDetail(
                 result.message,
-                loopTransition.warning === null
-                  ? loopTransition.message
-                  : `${loopTransition.message} ${loopTransition.warning}.`,
+                [
+                  playwrightResult?.message,
+                  loopTransition.message,
+                  loopTransition.warning === null
+                    ? null
+                    : `${loopTransition.warning}.`,
+                ].filter((part): part is string => Boolean(part)).join('; '),
               ),
             };
         const refusedRuntimeWrites: string[] = [];
@@ -252,9 +270,23 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
         }
       }
       setItemCursor(loopTransition?.nextCursor ?? itemCursor + 1);
-    }, executionDelayMs);
+    };
 
-    return () => window.clearTimeout(timer);
+    const scheduleCurrentItem = async () => {
+      if (loopTransition?.playwrightCommand) {
+        playwrightResult = await smokePlaywrightCommandBridge.dispatch(
+          loopTransition.playwrightCommand,
+        );
+      }
+      if (cancelled) return;
+      timer = window.setTimeout(completeCurrentItem, executionDelayMs);
+    };
+    void scheduleCurrentItem();
+
+    return () => {
+      cancelled = true;
+      if (timer !== null) window.clearTimeout(timer);
+    };
   }, [
     executionItems,
     executionProgram,
