@@ -20,7 +20,10 @@ import type {
   InstructionRelationshipEdge,
 } from '../bot-job-details/grid/domain/instructionRelationshipGraph';
 import { instructionCommandPresentation } from '../bot-job-details/grid/domain/instructionCommandPresentation';
-import { instructionRelationshipPolicy } from '../bot-job-details/grid/domain/instructionRelationshipPolicy';
+import {
+  canonicalInstructionAction,
+  instructionRelationshipPolicy,
+} from '../bot-job-details/grid/domain/instructionRelationshipPolicy';
 import InstructionCommandBadge from '../bot-job-details/grid/InstructionCommandBadge';
 import type {
   VariableInstructionNode,
@@ -588,6 +591,19 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
               {group.instructions.map((instruction, index) => {
                 const instructionId = instruction.id;
                 const policy = instructionRelationshipPolicy(instruction.command);
+                // Compact GridItem-style loop values: "T: <interval>s" over
+                // "L: <iterations>", aligned beside the name/ID column.
+                const rowCanonicalAction =
+                  canonicalInstructionAction(instruction.command);
+                const loopParts = (rowCanonicalAction === 'LOOP'
+                  || rowCanonicalAction === 'REFRESH_LOOP')
+                  && instruction.operation
+                  ? instruction.operation.split(':').map(part => part.trim())
+                  : null;
+                const loopValues = loopParts
+                  && loopParts.length >= 2 && loopParts[0] && loopParts[1]
+                  ? { interval: loopParts[0], iterations: loopParts[1] }
+                  : null;
                 const edges = instructionId === null
                   ? []
                   : edgesByInstruction.get(instructionId) ?? [];
@@ -811,6 +827,25 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                             {instructionId === null ? 'Missing ID' : `ID ${instructionId}`}
                           </small>
                         </button>
+                        {loopValues && (
+                          <span
+                            className={styles.loopValues}
+                            title={`Time ${loopValues.interval}s · Loop ${loopValues.iterations} times`}
+                          >
+                            <span className={styles.loopValueRow}>
+                              <span className={styles.loopValueLabel}>T:</span>
+                              <span className={styles.loopValueNumber}>
+                                {loopValues.interval}s
+                              </span>
+                            </span>
+                            <span className={styles.loopValueRow}>
+                              <span className={styles.loopValueLabel}>L:</span>
+                              <span className={styles.loopValueNumber}>
+                                {loopValues.iterations}
+                              </span>
+                            </span>
+                          </span>
+                        )}
                         <InstructionReferenceIcons
                           references={instructionId === null
                             ? []
