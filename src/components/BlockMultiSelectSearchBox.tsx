@@ -16,6 +16,8 @@ export interface BlockMultiSelectSearchBoxProps {
   onChange: (selectedValues: number[]) => void;
   label?: string;
   placeholder?: string;
+  selectionMode?: 'single' | 'multiple';
+  disabled?: boolean;
 }
 
 const BlockMultiSelectSearchBox: React.FC<BlockMultiSelectSearchBoxProps> = ({
@@ -24,6 +26,8 @@ const BlockMultiSelectSearchBox: React.FC<BlockMultiSelectSearchBoxProps> = ({
   onChange,
   label = 'Smoke Test Blocks',
   placeholder = 'Search Blocks...',
+  selectionMode = 'multiple',
+  disabled = false,
 }) => {
   const inputId = useId();
   const listboxId = useId();
@@ -54,6 +58,12 @@ const BlockMultiSelectSearchBox: React.FC<BlockMultiSelectSearchBoxProps> = ({
   }, [open]);
 
   const toggle = (value: number) => {
+    if (selectionMode === 'single') {
+      onChange(selected.has(value) ? [] : [value]);
+      setOpen(false);
+      setQuery('');
+      return;
+    }
     const next = new Set(selected);
     if (next.has(value)) next.delete(value);
     else next.add(value);
@@ -66,9 +76,12 @@ const BlockMultiSelectSearchBox: React.FC<BlockMultiSelectSearchBoxProps> = ({
     onChange(options.map(option => option.value).filter(optionValue => next.has(optionValue)));
   };
 
-  const closedValue = selectedValues.length === options.length && options.length > 0
-    ? `All ${options.length} Blocks selected`
-    : `${selectedValues.length} of ${options.length} Blocks selected`;
+  const selectedOption = options.find(option => selected.has(option.value)) ?? null;
+  const closedValue = selectionMode === 'single'
+    ? selectedOption?.label ?? ''
+    : selectedValues.length === options.length && options.length > 0
+      ? `All ${options.length} Blocks selected`
+      : `${selectedValues.length} of ${options.length} Blocks selected`;
 
   return (
     <div className={styles.root} ref={rootRef}>
@@ -83,10 +96,11 @@ const BlockMultiSelectSearchBox: React.FC<BlockMultiSelectSearchBoxProps> = ({
           aria-expanded={open}
           aria-controls={listboxId}
           aria-autocomplete="list"
+          disabled={disabled}
           value={open ? query : closedValue}
           placeholder={placeholder}
-          onFocus={() => setOpen(true)}
-          onClick={() => setOpen(true)}
+          onFocus={() => { if (!disabled) setOpen(true); }}
+          onClick={() => { if (!disabled) setOpen(true); }}
           onChange={(event) => {
             setOpen(true);
             setQuery(event.target.value);
@@ -100,6 +114,7 @@ const BlockMultiSelectSearchBox: React.FC<BlockMultiSelectSearchBoxProps> = ({
         />
         <button
           type="button"
+          disabled={disabled}
           aria-label={open ? 'Close Block choices' : 'Open Block choices'}
           onClick={() => {
             setOpen(current => !current);
@@ -116,10 +131,12 @@ const BlockMultiSelectSearchBox: React.FC<BlockMultiSelectSearchBoxProps> = ({
             <span>{filteredOptions.length} Block{filteredOptions.length === 1 ? '' : 's'} found</span>
             <strong>{selectedValues.length} selected</strong>
           </header>
-          <div className={styles.bulkActions}>
-            <button type="button" onClick={selectVisible}>Select visible</button>
-            <button type="button" onClick={() => onChange([])}>Clear all</button>
-          </div>
+          {selectionMode === 'multiple' && (
+            <div className={styles.bulkActions}>
+              <button type="button" onClick={selectVisible}>Select visible</button>
+              <button type="button" onClick={() => onChange([])}>Clear all</button>
+            </div>
+          )}
           <ul id={listboxId} role="listbox" aria-multiselectable="true">
             {filteredOptions.map(option => {
               const checked = selected.has(option.value);

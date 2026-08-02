@@ -15,7 +15,9 @@ import {
   X,
 } from 'lucide-react';
 import { RulesCard, type RulesCardEvent } from '../RulesCard';
-import SearchBox, { type SearchBoxOption } from '../SearchBox';
+import BlockMultiSelectSearchBox, {
+  type BlockMultiSelectOption,
+} from '../BlockMultiSelectSearchBox';
 import type {
   InstructionRelationshipEdge,
 } from '../bot-job-details/grid/domain/instructionRelationshipGraph';
@@ -200,7 +202,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
     }
   }, [blockFilter, blocks, onBlockFilterChange]);
 
-  const blockSearchOptions = useMemo<SearchBoxOption[]>(() => {
+  const blockSearchOptions = useMemo<readonly BlockMultiSelectOption[]>(() => {
     const commandCounts = new Map<number, number>();
     instructions.forEach((instruction) => {
       if (instruction.blockId === null) return;
@@ -210,12 +212,10 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
       );
     });
     return blocks.map(block => ({
-      value: String(block.id),
+      value: block.id,
       label: `#${block.order ?? block.id} ${block.name}`,
       sublabel: `${commandCounts.get(block.id) ?? 0} command(s) · block ID ${block.id}`,
-      badges: [block.active === false
-        ? { text: 'INACTIVE', tone: 'red' as const }
-        : { text: 'ACTIVE', tone: 'green' as const }],
+      active: block.active !== false,
       keywords: String(block.id),
     }));
   }, [blocks, instructions]);
@@ -484,17 +484,15 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                 />
               </span>
             </label>
-            <SearchBox
+            <BlockMultiSelectSearchBox
               key={`variables-command-block-search:${workspaceIdentityKey ?? 'unbound'}`}
               label="Block"
               placeholder="Search block name or number..."
-              headerRight="Commands per block"
-              countLabel={count => `${count} BLOCK${count === 1 ? '' : 'S'}`}
-              allOptionLabel="All blocks"
               options={blockSearchOptions}
-              value={blockFilter === null ? null : String(blockFilter)}
-              onChange={(value) => {
-                const nextBlockFilter = value === null ? null : Number(value);
+              selectedValues={blockFilter === null ? [] : [blockFilter]}
+              selectionMode="single"
+              onChange={(values) => {
+                const nextBlockFilter = values[0] ?? null;
                 setLocalBlockFilter(nextBlockFilter);
                 onBlockFilterChange?.(nextBlockFilter);
               }}

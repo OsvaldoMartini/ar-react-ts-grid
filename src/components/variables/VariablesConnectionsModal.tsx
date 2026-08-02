@@ -14,6 +14,9 @@ import SearchBox, {
   type SearchBoxBadge,
   type SearchBoxOption,
 } from '../SearchBox';
+import BlockMultiSelectSearchBox, {
+  type BlockMultiSelectOption,
+} from '../BlockMultiSelectSearchBox';
 import { RulesCard, type RulesCardEvent } from '../RulesCard';
 import type { VariableWorkspaceBlock } from '../variablesWorkspace.contract';
 import VariablesConnectionsHelpModal from './VariablesConnectionsHelpModal';
@@ -140,7 +143,7 @@ const VariablesConnectionsModal: React.FC<
       return [item.id, valid ? initial : firstAvailable];
     }),
   ));
-  const blockSearchOptions = useMemo<SearchBoxOption[]>(() => {
+  const blockSearchOptions = useMemo<readonly BlockMultiSelectOption[]>(() => {
     const connectionCounts = new Map<number, number>();
     items.forEach((item) => {
       if (item.blockId == null) return;
@@ -150,12 +153,10 @@ const VariablesConnectionsModal: React.FC<
       );
     });
     return blocks.map(block => ({
-      value: String(block.id),
+      value: block.id,
       label: `#${block.order ?? block.id} ${block.name}`,
       sublabel: `${connectionCounts.get(block.id) ?? 0} connection(s) · block ID ${block.id}`,
-      badges: [block.active === false
-        ? { text: 'INACTIVE', tone: 'red' as const }
-        : { text: 'ACTIVE', tone: 'green' as const }],
+      active: block.active !== false,
       keywords: String(block.id),
     }));
   }, [blocks, items]);
@@ -320,16 +321,14 @@ const VariablesConnectionsModal: React.FC<
               </>
             )}
           </section>
-          <SearchBox
+          <BlockMultiSelectSearchBox
             label="Block"
             placeholder="Search block name or number..."
-            headerRight="Connections per block"
-            countLabel={count => `${count} BLOCK${count === 1 ? '' : 'S'}`}
-            allOptionLabel="All blocks"
             options={blockSearchOptions}
-            value={blockFilter === null ? null : String(blockFilter)}
-            onChange={(value) => {
-              const nextBlockFilter = value === null ? null : Number(value);
+            selectedValues={blockFilter === null ? [] : [blockFilter]}
+            selectionMode="single"
+            onChange={(values) => {
+              const nextBlockFilter = values[0] ?? null;
               setLocalBlockFilter(nextBlockFilter);
               onBlockFilterChange?.(nextBlockFilter);
             }}

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { FlaskConical, Octagon, Play, ShieldCheck } from 'lucide-react';
 import type { VariablesExecutionFlowReview } from './domain/variablesExecutionFlowReview';
 import { buildVariablesSmokeTestPlan } from './domain/variablesSmokeTestPlan';
@@ -17,14 +17,11 @@ import type {
 } from './domain/variablesSmokeTestTypes';
 import VariablesSmokeTestLog from './VariablesSmokeTestLog';
 import VariablesSmokeTestReportModal from './VariablesSmokeTestReportModal';
-import BlockMultiSelectSearchBox, {
-  type BlockMultiSelectOption,
-} from './BlockMultiSelectSearchBox';
 import styles from './VariablesSmokeTestPanel.module.scss';
 
 export interface VariablesSmokeTestPanelProps {
   review: VariablesExecutionFlowReview;
-  blockFilter: number | null;
+  selectedBlockIds: readonly number[];
   onActivePositionChange?: (position: VariablesSmokeTestPosition | null) => void;
 }
 
@@ -75,27 +72,9 @@ const executionItemsFor = (plan: VariablesSmokeTestPlan): readonly SmokeExecutio
 
 const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   review,
-  blockFilter,
+  selectedBlockIds,
   onActivePositionChange,
 }) => {
-  const blockOptions = useMemo<readonly BlockMultiSelectOption[]>(() => review.blocks
-    .flatMap(block => block.blockId === null ? [] : [{
-      value: block.blockId,
-      label: `#${block.blockOrder ?? block.blockId} ${block.blockName}`,
-      sublabel: `${block.steps.length} command(s) - Block ID ${block.blockId}`,
-      active: block.active,
-      keywords: `${block.blockId} ${block.blockOrder ?? ''}`,
-    }]), [review.blocks]);
-  const defaultSelectedBlockIds = useMemo(
-    () => blockFilter === null
-      ? blockOptions.map(option => option.value)
-      : blockOptions.some(option => option.value === blockFilter)
-        ? [blockFilter]
-        : [],
-    [blockFilter, blockOptions],
-  );
-  const selectionIdentity = `${review.homeBankingId}:${review.botJobId}:${blockFilter ?? 'ALL'}:${blockOptions.map(option => option.value).join(',')}`;
-  const previousSelectionIdentityRef = useRef(selectionIdentity);
   const [status, setStatus] = useState<VariablesSmokeTestStatus>('IDLE');
   const [plan, setPlan] = useState<VariablesSmokeTestPlan | null>(null);
   const [entries, setEntries] = useState<readonly VariablesSmokeTestLogEntry[]>([]);
@@ -104,7 +83,6 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   const [processedCommands, setProcessedCommands] = useState(0);
   const [stepIntervalMs, setStepIntervalMs] = useState(100);
   const [reportCounter, setReportCounter] = useState<keyof VariablesSmokeTestCounters | null>(null);
-  const [selectedBlockIds, setSelectedBlockIds] = useState<number[]>(defaultSelectedBlockIds);
   const previewPlan = useMemo(
     () => buildVariablesSmokeTestPlan(review, selectedBlockIds),
     [review, selectedBlockIds],
@@ -113,12 +91,6 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     () => plan === null ? [] : executionItemsFor(plan),
     [plan],
   );
-
-  useEffect(() => {
-    if (previousSelectionIdentityRef.current === selectionIdentity) return;
-    previousSelectionIdentityRef.current = selectionIdentity;
-    setSelectedBlockIds(defaultSelectedBlockIds);
-  }, [defaultSelectedBlockIds, selectionIdentity]);
 
   const run = () => {
     const nextPlan = buildVariablesSmokeTestPlan(review, selectedBlockIds);
@@ -264,14 +236,6 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
           <Octagon size={14} aria-hidden="true" /> STOP
         </button>
       </div>
-
-      <section className={styles.blockSelector} aria-label="Smoke Test Block selection">
-        <BlockMultiSelectSearchBox
-          options={blockOptions}
-          selectedValues={selectedBlockIds}
-          onChange={setSelectedBlockIds}
-        />
-      </section>
 
       <section className={styles.scope} aria-label="Frozen Smoke Test scope">
         <span>{plan === null ? 'Visible scope' : 'Frozen scope'}</span>

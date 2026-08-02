@@ -16,7 +16,9 @@ import type {
 } from './domain/variablesExecutionFlowReview';
 import { variablesSmokeTestBlockKey } from './domain/variablesSmokeTestSimulation';
 import type { VariablesSmokeTestPosition } from './domain/variablesSmokeTestTypes';
-import SearchBox, { type SearchBoxOption } from '../SearchBox';
+import BlockMultiSelectSearchBox, {
+  type BlockMultiSelectOption,
+} from '../BlockMultiSelectSearchBox';
 import VariablesSmokeTestPanel from './VariablesSmokeTestPanel';
 import styles from './VariablesExecutionFlowReviewModal.module.scss';
 
@@ -53,7 +55,6 @@ const VariablesExecutionFlowReviewModal: React.FC<
   review,
   scopeLabel,
   blockFilter: controlledBlockFilter,
-  onBlockFilterChange,
   returnFocusElement = null,
   onClose,
 }) => {
@@ -64,10 +65,10 @@ const VariablesExecutionFlowReviewModal: React.FC<
   const smokeStepRefs = useRef(new Map<string, HTMLElement>());
   const smokeBlockRefs = useRef(new Map<string, HTMLElement>());
   const [activeSmokePosition, setActiveSmokePosition] = useState<VariablesSmokeTestPosition | null>(null);
-  const [localBlockFilter, setLocalBlockFilter] = useState<number | null>(null);
-  const blockFilter = controlledBlockFilter === undefined
-    ? localBlockFilter
-    : controlledBlockFilter;
+  const [selectedBlockIds, setSelectedBlockIds] = useState<number[]>(() =>
+    controlledBlockFilter == null
+      ? review.blocks.flatMap(block => block.blockId === null ? [] : [block.blockId])
+      : [controlledBlockFilter]);
   const returnFocusRef = useRef<HTMLElement | null>(
     returnFocusElement
     ?? (typeof document !== 'undefined'
@@ -80,20 +81,23 @@ const VariablesExecutionFlowReviewModal: React.FC<
       ? []
       : [[step.instructionId, step] as const]),
   ), [review.steps]);
-  const blockSearchOptions = useMemo<SearchBoxOption[]>(() => review.blocks
+  const blockSearchOptions = useMemo<readonly BlockMultiSelectOption[]>(() => review.blocks
     .filter(block => block.blockId !== null)
     .map(block => ({
-      value: String(block.blockId),
+      value: block.blockId as number,
       label: `#${block.blockOrder ?? block.blockId} ${block.blockName}`,
       sublabel: `${block.steps.length} command(s) · block ID ${block.blockId}`,
-      badges: [block.active
-        ? { text: 'ACTIVE', tone: 'green' as const }
-        : { text: 'INACTIVE', tone: 'red' as const }],
+      active: block.active,
       keywords: String(block.blockId),
     })), [review.blocks]);
-  const visibleBlocks = useMemo(() => blockFilter === null
-    ? review.blocks
-    : review.blocks.filter(block => block.blockId === blockFilter), [blockFilter, review.blocks]);
+  const selectedBlockIdSet = useMemo(() => new Set(selectedBlockIds), [selectedBlockIds]);
+  const allBlocksSelected = blockSearchOptions.length > 0
+    && selectedBlockIds.length === blockSearchOptions.length;
+  const visibleBlocks = useMemo(() => review.blocks.filter(block =>
+    block.blockId !== null && selectedBlockIdSet.has(block.blockId)), [
+    review.blocks,
+    selectedBlockIdSet,
+  ]);
   const visibleSteps = useMemo(
     () => visibleBlocks.flatMap(block => block.steps),
     [visibleBlocks],
@@ -103,14 +107,14 @@ const VariablesExecutionFlowReviewModal: React.FC<
       ? []
       : [step.instructionId]),
   ), [visibleSteps]);
-  const visibleVariableFlows = useMemo(() => blockFilter === null
+  const visibleVariableFlows = useMemo(() => allBlocksSelected
     ? review.variableFlows
     : review.variableFlows.filter(flow =>
         (flow.ownerInstructionId !== null
           && visibleStepIds.has(flow.ownerInstructionId))
         || flow.producerInstructionIds.some(id => visibleStepIds.has(id))
         || flow.readerInstructionIds.some(id => visibleStepIds.has(id))), [
-    blockFilter,
+    allBlocksSelected,
     review.variableFlows,
     visibleStepIds,
   ]);
@@ -118,7 +122,7 @@ const VariablesExecutionFlowReviewModal: React.FC<
     () => new Set(visibleVariableFlows.map(flow => flow.variableId)),
     [visibleVariableFlows],
   );
-  const visibleUnassignedConnections = useMemo(() => blockFilter === null
+  const visibleUnassignedConnections = useMemo(() => allBlocksSelected
     ? review.unassignedConnections
     : review.unassignedConnections.filter(connection => {
         const targetVisible = connection.target?.entity === 'INSTRUCTION'
@@ -133,13 +137,13 @@ const VariablesExecutionFlowReviewModal: React.FC<
             : false;
         return sourceVisible || targetVisible;
       }), [
-    blockFilter,
+    allBlocksSelected,
     review.unassignedConnections,
     visibleStepIds,
     visibleVariableIds,
   ]);
   const visibleConnectionCount = useMemo(() => {
-    if (blockFilter === null) return review.connectionCount;
+    if (allBlocksSelected) return review.connectionCount;
     const connectionIds = new Set(
       visibleSteps.flatMap(step => step.connections.map(connection => connection.id)),
     );
@@ -147,31 +151,36 @@ const VariablesExecutionFlowReviewModal: React.FC<
       connectionIds.add(connection.id));
     return connectionIds.size;
   }, [
-    blockFilter,
+    allBlocksSelected,
     review.connectionCount,
     visibleSteps,
     visibleUnassignedConnections,
   ]);
-  const selectedBlock = blockFilter === null
-    ? null
-    : review.blocks.find(block => block.blockId === blockFilter) ?? null;
-  const visibleScopeLabel = blockFilter === null
+  const selectedBlock = selectedBlockIds.length === 1
+    ? review.blocks.find(block => block.blockId === selectedBlockIds[0]) ?? null
+    : null;
+  const visibleScopeLabel = allBlocksSelected
     ? `All Blocks Â· ${visibleSteps.length} visible command${visibleSteps.length === 1 ? '' : 's'}`
     : selectedBlock
       ? `Block #${selectedBlock.blockOrder ?? selectedBlock.blockId} ${selectedBlock.blockName} Â· ${visibleSteps.length} visible command${visibleSteps.length === 1 ? '' : 's'}`
-      : scopeLabel;
-  const visibleDiagnostics = useMemo(() => blockFilter === null
+      : selectedBlockIds.length > 0
+        ? `${selectedBlockIds.length} selected Blocks - ${visibleSteps.length} visible command${visibleSteps.length === 1 ? '' : 's'}`
+        : scopeLabel;
+  const visibleDiagnostics = useMemo(() => allBlocksSelected
     ? review.diagnostics
     : review.diagnostics.filter(diagnostic =>
         diagnostic.blockIds.length === 0
-        || diagnostic.blockIds.includes(blockFilter)), [blockFilter, review.diagnostics]);
+        || diagnostic.blockIds.some(blockId => selectedBlockIdSet.has(blockId))), [
+    allBlocksSelected,
+    review.diagnostics,
+    selectedBlockIdSet,
+  ]);
   const blocksById = useMemo(() => new Map(review.blocks.flatMap(block =>
     block.blockId === null ? [] : [[block.blockId, block] as const])), [review.blocks]);
   const diagnosticBlockLabel = (diagnostic: VariablesExecutionFlowDiagnostic) => {
-    const visibleBlockIds = blockFilter !== null
-      && diagnostic.blockIds.includes(blockFilter)
-      ? [blockFilter]
-      : diagnostic.blockIds;
+    const visibleBlockIds = allBlocksSelected
+      ? diagnostic.blockIds
+      : diagnostic.blockIds.filter(blockId => selectedBlockIdSet.has(blockId));
     if (visibleBlockIds.length === 0) return 'Bot Job';
     return visibleBlockIds.map((blockId) => {
       const block = blocksById.get(blockId);
@@ -304,19 +313,13 @@ const VariablesExecutionFlowReviewModal: React.FC<
             </div>
           )}
 
-          <SearchBox
+          <BlockMultiSelectSearchBox
             label="Block"
             placeholder="Search block name or number..."
-            headerRight="Commands per block"
-            countLabel={count => `${count} BLOCK${count === 1 ? '' : 'S'}`}
-            allOptionLabel="All blocks"
             options={blockSearchOptions}
-            value={blockFilter === null ? null : String(blockFilter)}
-            onChange={(value) => {
-              const nextBlockFilter = value === null ? null : Number(value);
-              setLocalBlockFilter(nextBlockFilter);
-              onBlockFilterChange?.(nextBlockFilter);
-            }}
+            selectedValues={selectedBlockIds}
+            onChange={setSelectedBlockIds}
+            selectionMode="multiple"
           />
 
           {visibleVariableFlows.length > 0 && (
@@ -528,7 +531,7 @@ const VariablesExecutionFlowReviewModal: React.FC<
 
           <VariablesSmokeTestPanel
             review={review}
-            blockFilter={blockFilter}
+            selectedBlockIds={selectedBlockIds}
             onActivePositionChange={setActiveSmokePosition}
           />
         </div>
