@@ -535,6 +535,23 @@
   background: #e9dafa;
 }
 
+.checkOperator {
+  min-height: 24px;
+  min-width: 30px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 7px;
+  border: 1px solid #5d8fc2;
+  border-radius: 999px;
+  background: #eaf3fc;
+  color: #0b5394;
+  font-size: 0.6rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
 .variableBadge,
 .independentBadge,
 .inactiveBadge {

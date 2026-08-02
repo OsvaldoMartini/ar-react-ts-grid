@@ -707,6 +707,19 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                   : requiresVariableBinding
                     ? configuredVariableId
                     : null;
+                const variableOnlyCheck = rowCanonicalAction === 'CK'
+                  || rowCanonicalAction === 'CSV CHECK'
+                  || rowCanonicalAction === 'PDF CHECK';
+                const checkOperator = instruction.commandConfiguration
+                  ?.comparisonOperator?.trim()
+                  || instruction.operation.split(':')[1]?.trim()
+                  || '=';
+                const secondCheckVariableId = variableOnlyCheck
+                  && typeof instruction.commandConfiguration?.operandVariableId === 'number'
+                  && Number.isSafeInteger(instruction.commandConfiguration.operandVariableId)
+                  && instruction.commandConfiguration.operandVariableId > 0
+                    ? instruction.commandConfiguration.operandVariableId
+                    : null;
                 const structuralKind = otherParentEdge?.kind
                   ?? (policy.requirements.includes('LOOP_ANCHOR')
                     ? 'LOOP_ANCHOR' as const
@@ -774,7 +787,9 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                   reconnectVariable
                     ? {
                         color: 'red',
-                        rules: 'Reconnect Variable',
+                        rules: variableOnlyCheck
+                          ? 'Reconnect Variable 1'
+                          : 'Reconnect Variable',
                         context: '',
                         ts: instructionId ?? index,
                       }
@@ -1075,9 +1090,11 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                           >
                             <RulesCard
                               event={reconnectVariableEvent}
-                              compactLabel="VAR"
+                              compactLabel={variableOnlyCheck ? 'VAR 1' : 'VAR'}
                               ariaLabel={relationshipTitle(
-                                'Reconnect variable',
+                                variableOnlyCheck
+                                  ? 'Reconnect variable 1'
+                                  : 'Reconnect variable',
                                 variableBindingEdge,
                               )}
                               glow
@@ -1105,7 +1122,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                                 <button
                                   type="button"
                                   className={`${styles.connectedVariable} ${styles.variableButton}`}
-                                  aria-label={`Variable connected (id: ${connectedVariableId})`}
+                                  aria-label={`${variableOnlyCheck ? 'Variable 1' : 'Variable'} connected (id: ${connectedVariableId})`}
                                   title="Change connected variable"
                                   disabled={disabled}
                                   onMouseDown={event => event.stopPropagation()}
@@ -1119,7 +1136,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                                 >
                                   <Variable size={11} aria-hidden="true" />
                                   <span className={styles.relationshipLabelFull}>
-                                    Variable connected (id: {connectedVariableId})
+                                    {variableOnlyCheck ? 'Variable 1' : 'Variable'} connected (id: {connectedVariableId})
                                   </span>
                                   <span className={styles.relationshipLabelCompact}>
                                     ID {connectedVariableId}
@@ -1129,18 +1146,76 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                             : (
                                 <span
                                   className={`${styles.connectedVariable} ${styles.variableButton} ${styles.connectedStatic}`}
-                                  aria-label={`Variable connected (id: ${connectedVariableId})`}
-                                  title={`Variable connected (id: ${connectedVariableId})`}
+                                  aria-label={`${variableOnlyCheck ? 'Variable 1' : 'Variable'} connected (id: ${connectedVariableId})`}
+                                  title={`${variableOnlyCheck ? 'Variable 1' : 'Variable'} connected (id: ${connectedVariableId})`}
                                 >
                                   <Variable size={11} aria-hidden="true" />
                                   <span className={styles.relationshipLabelFull}>
-                                    Variable connected (id: {connectedVariableId})
+                                    {variableOnlyCheck ? 'Variable 1' : 'Variable'} connected (id: {connectedVariableId})
                                   </span>
                                   <span className={styles.relationshipLabelCompact}>
                                     ID {connectedVariableId}
                                   </span>
                                 </span>
                               )
+                        )}
+                        {variableOnlyCheck && (
+                          <span
+                            className={styles.checkOperator}
+                            aria-label={`Comparison operator ${checkOperator}`}
+                            title={`Comparison operator ${checkOperator}`}
+                          >
+                            {checkOperator}
+                          </span>
+                        )}
+                        {variableOnlyCheck && secondCheckVariableId !== null && (
+                          <button
+                            type="button"
+                            className={`${styles.connectedVariable} ${styles.variableButton}`}
+                            aria-label={`Variable 2 connected (id: ${secondCheckVariableId})`}
+                            title="Change second comparison variable"
+                            disabled={disabled || !onEditCommand}
+                            onMouseDown={event => event.stopPropagation()}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onEditCommand?.(instruction);
+                            }}
+                          >
+                            <Variable size={11} aria-hidden="true" />
+                            <span className={styles.relationshipLabelFull}>
+                              Variable 2 connected (id: {secondCheckVariableId})
+                            </span>
+                            <span className={styles.relationshipLabelCompact}>
+                              ID {secondCheckVariableId}
+                            </span>
+                          </button>
+                        )}
+                        {variableOnlyCheck && secondCheckVariableId === null && (
+                          <span
+                            className={styles.reconnectRuleCard}
+                            onMouseDown={event => event.stopPropagation()}
+                          >
+                            <RulesCard
+                              event={{
+                                color: 'red',
+                                rules: 'Reconnect Variable 2',
+                                context: '',
+                                ts: instructionId ?? index,
+                              }}
+                              compactLabel="VAR 2"
+                              ariaLabel="Reconnect variable 2"
+                              glow
+                              border
+                              animate={false}
+                              pulse
+                              iconNode={<Variable size={11} aria-hidden="true" />}
+                              title="Reconnect variable 2 in Command Editor"
+                              disabled={disabled || !onEditCommand}
+                              onClick={onEditCommand
+                                ? () => onEditCommand(instruction)
+                                : undefined}
+                            />
+                          </span>
                         )}
                         {!requiresVariableBinding
                           && instruction.variableId !== null && (
