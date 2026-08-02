@@ -48,7 +48,7 @@ export type VariablesConnectionScope = {
   visibleCount: number;
   totalCount: number;
   commandSearch: string;
-  blockId: number | null;
+  blockIds: readonly number[];
   blockLabel: string;
   label: string;
 };
@@ -59,8 +59,8 @@ export interface VariablesCommandBoardProps {
   relationshipEdges?: readonly InstructionRelationshipEdge[];
   /** Stable Bot Job owner key. Changing it clears command-list filters. */
   workspaceIdentityKey?: string | number | null;
-  blockFilter?: number | null;
-  onBlockFilterChange?: (blockId: number | null) => void;
+  blockFilters?: readonly number[];
+  onBlockFiltersChange?: (blockIds: number[]) => void;
   disabled?: boolean;
   unavailableReason?: string;
   selectedInstructionId?: number | null;
@@ -157,8 +157,8 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
   instructions,
   relationshipEdges = [],
   workspaceIdentityKey,
-  blockFilter: controlledBlockFilter,
-  onBlockFilterChange,
+  blockFilters: controlledBlockFilters,
+  onBlockFiltersChange,
   disabled = false,
   unavailableReason,
   selectedInstructionId = null,
@@ -181,26 +181,29 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
   className,
 }) => {
   const [commandSearch, setCommandSearch] = useState('');
-  const [localBlockFilter, setLocalBlockFilter] = useState<number | null>(null);
-  const blockFilter = controlledBlockFilter === undefined
-    ? localBlockFilter
-    : controlledBlockFilter;
+  const [localBlockFilters, setLocalBlockFilters] = useState<number[]>(() =>
+    blocks.map(block => block.id));
+  const blockFilters = controlledBlockFilters === undefined
+    ? localBlockFilters
+    : controlledBlockFilters;
+  const selectedBlockIds = useMemo(() => new Set(blockFilters), [blockFilters]);
   const commandSearchActive = commandSearch.trim().length > 0;
 
   useEffect(() => {
     setCommandSearch('');
-    setLocalBlockFilter(null);
+    setLocalBlockFilters([]);
   }, [workspaceIdentityKey]);
 
   useEffect(() => {
     if (
-      blockFilter !== null
-      && !blocks.some(block => block.id === blockFilter)
+      blockFilters.some(blockId => !blocks.some(block => block.id === blockId))
     ) {
-      setLocalBlockFilter(null);
-      onBlockFilterChange?.(null);
+      const validBlockIds = blockFilters.filter(blockId =>
+        blocks.some(block => block.id === blockId));
+      setLocalBlockFilters(validBlockIds);
+      onBlockFiltersChange?.(validBlockIds);
     }
-  }, [blockFilter, blocks, onBlockFilterChange]);
+  }, [blockFilters, blocks, onBlockFiltersChange]);
 
   const blockSearchOptions = useMemo<readonly BlockMultiSelectOption[]>(() => {
     const commandCounts = new Map<number, number>();
@@ -227,7 +230,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
       .split(/\s+/)
       .filter(Boolean);
     return instructions.filter((instruction) => {
-      if (blockFilter !== null && instruction.blockId !== blockFilter) {
+      if (instruction.blockId === null || !selectedBlockIds.has(instruction.blockId)) {
         return false;
       }
       if (tokens.length === 0) return true;
@@ -255,15 +258,15 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
         .toLocaleLowerCase();
       return tokens.every(token => haystack.includes(token));
     });
-  }, [blockFilter, commandSearch, instructions]);
+  }, [commandSearch, instructions, selectedBlockIds]);
 
   const visibleConnectionScope = useMemo<VariablesConnectionScope>(() => {
-    const selectedBlock = blockFilter === null
-      ? null
-      : blocks.find(block => block.id === blockFilter) ?? null;
-    const blockLabel = selectedBlock
-      ? `Block #${selectedBlock.order ?? selectedBlock.id} ${selectedBlock.name}`
-      : 'All Blocks';
+    const selectedBlocks = blocks.filter(block => selectedBlockIds.has(block.id));
+    const blockLabel = blockFilters.length === 0
+      ? 'No Blocks selected'
+      : selectedBlocks.length === 1
+        ? `Block #${selectedBlocks[0].order ?? selectedBlocks[0].id} ${selectedBlocks[0].name}`
+        : `${selectedBlocks.length} selected Blocks`;
     const normalizedSearch = commandSearch.trim();
     const instructionIds = Array.from(new Set(
       visibleInstructions.flatMap(instruction =>
@@ -278,7 +281,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
       visibleCount: instructionIds.length,
       totalCount: instructions.length,
       commandSearch: normalizedSearch,
-      blockId: blockFilter,
+      blockIds: [...blockFilters],
       blockLabel,
       label: [
         blockLabel,
@@ -287,10 +290,11 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
       ].filter(Boolean).join(' · '),
     };
   }, [
-    blockFilter,
+    blockFilters,
     blocks,
     commandSearch,
     instructions.length,
+    selectedBlockIds,
     visibleInstructions,
   ]);
 
@@ -308,7 +312,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
   const groups = useMemo<CommandGroup[]>(() => {
     const byBlock = new Map<number, CommandGroup>();
     blocks
-      .filter(block => blockFilter === null || block.id === blockFilter)
+      .filter(block => selectedBlockIds.has(block.id))
       .forEach((block) => {
       byBlock.set(block.id, {
         block,
@@ -364,10 +368,10 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
     }
     return result;
   }, [
-    blockFilter,
     blocks,
     commandSearchActive,
     visibleInstructions,
+    selectedBlockIds,
   ]);
 
   const edgesByInstruction = useMemo(
@@ -489,12 +493,11 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
               label="Block"
               placeholder="Search block name or number..."
               options={blockSearchOptions}
-              selectedValues={blockFilter === null ? [] : [blockFilter]}
-              selectionMode="single"
+              selectedValues={blockFilters}
+              selectionMode="multiple"
               onChange={(values) => {
-                const nextBlockFilter = values[0] ?? null;
-                setLocalBlockFilter(nextBlockFilter);
-                onBlockFilterChange?.(nextBlockFilter);
+                setLocalBlockFilters(values);
+                onBlockFiltersChange?.(values);
               }}
             />
           </div>

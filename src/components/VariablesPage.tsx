@@ -218,22 +218,22 @@ type PendingReleaseBuildResult =
   | { ok: true; pending: PendingConnectionsRelease }
   | { ok: false; message: string };
 
-const variablesConnectionScopeForBlock = (
+const variablesConnectionScopeForBlocks = (
   snapshot: VariableWorkspaceSnapshot,
-  requestedBlockId: number | null,
+  requestedBlockIds: readonly number[],
   commandSearch = '',
 ): VariablesConnectionScope => {
-  const selectedBlock = requestedBlockId === null
-    ? null
-    : snapshot.blocks.find(block => block.id === requestedBlockId) ?? null;
-  const blockId = selectedBlock?.id ?? null;
+  const availableBlockIds = new Set(snapshot.blocks.map(block => block.id));
+  const blockIds = requestedBlockIds.filter(blockId => availableBlockIds.has(blockId));
+  const selectedBlockIds = new Set(blockIds);
+  const selectedBlocks = snapshot.blocks.filter(block => selectedBlockIds.has(block.id));
   const normalizedSearch = commandSearch.trim();
   const tokens = normalizedSearch
     .toLocaleLowerCase()
     .split(/\s+/)
     .filter(Boolean);
   const visibleCommands = snapshot.commands.filter((instruction) => {
-    if (blockId !== null && instruction.blockId !== blockId) return false;
+    if (instruction.blockId === null || !selectedBlockIds.has(instruction.blockId)) return false;
     if (tokens.length === 0) return true;
     const commandPresentation = instructionCommandPresentation(
       instruction.command,
@@ -267,15 +267,17 @@ const variablesConnectionScopeForBlock = (
         ? [instruction.id]
         : []),
   ));
-  const blockLabel = selectedBlock
-    ? `Block #${selectedBlock.order ?? selectedBlock.id} ${selectedBlock.name}`
-    : 'All Blocks';
+  const blockLabel = blockIds.length === 0
+    ? 'No Blocks selected'
+    : selectedBlocks.length === 1
+      ? `Block #${selectedBlocks[0].order ?? selectedBlocks[0].id} ${selectedBlocks[0].name}`
+      : `${selectedBlocks.length} selected Blocks`;
   return {
     instructionIds,
     visibleCount: instructionIds.length,
     totalCount: snapshot.commands.length,
     commandSearch: normalizedSearch,
-    blockId,
+    blockIds,
     blockLabel,
     label: [
       blockLabel,
@@ -791,7 +793,7 @@ const VariablesPage: React.FC<Props> = ({
   const [selectedInstructionId, setSelectedInstructionId] =
     useState<number | null>(null);
   const [editingCommandId, setEditingCommandId] = useState<number | null>(null);
-  const [sharedBlockFilter, setSharedBlockFilter] = useState<number | null>(null);
+  const [sharedBlockFilters, setSharedBlockFilters] = useState<number[]>([]);
   const [draggingInstructionId, setDraggingInstructionId] =
     useState<number | null>(null);
   const [activeDropTarget, setActiveDropTarget] =
@@ -835,8 +837,12 @@ const VariablesPage: React.FC<Props> = ({
     next: VariableWorkspaceSnapshot,
     ownerChanged = false,
   ) => {
+    const previous = snapshotRef.current;
     snapshotRef.current = next;
     setSnapshot(next);
+    setSharedBlockFilters(current => previous === null || ownerChanged
+      ? next.blocks.map(block => block.id)
+      : current.filter(blockId => next.blocks.some(block => block.id === blockId)));
     setSelectedVariableId(current =>
       !ownerChanged
       && current !== null
@@ -1158,7 +1164,7 @@ const VariablesPage: React.FC<Props> = ({
     resetRuntimeMemory();
     closeExecutionFlowReview();
     setHealthFilter('ALL');
-    setSharedBlockFilter(null);
+    setSharedBlockFilters([]);
     setDraggingInstructionId(null);
     setActiveDropTarget(null);
     setPendingReconnect(null);
@@ -1450,9 +1456,9 @@ const VariablesPage: React.FC<Props> = ({
       )
     ) {
       if (pendingConnections.mode === 'RESOLVE') {
-        const refreshedScope = variablesConnectionScopeForBlock(
+        const refreshedScope = variablesConnectionScopeForBlocks(
           snapshot,
-          pendingConnections.scope.blockId,
+          pendingConnections.scope.blockIds,
           pendingConnections.scope.commandSearch,
         );
         const rebuilt = buildPendingResolveConnections(
@@ -1468,9 +1474,9 @@ const VariablesPage: React.FC<Props> = ({
         setStatus({ level: 'error', text: rebuilt.message });
         return;
       }
-      const refreshedScope = variablesConnectionScopeForBlock(
+      const refreshedScope = variablesConnectionScopeForBlocks(
         snapshot,
-        pendingConnections.scope.blockId,
+        pendingConnections.scope.blockIds,
         pendingConnections.scope.commandSearch,
       );
       const rebuilt = buildPendingReleaseConnections(snapshot, refreshedScope);
@@ -1883,18 +1889,18 @@ const VariablesPage: React.FC<Props> = ({
     });
   }, []);
 
-  const changeConnectionsBlockFilter = useCallback((
-    nextBlockId: number | null,
+  const changeConnectionsBlockFilters = useCallback((
+    nextBlockIds: number[],
   ) => {
     const current = snapshotRef.current;
     const pending = pendingConnections;
     if (!current || !pending) {
-      setSharedBlockFilter(nextBlockId);
+      setSharedBlockFilters(nextBlockIds);
       return;
     }
-    const nextScope = variablesConnectionScopeForBlock(
+    const nextScope = variablesConnectionScopeForBlocks(
       current,
-      nextBlockId,
+      nextBlockIds,
       pending.scope.commandSearch,
     );
     const rebuilt = pending.mode === 'RESOLVE'
@@ -1908,7 +1914,7 @@ const VariablesPage: React.FC<Props> = ({
       setStatus({ level: 'error', text: rebuilt.message });
       return;
     }
-    setSharedBlockFilter(nextScope.blockId);
+    setSharedBlockFilters([...nextScope.blockIds]);
     setPendingConnections(rebuilt.pending);
     setStatus({
       level: rebuilt.pending.mode === 'RESOLVE'
@@ -2413,8 +2419,8 @@ const VariablesPage: React.FC<Props> = ({
             <section className={styles.workspace}>
               <VariablesCommandBoard
                 workspaceIdentityKey={workspaceIdentityKey}
-                blockFilter={sharedBlockFilter}
-                onBlockFilterChange={setSharedBlockFilter}
+                blockFilters={sharedBlockFilters}
+                onBlockFiltersChange={setSharedBlockFilters}
                 blocks={snapshot.blocks}
                 instructions={snapshot.commands}
                 relationshipEdges={relationshipGraph?.edges ?? []}
@@ -2853,8 +2859,8 @@ const VariablesPage: React.FC<Props> = ({
               ? batchResolveModalItems(snapshot, pendingConnections.review)
               : pendingConnections.items}
             blocks={snapshot.blocks}
-            blockFilter={sharedBlockFilter}
-            onBlockFilterChange={changeConnectionsBlockFilter}
+            blockFilters={sharedBlockFilters}
+            onBlockFiltersChange={changeConnectionsBlockFilters}
             pending={pendingMutationRequestId !== null}
             onConfirm={submitVisibleConnections}
             onCancel={() => {
@@ -2872,8 +2878,8 @@ const VariablesPage: React.FC<Props> = ({
             key={executionFlowReview.authorityKey}
             review={executionFlowReview.review}
             scopeLabel={executionFlowReview.scopeLabel}
-            blockFilter={sharedBlockFilter}
-            onBlockFilterChange={setSharedBlockFilter}
+            blockFilters={sharedBlockFilters}
+            onBlockFiltersChange={setSharedBlockFilters}
             onClose={closeExecutionFlowReviewModal}
           />
         )}

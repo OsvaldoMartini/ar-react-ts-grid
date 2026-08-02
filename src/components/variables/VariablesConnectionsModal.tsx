@@ -74,8 +74,8 @@ export interface VariablesConnectionsModalProps {
   scopeCount: number;
   items: readonly VariablesConnectionReviewItem[];
   blocks?: readonly VariableWorkspaceBlock[];
-  blockFilter?: number | null;
-  onBlockFilterChange?: (blockId: number | null) => void;
+  blockFilters?: readonly number[];
+  onBlockFiltersChange?: (blockIds: number[]) => void;
   pending?: boolean;
   onCancel: () => void;
   onConfirm: (submission: VariablesConnectionsModalSubmission) => void;
@@ -115,8 +115,8 @@ const VariablesConnectionsModal: React.FC<
   scopeCount,
   items,
   blocks = [],
-  blockFilter: controlledBlockFilter,
-  onBlockFilterChange,
+  blockFilters: controlledBlockFilters,
+  onBlockFiltersChange,
   pending = false,
   onCancel,
   onConfirm,
@@ -124,11 +124,13 @@ const VariablesConnectionsModal: React.FC<
   const titleId = useId();
   const descriptionId = useId();
   const dialogRef = useRef<HTMLElement>(null);
-  const [localBlockFilter, setLocalBlockFilter] = useState<number | null>(null);
+  const [localBlockFilters, setLocalBlockFilters] = useState<number[]>(() =>
+    blocks.map(block => block.id));
   const [helpOpen, setHelpOpen] = useState(false);
-  const blockFilter = controlledBlockFilter === undefined
-    ? localBlockFilter
-    : controlledBlockFilter;
+  const blockFilters = controlledBlockFilters === undefined
+    ? localBlockFilters
+    : controlledBlockFilters;
+  const selectedBlockIds = useMemo(() => new Set(blockFilters), [blockFilters]);
 
   const [selectionByItem, setSelectionByItem] = useState<
     Record<string, string | null>
@@ -160,9 +162,11 @@ const VariablesConnectionsModal: React.FC<
       keywords: String(block.id),
     }));
   }, [blocks, items]);
-  const visibleItems = useMemo(() => blockFilter === null
-    ? items
-    : items.filter(item => item.blockId === blockFilter), [blockFilter, items]);
+  const visibleItems = useMemo(() => items.filter(item =>
+    item.blockId != null && selectedBlockIds.has(item.blockId)), [
+    items,
+    selectedBlockIds,
+  ]);
   const resolutionItems = mode === 'RESOLVE' ? visibleItems : items;
   const resolutions = useMemo<VariablesConnectionResolution[]>(
     () => resolutionItems.flatMap((item) => {
@@ -325,12 +329,11 @@ const VariablesConnectionsModal: React.FC<
             label="Block"
             placeholder="Search block name or number..."
             options={blockSearchOptions}
-            selectedValues={blockFilter === null ? [] : [blockFilter]}
-            selectionMode="single"
+            selectedValues={blockFilters}
+            selectionMode="multiple"
             onChange={(values) => {
-              const nextBlockFilter = values[0] ?? null;
-              setLocalBlockFilter(nextBlockFilter);
-              onBlockFilterChange?.(nextBlockFilter);
+              setLocalBlockFilters(values);
+              onBlockFiltersChange?.(values);
             }}
             disabled={pending}
           />

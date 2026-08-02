@@ -25,8 +25,8 @@ import styles from './VariablesExecutionFlowReviewModal.module.scss';
 export interface VariablesExecutionFlowReviewModalProps {
   review: VariablesExecutionFlowReview;
   scopeLabel: string;
-  blockFilter?: number | null;
-  onBlockFilterChange?: (blockId: number | null) => void;
+  blockFilters?: readonly number[];
+  onBlockFiltersChange?: (blockIds: number[]) => void;
   returnFocusElement?: HTMLElement | null;
   onClose: () => void;
 }
@@ -54,7 +54,8 @@ const VariablesExecutionFlowReviewModal: React.FC<
 > = ({
   review,
   scopeLabel,
-  blockFilter: controlledBlockFilter,
+  blockFilters: controlledBlockFilters,
+  onBlockFiltersChange,
   returnFocusElement = null,
   onClose,
 }) => {
@@ -65,10 +66,11 @@ const VariablesExecutionFlowReviewModal: React.FC<
   const smokeStepRefs = useRef(new Map<string, HTMLElement>());
   const smokeBlockRefs = useRef(new Map<string, HTMLElement>());
   const [activeSmokePosition, setActiveSmokePosition] = useState<VariablesSmokeTestPosition | null>(null);
-  const [selectedBlockIds, setSelectedBlockIds] = useState<number[]>(() =>
-    controlledBlockFilter == null
-      ? review.blocks.flatMap(block => block.blockId === null ? [] : [block.blockId])
-      : [controlledBlockFilter]);
+  const [localSelectedBlockIds, setLocalSelectedBlockIds] = useState<number[]>(() =>
+    review.blocks.flatMap(block => block.blockId === null ? [] : [block.blockId]));
+  const selectedBlockIds = controlledBlockFilters === undefined
+    ? localSelectedBlockIds
+    : controlledBlockFilters;
   const returnFocusRef = useRef<HTMLElement | null>(
     returnFocusElement
     ?? (typeof document !== 'undefined'
@@ -318,7 +320,10 @@ const VariablesExecutionFlowReviewModal: React.FC<
             placeholder="Search block name or number..."
             options={blockSearchOptions}
             selectedValues={selectedBlockIds}
-            onChange={setSelectedBlockIds}
+            onChange={(values) => {
+              setLocalSelectedBlockIds(values);
+              onBlockFiltersChange?.(values);
+            }}
             selectionMode="multiple"
           />
 
