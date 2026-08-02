@@ -59,6 +59,8 @@ const VariablesExecutionFlowReviewModal: React.FC<
   const descriptionId = useId();
   const dialogRef = useRef<HTMLElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const smokeStepRefs = useRef(new Map<string, HTMLElement>());
+  const [activeSmokeStepKey, setActiveSmokeStepKey] = useState<string | null>(null);
   const [localBlockFilter, setLocalBlockFilter] = useState<number | null>(null);
   const blockFilter = controlledBlockFilter === undefined
     ? localBlockFilter
@@ -183,6 +185,18 @@ const VariablesExecutionFlowReviewModal: React.FC<
       if (returnFocusTarget?.isConnected) returnFocusTarget.focus();
     };
   }, []);
+
+  useEffect(() => {
+    if (activeSmokeStepKey === null) return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      smokeStepRefs.current.get(activeSmokeStepKey)?.scrollIntoView({
+        behavior: 'auto',
+        block: 'center',
+        inline: 'nearest',
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeSmokeStepKey]);
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
     if (event.key === 'Escape') {
@@ -389,8 +403,13 @@ const VariablesExecutionFlowReviewModal: React.FC<
                   <div className={styles.stepList}>
                     {block.steps.map((step, index) => (
                       <article
-                        className={`${styles.step} ${!step.active ? styles.inactive : ''}`}
+                        ref={(element) => {
+                          if (element === null) smokeStepRefs.current.delete(step.key);
+                          else smokeStepRefs.current.set(step.key, element);
+                        }}
+                        className={`${styles.step} ${!step.active ? styles.inactive : ''} ${activeSmokeStepKey === step.key ? styles.smokeActiveStep : ''}`}
                         key={step.key}
+                        data-smoke-active={activeSmokeStepKey === step.key ? 'true' : 'false'}
                       >
                         <div className={styles.stepSequence}>
                           <span>{index === 0 ? 'START' : 'NEXT'}</span>
@@ -496,6 +515,7 @@ const VariablesExecutionFlowReviewModal: React.FC<
           <VariablesSmokeTestPanel
             review={review}
             blockFilter={blockFilter}
+            onActiveStepChange={setActiveSmokeStepKey}
           />
         </div>
 

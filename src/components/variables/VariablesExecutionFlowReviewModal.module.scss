@@ -306,6 +306,30 @@
   gap: 8px;
   grid-template-columns: 45px minmax(150px, 0.6fr) minmax(260px, 1.4fr);
   padding: 8px;
+  position: relative;
+  transition: border-color 80ms ease, box-shadow 80ms ease, transform 80ms ease;
+}
+
+.smokeActiveStep {
+  background: linear-gradient(90deg, #fff8df 0%, #ffffff 72%);
+  border-color: #f08a00;
+  box-shadow: 0 0 0 2px rgba(255, 136, 0, 0.24), 0 0 18px rgba(255, 136, 0, 0.48);
+  transform: translateX(3px);
+  z-index: 2;
+
+  &::after {
+    background: #ff8800;
+    border-radius: 999px;
+    box-shadow: 0 0 10px rgba(255, 136, 0, 0.75);
+    color: #fff;
+    content: 'RUNNING';
+    font-size: 0.48rem;
+    font-weight: 900;
+    padding: 3px 6px;
+    position: absolute;
+    right: 6px;
+    top: 5px;
+  }
 }
 
 .inactive {

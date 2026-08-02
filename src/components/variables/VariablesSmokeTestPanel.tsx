@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { FlaskConical, Octagon, Play, ShieldCheck } from 'lucide-react';
 import type { VariablesExecutionFlowReview } from './domain/variablesExecutionFlowReview';
 import { buildVariablesSmokeTestPlan } from './domain/variablesSmokeTestPlan';
+import { simulateVariablesSmokeTestStep } from './domain/variablesSmokeTestSimulation';
 import type {
   VariablesSmokeTestCounters,
   VariablesSmokeTestLogEntry,
@@ -14,7 +15,10 @@ import styles from './VariablesSmokeTestPanel.module.scss';
 export interface VariablesSmokeTestPanelProps {
   review: VariablesExecutionFlowReview;
   blockFilter: number | null;
+  onActiveStepChange?: (stepKey: string | null) => void;
 }
+
+const STEP_INTERVAL_MS = 100;
 
 const EMPTY_COUNTERS: VariablesSmokeTestCounters = Object.freeze({
   passed: 0,
@@ -37,11 +41,13 @@ const logEntry = (
 const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   review,
   blockFilter,
+  onActiveStepChange,
 }) => {
   const [status, setStatus] = useState<VariablesSmokeTestStatus>('IDLE');
   const [plan, setPlan] = useState<VariablesSmokeTestPlan | null>(null);
   const [entries, setEntries] = useState<readonly VariablesSmokeTestLogEntry[]>([]);
-  const counters = EMPTY_COUNTERS;
+  const [counters, setCounters] = useState<VariablesSmokeTestCounters>(EMPTY_COUNTERS);
+  const [cursor, setCursor] = useState(0);
   const previewPlan = useMemo(
     () => buildVariablesSmokeTestPlan(review, blockFilter),
     [blockFilter, review],
@@ -50,30 +56,73 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   const run = () => {
     const nextPlan = buildVariablesSmokeTestPlan(review, blockFilter);
     setPlan(nextPlan);
-    setStatus('FROZEN');
+    setCursor(0);
+    setCounters(EMPTY_COUNTERS);
+    onActiveStepChange?.(null);
+    setStatus(nextPlan.steps.length === 0 ? 'COMPLETED' : 'RUNNING');
     setEntries([
       logEntry(
         'SUCCESS',
-        `Frozen ${nextPlan.steps.length} command(s) across ${nextPlan.blocks.length} Block(s). No browser or database action was executed.`,
+        `Started in-memory Smoke Test for ${nextPlan.steps.length} command(s) across ${nextPlan.blocks.length} Block(s).`,
       ),
       logEntry(
         'INFO',
-        `Graph revision ${nextPlan.graphRevision || 'unavailable'} and runtime revision ${nextPlan.runtimeMemoryRevision} are fixed for this run.`,
+        nextPlan.steps.length === 0
+          ? 'The selected scope contains no commands to simulate.'
+          : `Frozen graph revision ${nextPlan.graphRevision || 'unavailable'}; running one command every ${STEP_INTERVAL_MS} ms.`,
       ),
     ]);
   };
 
   const stop = () => {
-    if (status !== 'FROZEN') return;
+    if (status !== 'RUNNING') return;
     setStatus('STOPPED');
+    onActiveStepChange?.(null);
     setEntries(current => [
       ...current,
-      logEntry('WARNING', 'Smoke Test stopped. The frozen plan and runtime values remain unchanged.'),
+      logEntry('WARNING', `Smoke Test stopped after ${cursor} of ${plan?.steps.length ?? 0} command(s).`),
     ]);
   };
 
+  useEffect(() => {
+    if (status !== 'RUNNING' || plan === null) return undefined;
+    if (cursor >= plan.steps.length) {
+      setStatus('COMPLETED');
+      onActiveStepChange?.(null);
+      setEntries(current => [
+        ...current,
+        logEntry('SUCCESS', `Smoke Test completed all ${plan.steps.length} command(s).`),
+      ]);
+      return undefined;
+    }
+
+    const step = plan.steps[cursor];
+    onActiveStepChange?.(step.key);
+    const timer = window.setTimeout(() => {
+      const result = simulateVariablesSmokeTestStep(step, cursor + 1);
+      setEntries(current => [...current, logEntry(result.tone, result.message)]);
+      setCounters(current => ({
+        ...current,
+        [result.counter]: current[result.counter] + 1,
+      }));
+      setCursor(current => current + 1);
+    }, STEP_INTERVAL_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [cursor, onActiveStepChange, plan, status]);
+
+  useEffect(() => () => onActiveStepChange?.(null), [onActiveStepChange]);
+
   const activePlan = plan ?? previewPlan;
-  const currentStep = status === 'FROZEN' ? activePlan.steps[0] ?? null : null;
+  const currentStep = status === 'RUNNING' && plan !== null
+    ? plan.steps[cursor] ?? null
+    : null;
+  const completedSteps = status === 'COMPLETED'
+    ? activePlan.steps.length
+    : cursor;
+  const progress = activePlan.steps.length === 0
+    ? 0
+    : Math.round((completedSteps / activePlan.steps.length) * 100);
 
   return (
     <aside className={styles.panel} aria-label="Smoke Tests">
@@ -92,7 +141,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
         <button
           type="button"
           className={styles.stopButton}
-          disabled={status !== 'FROZEN'}
+          disabled={status !== 'RUNNING'}
           onClick={stop}
         >
           <Octagon size={14} aria-hidden="true" /> STOP
@@ -112,7 +161,13 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
           : 'Not executing'}</strong>
         <small>{currentStep
           ? `#${currentStep.instructionOrder ?? '?'} ${currentStep.instructionName} · ID ${currentStep.instructionId ?? 'Missing'}`
-          : 'The deterministic engine begins in S2.'}</small>
+          : status === 'COMPLETED'
+            ? 'All visible commands were simulated.'
+            : 'Press Run Smoke Test to begin.'}</small>
+        <div className={styles.progress} aria-label={`${progress}% completed`}>
+          <span style={{ width: `${progress}%` }} />
+        </div>
+        <small>{completedSteps} / {activePlan.steps.length} commands</small>
       </section>
 
       <section className={styles.logSection} aria-label="Smoke Test results">
@@ -136,4 +191,3 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
 };
 
 export default VariablesSmokeTestPanel;
-

@@ -43,10 +43,17 @@
     font-size: 0.55rem;
     padding: 4px 7px;
 
-    &[data-status='FROZEN'] {
+    &[data-status='RUNNING'] {
       background: #e9f8ef;
       border-color: #81bf96;
       color: #1f6b38;
+      box-shadow: 0 0 9px rgba(31, 107, 56, 0.3);
+    }
+
+    &[data-status='COMPLETED'] {
+      background: #e8f4ff;
+      border-color: #76abd5;
+      color: #175f96;
     }
 
     &[data-status='STOPPED'] {
@@ -115,6 +122,21 @@
   small { color: #687b8d; font-size: 0.61rem; overflow-wrap: anywhere; }
 }
 
+.progress {
+  background: #dce6ef;
+  border-radius: 999px;
+  height: 5px;
+  margin-top: 3px;
+  overflow: hidden;
+
+  span {
+    background: linear-gradient(90deg, #2e75b6, #2f9e5b);
+    display: block;
+    height: 100%;
+    transition: width 80ms linear;
+  }
+}
+
 .logSection {
   background: #eaf1f7;
   border: 1px solid #c7d5e2;
@@ -166,4 +188,3 @@
   gap: 6px;
   line-height: 1.35;
 }
-

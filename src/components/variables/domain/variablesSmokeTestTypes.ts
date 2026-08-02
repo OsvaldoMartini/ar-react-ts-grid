@@ -3,7 +3,7 @@ import type {
   VariablesExecutionVariableFlow,
 } from './variablesExecutionFlowReview';
 
-export type VariablesSmokeTestStatus = 'IDLE' | 'FROZEN' | 'STOPPED';
+export type VariablesSmokeTestStatus = 'IDLE' | 'RUNNING' | 'COMPLETED' | 'STOPPED';
 
 export type VariablesSmokeTestStep = {
   key: string;
@@ -57,4 +57,3 @@ export type VariablesSmokeTestCounters = {
   warning: number;
   failed: number;
 };
-
