@@ -159,9 +159,9 @@ const VariablesConnectionsModal: React.FC<
       keywords: String(block.id),
     }));
   }, [blocks, items]);
-  const visibleItems = useMemo(() => mode !== 'RESOLVE' || blockFilter === null
+  const visibleItems = useMemo(() => blockFilter === null
     ? items
-    : items.filter(item => item.blockId === blockFilter), [blockFilter, items, mode]);
+    : items.filter(item => item.blockId === blockFilter), [blockFilter, items]);
   const resolutionItems = mode === 'RESOLVE' ? visibleItems : items;
   const resolutions = useMemo<VariablesConnectionResolution[]>(
     () => resolutionItems.flatMap((item) => {
@@ -185,7 +185,7 @@ const VariablesConnectionsModal: React.FC<
   );
   const selectedCount = resolutions.length;
   const remainingCount = Math.max(visibleItems.length - selectedCount, 0);
-  const confirmCount = mode === 'RESOLVE' ? selectedCount : items.length;
+  const confirmCount = mode === 'RESOLVE' ? selectedCount : visibleItems.length;
   const confirmDisabled = pending || confirmCount === 0;
 
   const confirmEvent = useMemo<RulesCardEvent>(() => ({
@@ -211,7 +211,7 @@ const VariablesConnectionsModal: React.FC<
       });
       return;
     }
-    onConfirm({ mode, itemIds: items.map(item => item.id) });
+    onConfirm({ mode, itemIds: visibleItems.map(item => item.id) });
   };
   const handleDialogKeyDown = (
     event: React.KeyboardEvent<HTMLElement>,
@@ -301,7 +301,7 @@ const VariablesConnectionsModal: React.FC<
           <section className={styles.summary} aria-label="Connection summary">
             <div>
               <span>Connections</span>
-              <strong>{resolving ? visibleItems.length : items.length}</strong>
+              <strong>{visibleItems.length}</strong>
             </div>
             <div>
               <span>{resolving ? 'Ready' : 'To release'}</span>
@@ -320,27 +320,25 @@ const VariablesConnectionsModal: React.FC<
               </>
             )}
           </section>
-          {resolving && (
-            <SearchBox
-              label="Block"
-              placeholder="Search block name or number..."
-              headerRight="Connections per block"
-              countLabel={count => `${count} BLOCK${count === 1 ? '' : 'S'}`}
-              allOptionLabel="All blocks"
-              options={blockSearchOptions}
-              value={blockFilter === null ? null : String(blockFilter)}
-              onChange={(value) => {
-                const nextBlockFilter = value === null ? null : Number(value);
-                setLocalBlockFilter(nextBlockFilter);
-                onBlockFilterChange?.(nextBlockFilter);
-              }}
-              disabled={pending}
-            />
-          )}
+          <SearchBox
+            label="Block"
+            placeholder="Search block name or number..."
+            headerRight="Connections per block"
+            countLabel={count => `${count} BLOCK${count === 1 ? '' : 'S'}`}
+            allOptionLabel="All blocks"
+            options={blockSearchOptions}
+            value={blockFilter === null ? null : String(blockFilter)}
+            onChange={(value) => {
+              const nextBlockFilter = value === null ? null : Number(value);
+              setLocalBlockFilter(nextBlockFilter);
+              onBlockFilterChange?.(nextBlockFilter);
+            }}
+            disabled={pending}
+          />
           {!resolving && (
             <p className={styles.releaseSummary}>
-              Release will disconnect all {items.length} reviewed connection
-              {items.length === 1 ? '' : 's'} in this frozen scope.
+              Release will disconnect {visibleItems.length} reviewed connection
+              {visibleItems.length === 1 ? '' : 's'} in the selected Block scope.
             </p>
           )}
 

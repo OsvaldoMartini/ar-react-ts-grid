@@ -12,44 +12,98 @@ export interface AddVariableDraft {
   name: string;
 }
 
+export interface AddVariableBatchDraft {
+  variables: readonly AddVariableDraft[];
+}
+
 interface AddVariableModalProps {
   existingNames: readonly string[];
   pending?: boolean;
-  onSubmit: (draft: AddVariableDraft) => void;
+  successVersion?: number;
+  onSubmit: (draft: AddVariableBatchDraft) => void;
   onCancel: () => void;
 }
+
+const normalizedKey = (value: string): string =>
+  value.trim().toLocaleLowerCase();
+
+const nextAvailableVariableName = (
+  names: readonly string[],
+): string => {
+  const occupied = new Set(names.map(normalizedKey).filter(Boolean));
+  let sequence = 1;
+  while (occupied.has(`variable_${sequence}`)) sequence += 1;
+  return `Variable_${sequence}`;
+};
 
 const AddVariableModal: React.FC<AddVariableModalProps> = ({
   existingNames,
   pending = false,
+  successVersion = 0,
   onSubmit,
   onCancel,
 }) => {
   const titleId = useId();
   const descriptionId = useId();
   const nameInputRef = useRef<HTMLInputElement>(null);
-  const [name, setName] = useState('');
+  const submittedNamesRef = useRef<string[]>([]);
+  const previousSuccessVersionRef = useRef(successVersion);
+  const [stagedNames, setStagedNames] = useState<string[]>([]);
+  const [name, setName] = useState(() =>
+    nextAvailableVariableName(existingNames));
+  const [nameEdited, setNameEdited] = useState(false);
   const normalizedName = name.trim();
+  const occupiedNames = [...existingNames, ...stagedNames];
   const duplicate = normalizedName !== ''
-    && existingNames.some(existing =>
-      existing.trim().localeCompare(normalizedName, undefined, {
-        sensitivity: 'accent',
-        usage: 'search',
-      }) === 0);
+    && occupiedNames.some(existing =>
+      normalizedKey(existing) === normalizedKey(normalizedName));
   const valid = normalizedName !== '' && !duplicate && !pending;
+  const canCreate = !pending && (stagedNames.length > 0 || valid);
 
   useEffect(() => {
     nameInputRef.current?.focus();
   }, []);
 
+  useEffect(() => {
+    if (successVersion === previousSuccessVersionRef.current) return;
+    previousSuccessVersionRef.current = successVersion;
+    const submittedNames = submittedNamesRef.current;
+    submittedNamesRef.current = [];
+    setStagedNames([]);
+    setName(nextAvailableVariableName([
+      ...existingNames,
+      ...submittedNames,
+    ]));
+    setNameEdited(false);
+    nameInputRef.current?.focus();
+  }, [existingNames, successVersion]);
+
   const cancel = () => {
     if (!pending) onCancel();
   };
 
-  const submit = () => {
+  const stage = () => {
     if (!valid) return;
+    const nextStagedNames = [...stagedNames, normalizedName];
+    setStagedNames(nextStagedNames);
+    setName(nextAvailableVariableName([
+      ...existingNames,
+      ...nextStagedNames,
+    ]));
+    setNameEdited(false);
+    nameInputRef.current?.focus();
+  };
+
+  const submit = () => {
+    if (!canCreate) return;
+    const includeCurrent = valid
+      && (stagedNames.length === 0 || nameEdited);
+    const names = includeCurrent
+      ? [...stagedNames, normalizedName]
+      : [...stagedNames];
+    submittedNamesRef.current = names;
     onSubmit({
-      name: normalizedName,
+      variables: names.map(variableName => ({ name: variableName })),
     });
   };
 
@@ -99,26 +153,65 @@ const AddVariableModal: React.FC<AddVariableModalProps> = ({
         <div className={styles.body}>
           <label className={styles.field}>
             <span>Variable name</span>
-            <input
-              ref={nameInputRef}
-              type="text"
-              value={name}
-              disabled={pending}
-              aria-invalid={duplicate}
-              placeholder="Enter a unique variable name"
-              onChange={event => setName(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' && valid) {
-                  event.preventDefault();
-                  submit();
-                }
-              }}
-            />
+            <span className={styles.nameEntry}>
+              <input
+                ref={nameInputRef}
+                type="text"
+                value={name}
+                disabled={pending}
+                aria-invalid={duplicate}
+                onChange={event => {
+                  setName(event.target.value);
+                  setNameEdited(true);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && valid) {
+                    event.preventDefault();
+                    stage();
+                  }
+                }}
+              />
+              <button
+                type="button"
+                className={styles.addButton}
+                disabled={!valid}
+                onClick={stage}
+                title="Stage this variable and prepare the next name"
+              >
+                ADD
+              </button>
+            </span>
           </label>
           {duplicate && (
             <p className={styles.error} role="alert">
               A variable with this name already exists in the Bot Job.
             </p>
+          )}
+
+          {stagedNames.length > 0 && (
+            <section className={styles.staged} aria-label="Variables ready to create">
+              <header>
+                <span>Ready to create</span>
+                <strong>{stagedNames.length}</strong>
+              </header>
+              <div>
+                {stagedNames.map(stagedName => (
+                  <span className={styles.stagedName} key={normalizedKey(stagedName)}>
+                    {stagedName}
+                    <button
+                      type="button"
+                      disabled={pending}
+                      aria-label={`Remove ${stagedName}`}
+                      title={`Remove ${stagedName}`}
+                      onClick={() => setStagedNames(current =>
+                        current.filter(candidate => candidate !== stagedName))}
+                    >
+                      <X size={12} aria-hidden="true" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </section>
           )}
 
           <div className={styles.rawNotice}>
@@ -147,9 +240,9 @@ const AddVariableModal: React.FC<AddVariableModalProps> = ({
             glow={false}
             border
             icon={false}
-            disabled={!valid}
+            disabled={!canCreate}
             onClick={submit}
-            title="Create the variable in this Bot Job"
+            title="Create all prepared variables in this Bot Job"
           />
         </footer>
       </section>

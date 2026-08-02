@@ -39,6 +39,7 @@ import { variableValuePresentation } from './variables/domain/variableValuePrese
 import { orderRuntimeVariablesByExecution } from './variables/domain/variableExecutionOrder';
 import RuntimeMemoryPanel from './variables/RuntimeMemoryPanel';
 import AddVariableModal, {
+  type AddVariableBatchDraft,
   type AddVariableDraft,
 } from './variables/AddVariableModal';
 import VariablesBlockTransferBoard, {
@@ -196,6 +197,10 @@ type PendingConnections =
 
 type PendingResolveBuildResult =
   | { ok: true; pending: PendingConnectionsResolve }
+  | { ok: false; message: string };
+
+type PendingReleaseBuildResult =
+  | { ok: true; pending: PendingConnectionsRelease }
   | { ok: false; message: string };
 
 const variablesConnectionScopeForBlock = (
@@ -554,6 +559,24 @@ const batchReleaseModalItems = (
   return [...relationItems, ...variableItems];
 };
 
+const buildPendingReleaseConnections = (
+  snapshot: VariableWorkspaceSnapshot,
+  scope: VariablesConnectionScope,
+): PendingReleaseBuildResult => {
+  const planned = planVariablesBatchRelease(snapshot, scope.instructionIds);
+  if (!planned.ok) return { ok: false, message: planned.message };
+  return {
+    ok: true,
+    pending: {
+      mode: 'RELEASE',
+      authorityKey: planned.plan.authorityKey,
+      scope,
+      plan: planned.plan,
+      items: batchReleaseModalItems(snapshot, planned.plan),
+    },
+  };
+};
+
 const InstructionCard: React.FC<{
   instruction: VariableInstructionNode;
   tone: 'owner' | 'producer' | 'consumer' | 'literal' | 'invalid';
@@ -767,6 +790,7 @@ const VariablesPage: React.FC<Props> = ({
   const [deleteConfirmation, setDeleteConfirmation] =
     useState<VariableDeleteConfirmation | null>(null);
   const [addVariableOpen, setAddVariableOpen] = useState(false);
+  const [addVariableSuccessVersion, setAddVariableSuccessVersion] = useState(0);
   const [clearValuesConfirmation, setClearValuesConfirmation] = useState(false);
   const [deletingVariableIds, setDeletingVariableIds] =
     useState<ReadonlySet<number>>(() => new Set());
@@ -837,16 +861,57 @@ const VariablesPage: React.FC<Props> = ({
     onStatus: setStatus,
   });
 
+  const submitVariableCreateRef = useRef<(
+    draft: AddVariableDraft,
+  ) => string | null>(() => null);
+  const createVariableBatchRef = useRef<{
+    names: string[];
+    nextIndex: number;
+    createdIds: number[];
+  } | null>(null);
+
   const handleVariableCreateResult = useCallback((
     result: VariablesCreateResult,
   ) => {
+    const batch = createVariableBatchRef.current;
+    if (result.ok && batch) {
+      if (result.variableId !== null) batch.createdIds.push(result.variableId);
+      const nextIndex = batch.nextIndex + 1;
+      if (nextIndex < batch.names.length) {
+        batch.nextIndex = nextIndex;
+        const nextName = batch.names[nextIndex];
+        const nextRequestId = submitVariableCreateRef.current({ name: nextName });
+        if (nextRequestId) {
+          setStatus({
+            level: 'warn',
+            text: `Creating variable ${nextIndex + 1} of ${batch.names.length}: “${nextName}”...`,
+          });
+          return;
+        }
+        createVariableBatchRef.current = null;
+        setStatus({
+          level: 'error',
+          text: `${batch.createdIds.length} variable(s) were created, but “${nextName}” could not be started.`,
+        });
+        return;
+      }
+      createVariableBatchRef.current = null;
+      setAddVariableSuccessVersion(current => current + 1);
+      setStatus({
+        level: 'ok',
+        text: batch.names.length === 1
+          ? result.message || `Variable #${result.variableId ?? '?'} created.`
+          : `${batch.names.length} variables created. The modal remains open.`,
+      });
+      return;
+    }
+    createVariableBatchRef.current = null;
     setStatus({
       level: result.ok ? 'ok' : 'error',
       text: result.ok
         ? result.message || `Variable #${result.variableId ?? '?'} created.`
         : result.error || 'Variable creation was refused.',
     });
-    if (result.ok) setAddVariableOpen(false);
   }, []);
 
   const {
@@ -861,6 +926,7 @@ const VariablesPage: React.FC<Props> = ({
     snapshot,
     onResult: handleVariableCreateResult,
   });
+  submitVariableCreateRef.current = submitVariableCreate;
 
   const handleVariableDeleteResult = useCallback((
     result: VariablesDeleteResult,
@@ -1032,6 +1098,7 @@ const VariablesPage: React.FC<Props> = ({
   });
 
   const resetOwnerScopedUi = useCallback(() => {
+    createVariableBatchRef.current = null;
     clearPendingRequest();
     resetGraphMutation();
     resetInstructionCopy();
@@ -1340,11 +1407,18 @@ const VariablesPage: React.FC<Props> = ({
         setStatus({ level: 'error', text: rebuilt.message });
         return;
       }
+      const refreshedScope = variablesConnectionScopeForBlock(
+        snapshot,
+        pendingConnections.scope.blockId,
+        pendingConnections.scope.commandSearch,
+      );
+      const rebuilt = buildPendingReleaseConnections(snapshot, refreshedScope);
+      if (rebuilt.ok) {
+        setPendingConnections(rebuilt.pending);
+        return;
+      }
       setPendingConnections(null);
-      setStatus({
-        level: 'error',
-        text: 'The Variables graph changed. Open the bulk connection action again.',
-      });
+      setStatus({ level: 'error', text: rebuilt.message });
     }
   }, [pendingConnections, snapshot]);
 
@@ -1748,12 +1822,12 @@ const VariablesPage: React.FC<Props> = ({
     });
   }, []);
 
-  const changeResolveConnectionsBlockFilter = useCallback((
+  const changeConnectionsBlockFilter = useCallback((
     nextBlockId: number | null,
   ) => {
     const current = snapshotRef.current;
     const pending = pendingConnections;
-    if (!current || pending?.mode !== 'RESOLVE') {
+    if (!current || !pending) {
       setSharedBlockFilter(nextBlockId);
       return;
     }
@@ -1762,11 +1836,13 @@ const VariablesPage: React.FC<Props> = ({
       nextBlockId,
       pending.scope.commandSearch,
     );
-    const rebuilt = buildPendingResolveConnections(
-      current,
-      nextScope,
-      pending.reviewRevision + 1,
-    );
+    const rebuilt = pending.mode === 'RESOLVE'
+      ? buildPendingResolveConnections(
+          current,
+          nextScope,
+          pending.reviewRevision + 1,
+        )
+      : buildPendingReleaseConnections(current, nextScope);
     if (!rebuilt.ok) {
       setStatus({ level: 'error', text: rebuilt.message });
       return;
@@ -1774,10 +1850,16 @@ const VariablesPage: React.FC<Props> = ({
     setSharedBlockFilter(nextScope.blockId);
     setPendingConnections(rebuilt.pending);
     setStatus({
-      level: rebuilt.pending.review.items.length > 0 ? 'warn' : 'ok',
-      text: rebuilt.pending.review.items.length > 0
-        ? `Reviewing direct connections for ${nextScope.visibleCount} visible command(s).`
-        : `All ${nextScope.visibleCount} visible command(s) already have valid direct connections.`,
+      level: rebuilt.pending.mode === 'RESOLVE'
+        ? rebuilt.pending.review.items.length > 0 ? 'warn' : 'ok'
+        : rebuilt.pending.items.length > 0 ? 'warn' : 'ok',
+      text: rebuilt.pending.mode === 'RESOLVE'
+        ? rebuilt.pending.review.items.length > 0
+          ? `Reviewing direct connections for ${nextScope.visibleCount} visible command(s).`
+          : `All ${nextScope.visibleCount} visible command(s) already have valid direct connections.`
+        : rebuilt.pending.items.length > 0
+          ? `Reviewing ${rebuilt.pending.items.length} direct connection(s) in ${nextScope.blockLabel}.`
+          : `${nextScope.blockLabel} has no direct connections to release. Select another Block to continue.`,
     });
   }, [pendingConnections]);
 
@@ -1792,32 +1874,17 @@ const VariablesPage: React.FC<Props> = ({
       });
       return;
     }
-    const planned = planVariablesBatchRelease(
-      current,
-      scope.instructionIds,
-    );
-    if (!planned.ok) {
-      setStatus({ level: 'error', text: planned.message });
+    const built = buildPendingReleaseConnections(current, scope);
+    if (!built.ok) {
+      setStatus({ level: 'error', text: built.message });
       return;
     }
-    const items = batchReleaseModalItems(current, planned.plan);
-    if (items.length === 0) {
-      setStatus({
-        level: 'ok',
-        text: `The ${scope.visibleCount} visible command(s) have no direct connections to release.`,
-      });
-      return;
-    }
-    setPendingConnections({
-      mode: 'RELEASE',
-      authorityKey: planned.plan.authorityKey,
-      scope,
-      plan: planned.plan,
-      items,
-    });
+    setPendingConnections(built.pending);
     setStatus({
-      level: 'warn',
-      text: `Reviewing ${items.length} direct connection(s) before release.`,
+      level: built.pending.items.length > 0 ? 'warn' : 'ok',
+      text: built.pending.items.length > 0
+        ? `Reviewing ${built.pending.items.length} direct connection(s) before release.`
+        : `${scope.blockLabel} has no direct connections to release. Select another Block to continue.`,
     });
   }, []);
 
@@ -2026,9 +2093,22 @@ const VariablesPage: React.FC<Props> = ({
     });
   }, [deleteConfirmation, submitVariableDelete]);
 
-  const submitNewVariable = useCallback((draft: AddVariableDraft) => {
-    const requestId = submitVariableCreate(draft);
+  const submitNewVariable = useCallback((draft: AddVariableBatchDraft) => {
+    const names = draft.variables
+      .map(variable => variable.name.trim())
+      .filter(Boolean);
+    if (names.length === 0) {
+      setStatus({ level: 'error', text: 'Add at least one variable name.' });
+      return;
+    }
+    createVariableBatchRef.current = {
+      names,
+      nextIndex: 0,
+      createdIds: [],
+    };
+    const requestId = submitVariableCreate({ name: names[0] });
     if (!requestId) {
+      createVariableBatchRef.current = null;
       setStatus({
         level: 'error',
         text: 'Variables is busy, disconnected, or read-only. No variable was created.',
@@ -2037,7 +2117,9 @@ const VariablesPage: React.FC<Props> = ({
     }
     setStatus({
       level: 'warn',
-      text: `Creating variable “${draft.name}”...`,
+      text: names.length === 1
+        ? `Creating variable “${names[0]}”...`
+        : `Creating variable 1 of ${names.length}: “${names[0]}”...`,
     });
   }, [submitVariableCreate]);
 
@@ -2665,7 +2747,7 @@ const VariablesPage: React.FC<Props> = ({
               : pendingConnections.items}
             blocks={snapshot.blocks}
             blockFilter={sharedBlockFilter}
-            onBlockFilterChange={changeResolveConnectionsBlockFilter}
+            onBlockFilterChange={changeConnectionsBlockFilter}
             pending={pendingMutationRequestId !== null}
             onConfirm={submitVisibleConnections}
             onCancel={() => {
@@ -2766,6 +2848,7 @@ const VariablesPage: React.FC<Props> = ({
           <AddVariableModal
             existingNames={snapshot.variables.map(variable => variable.name)}
             pending={pendingCreateRequestId !== null}
+            successVersion={addVariableSuccessVersion}
             onSubmit={submitNewVariable}
             onCancel={() => {
               if (pendingCreateRequestId === null) setAddVariableOpen(false);
