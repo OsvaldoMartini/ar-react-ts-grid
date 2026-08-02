@@ -591,19 +591,44 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
               {group.instructions.map((instruction, index) => {
                 const instructionId = instruction.id;
                 const policy = instructionRelationshipPolicy(instruction.command);
-                // Compact GridItem-style loop values: "T: <interval>s" over
-                // "L: <iterations>", aligned beside the name/ID column.
+                // Compact GridItem-style intrinsic values beside the name/ID
+                // column: LOOP/REFRESH_LOOP -> T:/L:, GOTO -> L: (limit),
+                // SWIPE -> R: (repeats). Missing/malformed operations render
+                // no card - never an N/A placeholder.
                 const rowCanonicalAction =
                   canonicalInstructionAction(instruction.command);
-                const loopParts = (rowCanonicalAction === 'LOOP'
-                  || rowCanonicalAction === 'REFRESH_LOOP')
-                  && instruction.operation
-                  ? instruction.operation.split(':').map(part => part.trim())
-                  : null;
-                const loopValues = loopParts
-                  && loopParts.length >= 2 && loopParts[0] && loopParts[1]
-                  ? { interval: loopParts[0], iterations: loopParts[1] }
-                  : null;
+                const rowOperation = (instruction.operation ?? '').trim();
+                let commandValueRows:
+                  | { label: string; value: string }[]
+                  | null = null;
+                let commandValuesTitle = '';
+                if (
+                  (rowCanonicalAction === 'LOOP'
+                    || rowCanonicalAction === 'REFRESH_LOOP')
+                  && rowOperation
+                ) {
+                  const [interval, iterations] = rowOperation
+                    .split(':')
+                    .map(part => part.trim());
+                  if (interval && iterations) {
+                    commandValueRows = [
+                      { label: 'T:', value: `${interval}s` },
+                      { label: 'L:', value: iterations },
+                    ];
+                    commandValuesTitle =
+                      `Time ${interval}s · Loop ${iterations} times`;
+                  }
+                } else if (rowCanonicalAction === 'GOTO' && rowOperation) {
+                  commandValueRows = [{ label: 'L:', value: rowOperation }];
+                  commandValuesTitle = `GOTO limit ${rowOperation}`;
+                } else if (
+                  (rowCanonicalAction === 'SWIPE_UP'
+                    || rowCanonicalAction === 'SWIPE_DOWN')
+                  && rowOperation
+                ) {
+                  commandValueRows = [{ label: 'R:', value: rowOperation }];
+                  commandValuesTitle = `Swipe ${rowOperation} time(s)`;
+                }
                 const edges = instructionId === null
                   ? []
                   : edgesByInstruction.get(instructionId) ?? [];
@@ -827,23 +852,24 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                             {instructionId === null ? 'Missing ID' : `ID ${instructionId}`}
                           </small>
                         </button>
-                        {loopValues && (
+                        {commandValueRows && (
                           <span
                             className={styles.loopValues}
-                            title={`Time ${loopValues.interval}s · Loop ${loopValues.iterations} times`}
+                            title={commandValuesTitle}
                           >
-                            <span className={styles.loopValueRow}>
-                              <span className={styles.loopValueLabel}>T:</span>
-                              <span className={styles.loopValueNumber}>
-                                {loopValues.interval}s
+                            {commandValueRows.map(row => (
+                              <span
+                                key={row.label}
+                                className={styles.loopValueRow}
+                              >
+                                <span className={styles.loopValueLabel}>
+                                  {row.label}
+                                </span>
+                                <span className={styles.loopValueNumber}>
+                                  {row.value}
+                                </span>
                               </span>
-                            </span>
-                            <span className={styles.loopValueRow}>
-                              <span className={styles.loopValueLabel}>L:</span>
-                              <span className={styles.loopValueNumber}>
-                                {loopValues.iterations}
-                              </span>
-                            </span>
+                            ))}
                           </span>
                         )}
                         <InstructionReferenceIcons

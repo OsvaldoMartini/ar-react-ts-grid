@@ -301,10 +301,24 @@
 
 .identityContent {
   min-width: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+}
+
+/* The name/ID column keeps its natural width so the value card hugs it;
+   long names truncate instead of pushing the card away. */
+.identityContent .identity {
+  flex: 0 1 auto;
+  max-width: 60%;
+  overflow: hidden;
+}
+
+.identityContent .identity strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .identity {
