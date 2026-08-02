@@ -15,6 +15,7 @@
 .info,
 .success,
 .warning,
+.fail,
 .error {
   align-items: stretch;
   background: #fff;
@@ -93,4 +94,5 @@
 .info { border-left-color: #2e75b6; .result header strong { color: #1d5f99; } }
 .success { border-left-color: #2f855a; .result header strong { color: #257046; } }
 .warning { border-left-color: #dd8b19; .result header strong { color: #9a5700; } }
+.fail { border-left-color: #c05621; .result header strong { color: #9c4221; } }
 .error { border-left-color: #c53030; .result header strong { color: #a61b1b; } }

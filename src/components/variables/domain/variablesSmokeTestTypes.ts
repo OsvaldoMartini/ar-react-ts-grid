@@ -51,7 +51,7 @@ export type VariablesSmokeTestPlan = {
   variableFlows: readonly VariablesExecutionVariableFlow[];
 };
 
-export type VariablesSmokeTestLogTone = 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR';
+export type VariablesSmokeTestLogTone = 'INFO' | 'SUCCESS' | 'WARNING' | 'FAIL' | 'ERROR';
 
 export type VariablesSmokeTestLogEntry = {
   id: string;

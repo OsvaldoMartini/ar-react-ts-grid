@@ -170,7 +170,7 @@ export const simulateVariablesSmokeTestStep = (
   }
   if (comparison?.status === 'FAIL') {
     return {
-      tone: 'ERROR',
+      tone: 'FAIL',
       counter: 'failed',
       message: `${position}: comparison failed (${comparison.expression}).`,
       runtimeWrites: simulatedAction.writes,
