@@ -28,6 +28,8 @@ export interface ComponentEditorVariableOption {
 
 export interface ComponentEditorStoredConfiguration {
   commandType: string;
+  conditionSource: string;
+  leftVariableId: number | null;
   operandKind: string;
   comparisonOperator: string;
   operandRawValue: string;

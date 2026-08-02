@@ -65,6 +65,20 @@ export interface SwipeCommandEditorDraft {
   count: number;
 }
 
+export type ConditionalSource = 'PREVIOUS_RESULT' | 'VARIABLE_COMPARISON';
+
+export interface ConditionalCommandEditorDraft {
+  kind: 'CONDITIONAL';
+  conditionType: 'IF' | 'ELSEIF';
+  conditionSource: ConditionalSource;
+  leftVariableId: number | null;
+  operator: ComparisonOperator;
+  operandKind: ComparisonOperandKind;
+  operandRawValue: string;
+  operandVariableId: number | null;
+  formatPolicy: string;
+}
+
 export interface LegacyCommandEditorDraft {
   kind: 'LEGACY';
   operation: string;
@@ -79,6 +93,7 @@ export type CommandEditorConfiguration =
   | ExcelWriteCommandEditorDraft
   | GotoCommandEditorDraft
   | SwipeCommandEditorDraft
+  | ConditionalCommandEditorDraft
   | LegacyCommandEditorDraft;
 
 export interface CommandEditorBaseDraft {
@@ -158,6 +173,29 @@ const legacyExcelOutputKey = (operation: string): string => {
   return value.replace(/^[$#]/, '').trim() || 'ExcelWrite';
 };
 
+const conditionalConfiguration = (
+  conditionType: 'IF' | 'ELSEIF',
+  stored: ComponentEditorStoredConfiguration | null | undefined,
+): ConditionalCommandEditorDraft => {
+  const conditionSource: ConditionalSource = stored?.conditionSource === 'VARIABLE_COMPARISON'
+    ? 'VARIABLE_COMPARISON'
+    : 'PREVIOUS_RESULT';
+  const operandKind = (['LITERAL', 'VARIABLE', 'EMPTY', 'VOID'].includes(stored?.operandKind || '')
+    ? stored?.operandKind
+    : 'LITERAL') as ComparisonOperandKind;
+  return {
+    kind: 'CONDITIONAL',
+    conditionType,
+    conditionSource,
+    leftVariableId: stored?.leftVariableId ?? null,
+    operator: comparisonOperator(stored?.comparisonOperator || '='),
+    operandKind,
+    operandRawValue: stored?.operandRawValue || '',
+    operandVariableId: stored?.operandVariableId ?? null,
+    formatPolicy: stored?.formatPolicy || 'EXACT_TEXT',
+  };
+};
+
 export const commandEditorConfiguration = (
   actionValue: string,
   operation: string,
@@ -201,6 +239,9 @@ export const commandEditorConfiguration = (
       count: boundedPositiveInteger(operation, 1),
     };
   }
+  if (action === 'IF' || action === 'ELSEIF') {
+    return conditionalConfiguration(action, storedConfiguration);
+  }
   return { kind: 'LEGACY', operation };
 };
 
@@ -243,6 +284,15 @@ const isConfigurationValid = (configuration: CommandEditorConfiguration): boolea
   }
   if (configuration.kind === 'GOTO' || configuration.kind === 'SWIPE') {
     return isPositiveEditorInteger(configuration.count);
+  }
+  if (configuration.kind === 'CONDITIONAL') {
+    if (configuration.conditionSource === 'PREVIOUS_RESULT') return true;
+    if (configuration.leftVariableId === null || configuration.leftVariableId <= 0) return false;
+    return configuration.operandKind === 'VARIABLE'
+      ? configuration.operandVariableId !== null && configuration.operandVariableId > 0
+      : configuration.operandKind === 'LITERAL'
+        ? true
+        : configuration.operandRawValue.length === 0;
   }
   return true;
 };

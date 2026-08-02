@@ -11,14 +11,16 @@ const EDITABLE_COMMANDS = new Set([
   'SWIPE_UP',
   'SWIPE_DOWN',
   'E',
+  'IF',
+  'ELSEIF',
 ]);
 
 /**
  * Commands exposed by the Variables green edit button.
  *
  * Relationship-only commands such as GET and SET intentionally remain in the
- * reconnect workflow. IF/ELSEIF join this set only after their typed condition
- * contract is implemented.
+ * reconnect workflow. ELSE and ENDIF remain structural and are never edited
+ * through this modal.
  */
 export const isVariablesCommandEditorEligible = (
   action: string | null | undefined,

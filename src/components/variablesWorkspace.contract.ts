@@ -80,6 +80,8 @@ export interface VariableInstructionNode {
 
 export interface VariableCommandConfiguration {
   commandType: string;
+  conditionSource: string;
+  leftVariableId: number | null;
   operandKind: string;
   comparisonOperator: string;
   operandRawValue: string;
@@ -524,6 +526,8 @@ const normalizeInstruction = (value: unknown): VariableInstructionNode | null =>
     blockActive: typeof candidate.blockActive === 'boolean' ? candidate.blockActive : null,
     commandConfiguration: storedConfiguration ? {
       commandType: textValue(storedConfiguration.commandType),
+      conditionSource: textValue(storedConfiguration.conditionSource),
+      leftVariableId: positiveInteger(storedConfiguration.leftVariableId),
       operandKind: textValue(storedConfiguration.operandKind),
       comparisonOperator: textValue(storedConfiguration.comparisonOperator),
       operandRawValue: textValue(storedConfiguration.operandRawValue),

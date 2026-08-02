@@ -21,6 +21,7 @@ import ExternalCheckCommandEditor from './editors/ExternalCheckCommandEditor';
 import ExcelWriteCommandEditor from './editors/ExcelWriteCommandEditor';
 import GotoCommandEditor from './editors/GotoCommandEditor';
 import SwipeCommandEditor from './editors/SwipeCommandEditor';
+import ConditionalCommandEditor from './editors/ConditionalCommandEditor';
 import type {
   CommandEditorMutationAction,
   CommandEditorMutationIntent,
@@ -205,6 +206,15 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
                         onChange={(configuration) => setDraft(current => ({ ...current, configuration }))}
                       />
                     )
+                  : draft.configuration.kind === 'CONDITIONAL'
+                    ? (
+                        <ConditionalCommandEditor
+                          value={draft.configuration}
+                          variables={variables}
+                          disabled={pending}
+                          onChange={(configuration) => setDraft(current => ({ ...current, configuration }))}
+                        />
+                      )
         : null;
 
   const placement = commandEditorPlacementFromValue(
