@@ -6,6 +6,11 @@ import type {
 
 export type VariablesSmokeTestStatus = 'IDLE' | 'RUNNING' | 'COMPLETED' | 'STOPPED';
 
+export type VariablesSmokeTestRuntimeValue = {
+  state: 'VALUE' | 'VOID';
+  value: string;
+};
+
 export type VariablesSmokeTestStep = {
   key: string;
   instructionId: number | null;

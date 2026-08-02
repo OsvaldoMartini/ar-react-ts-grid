@@ -5,7 +5,6 @@ import { buildVariablesSmokeTestPlan } from './domain/variablesSmokeTestPlan';
 import {
   simulateVariablesSmokeTestStep,
   variablesSmokeTestBlockKey,
-  type VariablesSmokeTestRuntimeValue,
 } from './domain/variablesSmokeTestSimulation';
 import type {
   VariablesSmokeTestBlock,
@@ -13,6 +12,7 @@ import type {
   VariablesSmokeTestLogEntry,
   VariablesSmokeTestPlan,
   VariablesSmokeTestPosition,
+  VariablesSmokeTestRuntimeValue,
   VariablesSmokeTestStatus,
   VariablesSmokeTestStep,
 } from './domain/variablesSmokeTestTypes';

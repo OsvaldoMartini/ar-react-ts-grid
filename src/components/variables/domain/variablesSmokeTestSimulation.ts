@@ -2,9 +2,10 @@ import type {
   VariablesSmokeTestBlock,
   VariablesSmokeTestCounters,
   VariablesSmokeTestLogTone,
+  VariablesSmokeTestRuntimeValue,
   VariablesSmokeTestStep,
 } from './variablesSmokeTestTypes';
-import { evaluateVariablesSmokeComparison } from './variablesSmokeTestComparison';
+import { evaluateCheckValueSmokeStep } from '../smoke-test/check-value/checkValueSmokeService';
 
 export const variablesSmokeTestBlockKey = (
   block: Pick<VariablesSmokeTestBlock, 'blockId' | 'blockOrder' | 'blockName'>,
@@ -17,11 +18,6 @@ export type VariablesSmokeTestStepResult = {
   counter: VariablesSmokeTestCounter;
   message: string;
   runtimeWrites: readonly VariablesSmokeTestRuntimeWrite[];
-};
-
-export type VariablesSmokeTestRuntimeValue = {
-  state: 'VALUE' | 'VOID';
-  value: string;
 };
 
 export type VariablesSmokeTestRuntimeWrite = {
@@ -163,7 +159,7 @@ export const simulateVariablesSmokeTestStep = (
     };
   }
 
-  const comparison = evaluateVariablesSmokeComparison(step, runtimeValues);
+  const comparison = evaluateCheckValueSmokeStep(step, runtimeValues);
   if (comparison?.status === 'WARNING') {
     return {
       tone: 'WARNING',
