@@ -1397,6 +1397,7 @@ const VariablesPage: React.FC<Props> = ({
         active: editingCommandNode.active,
         parentId: editingCommandNode.parentId,
         parentBlockId: editingCommandNode.parentBlockId,
+        variableId: editingCommandNode.variableId,
         storedConfiguration: editingCommandNode.commandConfiguration ?? null,
       };
   const editorCommands: ComponentEditorCommand[] = snapshot?.commands.flatMap(command =>
@@ -1413,6 +1414,7 @@ const VariablesPage: React.FC<Props> = ({
       active: command.active,
       parentId: command.parentId,
       parentBlockId: command.parentBlockId,
+      variableId: command.variableId,
       storedConfiguration: command.commandConfiguration ?? null,
     }]) ?? [];
   const editorScopeLabel = editingCommand

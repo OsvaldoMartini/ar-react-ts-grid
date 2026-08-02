@@ -19,6 +19,7 @@ export interface ComponentEditorCommand {
   active: boolean | null;
   parentId: number | null;
   parentBlockId: number | null;
+  variableId?: number | null;
   storedConfiguration?: ComponentEditorStoredConfiguration | null;
 }
 

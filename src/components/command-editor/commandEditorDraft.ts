@@ -28,6 +28,7 @@ export type ComparisonOperator = '=' | '!=' | '>' | '<' | '>=' | '<='
 
 export interface CheckValueCommandEditorDraft {
   kind: 'CHECK_VALUE';
+  leftVariableId: number | null;
   operator: ComparisonOperator;
   operandKind: ComparisonOperandKind;
   operandRawValue: string;
@@ -38,6 +39,7 @@ export interface CheckValueCommandEditorDraft {
 export interface ExternalCheckCommandEditorDraft {
   kind: 'EXTERNAL_CHECK';
   checkType: 'CSV CHECK' | 'PDF CHECK';
+  leftVariableId: number | null;
   operator: ComparisonOperator;
   operandKind: ComparisonOperandKind;
   operandRawValue: string;
@@ -136,24 +138,14 @@ const comparisonConfiguration = (
   operation: string,
   stored: ComponentEditorStoredConfiguration | null | undefined,
   checkType: 'CK' | 'CSV CHECK' | 'PDF CHECK',
+  primaryVariableId: number | null,
 ): CheckValueCommandEditorDraft | ExternalCheckCommandEditorDraft => {
   const parts = operation.split(':');
-  const hasStored = stored != null;
-  const legacyOperand = parts.slice(2).join(':');
-  const legacyOperandKind: ComparisonOperandKind = legacyOperand === '$EMPTY'
-    || legacyOperand === '#EMPTY'
-    ? 'EMPTY'
-    : legacyOperand === 'VOID'
-      ? 'VOID'
-      : 'LITERAL';
   const base = {
-    operator: comparisonOperator(hasStored ? stored.comparisonOperator : parts[1] || '='),
-    operandKind: (['LITERAL', 'VARIABLE', 'EMPTY', 'VOID'].includes(stored?.operandKind || '')
-      ? stored?.operandKind
-      : legacyOperandKind) as ComparisonOperandKind,
-    operandRawValue: hasStored || legacyOperandKind !== 'LITERAL'
-      ? stored?.operandRawValue || ''
-      : legacyOperand,
+    leftVariableId: stored?.leftVariableId ?? primaryVariableId,
+    operator: comparisonOperator(stored?.comparisonOperator || parts[1] || '='),
+    operandKind: 'VARIABLE' as const,
+    operandRawValue: '',
     operandVariableId: stored?.operandVariableId ?? null,
     formatPolicy: stored?.formatPolicy || 'EXACT_TEXT',
   };
@@ -201,6 +193,7 @@ export const commandEditorConfiguration = (
   operation: string,
   onHoldSeconds: number | null,
   storedConfiguration?: ComponentEditorStoredConfiguration | null,
+  primaryVariableId: number | null = null,
 ): CommandEditorConfiguration => {
   const action = canonicalInstructionAction(actionValue);
   if (action === 'LOOP') return loopConfiguration('LOOP', operation);
@@ -214,10 +207,10 @@ export const commandEditorConfiguration = (
     };
   }
   if (action === 'CK') {
-    return comparisonConfiguration(operation, storedConfiguration, 'CK');
+    return comparisonConfiguration(operation, storedConfiguration, 'CK', primaryVariableId);
   }
   if (action === 'CSV CHECK' || action === 'PDF CHECK') {
-    return comparisonConfiguration(operation, storedConfiguration, action);
+    return comparisonConfiguration(operation, storedConfiguration, action, primaryVariableId);
   }
   if (action === 'E') {
     const stored = storedConfiguration;
@@ -256,6 +249,7 @@ export const commandEditorBaseDraft = (
     command.operation,
     command.onHoldSeconds,
     command.storedConfiguration,
+    command.variableId ?? null,
   ),
 });
 
@@ -271,13 +265,11 @@ const isConfigurationValid = (configuration: CommandEditorConfiguration): boolea
     return isPositiveEditorInteger(configuration.waitSeconds);
   }
   if (configuration.kind === 'CHECK_VALUE' || configuration.kind === 'EXTERNAL_CHECK') {
-    const operandValid = configuration.operandKind === 'VARIABLE'
-      ? configuration.operandVariableId !== null && configuration.operandVariableId > 0
-      : configuration.operandKind === 'LITERAL'
-        ? true
-        : configuration.operandRawValue.length === 0;
-    return operandValid && (configuration.kind !== 'EXTERNAL_CHECK'
-      || configuration.externalSourceKey.trim().length > 0);
+    return configuration.leftVariableId !== null
+      && configuration.leftVariableId > 0
+      && configuration.operandKind === 'VARIABLE'
+      && configuration.operandVariableId !== null
+      && configuration.operandVariableId > 0;
   }
   if (configuration.kind === 'EXCEL_WRITE') {
     return configuration.outputKey.trim().length > 0;

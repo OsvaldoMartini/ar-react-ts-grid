@@ -167,6 +167,7 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
         command.operation,
         command.onHoldSeconds,
         command.storedConfiguration,
+        command.variableId ?? null,
       ),
     });
   }, [
@@ -177,6 +178,7 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
     command.onHoldSeconds,
     command.operation,
     command.storedConfiguration,
+    command.variableId,
   ]);
 
   const configurationEditor = draft.configuration.kind === 'LOOP'

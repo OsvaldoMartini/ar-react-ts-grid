@@ -20,6 +20,10 @@ export const comparisonOperators: readonly ComparisonOperator[] = [
   'isEmpty', 'isNotEmpty',
 ];
 
+export const binaryComparisonOperators: readonly ComparisonOperator[] =
+  comparisonOperators.filter(operator => operator !== 'isEmpty' && operator !== 'isNotEmpty');
+
+/** Shared by conditional editors; variable-only Check forms do not render this catalog. */
 export const operandKinds: readonly ComparisonOperandKind[] = [
   'LITERAL', 'VARIABLE', 'EMPTY', 'VOID',
 ];
@@ -40,56 +44,46 @@ const CheckValueCommandEditor: React.FC<CheckValueCommandEditorProps> = ({
     <section className={styles.editor} aria-label="CheckValue configuration">
       <header>
         <span>CheckValue configuration</span>
-        <small>Compare the connected runtime variable without changing its relationship.</small>
+        <small>Compare the first runtime variable with the second runtime variable.</small>
       </header>
       <div className={styles.fields}>
+        <div className={styles.wide}>
+          <SearchBox
+            label="First variable"
+            placeholder="Search first variable name or ID..."
+            options={variableOptions}
+            value={value.leftVariableId == null ? null : String(value.leftVariableId)}
+            onChange={(selected) => onChange({
+              ...value,
+              leftVariableId: selected == null ? null : Number(selected),
+            })}
+            disabled={disabled}
+          />
+        </div>
         <label>
           <span>Operator</span>
           <select disabled={disabled} value={value.operator} onChange={(event) => onChange({
             ...value,
             operator: event.target.value as ComparisonOperator,
           })}>
-            {comparisonOperators.map(operator => <option key={operator} value={operator}>{operator}</option>)}
+            {binaryComparisonOperators.map(operator => <option key={operator} value={operator}>{operator}</option>)}
           </select>
         </label>
-        <label>
-          <span>Expected operand</span>
-          <select disabled={disabled} value={value.operandKind} onChange={(event) => {
-            const operandKind = event.target.value as ComparisonOperandKind;
-            onChange({
+        <div className={styles.wide}>
+          <SearchBox
+            label="Second variable"
+            placeholder="Search second variable name or ID..."
+            options={variableOptions}
+            value={value.operandVariableId == null ? null : String(value.operandVariableId)}
+            onChange={(selected) => onChange({
               ...value,
-              operandKind,
-              operandRawValue: operandKind === 'LITERAL' ? value.operandRawValue : '',
-              operandVariableId: operandKind === 'VARIABLE' ? value.operandVariableId : null,
-            });
-          }}>
-            {operandKinds.map(kind => <option key={kind} value={kind}>{kind}</option>)}
-          </select>
-        </label>
-        {value.operandKind === 'LITERAL' && (
-          <label className={styles.wide}>
-            <span>Exact comparison text</span>
-            <input disabled={disabled} type="text" value={value.operandRawValue} onChange={(event) => onChange({
-              ...value,
-              operandRawValue: event.target.value,
-            })} />
-          </label>
-        )}
-        {value.operandKind === 'VARIABLE' && (
-          <div className={styles.wide}>
-            <SearchBox
-              label="Comparison variable"
-              placeholder="Search variable name or ID..."
-              options={variableOptions}
-              value={value.operandVariableId == null ? null : String(value.operandVariableId)}
-              onChange={(selected) => onChange({
-                ...value,
-                operandVariableId: selected == null ? null : Number(selected),
-              })}
-              disabled={disabled}
-            />
-          </div>
-        )}
+              operandKind: 'VARIABLE',
+              operandRawValue: '',
+              operandVariableId: selected == null ? null : Number(selected),
+            })}
+            disabled={disabled}
+          />
+        </div>
         <label className={styles.wide}>
           <span>Format policy</span>
           <select disabled={disabled} value={value.formatPolicy} onChange={(event) => onChange({

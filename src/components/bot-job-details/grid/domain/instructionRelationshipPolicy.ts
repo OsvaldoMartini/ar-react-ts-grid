@@ -87,19 +87,19 @@ const POLICIES: Record<string, InstructionActionPolicy> = {
   CK: policy('CK', {
     role: 'VARIABLE_COMMAND',
     variableSemantics: 'RUNTIME_CONSUMER',
-    requirements: ['ELEMENT_TARGET', 'VARIABLE_BINDING', 'VARIABLE_ORDER'],
+    requirements: ['VARIABLE_BINDING', 'VARIABLE_ORDER'],
     allowedVariableTypes: VARIABLE_TYPES,
   }),
   'PDF CHECK': policy('PDF CHECK', {
     role: 'VARIABLE_COMMAND',
     variableSemantics: 'OUTPUT_VALIDATION',
-    requirements: ['ELEMENT_TARGET', 'VARIABLE_BINDING'],
+    requirements: ['VARIABLE_BINDING'],
     allowedVariableTypes: VARIABLE_TYPES,
   }),
   'CSV CHECK': policy('CSV CHECK', {
     role: 'VARIABLE_COMMAND',
     variableSemantics: 'OUTPUT_VALIDATION',
-    requirements: ['ELEMENT_TARGET', 'VARIABLE_BINDING'],
+    requirements: ['VARIABLE_BINDING'],
     allowedVariableTypes: VARIABLE_TYPES,
   }),
   IF: policy('IF', {
