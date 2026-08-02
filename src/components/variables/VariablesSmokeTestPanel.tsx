@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { FlaskConical, Octagon, Play, ShieldCheck } from 'lucide-react';
 import type { VariablesExecutionFlowReview } from './domain/variablesExecutionFlowReview';
 import { buildVariablesSmokeTestPlan } from './domain/variablesSmokeTestPlan';
 import {
   simulateVariablesSmokeTestStep,
   variablesSmokeTestBlockKey,
+  type VariablesSmokeTestRuntimeValue,
 } from './domain/variablesSmokeTestSimulation';
 import type {
   VariablesSmokeTestBlock,
@@ -22,6 +23,8 @@ import styles from './VariablesSmokeTestPanel.module.scss';
 export interface VariablesSmokeTestPanelProps {
   review: VariablesExecutionFlowReview;
   selectedBlockIds: readonly number[];
+  runtimeWriteAvailable?: boolean;
+  onCommitRuntimeValue?: (variableId: number, value: string) => boolean;
   onActivePositionChange?: (position: VariablesSmokeTestPosition | null) => void;
 }
 
@@ -73,6 +76,8 @@ const executionItemsFor = (plan: VariablesSmokeTestPlan): readonly SmokeExecutio
 const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   review,
   selectedBlockIds,
+  runtimeWriteAvailable = false,
+  onCommitRuntimeValue,
   onActivePositionChange,
 }) => {
   const [status, setStatus] = useState<VariablesSmokeTestStatus>('IDLE');
@@ -82,7 +87,9 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   const [itemCursor, setItemCursor] = useState(0);
   const [processedCommands, setProcessedCommands] = useState(0);
   const [stepIntervalMs, setStepIntervalMs] = useState(100);
+  const [writeRuntimeValues, setWriteRuntimeValues] = useState(false);
   const [reportCounter, setReportCounter] = useState<keyof VariablesSmokeTestCounters | null>(null);
+  const runtimeValuesRef = useRef<Map<number, VariablesSmokeTestRuntimeValue>>(new Map());
   const previewPlan = useMemo(
     () => buildVariablesSmokeTestPlan(review, selectedBlockIds),
     [review, selectedBlockIds],
@@ -95,6 +102,13 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   const run = () => {
     const nextPlan = buildVariablesSmokeTestPlan(review, selectedBlockIds);
     const nextItems = executionItemsFor(nextPlan);
+    runtimeValuesRef.current = new Map(nextPlan.variableFlows.map(flow => [
+      flow.variableId,
+      {
+        state: flow.runtimeState,
+        value: flow.runtimeRawValue,
+      },
+    ]));
     setPlan(nextPlan);
     setItemCursor(0);
     setProcessedCommands(0);
@@ -159,10 +173,35 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
         setCounters(current => ({ ...current, bypassed: current.bypassed + skipped }));
         setProcessedCommands(current => current + skipped);
       } else {
-        const result = simulateVariablesSmokeTestStep(item.step, processedCommands + 1);
+        const result = simulateVariablesSmokeTestStep(
+          item.step,
+          processedCommands + 1,
+          runtimeValuesRef.current,
+        );
+        const refusedRuntimeWrites: string[] = [];
+        result.runtimeWrites.forEach((write) => {
+          runtimeValuesRef.current.set(write.variableId, {
+            state: 'VALUE',
+            value: write.value,
+          });
+          if (
+            writeRuntimeValues
+            && (!runtimeWriteAvailable
+              || !onCommitRuntimeValue
+              || !onCommitRuntimeValue(write.variableId, write.value))
+          ) {
+            refusedRuntimeWrites.push(write.variableName);
+          }
+        });
         setEntries(current => [
           ...current,
           logEntry(result.tone, result.message, result.counter),
+          ...(refusedRuntimeWrites.length > 0
+            ? [logEntry(
+                'WARNING',
+                `Smoke value write-through is waiting or unavailable for ${refusedRuntimeWrites.join(', ')}. The local simulation continued.`,
+              )]
+            : []),
         ]);
         setCounters(current => ({
           ...current,
@@ -178,10 +217,13 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     executionItems,
     itemCursor,
     onActivePositionChange,
+    onCommitRuntimeValue,
     plan,
     processedCommands,
+    runtimeWriteAvailable,
     status,
     stepIntervalMs,
+    writeRuntimeValues,
   ]);
 
   useEffect(() => () => onActivePositionChange?.(null), [onActivePositionChange]);
@@ -226,6 +268,22 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
           </select>
+        </label>
+        <label
+          className={styles.runtimeToggle}
+          title={writeRuntimeValues
+            ? 'ON: generated Smoke values are saved to connected runtime variables and broadcast to open Variables pages.'
+            : 'OFF: generated Smoke values remain inside this simulation and do not change saved runtime values.'}
+        >
+          <input
+            type="checkbox"
+            checked={writeRuntimeValues}
+            disabled={!runtimeWriteAvailable}
+            onChange={event => setWriteRuntimeValues(event.target.checked)}
+          />
+          <span aria-hidden="true"><i /></span>
+          <b>{writeRuntimeValues ? 'ON' : 'OFF'}</b>
+          <small>Update values</small>
         </label>
         <button
           type="button"

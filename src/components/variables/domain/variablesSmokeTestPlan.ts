@@ -23,6 +23,7 @@ const frozenStep = (
   step: VariablesSmokeTestStep,
 ): VariablesSmokeTestStep => Object.freeze({
   ...step,
+  variables: Object.freeze(step.variables.map(variable => Object.freeze({ ...variable }))),
   connections: Object.freeze(step.connections.map(frozenConnection)),
 });
 

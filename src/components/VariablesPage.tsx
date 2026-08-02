@@ -2926,6 +2926,8 @@ const VariablesPage: React.FC<Props> = ({
             scopeLabel={executionFlowReview.scopeLabel}
             blockFilters={sharedBlockFilters}
             onBlockFiltersChange={setSharedBlockFilters}
+            runtimeWriteAvailable={connected}
+            onCommitRuntimeValue={updateRuntimeValue}
             onClose={closeExecutionFlowReviewModal}
           />
         )}

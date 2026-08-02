@@ -23,6 +23,15 @@ export type VariablesExecutionFlowConnection = {
   targetLabel: string | null;
 };
 
+export type VariablesExecutionStepVariable = {
+  slot: 'PRIMARY' | 'SECONDARY';
+  variableId: number | null;
+  variableName: string;
+  runtimeState: 'VALUE' | 'VOID';
+  runtimeRawValue: string;
+  displayValue: string;
+};
+
 export type VariablesExecutionFlowStep = {
   key: string;
   instructionId: number | null;
@@ -34,6 +43,7 @@ export type VariablesExecutionFlowStep = {
   blockOrder: number | null;
   instructionOrder: number | null;
   active: boolean;
+  variables: readonly VariablesExecutionStepVariable[];
   connections: readonly VariablesExecutionFlowConnection[];
 };
 
@@ -137,6 +147,13 @@ export const buildVariablesExecutionFlowReview = (
   const blocksById = new Map(snapshot.blocks.map(block => [block.id, block]));
   const variablesById = new Map(snapshot.variables.map(variable =>
     [variable.id, variable] as const));
+  const runtimeByVariableId = new Map(snapshot.runtimeMemory.variables.map(entry =>
+    [entry.variableId, entry] as const));
+  const relationshipOwner = Object.freeze({
+    workspaceKind: 'BOT_JOB' as const,
+    homeBankingId: snapshot.botJob.homeBankingId,
+    botJobId: snapshot.botJob.id,
+  });
   const targetLabel = (target: RelationshipTarget): string => {
     if (target.entity === 'INSTRUCTION') {
       const command = commandsById.get(target.id);
@@ -207,10 +224,121 @@ export const buildVariablesExecutionFlowReview = (
     assignedConnectionIds.add(connection.id);
   });
 
+  const variableIdsForCommand = (
+    command: VariableWorkspaceSnapshot['commands'][number],
+    action: string,
+  ): readonly (number | null)[] => {
+    const configured = command.commandConfiguration;
+    const configuredLeftVariableId = configured?.leftVariableId ?? null;
+    const configuredOperandVariableId = configured?.operandVariableId ?? null;
+    const primary = positiveInteger(configuredLeftVariableId)
+      ? configuredLeftVariableId
+      : positiveInteger(command.variableId)
+        ? command.variableId
+        : null;
+    if (action === 'CK' || action === 'CSV CHECK' || action === 'PDF CHECK') {
+      return Object.freeze([
+        primary,
+        positiveInteger(configuredOperandVariableId)
+          ? configuredOperandVariableId
+          : null,
+      ]);
+    }
+    return ['GET', 'SET', 'E'].includes(action)
+      ? Object.freeze([primary])
+      : Object.freeze([]);
+  };
+
+  const stepVariable = (
+    variableId: number | null,
+    index: number,
+  ): VariablesExecutionStepVariable => {
+    const variable = variableId === null ? null : variablesById.get(variableId) ?? null;
+    const runtime = variableId === null ? null : runtimeByVariableId.get(variableId) ?? null;
+    const runtimeState = runtime?.state ?? 'VOID';
+    const runtimeRawValue = runtimeState === 'VALUE' ? runtime?.value ?? '' : '';
+    return Object.freeze({
+      slot: index === 0 ? 'PRIMARY' : 'SECONDARY',
+      variableId,
+      variableName: variable?.name ?? (variableId === null
+        ? 'Variable not connected'
+        : `Variable ${variableId}`),
+      runtimeState,
+      runtimeRawValue,
+      displayValue: runtimeState === 'VOID'
+        ? 'VOID'
+        : runtimeRawValue === ''
+          ? 'EMPTY'
+          : runtimeRawValue,
+    });
+  };
+
+  const variableConnection = (
+    command: VariableWorkspaceSnapshot['commands'][number],
+    variableId: number | null,
+    index: number,
+    existing: VariablesExecutionFlowConnection | null,
+  ): VariablesExecutionFlowConnection => {
+    if (existing !== null) return existing;
+    const sourceId = positiveInteger(command.id) ? command.id : 0;
+    const target = variableId === null ? null : Object.freeze({
+      entity: 'VARIABLE' as const,
+      owner: relationshipOwner,
+      id: variableId,
+    });
+    return frozenConnection({
+      id: `REVIEW:VARIABLE_BINDING:${sourceId}:${index}:${variableId ?? 'NONE'}`,
+      kind: 'VARIABLE_BINDING',
+      state: variableId === null ? 'RECONNECT_VARIABLE' : 'CONNECTED',
+      code: variableId === null ? 'MISSING_VARIABLE_BINDING' : null,
+      required: true,
+      source: {
+        entity: 'INSTRUCTION',
+        owner: relationshipOwner,
+        id: sourceId,
+      },
+      target,
+      sourceLabel: positiveInteger(command.id)
+        ? targetLabel({ entity: 'INSTRUCTION', owner: relationshipOwner, id: command.id })
+        : command.name || command.command || 'Unnamed command',
+      targetLabel: target === null ? null : targetLabel(target),
+    });
+  };
+
   const steps = snapshot.commands.map((command, index) => {
     const block = command.blockId === null
       ? null
       : blocksById.get(command.blockId) ?? null;
+    const action = canonicalInstructionAction(command.command);
+    const variableIds = variableIdsForCommand(command, action);
+    const originalConnections = positiveInteger(command.id)
+      ? [...(instructionConnections.get(command.id) ?? [])]
+      : [];
+    const variableBindings = originalConnections.filter(connection =>
+      connection.kind === 'VARIABLE_BINDING');
+    const variableConnections = variableIds.map((variableId, variableIndex) => {
+      const existing = variableBindings.find(connection =>
+        variableId === null
+          ? connection.target === null
+          : connection.target?.entity === 'VARIABLE'
+            && connection.target.id === variableId) ?? null;
+      return variableConnection(command, variableId, variableIndex, existing);
+    });
+    const presentationConnections = variableIds.length === 0
+      ? originalConnections
+      : [
+          ...originalConnections.filter(connection => {
+            if (connection.kind === 'VARIABLE_BINDING') return false;
+            if (connection.kind === 'VARIABLE_ORDER') return false;
+            if (action === 'E' && connection.kind === 'ELEMENT_TARGET') return false;
+            if (
+              (action === 'CK' || action === 'CSV CHECK' || action === 'PDF CHECK')
+              && connection.kind === 'ELEMENT_TARGET'
+            ) return false;
+            return true;
+          }),
+          ...variableConnections,
+        ];
     return Object.freeze({
       key: positiveInteger(command.id)
         ? `INSTRUCTION:${command.id}`
@@ -218,7 +346,7 @@ export const buildVariablesExecutionFlowReview = (
       instructionId: positiveInteger(command.id) ? command.id : null,
       instructionName: command.name || command.command || 'Unnamed command',
       action: command.command || 'UNKNOWN',
-      operation: canonicalInstructionAction(command.command) === 'GET'
+      operation: variableIds.length > 0
         ? ''
         : command.operation,
       blockId: command.blockId,
@@ -230,11 +358,8 @@ export const buildVariablesExecutionFlowReview = (
       blockOrder: command.blockOrder ?? block?.order ?? null,
       instructionOrder: command.instructionOrder,
       active: command.active !== false && command.blockActive !== false,
-      connections: Object.freeze(
-        positiveInteger(command.id)
-          ? [...(instructionConnections.get(command.id) ?? [])]
-          : [],
-      ),
+      variables: Object.freeze(variableIds.map(stepVariable)),
+      connections: Object.freeze(presentationConnections),
     });
   }).sort(compareSteps);
 

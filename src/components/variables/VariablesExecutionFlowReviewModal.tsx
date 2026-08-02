@@ -27,6 +27,8 @@ export interface VariablesExecutionFlowReviewModalProps {
   scopeLabel: string;
   blockFilters?: readonly number[];
   onBlockFiltersChange?: (blockIds: number[]) => void;
+  runtimeWriteAvailable?: boolean;
+  onCommitRuntimeValue?: (variableId: number, value: string) => boolean;
   returnFocusElement?: HTMLElement | null;
   onClose: () => void;
 }
@@ -56,6 +58,8 @@ const VariablesExecutionFlowReviewModal: React.FC<
   scopeLabel,
   blockFilters: controlledBlockFilters,
   onBlockFiltersChange,
+  runtimeWriteAvailable = false,
+  onCommitRuntimeValue,
   returnFocusElement = null,
   onClose,
 }) => {
@@ -444,6 +448,15 @@ const VariablesExecutionFlowReviewModal: React.FC<
                               {step.operation}
                             </code>
                           )}
+                          {step.variables.map(variable => (
+                            <code
+                              className={styles.operation}
+                              key={`${step.key}:${variable.slot}:${variable.variableId ?? 'NONE'}`}
+                              title={`${variable.variableName}: ${variable.displayValue}`}
+                            >
+                              {variable.variableName}: {variable.displayValue}
+                            </code>
+                          ))}
                         </div>
                         <div className={styles.connections}>
                           {step.connections.map(connection => (
@@ -537,6 +550,8 @@ const VariablesExecutionFlowReviewModal: React.FC<
           <VariablesSmokeTestPanel
             review={review}
             selectedBlockIds={selectedBlockIds}
+            runtimeWriteAvailable={runtimeWriteAvailable}
+            onCommitRuntimeValue={onCommitRuntimeValue}
             onActivePositionChange={setActiveSmokePosition}
           />
         </div>

@@ -1,5 +1,6 @@
 import type {
   VariablesExecutionFlowConnection,
+  VariablesExecutionStepVariable,
   VariablesExecutionVariableFlow,
 } from './variablesExecutionFlowReview';
 
@@ -16,6 +17,7 @@ export type VariablesSmokeTestStep = {
   blockOrder: number | null;
   instructionOrder: number | null;
   active: boolean;
+  variables: readonly VariablesExecutionStepVariable[];
   connections: readonly VariablesExecutionFlowConnection[];
 };
 
