@@ -17,6 +17,8 @@ export type VariablesSmokeTestStep = {
   blockOrder: number | null;
   instructionOrder: number | null;
   active: boolean;
+  comparisonOperator: string | null;
+  comparisonFormatPolicy: string;
   variables: readonly VariablesExecutionStepVariable[];
   connections: readonly VariablesExecutionFlowConnection[];
 };

@@ -43,6 +43,8 @@ export type VariablesExecutionFlowStep = {
   blockOrder: number | null;
   instructionOrder: number | null;
   active: boolean;
+  comparisonOperator: string | null;
+  comparisonFormatPolicy: string;
   variables: readonly VariablesExecutionStepVariable[];
   connections: readonly VariablesExecutionFlowConnection[];
 };
@@ -358,6 +360,11 @@ export const buildVariablesExecutionFlowReview = (
       blockOrder: command.blockOrder ?? block?.order ?? null,
       instructionOrder: command.instructionOrder,
       active: command.active !== false && command.blockActive !== false,
+      comparisonOperator: variableIds.length > 1
+        ? command.commandConfiguration?.comparisonOperator?.trim() || null
+        : null,
+      comparisonFormatPolicy:
+        command.commandConfiguration?.formatPolicy?.trim() || 'EXACT_TEXT',
       variables: Object.freeze(variableIds.map(stepVariable)),
       connections: Object.freeze(presentationConnections),
     });

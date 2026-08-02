@@ -4,6 +4,7 @@ import type {
   VariablesSmokeTestLogTone,
   VariablesSmokeTestStep,
 } from './variablesSmokeTestTypes';
+import { evaluateVariablesSmokeComparison } from './variablesSmokeTestComparison';
 
 export const variablesSmokeTestBlockKey = (
   block: Pick<VariablesSmokeTestBlock, 'blockId' | 'blockOrder' | 'blockName'>,
@@ -158,6 +159,32 @@ export const simulateVariablesSmokeTestStep = (
       tone: 'WARNING',
       counter: 'warning',
       message: `${position}: ${simulatedAction.message}; continued with ${unresolved.length} unresolved required connection(s).`,
+      runtimeWrites: simulatedAction.writes,
+    };
+  }
+
+  const comparison = evaluateVariablesSmokeComparison(step, runtimeValues);
+  if (comparison?.status === 'WARNING') {
+    return {
+      tone: 'WARNING',
+      counter: 'warning',
+      message: `${position}: comparison could not be evaluated (${comparison.expression}); ${comparison.reason}.`,
+      runtimeWrites: simulatedAction.writes,
+    };
+  }
+  if (comparison?.status === 'FAIL') {
+    return {
+      tone: 'ERROR',
+      counter: 'failed',
+      message: `${position}: comparison failed (${comparison.expression}).`,
+      runtimeWrites: simulatedAction.writes,
+    };
+  }
+  if (comparison?.status === 'PASS') {
+    return {
+      tone: 'SUCCESS',
+      counter: 'passed',
+      message: `${position}: comparison passed (${comparison.expression}).`,
       runtimeWrites: simulatedAction.writes,
     };
   }
