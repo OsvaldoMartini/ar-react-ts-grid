@@ -17,6 +17,8 @@ export interface ComponentEditorCommand {
   blockOrder: number | null;
   blockName: string;
   active: boolean | null;
+  parentId: number | null;
+  parentBlockId: number | null;
   storedConfiguration?: ComponentEditorStoredConfiguration | null;
 }
 

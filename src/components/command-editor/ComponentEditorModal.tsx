@@ -22,6 +22,12 @@ import ExcelWriteCommandEditor from './editors/ExcelWriteCommandEditor';
 import GotoCommandEditor from './editors/GotoCommandEditor';
 import SwipeCommandEditor from './editors/SwipeCommandEditor';
 import ConditionalCommandEditor from './editors/ConditionalCommandEditor';
+import CommandEditorRelationshipWarningModal from './CommandEditorRelationshipWarningModal';
+import {
+  commandEditorRelationshipImpact,
+  hasCommandEditorRelationshipImpact,
+  type CommandEditorRelationshipImpact,
+} from './commandEditorRelationshipImpact';
 import type {
   CommandEditorMutationAction,
   CommandEditorMutationIntent,
@@ -80,6 +86,10 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
   const [targetBlockId, setTargetBlockId] = useState(initialTargetBlockId);
   const [placementValue, setPlacementValue] = useState('KEEP');
   const [draft, setDraft] = useState(() => commandEditorBaseDraft(command));
+  const [relationshipWarning, setRelationshipWarning] = useState<{
+    impact: CommandEditorRelationshipImpact;
+    intent: CommandEditorMutationIntent;
+  } | null>(null);
   const returnFocusRef = useRef<HTMLElement | null>(
     returnFocusElement
     ?? (typeof document !== 'undefined'
@@ -110,6 +120,7 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
     const nextTargetBlockId = command.blockId ?? 0;
     setTargetBlockId(nextTargetBlockId);
     setPlacementValue('KEEP');
+    setRelationshipWarning(null);
     setDraft({
       name: command.instructionName,
       action: command.action,
@@ -233,13 +244,30 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
     const submittedPlacement = action === 'COPY_NEW' && placement.kind === 'KEEP'
       ? { kind: 'AFTER_INSTRUCTION' as const, instructionId: command.instructionId }
       : placement;
-    onSubmit({
+    const intent: CommandEditorMutationIntent = {
       action,
       sourceInstructionId: command.instructionId,
       targetBlockId,
       placement: submittedPlacement,
       draft: { ...draft, name: draft.name.trim() },
-    });
+      allowRelationshipDisconnect: false,
+    };
+    if (action === 'UPDATE') {
+      const impact = commandEditorRelationshipImpact(
+        command,
+        targetBlockId,
+        submittedPlacement,
+        commands,
+      );
+      if (hasCommandEditorRelationshipImpact(impact)) {
+        setRelationshipWarning({
+          impact,
+          intent: { ...intent, allowRelationshipDisconnect: true },
+        });
+        return;
+      }
+    }
+    onSubmit(intent);
   };
 
   useEffect(() => {
@@ -407,6 +435,17 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
           </button>
         </footer>
       </section>
+      {relationshipWarning && (
+        <CommandEditorRelationshipWarningModal
+          impact={relationshipWarning.impact}
+          onCancel={() => setRelationshipWarning(null)}
+          onContinue={() => {
+            const intent = relationshipWarning.intent;
+            setRelationshipWarning(null);
+            onSubmit?.(intent);
+          }}
+        />
+      )}
     </div>
   );
 };

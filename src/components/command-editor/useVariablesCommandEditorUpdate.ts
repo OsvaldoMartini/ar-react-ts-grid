@@ -148,6 +148,7 @@ export const useVariablesCommandEditorUpdate = ({
               ? intent.placement.instructionId
               : null,
           },
+          allowRelationshipDisconnect: intent.allowRelationshipDisconnect,
           configuration,
         }),
       }));

@@ -9,4 +9,5 @@ export interface CommandEditorMutationIntent {
   targetBlockId: number;
   placement: CommandEditorPlacement;
   draft: CommandEditorBaseDraft;
+  allowRelationshipDisconnect: boolean;
 }
