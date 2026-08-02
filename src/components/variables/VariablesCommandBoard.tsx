@@ -628,6 +628,16 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                 ) {
                   commandValueRows = [{ label: 'R:', value: rowOperation }];
                   commandValuesTitle = `Swipe ${rowOperation} time(s)`;
+                } else if (
+                  rowCanonicalAction === 'H'
+                  && typeof instruction.onHoldSeconds === 'number'
+                  && instruction.onHoldSeconds > 0
+                ) {
+                  commandValueRows = [
+                    { label: 'S:', value: String(instruction.onHoldSeconds) },
+                  ];
+                  commandValuesTitle =
+                    `Wait ${instruction.onHoldSeconds} second(s)`;
                 }
                 const edges = instructionId === null
                   ? []
