@@ -503,7 +503,11 @@ const normalizeInstruction = (value: unknown): VariableInstructionNode | null =>
     id,
     name: name || 'Unknown instruction',
     command: command || 'UNKNOWN',
-    operation: textValue(candidate.operation, candidate.value, candidate.configuredValue),
+    // GET is authored by parentId + variableId. Never normalize its historical
+    // "Web Field:$Variable" operation into active client state.
+    operation: canonicalInstructionAction(command) === 'GET'
+      ? ''
+      : textValue(candidate.operation, candidate.value, candidate.configuredValue),
     onHoldSeconds: positiveInteger(candidate.onHoldSeconds, candidate.on_hold_seconds),
     blockId: positiveInteger(candidate.blockId, candidate.sourceBlockId),
     blockName: textValue(candidate.blockName, candidate.sourceBlockName),

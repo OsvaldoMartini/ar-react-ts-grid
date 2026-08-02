@@ -6,6 +6,9 @@ import type {
 import type {
   VariableWorkspaceSnapshot,
 } from '../../variablesWorkspace.contract';
+import {
+  canonicalInstructionAction,
+} from '../../bot-job-details/grid/domain/instructionRelationshipPolicy';
 import { variablesReconnectGraph } from './variablesReconnectMutation';
 
 export type VariablesExecutionFlowConnection = {
@@ -215,7 +218,9 @@ export const buildVariablesExecutionFlowReview = (
       instructionId: positiveInteger(command.id) ? command.id : null,
       instructionName: command.name || command.command || 'Unnamed command',
       action: command.command || 'UNKNOWN',
-      operation: command.operation,
+      operation: canonicalInstructionAction(command.command) === 'GET'
+        ? ''
+        : command.operation,
       blockId: command.blockId,
       blockName: command.blockName
         || block?.name

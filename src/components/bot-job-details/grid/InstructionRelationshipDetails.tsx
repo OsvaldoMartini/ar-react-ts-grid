@@ -95,7 +95,10 @@ const renderOperationContent = (
   allInstructions: readonly BlockLoopInstructionLoadDTO[],
   workspaceBlocks: readonly WorkspaceBlock[],
 ): React.ReactNode => {
-  const validActions = ['SET', 'GET'];
+  // GET is relationship-authored: its Web Element and runtime Variable are
+  // rendered by the connection chips. The historical operation text is not
+  // execution authority and must not be projected into the grid.
+  const validActions = ['SET'];
 
   if (
     (

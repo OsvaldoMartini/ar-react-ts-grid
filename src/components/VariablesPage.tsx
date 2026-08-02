@@ -22,7 +22,10 @@ import type {
   RelationshipTarget,
 } from './bot-job-details/grid/domain/instructionRelationshipGraph';
 import { instructionCommandPresentation } from './bot-job-details/grid/domain/instructionCommandPresentation';
-import { instructionRelationshipPolicy } from './bot-job-details/grid/domain/instructionRelationshipPolicy';
+import {
+  canonicalInstructionAction,
+  instructionRelationshipPolicy,
+} from './bot-job-details/grid/domain/instructionRelationshipPolicy';
 import SearchBox, { type SearchBoxOption } from './SearchBox';
 import { useWebSocket } from './useWebSocket';
 import {
@@ -615,11 +618,12 @@ const InstructionCard: React.FC<{
     </div>
     <strong>{instruction.name || 'Unnamed instruction'}</strong>
     <span className={styles.location}>{instructionLocation(instruction)}</span>
-    {instruction.operation && (
+    {canonicalInstructionAction(instruction.command) !== 'GET'
+      && instruction.operation && (
       <code className={styles.operation} title={instruction.operation}>
         {instruction.operation}
       </code>
-    )}
+      )}
     {(instruction.active === false || instruction.blockActive === false) && (
       <span className={styles.inactivePill}>Inactive in execution</span>
     )}
