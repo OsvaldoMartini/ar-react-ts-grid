@@ -830,24 +830,6 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                         />
                       </div>
                       <div className={styles.relationships}>
-                        {instructionId !== null && (
-                          <button
-                            type="button"
-                            className={styles.deleteCommandButton}
-                            aria-label={`Delete command ${instruction.name || instruction.command} ID ${instructionId}`}
-                            title="Delete only this command"
-                            draggable={false}
-                            disabled={disabled || !onDeleteCommand}
-                            onMouseDown={event => event.stopPropagation()}
-                            onDragStart={event => event.preventDefault()}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              onDeleteCommand?.(instruction);
-                            }}
-                          >
-                            <X size={15} aria-hidden="true" />
-                          </button>
-                        )}
                         {editCommandEvent && (
                           <span
                             className={styles.quickReconnectRuleCard}
@@ -1112,6 +1094,24 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                           )}
                         {inactive && (
                           <span className={styles.inactiveBadge}>Inactive</span>
+                        )}
+                        {instructionId !== null && (
+                          <button
+                            type="button"
+                            className={styles.deleteCommandButton}
+                            aria-label={`Delete command ${instruction.name || instruction.command} ID ${instructionId}`}
+                            title="Delete only this command"
+                            draggable={false}
+                            disabled={disabled || !onDeleteCommand}
+                            onMouseDown={event => event.stopPropagation()}
+                            onDragStart={event => event.preventDefault()}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onDeleteCommand?.(instruction);
+                            }}
+                          >
+                            <X size={15} aria-hidden="true" />
+                          </button>
                         )}
                       </div>
                     </article>
