@@ -37,12 +37,12 @@ const frozenVariableFlow = (
 
 export const buildVariablesSmokeTestPlan = (
   review: VariablesExecutionFlowReview,
-  blockFilter: number | null,
+  selectedBlockIds: readonly number[],
   createdAt = new Date(),
 ): VariablesSmokeTestPlan => {
-  const selectedBlocks = blockFilter === null
-    ? review.blocks
-    : review.blocks.filter(block => block.blockId === blockFilter);
+  const selectedBlockIdSet = new Set(selectedBlockIds);
+  const selectedBlocks = review.blocks.filter(block =>
+    block.blockId !== null && selectedBlockIdSet.has(block.blockId));
   const blocks: readonly VariablesSmokeTestBlock[] = Object.freeze(
     selectedBlocks.map(block => {
       const steps = Object.freeze(block.steps.map(step => frozenStep({ ...step })));
@@ -56,12 +56,13 @@ export const buildVariablesSmokeTestPlan = (
     }),
   );
   const steps = Object.freeze(blocks.flatMap(block => block.steps));
-  const selectedBlock = blockFilter === null
-    ? null
-    : blocks.find(block => block.blockId === blockFilter) ?? null;
-  const scopeLabel = selectedBlock === null
-    ? `All Blocks · ${steps.length} command${steps.length === 1 ? '' : 's'}`
-    : `Block #${selectedBlock.blockOrder ?? selectedBlock.blockId} ${selectedBlock.blockName} · ${steps.length} command${steps.length === 1 ? '' : 's'}`;
+  const allSelectableBlockCount = review.blocks.filter(block => block.blockId !== null).length;
+  const selectedBlock = blocks.length === 1 ? blocks[0] : null;
+  const scopeLabel = blocks.length === allSelectableBlockCount && allSelectableBlockCount > 0
+    ? `All Blocks - ${steps.length} command${steps.length === 1 ? '' : 's'}`
+    : selectedBlock !== null
+      ? `Block #${selectedBlock.blockOrder ?? selectedBlock.blockId} ${selectedBlock.blockName} - ${steps.length} command${steps.length === 1 ? '' : 's'}`
+      : `${blocks.length} selected Blocks - ${steps.length} command${steps.length === 1 ? '' : 's'}`;
   const timestamp = createdAt.toISOString();
 
   return Object.freeze({
@@ -72,11 +73,10 @@ export const buildVariablesSmokeTestPlan = (
     botJobName: review.botJobName,
     graphRevision: review.graphRevision,
     runtimeMemoryRevision: review.runtimeMemoryRevision,
-    blockFilter,
+    selectedBlockIds: Object.freeze([...selectedBlockIds]),
     scopeLabel,
     blocks,
     steps,
     variableFlows: Object.freeze(review.variableFlows.map(frozenVariableFlow)),
   });
 };
-

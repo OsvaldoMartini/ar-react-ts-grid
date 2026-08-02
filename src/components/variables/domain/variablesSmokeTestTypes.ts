@@ -35,7 +35,7 @@ export type VariablesSmokeTestPlan = {
   botJobName: string;
   graphRevision: string;
   runtimeMemoryRevision: number;
-  blockFilter: number | null;
+  selectedBlockIds: readonly number[];
   scopeLabel: string;
   blocks: readonly VariablesSmokeTestBlock[];
   steps: readonly VariablesSmokeTestStep[];
