@@ -168,11 +168,14 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
   );
   const submit = (action: CommandEditorMutationAction) => {
     if (!canSubmit || !placement || !onSubmit || !enabledActions.includes(action)) return;
+    const submittedPlacement = action === 'COPY_NEW' && placement.kind === 'KEEP'
+      ? { kind: 'AFTER_INSTRUCTION' as const, instructionId: command.instructionId }
+      : placement;
     onSubmit({
       action,
       sourceInstructionId: command.instructionId,
       targetBlockId,
-      placement,
+      placement: submittedPlacement,
       draft: { ...draft, name: draft.name.trim() },
     });
   };

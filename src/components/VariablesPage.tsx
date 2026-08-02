@@ -60,6 +60,10 @@ import {
   type VariablesCommandUpdateResult,
 } from './command-editor/useVariablesCommandEditorUpdate';
 import {
+  useVariablesCommandEditorCopy,
+  type VariablesCommandCopyResult,
+} from './command-editor/useVariablesCommandEditorCopy';
+import {
   buildVariablesBatchResolveMutation,
   planVariablesBatchRelease,
   planVariablesBatchResolve,
@@ -1003,11 +1007,36 @@ const VariablesPage: React.FC<Props> = ({
     onResult: handleCommandUpdateResult,
   });
 
+  const handleCommandCopyResult = useCallback((
+    result: VariablesCommandCopyResult,
+  ) => {
+    setStatus({
+      level: result.ok ? 'ok' : 'error',
+      text: result.message || (result.ok
+        ? `Command copied as instruction ID ${result.createdInstructionId ?? 'new'}.`
+        : 'The command copy was refused.'),
+    });
+    if (result.ok) sendWorkspaceRequest('variablesWorkspace.refresh');
+  }, [sendWorkspaceRequest]);
+
+  const {
+    pendingRequestId: pendingCommandCopyRequestId,
+    submit: submitCommandCopy,
+    handleMessage: handleCommandCopyMessage,
+    resetPending: resetCommandCopy,
+  } = useVariablesCommandEditorCopy({
+    webSocket,
+    connected,
+    snapshot,
+    onResult: handleCommandCopyResult,
+  });
+
   const resetOwnerScopedUi = useCallback(() => {
     clearPendingRequest();
     resetGraphMutation();
     resetInstructionCopy();
     resetCommandUpdate();
+    resetCommandCopy();
     resetVariableCreate();
     resetVariableDelete();
     resetRuntimeMemory();
@@ -1028,6 +1057,7 @@ const VariablesPage: React.FC<Props> = ({
     closeExecutionFlowReview,
     resetGraphMutation,
     resetInstructionCopy,
+    resetCommandCopy,
     resetCommandUpdate,
     resetRuntimeMemory,
     resetVariableCreate,
@@ -1057,6 +1087,7 @@ const VariablesPage: React.FC<Props> = ({
     processedMessagesRef.current = messages.length;
 
     pending.forEach(raw => {
+      if (handleCommandCopyMessage(raw)) return;
       if (handleCommandUpdateMessage(raw)) return;
       if (handleInstructionCopyMessage(raw)) return;
       if (handleVariableCreateMessage(raw)) return;
@@ -1139,6 +1170,7 @@ const VariablesPage: React.FC<Props> = ({
   }, [
     clearPendingRequest,
     handleGraphMutationMessage,
+    handleCommandCopyMessage,
     handleCommandUpdateMessage,
     handleInstructionCopyMessage,
     handleRuntimeMemoryMessage,
@@ -2674,15 +2706,28 @@ const VariablesPage: React.FC<Props> = ({
             }))}
             connectionCount={relationshipGraph?.edges.length ?? 0}
             diagnosticCount={snapshot.diagnostics.length}
-            pending={pendingCommandUpdateRequestId !== null}
-            enabledActions={['UPDATE']}
+            pending={
+              pendingCommandUpdateRequestId !== null
+              || pendingCommandCopyRequestId !== null
+            }
+            enabledActions={['UPDATE', 'COPY_NEW']}
             onSubmit={(intent) => {
-              if (submitCommandUpdate(intent)) {
-                setStatus({ level: 'warn', text: 'Updating command...' });
+              const requestId = intent.action === 'COPY_NEW'
+                ? submitCommandCopy(intent)
+                : submitCommandUpdate(intent);
+              if (requestId) {
+                setStatus({
+                  level: 'warn',
+                  text: intent.action === 'COPY_NEW'
+                    ? 'Copying command...'
+                    : 'Updating command...',
+                });
               } else {
                 setStatus({
                   level: 'error',
-                  text: 'The command update could not be started.',
+                  text: intent.action === 'COPY_NEW'
+                    ? 'The command copy could not be started.'
+                    : 'The command update could not be started.',
                 });
               }
             }}
