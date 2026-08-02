@@ -273,6 +273,12 @@
   border: 1px solid #bdd0e2;
   border-radius: 8px;
   overflow: hidden;
+  transition: border-color 80ms ease, box-shadow 80ms ease;
+}
+
+.smokeActiveBlock {
+  border-color: #f08a00;
+  box-shadow: 0 0 0 2px rgba(255, 136, 0, 0.2), 0 0 16px rgba(255, 136, 0, 0.38);
 }
 
 .blockHeader {

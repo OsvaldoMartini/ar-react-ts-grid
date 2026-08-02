@@ -2,23 +2,41 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { FlaskConical, Octagon, Play, ShieldCheck } from 'lucide-react';
 import type { VariablesExecutionFlowReview } from './domain/variablesExecutionFlowReview';
 import { buildVariablesSmokeTestPlan } from './domain/variablesSmokeTestPlan';
-import { simulateVariablesSmokeTestStep } from './domain/variablesSmokeTestSimulation';
+import {
+  simulateVariablesSmokeTestStep,
+  variablesSmokeTestBlockKey,
+} from './domain/variablesSmokeTestSimulation';
 import type {
+  VariablesSmokeTestBlock,
   VariablesSmokeTestCounters,
   VariablesSmokeTestLogEntry,
   VariablesSmokeTestPlan,
+  VariablesSmokeTestPosition,
   VariablesSmokeTestStatus,
+  VariablesSmokeTestStep,
 } from './domain/variablesSmokeTestTypes';
 import VariablesSmokeTestLog from './VariablesSmokeTestLog';
+import VariablesSmokeTestReportModal from './VariablesSmokeTestReportModal';
 import styles from './VariablesSmokeTestPanel.module.scss';
 
 export interface VariablesSmokeTestPanelProps {
   review: VariablesExecutionFlowReview;
   blockFilter: number | null;
-  onActiveStepChange?: (stepKey: string | null) => void;
+  onActivePositionChange?: (position: VariablesSmokeTestPosition | null) => void;
 }
 
-const STEP_INTERVAL_MS = 100;
+type SmokeExecutionItem =
+  | { kind: 'INACTIVE_BLOCK'; block: VariablesSmokeTestBlock }
+  | { kind: 'STEP'; block: VariablesSmokeTestBlock; step: VariablesSmokeTestStep };
+
+const SPEED_OPTIONS = [
+  { value: 0, label: '0 ms' },
+  { value: 50, label: '50 ms' },
+  { value: 100, label: '100 ms' },
+  { value: 1000, label: '1 second' },
+  { value: 5000, label: '5 seconds' },
+  { value: 10000, label: '10 seconds' },
+] as const;
 
 const EMPTY_COUNTERS: VariablesSmokeTestCounters = Object.freeze({
   passed: 0,
@@ -30,36 +48,60 @@ const EMPTY_COUNTERS: VariablesSmokeTestCounters = Object.freeze({
 const logEntry = (
   tone: VariablesSmokeTestLogEntry['tone'],
   message: string,
+  counter: VariablesSmokeTestLogEntry['counter'] = null,
   now = new Date(),
 ): VariablesSmokeTestLogEntry => ({
   id: `${now.getTime()}:${tone}:${message}`,
   timestamp: now.toISOString(),
   tone,
+  counter,
   message,
 });
+
+const executionItemsFor = (plan: VariablesSmokeTestPlan): readonly SmokeExecutionItem[] => {
+  const items: SmokeExecutionItem[] = [];
+  plan.blocks.forEach((block) => {
+    if (!block.active) {
+      items.push({ kind: 'INACTIVE_BLOCK', block });
+      return;
+    }
+    block.steps.forEach(step => items.push({ kind: 'STEP', block, step }));
+  });
+  return items;
+};
 
 const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   review,
   blockFilter,
-  onActiveStepChange,
+  onActivePositionChange,
 }) => {
   const [status, setStatus] = useState<VariablesSmokeTestStatus>('IDLE');
   const [plan, setPlan] = useState<VariablesSmokeTestPlan | null>(null);
   const [entries, setEntries] = useState<readonly VariablesSmokeTestLogEntry[]>([]);
   const [counters, setCounters] = useState<VariablesSmokeTestCounters>(EMPTY_COUNTERS);
-  const [cursor, setCursor] = useState(0);
+  const [itemCursor, setItemCursor] = useState(0);
+  const [processedCommands, setProcessedCommands] = useState(0);
+  const [stepIntervalMs, setStepIntervalMs] = useState(100);
+  const [reportCounter, setReportCounter] = useState<keyof VariablesSmokeTestCounters | null>(null);
   const previewPlan = useMemo(
     () => buildVariablesSmokeTestPlan(review, blockFilter),
     [blockFilter, review],
   );
+  const executionItems = useMemo(
+    () => plan === null ? [] : executionItemsFor(plan),
+    [plan],
+  );
 
   const run = () => {
     const nextPlan = buildVariablesSmokeTestPlan(review, blockFilter);
+    const nextItems = executionItemsFor(nextPlan);
     setPlan(nextPlan);
-    setCursor(0);
+    setItemCursor(0);
+    setProcessedCommands(0);
     setCounters(EMPTY_COUNTERS);
-    onActiveStepChange?.(null);
-    setStatus(nextPlan.steps.length === 0 ? 'COMPLETED' : 'RUNNING');
+    setReportCounter(null);
+    onActivePositionChange?.(null);
+    setStatus(nextItems.length === 0 ? 'COMPLETED' : 'RUNNING');
     setEntries([
       logEntry(
         'SUCCESS',
@@ -67,9 +109,9 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
       ),
       logEntry(
         'INFO',
-        nextPlan.steps.length === 0
-          ? 'The selected scope contains no commands to simulate.'
-          : `Frozen graph revision ${nextPlan.graphRevision || 'unavailable'}; running one command every ${STEP_INTERVAL_MS} ms.`,
+        nextItems.length === 0
+          ? 'The selected scope contains no Blocks or commands to simulate.'
+          : `Frozen graph revision ${nextPlan.graphRevision || 'unavailable'}; speed ${stepIntervalMs} ms.`,
       ),
     ]);
   };
@@ -77,18 +119,18 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   const stop = () => {
     if (status !== 'RUNNING') return;
     setStatus('STOPPED');
-    onActiveStepChange?.(null);
+    onActivePositionChange?.(null);
     setEntries(current => [
       ...current,
-      logEntry('WARNING', `Smoke Test stopped after ${cursor} of ${plan?.steps.length ?? 0} command(s).`),
+      logEntry('WARNING', `Smoke Test stopped after ${processedCommands} of ${plan?.steps.length ?? 0} command(s).`),
     ]);
   };
 
   useEffect(() => {
     if (status !== 'RUNNING' || plan === null) return undefined;
-    if (cursor >= plan.steps.length) {
+    if (itemCursor >= executionItems.length) {
       setStatus('COMPLETED');
-      onActiveStepChange?.(null);
+      onActivePositionChange?.(null);
       setEntries(current => [
         ...current,
         logEntry('SUCCESS', `Smoke Test completed all ${plan.steps.length} command(s).`),
@@ -96,33 +138,63 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
       return undefined;
     }
 
-    const step = plan.steps[cursor];
-    onActiveStepChange?.(step.key);
+    const item = executionItems[itemCursor];
+    const blockKey = variablesSmokeTestBlockKey(item.block);
+    onActivePositionChange?.({
+      blockKey,
+      stepKey: item.kind === 'STEP' ? item.step.key : null,
+    });
+
     const timer = window.setTimeout(() => {
-      const result = simulateVariablesSmokeTestStep(step, cursor + 1);
-      setEntries(current => [...current, logEntry(result.tone, result.message)]);
-      setCounters(current => ({
-        ...current,
-        [result.counter]: current[result.counter] + 1,
-      }));
-      setCursor(current => current + 1);
-    }, STEP_INTERVAL_MS);
+      if (item.kind === 'INACTIVE_BLOCK') {
+        const skipped = item.block.steps.length;
+        setEntries(current => [
+          ...current,
+          logEntry(
+            'WARNING',
+            `Block #${item.block.blockOrder ?? item.block.blockId ?? '?'} ${item.block.blockName}: BLOCK INACTIVE - skipped ${skipped} instruction(s).`,
+            'bypassed',
+          ),
+        ]);
+        setCounters(current => ({ ...current, bypassed: current.bypassed + skipped }));
+        setProcessedCommands(current => current + skipped);
+      } else {
+        const result = simulateVariablesSmokeTestStep(item.step, processedCommands + 1);
+        setEntries(current => [
+          ...current,
+          logEntry(result.tone, result.message, result.counter),
+        ]);
+        setCounters(current => ({
+          ...current,
+          [result.counter]: current[result.counter] + 1,
+        }));
+        setProcessedCommands(current => current + 1);
+      }
+      setItemCursor(current => current + 1);
+    }, stepIntervalMs);
 
     return () => window.clearTimeout(timer);
-  }, [cursor, onActiveStepChange, plan, status]);
+  }, [
+    executionItems,
+    itemCursor,
+    onActivePositionChange,
+    plan,
+    processedCommands,
+    status,
+    stepIntervalMs,
+  ]);
 
-  useEffect(() => () => onActiveStepChange?.(null), [onActiveStepChange]);
+  useEffect(() => () => onActivePositionChange?.(null), [onActivePositionChange]);
 
   const activePlan = plan ?? previewPlan;
-  const currentStep = status === 'RUNNING' && plan !== null
-    ? plan.steps[cursor] ?? null
+  const currentItem = status === 'RUNNING' ? executionItems[itemCursor] ?? null : null;
+  const currentStep = currentItem?.kind === 'STEP' ? currentItem.step : null;
+  const currentInactiveBlock = currentItem?.kind === 'INACTIVE_BLOCK'
+    ? currentItem.block
     : null;
-  const completedSteps = status === 'COMPLETED'
-    ? activePlan.steps.length
-    : cursor;
   const progress = activePlan.steps.length === 0
-    ? 0
-    : Math.round((completedSteps / activePlan.steps.length) * 100);
+    ? status === 'COMPLETED' ? 100 : 0
+    : Math.round((processedCommands / activePlan.steps.length) * 100);
 
   return (
     <aside className={styles.panel} aria-label="Smoke Tests">
@@ -138,6 +210,18 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
         <button type="button" className={styles.runButton} onClick={run}>
           <Play size={14} aria-hidden="true" /> RUN SMOKE TEST
         </button>
+        <label className={styles.speedSelector}>
+          <span>Speed</span>
+          <select
+            aria-label="Smoke Test speed"
+            value={stepIntervalMs}
+            onChange={event => setStepIntervalMs(Number(event.target.value))}
+          >
+            {SPEED_OPTIONS.map(option => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+        </label>
         <button
           type="button"
           className={styles.stopButton}
@@ -158,16 +242,20 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
         <span>Current position</span>
         <strong>{currentStep
           ? `Block #${currentStep.blockOrder ?? currentStep.blockId ?? '?'} ${currentStep.blockName}`
-          : 'Not executing'}</strong>
+          : currentInactiveBlock
+            ? `Block #${currentInactiveBlock.blockOrder ?? currentInactiveBlock.blockId ?? '?'} ${currentInactiveBlock.blockName}`
+            : 'Not executing'}</strong>
         <small>{currentStep
-          ? `#${currentStep.instructionOrder ?? '?'} ${currentStep.instructionName} · ID ${currentStep.instructionId ?? 'Missing'}`
-          : status === 'COMPLETED'
-            ? 'All visible commands were simulated.'
-            : 'Press Run Smoke Test to begin.'}</small>
+          ? `#${currentStep.instructionOrder ?? '?'} ${currentStep.instructionName} - ID ${currentStep.instructionId ?? 'Missing'}`
+          : currentInactiveBlock
+            ? `BLOCK INACTIVE - ${currentInactiveBlock.steps.length} instruction(s) will be skipped.`
+            : status === 'COMPLETED'
+              ? 'All visible commands were simulated.'
+              : 'Press Run Smoke Test to begin.'}</small>
         <div className={styles.progress} aria-label={`${progress}% completed`}>
           <span style={{ width: `${progress}%` }} />
         </div>
-        <small>{completedSteps} / {activePlan.steps.length} commands</small>
+        <small>{processedCommands} / {activePlan.steps.length} commands</small>
       </section>
 
       <section className={styles.logSection} aria-label="Smoke Test results">
@@ -176,16 +264,27 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
       </section>
 
       <section className={styles.counters} aria-label="Smoke Test counters">
-        <div><span>Passed</span><strong>{counters.passed}</strong></div>
-        <div><span>Bypassed</span><strong>{counters.bypassed}</strong></div>
-        <div><span>Warning</span><strong>{counters.warning}</strong></div>
-        <div><span>Failed</span><strong>{counters.failed}</strong></div>
+        {(Object.keys(counters) as Array<keyof VariablesSmokeTestCounters>).map(counter => (
+          <button type="button" key={counter} onClick={() => setReportCounter(counter)}>
+            <span>{counter === 'warning' ? 'Warning' : `${counter.charAt(0).toLocaleUpperCase()}${counter.slice(1)}`}</span>
+            <strong>{counters[counter]}</strong>
+          </button>
+        ))}
       </section>
 
       <footer className={styles.safety}>
         <ShieldCheck size={15} aria-hidden="true" />
         <span>No Playwright, Web page, or production execution is called.</span>
       </footer>
+
+      {reportCounter !== null && (
+        <VariablesSmokeTestReportModal
+          counter={reportCounter}
+          count={counters[reportCounter]}
+          entries={entries}
+          onClose={() => setReportCounter(null)}
+        />
+      )}
     </aside>
   );
 };

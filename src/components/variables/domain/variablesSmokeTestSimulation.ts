@@ -1,8 +1,13 @@
 import type {
+  VariablesSmokeTestBlock,
   VariablesSmokeTestCounters,
   VariablesSmokeTestLogTone,
   VariablesSmokeTestStep,
 } from './variablesSmokeTestTypes';
+
+export const variablesSmokeTestBlockKey = (
+  block: Pick<VariablesSmokeTestBlock, 'blockId' | 'blockOrder' | 'blockName'>,
+): string => `${block.blockOrder ?? 'NONE'}:${block.blockId ?? 'NONE'}:${block.blockName}`;
 
 export type VariablesSmokeTestCounter = keyof VariablesSmokeTestCounters;
 

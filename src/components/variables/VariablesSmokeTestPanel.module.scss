@@ -67,7 +67,7 @@
 .actions {
   display: grid;
   gap: 7px;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(78px, auto) auto;
 
   button {
     align-items: center;
@@ -80,6 +80,35 @@
     justify-content: center;
     min-height: 34px;
     padding: 6px 9px;
+  }
+}
+
+.speedSelector {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #9dbbd5;
+  border-radius: 6px;
+  display: grid;
+  gap: 1px;
+  min-height: 34px;
+  padding: 3px 6px;
+
+  span {
+    color: #668097;
+    font-size: 0.47rem;
+    font-weight: 900;
+    text-transform: uppercase;
+  }
+
+  select {
+    background: transparent;
+    border: 0;
+    color: #17324d;
+    cursor: pointer;
+    font-size: 0.62rem;
+    font-weight: 900;
+    min-width: 72px;
+    outline: none;
   }
 }
 
@@ -165,14 +194,22 @@
   gap: 5px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
 
-  div {
+  button {
     background: #fff;
     border: 1px solid #cfdae5;
     border-radius: 6px;
+    cursor: pointer;
     display: grid;
     gap: 2px;
     padding: 5px;
     text-align: center;
+
+    &:hover,
+    &:focus-visible {
+      border-color: #2e75b6;
+      box-shadow: 0 0 0 2px rgba(46, 117, 182, 0.14);
+      outline: none;
+    }
   }
 
   span { color: #718096; font-size: 0.48rem; font-weight: 900; text-transform: uppercase; }

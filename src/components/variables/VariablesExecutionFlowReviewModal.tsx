@@ -14,6 +14,8 @@ import type {
   VariablesExecutionFlowDiagnostic,
   VariablesExecutionFlowReview,
 } from './domain/variablesExecutionFlowReview';
+import { variablesSmokeTestBlockKey } from './domain/variablesSmokeTestSimulation';
+import type { VariablesSmokeTestPosition } from './domain/variablesSmokeTestTypes';
 import SearchBox, { type SearchBoxOption } from '../SearchBox';
 import VariablesSmokeTestPanel from './VariablesSmokeTestPanel';
 import styles from './VariablesExecutionFlowReviewModal.module.scss';
@@ -60,7 +62,8 @@ const VariablesExecutionFlowReviewModal: React.FC<
   const dialogRef = useRef<HTMLElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const smokeStepRefs = useRef(new Map<string, HTMLElement>());
-  const [activeSmokeStepKey, setActiveSmokeStepKey] = useState<string | null>(null);
+  const smokeBlockRefs = useRef(new Map<string, HTMLElement>());
+  const [activeSmokePosition, setActiveSmokePosition] = useState<VariablesSmokeTestPosition | null>(null);
   const [localBlockFilter, setLocalBlockFilter] = useState<number | null>(null);
   const blockFilter = controlledBlockFilter === undefined
     ? localBlockFilter
@@ -187,16 +190,19 @@ const VariablesExecutionFlowReviewModal: React.FC<
   }, []);
 
   useEffect(() => {
-    if (activeSmokeStepKey === null) return undefined;
+    if (activeSmokePosition === null) return undefined;
     const frame = window.requestAnimationFrame(() => {
-      smokeStepRefs.current.get(activeSmokeStepKey)?.scrollIntoView({
+      const target = activeSmokePosition.stepKey === null
+        ? smokeBlockRefs.current.get(activeSmokePosition.blockKey)
+        : smokeStepRefs.current.get(activeSmokePosition.stepKey);
+      target?.scrollIntoView({
         behavior: 'auto',
         block: 'center',
         inline: 'nearest',
       });
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [activeSmokeStepKey]);
+  }, [activeSmokePosition]);
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
     if (event.key === 'Escape') {
@@ -391,10 +397,17 @@ const VariablesExecutionFlowReviewModal: React.FC<
               </div>
             </header>
             <div className={styles.blockList}>
-              {visibleBlocks.map(block => (
+              {visibleBlocks.map(block => {
+                const smokeBlockKey = variablesSmokeTestBlockKey(block);
+                return (
                 <section
-                  className={`${styles.block} ${!block.active ? styles.inactive : ''}`}
-                  key={`${block.blockOrder ?? 'NONE'}:${block.blockId ?? 'NONE'}:${block.blockName}`}
+                  ref={(element) => {
+                    if (element === null) smokeBlockRefs.current.delete(smokeBlockKey);
+                    else smokeBlockRefs.current.set(smokeBlockKey, element);
+                  }}
+                  className={`${styles.block} ${!block.active ? styles.inactive : ''} ${activeSmokePosition?.blockKey === smokeBlockKey ? styles.smokeActiveBlock : ''}`}
+                  key={smokeBlockKey}
+                  data-smoke-active={activeSmokePosition?.blockKey === smokeBlockKey ? 'true' : 'false'}
                 >
                   <header className={styles.blockHeader}>
                     <strong>Block #{block.blockOrder ?? '?'} {block.blockName}</strong>
@@ -407,9 +420,9 @@ const VariablesExecutionFlowReviewModal: React.FC<
                           if (element === null) smokeStepRefs.current.delete(step.key);
                           else smokeStepRefs.current.set(step.key, element);
                         }}
-                        className={`${styles.step} ${!step.active ? styles.inactive : ''} ${activeSmokeStepKey === step.key ? styles.smokeActiveStep : ''}`}
+                        className={`${styles.step} ${!step.active ? styles.inactive : ''} ${activeSmokePosition?.stepKey === step.key ? styles.smokeActiveStep : ''}`}
                         key={step.key}
-                        data-smoke-active={activeSmokeStepKey === step.key ? 'true' : 'false'}
+                        data-smoke-active={activeSmokePosition?.stepKey === step.key ? 'true' : 'false'}
                       >
                         <div className={styles.stepSequence}>
                           <span>{index === 0 ? 'START' : 'NEXT'}</span>
@@ -452,7 +465,8 @@ const VariablesExecutionFlowReviewModal: React.FC<
                     )}
                   </div>
                 </section>
-              ))}
+                );
+              })}
             </div>
           </section>
 
@@ -515,7 +529,7 @@ const VariablesExecutionFlowReviewModal: React.FC<
           <VariablesSmokeTestPanel
             review={review}
             blockFilter={blockFilter}
-            onActiveStepChange={setActiveSmokeStepKey}
+            onActivePositionChange={setActiveSmokePosition}
           />
         </div>
 

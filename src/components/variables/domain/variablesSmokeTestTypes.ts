@@ -48,6 +48,7 @@ export type VariablesSmokeTestLogEntry = {
   id: string;
   timestamp: string;
   tone: VariablesSmokeTestLogTone;
+  counter: keyof VariablesSmokeTestCounters | null;
   message: string;
 };
 
@@ -56,4 +57,9 @@ export type VariablesSmokeTestCounters = {
   bypassed: number;
   warning: number;
   failed: number;
+};
+
+export type VariablesSmokeTestPosition = {
+  blockKey: string;
+  stepKey: string | null;
 };
