@@ -19,6 +19,8 @@ import WaitCommandEditor from './editors/WaitCommandEditor';
 import CheckValueCommandEditor from './editors/CheckValueCommandEditor';
 import ExternalCheckCommandEditor from './editors/ExternalCheckCommandEditor';
 import ExcelWriteCommandEditor from './editors/ExcelWriteCommandEditor';
+import GotoCommandEditor from './editors/GotoCommandEditor';
+import SwipeCommandEditor from './editors/SwipeCommandEditor';
 import type {
   CommandEditorMutationAction,
   CommandEditorMutationIntent,
@@ -187,6 +189,22 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
                     onChange={(configuration) => setDraft(current => ({ ...current, configuration }))}
                   />
                 )
+              : draft.configuration.kind === 'GOTO'
+                ? (
+                    <GotoCommandEditor
+                      value={draft.configuration}
+                      disabled={pending}
+                      onChange={(configuration) => setDraft(current => ({ ...current, configuration }))}
+                    />
+                  )
+                : draft.configuration.kind === 'SWIPE'
+                  ? (
+                      <SwipeCommandEditor
+                        value={draft.configuration}
+                        disabled={pending}
+                        onChange={(configuration) => setDraft(current => ({ ...current, configuration }))}
+                      />
+                    )
         : null;
 
   const placement = commandEditorPlacementFromValue(

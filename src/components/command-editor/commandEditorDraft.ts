@@ -54,6 +54,17 @@ export interface ExcelWriteCommandEditorDraft {
   formatPolicy: string;
 }
 
+export interface GotoCommandEditorDraft {
+  kind: 'GOTO';
+  count: number;
+}
+
+export interface SwipeCommandEditorDraft {
+  kind: 'SWIPE';
+  direction: 'SWIPE_UP' | 'SWIPE_DOWN';
+  count: number;
+}
+
 export interface LegacyCommandEditorDraft {
   kind: 'LEGACY';
   operation: string;
@@ -66,6 +77,8 @@ export type CommandEditorConfiguration =
   | CheckValueCommandEditorDraft
   | ExternalCheckCommandEditorDraft
   | ExcelWriteCommandEditorDraft
+  | GotoCommandEditorDraft
+  | SwipeCommandEditorDraft
   | LegacyCommandEditorDraft;
 
 export interface CommandEditorBaseDraft {
@@ -178,6 +191,16 @@ export const commandEditorConfiguration = (
       formatPolicy: stored ? stored.formatPolicy : 'EXACT_TEXT',
     };
   }
+  if (action === 'GOTO') {
+    return { kind: 'GOTO', count: boundedPositiveInteger(operation, 1) };
+  }
+  if (action === 'SWIPE_UP' || action === 'SWIPE_DOWN') {
+    return {
+      kind: 'SWIPE',
+      direction: action,
+      count: boundedPositiveInteger(operation, 1),
+    };
+  }
   return { kind: 'LEGACY', operation };
 };
 
@@ -217,6 +240,9 @@ const isConfigurationValid = (configuration: CommandEditorConfiguration): boolea
   }
   if (configuration.kind === 'EXCEL_WRITE') {
     return configuration.outputKey.trim().length > 0;
+  }
+  if (configuration.kind === 'GOTO' || configuration.kind === 'SWIPE') {
+    return isPositiveEditorInteger(configuration.count);
   }
   return true;
 };
