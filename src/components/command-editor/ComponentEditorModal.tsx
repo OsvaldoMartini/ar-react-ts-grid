@@ -8,6 +8,8 @@ import type {
 } from './componentEditor.types';
 import { commandEditorPlacementOptions } from './commandEditorPlacement';
 import { commandEditorPlacementFromValue } from './commandEditorPlacement';
+import { COMMAND_EDITOR_COMMAND_OPTIONS } from './commandEditorCommandOptions';
+import { canonicalInstructionAction } from '../bot-job-details/grid/domain/instructionRelationshipPolicy';
 import {
   commandEditorBaseDraft,
   commandEditorConfiguration,
@@ -85,7 +87,10 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
   const initialTargetBlockId = command.blockId ?? 0;
   const [targetBlockId, setTargetBlockId] = useState(initialTargetBlockId);
   const [placementValue, setPlacementValue] = useState('KEEP');
+  const originalCommandCode = canonicalInstructionAction(command.action);
+  const [selectedCommandCode, setSelectedCommandCode] = useState(originalCommandCode);
   const [draft, setDraft] = useState(() => commandEditorBaseDraft(command));
+  const commandChanged = selectedCommandCode !== originalCommandCode;
   const [relationshipWarning, setRelationshipWarning] = useState<{
     impact: CommandEditorRelationshipImpact;
     intent: CommandEditorMutationIntent;
@@ -107,6 +112,37 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
       : { text: 'ACTIVE', tone: 'green' as const }],
     keywords: `${block.blockId} ${block.blockOrder} ${block.blockName}`,
   })), [blocks]);
+  const commandSearchOptions = useMemo<SearchBoxOption[]>(() => {
+    const catalog = COMMAND_EDITOR_COMMAND_OPTIONS.some(
+      option => option.code === originalCommandCode,
+    )
+      ? COMMAND_EDITOR_COMMAND_OPTIONS
+      : [
+          { code: originalCommandCode, label: command.action || originalCommandCode },
+          ...COMMAND_EDITOR_COMMAND_OPTIONS,
+        ];
+    return catalog.map(option => ({
+      value: option.code,
+      label: option.label,
+      sublabel: `command code ${option.code}`,
+      badges: option.code === originalCommandCode
+        ? [{ text: 'CURRENT', tone: 'green' as const }]
+        : [],
+      keywords: `${option.code} ${option.label}`,
+    }));
+  }, [command.action, originalCommandCode]);
+  const selectCommand = (value: string | null) => {
+    if (value === null || value === selectedCommandCode) return;
+    setSelectedCommandCode(value);
+    setDraft(current => value === originalCommandCode
+      ? commandEditorBaseDraft(command)
+      : {
+          ...current,
+          action: value,
+          operation: '',
+          configuration: commandEditorConfiguration(value, '', null, null),
+        });
+  };
   const targetBlock = blocks.find(block => block.blockId === targetBlockId) ?? null;
   const targetCommandCount = commands.filter(
     candidate => candidate.blockId === targetBlockId,
@@ -121,6 +157,7 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
     setTargetBlockId(nextTargetBlockId);
     setPlacementValue('KEEP');
     setRelationshipWarning(null);
+    setSelectedCommandCode(canonicalInstructionAction(command.action));
     setDraft({
       name: command.instructionName,
       action: command.action,
@@ -235,6 +272,7 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
   const canSubmit = Boolean(
     onSubmit
     && !pending
+    && !commandChanged
     && targetBlockId > 0
     && placement
     && isCommandEditorBaseDraftValid(draft),
@@ -380,6 +418,25 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
             </select>
           </label>
 
+          <SearchBox
+            label="Command"
+            placeholder="Search command name or code..."
+            headerRight="Command catalog"
+            countLabel={count => `${count} COMMAND${count === 1 ? '' : 'S'}`}
+            options={commandSearchOptions}
+            value={selectedCommandCode}
+            onChange={selectCommand}
+          />
+
+          {commandChanged && (
+            <p className={styles.commandChangeNotice} role="status">
+              Command type change is a design preview: the editor below already
+              switches to the selected command, but UPDATE / COPY NEW for a
+              changed command will be enabled in the next step. Select the
+              CURRENT command to submit again.
+            </p>
+          )}
+
           <section className={styles.selectedCommand} aria-label="Selected command">
             <div>
               <span>Selected command</span>
@@ -389,7 +446,10 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
             </div>
             <div>
               <span>Command</span>
-              <strong>{command.action || 'Unknown'}</strong>
+              <strong>
+                {command.action || 'Unknown'}
+                {commandChanged ? ` → ${selectedCommandCode}` : ''}
+              </strong>
             </div>
             <div>
               <span>Instruction ID</span>
@@ -419,7 +479,7 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
             type="button"
             className={styles.copyButton}
             disabled={!canSubmit || !enabledActions.includes('COPY_NEW')}
-            title={onSubmit ? 'Create a disconnected copy with a new instruction ID' : 'Command persistence is not connected yet'}
+            title={commandChanged ? 'Command type change persistence arrives in the next step' : onSubmit ? 'Create a disconnected copy with a new instruction ID' : 'Command persistence is not connected yet'}
             onClick={() => submit('COPY_NEW')}
           >
             COPY NEW
@@ -428,7 +488,7 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
             type="button"
             className={styles.updateButton}
             disabled={!canSubmit || !enabledActions.includes('UPDATE')}
-            title={onSubmit ? 'Update the selected instruction' : 'Command persistence is not connected yet'}
+            title={commandChanged ? 'Command type change persistence arrives in the next step' : onSubmit ? 'Update the selected instruction' : 'Command persistence is not connected yet'}
             onClick={() => submit('UPDATE')}
           >
             UPDATE
