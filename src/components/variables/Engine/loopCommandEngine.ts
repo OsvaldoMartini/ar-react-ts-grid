@@ -69,8 +69,8 @@ export const initialLoopRemaining = (
 
 /**
  * Resolves one LOOP transition without persistence or browser access.
- * A configured count of N executes the parent-to-LOOP span N times total,
- * matching the established executeJob behavior.
+ * A configured count of N performs N complete jumps back to the parent.
+ * The initial pass before LOOP is not deducted from the configured count.
  */
 export const resolveLoopCommandTransition = (
   program: SmokeExecutionProgram,
@@ -113,30 +113,30 @@ export const resolveLoopCommandTransition = (
 
   const currentRemaining = remainingByInstructionId[instructionId]
     ?? configuration.repetitions;
-  const nextRemaining = Math.max(0, currentRemaining - 1);
-  const waitMs = Math.round(configuration.intervalSeconds * 1000);
-  if (nextRemaining > 0) {
-    const anchor = program.items[anchorCursor];
-    const anchorLabel = anchor?.kind === 'STEP'
-      ? `#${anchor.step.instructionOrder ?? '?'} ${anchor.step.instructionName} (ID ${anchorId})`
-      : `instruction ID ${anchorId}`;
+  if (currentRemaining <= 0) {
     return {
       instructionId,
-      nextCursor: anchorCursor,
-      nextRemaining,
-      waitMs,
-      message: `waited ${configuration.intervalSeconds}s; ${nextRemaining} loop(s) remaining; returning to ${anchorLabel}.`,
+      nextCursor: cursor + 1,
+      nextRemaining: 0,
+      waitMs: 0,
+      message: `all ${configuration.repetitions} configured loop repeat(s) completed; continuing.`,
       warning: null,
-      playwrightCommand: refreshLoopPlaywrightCommand(item.step),
+      playwrightCommand: null,
     };
   }
 
+  const nextRemaining = Math.max(0, currentRemaining - 1);
+  const waitMs = Math.round(configuration.intervalSeconds * 1000);
+  const anchor = program.items[anchorCursor];
+  const anchorLabel = anchor?.kind === 'STEP'
+    ? `#${anchor.step.instructionOrder ?? '?'} ${anchor.step.instructionName} (ID ${anchorId})`
+    : `instruction ID ${anchorId}`;
   return {
     instructionId,
-    nextCursor: cursor + 1,
-    nextRemaining: 0,
+    nextCursor: anchorCursor,
+    nextRemaining,
     waitMs,
-    message: `waited ${configuration.intervalSeconds}s; all ${configuration.repetitions} loop pass(es) completed; continuing.`,
+    message: `waited ${configuration.intervalSeconds}s; ${nextRemaining} loop(s) remaining; returning to ${anchorLabel}.`,
     warning: null,
     playwrightCommand: refreshLoopPlaywrightCommand(item.step),
   };
