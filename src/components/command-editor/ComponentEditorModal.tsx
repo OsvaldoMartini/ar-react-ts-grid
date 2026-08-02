@@ -4,6 +4,7 @@ import SearchBox, { type SearchBoxOption } from '../SearchBox';
 import type {
   ComponentEditorBlockOption,
   ComponentEditorCommand,
+  ComponentEditorVariableOption,
 } from './componentEditor.types';
 import { commandEditorPlacementOptions } from './commandEditorPlacement';
 import { commandEditorPlacementFromValue } from './commandEditorPlacement';
@@ -15,6 +16,9 @@ import {
 import LoopCommandEditor from './editors/LoopCommandEditor';
 import RefreshLoopCommandEditor from './editors/RefreshLoopCommandEditor';
 import WaitCommandEditor from './editors/WaitCommandEditor';
+import CheckValueCommandEditor from './editors/CheckValueCommandEditor';
+import ExternalCheckCommandEditor from './editors/ExternalCheckCommandEditor';
+import ExcelWriteCommandEditor from './editors/ExcelWriteCommandEditor';
 import type {
   CommandEditorMutationAction,
   CommandEditorMutationIntent,
@@ -30,6 +34,7 @@ export interface ComponentEditorModalProps {
   diagnosticCount: number;
   command: ComponentEditorCommand;
   commands: readonly ComponentEditorCommand[];
+  variables?: readonly ComponentEditorVariableOption[];
   returnFocusElement?: HTMLElement | null;
   children?: React.ReactNode;
   pending?: boolean;
@@ -56,6 +61,7 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
   diagnosticCount,
   command,
   commands,
+  variables = [],
   returnFocusElement = null,
   children,
   pending = false,
@@ -109,6 +115,7 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
         command.action,
         command.operation,
         command.onHoldSeconds,
+        command.storedConfiguration,
       ),
     });
   }, [
@@ -118,6 +125,7 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
     command.instructionName,
     command.onHoldSeconds,
     command.operation,
+    command.storedConfiguration,
   ]);
 
   const configurationEditor = draft.configuration.kind === 'LOOP'
@@ -153,6 +161,32 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
               }))}
             />
           )
+        : draft.configuration.kind === 'CHECK_VALUE'
+          ? (
+              <CheckValueCommandEditor
+                value={draft.configuration}
+                variables={variables}
+                disabled={pending}
+                onChange={(configuration) => setDraft(current => ({ ...current, configuration }))}
+              />
+            )
+          : draft.configuration.kind === 'EXTERNAL_CHECK'
+            ? (
+                <ExternalCheckCommandEditor
+                  value={draft.configuration}
+                  variables={variables}
+                  disabled={pending}
+                  onChange={(configuration) => setDraft(current => ({ ...current, configuration }))}
+                />
+              )
+            : draft.configuration.kind === 'EXCEL_WRITE'
+              ? (
+                  <ExcelWriteCommandEditor
+                    value={draft.configuration}
+                    disabled={pending}
+                    onChange={(configuration) => setDraft(current => ({ ...current, configuration }))}
+                  />
+                )
         : null;
 
   const placement = commandEditorPlacementFromValue(

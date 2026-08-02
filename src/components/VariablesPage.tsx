@@ -1342,6 +1342,7 @@ const VariablesPage: React.FC<Props> = ({
         blockOrder: editingCommandNode.blockOrder,
         blockName: editingCommandNode.blockName,
         active: editingCommandNode.active,
+        storedConfiguration: editingCommandNode.commandConfiguration ?? null,
       };
   const editorCommands: ComponentEditorCommand[] = snapshot?.commands.flatMap(command =>
     command.id === null ? [] : [{
@@ -1355,6 +1356,7 @@ const VariablesPage: React.FC<Props> = ({
       blockOrder: command.blockOrder,
       blockName: command.blockName,
       active: command.active,
+      storedConfiguration: command.commandConfiguration ?? null,
     }]) ?? [];
   const editorScopeLabel = editingCommand
     ? `#${editingCommand.blockOrder ?? '?'} ${editingCommand.blockName || 'Unknown Block'} · #${editingCommand.instructionOrder ?? '?'} instruction`
@@ -2774,6 +2776,11 @@ const VariablesPage: React.FC<Props> = ({
           <ComponentEditorModal
             command={editingCommand}
             commands={editorCommands}
+            variables={snapshot.variables.map(variable => ({
+              variableId: variable.id,
+              name: variable.name,
+              type: variable.type,
+            }))}
             botJobId={snapshot.botJob.id}
             botJobName={snapshot.botJob.name}
             scopeLabel={editorScopeLabel}

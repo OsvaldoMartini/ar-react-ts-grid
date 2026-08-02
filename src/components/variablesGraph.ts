@@ -60,6 +60,7 @@ interface RawCommand {
   instructionOrder: number | null;
   active: boolean | null;
   blockActive: boolean | null;
+  commandConfiguration: Raw | null;
 }
 
 interface RawVariable {
@@ -110,6 +111,7 @@ const parseRawCommand = (value: unknown): RawCommand | null => {
     instructionOrder: intOrNull(raw.instructionOrder),
     active: boolOrNull(raw.active),
     blockActive: boolOrNull(raw.blockActive),
+    commandConfiguration: asObject(raw.commandConfiguration),
   };
 };
 
@@ -178,6 +180,7 @@ const commandJson = (command: RawCommand, commandRole: string): Raw => ({
   active: command.active,
   blockActive: command.blockActive,
   effectiveActive: isEffectivelyActive(command),
+  commandConfiguration: command.commandConfiguration,
 });
 
 /**

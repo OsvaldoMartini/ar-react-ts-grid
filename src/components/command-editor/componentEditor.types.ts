@@ -17,4 +17,24 @@ export interface ComponentEditorCommand {
   blockOrder: number | null;
   blockName: string;
   active: boolean | null;
+  storedConfiguration?: ComponentEditorStoredConfiguration | null;
+}
+
+export interface ComponentEditorVariableOption {
+  variableId: number;
+  name: string;
+  type: string;
+}
+
+export interface ComponentEditorStoredConfiguration {
+  commandType: string;
+  operandKind: string;
+  comparisonOperator: string;
+  operandRawValue: string;
+  operandVariableId: number | null;
+  outputKey: string;
+  outputColumn: string;
+  outputFile: string;
+  externalSourceKey: string;
+  formatPolicy: string;
 }

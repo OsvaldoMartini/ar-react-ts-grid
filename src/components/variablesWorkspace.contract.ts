@@ -75,6 +75,20 @@ export interface VariableInstructionNode {
   tagName?: string | null;
   active: boolean | null;
   blockActive: boolean | null;
+  commandConfiguration?: VariableCommandConfiguration | null;
+}
+
+export interface VariableCommandConfiguration {
+  commandType: string;
+  operandKind: string;
+  comparisonOperator: string;
+  operandRawValue: string;
+  operandVariableId: number | null;
+  outputKey: string;
+  outputColumn: string;
+  outputFile: string;
+  externalSourceKey: string;
+  formatPolicy: string;
 }
 
 export interface VariableCommandLink extends VariableInstructionNode {
@@ -482,6 +496,7 @@ const normalizeInstruction = (value: unknown): VariableInstructionNode | null =>
   );
   const command = commandText(candidate);
   if (id === null && !name && !command) return null;
+  const storedConfiguration = asObject(candidate.commandConfiguration);
   return {
     id,
     name: name || 'Unknown instruction',
@@ -507,6 +522,18 @@ const normalizeInstruction = (value: unknown): VariableInstructionNode | null =>
     tagName: textValue(candidate.tagName, candidate.tag_name) || null,
     active: typeof candidate.active === 'boolean' ? candidate.active : null,
     blockActive: typeof candidate.blockActive === 'boolean' ? candidate.blockActive : null,
+    commandConfiguration: storedConfiguration ? {
+      commandType: textValue(storedConfiguration.commandType),
+      operandKind: textValue(storedConfiguration.operandKind),
+      comparisonOperator: textValue(storedConfiguration.comparisonOperator),
+      operandRawValue: textValue(storedConfiguration.operandRawValue),
+      operandVariableId: positiveInteger(storedConfiguration.operandVariableId),
+      outputKey: textValue(storedConfiguration.outputKey),
+      outputColumn: textValue(storedConfiguration.outputColumn),
+      outputFile: textValue(storedConfiguration.outputFile),
+      externalSourceKey: textValue(storedConfiguration.externalSourceKey),
+      formatPolicy: textValue(storedConfiguration.formatPolicy),
+    } : null,
   };
 };
 
