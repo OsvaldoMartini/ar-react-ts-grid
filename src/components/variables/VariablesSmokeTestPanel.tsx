@@ -7,17 +7,23 @@ import {
   variablesSmokeTestBlockKey,
 } from './domain/variablesSmokeTestSimulation';
 import type {
-  VariablesSmokeTestBlock,
   VariablesSmokeTestCounters,
   VariablesSmokeTestLogEntry,
   VariablesSmokeTestPlan,
   VariablesSmokeTestPosition,
   VariablesSmokeTestRuntimeValue,
   VariablesSmokeTestStatus,
-  VariablesSmokeTestStep,
 } from './domain/variablesSmokeTestTypes';
 import VariablesSmokeTestLog from './VariablesSmokeTestLog';
 import VariablesSmokeTestReportModal from './VariablesSmokeTestReportModal';
+import {
+  buildSmokeExecutionProgram,
+} from './Engine/smokeExecutionProgram';
+import {
+  initialLoopRemaining,
+  resolveLoopCommandTransition,
+  type LoopRemainingByInstructionId,
+} from './Engine/loopCommandEngine';
 import styles from './VariablesSmokeTestPanel.module.scss';
 
 export interface VariablesSmokeTestPanelProps {
@@ -26,11 +32,8 @@ export interface VariablesSmokeTestPanelProps {
   runtimeWriteAvailable?: boolean;
   onCommitRuntimeValue?: (variableId: number, value: string) => boolean;
   onActivePositionChange?: (position: VariablesSmokeTestPosition | null) => void;
+  onLoopRemainingChange?: (remaining: LoopRemainingByInstructionId) => void;
 }
-
-type SmokeExecutionItem =
-  | { kind: 'INACTIVE_BLOCK'; block: VariablesSmokeTestBlock }
-  | { kind: 'STEP'; block: VariablesSmokeTestBlock; step: VariablesSmokeTestStep };
 
 const SPEED_OPTIONS = [
   { value: 0, label: '0 ms' },
@@ -63,18 +66,6 @@ const logEntry = (
   message,
 });
 
-const executionItemsFor = (plan: VariablesSmokeTestPlan): readonly SmokeExecutionItem[] => {
-  const items: SmokeExecutionItem[] = [];
-  plan.blocks.forEach((block) => {
-    if (!block.active) {
-      items.push({ kind: 'INACTIVE_BLOCK', block });
-      return;
-    }
-    block.steps.forEach(step => items.push({ kind: 'STEP', block, step }));
-  });
-  return items;
-};
-
 const generatedSmokeValue = (
   variableType: string,
   index: number,
@@ -85,12 +76,18 @@ const generatedSmokeValue = (
     : `SMOKE_${index + 1}_${randomNumber}`;
 };
 
+const replaceSmokeStepDetail = (message: string, detail: string): string => {
+  const separator = message.indexOf(': ');
+  return separator < 0 ? detail : `${message.slice(0, separator)}: ${detail}`;
+};
+
 const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   review,
   selectedBlockIds,
   runtimeWriteAvailable = false,
   onCommitRuntimeValue,
   onActivePositionChange,
+  onLoopRemainingChange,
 }) => {
   const [status, setStatus] = useState<VariablesSmokeTestStatus>('IDLE');
   const [plan, setPlan] = useState<VariablesSmokeTestPlan | null>(null);
@@ -102,18 +99,26 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   const [writeRuntimeValues, setWriteRuntimeValues] = useState(false);
   const [reportCounter, setReportCounter] = useState<keyof VariablesSmokeTestCounters | null>(null);
   const runtimeValuesRef = useRef<Map<number, VariablesSmokeTestRuntimeValue>>(new Map());
+  const loopRemainingRef = useRef<LoopRemainingByInstructionId>({});
   const previewPlan = useMemo(
     () => buildVariablesSmokeTestPlan(review, selectedBlockIds),
     [review, selectedBlockIds],
   );
-  const executionItems = useMemo(
-    () => plan === null ? [] : executionItemsFor(plan),
+  const executionProgram = useMemo(
+    () => plan === null ? null : buildSmokeExecutionProgram(plan),
     [plan],
+  );
+  const executionItems = useMemo(
+    () => executionProgram?.items ?? [],
+    [executionProgram],
   );
 
   const run = () => {
     const nextPlan = buildVariablesSmokeTestPlan(review, selectedBlockIds);
-    const nextItems = executionItemsFor(nextPlan);
+    const nextProgram = buildSmokeExecutionProgram(nextPlan);
+    const nextLoopRemaining = initialLoopRemaining(nextProgram);
+    loopRemainingRef.current = nextLoopRemaining;
+    onLoopRemainingChange?.(nextLoopRemaining);
     runtimeValuesRef.current = new Map(nextPlan.variableFlows.map((flow, index) => {
       if (flow.runtimeState === 'VALUE') {
         return [flow.variableId, {
@@ -141,7 +146,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     setCounters(EMPTY_COUNTERS);
     setReportCounter(null);
     onActivePositionChange?.(null);
-    setStatus(nextItems.length === 0 ? 'COMPLETED' : 'RUNNING');
+    setStatus(nextProgram.items.length === 0 ? 'COMPLETED' : 'RUNNING');
     setEntries([]);
   };
 
@@ -152,7 +157,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   };
 
   useEffect(() => {
-    if (status !== 'RUNNING' || plan === null) return undefined;
+    if (status !== 'RUNNING' || plan === null || executionProgram === null) return undefined;
     if (itemCursor >= executionItems.length) {
       setStatus('COMPLETED');
       onActivePositionChange?.(null);
@@ -165,6 +170,12 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
       blockKey,
       stepKey: item.kind === 'STEP' ? item.step.key : null,
     });
+    const loopTransition = resolveLoopCommandTransition(
+      executionProgram,
+      itemCursor,
+      loopRemainingRef.current,
+    );
+    const executionDelayMs = stepIntervalMs + (loopTransition?.waitMs ?? 0);
 
     const timer = window.setTimeout(() => {
       if (item.kind === 'INACTIVE_BLOCK') {
@@ -186,8 +197,21 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
           processedCommands + 1,
           runtimeValuesRef.current,
         );
+        const loopResult = loopTransition === null
+          ? result
+          : {
+              ...result,
+              tone: loopTransition.warning === null ? result.tone : 'WARNING' as const,
+              counter: loopTransition.warning === null ? result.counter : 'warning' as const,
+              message: replaceSmokeStepDetail(
+                result.message,
+                loopTransition.warning === null
+                  ? loopTransition.message
+                  : `${loopTransition.message} ${loopTransition.warning}.`,
+              ),
+            };
         const refusedRuntimeWrites: string[] = [];
-        result.runtimeWrites.forEach((write) => {
+        loopResult.runtimeWrites.forEach((write) => {
           runtimeValuesRef.current.set(write.variableId, {
             state: 'VALUE',
             value: write.value,
@@ -205,29 +229,39 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
           ...current,
           logEntry(
             processedCommands + 1,
-            refusedRuntimeWrites.length > 0 ? 'WARNING' : result.tone,
+            refusedRuntimeWrites.length > 0 ? 'WARNING' : loopResult.tone,
             refusedRuntimeWrites.length > 0
-              ? `${result.message} Runtime write-through remained local for ${refusedRuntimeWrites.join(', ')}.`
-              : result.message,
-            refusedRuntimeWrites.length > 0 ? 'warning' : result.counter,
+              ? `${loopResult.message} Runtime write-through remained local for ${refusedRuntimeWrites.join(', ')}.`
+              : loopResult.message,
+            refusedRuntimeWrites.length > 0 ? 'warning' : loopResult.counter,
           ),
         ]);
         setCounters(current => ({
           ...current,
-          [refusedRuntimeWrites.length > 0 ? 'warning' : result.counter]:
-            current[refusedRuntimeWrites.length > 0 ? 'warning' : result.counter] + 1,
+          [refusedRuntimeWrites.length > 0 ? 'warning' : loopResult.counter]:
+            current[refusedRuntimeWrites.length > 0 ? 'warning' : loopResult.counter] + 1,
         }));
         setProcessedCommands(current => current + 1);
+        if (loopTransition !== null) {
+          const nextRemaining = Object.freeze({
+            ...loopRemainingRef.current,
+            [loopTransition.instructionId]: loopTransition.nextRemaining,
+          });
+          loopRemainingRef.current = nextRemaining;
+          onLoopRemainingChange?.(nextRemaining);
+        }
       }
-      setItemCursor(current => current + 1);
-    }, stepIntervalMs);
+      setItemCursor(loopTransition?.nextCursor ?? itemCursor + 1);
+    }, executionDelayMs);
 
     return () => window.clearTimeout(timer);
   }, [
     executionItems,
+    executionProgram,
     itemCursor,
     onActivePositionChange,
     onCommitRuntimeValue,
+    onLoopRemainingChange,
     plan,
     processedCommands,
     runtimeWriteAvailable,
@@ -236,7 +270,10 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     writeRuntimeValues,
   ]);
 
-  useEffect(() => () => onActivePositionChange?.(null), [onActivePositionChange]);
+  useEffect(() => () => {
+    onActivePositionChange?.(null);
+    onLoopRemainingChange?.({});
+  }, [onActivePositionChange, onLoopRemainingChange]);
 
   const activePlan = plan ?? previewPlan;
   const currentItem = status === 'RUNNING' ? executionItems[itemCursor] ?? null : null;
@@ -246,7 +283,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     : null;
   const progress = activePlan.steps.length === 0
     ? status === 'COMPLETED' ? 100 : 0
-    : Math.round((processedCommands / activePlan.steps.length) * 100);
+    : Math.min(100, Math.round((processedCommands / activePlan.steps.length) * 100));
 
   return (
     <aside className={styles.panel} aria-label="Smoke Tests">

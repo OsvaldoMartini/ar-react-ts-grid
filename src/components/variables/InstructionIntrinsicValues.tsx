@@ -6,6 +6,7 @@ export interface InstructionIntrinsicValuesProps {
   action: string;
   operation?: string | null;
   onHoldSeconds?: number | null;
+  loopRemaining?: number | null;
 }
 
 type IntrinsicValuePresentation = {
@@ -13,7 +14,7 @@ type IntrinsicValuePresentation = {
   title: string;
 };
 
-const presentationFor = ({
+export const instructionIntrinsicValuePresentation = ({
   action,
   operation,
   onHoldSeconds,
@@ -72,15 +73,24 @@ const presentationFor = ({
 };
 
 const InstructionIntrinsicValues: React.FC<InstructionIntrinsicValuesProps> = (props) => {
-  const presentation = presentationFor(props);
+  const presentation = instructionIntrinsicValuePresentation(props);
   if (presentation === null) return null;
+  const canonicalAction = canonicalInstructionAction(props.action);
+  const rendersLoopCountdown = canonicalAction === 'LOOP'
+    || canonicalAction === 'REFRESH_LOOP';
 
   return (
     <span className={styles.values} title={presentation.title}>
       {presentation.rows.map(row => (
         <span key={row.label} className={styles.row}>
           <span className={styles.label}>{row.label}</span>
-          <span className={styles.number}>{row.value}</span>
+          <span className={styles.number}>
+            {rendersLoopCountdown
+              && row.label === 'L:'
+              && typeof props.loopRemaining === 'number'
+                ? props.loopRemaining
+                : row.value}
+          </span>
         </span>
       ))}
     </span>

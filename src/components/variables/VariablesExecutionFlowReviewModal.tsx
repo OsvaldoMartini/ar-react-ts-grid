@@ -20,7 +20,9 @@ import BlockMultiSelectSearchBox, {
   type BlockMultiSelectOption,
 } from '../BlockMultiSelectSearchBox';
 import VariablesSmokeTestPanel from './VariablesSmokeTestPanel';
-import InstructionIntrinsicValues from './InstructionIntrinsicValues';
+import InstructionIntrinsicValues, {
+  instructionIntrinsicValuePresentation,
+} from './InstructionIntrinsicValues';
 import styles from './VariablesExecutionFlowReviewModal.module.scss';
 
 export interface VariablesExecutionFlowReviewModalProps {
@@ -71,6 +73,8 @@ const VariablesExecutionFlowReviewModal: React.FC<
   const smokeStepRefs = useRef(new Map<string, HTMLElement>());
   const smokeBlockRefs = useRef(new Map<string, HTMLElement>());
   const [activeSmokePosition, setActiveSmokePosition] = useState<VariablesSmokeTestPosition | null>(null);
+  const [loopRemainingByInstructionId, setLoopRemainingByInstructionId] =
+    useState<Readonly<Record<number, number>>>({});
   const [localSelectedBlockIds, setLocalSelectedBlockIds] = useState<number[]>(() =>
     review.blocks.flatMap(block => block.blockId === null ? [] : [block.blockId]));
   const selectedBlockIds = controlledBlockFilters === undefined
@@ -448,10 +452,13 @@ const VariablesExecutionFlowReviewModal: React.FC<
                               action={step.action}
                               operation={step.operation}
                               onHoldSeconds={step.onHoldSeconds}
+                              loopRemaining={step.instructionId === null
+                                ? null
+                                : loopRemainingByInstructionId[step.instructionId]}
                             />
                           </div>
                           <small>{step.action} · Instruction ID {step.instructionId ?? 'Missing'}</small>
-                          {step.operation && (
+                          {step.operation && instructionIntrinsicValuePresentation(step) === null && (
                             <code className={styles.operation} title={step.operation}>
                               {step.operation}
                             </code>
@@ -561,6 +568,7 @@ const VariablesExecutionFlowReviewModal: React.FC<
             runtimeWriteAvailable={runtimeWriteAvailable}
             onCommitRuntimeValue={onCommitRuntimeValue}
             onActivePositionChange={setActiveSmokePosition}
+            onLoopRemainingChange={setLoopRemainingByInstructionId}
           />
         </div>
 
