@@ -18,15 +18,33 @@ const VariablesSmokeTestLog: React.FC<VariablesSmokeTestLogProps> = ({ entries }
   <div ref={logRef} className={styles.log} role="log" aria-live="polite" aria-label="Smoke Test log">
     {entries.length === 0 ? (
       <span className={styles.empty}>Run a Smoke Test to freeze the visible execution scope.</span>
-    ) : entries.map(entry => (
-      <article className={styles[entry.tone.toLocaleLowerCase()]} key={entry.id}>
-        <time dateTime={entry.timestamp}>
-          {new Date(entry.timestamp).toLocaleTimeString()}
-        </time>
-        <strong>{entry.tone}</strong>
-        <p>{entry.message}</p>
-      </article>
-    ))}
+    ) : entries.map((entry) => {
+      const separator = entry.message.indexOf(': ');
+      const position = separator < 0
+        ? `Step ${entry.sequence}`
+        : entry.message.slice(0, separator);
+      const detail = separator < 0
+        ? entry.message
+        : entry.message.slice(separator + 2);
+      return (
+        <article className={styles[entry.tone.toLocaleLowerCase()]} key={entry.id}>
+          <div className={styles.sequence}>
+            <span>NEXT</span>
+            <b>{entry.sequence}</b>
+          </div>
+          <div className={styles.result}>
+            <header>
+              <time dateTime={entry.timestamp}>
+                {new Date(entry.timestamp).toLocaleTimeString()}
+              </time>
+              <strong>{entry.tone}</strong>
+            </header>
+            <h4>{position}</h4>
+            <p>{detail}</p>
+          </div>
+        </article>
+      );
+    })}
   </div>
   );
 };

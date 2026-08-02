@@ -49,12 +49,14 @@ const EMPTY_COUNTERS: VariablesSmokeTestCounters = Object.freeze({
 });
 
 const logEntry = (
+  sequence: number,
   tone: VariablesSmokeTestLogEntry['tone'],
   message: string,
   counter: VariablesSmokeTestLogEntry['counter'] = null,
   now = new Date(),
 ): VariablesSmokeTestLogEntry => ({
-  id: `${now.getTime()}:${tone}:${message}`,
+  id: `${sequence}:${now.getTime()}:${tone}:${message}`,
+  sequence,
   timestamp: now.toISOString(),
   tone,
   counter,
@@ -112,8 +114,6 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   const run = () => {
     const nextPlan = buildVariablesSmokeTestPlan(review, selectedBlockIds);
     const nextItems = executionItemsFor(nextPlan);
-    const initializedVariables: string[] = [];
-    const refusedInitialWrites: string[] = [];
     runtimeValuesRef.current = new Map(nextPlan.variableFlows.map((flow, index) => {
       if (flow.runtimeState === 'VALUE') {
         return [flow.variableId, {
@@ -122,14 +122,13 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
         }];
       }
       const value = generatedSmokeValue(flow.variableType, index);
-      initializedVariables.push(`${flow.variableName}=${value}`);
       if (
         writeRuntimeValues
         && (!runtimeWriteAvailable
           || !onCommitRuntimeValue
           || !onCommitRuntimeValue(flow.variableId, value))
       ) {
-        refusedInitialWrites.push(flow.variableName);
+        // The local Smoke value remains available even when durable memory is busy.
       }
       return [flow.variableId, {
         state: 'VALUE' as const,
@@ -143,40 +142,13 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     setReportCounter(null);
     onActivePositionChange?.(null);
     setStatus(nextItems.length === 0 ? 'COMPLETED' : 'RUNNING');
-    setEntries([
-      logEntry(
-        'SUCCESS',
-        `Started in-memory Smoke Test for ${nextPlan.steps.length} command(s) across ${nextPlan.blocks.length} Block(s).`,
-      ),
-      logEntry(
-        'INFO',
-        nextItems.length === 0
-          ? 'The selected scope contains no Blocks or commands to simulate.'
-          : `Frozen graph revision ${nextPlan.graphRevision || 'unavailable'}; speed ${stepIntervalMs} ms.`,
-      ),
-      logEntry(
-        initializedVariables.length > 0 ? 'SUCCESS' : 'INFO',
-        initializedVariables.length > 0
-          ? `Initialized ${initializedVariables.length} VOID runtime variable(s): ${initializedVariables.join(', ')}.`
-          : 'All runtime variables already had initial values; no Smoke value was generated.',
-      ),
-      ...(refusedInitialWrites.length > 0
-        ? [logEntry(
-            'WARNING',
-            `Smoke value write-through is waiting or unavailable for ${refusedInitialWrites.join(', ')}. Local generated values remain active for this run.`,
-          )]
-        : []),
-    ]);
+    setEntries([]);
   };
 
   const stop = () => {
     if (status !== 'RUNNING') return;
     setStatus('STOPPED');
     onActivePositionChange?.(null);
-    setEntries(current => [
-      ...current,
-      logEntry('WARNING', `Smoke Test stopped after ${processedCommands} of ${plan?.steps.length ?? 0} command(s).`),
-    ]);
   };
 
   useEffect(() => {
@@ -184,10 +156,6 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     if (itemCursor >= executionItems.length) {
       setStatus('COMPLETED');
       onActivePositionChange?.(null);
-      setEntries(current => [
-        ...current,
-        logEntry('SUCCESS', `Smoke Test completed all ${plan.steps.length} command(s).`),
-      ]);
       return undefined;
     }
 
@@ -203,11 +171,12 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
         const skipped = item.block.steps.length;
         setEntries(current => [
           ...current,
-          logEntry(
+          ...item.block.steps.map((step, index) => logEntry(
+            processedCommands + index + 1,
             'WARNING',
-            `Block #${item.block.blockOrder ?? item.block.blockId ?? '?'} ${item.block.blockName}: BLOCK INACTIVE - skipped ${skipped} instruction(s).`,
+            `Block #${item.block.blockOrder ?? item.block.blockId ?? '?'} ${item.block.blockName} - #${step.instructionOrder ?? '?'} ${step.instructionName}: bypassed because the Block is inactive.`,
             'bypassed',
-          ),
+          )),
         ]);
         setCounters(current => ({ ...current, bypassed: current.bypassed + skipped }));
         setProcessedCommands(current => current + skipped);
@@ -234,17 +203,19 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
         });
         setEntries(current => [
           ...current,
-          logEntry(result.tone, result.message, result.counter),
-          ...(refusedRuntimeWrites.length > 0
-            ? [logEntry(
-                'WARNING',
-                `Smoke value write-through is waiting or unavailable for ${refusedRuntimeWrites.join(', ')}. The local simulation continued.`,
-              )]
-            : []),
+          logEntry(
+            processedCommands + 1,
+            refusedRuntimeWrites.length > 0 ? 'WARNING' : result.tone,
+            refusedRuntimeWrites.length > 0
+              ? `${result.message} Runtime write-through remained local for ${refusedRuntimeWrites.join(', ')}.`
+              : result.message,
+            refusedRuntimeWrites.length > 0 ? 'warning' : result.counter,
+          ),
         ]);
         setCounters(current => ({
           ...current,
-          [result.counter]: current[result.counter] + 1,
+          [refusedRuntimeWrites.length > 0 ? 'warning' : result.counter]:
+            current[refusedRuntimeWrites.length > 0 ? 'warning' : result.counter] + 1,
         }));
         setProcessedCommands(current => current + 1);
       }

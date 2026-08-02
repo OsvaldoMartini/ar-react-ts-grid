@@ -48,6 +48,7 @@ export type VariablesSmokeTestLogTone = 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR'
 
 export type VariablesSmokeTestLogEntry = {
   id: string;
+  sequence: number;
   timestamp: string;
   tone: VariablesSmokeTestLogTone;
   counter: keyof VariablesSmokeTestCounters | null;
