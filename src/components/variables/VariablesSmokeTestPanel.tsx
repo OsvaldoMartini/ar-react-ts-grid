@@ -73,6 +73,16 @@ const executionItemsFor = (plan: VariablesSmokeTestPlan): readonly SmokeExecutio
   return items;
 };
 
+const generatedSmokeValue = (
+  variableType: string,
+  index: number,
+): string => {
+  const randomNumber = Math.floor(1000 + Math.random() * 9000);
+  return variableType.trim().toLocaleUpperCase().includes('NUMERIC')
+    ? String(randomNumber)
+    : `SMOKE_${index + 1}_${randomNumber}`;
+};
+
 const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   review,
   selectedBlockIds,
@@ -102,13 +112,30 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   const run = () => {
     const nextPlan = buildVariablesSmokeTestPlan(review, selectedBlockIds);
     const nextItems = executionItemsFor(nextPlan);
-    runtimeValuesRef.current = new Map(nextPlan.variableFlows.map(flow => [
-      flow.variableId,
-      {
-        state: flow.runtimeState,
-        value: flow.runtimeRawValue,
-      },
-    ]));
+    const initializedVariables: string[] = [];
+    const refusedInitialWrites: string[] = [];
+    runtimeValuesRef.current = new Map(nextPlan.variableFlows.map((flow, index) => {
+      if (flow.runtimeState === 'VALUE') {
+        return [flow.variableId, {
+          state: 'VALUE' as const,
+          value: flow.runtimeRawValue,
+        }];
+      }
+      const value = generatedSmokeValue(flow.variableType, index);
+      initializedVariables.push(`${flow.variableName}=${value}`);
+      if (
+        writeRuntimeValues
+        && (!runtimeWriteAvailable
+          || !onCommitRuntimeValue
+          || !onCommitRuntimeValue(flow.variableId, value))
+      ) {
+        refusedInitialWrites.push(flow.variableName);
+      }
+      return [flow.variableId, {
+        state: 'VALUE' as const,
+        value,
+      }];
+    }));
     setPlan(nextPlan);
     setItemCursor(0);
     setProcessedCommands(0);
@@ -127,6 +154,18 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
           ? 'The selected scope contains no Blocks or commands to simulate.'
           : `Frozen graph revision ${nextPlan.graphRevision || 'unavailable'}; speed ${stepIntervalMs} ms.`,
       ),
+      logEntry(
+        initializedVariables.length > 0 ? 'SUCCESS' : 'INFO',
+        initializedVariables.length > 0
+          ? `Initialized ${initializedVariables.length} VOID runtime variable(s): ${initializedVariables.join(', ')}.`
+          : 'All runtime variables already had initial values; no Smoke value was generated.',
+      ),
+      ...(refusedInitialWrites.length > 0
+        ? [logEntry(
+            'WARNING',
+            `Smoke value write-through is waiting or unavailable for ${refusedInitialWrites.join(', ')}. Local generated values remain active for this run.`,
+          )]
+        : []),
     ]);
   };
 
