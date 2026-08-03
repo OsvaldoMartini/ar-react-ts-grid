@@ -1,4 +1,12 @@
-import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
+import React, {
+  Suspense,
+  lazy,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   AlertTriangle,
   ArrowRight,
@@ -25,6 +33,10 @@ import InstructionIntrinsicValues, {
 } from './InstructionIntrinsicValues';
 import styles from './VariablesExecutionFlowReviewModal.module.scss';
 import { hidesLegacyVariableOperation } from './domain/legacyVariableOperation';
+
+const VariablesSmokeTestFlowModal = lazy(
+  () => import('./VariablesSmokeTestFlowModal'),
+);
 
 export interface VariablesExecutionFlowReviewModalProps {
   review: VariablesExecutionFlowReview;
@@ -74,6 +86,7 @@ const VariablesExecutionFlowReviewModal: React.FC<
   const smokeStepRefs = useRef(new Map<string, HTMLElement>());
   const smokeBlockRefs = useRef(new Map<string, HTMLElement>());
   const [activeSmokePosition, setActiveSmokePosition] = useState<VariablesSmokeTestPosition | null>(null);
+  const [flowOpen, setFlowOpen] = useState(false);
   const [commandRemainingByInstructionId, setCommandRemainingByInstructionId] =
     useState<Readonly<Record<number, number>>>({});
   const [localSelectedBlockIds, setLocalSelectedBlockIds] = useState<number[]>(() =>
@@ -302,15 +315,29 @@ const VariablesExecutionFlowReviewModal: React.FC<
             <b>READ ONLY</b>
           </section>
 
-          <section className={styles.summary} aria-label="Execution flow summary">
-            <div><span>Blocks</span><strong>{visibleBlocks.length}</strong></div>
-            <div><span>Commands</span><strong>{visibleSteps.length}</strong></div>
-            <div><span>Connections</span><strong>{visibleConnectionCount}</strong></div>
-            <div>
-              <span>Diagnostics</span>
-              <strong>{visibleDiagnostics.length}</strong>
-            </div>
-          </section>
+          <div className={styles.summaryRow}>
+            <section className={styles.summary} aria-label="Execution flow summary">
+              <div><span>Blocks</span><strong>{visibleBlocks.length}</strong></div>
+              <div><span>Commands</span><strong>{visibleSteps.length}</strong></div>
+              <div><span>Connections</span><strong>{visibleConnectionCount}</strong></div>
+              <div>
+                <span>Diagnostics</span>
+                <strong>{visibleDiagnostics.length}</strong>
+              </div>
+            </section>
+            <button
+              type="button"
+              className={styles.flowButton}
+              aria-label={`Open execution flow for ${visibleScopeLabel}`}
+              title={visibleBlocks.length === 0
+                ? 'Select at least one Block to open its flow graph'
+                : `Open separated flow graph${visibleBlocks.length === 1 ? '' : 's'} for ${visibleScopeLabel}`}
+              disabled={visibleBlocks.length === 0}
+              onClick={() => setFlowOpen(true)}
+            >
+              FLOW
+            </button>
+          </div>
 
           {!review.relationshipsAvailable && (
             <div className={styles.relationshipsUnavailable} role="status">
@@ -585,6 +612,17 @@ const VariablesExecutionFlowReviewModal: React.FC<
           <button type="button" onClick={onClose}>Close</button>
         </footer>
       </section>
+      {flowOpen && (
+        <Suspense fallback={null}>
+          <VariablesSmokeTestFlowModal
+            botJobId={review.botJobId}
+            botJobName={review.botJobName}
+            blocks={visibleBlocks}
+            scopeLabel={visibleScopeLabel}
+            onClose={() => setFlowOpen(false)}
+          />
+        </Suspense>
+      )}
     </div>
   );
 };

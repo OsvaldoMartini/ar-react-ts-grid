@@ -199,7 +199,6 @@ const VariablesConnectionsHelpModal: React.FC<
                           title="Open EXCEL GOTO flow"
                           onClick={() => setGraphHelp('EXCEL_GOTO')}
                         >
-                          <CircleHelp size={14} aria-hidden="true" />
                           <span>CASE 1</span>
                         </button>
                       </div>

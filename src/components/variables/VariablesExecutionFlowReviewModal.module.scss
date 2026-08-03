@@ -131,11 +131,19 @@
   }
 }
 
+.summaryRow {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  margin-bottom: 13px;
+}
+
 .summary {
   display: grid;
+  flex: 1 1 auto;
   gap: 8px;
   grid-template-columns: repeat(4, minmax(100px, 1fr));
-  margin-bottom: 13px;
+  min-width: 0;
 
   div {
     background: #f7f9fb;
@@ -156,6 +164,42 @@
   strong {
     color: #17324d;
     font-size: 1rem;
+  }
+}
+
+.flowButton {
+  align-items: center;
+  appearance: none;
+  background: #eaf3fc;
+  border: 1px solid #5d8fc2;
+  border-radius: 999px;
+  box-sizing: border-box;
+  color: #0b5394;
+  cursor: pointer;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-family: inherit;
+  font-size: 0.6rem;
+  font-weight: 900;
+  gap: 4px;
+  justify-content: center;
+  min-height: 24px;
+  min-width: 30px;
+  padding: 3px 7px;
+  white-space: nowrap;
+
+  &:hover:not(:disabled) {
+    background: #d9eafa;
+    border-color: #2e75b6;
+  }
+
+  &:focus-visible {
+    outline: 3px solid rgba(46, 117, 182, 0.25);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
   }
 }
 
@@ -624,6 +668,10 @@
   .context,
   .summary {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .summaryRow {
+    align-items: flex-start;
   }
 
   .connection {
