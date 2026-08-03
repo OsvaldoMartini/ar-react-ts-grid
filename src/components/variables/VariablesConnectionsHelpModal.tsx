@@ -138,6 +138,53 @@ const VariablesConnectionsHelpModal: React.FC<
                     <td />
                   </tr>
                   <tr>
+                    <th scope="row">IF..ELSE..ENDIF FAMILY</th>
+                    <td>
+                      Must connect to the single <strong>IF</strong> root in the
+                      same Block.
+                    </td>
+                    <td className={styles.helpCell}>
+                      <button
+                        type="button"
+                        className={styles.helpPlaceholder}
+                        aria-label="IF, ELSE, and ENDIF family help is coming soon"
+                        title="Help coming soon"
+                        disabled
+                      >
+                        <CircleHelp size={14} aria-hidden="true" />
+                      </button>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th scope="row">EXCEL GOTO</th>
+                    <td>
+                      Dataset controller with <strong>Return Block</strong> and{' '}
+                      <strong>End Block</strong>. Only one active{' '}
+                      <strong>EXCEL GOTO</strong> is initially allowed per Bot Job.
+                    </td>
+                    <td className={styles.helpCell}>
+                      <button
+                        type="button"
+                        className={styles.helpPlaceholder}
+                        aria-label="EXCEL GOTO help is coming soon"
+                        title="Help coming soon"
+                        disabled
+                      >
+                        <CircleHelp size={14} aria-hidden="true" />
+                      </button>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th scope="row">CHECKVALUE</th>
+                    <td>
+                      Uses two variables and an operator:{' '}
+                      <strong>Left_Operand</strong> <strong>Operator</strong>{' '}
+                      <strong>Right_Operand</strong>. It does not require a{' '}
+                      <strong>Web Element</strong> parent.
+                    </td>
+                    <td />
+                  </tr>
+                  <tr>
                     <th scope="row">GET</th>
                     <td>
                       Reads the connected <strong>Web Element</strong>&apos;s value
@@ -170,15 +217,6 @@ const VariablesConnectionsHelpModal: React.FC<
                     <td />
                   </tr>
                   <tr>
-                    <th scope="row">REFRESH LOOP</th>
-                    <td>
-                      Uses the same anchor rules as <strong>LOOP</strong>. It
-                      refreshes the browser, waits for the configured interval,
-                      and jumps to its parent until its iteration count finishes.
-                    </td>
-                    <td />
-                  </tr>
-                  <tr>
                     <th scope="row">GOTO</th>
                     <td>
                       Targets another Block. It cannot target its own containing
@@ -187,51 +225,13 @@ const VariablesConnectionsHelpModal: React.FC<
                     <td />
                   </tr>
                   <tr>
-                    <th scope="row">EXCEL GOTO</th>
+                    <th scope="row">REFRESH LOOP</th>
                     <td>
-                      Dataset controller with <strong>Return Block</strong> and{' '}
-                      <strong>End Block</strong>. Only one active{' '}
-                      <strong>EXCEL GOTO</strong> is initially allowed per Bot Job.
-                    </td>
-                    <td className={styles.helpCell}>
-                      <button
-                        type="button"
-                        className={styles.helpPlaceholder}
-                        aria-label="EXCEL GOTO help is coming soon"
-                        title="Help coming soon"
-                        disabled
-                      >
-                        <CircleHelp size={14} aria-hidden="true" />
-                      </button>
-                    </td>
-                  </tr>
-                  <tr>
-                    <th scope="row">CHECKVALUE</th>
-                    <td>
-                      Uses two variables and an operator:{' '}
-                      <strong>Left_Operand</strong> <strong>Operator</strong>{' '}
-                      <strong>Right_Operand</strong>. It does not require a{' '}
-                      <strong>Web Element</strong> parent.
+                      Uses the same anchor rules as <strong>LOOP</strong>. It
+                      refreshes the browser, waits for the configured interval,
+                      and jumps to its parent until its iteration count finishes.
                     </td>
                     <td />
-                  </tr>
-                  <tr>
-                    <th scope="row">IF..ELSE..ENDIF FAMILY</th>
-                    <td>
-                      Must connect to the single <strong>IF</strong> root in the
-                      same Block.
-                    </td>
-                    <td className={styles.helpCell}>
-                      <button
-                        type="button"
-                        className={styles.helpPlaceholder}
-                        aria-label="IF, ELSE, and ENDIF family help is coming soon"
-                        title="Help coming soon"
-                        disabled
-                      >
-                        <CircleHelp size={14} aria-hidden="true" />
-                      </button>
-                    </td>
                   </tr>
                 </tbody>
               </table>
