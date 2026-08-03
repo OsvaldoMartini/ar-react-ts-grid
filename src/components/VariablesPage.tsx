@@ -68,6 +68,10 @@ import {
   type VariablesCommandCopyResult,
 } from './command-editor/useVariablesCommandEditorCopy';
 import {
+  useVariablesCommandEditorCreate,
+  type VariablesCommandCreateResult,
+} from './command-editor/useVariablesCommandEditorCreate';
+import {
   buildVariablesBatchResolveMutation,
   planVariablesBatchRelease,
   planVariablesBatchResolve,
@@ -1166,12 +1170,8 @@ const VariablesPage: React.FC<Props> = ({
     setStatus({
       level: result.ok ? 'ok' : 'error',
       text: result.message || (result.ok
-        ? result.action === 'CREATE_NEW'
-          ? `Command added as instruction ID ${result.createdInstructionId ?? 'new'}.`
-          : `Command copied as instruction ID ${result.createdInstructionId ?? 'new'}.`
-        : result.action === 'CREATE_NEW'
-          ? 'The new command was refused.'
-          : 'The command copy was refused.'),
+        ? `Command copied as instruction ID ${result.createdInstructionId ?? 'new'}.`
+        : 'The command copy was refused.'),
     });
     if (result.ok) sendWorkspaceRequest('variablesWorkspace.refresh');
   }, [sendWorkspaceRequest]);
@@ -1188,6 +1188,30 @@ const VariablesPage: React.FC<Props> = ({
     onResult: handleCommandCopyResult,
   });
 
+  const handleCommandCreateResult = useCallback((
+    result: VariablesCommandCreateResult,
+  ) => {
+    setStatus({
+      level: result.ok ? 'ok' : 'error',
+      text: result.message || (result.ok
+        ? `Command added as instruction ID ${result.createdInstructionId ?? 'new'}.`
+        : 'Add Command was refused.'),
+    });
+    if (result.ok) sendWorkspaceRequest('variablesWorkspace.refresh');
+  }, [sendWorkspaceRequest]);
+
+  const {
+    pendingRequestId: pendingCommandCreateRequestId,
+    submit: submitCommandCreate,
+    handleMessage: handleCommandCreateMessage,
+    resetPending: resetCommandCreate,
+  } = useVariablesCommandEditorCreate({
+    webSocket,
+    connected,
+    snapshot,
+    onResult: handleCommandCreateResult,
+  });
+
   const resetOwnerScopedUi = useCallback(() => {
     createVariableBatchRef.current = null;
     clearPendingRequest();
@@ -1195,6 +1219,7 @@ const VariablesPage: React.FC<Props> = ({
     resetInstructionCopy();
     resetCommandUpdate();
     resetCommandCopy();
+    resetCommandCreate();
     resetVariableCreate();
     resetVariableDelete();
     resetCommandDelete();
@@ -1220,6 +1245,7 @@ const VariablesPage: React.FC<Props> = ({
     resetGraphMutation,
     resetInstructionCopy,
     resetCommandCopy,
+    resetCommandCreate,
     resetCommandUpdate,
     resetRuntimeMemory,
     resetVariableCreate,
@@ -1251,6 +1277,7 @@ const VariablesPage: React.FC<Props> = ({
     processedMessagesRef.current = messages.length;
 
     pending.forEach(raw => {
+      if (handleCommandCreateMessage(raw)) return;
       if (handleCommandCopyMessage(raw)) return;
       if (handleCommandUpdateMessage(raw)) return;
       if (handleInstructionCopyMessage(raw)) return;
@@ -1336,6 +1363,7 @@ const VariablesPage: React.FC<Props> = ({
   }, [
     clearPendingRequest,
     handleGraphMutationMessage,
+    handleCommandCreateMessage,
     handleCommandCopyMessage,
     handleCommandUpdateMessage,
     handleInstructionCopyMessage,
@@ -2993,16 +3021,18 @@ const VariablesPage: React.FC<Props> = ({
             pending={
               pendingCommandUpdateRequestId !== null
               || pendingCommandCopyRequestId !== null
+              || pendingCommandCreateRequestId !== null
             }
             mode={addingCommand ? 'CREATE' : 'EDIT'}
             enabledActions={addingCommand
               ? ['CREATE_NEW']
               : ['UPDATE', 'COPY_NEW']}
             onSubmit={(intent) => {
-              const requestId = intent.action === 'COPY_NEW'
-                || intent.action === 'CREATE_NEW'
-                ? submitCommandCopy(intent)
-                : submitCommandUpdate(intent);
+              const requestId = intent.action === 'CREATE_NEW'
+                ? submitCommandCreate(intent)
+                : intent.action === 'COPY_NEW'
+                  ? submitCommandCopy(intent)
+                  : submitCommandUpdate(intent);
               if (requestId) {
                 setStatus({
                   level: 'warn',

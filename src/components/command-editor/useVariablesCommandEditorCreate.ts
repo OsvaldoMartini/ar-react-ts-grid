@@ -6,25 +6,24 @@ import {
 } from '../variablesWorkspace.contract';
 import type { CommandEditorMutationIntent } from './commandEditorMutation';
 
-export const VARIABLES_COMMAND_COPY_OPERATION =
-  'variablesWorkspace.commandEditor.copy' as const;
-export const VARIABLES_COMMAND_COPY_RESPONSE =
-  'variablesWorkspace.commandEditor.copyResponse' as const;
+export const VARIABLES_COMMAND_CREATE_OPERATION =
+  'variablesWorkspace.commandEditor.create' as const;
+export const VARIABLES_COMMAND_CREATE_RESPONSE =
+  'variablesWorkspace.commandEditor.createResponse' as const;
 
-export interface VariablesCommandCopyResult {
+export interface VariablesCommandCreateResult {
   ok: boolean;
   requestId: string;
   message: string;
   errorCode: string;
   createdInstructionId: number | null;
-  action: 'COPY_NEW';
 }
 
 interface Context {
   webSocket: WebSocket | null;
   connected: boolean;
   snapshot: VariableWorkspaceSnapshot | null;
-  onResult: (result: VariablesCommandCopyResult) => void;
+  onResult: (result: VariablesCommandCreateResult) => void;
   timeoutMs?: number;
 }
 
@@ -34,7 +33,6 @@ interface Pending {
   workspaceEpoch: number;
   webSocket: WebSocket;
   timeoutId: ReturnType<typeof setTimeout>;
-  action: 'COPY_NEW';
 }
 
 const DEFAULT_TIMEOUT_MS = 15_000;
@@ -42,20 +40,24 @@ let sequence = 0;
 const objectValue = (value: unknown): Record<string, any> | null =>
   value !== null && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, any> : null;
-const failure = (
-  requestId: string,
-  message: string,
-  action: 'COPY_NEW' = 'COPY_NEW',
-): VariablesCommandCopyResult => ({
-  ok: false, requestId, message,
-  errorCode: 'COMMAND_COPY_CLIENT_REFUSED', createdInstructionId: null, action,
+const failure = (requestId: string, message: string): VariablesCommandCreateResult => ({
+  ok: false,
+  requestId,
+  message,
+  errorCode: 'COMMAND_CREATE_CLIENT_REFUSED',
+  createdInstructionId: null,
 });
 
-export const useVariablesCommandEditorCopy = ({
-  webSocket, connected, snapshot, onResult, timeoutMs = DEFAULT_TIMEOUT_MS,
+export const useVariablesCommandEditorCreate = ({
+  webSocket,
+  connected,
+  snapshot,
+  onResult,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
 }: Context) => {
   const pendingRef = useRef<Pending | null>(null);
   const [pendingRequestId, setPendingRequestId] = useState<string | null>(null);
+
   const clearPending = useCallback(() => {
     const pending = pendingRef.current;
     if (!pending) return null;
@@ -73,9 +75,10 @@ export const useVariablesCommandEditorCopy = ({
       || snapshot?.bindingEpoch !== pending.bindingEpoch
       || snapshot.workspaceEpoch !== pending.workspaceEpoch) {
       clearPending();
-      onResult(failure(pending.requestId,
-        'The Variables workspace changed before command creation completed.',
-        pending.action));
+      onResult(failure(
+        pending.requestId,
+        'The Variables workspace changed before Add Command completed.',
+      ));
     }
   }, [clearPending, connected, onResult, snapshot, webSocket]);
 
@@ -88,33 +91,35 @@ export const useVariablesCommandEditorCopy = ({
   const submit = useCallback((intent: CommandEditorMutationIntent): string | null => {
     const capability = snapshot?.mutationCapability;
     const configuration = intent.draft.configuration;
-    const action = intent.action;
-    // LEGACY drafts (no-config commands such as GET/REFRESH) travel as the
-    // wire kind NONE so command transformations into them can persist.
     const wireConfiguration = configuration.kind === 'LEGACY'
       ? { kind: 'NONE' }
       : configuration;
-    if (action !== 'COPY_NEW'
+    if (intent.action !== 'CREATE_NEW'
       || !snapshot || !capability || !connected || !webSocket
       || webSocket.readyState !== WebSocket.OPEN || pendingRef.current) return null;
+
     sequence = sequence >= Number.MAX_SAFE_INTEGER ? 1 : sequence + 1;
-    const requestId = `${Date.now().toString(36)}-command-copy-${sequence.toString(36)}`;
+    const requestId = `${Date.now().toString(36)}-command-create-${sequence.toString(36)}`;
     const timeoutId = setTimeout(() => {
       if (pendingRef.current?.requestId !== requestId) return;
       clearPending();
-      onResult(failure(requestId,
-        'Command creation timed out. The original commands remain unchanged.',
-        action));
+      onResult(failure(
+        requestId,
+        'Add Command timed out. Existing commands remain unchanged.',
+      ));
     }, timeoutMs);
     pendingRef.current = {
-      requestId, bindingEpoch: snapshot.bindingEpoch,
-      workspaceEpoch: snapshot.workspaceEpoch, webSocket, timeoutId,
-      action,
+      requestId,
+      bindingEpoch: snapshot.bindingEpoch,
+      workspaceEpoch: snapshot.workspaceEpoch,
+      webSocket,
+      timeoutId,
     };
     setPendingRequestId(requestId);
+
     try {
       webSocket.send(JSON.stringify({
-        type: VARIABLES_COMMAND_COPY_OPERATION,
+        type: VARIABLES_COMMAND_CREATE_OPERATION,
         sessionId: VARIABLES_MANAGER_SESSION_ID,
         body: JSON.stringify({
           contractVersion: 1,
@@ -123,8 +128,6 @@ export const useVariablesCommandEditorCopy = ({
           workspaceEpoch: snapshot.workspaceEpoch,
           baseGraphVersion: capability.graphVersion,
           graphRevision: capability.graphRevision,
-          sourceInstructionId: intent.sourceInstructionId,
-          createBlank: false,
           targetBlockId: intent.targetBlockId,
           placement: {
             kind: intent.placement.kind,
@@ -138,7 +141,7 @@ export const useVariablesCommandEditorCopy = ({
       return requestId;
     } catch (_) {
       clearPending();
-      onResult(failure(requestId, 'The command creation could not be sent.', action));
+      onResult(failure(requestId, 'Add Command could not be sent.'));
       return null;
     }
   }, [clearPending, connected, onResult, snapshot, timeoutMs, webSocket]);
@@ -149,7 +152,7 @@ export const useVariablesCommandEditorCopy = ({
       envelope = parseVariablesWorkspaceMessage(
         typeof raw === 'string' ? raw : JSON.stringify(raw));
     } catch (_) { return false; }
-    if (envelope.operationId !== VARIABLES_COMMAND_COPY_RESPONSE) return false;
+    if (envelope.operationId !== VARIABLES_COMMAND_CREATE_RESPONSE) return false;
     const body = objectValue(envelope.body);
     const pending = pendingRef.current;
     const requestId = typeof body?.requestId === 'string' ? body.requestId.trim() : '';
@@ -162,7 +165,6 @@ export const useVariablesCommandEditorCopy = ({
       errorCode: typeof body.errorCode === 'string' ? body.errorCode.trim() : '',
       createdInstructionId: Number.isSafeInteger(Number(body.createdInstructionId))
         ? Number(body.createdInstructionId) : null,
-      action: pending.action,
     });
     return true;
   }, [clearPending, onResult]);
