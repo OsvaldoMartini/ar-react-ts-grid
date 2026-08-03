@@ -107,6 +107,41 @@ const toneClass = (
   }
 };
 
+/**
+ * NEW 2026-08-03 (user order) - presentation-only confirm-button state.
+ * When the frozen scope contains any red "Reconnect Variable" item, the
+ * button turns RED and reports both workloads: "Resolve Parents(X) Vars(Y)".
+ * It counts every command whose relationship is a Variable (GET/SET/CK/E -
+ * whatever the review enumerated in the current Bot Job scope). No resolution
+ * rule is read or changed here; this only reformats the existing counts.
+ */
+export const resolveConnectionsConfirmEvent = (
+  visibleItems: readonly VariablesConnectionReviewItem[],
+  confirmCount: number,
+  pending: boolean,
+): RulesCardEvent => {
+  const variableItems = visibleItems.filter(
+    item => item.relationLabel === 'Variable',
+  );
+  const parentCount = visibleItems.length - variableItems.length;
+  const hasRedVariable = variableItems.some(item => item.stateTone === 'red');
+  if (pending) {
+    return { color: hasRedVariable ? 'red' : 'green', rules: 'Resolving...', ts: 0 };
+  }
+  if (hasRedVariable) {
+    return {
+      color: 'red',
+      rules: `Resolve Parents(${parentCount}) Vars(${variableItems.length})`,
+      ts: 0,
+    };
+  }
+  return {
+    color: 'green',
+    rules: `Resolve ${confirmCount} Connection${confirmCount === 1 ? '' : 's'}`,
+    ts: 0,
+  };
+};
+
 const VariablesConnectionsModal: React.FC<
   VariablesConnectionsModalProps
 > = ({
@@ -193,15 +228,17 @@ const VariablesConnectionsModal: React.FC<
   const confirmCount = mode === 'RESOLVE' ? selectedCount : visibleItems.length;
   const confirmDisabled = pending || confirmCount === 0;
 
-  const confirmEvent = useMemo<RulesCardEvent>(() => ({
-    color: mode === 'RESOLVE' ? 'green' : 'red',
-    rules: pending
-      ? mode === 'RESOLVE'
-        ? 'Resolving...'
-        : 'Releasing...'
-      : `${mode === 'RESOLVE' ? 'Resolve' : 'Release'} ${confirmCount} Connection${confirmCount === 1 ? '' : 's'}`,
-    ts: 0,
-  }), [confirmCount, mode, pending]);
+  const confirmEvent = useMemo<RulesCardEvent>(() => (
+    mode === 'RESOLVE'
+      ? resolveConnectionsConfirmEvent(visibleItems, confirmCount, pending)
+      : {
+          color: 'red',
+          rules: pending
+            ? 'Releasing...'
+            : `Release ${confirmCount} Connection${confirmCount === 1 ? '' : 's'}`,
+          ts: 0,
+        }
+  ), [confirmCount, mode, pending, visibleItems]);
 
   const cancel = () => {
     if (!pending) onCancel();
