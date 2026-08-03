@@ -433,6 +433,7 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
 
           <SearchBox
             label="Command"
+            labelClassName={styles.commandLabel}
             placeholder="Search command name or code..."
             headerRight="Command catalog"
             countLabel={count => `${count} COMMAND${count === 1 ? '' : 'S'}`}

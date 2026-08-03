@@ -27,6 +27,7 @@ import {
   instructionRelationshipPolicy,
 } from '../bot-job-details/grid/domain/instructionRelationshipPolicy';
 import InstructionCommandBadge from '../bot-job-details/grid/InstructionCommandBadge';
+import InstructionCommandValues from '../bot-job-details/grid/InstructionCommandValues';
 import type {
   VariableGraphEntry,
   VariableInstructionNode,
@@ -636,48 +637,6 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                 const rowInstructionName = rowCanonicalAction === 'H'
                   ? 'Wait'
                   : instruction.name || 'Unnamed instruction';
-                const rowOperation = (instruction.operation ?? '').trim();
-                let commandValueRows:
-                  | { label: string; value: string }[]
-                  | null = null;
-                let commandValuesTitle = '';
-                if (
-                  (rowCanonicalAction === 'LOOP'
-                    || rowCanonicalAction === 'REFRESH_LOOP')
-                  && rowOperation
-                ) {
-                  const [interval, iterations] = rowOperation
-                    .split(':')
-                    .map(part => part.trim());
-                  if (interval && iterations) {
-                    commandValueRows = [
-                      { label: 'T:', value: `${interval}s` },
-                      { label: 'L:', value: iterations },
-                    ];
-                    commandValuesTitle =
-                      `Time ${interval}s · Loop ${iterations} times`;
-                  }
-                } else if (rowCanonicalAction === 'GOTO' && rowOperation) {
-                  commandValueRows = [{ label: 'L:', value: rowOperation }];
-                  commandValuesTitle = `GOTO limit ${rowOperation}`;
-                } else if (
-                  (rowCanonicalAction === 'SWIPE_UP'
-                    || rowCanonicalAction === 'SWIPE_DOWN')
-                  && rowOperation
-                ) {
-                  commandValueRows = [{ label: 'R:', value: rowOperation }];
-                  commandValuesTitle = `Swipe ${rowOperation} time(s)`;
-                } else if (
-                  rowCanonicalAction === 'H'
-                  && typeof instruction.onHoldSeconds === 'number'
-                  && instruction.onHoldSeconds > 0
-                ) {
-                  commandValueRows = [
-                    { label: 'S:', value: String(instruction.onHoldSeconds) },
-                  ];
-                  commandValuesTitle =
-                    `Wait ${instruction.onHoldSeconds} second(s)`;
-                }
                 const edges = instructionId === null
                   ? []
                   : edgesByInstruction.get(instructionId) ?? [];
@@ -921,26 +880,11 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                             {instructionId === null ? 'Missing ID' : `ID ${instructionId}`}
                           </small>
                         </button>
-                        {commandValueRows && (
-                          <span
-                            className={styles.loopValues}
-                            title={commandValuesTitle}
-                          >
-                            {commandValueRows.map(row => (
-                              <span
-                                key={row.label}
-                                className={styles.loopValueRow}
-                              >
-                                <span className={styles.loopValueLabel}>
-                                  {row.label}
-                                </span>
-                                <span className={styles.loopValueNumber}>
-                                  {row.value}
-                                </span>
-                              </span>
-                            ))}
-                          </span>
-                        )}
+                        <InstructionCommandValues
+                          action={instruction.command}
+                          operation={instruction.operation}
+                          onHoldSeconds={instruction.onHoldSeconds}
+                        />
                         <InstructionReferenceIcons
                           references={instructionId === null
                             ? []

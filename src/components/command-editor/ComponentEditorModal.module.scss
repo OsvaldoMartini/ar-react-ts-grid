@@ -134,6 +134,10 @@
   outline: none;
 }
 
+.commandLabel {
+  margin-top: 12px;
+}
+
 .selectedCommand {
   background: linear-gradient(135deg, #f8fbff, #eef6fd);
   border: 1px solid #b9cee0;

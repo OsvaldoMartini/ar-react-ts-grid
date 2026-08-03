@@ -13,6 +13,7 @@ import type {
 } from './domain/instructionRelationshipGraph';
 import { instructionRelationshipPolicy } from './domain/instructionRelationshipPolicy';
 import type { WorkspaceBlock } from './domain/workspaceBlocks';
+import InstructionCommandValues from './InstructionCommandValues';
 import styles from './InstructionRelationshipDetails.module.scss';
 
 export interface InstructionRelationshipDetailsProps {
@@ -65,30 +66,6 @@ const humanizeCode = (code: string | null): string =>
         .join(' ')
     : '';
 
-const blockLabel = (
-  blockId: number | null | undefined,
-  allInstructions: readonly BlockLoopInstructionLoadDTO[],
-  workspaceBlocks: readonly WorkspaceBlock[],
-): { order: number | 'N/A'; name: string } => {
-  if (blockId == null) return { order: 'N/A', name: 'Unknown' };
-
-  const instruction = allInstructions.find(candidate => candidate.blockId === blockId);
-  if (instruction) {
-    return {
-      order: instruction.blockOrderNumber,
-      name: instruction.blockName || 'Unknown',
-    };
-  }
-
-  const catalogBlock = workspaceBlocks.find(block => block.blockId === blockId);
-  return catalogBlock
-    ? {
-        order: catalogBlock.blockOrderNumber,
-        name: catalogBlock.blockName || 'Unknown',
-      }
-    : { order: 'N/A', name: 'Unknown' };
-};
-
 /**
  * This is the legacy GridItem operation presentation without its validation
  * side effects. Relationship health is supplied by the typed graph and rendered
@@ -96,8 +73,6 @@ const blockLabel = (
  */
 const renderOperationContent = (
   instruction: BlockLoopInstructionLoadDTO,
-  allInstructions: readonly BlockLoopInstructionLoadDTO[],
-  workspaceBlocks: readonly WorkspaceBlock[],
 ): React.ReactNode => {
   // GET is relationship-authored: its Web Element and runtime Variable are
   // rendered by the connection chips. The historical operation text is not
@@ -142,65 +117,20 @@ const renderOperationContent = (
     }
   }
 
-  if (instruction.actions === 'GOTO' && instruction.operation) {
-    const target = blockLabel(
-      instruction.parentBlockId,
-      allInstructions,
-      workspaceBlocks,
-    );
-    return (
-      <>
-        <span style={{ color: '#0b5394' }}>Block:</span>{' '}
-        <span style={{ color: '#b163ff' }}>#{target.order} {target.name}</span>{' '}
-        <span style={{ color: 'blue' }}>Limit:</span>{' '}
-        <span style={{ color: '#b163ff' }}>{instruction.operation}</span>
-      </>
-    );
-  }
-
-  if (instruction.actions === 'REFRESH_LOOP' && instruction.operation) {
-    const [refreshValue, loopValue] = instruction.operation
-      .split(':')
-      .map(part => part.trim());
-    // The parent reference is rendered exclusively by the relationship chip
-    // ("Loop connected (id: N) Name" / red "Reconnect Loop") — never as
-    // "(N/A)Unknown" text here.
-    return (
-      <>
-        <span style={{ color: '#0b5394' }}>Refresh</span>{' '}
-        <span style={{ color: '#FFA500' }}>{refreshValue}s</span>{' '}
-        <span style={{ color: '#0b5394' }}>Loop</span>{' '}
-        <span style={{ color: '#FFA500' }}>{loopValue} times</span>
-      </>
-    );
-  }
-
   if (
-    (instruction.actions === 'SWIPE_UP' || instruction.actions === 'SWIPE_DOWN')
-    && instruction.operation
+    instruction.actions === 'LOOP'
+    || instruction.actions === 'REFRESH_LOOP'
+    || instruction.actions === 'GOTO'
+    || instruction.actions === 'SWIPE_UP'
+    || instruction.actions === 'SWIPE_DOWN'
+    || instruction.actions === 'H'
   ) {
     return (
-      <>
-        <span style={{ color: '#0b5394' }}>Times</span>{' '}
-        <span style={{ color: '#FFA500' }}>{instruction.operation}x</span>{' '}
-      </>
-    );
-  }
-
-  if (instruction.actions === 'LOOP' && instruction.operation) {
-    const [refreshValue, loopValue] = instruction.operation
-      .split(':')
-      .map(part => part.trim());
-    // The parent reference is rendered exclusively by the relationship chip
-    // ("Loop connected (id: N) Name" / red "Reconnect Loop") — never as
-    // "(N/A)Unknown" text here.
-    return (
-      <>
-        <span style={{ color: '#0b5394' }}>Time</span>{' '}
-        <span style={{ color: '#FFA500' }}>{refreshValue}s</span>{' '}
-        <span style={{ color: '#0b5394' }}>Loop</span>{' '}
-        <span style={{ color: '#FFA500' }}>{loopValue} times</span>
-      </>
+      <InstructionCommandValues
+        action={instruction.actions}
+        operation={instruction.operation}
+        onHoldSeconds={instruction.onHoldSeconds}
+      />
     );
   }
 
@@ -245,8 +175,6 @@ const InstructionRelationshipDetails: React.FC<
   InstructionRelationshipDetailsProps
 > = ({
   instruction,
-  allInstructions,
-  workspaceBlocks = [],
   relationshipEdges = [],
   relationshipStates = [],
   variableLinks = [],
@@ -408,7 +336,7 @@ const InstructionRelationshipDetails: React.FC<
       className={gridStyles.instructionDetails}
       data-testid={`instruction-relationship-details-${instruction.id}`}
     >
-      {renderOperationContent(instruction, allInstructions, workspaceBlocks)}
+      {renderOperationContent(instruction)}
       {(
         chips.length > 0
         || reconnectParentEvent != null
