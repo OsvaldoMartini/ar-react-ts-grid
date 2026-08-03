@@ -10,4 +10,6 @@ export interface CommandEditorMutationIntent {
   placement: CommandEditorPlacement;
   draft: CommandEditorBaseDraft;
   allowRelationshipDisconnect: boolean;
+  allowConditionalFamilyDissolve: boolean;
+  conditionalFamilyDeleteIds: readonly number[];
 }

@@ -14,6 +14,8 @@ const EDITABLE_COMMANDS = new Set([
   'E',
   'IF',
   'ELSEIF',
+  'ELSE',
+  'ENDIF',
 ]);
 
 /**
@@ -21,8 +23,8 @@ const EDITABLE_COMMANDS = new Set([
  *
  * GET opens the editor with no intrinsic configuration (placement and command
  * transformation only); its variable link stays in the reconnect workflow.
- * SET remains reconnect-only. ELSE and ENDIF remain structural and are never
- * edited through this modal.
+ * SET remains reconnect-only. ELSE and ENDIF can be transformed only through
+ * the guarded IF-family dissolution flow.
  */
 export const isVariablesCommandEditorEligible = (
   action: string | null | undefined,

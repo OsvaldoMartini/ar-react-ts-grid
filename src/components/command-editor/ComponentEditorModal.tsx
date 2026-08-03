@@ -27,6 +27,12 @@ import GotoCommandEditor from './editors/GotoCommandEditor';
 import SwipeCommandEditor from './editors/SwipeCommandEditor';
 import ConditionalCommandEditor from './editors/ConditionalCommandEditor';
 import CommandEditorRelationshipWarningModal from './CommandEditorRelationshipWarningModal';
+import CommandEditorConditionalFamilyWarningModal from './CommandEditorConditionalFamilyWarningModal';
+import {
+  commandEditorConditionalFamilyImpact,
+  isCommandEditorConditionalBoundary,
+  type CommandEditorConditionalFamilyImpact,
+} from './commandEditorConditionalFamilyImpact';
 import {
   commandEditorRelationshipImpact,
   hasCommandEditorRelationshipImpact,
@@ -101,6 +107,10 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
     impact: CommandEditorRelationshipImpact;
     intent: CommandEditorMutationIntent;
   } | null>(null);
+  const [conditionalFamilyWarning, setConditionalFamilyWarning] = useState<{
+    impact: CommandEditorConditionalFamilyImpact;
+    intent: CommandEditorMutationIntent;
+  } | null>(null);
   const returnFocusRef = useRef<HTMLElement | null>(
     returnFocusElement
     ?? (typeof document !== 'undefined'
@@ -127,7 +137,11 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
           { code: originalCommandCode, label: command.action || originalCommandCode },
           ...COMMAND_EDITOR_COMMAND_OPTIONS,
         ];
-    return catalog.map(option => ({
+    return catalog
+      .filter(option => mode === 'CREATE'
+        || !isCommandEditorConditionalBoundary(option.code)
+        || option.code === originalCommandCode)
+      .map(option => ({
       value: option.code,
       label: option.label,
       icon: <InstructionCommandBadge action={option.code} iconOnly />,
@@ -136,8 +150,8 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
         ? [{ text: 'CURRENT', tone: 'green' as const }]
         : [],
       keywords: `${option.code} ${option.label}`,
-    }));
-  }, [command.action, originalCommandCode]);
+      }));
+  }, [command.action, mode, originalCommandCode]);
   const selectCommand = (value: string | null) => {
     if (value === null || value === selectedCommandCode) return;
     setSelectedCommandCode(value);
@@ -154,16 +168,57 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
   const targetCommandCount = commands.filter(
     candidate => candidate.blockId === targetBlockId,
   ).length;
-  const placementOptions = useMemo(
-    () => commandEditorPlacementOptions(command, targetBlockId, commands),
-    [command, commands, targetBlockId],
+  const conditionalImpactPreview = useMemo(
+    () => mode === 'EDIT'
+      ? commandEditorConditionalFamilyImpact(command, selectedCommandCode, commands)
+      : null,
+    [command, commands, mode, selectedCommandCode],
   );
+  const conditionalPositionLocked = mode === 'EDIT'
+    && isCommandEditorConditionalBoundary(originalCommandCode)
+    && !commandChanged;
+  const placementOptions = useMemo(
+    () => {
+      const options = commandEditorPlacementOptions(
+        command,
+        targetBlockId,
+        commands,
+        conditionalImpactPreview?.boundariesToDelete.map(
+          boundary => boundary.instructionId,
+        ) ?? [],
+      );
+      return conditionalPositionLocked
+        ? options.filter(option => option.placement.kind === 'KEEP')
+        : options;
+    }, [
+      command,
+      commands,
+      conditionalImpactPreview,
+      conditionalPositionLocked,
+      targetBlockId,
+    ],
+  );
+
+  useEffect(() => {
+    if (!conditionalPositionLocked) return;
+    setTargetBlockId(command.blockId ?? 0);
+    setPlacementValue('KEEP');
+  }, [command.blockId, conditionalPositionLocked]);
+
+  useEffect(() => {
+    if (placementOptions.some(option => option.value === placementValue)) return;
+    const fallback = placementOptions.find(option => option.value === 'KEEP')
+      ?? placementOptions.find(option => option.value === 'END')
+      ?? placementOptions[0];
+    if (fallback) setPlacementValue(fallback.value);
+  }, [placementOptions, placementValue]);
 
   useEffect(() => {
     const nextTargetBlockId = command.blockId ?? 0;
     setTargetBlockId(nextTargetBlockId);
     setPlacementValue(mode === 'CREATE' ? 'END' : 'KEEP');
     setRelationshipWarning(null);
+    setConditionalFamilyWarning(null);
     setSelectedCommandCode(canonicalInstructionAction(command.action));
     setDraft({
       name: command.instructionName,
@@ -284,7 +339,16 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
     && !pending
     && targetBlockId > 0
     && placement
-    && isCommandEditorBaseDraftValid(draft),
+    && isCommandEditorBaseDraftValid(draft)
+    && !(
+      conditionalPositionLocked
+      && (targetBlockId !== command.blockId || placement.kind !== 'KEEP')
+    )
+    && !(
+      mode === 'EDIT'
+      && ['ELSE', 'ENDIF'].includes(originalCommandCode)
+      && !commandChanged
+    )
   );
   const submit = (action: CommandEditorMutationAction) => {
     if (!canSubmit || !placement || !onSubmit || !enabledActions.includes(action)) return;
@@ -298,8 +362,28 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
       placement: submittedPlacement,
       draft: { ...draft, name: draft.name.trim() },
       allowRelationshipDisconnect: false,
+      allowConditionalFamilyDissolve: false,
+      conditionalFamilyDeleteIds: [],
     };
     if (action === 'UPDATE') {
+      const conditionalImpact = commandEditorConditionalFamilyImpact(
+        command,
+        draft.action,
+        commands,
+      );
+      if (conditionalImpact) {
+        setConditionalFamilyWarning({
+          impact: conditionalImpact,
+          intent: {
+            ...intent,
+            allowRelationshipDisconnect: true,
+            allowConditionalFamilyDissolve: true,
+            conditionalFamilyDeleteIds: conditionalImpact.boundariesToDelete
+              .map(boundary => boundary.instructionId),
+          },
+        });
+        return;
+      }
       const impact = commandEditorRelationshipImpact(
         command,
         targetBlockId,
@@ -412,6 +496,7 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
               if (value === null) return;
               const nextTargetBlockId = Number(value);
               if (!Number.isSafeInteger(nextTargetBlockId) || nextTargetBlockId <= 0) return;
+              if (conditionalPositionLocked) return;
               setTargetBlockId(nextTargetBlockId);
               setPlacementValue(nextTargetBlockId === command.blockId ? 'KEEP' : 'END');
             }}
@@ -497,8 +582,14 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
               <button
                 type="button"
                 className={styles.copyButton}
-                disabled={!canSubmit || !enabledActions.includes('COPY_NEW')}
-                title={onSubmit ? 'Create a disconnected copy with a new instruction ID' : 'Command persistence is not connected yet'}
+                disabled={!canSubmit
+                  || !enabledActions.includes('COPY_NEW')
+                  || isCommandEditorConditionalBoundary(originalCommandCode)}
+                title={isCommandEditorConditionalBoundary(originalCommandCode)
+                  ? 'Copy the complete IF family through Block transfer'
+                  : onSubmit
+                    ? 'Create a disconnected copy with a new instruction ID'
+                    : 'Command persistence is not connected yet'}
                 onClick={() => submit('COPY_NEW')}
               >
                 COPY NEW
@@ -523,6 +614,17 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
           onContinue={() => {
             const intent = relationshipWarning.intent;
             setRelationshipWarning(null);
+            onSubmit?.(intent);
+          }}
+        />
+      )}
+      {conditionalFamilyWarning && (
+        <CommandEditorConditionalFamilyWarningModal
+          impact={conditionalFamilyWarning.impact}
+          onCancel={() => setConditionalFamilyWarning(null)}
+          onContinue={() => {
+            const intent = conditionalFamilyWarning.intent;
+            setConditionalFamilyWarning(null);
             onSubmit?.(intent);
           }}
         />

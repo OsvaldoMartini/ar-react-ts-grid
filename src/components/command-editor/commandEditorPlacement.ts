@@ -23,7 +23,9 @@ export const commandEditorPlacementOptions = (
   command: ComponentEditorCommand,
   targetBlockId: number,
   commands: readonly ComponentEditorCommand[],
+  excludedInstructionIds: readonly number[] = [],
 ): readonly CommandEditorPlacementOption[] => {
+  const excludedIds = new Set(excludedInstructionIds);
   const options: CommandEditorPlacementOption[] = [];
   if (targetBlockId === command.blockId) {
     options.push({
@@ -39,7 +41,8 @@ export const commandEditorPlacementOptions = (
   commands
     .filter(candidate =>
       candidate.blockId === targetBlockId
-      && candidate.instructionId !== command.instructionId)
+      && candidate.instructionId !== command.instructionId
+      && !excludedIds.has(candidate.instructionId))
     .slice()
     .sort(commandOrder)
     .forEach(candidate => options.push({

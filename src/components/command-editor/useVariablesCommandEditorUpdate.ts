@@ -153,6 +153,8 @@ export const useVariablesCommandEditorUpdate = ({
               : null,
           },
           allowRelationshipDisconnect: intent.allowRelationshipDisconnect,
+          allowConditionalFamilyDissolve: intent.allowConditionalFamilyDissolve,
+          conditionalFamilyDeleteIds: [...intent.conditionalFamilyDeleteIds],
           configuration: wireConfiguration,
           targetAction: intent.draft.action,
         }),
