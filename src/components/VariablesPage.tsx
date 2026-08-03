@@ -96,6 +96,10 @@ import {
 } from './variables/domain/variablesConditionalFamilyWatcher';
 import { planIfFamilyAutoRepair } from './variables/domain/ifFamilyAutoRepair';
 import {
+  useVariablesCheckOperandConnect,
+  type VariablesCheckOperandConnectResult,
+} from './variables/useVariablesCheckOperandConnect';
+import {
   planVariableAutoResolve,
   type VariableAutoResolvePlan,
 } from './variables/domain/variableAutoResolvePlan';
@@ -1083,6 +1087,29 @@ const VariablesPage: React.FC<Props> = ({
     onResult: handleCommandDeleteResult,
   });
 
+  const handleCheckOperandConnectResult = useCallback((
+    result: VariablesCheckOperandConnectResult,
+  ) => {
+    setStatus({
+      level: result.ok ? 'ok' : 'error',
+      text: result.ok
+        ? result.message || 'CheckValue right operands connected.'
+        : result.error || 'The right-operand connection was refused.',
+    });
+  }, []);
+
+  const {
+    pendingRequestId: pendingCheckOperandConnectRequestId,
+    submit: submitCheckOperandConnect,
+    handleMessage: handleCheckOperandConnectMessage,
+  } = useVariablesCheckOperandConnect({
+    webSocket,
+    connected,
+    sessionId,
+    snapshot,
+    onResult: handleCheckOperandConnectResult,
+  });
+
   const handleInstructionStatusResult = useCallback((
     result: VariablesInstructionStatusResult,
   ) => {
@@ -1349,6 +1376,7 @@ const VariablesPage: React.FC<Props> = ({
       if (handleVariableCreateMessage(raw)) return;
       if (handleVariableDeleteMessage(raw)) return;
       if (handleCommandDeleteMessage(raw)) return;
+      if (handleCheckOperandConnectMessage(raw)) return;
       if (handleInstructionStatusMessage(raw)) return;
       if (handleGraphMutationMessage(raw)) return;
       if (handleRuntimeMemoryMessage(raw)) return;
@@ -1436,6 +1464,7 @@ const VariablesPage: React.FC<Props> = ({
     handleVariableCreateMessage,
     handleVariableDeleteMessage,
     handleCommandDeleteMessage,
+    handleCheckOperandConnectMessage,
     handleInstructionStatusMessage,
     messages,
     replaceSnapshot,
@@ -2604,6 +2633,7 @@ const VariablesPage: React.FC<Props> = ({
   // variable list contains any CK / CSV CHECK / PDF CHECK command, the
   // Left_Operand / Right_Operand variables are created DIRECTLY when absent -
   // never duplicated, never blocked, no existence messages. Nothing else runs.
+  const checkOperandConnectPendingRef = useRef(false);
   const createCheckValueDefaultVariables = useCallback(() => {
     const current = snapshotRef.current;
     if (!current || !pendingConnections || pendingConnections.mode !== 'RESOLVE') {
@@ -2619,6 +2649,9 @@ const VariablesPage: React.FC<Props> = ({
       && checkActions.has(canonicalInstructionAction(
         commandsById.get(item.sourceInstructionId)?.command)));
     if (!hasCheckValue) return;
+    // Step 1 of the NEW variable rules: once Right_Operand exists, the driver
+    // effect below connects it to every CheckValue with a FREE right spot.
+    checkOperandConnectPendingRef.current = true;
     const existingNames = new Set(
       current.variables.map(variable => variable.name.trim().toLowerCase()),
     );
@@ -2626,7 +2659,14 @@ const VariablesPage: React.FC<Props> = ({
       ...(existingNames.has('left_operand') ? [] : ['Left_Operand']),
       ...(existingNames.has('right_operand') ? [] : ['Right_Operand']),
     ];
-    if (toCreate.length === 0) return;
+    if (toCreate.length === 0) {
+      // Nothing to create - wake the step-1 driver so it connects directly.
+      setStatus({
+        level: 'warn',
+        text: 'Connecting CheckValue right operands...',
+      });
+      return;
+    }
     createVariableBatchRef.current = {
       names: toCreate,
       nextIndex: 0,
@@ -2642,6 +2682,50 @@ const VariablesPage: React.FC<Props> = ({
       text: `Creating CheckValue default variable “${toCreate[0]}”...`,
     });
   }, [pendingConnections, submitVariableCreate]);
+
+  // NEW variable rules step 1 driver: after the red Resolve click, once
+  // Right_Operand is visible in the snapshot, connect it to every CheckValue
+  // whose RIGHT spot is FREE. Occupied spots are skipped by Java; the flag is
+  // one-shot so a refusal never loops.
+  useEffect(() => {
+    if (!checkOperandConnectPendingRef.current || !snapshot) return;
+    if (createVariableBatchRef.current !== null
+      || pendingCreateRequestId !== null
+      || pendingCheckOperandConnectRequestId !== null) {
+      return;
+    }
+    const rightOperand = snapshot.variables.find(
+      variable => variable.name.trim().toLowerCase() === 'right_operand',
+    );
+    if (!rightOperand) return;
+    const checkActions = new Set(['CK', 'CSV CHECK', 'PDF CHECK']);
+    const freeRightSpotIds = snapshot.commands.flatMap((command) => {
+      if (command.id === null
+        || !checkActions.has(canonicalInstructionAction(command.command))) {
+        return [];
+      }
+      const configuration = command.commandConfiguration;
+      const occupied = configuration
+        && configuration.operandKind === 'VARIABLE'
+        && typeof configuration.operandVariableId === 'number'
+        && configuration.operandVariableId > 0;
+      return occupied ? [] : [command.id];
+    });
+    checkOperandConnectPendingRef.current = false;
+    if (freeRightSpotIds.length === 0) return;
+    const requestId = submitCheckOperandConnect(rightOperand.id, freeRightSpotIds);
+    if (requestId) {
+      setStatus({
+        level: 'warn',
+        text: `Connecting Right_Operand to ${freeRightSpotIds.length} CheckValue command(s)...`,
+      });
+    }
+  }, [
+    pendingCheckOperandConnectRequestId,
+    pendingCreateRequestId,
+    snapshot,
+    submitCheckOperandConnect,
+  ]);
 
   const startVariableAutoResolve = useCallback(() => {
     const current = snapshotRef.current;
