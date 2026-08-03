@@ -35,6 +35,7 @@ import {
   buildVariablesReconnectMutation,
   planVariablesReconnect,
   variablesReconnectGraph,
+  VARIABLES_REACT_AUTHORED_PROFILE,
   type VariablesReconnectPlan,
   type VariablesReconnectRelationKind,
 } from './variables/domain/variablesReconnectMutation';
@@ -93,6 +94,7 @@ import {
   variablesConditionalFamilyForInstruction,
   watchVariablesConditionalBlockTransfer,
 } from './variables/domain/variablesConditionalFamilyWatcher';
+import { planIfFamilyAutoRepair } from './variables/domain/ifFamilyAutoRepair';
 import { useVariablesGraphMutation } from './variables/useVariablesGraphMutation';
 import {
   useVariablesInstructionCopy,
@@ -1654,6 +1656,26 @@ const VariablesPage: React.FC<Props> = ({
     }
   }, [sendWorkspaceRequest, submitGraphMutation]);
 
+  // IF-family links are a CLOSED rule (user decision 2026-08-03): one IF root
+  // per Block has exactly one valid wiring, so broken links repair themselves
+  // instead of surfacing "Repair Conditional" choices. One attempt per
+  // authoritative graph state; a refusal stays visible and is never retried
+  // until the graph changes.
+  const ifFamilyAutoRepairAttemptRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!snapshot || !connected || pendingMutationRequestId !== null) return;
+    const plan = planIfFamilyAutoRepair(snapshot);
+    if (!plan || ifFamilyAutoRepairAttemptRef.current === plan.authorityKey) return;
+    ifFamilyAutoRepairAttemptRef.current = plan.authorityKey;
+    submitVariablesMutation(
+      plan.draft,
+      VARIABLES_REACT_AUTHORED_PROFILE,
+      plan.rootInstructionIds[0],
+      `Auto-repairing IF family links (IDs ${plan.repairedInstructionIds.join(', ')})...`,
+      'IF family links reconnected automatically.',
+    );
+  }, [connected, pendingMutationRequestId, snapshot, submitVariablesMutation]);
+
   const handleCommandDrop = useCallback((
     target: VariablesCommandDropTarget,
   ) => {
@@ -3039,6 +3061,7 @@ const VariablesPage: React.FC<Props> = ({
             }))}
             botJobId={snapshot.botJob.id}
             botJobName={snapshot.botJob.name}
+            status={status}
             scopeLabel={addingCommand
               ? 'Create a new Bot Job command'
               : editorScopeLabel}

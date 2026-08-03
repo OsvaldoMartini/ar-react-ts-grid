@@ -44,10 +44,16 @@ import type {
 } from './commandEditorMutation';
 import styles from './ComponentEditorModal.module.scss';
 
+export interface ComponentEditorModalStatus {
+  level: 'ok' | 'warn' | 'error';
+  text: string;
+}
+
 export interface ComponentEditorModalProps {
   botJobId: number;
   botJobName: string;
   scopeLabel: string;
+  status?: ComponentEditorModalStatus | null;
   blocks: readonly ComponentEditorBlockOption[];
   connectionCount: number;
   diagnosticCount: number;
@@ -76,6 +82,7 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
   botJobId,
   botJobName,
   scopeLabel,
+  status = null,
   blocks,
   connectionCount,
   diagnosticCount,
@@ -97,7 +104,7 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
   const initialTargetBlockId = command.blockId ?? 0;
   const [targetBlockId, setTargetBlockId] = useState(initialTargetBlockId);
   const [placementValue, setPlacementValue] = useState(
-    mode === 'CREATE' ? 'END' : 'KEEP',
+    mode === 'CREATE' ? 'TOP' : 'KEEP',
   );
   const originalCommandCode = canonicalInstructionAction(command.action);
   const [selectedCommandCode, setSelectedCommandCode] = useState(originalCommandCode);
@@ -216,7 +223,7 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
   useEffect(() => {
     const nextTargetBlockId = command.blockId ?? 0;
     setTargetBlockId(nextTargetBlockId);
-    setPlacementValue(mode === 'CREATE' ? 'END' : 'KEEP');
+    setPlacementValue(mode === 'CREATE' ? 'TOP' : 'KEEP');
     setRelationshipWarning(null);
     setConditionalFamilyWarning(null);
     setSelectedCommandCode(canonicalInstructionAction(command.action));
@@ -498,7 +505,9 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
               if (!Number.isSafeInteger(nextTargetBlockId) || nextTargetBlockId <= 0) return;
               if (conditionalPositionLocked) return;
               setTargetBlockId(nextTargetBlockId);
-              setPlacementValue(nextTargetBlockId === command.blockId ? 'KEEP' : 'END');
+              setPlacementValue(mode === 'CREATE' || nextTargetBlockId !== command.blockId
+                ? 'TOP'
+                : 'KEEP');
             }}
           />
 
@@ -564,6 +573,18 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
         </div>
 
         <footer className={styles.footer}>
+          {status && (
+            <div
+              role="status"
+              className={`${styles.status} ${status.level === 'ok'
+                ? styles.statusOk
+                : status.level === 'warn'
+                  ? styles.statusWarn
+                  : styles.statusError}`}
+            >
+              {status.text}
+            </div>
+          )}
           <button type="button" className={styles.cancelButton} disabled={pending} onClick={onClose}>
             CANCEL
           </button>

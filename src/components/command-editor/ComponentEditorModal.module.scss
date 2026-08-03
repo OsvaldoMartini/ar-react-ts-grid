@@ -18,8 +18,8 @@
   display: grid;
   font-family: Arial, Helvetica, sans-serif;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  max-height: calc(100vh - 24px);
-  min-height: min(620px, calc(100vh - 24px));
+  max-height: calc(100vh - 14px);
+  min-height: min(680px, calc(100vh - 14px));
   overflow: hidden;
   width: min(1180px, calc(100vw - 24px));
 }
@@ -35,9 +35,9 @@
 }
 
 .identity { min-width: 0; }
-.identity p { color: #52606d; font-size: 0.82rem; margin: 5px 0 0; }
+.identity p { color: #52606d; font-size: 0.78rem; margin: 5px 0 0; }
 .titleLine { align-items: center; color: #0b5394; display: flex; gap: 8px; }
-.titleLine h2 { color: #17324d; font-size: 1.08rem; margin: 0; }
+.titleLine h2 { color: #17324d; font-size: 1.02rem; margin: 0; }
 
 .closeIcon {
   align-items: center;
@@ -74,18 +74,18 @@
 .context div { display: grid; gap: 2px; min-width: 0; }
 .context span {
   color: #52718e;
-  font-size: 0.62rem;
+  font-size: 0.6rem;
   font-weight: 900;
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
-.context strong { overflow-wrap: anywhere; }
+.context strong { overflow-wrap: anywhere; font-size: 0.78rem; }
 .context > b {
   background: #fff4df;
   border: 1px solid #e0a24a;
   border-radius: 999px;
   color: #8a4b00;
-  font-size: 0.65rem;
+  font-size: 0.6rem;
   padding: 5px 8px;
 }
 
@@ -103,8 +103,8 @@
   gap: 2px;
   padding: 8px 10px;
 }
-.summary span { color: #6b7280; font-size: 0.61rem; font-weight: 900; text-transform: uppercase; }
-.summary strong { color: #17324d; font-size: 1rem; }
+.summary span { color: #6b7280; font-size: 0.6rem; font-weight: 900; text-transform: uppercase; }
+.summary strong { color: #17324d; font-size: 0.92rem; }
 
 .placementField {
   display: grid;
@@ -113,7 +113,7 @@
 }
 .placementField > span {
   color: #52718e;
-  font-size: 0.65rem;
+  font-size: 0.6rem;
   font-weight: 900;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -155,7 +155,7 @@
   font-weight: 900;
   text-transform: uppercase;
 }
-.selectedCommand strong { color: #17324d; font-size: 0.76rem; overflow-wrap: anywhere; }
+.selectedCommand strong { color: #17324d; font-size: 0.73rem; overflow-wrap: anywhere; }
 
 .nameField {
   display: grid;
@@ -164,7 +164,7 @@
 }
 .nameField span {
   color: #52718e;
-  font-size: 0.65rem;
+  font-size: 0.6rem;
   font-weight: 900;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -191,10 +191,38 @@
   border-radius: 7px;
   cursor: pointer;
   font: inherit;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 900;
   min-height: 34px;
   padding: 6px 13px;
+}
+
+/* Same live status chip as the Variables page top bar (VariablesPage.module.scss). */
+.status {
+  margin-right: auto;
+  max-width: min(52vw, 640px);
+  overflow: hidden;
+  padding: 5px 9px;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.statusOk {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.statusWarn {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.statusError {
+  background: #fee2e2;
+  color: #991b1b;
 }
 .footer button:disabled { cursor: not-allowed; opacity: 0.48; }
 .cancelButton { background: #fff; border: 1px solid #aebdca; color: #44596b; }
