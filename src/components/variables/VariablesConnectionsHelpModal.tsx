@@ -2,8 +2,12 @@ import React, {
   useEffect,
   useId,
   useRef,
+  useState,
 } from 'react';
 import { CircleHelp, X } from 'lucide-react';
+import VariablesConnectionGraphHelpModal, {
+  type VariablesConnectionGraphKind,
+} from './connection-help/VariablesConnectionGraphHelpModal';
 import styles from './VariablesConnectionsHelpModal.module.scss';
 
 export interface VariablesConnectionsHelpModalProps {
@@ -15,19 +19,23 @@ const VariablesConnectionsHelpModal: React.FC<
 > = ({ onClose }) => {
   const titleId = useId();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const [graphHelp, setGraphHelp] = useState<
+    VariablesConnectionGraphKind | null
+  >(null);
 
   useEffect(() => {
     closeButtonRef.current?.focus();
   }, []);
 
   return (
-    <div
-      className={styles.backdrop}
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
-      <section
+    <>
+      <div
+        className={styles.backdrop}
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget) onClose();
+        }}
+      >
+        <section
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -147,9 +155,9 @@ const VariablesConnectionsHelpModal: React.FC<
                       <button
                         type="button"
                         className={styles.helpPlaceholder}
-                        aria-label="IF, ELSE, and ENDIF family help is coming soon"
-                        title="Help coming soon"
-                        disabled
+                        aria-label="Open IF, ELSE, and ENDIF family flow help"
+                        title="Open IF family flow"
+                        onClick={() => setGraphHelp('IF_FAMILY')}
                       >
                         <CircleHelp size={14} aria-hidden="true" />
                       </button>
@@ -166,9 +174,9 @@ const VariablesConnectionsHelpModal: React.FC<
                       <button
                         type="button"
                         className={styles.helpPlaceholder}
-                        aria-label="EXCEL GOTO help is coming soon"
-                        title="Help coming soon"
-                        disabled
+                        aria-label="Open EXCEL GOTO execution flow help"
+                        title="Open EXCEL GOTO flow"
+                        onClick={() => setGraphHelp('EXCEL_GOTO')}
                       >
                         <CircleHelp size={14} aria-hidden="true" />
                       </button>
@@ -244,8 +252,15 @@ const VariablesConnectionsHelpModal: React.FC<
             frozen scope.
           </p>
         </div>
-      </section>
-    </div>
+        </section>
+      </div>
+      {graphHelp && (
+        <VariablesConnectionGraphHelpModal
+          kind={graphHelp}
+          onClose={() => setGraphHelp(null)}
+        />
+      )}
+    </>
   );
 };
 

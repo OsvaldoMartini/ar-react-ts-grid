@@ -164,13 +164,24 @@
   border: 0;
   border-radius: 9999px;
   color: #fff;
-  cursor: default;
+  cursor: pointer;
   display: inline-flex;
   height: 24px;
   justify-content: center;
   opacity: 1;
   padding: 0;
   width: 24px;
+
+  &:hover {
+    background: #1f5f99;
+    box-shadow: 0 3px 10px rgba(46, 117, 182, 0.34);
+    transform: translateY(-1px);
+  }
+
+  &:focus-visible {
+    outline: 3px solid rgba(46, 117, 182, 0.28);
+    outline-offset: 2px;
+  }
 }
 
 .scopeNote {
