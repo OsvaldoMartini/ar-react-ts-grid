@@ -801,6 +801,7 @@ const VariablesPage: React.FC<Props> = ({
   const [selectedInstructionId, setSelectedInstructionId] =
     useState<number | null>(null);
   const [editingCommandId, setEditingCommandId] = useState<number | null>(null);
+  const [addingCommand, setAddingCommand] = useState(false);
   const [sharedBlockFilters, setSharedBlockFilters] = useState<number[]>([]);
   const [draggingInstructionId, setDraggingInstructionId] =
     useState<number | null>(null);
@@ -1165,8 +1166,12 @@ const VariablesPage: React.FC<Props> = ({
     setStatus({
       level: result.ok ? 'ok' : 'error',
       text: result.message || (result.ok
-        ? `Command copied as instruction ID ${result.createdInstructionId ?? 'new'}.`
-        : 'The command copy was refused.'),
+        ? result.action === 'CREATE_NEW'
+          ? `Command added as instruction ID ${result.createdInstructionId ?? 'new'}.`
+          : `Command copied as instruction ID ${result.createdInstructionId ?? 'new'}.`
+        : result.action === 'CREATE_NEW'
+          ? 'The new command was refused.'
+          : 'The command copy was refused.'),
     });
     if (result.ok) sendWorkspaceRequest('variablesWorkspace.refresh');
   }, [sendWorkspaceRequest]);
@@ -1206,6 +1211,7 @@ const VariablesPage: React.FC<Props> = ({
     setDeleteConfirmation(null);
     setCommandDeleteConfirmation(null);
     setAddVariableOpen(false);
+    setAddingCommand(false);
     setClearValuesConfirmation(false);
     setDeletingVariableIds(new Set());
   }, [
@@ -1462,6 +1468,28 @@ const VariablesPage: React.FC<Props> = ({
   const editorScopeLabel = editingCommand
     ? `#${editingCommand.blockOrder ?? '?'} ${editingCommand.blockName || 'Unknown Block'} · #${editingCommand.instructionOrder ?? '?'} instruction`
     : 'No command selected';
+  const addCommandBlock = snapshot?.blocks.find(block =>
+    sharedBlockFilters.length === 1 && block.id === sharedBlockFilters[0])
+    ?? snapshot?.blocks[0]
+    ?? null;
+  const addCommandDraft: ComponentEditorCommand | null = addCommandBlock
+    ? {
+        instructionId: 0,
+        instructionOrder: null,
+        instructionName: 'GetValue',
+        action: 'GET',
+        operation: '',
+        onHoldSeconds: null,
+        blockId: addCommandBlock.id,
+        blockOrder: addCommandBlock.order,
+        blockName: addCommandBlock.name,
+        active: true,
+        parentId: null,
+        parentBlockId: null,
+        variableId: null,
+        storedConfiguration: null,
+      }
+    : null;
 
   useEffect(() => {
     if (editingCommandId !== null && !editingCommandNode) {
@@ -2538,6 +2566,7 @@ const VariablesPage: React.FC<Props> = ({
                   openReconnect(instructionId, 'VARIABLE_BINDING')}
                 onEditCommand={(instruction) => {
                   if (instruction.id === null) return;
+                  setAddingCommand(false);
                   setSelectedInstructionId(instruction.id);
                   setEditingCommandId(instruction.id);
                 }}
@@ -2556,6 +2585,10 @@ const VariablesPage: React.FC<Props> = ({
                 onResolveVisibleConnections={openResolveVisibleConnections}
                 onReviewVisibleConnections={openReviewVisibleConnections}
                 onReleaseVisibleConnections={openReleaseVisibleConnections}
+                onAddCommand={() => {
+                  setEditingCommandId(null);
+                  setAddingCommand(true);
+                }}
               />
 
               <section
@@ -2932,9 +2965,9 @@ const VariablesPage: React.FC<Props> = ({
             onClose={closeExecutionFlowReviewModal}
           />
         )}
-        {snapshot && editingCommand && (
+        {snapshot && (editingCommand || (addingCommand && addCommandDraft)) && (
           <ComponentEditorModal
-            command={editingCommand}
+            command={editingCommand ?? addCommandDraft!}
             commands={editorCommands}
             variables={snapshot.variables.map(variable => ({
               variableId: variable.id,
@@ -2943,7 +2976,9 @@ const VariablesPage: React.FC<Props> = ({
             }))}
             botJobId={snapshot.botJob.id}
             botJobName={snapshot.botJob.name}
-            scopeLabel={editorScopeLabel}
+            scopeLabel={addingCommand
+              ? 'Create a new Bot Job command'
+              : editorScopeLabel}
             blocks={snapshot.blocks.map(block => ({
               blockId: block.id,
               blockOrder: block.order ?? block.id,
@@ -2959,28 +2994,39 @@ const VariablesPage: React.FC<Props> = ({
               pendingCommandUpdateRequestId !== null
               || pendingCommandCopyRequestId !== null
             }
-            enabledActions={['UPDATE', 'COPY_NEW']}
+            mode={addingCommand ? 'CREATE' : 'EDIT'}
+            enabledActions={addingCommand
+              ? ['CREATE_NEW']
+              : ['UPDATE', 'COPY_NEW']}
             onSubmit={(intent) => {
               const requestId = intent.action === 'COPY_NEW'
+                || intent.action === 'CREATE_NEW'
                 ? submitCommandCopy(intent)
                 : submitCommandUpdate(intent);
               if (requestId) {
                 setStatus({
                   level: 'warn',
-                  text: intent.action === 'COPY_NEW'
-                    ? 'Copying command...'
-                    : 'Updating command...',
+                  text: intent.action === 'CREATE_NEW'
+                    ? 'Adding command...'
+                    : intent.action === 'COPY_NEW'
+                      ? 'Copying command...'
+                      : 'Updating command...',
                 });
               } else {
                 setStatus({
                   level: 'error',
-                  text: intent.action === 'COPY_NEW'
-                    ? 'The command copy could not be started.'
-                    : 'The command update could not be started.',
+                  text: intent.action === 'CREATE_NEW'
+                    ? 'The new command could not be started.'
+                    : intent.action === 'COPY_NEW'
+                      ? 'The command copy could not be started.'
+                      : 'The command update could not be started.',
                 });
               }
             }}
-            onClose={() => setEditingCommandId(null)}
+            onClose={() => {
+              setEditingCommandId(null);
+              setAddingCommand(false);
+            }}
           />
         )}
         {snapshot && pendingReconnect && (

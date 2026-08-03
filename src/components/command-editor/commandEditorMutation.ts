@@ -1,7 +1,7 @@
 import type { CommandEditorBaseDraft } from './commandEditorDraft';
 import type { CommandEditorPlacement } from './commandEditorPlacement';
 
-export type CommandEditorMutationAction = 'UPDATE' | 'COPY_NEW';
+export type CommandEditorMutationAction = 'UPDATE' | 'COPY_NEW' | 'CREATE_NEW';
 
 export interface CommandEditorMutationIntent {
   action: CommandEditorMutationAction;

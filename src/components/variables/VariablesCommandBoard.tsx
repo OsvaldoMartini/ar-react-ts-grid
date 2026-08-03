@@ -108,6 +108,7 @@ export interface VariablesCommandBoardProps {
   onResolveVisibleConnections?: (scope: VariablesConnectionScope) => void;
   onReviewVisibleConnections?: (scope: VariablesConnectionScope) => void;
   onReleaseVisibleConnections?: (scope: VariablesConnectionScope) => void;
+  onAddCommand?: () => void;
   className?: string;
 }
 
@@ -188,6 +189,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
   onResolveVisibleConnections,
   onReviewVisibleConnections,
   onReleaseVisibleConnections,
+  onAddCommand,
   className,
 }) => {
   const [commandSearch, setCommandSearch] = useState('');
@@ -320,6 +322,11 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
   const releaseConnectionsEvent = useMemo<RulesCardEvent>(() => ({
     color: 'red',
     rules: 'RELEASE CONNECTIONS',
+    ts: 0,
+  }), []);
+  const addCommandEvent = useMemo<RulesCardEvent>(() => ({
+    color: 'green',
+    rules: 'ADD',
     ts: 0,
   }), []);
 
@@ -519,6 +526,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
             onResolveVisibleConnections
             || onReviewVisibleConnections
             || onReleaseVisibleConnections
+            || onAddCommand
           ) && (
             <div
               className={styles.connectionActions}
@@ -553,6 +561,19 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                     onReleaseVisibleConnections(visibleConnectionScope)}
                   disabled={disabled || visibleConnectionScope.visibleCount === 0}
                   title={`Release connections for ${visibleConnectionScope.label}`}
+                />
+              )}
+              {onAddCommand && (
+                <RulesCard
+                  event={addCommandEvent}
+                  className={styles.quickReconnectButton}
+                  iconNode={<SquarePen size={14} aria-hidden="true" />}
+                  animate={false}
+                  pulse={false}
+                  glow={false}
+                  onClick={onAddCommand}
+                  disabled={disabled || blocks.length === 0}
+                  title="Add a new command to this Bot Job"
                 />
               )}
             </div>

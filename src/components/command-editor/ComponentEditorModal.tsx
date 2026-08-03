@@ -2,6 +2,7 @@ import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { PencilLine, X } from 'lucide-react';
 import SearchBox, { type SearchBoxOption } from '../SearchBox';
 import InstructionCommandBadge from '../bot-job-details/grid/InstructionCommandBadge';
+import { instructionCommandPresentation } from '../bot-job-details/grid/domain/instructionCommandPresentation';
 import type {
   ComponentEditorBlockOption,
   ComponentEditorCommand,
@@ -52,6 +53,7 @@ export interface ComponentEditorModalProps {
   pending?: boolean;
   onSubmit?: (intent: CommandEditorMutationIntent) => void;
   enabledActions?: readonly CommandEditorMutationAction[];
+  mode?: 'EDIT' | 'CREATE';
   onClose: () => void;
 }
 
@@ -79,6 +81,7 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
   pending = false,
   onSubmit,
   enabledActions = ['UPDATE', 'COPY_NEW'],
+  mode = 'EDIT',
   onClose,
 }) => {
   const titleId = useId();
@@ -87,7 +90,9 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
   const closeRef = useRef<HTMLButtonElement>(null);
   const initialTargetBlockId = command.blockId ?? 0;
   const [targetBlockId, setTargetBlockId] = useState(initialTargetBlockId);
-  const [placementValue, setPlacementValue] = useState('KEEP');
+  const [placementValue, setPlacementValue] = useState(
+    mode === 'CREATE' ? 'END' : 'KEEP',
+  );
   const originalCommandCode = canonicalInstructionAction(command.action);
   const [selectedCommandCode, setSelectedCommandCode] = useState(originalCommandCode);
   const [draft, setDraft] = useState(() => commandEditorBaseDraft(command));
@@ -157,7 +162,7 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
   useEffect(() => {
     const nextTargetBlockId = command.blockId ?? 0;
     setTargetBlockId(nextTargetBlockId);
-    setPlacementValue('KEEP');
+    setPlacementValue(mode === 'CREATE' ? 'END' : 'KEEP');
     setRelationshipWarning(null);
     setSelectedCommandCode(canonicalInstructionAction(command.action));
     setDraft({
@@ -181,6 +186,7 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
     command.operation,
     command.storedConfiguration,
     command.variableId,
+    mode,
   ]);
 
   const configurationEditor = draft.configuration.kind === 'LOOP'
@@ -363,7 +369,11 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
               <PencilLine size={22} aria-hidden="true" />
               <h2 id={titleId}>Command Editor</h2>
             </div>
-            <p id={descriptionId}>Review and update the selected command configuration.</p>
+            <p id={descriptionId}>
+              {mode === 'CREATE'
+                ? 'Add a new disconnected command to the active Bot Job.'
+                : 'Review and update the selected command configuration.'}
+            </p>
           </div>
           <button
             ref={closeRef}
@@ -381,7 +391,7 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
           <section className={styles.context} aria-label="Command Editor context">
             <div><span>Bot Job</span><strong>#{botJobId} {botJobName}</strong></div>
             <div><span>Original position</span><strong>{scopeLabel}</strong></div>
-            <b>EDIT MODE</b>
+            <b>{mode === 'CREATE' ? 'ADD MODE' : 'EDIT MODE'}</b>
           </section>
 
           <section className={styles.summary} aria-label="Command Editor summary">
@@ -433,9 +443,11 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
 
           <section className={styles.selectedCommand} aria-label="Selected command">
             <div>
-              <span>Selected command</span>
+              <span>{mode === 'CREATE' ? 'New command' : 'Selected command'}</span>
               <strong>
-                #{command.instructionOrder ?? '?'} {command.instructionName}
+                {mode === 'CREATE'
+                  ? instructionCommandPresentation(selectedCommandCode).label
+                  : `#${command.instructionOrder ?? '?'} ${command.instructionName}`}
               </strong>
             </div>
             <div>
@@ -447,7 +459,7 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
             </div>
             <div>
               <span>Instruction ID</span>
-              <strong>{command.instructionId}</strong>
+              <strong>{mode === 'CREATE' ? 'NEW' : command.instructionId}</strong>
             </div>
             <div>
               <span>Block</span>
@@ -469,24 +481,38 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
           <button type="button" className={styles.cancelButton} disabled={pending} onClick={onClose}>
             CANCEL
           </button>
-          <button
-            type="button"
-            className={styles.copyButton}
-            disabled={!canSubmit || !enabledActions.includes('COPY_NEW')}
-            title={onSubmit ? 'Create a disconnected copy with a new instruction ID' : 'Command persistence is not connected yet'}
-            onClick={() => submit('COPY_NEW')}
-          >
-            COPY NEW
-          </button>
-          <button
-            type="button"
-            className={styles.updateButton}
-            disabled={!canSubmit || !enabledActions.includes('UPDATE')}
-            title={onSubmit ? 'Update the selected instruction' : 'Command persistence is not connected yet'}
-            onClick={() => submit('UPDATE')}
-          >
-            UPDATE
-          </button>
+          {mode === 'CREATE' ? (
+            <button
+              type="button"
+              className={styles.updateButton}
+              disabled={!canSubmit || !enabledActions.includes('CREATE_NEW')}
+              title={onSubmit ? 'Add a new disconnected command' : 'Command persistence is not connected yet'}
+              onClick={() => submit('CREATE_NEW')}
+            >
+              ADD COMMAND
+            </button>
+          ) : (
+            <>
+              <button
+                type="button"
+                className={styles.copyButton}
+                disabled={!canSubmit || !enabledActions.includes('COPY_NEW')}
+                title={onSubmit ? 'Create a disconnected copy with a new instruction ID' : 'Command persistence is not connected yet'}
+                onClick={() => submit('COPY_NEW')}
+              >
+                COPY NEW
+              </button>
+              <button
+                type="button"
+                className={styles.updateButton}
+                disabled={!canSubmit || !enabledActions.includes('UPDATE')}
+                title={onSubmit ? 'Update the selected instruction' : 'Command persistence is not connected yet'}
+                onClick={() => submit('UPDATE')}
+              >
+                UPDATE
+              </button>
+            </>
+          )}
         </footer>
       </section>
       {relationshipWarning && (

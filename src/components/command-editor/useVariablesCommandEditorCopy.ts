@@ -17,6 +17,7 @@ export interface VariablesCommandCopyResult {
   message: string;
   errorCode: string;
   createdInstructionId: number | null;
+  action: 'COPY_NEW' | 'CREATE_NEW';
 }
 
 interface Context {
@@ -33,6 +34,7 @@ interface Pending {
   workspaceEpoch: number;
   webSocket: WebSocket;
   timeoutId: ReturnType<typeof setTimeout>;
+  action: 'COPY_NEW' | 'CREATE_NEW';
 }
 
 const DEFAULT_TIMEOUT_MS = 15_000;
@@ -40,9 +42,13 @@ let sequence = 0;
 const objectValue = (value: unknown): Record<string, any> | null =>
   value !== null && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, any> : null;
-const failure = (requestId: string, message: string): VariablesCommandCopyResult => ({
+const failure = (
+  requestId: string,
+  message: string,
+  action: 'COPY_NEW' | 'CREATE_NEW' = 'COPY_NEW',
+): VariablesCommandCopyResult => ({
   ok: false, requestId, message,
-  errorCode: 'COMMAND_COPY_CLIENT_REFUSED', createdInstructionId: null,
+  errorCode: 'COMMAND_COPY_CLIENT_REFUSED', createdInstructionId: null, action,
 });
 
 export const useVariablesCommandEditorCopy = ({
@@ -68,7 +74,8 @@ export const useVariablesCommandEditorCopy = ({
       || snapshot.workspaceEpoch !== pending.workspaceEpoch) {
       clearPending();
       onResult(failure(pending.requestId,
-        'The Variables workspace changed before command copy completed.'));
+        'The Variables workspace changed before command creation completed.',
+        pending.action));
     }
   }, [clearPending, connected, onResult, snapshot, webSocket]);
 
@@ -81,12 +88,13 @@ export const useVariablesCommandEditorCopy = ({
   const submit = useCallback((intent: CommandEditorMutationIntent): string | null => {
     const capability = snapshot?.mutationCapability;
     const configuration = intent.draft.configuration;
+    const action = intent.action;
     // LEGACY drafts (no-config commands such as GET/REFRESH) travel as the
     // wire kind NONE so command transformations into them can persist.
     const wireConfiguration = configuration.kind === 'LEGACY'
       ? { kind: 'NONE' }
       : configuration;
-    if (intent.action !== 'COPY_NEW'
+    if ((action !== 'COPY_NEW' && action !== 'CREATE_NEW')
       || !snapshot || !capability || !connected || !webSocket
       || webSocket.readyState !== WebSocket.OPEN || pendingRef.current) return null;
     sequence = sequence >= Number.MAX_SAFE_INTEGER ? 1 : sequence + 1;
@@ -95,11 +103,13 @@ export const useVariablesCommandEditorCopy = ({
       if (pendingRef.current?.requestId !== requestId) return;
       clearPending();
       onResult(failure(requestId,
-        'Command copy timed out. The original command remains unchanged.'));
+        'Command creation timed out. The original commands remain unchanged.',
+        action));
     }, timeoutMs);
     pendingRef.current = {
       requestId, bindingEpoch: snapshot.bindingEpoch,
       workspaceEpoch: snapshot.workspaceEpoch, webSocket, timeoutId,
+      action,
     };
     setPendingRequestId(requestId);
     try {
@@ -113,7 +123,10 @@ export const useVariablesCommandEditorCopy = ({
           workspaceEpoch: snapshot.workspaceEpoch,
           baseGraphVersion: capability.graphVersion,
           graphRevision: capability.graphRevision,
-          sourceInstructionId: intent.sourceInstructionId,
+          sourceInstructionId: action === 'CREATE_NEW'
+            ? null
+            : intent.sourceInstructionId,
+          createBlank: action === 'CREATE_NEW',
           targetBlockId: intent.targetBlockId,
           placement: {
             kind: intent.placement.kind,
@@ -127,7 +140,7 @@ export const useVariablesCommandEditorCopy = ({
       return requestId;
     } catch (_) {
       clearPending();
-      onResult(failure(requestId, 'The command copy could not be sent.'));
+      onResult(failure(requestId, 'The command creation could not be sent.', action));
       return null;
     }
   }, [clearPending, connected, onResult, snapshot, timeoutMs, webSocket]);
@@ -151,6 +164,7 @@ export const useVariablesCommandEditorCopy = ({
       errorCode: typeof body.errorCode === 'string' ? body.errorCode.trim() : '',
       createdInstructionId: Number.isSafeInteger(Number(body.createdInstructionId))
         ? Number(body.createdInstructionId) : null,
+      action: pending.action,
     });
     return true;
   }, [clearPending, onResult]);
