@@ -65,10 +65,6 @@ import {
   type VariablesCommandUpdateResult,
 } from './command-editor/useVariablesCommandEditorUpdate';
 import {
-  useVariablesVariableAutoResolve,
-  type VariablesVariableAutoResolveResult,
-} from './variables/useVariablesVariableAutoResolve';
-import {
   useVariablesCommandEditorCopy,
   type VariablesCommandCopyResult,
 } from './command-editor/useVariablesCommandEditorCopy';
@@ -478,8 +474,6 @@ const batchSourceLabels = (
   };
 };
 
-const VARIABLES_AUTO_CREATE_OPTION = '__VARIABLES_AUTO_CREATE__';
-
 const batchResolveModalItems = (
   snapshot: VariableWorkspaceSnapshot,
   review: VariablesBatchResolveReview,
@@ -504,31 +498,19 @@ const batchResolveModalItems = (
           : item.resolution === 'BLOCKED'
             ? 'SELECT PARENT FIRST'
             : 'SKIPPED';
-  // DEFAULT VARIABLE CREATED rule: a variable command with no compatible
-  // variable gets a synthetic auto-create option resolved server-side.
-  const autoCreate = item.kind === 'VARIABLE_BINDING'
-    && item.resolution === 'UNAVAILABLE';
   return {
     id: item.reviewId,
     blockId: source.blockId,
     sourceLabel: source.label,
     sourceSublabel: source.sublabel,
     relationLabel: batchRelationshipLabel(item.kind),
-    state: autoCreate ? 'DEFAULT VARIABLE CREATED' : state,
-    stateTone: autoCreate ? 'blue' : stateTone,
+    state,
+    stateTone,
     currentTargetLabel: relationshipTargetLabel(
       snapshot,
       item.currentTarget,
     ),
-    compatibleOptions: autoCreate
-      ? [{
-          value: VARIABLES_AUTO_CREATE_OPTION,
-          label: 'Create + connect a default variable automatically',
-          sublabel: 'Variable_N / Left_Operand / Right_Operand',
-          badges: [{ text: 'AUTO', tone: 'green' as const }],
-          keywords: 'auto create default variable',
-        }]
-      : item.compatibleTargets.map(target => ({
+    compatibleOptions: item.compatibleTargets.map(target => ({
       value: relationshipTargetValue(target),
       label: relationshipTargetLabel(snapshot, target)
         ?? `${target.entity} ID ${target.id}`,
@@ -540,11 +522,9 @@ const batchResolveModalItems = (
         relationshipTargetLabel(snapshot, target),
       ].join(' '),
     })),
-    initialOptionValue: autoCreate
-      ? VARIABLES_AUTO_CREATE_OPTION
-      : item.selectedTarget
-        ? relationshipTargetValue(item.selectedTarget)
-        : null,
+    initialOptionValue: item.selectedTarget
+      ? relationshipTargetValue(item.selectedTarget)
+      : null,
   };
 });
 
@@ -1185,28 +1165,6 @@ const VariablesPage: React.FC<Props> = ({
     onResult: handleCommandUpdateResult,
   });
 
-  const handleVariableAutoResolveResult = useCallback((
-    result: VariablesVariableAutoResolveResult,
-  ) => {
-    setStatus({
-      level: result.ok ? 'ok' : 'error',
-      text: result.message || (result.ok
-        ? 'Variables resolved.'
-        : 'The variable resolution was refused.'),
-    });
-    if (result.ok) sendWorkspaceRequest('variablesWorkspace.refresh');
-  }, [sendWorkspaceRequest]);
-
-  const {
-    submit: submitVariableAutoResolve,
-    handleMessage: handleVariableAutoResolveMessage,
-  } = useVariablesVariableAutoResolve({
-    webSocket,
-    connected,
-    snapshot,
-    onResult: handleVariableAutoResolveResult,
-  });
-
   const handleCommandCopyResult = useCallback((
     result: VariablesCommandCopyResult,
   ) => {
@@ -1323,7 +1281,6 @@ const VariablesPage: React.FC<Props> = ({
       if (handleCommandCreateMessage(raw)) return;
       if (handleCommandCopyMessage(raw)) return;
       if (handleCommandUpdateMessage(raw)) return;
-      if (handleVariableAutoResolveMessage(raw)) return;
       if (handleInstructionCopyMessage(raw)) return;
       if (handleVariableCreateMessage(raw)) return;
       if (handleVariableDeleteMessage(raw)) return;
@@ -1410,7 +1367,6 @@ const VariablesPage: React.FC<Props> = ({
     handleCommandCreateMessage,
     handleCommandCopyMessage,
     handleCommandUpdateMessage,
-    handleVariableAutoResolveMessage,
     handleInstructionCopyMessage,
     handleRuntimeMemoryMessage,
     handleVariableCreateMessage,
@@ -1647,13 +1603,7 @@ const VariablesPage: React.FC<Props> = ({
     sourceInstructionId: number,
     pendingText: string,
     committedText: string,
-    options: {
-      keepConnectionsOpen?: boolean;
-      afterCommitted?: (fresh: {
-        committedGraphVersion: number;
-        graphRevision: string;
-      }) => void;
-    } = {},
+    options: { keepConnectionsOpen?: boolean } = {},
   ) => {
     const keepConnectionsOpen = options.keepConnectionsOpen === true;
     setStatus({ level: 'warn', text: pendingText });
@@ -1669,10 +1619,6 @@ const VariablesPage: React.FC<Props> = ({
           text: response.message || committedText,
         });
         sendWorkspaceRequest('variablesWorkspace.refresh');
-        options.afterCommitted?.({
-          committedGraphVersion: response.committedGraphVersion,
-          graphRevision: response.graphRevision,
-        });
       },
       refused: (response, reason) => {
         setPendingReconnect(null);
@@ -2190,18 +2136,9 @@ const VariablesPage: React.FC<Props> = ({
       setStatus({ level: 'error', text: scopedPlan.message });
       return;
     }
-    const autoCreateInstructionIds = new Set<number>();
     const choicesById = new Map<string, VariablesBatchResolveChoice>();
     for (const resolution of submission.resolutions) {
       const item = reviewedItemsById.get(resolution.itemId);
-      if (
-        item
-        && resolution.optionValue === VARIABLES_AUTO_CREATE_OPTION
-        && item.kind === 'VARIABLE_BINDING'
-      ) {
-        autoCreateInstructionIds.add(item.sourceInstructionId);
-        continue;
-      }
       const target = item?.compatibleTargets.find(candidate =>
         relationshipTargetValue(candidate) === resolution.optionValue);
       if (!item || !target) {
@@ -2217,60 +2154,12 @@ const VariablesPage: React.FC<Props> = ({
         target,
       });
     }
-    // CHECKVALUE right operands are repaired server-side: include every scoped
-    // check command in the auto-resolve scope (only MISSING slots are filled).
-    const factActions = new Map(
-      (current.mutationCapability?.instructionFacts ?? []).map(fact =>
-        [fact.instructionId, canonicalInstructionAction(fact.action)]),
-    );
-    const checkInstructionIds = scopedInstructionIds.filter(instructionId =>
-      ['CK', 'PDF CHECK', 'CSV CHECK'].includes(
-        factActions.get(instructionId) ?? ''));
-    const autoResolveScope = [...new Set([
-      ...autoCreateInstructionIds,
-      ...checkInstructionIds,
-    ])];
-    const runAutoResolve = (fresh?: {
-      committedGraphVersion: number;
-      graphRevision: string;
-    }) => {
-      const requestId = submitVariableAutoResolve({
-        instructionIds: autoResolveScope,
-        baseGraphVersion: fresh?.committedGraphVersion,
-        graphRevision: fresh?.graphRevision,
-      });
-      if (requestId) {
-        setStatus({
-          level: 'warn',
-          text: `Resolving variables for ${autoResolveScope.length} command(s)...`,
-        });
-      }
-      return requestId;
-    };
     const choices = [...choicesById.values()];
-    if (choices.length === 0 && autoResolveScope.length > 0) {
-      if (!runAutoResolve()) {
-        setStatus({
-          level: 'error',
-          text: 'The variable resolution could not be sent.',
-        });
-      }
-      return;
-    }
     const built = buildVariablesBatchResolveMutation(
       scopedPlan.plan,
       choices,
     );
     if (!built.ok) {
-      if (built.code === 'NO_CHANGES' && autoResolveScope.length > 0) {
-        if (!runAutoResolve()) {
-          setStatus({
-            level: 'error',
-            text: 'The variable resolution could not be sent.',
-          });
-        }
-        return;
-      }
       if (built.code === 'REVIEW_REQUIRED') {
         const reviewed = reviewVariablesBatchResolve(
           scopedPlan.plan,
@@ -2300,16 +2189,10 @@ const VariablesPage: React.FC<Props> = ({
       built.mutation.changedInstructionIds[0] ?? 0,
       `Resolving ${built.mutation.changedInstructionIds.length} visible command(s)...`,
       `${built.mutation.changedInstructionIds.length} visible command(s) resolved.`,
-      {
-        keepConnectionsOpen: true,
-        afterCommitted: autoResolveScope.length > 0
-          ? fresh => { runAutoResolve(fresh); }
-          : undefined,
-      },
+      { keepConnectionsOpen: true },
     );
   }, [
     pendingConnections,
-    submitVariableAutoResolve,
     submitVariablesMutation,
   ]);
 
