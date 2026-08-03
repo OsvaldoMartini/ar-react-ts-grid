@@ -23,7 +23,11 @@ import {
   resolveInstructionDragGroup,
   type InstructionMovePlan,
 } from '../domain/instructionMove';
-import { planBotJobInstructionFreeMove } from '../domain/instructionFreeMove';
+import {
+  planBotJobConditionalFreeMove,
+  planBotJobInstructionFreeMove,
+  type InstructionFreeMovePlan,
+} from '../domain/instructionFreeMove';
 import {
   buildInstructionFreeMoveMutationDraft,
   type InstructionFreeMoveChoice,
@@ -755,6 +759,85 @@ export function useGridData(deps: UseGridDataDeps) {
     setIsDataReordered(false);
   };
 
+  const commitConditionalFreeMove = (plan: InstructionFreeMovePlan) => {
+    const mutation = buildInstructionFreeMoveMutationDraft({
+      plan,
+      choices: [],
+    });
+    if (!mutation.ok) {
+      setAlertImage(forbiddenImage);
+      setAlertClass('construction-image');
+      setAlertMessageHeader('IF-family Move Not Sent');
+      setAlertMessageBody(mutation.message);
+      setAlertMessageFooter('The IF family and its body commands remain unchanged.');
+      setAlertOnConfirm(undefined);
+      setErrorFlag(true);
+      return;
+    }
+
+    const previousRows = instructionsData;
+    const projectedRows = [...plan.layoutRows];
+    const restoreRows = () => {
+      setInstructionsData(previousRows);
+      setGroupedData(groupByBlock(previousRows));
+      setIsDataReordered(false);
+    };
+    const requestId = submitBotJobGraphMutation(
+      mutation.draft,
+      {
+        rollback: (reason) => {
+          restoreRows();
+          if (reason === 'UNMOUNTED') return;
+          setAlertImage(warningRedImage);
+          setAlertClass('construction-image');
+          setAlertMessageHeader('IF-family Move Not Confirmed');
+          setAlertMessageBody(
+            `The selected boundary was restored because the graph mutation did not complete (${reason}).`,
+          );
+          setAlertMessageFooter('No IF-family body command was moved.');
+          setAlertOnConfirm(undefined);
+          setErrorFlag(true);
+        },
+        committed: (response) => {
+          setBotJobGraphMutationCapability(current => current
+            ? {
+                ...current,
+                graphVersion: response.committedGraphVersion,
+                graphRevision: response.graphRevision,
+              }
+            : current);
+        },
+        refused: (response) => {
+          setAlertImage(warningRedImage);
+          setAlertClass('construction-image');
+          setAlertMessageHeader('IF-family Move Refused');
+          setAlertMessageBody(response.message);
+          setAlertMessageFooter('The selected boundary was restored.');
+          setAlertOnConfirm(undefined);
+          setErrorFlag(true);
+        },
+      },
+    );
+    if (!requestId) {
+      restoreRows();
+      setAlertImage(forbiddenImage);
+      setAlertClass('construction-image');
+      setAlertMessageHeader('IF-family Move Not Sent');
+      setAlertMessageBody(
+        'The IF-family graph mutation is not synchronized with the backend.',
+      );
+      setAlertMessageFooter('Refresh this workspace and try again.');
+      setAlertOnConfirm(undefined);
+      setErrorFlag(true);
+      return;
+    }
+    setMoveGraphRevision('');
+    setMemoryCapabilities(new Map());
+    setGroupedData(groupByBlock(projectedRows));
+    setInstructionsData(projectedRows);
+    setIsDataReordered(false);
+  };
+
   // React owns grouping and final-layout validation. Java receives exactly one
   // complete version-2 persistence layout after this planner succeeds.
   const applyDragMove = (result: any) => {
@@ -790,6 +873,49 @@ export function useGridData(deps: UseGridDataDeps) {
       return;
     }
 
+    const draggedInstruction = instructionsData.find(row => row.id === instructionId);
+    const draggedAction = draggedInstruction
+      ? canonicalInstructionAction(draggedInstruction.actions)
+      : '';
+    if (CONDITIONAL_FREE_MOVE_ACTIONS.has(draggedAction)) {
+      if (workspaceKind !== 'BOT_JOB' || botJobGraphMutationCapability === null) {
+        setAlertImage(forbiddenImage);
+        setAlertClass('construction-image');
+        setAlertMessageHeader('IF-family Move Not Available');
+        setAlertMessageBody(
+          'Wait for the authoritative Bot Job graph, then retry this boundary move.',
+        );
+        setAlertMessageFooter('No IF-family command was moved.');
+        setAlertOnConfirm(undefined);
+        setErrorFlag(true);
+        return;
+      }
+      const conditionalPlan = planBotJobConditionalFreeMove(
+        instructionsData,
+        instructionId,
+        destinationBlockId,
+        destination.index,
+        workspaceBlocks,
+      );
+      if (!conditionalPlan.ok) {
+        setAlertImage(forbiddenImage);
+        setAlertClass('construction-image');
+        setAlertMessageHeader('IF-family Drag & Drop Not Allowed');
+        setAlertMessageBody(
+          conditionalPlan.error || 'This move breaks the IF-family rules.',
+        );
+        setAlertMessageFooter(
+          'Keep IF, ELSEIF(s), ELSE, and ENDIF in order inside the same Block.',
+        );
+        setAlertOnConfirm(undefined);
+        setErrorFlag(true);
+        return;
+      }
+      if (!conditionalPlan.changed) return;
+      commitConditionalFreeMove(conditionalPlan);
+      return;
+    }
+
     const plan = planInstructionMove(
       instructionsData,
       variableLinks,
@@ -811,10 +937,6 @@ export function useGridData(deps: UseGridDataDeps) {
     if (!plan.changed && plan.group.length <= 1) return;
 
     if (plan.group.length > 1) {
-      const draggedInstruction = instructionsData.find(row => row.id === instructionId);
-      const draggedAction = draggedInstruction
-        ? canonicalInstructionAction(draggedInstruction.actions)
-        : '';
       const isSingleDetachCandidate =
         workspaceKind === 'BOT_JOB'
         && botJobGraphMutationCapability !== null

@@ -1,6 +1,9 @@
 import type { BlockLoopInstructionLoadDTO } from '../../../instructionsMockData';
 import type { WorkspaceBlock } from './workspaceBlocks';
-import { planBotJobInstructionFreeMove } from './instructionFreeMove';
+import {
+  planBotJobConditionalFreeMove,
+  planBotJobInstructionFreeMove,
+} from './instructionFreeMove';
 
 const block = (
   blockId: number,
@@ -397,5 +400,86 @@ describe('Bot Job single-row free-move planning', () => {
       [130, 30, 3],
     ]);
     expect(rows.map(candidate => candidate.blockOrderNumber)).toEqual([91, 92, 93]);
+  });
+
+  describe('GridItem IF-family free movement', () => {
+    const conditionalRows = (): BlockLoopInstructionLoadDTO[] => [
+      row(101, 10, 1, 1, 'IF', { parentId: 101, parentBlockId: 10 }),
+      row(102, 10, 1, 2, 'PAUSE'),
+      row(103, 10, 1, 3, 'ELSEIF', { parentId: 101, parentBlockId: 10 }),
+      row(104, 10, 1, 4, 'PAUSE'),
+      row(105, 10, 1, 5, 'ELSE', { parentId: 101, parentBlockId: 10 }),
+      row(106, 10, 1, 6, 'PAUSE'),
+      row(107, 10, 1, 7, 'ENDIF', { parentId: 101, parentBlockId: 10 }),
+    ];
+
+    it('moves only the selected boundary and leaves positional body commands independent', () => {
+      const plan = planBotJobConditionalFreeMove(
+        conditionalRows(),
+        103,
+        10,
+        3,
+        [block(10, 1)],
+      );
+
+      expect(plan.ok).toBe(true);
+      expect(plan.changed).toBe(true);
+      expect(idsIn(plan.layoutRows, 10)).toEqual([
+        101, 102, 104, 103, 105, 106, 107,
+      ]);
+      expect(idsIn(plan.layoutRows, 10).filter(id => [102, 104, 106].includes(id)))
+        .toEqual([102, 104, 106]);
+      expect(plan.deferredDiagnostics).toEqual([]);
+    });
+
+    it('refuses a move that changes IF -> ELSEIF(s) -> ELSE -> ENDIF order', () => {
+      const plan = planBotJobConditionalFreeMove(
+        conditionalRows(),
+        105,
+        10,
+        0,
+        [block(10, 1)],
+      );
+
+      expect(plan).toMatchObject({
+        ok: false,
+        changed: false,
+        error: 'Keep the conditional order IF -> ELSEIF(s) -> ELSE -> ENDIF.',
+      });
+    });
+
+    it('refuses an individual IF boundary move to another Block', () => {
+      const plan = planBotJobConditionalFreeMove(
+        conditionalRows(),
+        107,
+        20,
+        0,
+        [block(10, 1), block(20, 2)],
+      );
+
+      expect(plan).toMatchObject({
+        ok: false,
+        changed: false,
+        error: expect.stringContaining('must change Blocks together'),
+      });
+    });
+
+    it('refuses an invalid or disconnected IF family before planning movement', () => {
+      const malformed = conditionalRows().map(candidate =>
+        candidate.id === 105 ? { ...candidate, parentId: null } : candidate);
+      const plan = planBotJobConditionalFreeMove(
+        malformed,
+        105,
+        10,
+        3,
+        [block(10, 1)],
+      );
+
+      expect(plan).toMatchObject({
+        ok: false,
+        changed: false,
+        error: expect.stringContaining('has no IF root'),
+      });
+    });
   });
 });

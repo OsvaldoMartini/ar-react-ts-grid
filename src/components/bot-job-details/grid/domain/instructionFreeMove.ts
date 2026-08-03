@@ -80,6 +80,7 @@ export type InstructionFreeMovePlan = {
 
 const LOOP_ACTIONS = new Set(['LOOP', 'REFRESH_LOOP']);
 const NAVIGATION_ACTIONS = new Set(['GOTO', 'EXCEL GOTO']);
+const CONDITIONAL_ACTIONS = new Set(['IF', 'ELSEIF', 'ELSE', 'ENDIF']);
 
 const failure = (
   instructionId: number,
@@ -507,5 +508,118 @@ export const planBotJobInstructionFreeMove = (
     relationshipImpacts: impacts,
     requiresRelationshipChoice: impacts.some(impact => impact.state === 'CHOICE_REQUIRED'),
     deferredDiagnostics: deferredDiagnostics(catalogRows, instructionId),
+  };
+};
+
+/**
+ * GridItem counterpart of the Variables Page IF-family free-move watcher.
+ * Only the selected structural boundary moves; positional body commands remain
+ * independent. The complete family must stay in one Block and retain the exact
+ * IF -> ELSEIF(s) -> ELSE -> ENDIF boundary order.
+ */
+export const planBotJobConditionalFreeMove = (
+  rows: readonly BlockLoopInstructionLoadDTO[],
+  instructionId: number,
+  destinationBlockId: number,
+  destinationIndex: number,
+  workspaceBlocks: readonly WorkspaceBlock[],
+): InstructionFreeMovePlan => {
+  const source = rows.find(row => row.id === instructionId);
+  if (!source || !CONDITIONAL_ACTIONS.has(actionOf(source))) {
+    return failure(instructionId, 'The dragged instruction is not an IF-family boundary.');
+  }
+  const rootInstructionId = actionOf(source) === 'IF'
+    ? source.id
+    : source.parentId;
+  if (rootInstructionId == null) {
+    return failure(
+      instructionId,
+      `${actionOf(source)} instruction #${instructionId} has no IF root.`,
+    );
+  }
+  const root = rows.find(row => row.id === rootInstructionId);
+  if (!root || actionOf(root) !== 'IF' || root.blockId !== source.blockId) {
+    return failure(
+      instructionId,
+      `Conditional instruction #${instructionId} references a missing IF root.`,
+    );
+  }
+  if (root.parentId !== root.id) {
+    return failure(
+      instructionId,
+      `IF instruction #${root.id} must reference itself.`,
+    );
+  }
+  if (destinationBlockId !== source.blockId) {
+    return failure(
+      instructionId,
+      'IF, ELSEIF, ELSE, and ENDIF must change Blocks together. '
+        + 'Use the IF-family Block transfer instead.',
+    );
+  }
+
+  const conditionalRows = rows.filter(row =>
+    row.blockId === root.blockId && CONDITIONAL_ACTIONS.has(actionOf(row)));
+  const rootsInBlock = conditionalRows.filter(row => actionOf(row) === 'IF');
+  if (rootsInBlock.length !== 1 || rootsInBlock[0].id !== root.id) {
+    return failure(instructionId, 'A Block may contain only one IF family.');
+  }
+  const boundaries = conditionalRows
+    .filter(row => row.id === root.id || row.parentId === root.id)
+    .sort(compareWithinBlock);
+  const boundaryIds = new Set(boundaries.map(row => row.id));
+  if (!boundaryIds.has(instructionId)
+    || boundaries.length !== conditionalRows.length
+    || boundaries.some(row => row.parentBlockId !== root.blockId)) {
+    return failure(
+      instructionId,
+      'Every IF-family boundary must reference its IF root and containing Block.',
+    );
+  }
+  const actions = boundaries.map(actionOf);
+  const expectedActions = [
+    'IF',
+    ...actions.filter(action => action === 'ELSEIF'),
+    'ELSE',
+    'ENDIF',
+  ];
+  if (actions.length !== expectedActions.length
+    || actions.some((action, index) => action !== expectedActions[index])) {
+    return failure(
+      instructionId,
+      'The IF family must remain IF, zero or more ELSEIF, ELSE, ENDIF.',
+    );
+  }
+
+  const plan = planBotJobInstructionFreeMove(
+    rows,
+    instructionId,
+    destinationBlockId,
+    destinationIndex,
+    workspaceBlocks,
+  );
+  if (!plan.ok || !plan.changed) return plan;
+
+  const finalBoundaries = plan.layoutRows
+    .filter(row => boundaryIds.has(row.id))
+    .sort(compareWithinBlock);
+  const finalActions = finalBoundaries.map(actionOf);
+  if (finalBoundaries.length !== boundaries.length
+    || finalBoundaries.some(row => row.blockId !== root.blockId)) {
+    return failure(instructionId, 'The complete IF family must remain in one Block.');
+  }
+  if (finalActions.length !== expectedActions.length
+    || finalActions.some((action, index) => action !== expectedActions[index])) {
+    return failure(
+      instructionId,
+      'Keep the conditional order IF -> ELSEIF(s) -> ELSE -> ENDIF.',
+    );
+  }
+
+  return {
+    ...plan,
+    deferredDiagnostics: plan.deferredDiagnostics.filter(
+      diagnostic => diagnostic.kind !== 'CONDITIONAL_STRUCTURE',
+    ),
   };
 };
