@@ -172,6 +172,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
     activeDraggedInstructionId,
     moveGraphRevision,
     variableLinks,
+    commandConfigurations,
     relationshipEdgesByInstruction,
     botJobRelationshipMutationAuthorityKey,
     botJobRelationshipMutationAvailable,
@@ -742,7 +743,11 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                                   relationshipEdgesByInstruction.get(instruction.id) ?? []
                                 }
                                 variableLinks={variableLinks}
+                                commandConfiguration={
+                                  commandConfigurations.get(instruction.id) ?? null
+                                }
                                 onReconnect={openReconnectPreview}
+                                onEditCommand={() => handleOpenCommandEditor(instruction)}
                               />
                             )}
                             deviceOptionsRow={renderDeviceOptionsRow(instruction)}

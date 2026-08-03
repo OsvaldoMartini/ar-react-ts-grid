@@ -70,6 +70,7 @@ import {
 import constructionImage from '../../../../assets/construction.png';
 import forbiddenImage from '../../../../assets/forbidden.png';
 import warningRedImage from '../../../../assets/warning_red.png';
+import type { VariableCommandConfiguration } from '../../../variablesWorkspace.contract';
 
 type BlockDeleteCapability = {
   canDelete: boolean;
@@ -273,6 +274,9 @@ export function useGridData(deps: UseGridDataDeps) {
 
   const [activeDraggedInstructionId, setActiveDraggedInstructionId] = useState<number | null>(null);
   const [variableLinks, setVariableLinks] = useState<InstructionVariableLink[]>([]);
+  const [commandConfigurations, setCommandConfigurations] = useState<
+    Map<number, VariableCommandConfiguration>
+  >(new Map());
   const [relationshipChipsV1, setRelationshipChipsV1] = useState(false);
   const [
     botJobGraphMutationCapability,
@@ -349,6 +353,7 @@ export function useGridData(deps: UseGridDataDeps) {
     setMemoryCapabilities(new Map());
     setBlockDeleteCapabilities(new Map());
     setVariableLinks([]);
+    setCommandConfigurations(new Map());
     setRelationshipChipsV1(false);
     setBotJobGraphMutationCapability(null);
     pendingCapabilityRequestRef.current = null;
@@ -1340,6 +1345,49 @@ export function useGridData(deps: UseGridDataDeps) {
               }))
             : [];
           setVariableLinks(variableLinks);
+          const commandConfigurations = new Map<number, VariableCommandConfiguration>();
+          if (Array.isArray(bodyData?.commandConfigurations)) {
+            bodyData.commandConfigurations.forEach((candidate: {
+              instructionId?: unknown;
+              commandType?: unknown;
+              conditionSource?: unknown;
+              leftVariableId?: unknown;
+              operandKind?: unknown;
+              comparisonOperator?: unknown;
+              operandRawValue?: unknown;
+              operandVariableId?: unknown;
+              outputKey?: unknown;
+              outputColumn?: unknown;
+              outputFile?: unknown;
+              externalSourceKey?: unknown;
+              formatPolicy?: unknown;
+            } | null) => {
+              const instructionId = Number(candidate?.instructionId);
+              if (!Number.isSafeInteger(instructionId) || instructionId <= 0) return;
+              const nullableId = (value: unknown): number | null => {
+                if (value == null) return null;
+                const parsed = Number(value);
+                return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
+              };
+              const text = (value: unknown): string =>
+                typeof value === 'string' ? value : '';
+              commandConfigurations.set(instructionId, {
+                commandType: text(candidate?.commandType),
+                conditionSource: text(candidate?.conditionSource),
+                leftVariableId: nullableId(candidate?.leftVariableId),
+                operandKind: text(candidate?.operandKind),
+                comparisonOperator: text(candidate?.comparisonOperator),
+                operandRawValue: text(candidate?.operandRawValue),
+                operandVariableId: nullableId(candidate?.operandVariableId),
+                outputKey: text(candidate?.outputKey),
+                outputColumn: text(candidate?.outputColumn),
+                outputFile: text(candidate?.outputFile),
+                externalSourceKey: text(candidate?.externalSourceKey),
+                formatPolicy: text(candidate?.formatPolicy),
+              });
+            });
+          }
+          setCommandConfigurations(commandConfigurations);
           const responseWorkspaceEpoch = Number(bodyData?.workspaceEpoch);
           setRelationshipChipsV1(
             workspaceKind === 'BOT_JOB'
@@ -3103,6 +3151,7 @@ export function useGridData(deps: UseGridDataDeps) {
     activeDraggedInstructionId,
     moveGraphRevision,
     variableLinks,
+    commandConfigurations,
     relationshipChipsV1,
     botJobRelationshipMutationAuthorityKey,
     botJobRelationshipMutationAvailable,

@@ -87,6 +87,24 @@
   border-color: #7546a8;
 }
 
+.checkOperator {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 16px;
+  min-width: 28px;
+  padding: 1px 6px;
+  border: 1px solid #5d8fc2;
+  border-radius: 999px;
+  background: #eaf3fc;
+  color: #0b5394;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
 .neutral {
   background: #eef2f5;
   color: #52606d;

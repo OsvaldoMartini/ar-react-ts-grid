@@ -39,6 +39,7 @@ import {
   type VariablesReconnectRelationKind,
 } from './variables/domain/variablesReconnectMutation';
 import { variableValuePresentation } from './variables/domain/variableValuePresentation';
+import { hidesLegacyVariableOperation } from './variables/domain/legacyVariableOperation';
 import { orderRuntimeVariablesByExecution } from './variables/domain/variableExecutionOrder';
 import RuntimeMemoryPanel from './variables/RuntimeMemoryPanel';
 import AddVariableModal, {
@@ -622,7 +623,7 @@ const InstructionCard: React.FC<{
     </div>
     <strong>{instruction.name || 'Unnamed instruction'}</strong>
     <span className={styles.location}>{instructionLocation(instruction)}</span>
-    {canonicalInstructionAction(instruction.command) !== 'GET'
+    {!hidesLegacyVariableOperation(instruction.command)
       && instruction.operation && (
       <code className={styles.operation} title={instruction.operation}>
         {instruction.operation}

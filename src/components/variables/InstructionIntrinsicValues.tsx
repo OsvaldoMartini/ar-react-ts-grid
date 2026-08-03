@@ -81,7 +81,7 @@ const InstructionIntrinsicValues: React.FC<InstructionIntrinsicValuesProps> = (p
     || canonicalAction === 'GOTO';
 
   return (
-    <span className={styles.values} title={presentation.title}>
+    <span className={styles.values}>
       {presentation.rows.map(row => (
         <span key={row.label} className={styles.row}>
           <span className={styles.label}>{row.label}</span>

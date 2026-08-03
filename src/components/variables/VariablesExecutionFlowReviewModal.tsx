@@ -24,6 +24,7 @@ import InstructionIntrinsicValues, {
   instructionIntrinsicValuePresentation,
 } from './InstructionIntrinsicValues';
 import styles from './VariablesExecutionFlowReviewModal.module.scss';
+import { hidesLegacyVariableOperation } from './domain/legacyVariableOperation';
 
 export interface VariablesExecutionFlowReviewModalProps {
   review: VariablesExecutionFlowReview;
@@ -458,7 +459,9 @@ const VariablesExecutionFlowReviewModal: React.FC<
                             />
                           </div>
                           <small>{step.action} · Instruction ID {step.instructionId ?? 'Missing'}</small>
-                          {step.operation && instructionIntrinsicValuePresentation(step) === null && (
+                          {step.operation
+                            && !hidesLegacyVariableOperation(step.action)
+                            && instructionIntrinsicValuePresentation(step) === null && (
                             <code className={styles.operation} title={step.operation}>
                               {step.operation}
                             </code>

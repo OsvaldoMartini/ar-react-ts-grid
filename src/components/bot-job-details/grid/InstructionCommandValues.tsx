@@ -77,7 +77,7 @@ const InstructionCommandValues: React.FC<InstructionCommandValuesProps> = props 
 
   const className = [styles.values, props.className].filter(Boolean).join(' ');
   return (
-    <span className={className} title={presentation.title}>
+    <span className={className}>
       {presentation.rows.map(row => (
         <span key={row.label} className={styles.valueRow}>
           <span className={styles.valueLabel}>{row.label}</span>

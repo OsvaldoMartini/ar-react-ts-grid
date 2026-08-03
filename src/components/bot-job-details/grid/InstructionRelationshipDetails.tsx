@@ -13,6 +13,7 @@ import type {
 } from './domain/instructionRelationshipGraph';
 import { instructionRelationshipPolicy } from './domain/instructionRelationshipPolicy';
 import type { WorkspaceBlock } from './domain/workspaceBlocks';
+import type { VariableCommandConfiguration } from '../../variablesWorkspace.contract';
 import InstructionCommandValues from './InstructionCommandValues';
 import styles from './InstructionRelationshipDetails.module.scss';
 
@@ -31,8 +32,11 @@ export interface InstructionRelationshipDetailsProps {
    */
   relationshipStates?: readonly RelationshipMutationState[];
   variableLinks?: readonly InstructionVariableLink[];
+  commandConfiguration?: VariableCommandConfiguration | null;
   /** Opens the shared reconnect presentation for one exact graph edge. */
   onReconnect?: (edge: InstructionRelationshipEdge) => void;
+  /** Opens the typed command editor for comparison-variable changes. */
+  onEditCommand?: () => void;
   reconnectDisabled?: boolean;
 }
 
@@ -66,57 +70,9 @@ const humanizeCode = (code: string | null): string =>
         .join(' ')
     : '';
 
-/**
- * This is the legacy GridItem operation presentation without its validation
- * side effects. Relationship health is supplied by the typed graph and rendered
- * as chips; a broken relationship must not erase this grid column.
- */
 const renderOperationContent = (
   instruction: BlockLoopInstructionLoadDTO,
 ): React.ReactNode => {
-  // GET is relationship-authored: its Web Element and runtime Variable are
-  // rendered by the connection chips. The historical operation text is not
-  // execution authority and must not be projected into the grid.
-  const validActions = ['SET'];
-
-  if (
-    (
-      instruction.actions === 'CK'
-      || instruction.actions === 'CSV CHECK'
-      || instruction.actions === 'PDF CHECK'
-    )
-    && instruction.operation
-  ) {
-    const [left, middle, right] = instruction.operation
-      .split(':')
-      .map(part => part.trim());
-
-    if (
-      middle === '='
-      || middle === '>'
-      || middle === '<'
-      || middle === '!='
-      || middle === 'contains'
-    ) {
-      const rightLabel = instruction.actions === 'CSV CHECK'
-        ? 'CSV VALUES'
-        : instruction.actions === 'PDF CHECK'
-          ? 'PDF VALUES'
-          : right;
-      const rightDisplay = middle === 'contains' ? `( ${rightLabel} )` : rightLabel;
-
-      return (
-        <>
-          <span style={{ color: '#FFA500' }}>
-            ({instruction.variableId}){left}
-          </span>{' '}
-          <span style={{ color: '#0b5394' }}>{middle}</span>{' '}
-          <span style={{ color: '#FFA500' }}>{rightDisplay}</span>
-        </>
-      );
-    }
-  }
-
   if (
     instruction.actions === 'LOOP'
     || instruction.actions === 'REFRESH_LOOP'
@@ -133,25 +89,6 @@ const renderOperationContent = (
       />
     );
   }
-
-  if (validActions.includes(instruction.actions) && instruction.operation) {
-    const [, right] = instruction.operation.split(':');
-    // The parent reference is rendered exclusively by the relationship chip
-    // ("Parent connected (id: N) Name" / red "Reconnect Parent").
-    return (
-      <span style={{ color: '#FFA500' }}>{right}</span>
-    );
-  }
-
-  if (instruction.actions === 'E' && instruction.operation) {
-    return (
-      <span style={{ color: '#FFA500' }}>
-        ({instruction.variableId}){instruction.operation}
-      </span>
-    );
-  }
-
-  if (validActions.includes(instruction.actions)) return instruction.actions;
 
   return '\u00a0';
 };
@@ -178,7 +115,9 @@ const InstructionRelationshipDetails: React.FC<
   relationshipEdges = [],
   relationshipStates = [],
   variableLinks = [],
+  commandConfiguration = null,
   onReconnect,
+  onEditCommand,
   reconnectDisabled = false,
 }) => {
   // Every structural attachment a command can carry via parent_id/parent_block_id
@@ -277,6 +216,21 @@ const InstructionRelationshipDetails: React.FC<
     : variableLinks.find(variable => variable.id === connectedVariableId)
         ?.name?.trim() || 'Variable';
   const connectedVariableText = `${connectedVariableName} (id: ${connectedVariableId})`;
+  const variableOnlyCheck = instruction.actions === 'CK'
+    || instruction.actions === 'CSV CHECK'
+    || instruction.actions === 'PDF CHECK';
+  const comparisonOperator = commandConfiguration?.comparisonOperator?.trim() || '=';
+  const secondVariableId = variableOnlyCheck
+    && typeof commandConfiguration?.operandVariableId === 'number'
+    && Number.isSafeInteger(commandConfiguration.operandVariableId)
+    && commandConfiguration.operandVariableId > 0
+      ? commandConfiguration.operandVariableId
+      : null;
+  const secondVariableName = secondVariableId === null
+    ? ''
+    : variableLinks.find(variable => variable.id === secondVariableId)
+        ?.name?.trim() || 'Variable';
+  const secondVariableText = `${secondVariableName} (id: ${secondVariableId})`;
   const reconnectParentEvent: RulesCardEvent | null =
     requiresElementParent
     && connectedParentId === null
@@ -468,6 +422,61 @@ const InstructionRelationshipDetails: React.FC<
                     {connectedVariableText}
                   </span>
                 )
+          )}
+          {variableOnlyCheck && (
+            <span
+              className={styles.checkOperator}
+              aria-label={`Comparison operator ${comparisonOperator}`}
+              title={`Comparison operator ${comparisonOperator}`}
+            >
+              {comparisonOperator}
+            </span>
+          )}
+          {variableOnlyCheck && secondVariableId !== null && (
+            <button
+              type="button"
+              className={[
+                styles.chip,
+                styles.reconnectButton,
+                styles.reconnectVariable,
+              ].join(' ')}
+              aria-label={secondVariableText}
+              title="Change second comparison variable"
+              disabled={reconnectDisabled || !onEditCommand}
+              onMouseDown={event => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation();
+                onEditCommand?.();
+              }}
+            >
+              <Variable size={10} aria-hidden="true" />
+              {secondVariableText}
+            </button>
+          )}
+          {variableOnlyCheck && secondVariableId === null && (
+            <span
+              className={styles.reconnectRuleCard}
+              onMouseDown={event => event.stopPropagation()}
+            >
+              <RulesCard
+                event={{
+                  color: 'red',
+                  rules: 'Reconnect Variable 2',
+                  context: '',
+                  ts: instruction.id,
+                }}
+                compactLabel="VAR 2"
+                ariaLabel="Reconnect variable 2"
+                glow
+                border
+                animate={false}
+                pulse
+                iconNode={<Variable size={10} aria-hidden="true" />}
+                title="Reconnect variable 2 in Command Editor"
+                disabled={reconnectDisabled || !onEditCommand}
+                onClick={onEditCommand}
+              />
+            </span>
           )}
           {chips.map(({ key, state, code, edge }) => {
             const descriptor = CHIP_DESCRIPTORS[state];
