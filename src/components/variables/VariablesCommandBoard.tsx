@@ -39,6 +39,7 @@ import InstructionReferenceIcons, {
   type InstructionReferenceIcon,
 } from './InstructionReferenceIcons';
 import { isVariablesCommandEditorEligible } from '../command-editor/commandEditorEligibility';
+import { isIfFamilyAction } from './domain/ifFamilyRules';
 import styles from './VariablesCommandBoard.module.scss';
 
 export type VariablesCommandDropTarget = {
@@ -616,6 +617,10 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
               {group.instructions.map((instruction, index) => {
                 const instructionId = instruction.id;
                 const policy = instructionRelationshipPolicy(instruction.command);
+                // IF-family links are a closed rule: always auto-connected, so
+                // family rows never show a conditional parent chip and carry
+                // the shared light-yellow family background.
+                const isIfFamilyRow = isIfFamilyAction(instruction.command);
                 // Compact GridItem-style intrinsic values beside the name/ID
                 // column: LOOP/REFRESH_LOOP -> T:/L:, GOTO -> L: (limit),
                 // SWIPE -> R: (repeats). Missing/malformed operations render
@@ -815,6 +820,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                     <article
                       className={[
                         styles.row,
+                        isIfFamilyRow ? styles.rowIfFamily : '',
                         selected ? styles.rowSelected : '',
                         dragging ? styles.rowDragging : '',
                         canDrag ? '' : styles.rowLocked,
@@ -985,7 +991,8 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                                 </span>
                               )
                         )}
-                        {reconnectOtherParentEvent && instructionId !== null && (
+                        {reconnectOtherParentEvent && instructionId !== null
+                          && !isIfFamilyRow && (
                           <span
                             className={styles.reconnectRuleCard}
                             onMouseDown={event => event.stopPropagation()}
@@ -1016,7 +1023,8 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                             />
                           </span>
                         )}
-                        {connectedStructuralId !== null && instructionId !== null && (
+                        {connectedStructuralId !== null && instructionId !== null
+                          && !isIfFamilyRow && (
                           otherParentEdge && onReconnectParent
                             ? (
                                 <button

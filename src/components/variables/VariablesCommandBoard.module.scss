@@ -249,6 +249,11 @@
     opacity 120ms ease;
 }
 
+/* IF-family rows share the grid's light-yellow row background (closed rule). */
+.rowIfFamily {
+  background: #ffffe0;
+}
+
 .row:hover {
   border-color: #91abc5;
 }

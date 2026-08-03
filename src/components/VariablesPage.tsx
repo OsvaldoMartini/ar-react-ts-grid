@@ -95,6 +95,11 @@ import {
   watchVariablesConditionalBlockTransfer,
 } from './variables/domain/variablesConditionalFamilyWatcher';
 import { planIfFamilyAutoRepair } from './variables/domain/ifFamilyAutoRepair';
+import {
+  planVariableAutoResolve,
+  type VariableAutoResolvePlan,
+} from './variables/domain/variableAutoResolvePlan';
+import { commandEditorConfiguration } from './command-editor/commandEditorDraft';
 import { useVariablesGraphMutation } from './variables/useVariablesGraphMutation';
 import {
   useVariablesInstructionCopy,
@@ -913,9 +918,59 @@ const VariablesPage: React.FC<Props> = ({
     createdIds: number[];
   } | null>(null);
 
+  // Resolve Connections rules 5+6 (independent TS rebuild, 2026-08-03):
+  // user-triggered run that creates missing variables, binds them, then saves
+  // CK right operands - each phase through the existing proven persistence ops.
+  const variableAutoResolveRunRef = useRef<{
+    phase: 'CREATING' | 'BINDINGS' | 'RIGHT_OPERANDS';
+    plan: VariableAutoResolvePlan;
+    createIndex: number;
+    createdIdByName: Map<string, number>;
+    submittedBindings: boolean;
+    stalls: number;
+  } | null>(null);
+
   const handleVariableCreateResult = useCallback((
     result: VariablesCreateResult,
   ) => {
+    const autoRun = variableAutoResolveRunRef.current;
+    if (autoRun && autoRun.phase === 'CREATING') {
+      const creation = autoRun.plan.creations[autoRun.createIndex];
+      if (!result.ok || result.variableId === null || !creation) {
+        variableAutoResolveRunRef.current = null;
+        setStatus({
+          level: 'error',
+          text: result.error
+            || 'Auto-resolve stopped: a variable could not be created.',
+        });
+        return;
+      }
+      autoRun.createdIdByName.set(creation.name, result.variableId);
+      autoRun.createIndex += 1;
+      const next = autoRun.plan.creations[autoRun.createIndex];
+      if (next) {
+        const requestId = submitVariableCreateRef.current({ name: next.name });
+        if (!requestId) {
+          variableAutoResolveRunRef.current = null;
+          setStatus({
+            level: 'error',
+            text: `Auto-resolve stopped: “${next.name}” could not be started.`,
+          });
+          return;
+        }
+        setStatus({
+          level: 'warn',
+          text: `Auto-resolve: creating variable “${next.name}” (${autoRun.createIndex + 1} of ${autoRun.plan.creations.length})...`,
+        });
+        return;
+      }
+      autoRun.phase = 'BINDINGS';
+      setStatus({
+        level: 'warn',
+        text: 'Auto-resolve: variables created. Connecting commands...',
+      });
+      return;
+    }
     const batch = createVariableBatchRef.current;
     if (result.ok && batch) {
       if (result.variableId !== null) batch.createdIds.push(result.variableId);
@@ -1150,6 +1205,9 @@ const VariablesPage: React.FC<Props> = ({
   const handleCommandUpdateResult = useCallback((
     result: VariablesCommandUpdateResult,
   ) => {
+    if (!result.ok && variableAutoResolveRunRef.current) {
+      variableAutoResolveRunRef.current = null;
+    }
     setStatus({
       level: result.ok ? 'ok' : 'error',
       text: result.message || (result.ok
@@ -1675,6 +1733,172 @@ const VariablesPage: React.FC<Props> = ({
       'IF family links reconnected automatically.',
     );
   }, [connected, pendingMutationRequestId, snapshot, submitVariablesMutation]);
+
+  // Rules 5+6 driver: advances the user-triggered auto-resolve run as fresh
+  // snapshots arrive. Every phase submits through an existing op; a refusal or
+  // a persistent stall clears the run with a visible error - never a loop.
+  useEffect(() => {
+    const run = variableAutoResolveRunRef.current;
+    if (!run || !snapshot || run.phase === 'CREATING') return;
+    const stalled = (): void => {
+      run.stalls += 1;
+      if (run.stalls > 6) {
+        variableAutoResolveRunRef.current = null;
+        setStatus({
+          level: 'error',
+          text: 'Auto-resolve stopped: the workspace did not reach the expected state.',
+        });
+      }
+    };
+    if (run.phase === 'BINDINGS') {
+      if (pendingMutationRequestId !== null) return;
+      if (run.submittedBindings) {
+        run.phase = 'RIGHT_OPERANDS';
+      } else {
+        const capability = snapshot.mutationCapability;
+        if (!capability) {
+          variableAutoResolveRunRef.current = null;
+          setStatus({
+            level: 'error',
+            text: 'Auto-resolve stopped: the Variables graph is not editable.',
+          });
+          return;
+        }
+        const visibleVariables = new Set(snapshot.variables.map(entry => entry.id));
+        const createdIds = [...run.createdIdByName.values()];
+        if (createdIds.some(id => !visibleVariables.has(id))) {
+          stalled();
+          return;
+        }
+        const factById = new Map(
+          capability.instructionFacts.map(fact => [fact.instructionId, fact]),
+        );
+        const patches = run.plan.bindings.flatMap((binding) => {
+          const fact = factById.get(binding.instructionId);
+          const replacement = binding.variableId
+            ?? (binding.pendingName
+              ? run.createdIdByName.get(binding.pendingName) ?? null
+              : null);
+          if (!fact || fact.variableId !== null || replacement === null) return [];
+          return [{
+            instructionId: binding.instructionId,
+            operation: 'SET' as const,
+            expected: { value: fact.variableId },
+            replacement: { value: replacement },
+          }];
+        });
+        run.submittedBindings = true;
+        if (patches.length === 0) {
+          run.phase = 'RIGHT_OPERANDS';
+        } else {
+          submitVariablesMutation(
+            {
+              mutationKind: 'RELATIONSHIP_UPDATE',
+              draggedInstructionId: null,
+              layoutRows: capability.layoutRows.map(row => ({ ...row })),
+              instructionRelationPatches: [],
+              variableBindingPatches: patches,
+              variableOwnerPatches: [],
+            },
+            VARIABLES_REACT_AUTHORED_PROFILE,
+            run.plan.bindings[0].instructionId,
+            `Auto-resolve: connecting ${patches.length} command variable(s)...`,
+            'Auto-resolve: command variables connected.',
+          );
+          return;
+        }
+      }
+    }
+    if (run.phase === 'RIGHT_OPERANDS') {
+      if (pendingCommandUpdateRequestId !== null || pendingMutationRequestId !== null) return;
+      const commandsById = new Map(
+        snapshot.commands.flatMap(command =>
+          command.id === null ? [] : [[command.id, command] as const]),
+      );
+      const next = run.plan.rightOperands.find((item) => {
+        const command = commandsById.get(item.instructionId);
+        if (!command) return false;
+        const configuration = command.commandConfiguration;
+        return !configuration
+          || configuration.operandKind !== 'VARIABLE'
+          || !configuration.operandVariableId;
+      });
+      if (!next) {
+        variableAutoResolveRunRef.current = null;
+        setStatus({
+          level: 'ok',
+          text: 'Auto-resolve completed: variables created and connected (rules 5+6).',
+        });
+        return;
+      }
+      const command = commandsById.get(next.instructionId);
+      const replacement = next.variableId
+        ?? (next.pendingName
+          ? run.createdIdByName.get(next.pendingName) ?? null
+          : null);
+      if (!command
+        || command.blockId === null
+        || replacement === null
+        || !command.variableId
+        || !snapshot.variables.some(entry => entry.id === replacement)) {
+        stalled();
+        return;
+      }
+      const targetBlockId = command.blockId;
+      const base = commandEditorConfiguration(
+        command.command,
+        command.operation,
+        command.onHoldSeconds ?? null,
+        command.commandConfiguration ?? null,
+        command.variableId ?? null,
+      );
+      if (base.kind !== 'CHECK_VALUE' && base.kind !== 'EXTERNAL_CHECK') {
+        variableAutoResolveRunRef.current = null;
+        setStatus({
+          level: 'error',
+          text: `Auto-resolve stopped: command #${next.instructionId} has no comparison configuration.`,
+        });
+        return;
+      }
+      const requestId = submitCommandUpdate({
+        action: 'UPDATE',
+        sourceInstructionId: next.instructionId,
+        targetBlockId,
+        placement: { kind: 'KEEP' },
+        draft: {
+          name: command.name,
+          action: command.command,
+          operation: command.operation,
+          configuration: {
+            ...base,
+            operandKind: 'VARIABLE',
+            operandVariableId: replacement,
+          },
+        },
+        allowRelationshipDisconnect: false,
+        allowConditionalFamilyDissolve: false,
+        conditionalFamilyDeleteIds: [],
+      });
+      if (!requestId) {
+        variableAutoResolveRunRef.current = null;
+        setStatus({
+          level: 'error',
+          text: 'Auto-resolve stopped: the second comparison variable could not be started.',
+        });
+        return;
+      }
+      setStatus({
+        level: 'warn',
+        text: `Auto-resolve: saving second comparison variable for command #${next.instructionId}...`,
+      });
+    }
+  }, [
+    pendingCommandUpdateRequestId,
+    pendingMutationRequestId,
+    snapshot,
+    submitCommandUpdate,
+    submitVariablesMutation,
+  ]);
 
   const handleCommandDrop = useCallback((
     target: VariablesCommandDropTarget,
@@ -2375,6 +2599,50 @@ const VariablesPage: React.FC<Props> = ({
     });
   }, [submitVariableCreate]);
 
+  const startVariableAutoResolve = useCallback(() => {
+    const current = snapshotRef.current;
+    if (!current || variableAutoResolveRunRef.current) return;
+    const plan = planVariableAutoResolve(current);
+    if (plan.creations.length === 0
+      && plan.bindings.length === 0
+      && plan.rightOperands.length === 0) {
+      setStatus({
+        level: 'ok',
+        text: 'All commands already have their variables connected (rules 5+6).',
+      });
+      return;
+    }
+    variableAutoResolveRunRef.current = {
+      phase: plan.creations.length > 0 ? 'CREATING' : 'BINDINGS',
+      plan,
+      createIndex: 0,
+      createdIdByName: new Map(),
+      submittedBindings: false,
+      stalls: 0,
+    };
+    if (plan.creations.length > 0) {
+      const first = plan.creations[0];
+      const requestId = submitVariableCreateRef.current({ name: first.name });
+      if (!requestId) {
+        variableAutoResolveRunRef.current = null;
+        setStatus({
+          level: 'error',
+          text: 'Variables is busy, disconnected, or read-only. Auto-resolve was not started.',
+        });
+        return;
+      }
+      setStatus({
+        level: 'warn',
+        text: `Auto-resolve: creating variable “${first.name}” (1 of ${plan.creations.length})...`,
+      });
+      return;
+    }
+    setStatus({
+      level: 'warn',
+      text: 'Auto-resolve: connecting variables to commands...',
+    });
+  }, []);
+
   const confirmClearAllValues = useCallback(() => {
     if (!clearAllValues()) {
       setStatus({
@@ -2494,6 +2762,15 @@ const VariablesPage: React.FC<Props> = ({
                   ? status.text
                   : `Reconnecting${reconnectAttempts ? ` (${reconnectAttempts})` : ''}`}
               </div>
+              <button
+                type="button"
+                className={styles.autoVariablesButton}
+                title="Create and connect missing command variables (rules 5+6)"
+                disabled={mutationDisabled}
+                onClick={startVariableAutoResolve}
+              >
+                AUTO VARIABLES
+              </button>
               <PagesOpenButton
                 webSocket={webSocket}
                 connected={connected}
