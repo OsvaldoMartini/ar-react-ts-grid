@@ -79,6 +79,12 @@ export interface VariablesConnectionsModalProps {
   pending?: boolean;
   onCancel: () => void;
   onConfirm: (submission: VariablesConnectionsModalSubmission) => void;
+  /**
+   * NEW 2026-08-03 (user order): the red "Resolve Parents(X) Vars(Y)" click
+   * only creates the missing CheckValue default variables (Left_Operand /
+   * Right_Operand). The owner page performs the creation.
+   */
+  onCreateCheckValueDefaults?: () => void;
 }
 
 const focusableSelector = [
@@ -165,6 +171,7 @@ const VariablesConnectionsModal: React.FC<
   pending = false,
   onCancel,
   onConfirm,
+  onCreateCheckValueDefaults,
 }) => {
   const titleId = useId();
   const descriptionId = useId();
@@ -243,12 +250,10 @@ const VariablesConnectionsModal: React.FC<
   const hasRedVariable = workloads.variableItems.some(
     item => item.stateTone === 'red',
   );
-  // The red Parents/Vars button is ALWAYS clickable - it opens the
-  // variables-to-fix message modal even when nothing is resolvable yet.
+  // The red Parents/Vars button is ALWAYS clickable - even when nothing is
+  // resolvable yet, it triggers the CheckValue default-variable creation.
   const confirmDisabled = pending
     || (confirmCount === 0 && !(mode === 'RESOLVE' && hasRedVariable));
-  const [variablesToFix, setVariablesToFix] =
-    useState<readonly VariablesConnectionReviewItem[] | null>(null);
 
   const confirmEvent = useMemo<RulesCardEvent>(() => (
     mode === 'RESOLVE'
@@ -274,13 +279,13 @@ const VariablesConnectionsModal: React.FC<
     if (confirmDisabled) return;
     if (mode === 'RESOLVE') {
       // Read the workloads AGAIN at click time (user order): a red variable
-      // workload opens the variables-to-fix message modal - nothing more.
+      // workload triggers ONLY the CheckValue default-variable creation.
       const clicked = resolveConnectionsWorkloads(visibleItems);
       const redVariables = clicked.variableItems.filter(
         item => item.stateTone === 'red',
       );
       if (redVariables.length > 0) {
-        setVariablesToFix(redVariables);
+        onCreateCheckValueDefaults?.();
         return;
       }
     }
@@ -535,35 +540,6 @@ const VariablesConnectionsModal: React.FC<
           <VariablesConnectionsHelpModal
             onClose={() => setHelpOpen(false)}
           />
-        )}
-        {variablesToFix && (
-          <div
-            className={styles.varsFixBackdrop}
-            onMouseDown={(event) => {
-              if (event.target === event.currentTarget) setVariablesToFix(null);
-            }}
-          >
-            <section
-              role="dialog"
-              aria-modal="true"
-              aria-label="Variables to be fixed"
-              className={styles.varsFixDialog}
-            >
-              <h3>Variables to be fixed ({variablesToFix.length})</h3>
-              <ul className={styles.varsFixList}>
-                {variablesToFix.map(item => (
-                  <li key={item.id}>{item.sourceLabel}</li>
-                ))}
-              </ul>
-              <button
-                type="button"
-                className={styles.cancelButton}
-                onClick={() => setVariablesToFix(null)}
-              >
-                Close
-              </button>
-            </section>
-          </div>
         )}
       </section>
     </div>

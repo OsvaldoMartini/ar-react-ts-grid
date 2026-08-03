@@ -2599,6 +2599,50 @@ const VariablesPage: React.FC<Props> = ({
     });
   }, [submitVariableCreate]);
 
+  // NEW 2026-08-03 (user order): the red "Resolve Parents(X) Vars(Y)" click
+  // creates ONLY the missing CheckValue default variables. If the frozen
+  // variable list contains any CK / CSV CHECK / PDF CHECK command, the
+  // Left_Operand / Right_Operand variables are created DIRECTLY when absent -
+  // never duplicated, never blocked, no existence messages. Nothing else runs.
+  const createCheckValueDefaultVariables = useCallback(() => {
+    const current = snapshotRef.current;
+    if (!current || !pendingConnections || pendingConnections.mode !== 'RESOLVE') {
+      return;
+    }
+    const commandsById = new Map(
+      current.commands.flatMap(command =>
+        command.id === null ? [] : [[command.id, command] as const]),
+    );
+    const checkActions = new Set(['CK', 'CSV CHECK', 'PDF CHECK']);
+    const hasCheckValue = pendingConnections.review.items.some(item =>
+      item.kind === 'VARIABLE_BINDING'
+      && checkActions.has(canonicalInstructionAction(
+        commandsById.get(item.sourceInstructionId)?.command)));
+    if (!hasCheckValue) return;
+    const existingNames = new Set(
+      current.variables.map(variable => variable.name.trim().toLowerCase()),
+    );
+    const toCreate = [
+      ...(existingNames.has('left_operand') ? [] : ['Left_Operand']),
+      ...(existingNames.has('right_operand') ? [] : ['Right_Operand']),
+    ];
+    if (toCreate.length === 0) return;
+    createVariableBatchRef.current = {
+      names: toCreate,
+      nextIndex: 0,
+      createdIds: [],
+    };
+    const requestId = submitVariableCreate({ name: toCreate[0] });
+    if (!requestId) {
+      createVariableBatchRef.current = null;
+      return;
+    }
+    setStatus({
+      level: 'warn',
+      text: `Creating CheckValue default variable “${toCreate[0]}”...`,
+    });
+  }, [pendingConnections, submitVariableCreate]);
+
   const startVariableAutoResolve = useCallback(() => {
     const current = snapshotRef.current;
     if (!current || variableAutoResolveRunRef.current) return;
@@ -3305,6 +3349,7 @@ const VariablesPage: React.FC<Props> = ({
             onBlockFiltersChange={changeConnectionsBlockFilters}
             pending={pendingMutationRequestId !== null}
             onConfirm={submitVisibleConnections}
+            onCreateCheckValueDefaults={createCheckValueDefaultVariables}
             onCancel={() => {
               if (pendingMutationRequestId !== null) return;
               setPendingConnections(null);
