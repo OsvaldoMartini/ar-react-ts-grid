@@ -68,20 +68,43 @@ const VariablesConnectionsHelpModal: React.FC<
             <h3>Connection selection rules</h3>
             <ul>
               <li>
-                <strong>AUTO SELECTED:</strong> Exactly one compatible target
-                exists, so it selects automatically.
+                <strong>AUTO SELECTED — Web Elements:</strong> Exactly one
+                compatible Web Element exists, so it is selected automatically.
               </li>
               <li>
-                <strong>SELECT TARGET:</strong> Multiple compatible targets
-                exist. The first available target at the top is selected
-                automatically, and you can change it before resolving.
+                <strong>SELECT TARGET — Web Elements:</strong> Multiple
+                compatible Web Elements exist. The first compatible Web Element
+                is selected automatically, but you can change it before resolving.
               </li>
               <li>
-                <strong>NO COMPATIBLE TARGET:</strong> Zero valid targets exist.
+                <strong>NO COMPATIBLE TARGET — Web Elements:</strong> No
+                compatible Web Element exists. The parent remains unresolved for
+                the client to configure later.
               </li>
               <li>
-                <strong>SELECT PARENT FIRST:</strong> Another parent relationship
-                must be resolved before the variable target can be calculated.
+                <strong>VARIABLE AUTO RESOLUTION:</strong> Variables are
+                independent of Web Element parents and are always resolved
+                separately.
+              </li>
+              <li>
+                <strong>DEFAULT VARIABLE CREATED:</strong> If a command requires
+                a variable and none exists, a sequential variable such as
+                Variable_1 is created and connected automatically.
+              </li>
+              <li>
+                <strong>CHECKVALUE VARIABLES:</strong> CHECKVALUE requires two
+                independent variables. The oldest compatible variable becomes
+                Left_Operand, and the next becomes Right_Operand. Missing operands
+                are created automatically.
+              </li>
+              <li>
+                <strong>IF FAMILY CREATED:</strong> Adding IF automatically
+                creates IF → ELSE → ENDIF. Additional ELSEIF commands may be
+                inserted between IF and ELSE.
+              </li>
+              <li>
+                <strong>EXCEL GOTO LIMITED:</strong> Only one active EXCEL GOTO is
+                allowed per Bot Job. It requires a Return Block and an End Block.
               </li>
             </ul>
           </section>
