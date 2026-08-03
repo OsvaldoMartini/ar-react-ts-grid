@@ -195,6 +195,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
     handleEditInstruction,
     handleSaveInstruction,
     submitInstructionRelationshipMutation,
+    submitCheckOperand,
     handleMoveRowUp,
     handleMoveRowDown,
     handleRowSelectedClick,
@@ -226,6 +227,70 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
       setReconnectPreview(null);
     }
   }, [botJobRelationshipMutationAuthorityKey, reconnectPreview]);
+  const [secondOperandPreview, setSecondOperandPreview] = React.useState<{
+    instructionId: number;
+    authorityKey: string;
+  } | null>(null);
+  React.useEffect(() => {
+    if (
+      secondOperandPreview
+      && secondOperandPreview.authorityKey
+        !== botJobRelationshipMutationAuthorityKey
+    ) {
+      setSecondOperandPreview(null);
+    }
+  }, [botJobRelationshipMutationAuthorityKey, secondOperandPreview]);
+  const secondOperandInstruction = secondOperandPreview
+    ? instructionsData.find(
+        instruction => instruction.id === secondOperandPreview.instructionId,
+      ) ?? null
+    : null;
+  const secondOperandConfiguration = secondOperandInstruction
+    ? commandConfigurations.get(secondOperandInstruction.id) ?? null
+    : null;
+  const secondOperandCurrentId =
+    typeof secondOperandConfiguration?.operandVariableId === 'number'
+    && Number.isSafeInteger(secondOperandConfiguration.operandVariableId)
+    && secondOperandConfiguration.operandVariableId > 0
+      ? secondOperandConfiguration.operandVariableId
+      : null;
+  const secondOperandOwner = {
+    workspaceKind: 'BOT_JOB' as const,
+    homeBankingId: homeBankingIdInitial ?? -1,
+    botJobId: botJobId ?? -1,
+  };
+  const secondOperandEdge: InstructionRelationshipEdge | null =
+    secondOperandInstruction
+      ? {
+          id: `second-operand:${secondOperandInstruction.id}`,
+          kind: 'VARIABLE_BINDING',
+          source: {
+            entity: 'INSTRUCTION',
+            owner: secondOperandOwner,
+            id: secondOperandInstruction.id,
+          },
+          target: secondOperandCurrentId === null
+            ? null
+            : {
+                entity: 'VARIABLE',
+                owner: secondOperandOwner,
+                id: secondOperandCurrentId,
+              },
+          state: secondOperandCurrentId === null
+            ? 'RECONNECT_VARIABLE'
+            : 'CONNECTED',
+          code: null,
+          required: true,
+          compatibleTargets: variableLinks
+            .filter(variable =>
+              typeof variable.id === 'number' && variable.id > 0)
+            .map(variable => ({
+              entity: 'VARIABLE' as const,
+              owner: secondOperandOwner,
+              id: variable.id as number,
+            })),
+        }
+      : null;
   const reconnectPreviewInstruction =
     reconnectPreviewEdge?.source.entity === 'INSTRUCTION'
       ? instructionsData.find(
@@ -503,6 +568,43 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
           onCancel={() => setReconnectPreview(null)}
         />
       )}
+      {secondOperandEdge && secondOperandInstruction && (
+        <ReconnectWebElement
+          edge={secondOperandEdge}
+          sourceLabel={`#${secondOperandInstruction.instructionOrderNumber} ${
+            secondOperandInstruction.name || secondOperandInstruction.actions
+          } · ID ${secondOperandInstruction.id} · second comparison variable`}
+          currentTargetLabel={secondOperandEdge.target
+            ? reconnectTargetLabel(
+                secondOperandEdge.target,
+                instructionsData,
+                workspaceBlocks,
+                variableLinks,
+              )
+            : null}
+          compatibleTargets={secondOperandEdge.compatibleTargets.map(target =>
+            reconnectOption(target, instructionsData, workspaceBlocks, variableLinks))}
+          pending={false}
+          actionsEnabled={
+            !componentWorkspace
+            && botJobRelationshipMutationAvailable
+            && secondOperandPreview?.authorityKey
+              === botJobRelationshipMutationAuthorityKey
+          }
+          actionDisabledTitle="Refresh this workspace before changing the relationship."
+          onDisconnect={() => {
+            if (submitCheckOperand(secondOperandInstruction.id, null)) {
+              setSecondOperandPreview(null);
+            }
+          }}
+          onConnect={(target) => {
+            if (submitCheckOperand(secondOperandInstruction.id, target.id)) {
+              setSecondOperandPreview(null);
+            }
+          }}
+          onCancel={() => setSecondOperandPreview(null)}
+        />
+      )}
       {gridActionNotice && (
         <div className={styles.gridActionNotice} role="status">
           <div className={styles.gridActionNoticeText}>
@@ -748,6 +850,13 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                                 }
                                 onReconnect={openReconnectPreview}
                                 onEditCommand={() => handleOpenCommandEditor(instruction)}
+                                onReconnectSecondVariable={componentWorkspace
+                                  ? undefined
+                                  : () => setSecondOperandPreview({
+                                      instructionId: instruction.id,
+                                      authorityKey:
+                                        botJobRelationshipMutationAuthorityKey ?? '',
+                                    })}
                               />
                             )}
                             deviceOptionsRow={renderDeviceOptionsRow(instruction)}

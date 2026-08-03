@@ -37,6 +37,7 @@ export interface InstructionRelationshipDetailsProps {
   onReconnect?: (edge: InstructionRelationshipEdge) => void;
   /** Opens the typed command editor for comparison-variable changes. */
   onEditCommand?: () => void;
+  onReconnectSecondVariable?: () => void;
   reconnectDisabled?: boolean;
 }
 
@@ -118,6 +119,7 @@ const InstructionRelationshipDetails: React.FC<
   commandConfiguration = null,
   onReconnect,
   onEditCommand,
+  onReconnectSecondVariable,
   reconnectDisabled = false,
 }) => {
   // Every structural attachment a command can carry via parent_id/parent_block_id
@@ -442,11 +444,11 @@ const InstructionRelationshipDetails: React.FC<
               ].join(' ')}
               aria-label={secondVariableText}
               title="Change second comparison variable"
-              disabled={reconnectDisabled || !onEditCommand}
+              disabled={reconnectDisabled || !onReconnectSecondVariable}
               onMouseDown={event => event.stopPropagation()}
               onClick={(event) => {
                 event.stopPropagation();
-                onEditCommand?.();
+                onReconnectSecondVariable?.();
               }}
             >
               <Variable size={10} aria-hidden="true" />
@@ -472,9 +474,9 @@ const InstructionRelationshipDetails: React.FC<
                 animate={false}
                 pulse
                 iconNode={<Variable size={10} aria-hidden="true" />}
-                title="Reconnect variable 2 in Command Editor"
-                disabled={reconnectDisabled || !onEditCommand}
-                onClick={onEditCommand}
+                title="Reconnect variable 2"
+                disabled={reconnectDisabled || !onReconnectSecondVariable}
+                onClick={onReconnectSecondVariable}
               />
             </span>
           )}

@@ -406,6 +406,45 @@ export function useGridData(deps: UseGridDataDeps) {
       : null;
   const botJobRelationshipMutationAvailable =
     botJobRelationshipMutationAuthorityKey !== null;
+  const pendingCheckOperandRequestRef = useRef<string | null>(null);
+  // CHECKVALUE second comparison variable (typed right operand). Persisted by the
+  // dedicated commandEditor.checkOperand backend op against the durable
+  // bot_job_variable_definition table; the server pushes the refreshed grid.
+  const submitCheckOperand = useCallback((
+    instructionId: number,
+    operandVariableId: number | null,
+  ): boolean => {
+    if (
+      workspaceKind !== 'BOT_JOB'
+      || !webSocket
+      || !connected
+      || webSocket.readyState !== WebSocket.OPEN
+      || !moveGraphRevision
+    ) {
+      return false;
+    }
+    const requestId = `${Date.now()}-${instructionId}-check-operand`;
+    pendingCheckOperandRequestRef.current = requestId;
+    webSocket.send(JSON.stringify({
+      type: 'commandEditor.checkOperand',
+      sessionId,
+      homeBankingId,
+      body: JSON.stringify({
+        requestId,
+        targetSessionId,
+        botJobId,
+        homeBankingId,
+        instructionId,
+        operandVariableId,
+        graphRevision: moveGraphRevision,
+      }),
+    }));
+    return true;
+  }, [
+    workspaceKind, webSocket, connected, moveGraphRevision, sessionId,
+    homeBankingId, botJobId, targetSessionId,
+  ]);
+
   const submitInstructionRelationshipMutation = useCallback((
     edge: InstructionRelationshipEdge,
     target: RelationshipTarget | null,
@@ -1095,6 +1134,23 @@ export function useGridData(deps: UseGridDataDeps) {
             memoryListOpenedRef.current = true;
             memoryListOpenRequestedRef.current = false;
             setMemoryListOpenVersion(version => version + 1);
+          }
+        } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "commandEditor.checkOperandResponse") {
+          const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
+          if (String(bodyData?.requestId || '') !== pendingCheckOperandRequestRef.current) return;
+          pendingCheckOperandRequestRef.current = null;
+          if (bodyData?.ok !== true) {
+            setAlertImage(forbiddenImage);
+            setAlertClass('construction-image');
+            setAlertMessageHeader('Variable 2 Not Saved');
+            setAlertMessageBody(String(
+              bodyData?.message || bodyData?.error
+              || 'The second comparison variable was not saved.',
+            ));
+            setAlertMessageFooter('The current second comparison variable remains unchanged.');
+            setAlertOnConfirm(undefined);
+            setAlertAlternateAction(undefined);
+            setErrorFlag(true);
           }
         } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "memoryList.syncResponse") {
           const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
@@ -3176,6 +3232,7 @@ export function useGridData(deps: UseGridDataDeps) {
     handleEditInstruction,
     handleSaveInstruction,
     submitInstructionRelationshipMutation,
+    submitCheckOperand,
     handleMoveRowUp,
     handleMoveRowDown,
     handleRowSelectedClick,
