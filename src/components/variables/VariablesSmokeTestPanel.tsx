@@ -184,18 +184,23 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
       blockKey,
       stepKey: item.kind === 'STEP' ? item.step.key : null,
     });
-    const loopTransition = resolveLoopCommandTransition(
-      executionProgram,
-      itemCursor,
-      commandRemainingRef.current,
-    );
-    const gotoTransition = resolveGotoCommandTransition(
-      executionProgram,
-      itemCursor,
-      commandRemainingRef.current,
-    );
+    const activeStep = item.kind === 'STEP' && item.step.active;
+    const loopTransition = activeStep
+      ? resolveLoopCommandTransition(
+          executionProgram,
+          itemCursor,
+          commandRemainingRef.current,
+        )
+      : null;
+    const gotoTransition = activeStep
+      ? resolveGotoCommandTransition(
+          executionProgram,
+          itemCursor,
+          commandRemainingRef.current,
+        )
+      : null;
     const controlTransition = loopTransition ?? gotoTransition;
-    const waitExecution = item.kind === 'STEP'
+    const waitExecution = activeStep
       ? resolveWaitCommandExecution(item.step)
       : null;
     const executionDelayMs = stepIntervalMs
