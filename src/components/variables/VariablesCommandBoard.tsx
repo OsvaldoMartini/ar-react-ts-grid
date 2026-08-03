@@ -34,6 +34,7 @@ import type {
   VariableWorkspaceBlock,
 } from '../variablesWorkspace.contract';
 import VariablesConnectionsPrimaryAction from './VariablesConnectionsPrimaryAction';
+import VariablesAddCommandButton from './VariablesAddCommandButton';
 import InstructionReferenceIcons, {
   type InstructionReferenceIcon,
 } from './InstructionReferenceIcons';
@@ -325,12 +326,6 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
     rules: 'RELEASE CONNECTIONS',
     ts: 0,
   }), []);
-  const addCommandEvent = useMemo<RulesCardEvent>(() => ({
-    color: 'green',
-    rules: 'ADD',
-    ts: 0,
-  }), []);
-
   const groups = useMemo<CommandGroup[]>(() => {
     const byBlock = new Map<number, CommandGroup>();
     blocks
@@ -565,16 +560,9 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                 />
               )}
               {onAddCommand && (
-                <RulesCard
-                  event={addCommandEvent}
-                  className={styles.quickReconnectButton}
-                  iconNode={<SquarePen size={14} aria-hidden="true" />}
-                  animate={false}
-                  pulse={false}
-                  glow={false}
-                  onClick={onAddCommand}
+                <VariablesAddCommandButton
+                  onAdd={onAddCommand}
                   disabled={disabled || blocks.length === 0}
-                  title="Add a new command to this Bot Job"
                 />
               )}
             </div>
