@@ -612,18 +612,15 @@ const deriveResolveReview = (
     visibleSet,
     new Set<VariablesBatchEditableRelationshipKind>(['VARIABLE_BINDING']),
   );
+  // VARIABLE_BINDING connection REMOVED COMPLETELY 2026-08-03 (user order):
+  // Resolve Connections no longer connects variables - not automatically, not
+  // manually. New variable-connection rules will be written from scratch.
+  // The items are still ENUMERATED (zero targets, nothing selectable, never
+  // submitted) so the red "Resolve Parents(X) Vars(Y)" workload count and the
+  // CheckValue Left_Operand/Right_Operand creation keep reading the list.
   for (const edge of variableEdges) {
     const sourceInstructionId = edge.source.id;
     const reviewId = reviewIdFor(sourceInstructionId, 'VARIABLE_BINDING');
-    const compatibleTargets =
-      compatibleChangingTargets(edge, projectedFacts);
-    const selection = selectReviewTarget(
-      reviewId,
-      compatibleTargets,
-      indexed.choices,
-      true,
-    );
-    if ('ok' in selection) return selection;
     remainingChoiceIds.delete(reviewId);
     items.push(Object.freeze({
       reviewId,
@@ -632,9 +629,9 @@ const deriveResolveReview = (
       state: edge.state,
       code: edge.code,
       currentTarget: edge.target,
-      compatibleTargets,
-      selectedTarget: selection.selectedTarget,
-      resolution: selection.resolution,
+      compatibleTargets: [],
+      selectedTarget: null,
+      resolution: 'UNAVAILABLE',
       blockedByReviewId: null,
     }));
   }
