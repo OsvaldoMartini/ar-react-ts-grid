@@ -1325,6 +1325,7 @@ export function useGridData(deps: UseGridDataDeps) {
                 id?: unknown;
                 instructionId?: unknown;
                 type?: unknown;
+                name?: unknown;
               } | null) => ({
                 id: Number(candidate?.id),
                 instructionId: candidate?.instructionId == null
@@ -1332,6 +1333,9 @@ export function useGridData(deps: UseGridDataDeps) {
                   : Number(candidate.instructionId),
                 type: typeof candidate?.type === 'string'
                   ? candidate.type
+                  : null,
+                name: typeof candidate?.name === 'string'
+                  ? candidate.name
                   : null,
               }))
             : [];

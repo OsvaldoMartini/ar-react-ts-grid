@@ -4,6 +4,9 @@ import type { BlockLoopInstructionLoadDTO } from '../../instructionsMockData';
 import { RulesCard, type RulesCardEvent } from '../../RulesCard';
 import gridStyles from '../../Griditem.module.scss';
 import type {
+  InstructionVariableLink,
+} from './domain/instructionDependency';
+import type {
   InstructionRelationshipEdge,
   RelationshipMutationState,
   RelationshipState,
@@ -26,6 +29,7 @@ export interface InstructionRelationshipDetailsProps {
    * mutations; accepting these states keeps the renderer complete and reusable.
    */
   relationshipStates?: readonly RelationshipMutationState[];
+  variableLinks?: readonly InstructionVariableLink[];
   /** Opens the shared reconnect presentation for one exact graph edge. */
   onReconnect?: (edge: InstructionRelationshipEdge) => void;
   reconnectDisabled?: boolean;
@@ -245,6 +249,7 @@ const InstructionRelationshipDetails: React.FC<
   workspaceBlocks = [],
   relationshipEdges = [],
   relationshipStates = [],
+  variableLinks = [],
   onReconnect,
   reconnectDisabled = false,
 }) => {
@@ -346,9 +351,16 @@ const InstructionRelationshipDetails: React.FC<
           ?.blockName
         ?? '')
       : (allInstructions.find(row => row.id === connectedParentId)?.name ?? '');
-  const connectedParentText = connectedParentName
-    ? `${structuralLabels.connected} (id: ${connectedParentId}) ${connectedParentName}`
-    : `${structuralLabels.connected} (id: ${connectedParentId})`;
+  const connectedParentText = structuralKind === 'ELEMENT_TARGET'
+    ? `id: ${connectedParentId}`
+    : connectedParentName
+      ? `${structuralLabels.connected} (id: ${connectedParentId}) ${connectedParentName}`
+      : `${structuralLabels.connected} (id: ${connectedParentId})`;
+  const connectedVariableName = connectedVariableId === null
+    ? ''
+    : variableLinks.find(variable => variable.id === connectedVariableId)
+        ?.name?.trim() || 'Variable';
+  const connectedVariableText = `${connectedVariableName} (id: ${connectedVariableId})`;
   const reconnectParentEvent: RulesCardEvent | null =
     requiresElementParent
     && connectedParentId === null
@@ -511,7 +523,7 @@ const InstructionRelationshipDetails: React.FC<
                       styles.reconnectButton,
                       styles.reconnectVariable,
                     ].join(' ')}
-                    aria-label={`Variable connected (id: ${connectedVariableId})`}
+                    aria-label={connectedVariableText}
                     title="Change connected variable"
                     data-relationship-state="CONNECTED"
                     disabled={reconnectDisabled}
@@ -522,7 +534,7 @@ const InstructionRelationshipDetails: React.FC<
                     }}
                   >
                     <Variable size={10} aria-hidden="true" />
-                    Variable connected (id: {connectedVariableId})
+                    {connectedVariableText}
                   </button>
                 )
               : (
@@ -532,12 +544,12 @@ const InstructionRelationshipDetails: React.FC<
                       styles.reconnectVariable,
                       styles.connectedStatic,
                     ].join(' ')}
-                    aria-label={`Variable connected (id: ${connectedVariableId})`}
-                    title={`Variable connected (id: ${connectedVariableId})`}
+                    aria-label={connectedVariableText}
+                    title={connectedVariableText}
                     data-relationship-state="CONNECTED"
                   >
                     <Variable size={10} aria-hidden="true" />
-                    Variable connected (id: {connectedVariableId})
+                    {connectedVariableText}
                   </span>
                 )
           )}

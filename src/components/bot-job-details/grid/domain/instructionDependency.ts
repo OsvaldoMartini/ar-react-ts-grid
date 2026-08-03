@@ -51,6 +51,8 @@ export interface InstructionVariableLink {
   instructionId: number | null;
   /** Read-only declaration type supplied with correlated relationship facts. */
   type?: string | null;
+  /** Read-only client-facing variable name. */
+  name?: string | null;
 }
 
 export interface DependencyClosureError {

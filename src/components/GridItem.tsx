@@ -741,6 +741,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                                 relationshipEdges={
                                   relationshipEdgesByInstruction.get(instruction.id) ?? []
                                 }
+                                variableLinks={variableLinks}
                                 onReconnect={openReconnectPreview}
                               />
                             )}

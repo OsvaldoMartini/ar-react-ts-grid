@@ -2460,6 +2460,7 @@ const VariablesPage: React.FC<Props> = ({
                 onBlockFiltersChange={setSharedBlockFilters}
                 blocks={snapshot.blocks}
                 instructions={snapshot.commands}
+                variables={snapshot.variables}
                 relationshipEdges={relationshipGraph?.edges ?? []}
                 disabled={mutationDisabled}
                 unavailableReason={pendingMutationRequestId

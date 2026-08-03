@@ -28,6 +28,7 @@ import {
 } from '../bot-job-details/grid/domain/instructionRelationshipPolicy';
 import InstructionCommandBadge from '../bot-job-details/grid/InstructionCommandBadge';
 import type {
+  VariableGraphEntry,
   VariableInstructionNode,
   VariableWorkspaceBlock,
 } from '../variablesWorkspace.contract';
@@ -56,6 +57,7 @@ export type VariablesConnectionScope = {
 export interface VariablesCommandBoardProps {
   blocks: readonly VariableWorkspaceBlock[];
   instructions: readonly VariableInstructionNode[];
+  variables?: readonly Pick<VariableGraphEntry, 'id' | 'name'>[];
   relationshipEdges?: readonly InstructionRelationshipEdge[];
   /** Stable Bot Job owner key. Changing it clears command-list filters. */
   workspaceIdentityKey?: string | number | null;
@@ -160,6 +162,7 @@ const relationshipTitle = (
 const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
   blocks,
   instructions,
+  variables = [],
   relationshipEdges = [],
   workspaceIdentityKey,
   blockFilters: controlledBlockFilters,
@@ -194,6 +197,10 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
     ? localBlockFilters
     : controlledBlockFilters;
   const selectedBlockIds = useMemo(() => new Set(blockFilters), [blockFilters]);
+  const variableNamesById = useMemo(
+    () => new Map(variables.map(variable => [variable.id, variable.name])),
+    [variables],
+  );
   const commandSearchActive = commandSearch.trim().length > 0;
 
   useEffect(() => {
@@ -718,6 +725,9 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                   : requiresVariableBinding
                     ? configuredVariableId
                     : null;
+                const connectedVariableName = connectedVariableId === null
+                  ? ''
+                  : variableNamesById.get(connectedVariableId)?.trim() || 'Variable';
                 const variableOnlyCheck = rowCanonicalAction === 'CK'
                   || rowCanonicalAction === 'CSV CHECK'
                   || rowCanonicalAction === 'PDF CHECK';
@@ -985,7 +995,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                                 <button
                                   type="button"
                                   className={styles.connectedParent}
-                                  aria-label={`Parent connected (id: ${connectedParentId})`}
+                                  aria-label={`Parent connected, id: ${connectedParentId}`}
                                   title="Change connected Web Element"
                                   disabled={disabled}
                                   onMouseDown={event => event.stopPropagation()}
@@ -999,25 +1009,25 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                                 >
                                   <Link2 size={11} aria-hidden="true" />
                                   <span className={styles.relationshipLabelFull}>
-                                    Parent connected (id: {connectedParentId})
+                                    id: {connectedParentId}
                                   </span>
                                   <span className={styles.relationshipLabelCompact}>
-                                    ID {connectedParentId}
+                                    id: {connectedParentId}
                                   </span>
                                 </button>
                               )
                             : (
                                 <span
                                   className={`${styles.connectedParent} ${styles.connectedStatic}`}
-                                  aria-label={`Parent connected (id: ${connectedParentId})`}
+                                  aria-label={`Parent connected, id: ${connectedParentId}`}
                                   title={`Parent connected (id: ${connectedParentId})`}
                                 >
                                   <Link2 size={11} aria-hidden="true" />
                                   <span className={styles.relationshipLabelFull}>
-                                    Parent connected (id: {connectedParentId})
+                                    id: {connectedParentId}
                                   </span>
                                   <span className={styles.relationshipLabelCompact}>
-                                    ID {connectedParentId}
+                                    id: {connectedParentId}
                                   </span>
                                 </span>
                               )
@@ -1135,7 +1145,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                                 <button
                                   type="button"
                                   className={`${styles.connectedVariable} ${styles.variableButton}`}
-                                  aria-label={`${variableOnlyCheck ? 'Variable 1' : 'Variable'} connected (id: ${connectedVariableId})`}
+                                  aria-label={`${connectedVariableName}, id: ${connectedVariableId}`}
                                   title="Change connected variable"
                                   disabled={disabled}
                                   onMouseDown={event => event.stopPropagation()}
@@ -1149,25 +1159,25 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                                 >
                                   <Variable size={11} aria-hidden="true" />
                                   <span className={styles.relationshipLabelFull}>
-                                    {variableOnlyCheck ? 'Variable 1' : 'Variable'} connected (id: {connectedVariableId})
+                                    {connectedVariableName} (id: {connectedVariableId})
                                   </span>
                                   <span className={styles.relationshipLabelCompact}>
-                                    ID {connectedVariableId}
+                                    {connectedVariableName} (id: {connectedVariableId})
                                   </span>
                                 </button>
                               )
                             : (
                                 <span
                                   className={`${styles.connectedVariable} ${styles.variableButton} ${styles.connectedStatic}`}
-                                  aria-label={`${variableOnlyCheck ? 'Variable 1' : 'Variable'} connected (id: ${connectedVariableId})`}
-                                  title={`${variableOnlyCheck ? 'Variable 1' : 'Variable'} connected (id: ${connectedVariableId})`}
+                                  aria-label={`${connectedVariableName}, id: ${connectedVariableId}`}
+                                  title={`${connectedVariableName} (id: ${connectedVariableId})`}
                                 >
                                   <Variable size={11} aria-hidden="true" />
                                   <span className={styles.relationshipLabelFull}>
-                                    {variableOnlyCheck ? 'Variable 1' : 'Variable'} connected (id: {connectedVariableId})
+                                    {connectedVariableName} (id: {connectedVariableId})
                                   </span>
                                   <span className={styles.relationshipLabelCompact}>
-                                    ID {connectedVariableId}
+                                    {connectedVariableName} (id: {connectedVariableId})
                                   </span>
                                 </span>
                               )
@@ -1185,7 +1195,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                           <button
                             type="button"
                             className={`${styles.connectedVariable} ${styles.variableButton}`}
-                            aria-label={`Variable 2 connected (id: ${secondCheckVariableId})`}
+                            aria-label={`${variableNamesById.get(secondCheckVariableId)?.trim() || 'Variable'}, id: ${secondCheckVariableId}`}
                             title="Change second comparison variable"
                             disabled={disabled || !onEditCommand}
                             onMouseDown={event => event.stopPropagation()}
@@ -1196,10 +1206,10 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                           >
                             <Variable size={11} aria-hidden="true" />
                             <span className={styles.relationshipLabelFull}>
-                              Variable 2 connected (id: {secondCheckVariableId})
+                              {variableNamesById.get(secondCheckVariableId)?.trim() || 'Variable'} (id: {secondCheckVariableId})
                             </span>
                             <span className={styles.relationshipLabelCompact}>
-                              ID {secondCheckVariableId}
+                              {variableNamesById.get(secondCheckVariableId)?.trim() || 'Variable'} (id: {secondCheckVariableId})
                             </span>
                           </button>
                         )}
