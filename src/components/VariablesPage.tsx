@@ -89,6 +89,10 @@ import {
   selectVariablesBlockTransferSources,
   type VariablesBlockTransferScope,
 } from './variables/domain/variablesBlockTransfer';
+import {
+  variablesConditionalFamilyForInstruction,
+  watchVariablesConditionalBlockTransfer,
+} from './variables/domain/variablesConditionalFamilyWatcher';
 import { useVariablesGraphMutation } from './variables/useVariablesGraphMutation';
 import {
   useVariablesInstructionCopy,
@@ -1778,10 +1782,24 @@ const VariablesPage: React.FC<Props> = ({
       });
       return;
     }
+    const conditionalWatch = watchVariablesConditionalBlockTransfer(
+      current,
+      pending.sourceInstructionId,
+      pending.targetBlockId,
+      pending.action,
+    );
+    if (!conditionalWatch.ok) {
+      setPendingBlockTransfer(null);
+      setStatus({ level: 'error', text: conditionalWatch.message });
+      return;
+    }
+    const effectiveScope: VariablesBlockTransferScope = conditionalWatch.family
+      ? 'WITH_PARENTS'
+      : scope;
     const selection = selectVariablesBlockTransferSources(
       current,
       pending.sourceInstructionId,
-      scope,
+      effectiveScope,
     );
     if (!selection.ok) {
       setPendingBlockTransfer(null);
@@ -1794,7 +1812,7 @@ const VariablesPage: React.FC<Props> = ({
         current,
         pending.sourceInstructionId,
         pending.targetBlockId,
-        scope,
+        effectiveScope,
       );
       if (!planned.ok) {
         setPendingBlockTransfer(null);
@@ -1818,7 +1836,7 @@ const VariablesPage: React.FC<Props> = ({
     const requestId = submitInstructionCopy({
       targetBlockId: pending.targetBlockId,
       selectedInstructionId: pending.sourceInstructionId,
-      scope,
+      scope: effectiveScope,
       sourceInstructionIds: selection.selection.sourceInstructionIds,
     });
     if (!requestId) {
@@ -2372,6 +2390,12 @@ const VariablesPage: React.FC<Props> = ({
         snapshot,
         pendingBlockTransfer.sourceInstructionId,
         'WITH_PARENTS',
+      )
+    : null;
+  const blockTransferConditionalFamily = snapshot && pendingBlockTransfer
+    ? variablesConditionalFamilyForInstruction(
+        snapshot,
+        pendingBlockTransfer.sourceInstructionId,
       )
     : null;
   const reconnectSource = snapshot && pendingReconnect
@@ -3141,20 +3165,30 @@ const VariablesPage: React.FC<Props> = ({
         )}
         {pendingBlockTransfer?.stage === 'SCOPE' && (
           <AlertModal
-            header={pendingBlockTransfer.action === 'COPY'
-              ? 'Choose Copy Scope'
-              : 'Choose Move Scope'}
-            body={`Instruction #${pendingBlockTransfer.sourceInstructionId} has `
-              + `${blockTransferSelection?.ok
-                ? Math.max(
-                    0,
-                    blockTransferSelection.selection.sourceInstructionIds.length - 1,
-                  )
-                : 0} explicit parent/dependency instruction(s) available. `
-              + 'Choose only this instruction or include all of those parents.'}
-            extraMsg={pendingBlockTransfer.action === 'COPY'
-              ? 'Every copied instruction receives a fresh ID. Internal parent and variable links are remapped to the new rows.'
-              : 'Move keeps the existing IDs. Relationships that cannot remain valid will become available for reconnect.'}
+            header={blockTransferConditionalFamily
+              ? 'Transfer Complete IF Family?'
+              : pendingBlockTransfer.action === 'COPY'
+                ? 'Choose Copy Scope'
+                : 'Choose Move Scope'}
+            body={blockTransferConditionalFamily
+              ? `IF family #${blockTransferConditionalFamily.rootInstructionId} contains `
+                + `${blockTransferConditionalFamily.boundaryInstructionIds.length} linked `
+                + 'boundaries. IF, ELSEIF, ELSE, and ENDIF always transfer together.'
+              : `Instruction #${pendingBlockTransfer.sourceInstructionId} has `
+                + `${blockTransferSelection?.ok
+                  ? Math.max(
+                      0,
+                      blockTransferSelection.selection.sourceInstructionIds.length - 1,
+                    )
+                  : 0} explicit parent/dependency instruction(s) available. `
+                + 'Choose only this instruction or include all of those parents.'}
+            extraMsg={blockTransferConditionalFamily
+              ? pendingBlockTransfer.action === 'COPY'
+                ? 'New Copy creates fresh IDs and remaps every conditional parent to the new IF root.'
+                : 'Move keeps the existing IDs and updates every conditional parent Block together.'
+              : pendingBlockTransfer.action === 'COPY'
+                ? 'Every copied instruction receives a fresh ID. Internal parent and variable links are remapped to the new rows.'
+                : 'Move keeps the existing IDs. Relationships that cannot remain valid will become available for reconnect.'}
             onClose={() => {
               setPendingBlockTransfer(null);
               setStatus({
@@ -3163,13 +3197,15 @@ const VariablesPage: React.FC<Props> = ({
               });
             }}
             onConfirm={() => submitBlockTransferScope('WITH_PARENTS')}
-            alternateAction={{
-              label: 'ONLY INSTRUCTION',
-              title: 'Transfer only the command that was dropped',
-              onAction: () => submitBlockTransferScope('ONLY_INSTRUCTION'),
-              confirmLabel: 'WITH ALL PARENTS',
-              confirmTitle: 'Transfer the command and its explicit dependency parents',
-            }}
+            alternateAction={blockTransferConditionalFamily
+              ? undefined
+              : {
+                  label: 'ONLY INSTRUCTION',
+                  title: 'Transfer only the command that was dropped',
+                  onAction: () => submitBlockTransferScope('ONLY_INSTRUCTION'),
+                  confirmLabel: 'WITH ALL PARENTS',
+                  confirmTitle: 'Transfer the command and its explicit dependency parents',
+                }}
             imageSrc={warningRedImage}
             imageClass="construction-image"
             error={false}

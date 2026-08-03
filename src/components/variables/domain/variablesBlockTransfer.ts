@@ -15,6 +15,10 @@ import {
   type VariablesFreeMoveClearedRelationship,
   type VariablesReactAuthoredProfile,
 } from './variablesFreeMove';
+import {
+  variablesConditionalFamilyForInstruction,
+  watchVariablesConditionalBlockTransfer,
+} from './variablesConditionalFamilyWatcher';
 
 export type VariablesBlockTransferScope =
   | 'ONLY_INSTRUCTION'
@@ -33,6 +37,11 @@ export type VariablesBlockTransferErrorCode =
   | 'BLOCK_NOT_FOUND'
   | 'AUTHORITATIVE_GRAPH_INVALID'
   | 'DESTINATION_INDEX_OUT_OF_RANGE'
+  | 'CONDITIONAL_FAMILY_INVALID'
+  | 'CONDITIONAL_FAMILY_SPLIT'
+  | 'CONDITIONAL_FAMILY_ORDER_INVALID'
+  | 'CONDITIONAL_FAMILY_TRANSFER_REQUIRED'
+  | 'CONDITIONAL_FAMILY_DESTINATION_OCCUPIED'
   | 'NO_CHANGE';
 
 export type VariablesBlockTransferSelectionResult =
@@ -179,6 +188,26 @@ export const selectVariablesBlockTransferSources = (
       'SOURCE_NOT_FOUND',
       `Instruction #${selectedInstructionId} is not in this Variables workspace.`,
     );
+  }
+  const conditionalFamily = variablesConditionalFamilyForInstruction(
+    snapshot,
+    selectedInstructionId,
+  );
+  if (conditionalFamily) {
+    if (!conditionalFamily.valid) {
+      return refusal(
+        'CONDITIONAL_FAMILY_INVALID',
+        conditionalFamily.error || 'Repair this IF family before transferring it.',
+      );
+    }
+    return {
+      ok: true,
+      selection: {
+        selectedInstructionId,
+        scope,
+        sourceInstructionIds: [...conditionalFamily.boundaryInstructionIds],
+      },
+    };
   }
   if (scope === 'ONLY_INSTRUCTION') {
     return {
@@ -394,6 +423,18 @@ export const planVariablesBlockMove = (
     );
   }
 
+  const conditionalWatch = watchVariablesConditionalBlockTransfer(
+    snapshot,
+    selectedInstructionId,
+    targetBlockId,
+  );
+  if (!conditionalWatch.ok) {
+    return moveRefusal(
+      conditionalWatch.code as VariablesBlockTransferErrorCode,
+      conditionalWatch.message,
+    );
+  }
+
   const selection = selectVariablesBlockTransferSources(
     snapshot,
     selectedInstructionId,
@@ -401,7 +442,10 @@ export const planVariablesBlockMove = (
   );
   if (!selection.ok) return selection;
 
-  if (scope === 'ONLY_INSTRUCTION') {
+  if (
+    scope === 'ONLY_INSTRUCTION'
+    && selection.selection.sourceInstructionIds.length === 1
+  ) {
     const destinationIndex = capability.layoutRows.filter(
       row =>
         row.blockId === targetBlockId

@@ -10,6 +10,7 @@ import {
   type VariablesInstructionFact,
   type VariableWorkspaceSnapshot,
 } from '../../variablesWorkspace.contract';
+import { watchVariablesConditionalFreeMove } from './variablesConditionalFamilyWatcher';
 
 export { VARIABLES_REACT_AUTHORED_PROFILE };
 
@@ -33,6 +34,10 @@ export type VariablesFreeMoveErrorCode =
   | 'BLOCK_NOT_FOUND'
   | 'AUTHORITATIVE_GRAPH_INVALID'
   | 'DESTINATION_INDEX_OUT_OF_RANGE'
+  | 'CONDITIONAL_FAMILY_INVALID'
+  | 'CONDITIONAL_FAMILY_SPLIT'
+  | 'CONDITIONAL_FAMILY_ORDER_INVALID'
+  | 'CONDITIONAL_FAMILY_TRANSFER_REQUIRED'
   | 'NO_CHANGE';
 
 export type VariablesFreeMoveClearReason =
@@ -386,6 +391,19 @@ export const planVariablesFreeMove = (
     .sort(compareLayout);
   if (sameLayout(capability.layoutRows, finalLayout)) {
     return refusal('NO_CHANGE', 'The instruction is already in that position.');
+  }
+
+  const conditionalWatch = watchVariablesConditionalFreeMove(
+    snapshot,
+    request.sourceInstructionId,
+    request.destinationBlockId,
+    finalLayout,
+  );
+  if (!conditionalWatch.ok) {
+    return refusal(
+      conditionalWatch.code as VariablesFreeMoveErrorCode,
+      conditionalWatch.message,
+    );
   }
 
   const finalLayoutById = new Map(
