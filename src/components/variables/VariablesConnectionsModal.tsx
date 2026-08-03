@@ -108,22 +108,32 @@ const toneClass = (
 };
 
 /**
- * NEW 2026-08-03 (user order) - presentation-only confirm-button state.
- * When the frozen scope contains any red "Reconnect Variable" item, the
- * button turns RED and reports both workloads: "Resolve Parents(X) Vars(Y)".
- * It counts every command whose relationship is a Variable (GET/SET/CK/E -
- * whatever the review enumerated in the current Bot Job scope). No resolution
- * rule is read or changed here; this only reformats the existing counts.
+ * NEW 2026-08-03 (user order) - splits the frozen scope into its two
+ * workloads: parent relationships and Variable relationships (GET/SET/CK/E -
+ * whatever the review enumerated). Pure read; no resolution rule touched.
+ */
+export const resolveConnectionsWorkloads = (
+  visibleItems: readonly VariablesConnectionReviewItem[],
+): {
+  parentItems: readonly VariablesConnectionReviewItem[];
+  variableItems: readonly VariablesConnectionReviewItem[];
+} => ({
+  parentItems: visibleItems.filter(item => item.relationLabel !== 'Variable'),
+  variableItems: visibleItems.filter(item => item.relationLabel === 'Variable'),
+});
+
+/**
+ * NEW 2026-08-03 (user order) - presentation-only confirm-button state,
+ * receiving the two workload arrays. Any red Variable item turns the button
+ * RED with "Resolve Parents(X) Vars(Y)". No resolution rule is read or
+ * changed here; this only reformats the existing counts.
  */
 export const resolveConnectionsConfirmEvent = (
-  visibleItems: readonly VariablesConnectionReviewItem[],
+  parentItems: readonly VariablesConnectionReviewItem[],
+  variableItems: readonly VariablesConnectionReviewItem[],
   confirmCount: number,
   pending: boolean,
 ): RulesCardEvent => {
-  const variableItems = visibleItems.filter(
-    item => item.relationLabel === 'Variable',
-  );
-  const parentCount = visibleItems.length - variableItems.length;
   const hasRedVariable = variableItems.some(item => item.stateTone === 'red');
   if (pending) {
     return { color: hasRedVariable ? 'red' : 'green', rules: 'Resolving...', ts: 0 };
@@ -131,7 +141,7 @@ export const resolveConnectionsConfirmEvent = (
   if (hasRedVariable) {
     return {
       color: 'red',
-      rules: `Resolve Parents(${parentCount}) Vars(${variableItems.length})`,
+      rules: `Resolve Parents(${parentItems.length}) Vars(${variableItems.length})`,
       ts: 0,
     };
   }
@@ -226,11 +236,28 @@ const VariablesConnectionsModal: React.FC<
   const selectedCount = resolutions.length;
   const remainingCount = Math.max(visibleItems.length - selectedCount, 0);
   const confirmCount = mode === 'RESOLVE' ? selectedCount : visibleItems.length;
-  const confirmDisabled = pending || confirmCount === 0;
+  const workloads = useMemo(
+    () => resolveConnectionsWorkloads(visibleItems),
+    [visibleItems],
+  );
+  const hasRedVariable = workloads.variableItems.some(
+    item => item.stateTone === 'red',
+  );
+  // The red Parents/Vars button is ALWAYS clickable - it opens the
+  // variables-to-fix message modal even when nothing is resolvable yet.
+  const confirmDisabled = pending
+    || (confirmCount === 0 && !(mode === 'RESOLVE' && hasRedVariable));
+  const [variablesToFix, setVariablesToFix] =
+    useState<readonly VariablesConnectionReviewItem[] | null>(null);
 
   const confirmEvent = useMemo<RulesCardEvent>(() => (
     mode === 'RESOLVE'
-      ? resolveConnectionsConfirmEvent(visibleItems, confirmCount, pending)
+      ? resolveConnectionsConfirmEvent(
+          workloads.parentItems,
+          workloads.variableItems,
+          confirmCount,
+          pending,
+        )
       : {
           color: 'red',
           rules: pending
@@ -238,13 +265,25 @@ const VariablesConnectionsModal: React.FC<
             : `Release ${confirmCount} Connection${confirmCount === 1 ? '' : 's'}`,
           ts: 0,
         }
-  ), [confirmCount, mode, pending, visibleItems]);
+  ), [confirmCount, mode, pending, workloads]);
 
   const cancel = () => {
     if (!pending) onCancel();
   };
   const confirm = () => {
     if (confirmDisabled) return;
+    if (mode === 'RESOLVE') {
+      // Read the workloads AGAIN at click time (user order): a red variable
+      // workload opens the variables-to-fix message modal - nothing more.
+      const clicked = resolveConnectionsWorkloads(visibleItems);
+      const redVariables = clicked.variableItems.filter(
+        item => item.stateTone === 'red',
+      );
+      if (redVariables.length > 0) {
+        setVariablesToFix(redVariables);
+        return;
+      }
+    }
     if (mode === 'RESOLVE') {
       onConfirm({
         mode,
@@ -496,6 +535,35 @@ const VariablesConnectionsModal: React.FC<
           <VariablesConnectionsHelpModal
             onClose={() => setHelpOpen(false)}
           />
+        )}
+        {variablesToFix && (
+          <div
+            className={styles.varsFixBackdrop}
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) setVariablesToFix(null);
+            }}
+          >
+            <section
+              role="dialog"
+              aria-modal="true"
+              aria-label="Variables to be fixed"
+              className={styles.varsFixDialog}
+            >
+              <h3>Variables to be fixed ({variablesToFix.length})</h3>
+              <ul className={styles.varsFixList}>
+                {variablesToFix.map(item => (
+                  <li key={item.id}>{item.sourceLabel}</li>
+                ))}
+              </ul>
+              <button
+                type="button"
+                className={styles.cancelButton}
+                onClick={() => setVariablesToFix(null)}
+              >
+                Close
+              </button>
+            </section>
+          </div>
         )}
       </section>
     </div>
