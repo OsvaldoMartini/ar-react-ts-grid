@@ -5,6 +5,7 @@ import {
   type VariableWorkspaceSnapshot,
 } from '../variablesWorkspace.contract';
 import type { CommandEditorMutationIntent } from './commandEditorMutation';
+import { validateIfFamilyCreate } from '../variables/domain/ifFamilyRules';
 
 export const VARIABLES_COMMAND_CREATE_OPERATION =
   'variablesWorkspace.commandEditor.create' as const;
@@ -97,6 +98,26 @@ export const useVariablesCommandEditorCreate = ({
     if (intent.action !== 'CREATE_NEW'
       || !snapshot || !capability || !connected || !webSocket
       || webSocket.readyState !== WebSocket.OPEN || pendingRef.current) return null;
+
+    // React owns the IF-family rules (backend refusals are parked): refuse here, visibly.
+    const ifFamilyRefusal = validateIfFamilyCreate(
+      snapshot,
+      intent.targetBlockId,
+      intent.draft.action,
+      intent.placement.kind === 'AFTER_INSTRUCTION'
+        ? { kind: 'AFTER_INSTRUCTION', instructionId: intent.placement.instructionId }
+        : { kind: intent.placement.kind },
+    );
+    if (ifFamilyRefusal) {
+      onResult({
+        ok: false,
+        requestId: '',
+        message: ifFamilyRefusal.message,
+        errorCode: ifFamilyRefusal.code,
+        createdInstructionId: null,
+      });
+      return null;
+    }
 
     sequence = sequence >= Number.MAX_SAFE_INTEGER ? 1 : sequence + 1;
     const requestId = `${Date.now().toString(36)}-command-create-${sequence.toString(36)}`;
