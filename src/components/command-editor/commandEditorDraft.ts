@@ -265,11 +265,9 @@ const isConfigurationValid = (configuration: CommandEditorConfiguration): boolea
     return isPositiveEditorInteger(configuration.waitSeconds);
   }
   if (configuration.kind === 'CHECK_VALUE' || configuration.kind === 'EXTERNAL_CHECK') {
-    return configuration.leftVariableId !== null
-      && configuration.leftVariableId > 0
-      && configuration.operandKind === 'VARIABLE'
-      && configuration.operandVariableId !== null
-      && configuration.operandVariableId > 0;
+    // UNBLOCKED 2026-08-03 (user order): CHECKVALUE may be added without any
+    // variables - AUTO VARIABLES (rules 5+6) fills the operands afterwards.
+    return true;
   }
   if (configuration.kind === 'EXCEL_WRITE') {
     return configuration.outputKey.trim().length > 0;
