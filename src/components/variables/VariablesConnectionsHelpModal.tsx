@@ -113,22 +113,50 @@ const VariablesConnectionsHelpModal: React.FC<
             <h3>Compatible targets depend on the relationship</h3>
             <ul>
               <li>
-                <strong>GET/SET/commands:</strong> Compatible preceding Web
-                Elements in the same Block.
+                <strong>Web Element parent:</strong> Must be a preceding
+                compatible Web Element in the same Block.
               </li>
               <li>
-                <strong>LOOP:</strong> Preceding Web Elements in the same Block.
+                <strong>GET:</strong> Reads the connected Web Element&apos;s value
+                and stores it in the selected variable. Requires a preceding Web
+                Element and one compatible $String or #Numeric variable. Variable
+                ownership does not restrict selection.
               </li>
               <li>
-                <strong>GOTO/EXCEL GOTO:</strong> Blocks other than the
-                containing Block.
+                <strong>SET:</strong> Reads the selected variable&apos;s value and
+                writes it into the connected Web Element. Requires a preceding
+                writable Web Element and one compatible $String or #Numeric
+                variable.
               </li>
               <li>
-                <strong>Variable binding:</strong> Compatible variables.
+                <strong>LOOP:</strong> May connect to any preceding Web Element
+                or command in the same Block. When executed, it waits for its
+                configured interval and jumps to that parent until its iteration
+                count finishes.
               </li>
               <li>
-                <strong>Conditional commands:</strong> Compatible conditional
-                roots.
+                <strong>REFRESH LOOP:</strong> Uses the same anchor rules as
+                LOOP. It refreshes the browser, waits for the configured interval,
+                and jumps to its parent until its iteration count finishes.
+              </li>
+              <li>
+                <strong>GOTO:</strong> Targets another Block. It cannot target
+                its own containing Block. It jumps according to its configured
+                count.
+              </li>
+              <li>
+                <strong>EXCEL GOTO:</strong> Dataset controller with Return Block
+                and End Block. Only one active EXCEL GOTO is initially allowed per
+                Bot Job.
+              </li>
+              <li>
+                <strong>CHECKVALUE:</strong> Uses two variables and an operator:
+                Left_Operand Operator Right_Operand. It does not require a Web
+                Element parent.
+              </li>
+              <li>
+                <strong>ELSEIF / ELSE / ENDIF:</strong> Must connect to the single
+                IF root in the same Block.
               </li>
             </ul>
           </section>
