@@ -12,6 +12,7 @@ import type {
   RelationshipState,
 } from './domain/instructionRelationshipGraph';
 import { instructionRelationshipPolicy } from './domain/instructionRelationshipPolicy';
+import { isIfFamilyAction } from '../../variables/domain/ifFamilyRules';
 import type { WorkspaceBlock } from './domain/workspaceBlocks';
 import type { VariableCommandConfiguration } from '../../variablesWorkspace.contract';
 import InstructionCommandValues from './InstructionCommandValues';
@@ -130,7 +131,11 @@ const InstructionRelationshipDetails: React.FC<
   // Structural kinds (loop/conditional/block) join it only when CONNECTED or
   // broken; their other states (FIX_ORDER, SAVING, REFUSED) keep their own
   // dedicated chips below.
-  const structuralParentEdge = relationshipEdges.find(edge =>
+  // IF-family links are a CLOSED rule (2026-08-03): always auto-connected and
+  // auto-repaired, so IF/ELSEIF/ELSE/ENDIF rows never show a parent chip -
+  // same contract as the Variables page board.
+  const isIfFamilyRow = isIfFamilyAction(instruction.actions);
+  const structuralParentEdge = isIfFamilyRow ? undefined : relationshipEdges.find(edge =>
     edge.source.entity === 'INSTRUCTION'
     && edge.source.id === instruction.id
     && (edge.kind === 'ELEMENT_TARGET'
@@ -149,16 +154,18 @@ const InstructionRelationshipDetails: React.FC<
   const relationshipPolicy = instructionRelationshipPolicy(
     instruction.actions,
   );
-  const structuralKind = structuralParentEdge?.kind
-    ?? (relationshipPolicy.requirements.includes('ELEMENT_TARGET')
-      ? 'ELEMENT_TARGET' as const
-      : relationshipPolicy.requirements.includes('LOOP_ANCHOR')
-        ? 'LOOP_ANCHOR' as const
-        : relationshipPolicy.requirements.includes('CONDITIONAL_ROOT')
-          ? 'CONDITIONAL_ROOT' as const
-          : relationshipPolicy.requirements.includes('BLOCK_TARGET')
-            ? 'BLOCK_TARGET' as const
-            : null);
+  const structuralKind = isIfFamilyRow
+    ? null
+    : structuralParentEdge?.kind
+      ?? (relationshipPolicy.requirements.includes('ELEMENT_TARGET')
+        ? 'ELEMENT_TARGET' as const
+        : relationshipPolicy.requirements.includes('LOOP_ANCHOR')
+          ? 'LOOP_ANCHOR' as const
+          : relationshipPolicy.requirements.includes('CONDITIONAL_ROOT')
+            ? 'CONDITIONAL_ROOT' as const
+            : relationshipPolicy.requirements.includes('BLOCK_TARGET')
+              ? 'BLOCK_TARGET' as const
+              : null);
   const structuralLabels = structuralKind === 'LOOP_ANCHOR'
     ? { broken: 'Reconnect Loop', connected: 'Loop connected', change: 'Change loop anchor' }
     : structuralKind === 'CONDITIONAL_ROOT'
@@ -271,7 +278,8 @@ const InstructionRelationshipDetails: React.FC<
       .filter(edge =>
         edge !== structuralParentEdge
         && edge !== variableBindingEdge
-        && edge.state !== 'CONNECTED')
+        && edge.state !== 'CONNECTED'
+        && !(isIfFamilyRow && edge.kind === 'CONDITIONAL_ROOT'))
       .map(edge => ({
         key: edge.id,
         state: edge.state as Exclude<RelationshipState, 'CONNECTED'>,
