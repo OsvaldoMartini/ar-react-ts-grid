@@ -119,61 +119,123 @@ const VariablesConnectionsHelpModal: React.FC<
 
           <section className={styles.section}>
             <h3>Compatible targets depend on the relationship</h3>
-            <ul>
-              <li>
-                <strong>Web Element parent:</strong> Must be a preceding
-                compatible <strong>Web Element</strong> in the same Block.
-              </li>
-              <li>
-                <strong>GET:</strong> Reads the connected{' '}
-                <strong>Web Element</strong>&apos;s value
-                and stores it in the selected variable. Requires a preceding{' '}
-                <strong>Web Element</strong> and one compatible{' '}
-                <strong>$String</strong> or{' '}
-                <strong>#Numeric</strong> variable. Variable ownership does not
-                restrict selection.
-              </li>
-              <li>
-                <strong>SET:</strong> Reads the selected variable&apos;s value and
-                writes it into the connected <strong>Web Element</strong>.
-                Requires a preceding writable <strong>Web Element</strong> and one
-                compatible <strong>$String</strong> or <strong>#Numeric</strong>{' '}
-                variable.
-              </li>
-              <li>
-                <strong>LOOP:</strong> May connect to any preceding{' '}
-                <strong>Web Element</strong> or command in the same Block. When
-                executed, it waits for its configured interval and jumps to that
-                parent until its iteration count finishes.
-              </li>
-              <li>
-                <strong>REFRESH LOOP:</strong> Uses the same anchor rules as
-                <strong> LOOP</strong>. It refreshes the browser, waits for the
-                configured interval, and jumps to its parent until its iteration
-                count finishes.
-              </li>
-              <li>
-                <strong>GOTO:</strong> Targets another Block. It cannot target
-                its own containing Block. It jumps according to its configured
-                count.
-              </li>
-              <li>
-                <strong>EXCEL GOTO:</strong> Dataset controller with{' '}
-                <strong>Return Block</strong> and <strong>End Block</strong>. Only
-                one active <strong>EXCEL GOTO</strong> is initially allowed per Bot
-                Job.
-              </li>
-              <li>
-                <strong>CHECKVALUE:</strong> Uses two variables and an operator:
-                <strong> Left_Operand</strong>{' '}
-                <strong>Operator</strong> <strong>Right_Operand</strong>. It does
-                not require a <strong>Web Element</strong> parent.
-              </li>
-              <li>
-                <strong>ELSEIF / ELSE / ENDIF:</strong> Must connect to the single
-                <strong> IF</strong> root in the same Block.
-              </li>
-            </ul>
+            <div className={styles.tableScroll}>
+              <table className={styles.compatibilityTable}>
+                <thead>
+                  <tr>
+                    <th scope="col">Command/connection</th>
+                    <th scope="col">Final rule</th>
+                    <th scope="col" className={styles.helpColumn}>Help</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <th scope="row">Web Element parent</th>
+                    <td>
+                      Must be a preceding compatible <strong>Web Element</strong>{' '}
+                      in the same Block.
+                    </td>
+                    <td />
+                  </tr>
+                  <tr>
+                    <th scope="row">GET</th>
+                    <td>
+                      Reads the connected <strong>Web Element</strong>&apos;s value
+                      and stores it in the selected variable. Requires a preceding{' '}
+                      <strong>Web Element</strong> and one compatible{' '}
+                      <strong>$String</strong> or <strong>#Numeric</strong>{' '}
+                      variable. Variable ownership does not restrict selection.
+                    </td>
+                    <td />
+                  </tr>
+                  <tr>
+                    <th scope="row">SET</th>
+                    <td>
+                      Reads the selected variable&apos;s value and writes it into the
+                      connected <strong>Web Element</strong>. Requires a preceding
+                      writable <strong>Web Element</strong> and one compatible{' '}
+                      <strong>$String</strong> or <strong>#Numeric</strong>{' '}
+                      variable.
+                    </td>
+                    <td />
+                  </tr>
+                  <tr>
+                    <th scope="row">LOOP</th>
+                    <td>
+                      May connect to any preceding <strong>Web Element</strong> or
+                      command in the same Block. When executed, it waits for its
+                      configured interval and jumps to that parent until its
+                      iteration count finishes.
+                    </td>
+                    <td />
+                  </tr>
+                  <tr>
+                    <th scope="row">REFRESH LOOP</th>
+                    <td>
+                      Uses the same anchor rules as <strong>LOOP</strong>. It
+                      refreshes the browser, waits for the configured interval,
+                      and jumps to its parent until its iteration count finishes.
+                    </td>
+                    <td />
+                  </tr>
+                  <tr>
+                    <th scope="row">GOTO</th>
+                    <td>
+                      Targets another Block. It cannot target its own containing
+                      Block. It jumps according to its configured count.
+                    </td>
+                    <td />
+                  </tr>
+                  <tr>
+                    <th scope="row">EXCEL GOTO</th>
+                    <td>
+                      Dataset controller with <strong>Return Block</strong> and{' '}
+                      <strong>End Block</strong>. Only one active{' '}
+                      <strong>EXCEL GOTO</strong> is initially allowed per Bot Job.
+                    </td>
+                    <td className={styles.helpCell}>
+                      <button
+                        type="button"
+                        className={styles.helpPlaceholder}
+                        aria-label="EXCEL GOTO help is coming soon"
+                        title="Help coming soon"
+                        disabled
+                      >
+                        <CircleHelp size={14} aria-hidden="true" />
+                      </button>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th scope="row">CHECKVALUE</th>
+                    <td>
+                      Uses two variables and an operator:{' '}
+                      <strong>Left_Operand</strong> <strong>Operator</strong>{' '}
+                      <strong>Right_Operand</strong>. It does not require a{' '}
+                      <strong>Web Element</strong> parent.
+                    </td>
+                    <td />
+                  </tr>
+                  <tr>
+                    <th scope="row">IF..ELSE..ENDIF FAMILY</th>
+                    <td>
+                      Must connect to the single <strong>IF</strong> root in the
+                      same Block.
+                    </td>
+                    <td className={styles.helpCell}>
+                      <button
+                        type="button"
+                        className={styles.helpPlaceholder}
+                        aria-label="IF, ELSE, and ENDIF family help is coming soon"
+                        title="Help coming soon"
+                        disabled
+                      >
+                        <CircleHelp size={14} aria-hidden="true" />
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </section>
 
           <p className={styles.scopeNote}>

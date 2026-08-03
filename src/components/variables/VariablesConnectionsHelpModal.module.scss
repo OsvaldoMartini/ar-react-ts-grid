@@ -107,6 +107,71 @@
   }
 }
 
+.tableScroll {
+  border: 1px solid #c9d9e8;
+  border-radius: 7px;
+  overflow-x: auto;
+}
+
+.compatibilityTable {
+  border-collapse: collapse;
+  color: #425b72;
+  font-size: 0.76rem;
+  line-height: 1.45;
+  min-width: 720px;
+  table-layout: fixed;
+  width: 100%;
+
+  th,
+  td {
+    border-bottom: 1px solid #d9e4ee;
+    padding: 8px 10px;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  thead th {
+    background: #eaf3fb;
+    color: #17324d;
+    font-size: 0.7rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  tbody th {
+    color: #0b5394;
+    font-weight: 900;
+    width: 180px;
+  }
+
+  tbody tr:last-child th,
+  tbody tr:last-child td {
+    border-bottom: 0;
+  }
+}
+
+.helpColumn,
+.helpCell {
+  text-align: center !important;
+  width: 48px;
+}
+
+.helpPlaceholder {
+  align-items: center;
+  appearance: none;
+  background: #2e75b6;
+  border: 0;
+  border-radius: 9999px;
+  color: #fff;
+  cursor: default;
+  display: inline-flex;
+  height: 24px;
+  justify-content: center;
+  opacity: 1;
+  padding: 0;
+  width: 24px;
+}
+
 .scopeNote {
   background: #fff6e8;
   border: 1px solid #e3ad5a;
