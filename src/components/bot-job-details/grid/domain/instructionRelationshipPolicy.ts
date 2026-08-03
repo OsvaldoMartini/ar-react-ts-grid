@@ -45,8 +45,6 @@ const ACTION_ALIASES: Readonly<Record<string, string>> = {
 
 const VARIABLE_TYPES = ['$String', '#Numeric'] as const;
 const WRITABLE_TAGS = ['input', 'select', 'textarea'] as const;
-const LOOP_COMMAND_ANCHORS = new Set(['GET', 'SET', 'E', 'GOTO']);
-
 const policy = (
   canonicalAction: string,
   overrides: Partial<Omit<InstructionActionPolicy, 'canonicalAction'>> = {},
@@ -178,7 +176,7 @@ export const isCompatibleLoopAnchorAction = (
 ): boolean => {
   const relationshipPolicy = instructionRelationshipPolicy(action);
   return relationshipPolicy.role === 'WEB_ELEMENT'
-    || LOOP_COMMAND_ANCHORS.has(relationshipPolicy.canonicalAction);
+    || relationshipPolicy.canonicalAction.length > 0;
 };
 
 export const isVariableProducerAction = (action: unknown): boolean =>

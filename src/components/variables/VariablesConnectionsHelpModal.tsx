@@ -119,7 +119,10 @@ const VariablesConnectionsHelpModal: React.FC<
                 <strong>IF FAMILY CREATED:</strong> Adding <strong>IF</strong>{' '}
                 automatically creates <strong>IF → ELSE → ENDIF</strong>.
                 Additional <strong>ELSEIF</strong> commands may be inserted between{' '}
-                <strong>IF</strong> and <strong>ELSE</strong>.
+                <strong>IF</strong> and <strong>ELSE</strong>. Only{' '}
+                <strong>CheckValue</strong> results select a conditional branch;
+                a branch without <strong>CheckValue</strong> executes its regular
+                steps normally.
               </li>
               <li>
                 <strong>EXCEL GOTO LIMITED:</strong> Only one active{' '}
@@ -156,15 +159,28 @@ const VariablesConnectionsHelpModal: React.FC<
                       same Block.
                     </td>
                     <td className={styles.helpCell}>
-                      <button
-                        type="button"
-                        className={styles.helpPlaceholder}
-                        aria-label="Open IF, ELSE, and ENDIF family flow help"
-                        title="Open IF family flow"
-                        onClick={() => setGraphHelp('IF_FAMILY')}
-                      >
-                        <CircleHelp size={14} aria-hidden="true" />
-                      </button>
+                      <div className={styles.ifCaseButtons}>
+                        <button
+                          type="button"
+                          className={styles.ifCaseButton}
+                          aria-label="Open IF family basic flow case 1"
+                          title="Open IF family basic flow"
+                          onClick={() => setGraphHelp('IF_FAMILY')}
+                        >
+                          <CircleHelp size={14} aria-hidden="true" />
+                          <span>CASE 1</span>
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.ifCaseButton}
+                          aria-label="Open IF family CHECKVALUE flow case 2"
+                          title="Open IF family CHECKVALUE flow"
+                          onClick={() => setGraphHelp('IF_FAMILY_CHECKVALUE')}
+                        >
+                          <CircleHelp size={14} aria-hidden="true" />
+                          <span>CASE 2</span>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                   <tr>
@@ -175,15 +191,18 @@ const VariablesConnectionsHelpModal: React.FC<
                       <strong>EXCEL GOTO</strong> is initially allowed per Bot Job.
                     </td>
                     <td className={styles.helpCell}>
-                      <button
-                        type="button"
-                        className={styles.helpPlaceholder}
-                        aria-label="Open EXCEL GOTO execution flow help"
-                        title="Open EXCEL GOTO flow"
-                        onClick={() => setGraphHelp('EXCEL_GOTO')}
-                      >
-                        <CircleHelp size={14} aria-hidden="true" />
-                      </button>
+                      <div className={styles.ifCaseButtons}>
+                        <button
+                          type="button"
+                          className={styles.ifCaseButton}
+                          aria-label="Open EXCEL GOTO execution flow case 1"
+                          title="Open EXCEL GOTO flow"
+                          onClick={() => setGraphHelp('EXCEL_GOTO')}
+                        >
+                          <CircleHelp size={14} aria-hidden="true" />
+                          <span>CASE 1</span>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                   <tr>

@@ -487,6 +487,7 @@ const selectReviewTarget = (
   reviewId: string,
   compatibleTargets: readonly RelationshipTarget[],
   choices: ReadonlyMap<string, VariablesBatchResolveChoice>,
+  autoSelectFirst = false,
 ): {
   selectedTarget: RelationshipTarget | null;
   resolution: VariablesBatchResolveResolution;
@@ -511,7 +512,13 @@ const selectReviewTarget = (
   if (compatibleTargets.length === 1) {
     return { selectedTarget: compatibleTargets[0], resolution: 'AUTO' };
   }
-  return { selectedTarget: null, resolution: 'REVIEW_REQUIRED' };
+  if (autoSelectFirst) {
+    return { selectedTarget: compatibleTargets[0], resolution: 'AUTO' };
+  }
+  return {
+    selectedTarget: compatibleTargets[0],
+    resolution: 'REVIEW_REQUIRED',
+  };
 };
 
 type DerivedReviewResult =
@@ -542,7 +549,6 @@ const deriveResolveReview = (
     [...basis.factsById].map(([id, fact]) => [id, cloneFact(fact)]),
   );
   const items: VariablesBatchResolveReviewItem[] = [];
-  const unresolvedParentBySource = new Map<number, string>();
   const parentEdges = editableIssueEdges(baseGraph, visibleSet, PARENT_KINDS);
 
   for (const edge of parentEdges) {
@@ -571,7 +577,6 @@ const deriveResolveReview = (
     };
     items.push(Object.freeze(item));
     if (selection.selectedTarget === null) {
-      unresolvedParentBySource.set(sourceInstructionId, reviewId);
       continue;
     }
     const fact = projectedFacts.get(sourceInstructionId);
@@ -610,36 +615,13 @@ const deriveResolveReview = (
   for (const edge of variableEdges) {
     const sourceInstructionId = edge.source.id;
     const reviewId = reviewIdFor(sourceInstructionId, 'VARIABLE_BINDING');
-    const blockedByReviewId =
-      unresolvedParentBySource.get(sourceInstructionId) ?? null;
-    if (blockedByReviewId !== null) {
-      if (indexed.choices.has(reviewId)) {
-        return failure(
-          'PARENT_REVIEW_REQUIRED',
-          `Resolve ${blockedByReviewId} before choosing ${reviewId}.`,
-        );
-      }
-      items.push(Object.freeze({
-        reviewId,
-        sourceInstructionId,
-        kind: 'VARIABLE_BINDING',
-        state: edge.state,
-        code: edge.code,
-        currentTarget: edge.target,
-        compatibleTargets: Object.freeze([]),
-        selectedTarget: null,
-        resolution: 'BLOCKED',
-        blockedByReviewId,
-      }));
-      continue;
-    }
-
     const compatibleTargets =
       compatibleChangingTargets(edge, projectedFacts);
     const selection = selectReviewTarget(
       reviewId,
       compatibleTargets,
       indexed.choices,
+      true,
     );
     if ('ok' in selection) return selection;
     remainingChoiceIds.delete(reviewId);

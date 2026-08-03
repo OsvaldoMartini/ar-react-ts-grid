@@ -154,7 +154,45 @@
 .helpColumn,
 .helpCell {
   text-align: center !important;
-  width: 48px;
+  width: 148px;
+}
+
+.ifCaseButtons {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+
+.ifCaseButton {
+  align-items: center;
+  appearance: none;
+  background: #eaf3fc;
+  border: 1px solid #5d8fc2;
+  border-radius: 999px;
+  box-sizing: border-box;
+  color: #0b5394;
+  cursor: pointer;
+  display: inline-flex;
+  font-family: inherit;
+  font-size: 0.6rem;
+  font-weight: 900;
+  gap: 4px;
+  justify-content: center;
+  min-height: 24px;
+  min-width: 30px;
+  padding: 3px 7px;
+  white-space: nowrap;
+
+  &:hover {
+    background: #d9eafa;
+    border-color: #2e75b6;
+  }
+
+  &:focus-visible {
+    outline: 3px solid rgba(46, 117, 182, 0.25);
+    outline-offset: 2px;
+  }
 }
 
 .helpPlaceholder {

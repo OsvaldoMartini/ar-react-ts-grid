@@ -206,23 +206,11 @@ const supportsVariable = (
     && policy.allowedVariableTypes.includes(variable.type)
   );
 
-const requiresOwnedVariableParentAgreement = (
-  policy: InstructionActionPolicy,
-): boolean =>
-  policy.variableSemantics === 'PRODUCER'
-  || policy.variableSemantics === 'LITERAL_ASSIGNMENT';
-
 const supportsVariableForInstruction = (
   policy: InstructionActionPolicy,
-  instruction: RelationshipInstructionFact,
+  _instruction: RelationshipInstructionFact,
   variable: RelationshipVariableFact,
-): boolean =>
-  supportsVariable(policy, variable)
-  && (
-    !requiresOwnedVariableParentAgreement(policy)
-    || variable.ownerInstructionId === null
-    || variable.ownerInstructionId === instruction.parentId
-  );
+): boolean => supportsVariable(policy, variable);
 
 const supportsElement = (
   policy: InstructionActionPolicy,
@@ -468,12 +456,6 @@ export const buildInstructionRelationshipGraph = ({
       else if (!selected) code = 'DANGLING_VARIABLE_BINDING';
       else if (!supportsVariable(policy, selected)) {
         code = 'INCOMPATIBLE_VARIABLE_TYPE';
-      } else if (
-        requiresOwnedVariableParentAgreement(policy)
-        && selected.ownerInstructionId !== null
-        && selected.ownerInstructionId !== instruction.parentId
-      ) {
-        code = 'VARIABLE_OWNER_PARENT_MISMATCH';
       }
       relationshipEdges.push(edge(
         owner,

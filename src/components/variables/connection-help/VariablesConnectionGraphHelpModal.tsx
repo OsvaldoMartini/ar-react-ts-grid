@@ -8,9 +8,13 @@ import { CircleHelp, X } from 'lucide-react';
 import '@xyflow/react/dist/style.css';
 import ExcelGotoHelpGraph from './ExcelGotoHelpGraph';
 import IfFamilyHelpGraph from './IfFamilyHelpGraph';
+import IfFamilyCheckValueHelpGraph from './IfFamilyCheckValueHelpGraph';
 import styles from './VariablesConnectionGraphHelpModal.module.scss';
 
-export type VariablesConnectionGraphKind = 'EXCEL_GOTO' | 'IF_FAMILY';
+export type VariablesConnectionGraphKind =
+  | 'EXCEL_GOTO'
+  | 'IF_FAMILY'
+  | 'IF_FAMILY_CHECKVALUE';
 
 export interface VariablesConnectionGraphHelpModalProps {
   kind: VariablesConnectionGraphKind;
@@ -28,9 +32,12 @@ const VariablesConnectionGraphHelpModal: React.FC<
   }, []);
 
   const excelGoto = kind === 'EXCEL_GOTO';
+  const checkValueCase = kind === 'IF_FAMILY_CHECKVALUE';
   const title = excelGoto
     ? 'EXCEL GOTO execution flow'
-    : 'IF..ELSE..ENDIF family flow';
+    : checkValueCase
+      ? 'IF..ELSE..ENDIF CHECKVALUE flow'
+      : 'IF..ELSE..ENDIF family flow';
 
   return createPortal(
     <div
@@ -73,7 +80,13 @@ const VariablesConnectionGraphHelpModal: React.FC<
         </header>
 
         <div className={styles.body}>
-          {excelGoto ? <ExcelGotoHelpGraph /> : <IfFamilyHelpGraph />}
+          {excelGoto ? (
+            <ExcelGotoHelpGraph />
+          ) : checkValueCase ? (
+            <IfFamilyCheckValueHelpGraph />
+          ) : (
+            <IfFamilyHelpGraph />
+          )}
         </div>
       </section>
     </div>,

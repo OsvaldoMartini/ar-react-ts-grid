@@ -16,6 +16,7 @@ export const COMMAND_EDITOR_COMMAND_OPTIONS: readonly CommandEditorCommandOption
   // PARKED (user request 2026-08-02): { code: 'CSV CHECK', label: 'CSV Check' },
   { code: 'E', label: 'Extract Field' },
   { code: 'IF', label: 'IF' },
+  { code: 'ELSEIF', label: 'Else If' },
   { code: 'GOTO', label: 'GOTO' },
   { code: 'EXCEL GOTO', label: 'Excel GOTO' },
   { code: 'LOOP', label: 'Loop' },

@@ -35,6 +35,13 @@ import {
   smokePlaywrightCommandBridge,
   type PlaywrightCommandResult,
 } from './Engine/playwrightCommandBridge';
+import {
+  buildConditionalExecutionIndex,
+  initialConditionalExecutionState,
+  resolveConditionalBoundaryTransition,
+  resolveConditionalCheckFailureTransition,
+  type ConditionalExecutionState,
+} from './Engine/ifElseCommandEngine';
 import styles from './VariablesSmokeTestPanel.module.scss';
 
 export interface VariablesSmokeTestPanelProps {
@@ -111,6 +118,9 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   const [reportCounter, setReportCounter] = useState<keyof VariablesSmokeTestCounters | null>(null);
   const runtimeValuesRef = useRef<Map<number, VariablesSmokeTestRuntimeValue>>(new Map());
   const commandRemainingRef = useRef<CommandRemainingByInstructionId>({});
+  const conditionalStateRef = useRef<ConditionalExecutionState>(
+    initialConditionalExecutionState(),
+  );
   const previewPlan = useMemo(
     () => buildVariablesSmokeTestPlan(review, selectedBlockIds),
     [review, selectedBlockIds],
@@ -123,6 +133,12 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     () => executionProgram?.items ?? [],
     [executionProgram],
   );
+  const conditionalIndex = useMemo(
+    () => executionProgram === null
+      ? null
+      : buildConditionalExecutionIndex(executionProgram),
+    [executionProgram],
+  );
 
   const run = () => {
     const nextPlan = buildVariablesSmokeTestPlan(review, selectedBlockIds);
@@ -132,6 +148,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
       ...initialGotoRemaining(nextProgram),
     });
     commandRemainingRef.current = nextCommandRemaining;
+    conditionalStateRef.current = initialConditionalExecutionState();
     onCommandRemainingChange?.(nextCommandRemaining);
     runtimeValuesRef.current = new Map(nextPlan.variableFlows.map((flow, index) => {
       if (flow.runtimeState === 'VALUE') {
@@ -200,6 +217,13 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
         )
       : null;
     const controlTransition = loopTransition ?? gotoTransition;
+    const conditionalBoundaryTransition = activeStep && conditionalIndex !== null
+      ? resolveConditionalBoundaryTransition(
+          conditionalIndex,
+          itemCursor,
+          conditionalStateRef.current,
+        )
+      : null;
     const waitExecution = activeStep
       ? resolveWaitCommandExecution(item.step)
       : null;
@@ -211,6 +235,9 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     let playwrightResult: PlaywrightCommandResult | null = null;
 
     const completeCurrentItem = () => {
+      let nextCursor = conditionalBoundaryTransition?.nextCursor
+        ?? controlTransition?.nextCursor
+        ?? itemCursor + 1;
       if (item.kind === 'INACTIVE_BLOCK') {
         const skipped = item.block.steps.length;
         setEntries(current => [
@@ -232,7 +259,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
         );
         const engineWarning = controlTransition?.warning ?? waitExecution?.warning ?? null;
         const engineMessage = controlTransition === null
-          ? waitExecution?.message ?? null
+          ? conditionalBoundaryTransition?.message ?? waitExecution?.message ?? null
           : [
               playwrightResult?.message,
               controlTransition.message,
@@ -259,8 +286,21 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
                   : engineMessage,
               ),
             };
+        const conditionalCheckTransition = engineResult.tone === 'FAIL'
+          && conditionalIndex !== null
+          ? resolveConditionalCheckFailureTransition(
+              conditionalIndex,
+              itemCursor,
+            )
+          : null;
+        const displayedResult = conditionalCheckTransition === null
+          ? engineResult
+          : {
+              ...engineResult,
+              message: `${engineResult.message} ${conditionalCheckTransition.message}.`,
+            };
         const refusedRuntimeWrites: string[] = [];
-        engineResult.runtimeWrites.forEach((write) => {
+        displayedResult.runtimeWrites.forEach((write) => {
           runtimeValuesRef.current.set(write.variableId, {
             state: 'VALUE',
             value: write.value,
@@ -278,17 +318,17 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
           ...current,
           logEntry(
             processedCommands + 1,
-            refusedRuntimeWrites.length > 0 ? 'WARNING' : engineResult.tone,
+            refusedRuntimeWrites.length > 0 ? 'WARNING' : displayedResult.tone,
             refusedRuntimeWrites.length > 0
-              ? `${engineResult.message} Runtime write-through remained local for ${refusedRuntimeWrites.join(', ')}.`
-              : engineResult.message,
-            refusedRuntimeWrites.length > 0 ? 'warning' : engineResult.counter,
+              ? `${displayedResult.message} Runtime write-through remained local for ${refusedRuntimeWrites.join(', ')}.`
+              : displayedResult.message,
+            refusedRuntimeWrites.length > 0 ? 'warning' : displayedResult.counter,
           ),
         ]);
         setCounters(current => ({
           ...current,
-          [refusedRuntimeWrites.length > 0 ? 'warning' : engineResult.counter]:
-            current[refusedRuntimeWrites.length > 0 ? 'warning' : engineResult.counter] + 1,
+          [refusedRuntimeWrites.length > 0 ? 'warning' : displayedResult.counter]:
+            current[refusedRuntimeWrites.length > 0 ? 'warning' : displayedResult.counter] + 1,
         }));
         setProcessedCommands(current => current + 1);
         if (controlTransition !== null) {
@@ -299,8 +339,14 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
           commandRemainingRef.current = nextRemaining;
           onCommandRemainingChange?.(nextRemaining);
         }
+        const conditionalTransition = conditionalCheckTransition
+          ?? conditionalBoundaryTransition;
+        if (conditionalTransition !== null) {
+          conditionalStateRef.current = conditionalTransition.nextState;
+          nextCursor = conditionalTransition.nextCursor;
+        }
       }
-      setItemCursor(controlTransition?.nextCursor ?? itemCursor + 1);
+      setItemCursor(nextCursor);
     };
 
     const scheduleCurrentItem = async () => {
@@ -321,6 +367,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   }, [
     executionItems,
     executionProgram,
+    conditionalIndex,
     itemCursor,
     onActivePositionChange,
     onCommitRuntimeValue,
