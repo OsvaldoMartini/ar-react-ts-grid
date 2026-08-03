@@ -157,6 +157,83 @@ test('Bot Job grid consumes a capability response even when a later frame is que
   await expectQueuedCapabilityEnablesDrag('botJobTasks');
 });
 
+test('Bot Job IF-family drag uses the proven ROW_MOVE path without optional v3 capability', async () => {
+  const familyRows: BlockLoopInstructionLoadDTO[] = [
+    { ...row, id: 101, instructionOrderNumber: 1, name: 'IF', actions: 'IF', parentId: 101, parentBlockId: 10 },
+    { ...row, id: 102, instructionOrderNumber: 2, name: 'IF body', actions: 'PAUSE' },
+    { ...row, id: 103, instructionOrderNumber: 3, name: 'ELSEIF', actions: 'ELSEIF', parentId: 101, parentBlockId: 10 },
+    { ...row, id: 104, instructionOrderNumber: 4, name: 'ELSEIF body', actions: 'PAUSE' },
+    { ...row, id: 105, instructionOrderNumber: 5, name: 'ELSE', actions: 'ELSE', parentId: 101, parentBlockId: 10 },
+    { ...row, id: 106, instructionOrderNumber: 6, name: 'ELSE body', actions: 'PAUSE' },
+    { ...row, id: 107, instructionOrderNumber: 7, name: 'ENDIF', actions: 'ENDIF', parentId: 101, parentBlockId: 10 },
+  ];
+  const props = {
+    homeBankingIdInitial: 2,
+    data: familyRows,
+    socketPort: 52101,
+    sessionId: 'botJobTasks',
+    botJobIdInitial: 5,
+    botJobNameInitial: 'Drag regression',
+    onSessionOpen: jest.fn(),
+  };
+  const view = render(<GridItem {...props} />);
+  await waitFor(() => expect(mockSend.mock.calls
+    .map(([payload]) => JSON.parse(payload).type))
+    .toContain('instructionEditor.memoryCapabilities'));
+
+  const request = [...mockSend.mock.calls]
+    .reverse()
+    .map(([payload]) => JSON.parse(payload))
+    .find(message => message.type === 'instructionEditor.memoryCapabilities');
+  const requestedBody = JSON.parse(request.body);
+  const graphRevision = computeInstructionGraphRevision(familyRows, []);
+  mockMessages = [JSON.stringify({
+    sessionId: props.sessionId,
+    homeBankingId: 2,
+    operationId: 'instructionEditor.memoryCapabilitiesResponse',
+    body: JSON.stringify({
+      ok: true,
+      requestId: requestedBody.requestId,
+      targetSessionId: requestedBody.targetSessionId,
+      homeBankingId: requestedBody.homeBankingId,
+      botJobId: requestedBody.botJobId,
+      graphRevision,
+      capabilities: familyRows.map(instruction => ({
+        instructionId: instruction.id,
+        canAddToMemory: true,
+        canMove: true,
+        canDelete: true,
+        allowedBlockIds: [10],
+      })),
+      blockCapabilities: [],
+      variableLinks: [],
+      // Deliberately no workspaceCapabilities.botJobGraphMutationV3.
+    }),
+  })];
+  view.rerender(<GridItem {...props} />);
+
+  await waitFor(() => expect(screen.getByLabelText('Move instruction 3')).toBeEnabled());
+  const source = screen.getByLabelText('Move instruction 3').closest('[draggable]');
+  const destination = screen.getByLabelText('Move instruction 4').closest('[draggable]');
+  fireEvent.dragStart(source as Element);
+  fireEvent.drop(destination as Element);
+
+  await waitFor(() => {
+    const move = mockSend.mock.calls
+      .map(([payload]) => JSON.parse(payload))
+      .find(message => message.type === 'ROW_MOVE');
+    expect(move).toMatchObject({
+      sessionId: 'botJobTasks',
+      rowMoveLayoutVersion: 2,
+      graphRevision,
+    });
+    expect(move.updatedRows.map((updated: { instructionId: number }) => updated.instructionId))
+      .toEqual([101, 102, 104, 103, 105, 106, 107]);
+  });
+  expect(mockSend.mock.calls.map(([payload]) => JSON.parse(payload).type))
+    .not.toContain('instructionGraphMutationV3');
+});
+
 test('Component grid consumes a capability response even when a later frame is queued', async () => {
   const props = {
     homeBankingIdInitial: 2,
