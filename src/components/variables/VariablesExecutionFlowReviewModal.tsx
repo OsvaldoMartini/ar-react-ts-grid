@@ -73,7 +73,7 @@ const VariablesExecutionFlowReviewModal: React.FC<
   const smokeStepRefs = useRef(new Map<string, HTMLElement>());
   const smokeBlockRefs = useRef(new Map<string, HTMLElement>());
   const [activeSmokePosition, setActiveSmokePosition] = useState<VariablesSmokeTestPosition | null>(null);
-  const [loopRemainingByInstructionId, setLoopRemainingByInstructionId] =
+  const [commandRemainingByInstructionId, setCommandRemainingByInstructionId] =
     useState<Readonly<Record<number, number>>>({});
   const [localSelectedBlockIds, setLocalSelectedBlockIds] = useState<number[]>(() =>
     review.blocks.flatMap(block => block.blockId === null ? [] : [block.blockId]));
@@ -452,9 +452,9 @@ const VariablesExecutionFlowReviewModal: React.FC<
                               action={step.action}
                               operation={step.operation}
                               onHoldSeconds={step.onHoldSeconds}
-                              loopRemaining={step.instructionId === null
+                              remainingCount={step.instructionId === null
                                 ? null
-                                : loopRemainingByInstructionId[step.instructionId]}
+                                : commandRemainingByInstructionId[step.instructionId]}
                             />
                           </div>
                           <small>{step.action} · Instruction ID {step.instructionId ?? 'Missing'}</small>
@@ -568,7 +568,7 @@ const VariablesExecutionFlowReviewModal: React.FC<
             runtimeWriteAvailable={runtimeWriteAvailable}
             onCommitRuntimeValue={onCommitRuntimeValue}
             onActivePositionChange={setActiveSmokePosition}
-            onLoopRemainingChange={setLoopRemainingByInstructionId}
+            onCommandRemainingChange={setCommandRemainingByInstructionId}
           />
         </div>
 

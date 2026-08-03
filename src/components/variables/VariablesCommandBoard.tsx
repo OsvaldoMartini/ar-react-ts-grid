@@ -605,6 +605,9 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                 // no card - never an N/A placeholder.
                 const rowCanonicalAction =
                   canonicalInstructionAction(instruction.command);
+                const rowInstructionName = rowCanonicalAction === 'H'
+                  ? 'Wait'
+                  : instruction.name || 'Unnamed instruction';
                 const rowOperation = (instruction.operation ?? '').trim();
                 let commandValueRows:
                   | { label: string; value: string }[]
@@ -880,8 +883,8 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                             }
                           }}
                         >
-                          <strong title={instruction.name}>
-                            {instruction.name || 'Unnamed instruction'}
+                          <strong title={rowInstructionName}>
+                            {rowInstructionName}
                           </strong>
                           <small>
                             {instructionId === null ? 'Missing ID' : `ID ${instructionId}`}

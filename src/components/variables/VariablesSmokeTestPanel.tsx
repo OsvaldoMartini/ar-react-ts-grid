@@ -22,8 +22,15 @@ import {
 import {
   initialLoopRemaining,
   resolveLoopCommandTransition,
-  type LoopRemainingByInstructionId,
 } from './Engine/loopCommandEngine';
+import {
+  initialGotoRemaining,
+  resolveGotoCommandTransition,
+} from './Engine/gotoCommandEngine';
+import type {
+  CommandRemainingByInstructionId,
+} from './Engine/controlFlowCommand.types';
+import { resolveWaitCommandExecution } from './Engine/waitCommandEngine';
 import {
   smokePlaywrightCommandBridge,
   type PlaywrightCommandResult,
@@ -36,7 +43,7 @@ export interface VariablesSmokeTestPanelProps {
   runtimeWriteAvailable?: boolean;
   onCommitRuntimeValue?: (variableId: number, value: string) => boolean;
   onActivePositionChange?: (position: VariablesSmokeTestPosition | null) => void;
-  onLoopRemainingChange?: (remaining: LoopRemainingByInstructionId) => void;
+  onCommandRemainingChange?: (remaining: CommandRemainingByInstructionId) => void;
 }
 
 const SPEED_OPTIONS = [
@@ -91,7 +98,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   runtimeWriteAvailable = false,
   onCommitRuntimeValue,
   onActivePositionChange,
-  onLoopRemainingChange,
+  onCommandRemainingChange,
 }) => {
   const [status, setStatus] = useState<VariablesSmokeTestStatus>('IDLE');
   const [plan, setPlan] = useState<VariablesSmokeTestPlan | null>(null);
@@ -103,7 +110,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   const [writeRuntimeValues, setWriteRuntimeValues] = useState(false);
   const [reportCounter, setReportCounter] = useState<keyof VariablesSmokeTestCounters | null>(null);
   const runtimeValuesRef = useRef<Map<number, VariablesSmokeTestRuntimeValue>>(new Map());
-  const loopRemainingRef = useRef<LoopRemainingByInstructionId>({});
+  const commandRemainingRef = useRef<CommandRemainingByInstructionId>({});
   const previewPlan = useMemo(
     () => buildVariablesSmokeTestPlan(review, selectedBlockIds),
     [review, selectedBlockIds],
@@ -120,9 +127,12 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   const run = () => {
     const nextPlan = buildVariablesSmokeTestPlan(review, selectedBlockIds);
     const nextProgram = buildSmokeExecutionProgram(nextPlan);
-    const nextLoopRemaining = initialLoopRemaining(nextProgram);
-    loopRemainingRef.current = nextLoopRemaining;
-    onLoopRemainingChange?.(nextLoopRemaining);
+    const nextCommandRemaining = Object.freeze({
+      ...initialLoopRemaining(nextProgram),
+      ...initialGotoRemaining(nextProgram),
+    });
+    commandRemainingRef.current = nextCommandRemaining;
+    onCommandRemainingChange?.(nextCommandRemaining);
     runtimeValuesRef.current = new Map(nextPlan.variableFlows.map((flow, index) => {
       if (flow.runtimeState === 'VALUE') {
         return [flow.variableId, {
@@ -177,9 +187,19 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     const loopTransition = resolveLoopCommandTransition(
       executionProgram,
       itemCursor,
-      loopRemainingRef.current,
+      commandRemainingRef.current,
     );
-    const executionDelayMs = stepIntervalMs + (loopTransition?.waitMs ?? 0);
+    const gotoTransition = resolveGotoCommandTransition(
+      executionProgram,
+      itemCursor,
+      commandRemainingRef.current,
+    );
+    const controlTransition = loopTransition ?? gotoTransition;
+    const waitExecution = item.kind === 'STEP'
+      ? resolveWaitCommandExecution(item.step)
+      : null;
+    const executionDelayMs = stepIntervalMs
+      + (controlTransition?.waitMs ?? waitExecution?.waitMs ?? 0);
 
     let cancelled = false;
     let timer: number | null = null;
@@ -205,31 +225,37 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
           processedCommands + 1,
           runtimeValuesRef.current,
         );
-        const loopResult = loopTransition === null
+        const engineWarning = controlTransition?.warning ?? waitExecution?.warning ?? null;
+        const engineMessage = controlTransition === null
+          ? waitExecution?.message ?? null
+          : [
+              playwrightResult?.message,
+              controlTransition.message,
+              controlTransition.warning === null
+                ? null
+                : `${controlTransition.warning}.`,
+            ].filter((part): part is string => Boolean(part)).join('; ');
+        const engineResult = engineMessage === null
           ? result
           : {
               ...result,
-              tone: loopTransition.warning === null
+              tone: engineWarning === null
                 && playwrightResult?.status !== 'FAILED'
                   ? result.tone
                   : 'WARNING' as const,
-              counter: loopTransition.warning === null
+              counter: engineWarning === null
                 && playwrightResult?.status !== 'FAILED'
                   ? result.counter
                   : 'warning' as const,
               message: replaceSmokeStepDetail(
                 result.message,
-                [
-                  playwrightResult?.message,
-                  loopTransition.message,
-                  loopTransition.warning === null
-                    ? null
-                    : `${loopTransition.warning}.`,
-                ].filter((part): part is string => Boolean(part)).join('; '),
+                engineWarning !== null && controlTransition === null
+                  ? `${engineMessage} ${engineWarning}.`
+                  : engineMessage,
               ),
             };
         const refusedRuntimeWrites: string[] = [];
-        loopResult.runtimeWrites.forEach((write) => {
+        engineResult.runtimeWrites.forEach((write) => {
           runtimeValuesRef.current.set(write.variableId, {
             state: 'VALUE',
             value: write.value,
@@ -247,35 +273,35 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
           ...current,
           logEntry(
             processedCommands + 1,
-            refusedRuntimeWrites.length > 0 ? 'WARNING' : loopResult.tone,
+            refusedRuntimeWrites.length > 0 ? 'WARNING' : engineResult.tone,
             refusedRuntimeWrites.length > 0
-              ? `${loopResult.message} Runtime write-through remained local for ${refusedRuntimeWrites.join(', ')}.`
-              : loopResult.message,
-            refusedRuntimeWrites.length > 0 ? 'warning' : loopResult.counter,
+              ? `${engineResult.message} Runtime write-through remained local for ${refusedRuntimeWrites.join(', ')}.`
+              : engineResult.message,
+            refusedRuntimeWrites.length > 0 ? 'warning' : engineResult.counter,
           ),
         ]);
         setCounters(current => ({
           ...current,
-          [refusedRuntimeWrites.length > 0 ? 'warning' : loopResult.counter]:
-            current[refusedRuntimeWrites.length > 0 ? 'warning' : loopResult.counter] + 1,
+          [refusedRuntimeWrites.length > 0 ? 'warning' : engineResult.counter]:
+            current[refusedRuntimeWrites.length > 0 ? 'warning' : engineResult.counter] + 1,
         }));
         setProcessedCommands(current => current + 1);
-        if (loopTransition !== null) {
+        if (controlTransition !== null) {
           const nextRemaining = Object.freeze({
-            ...loopRemainingRef.current,
-            [loopTransition.instructionId]: loopTransition.nextRemaining,
+            ...commandRemainingRef.current,
+            [controlTransition.instructionId]: controlTransition.nextRemaining,
           });
-          loopRemainingRef.current = nextRemaining;
-          onLoopRemainingChange?.(nextRemaining);
+          commandRemainingRef.current = nextRemaining;
+          onCommandRemainingChange?.(nextRemaining);
         }
       }
-      setItemCursor(loopTransition?.nextCursor ?? itemCursor + 1);
+      setItemCursor(controlTransition?.nextCursor ?? itemCursor + 1);
     };
 
     const scheduleCurrentItem = async () => {
-      if (loopTransition?.playwrightCommand) {
+      if (controlTransition?.playwrightCommand) {
         playwrightResult = await smokePlaywrightCommandBridge.dispatch(
-          loopTransition.playwrightCommand,
+          controlTransition.playwrightCommand,
         );
       }
       if (cancelled) return;
@@ -293,7 +319,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     itemCursor,
     onActivePositionChange,
     onCommitRuntimeValue,
-    onLoopRemainingChange,
+    onCommandRemainingChange,
     plan,
     processedCommands,
     runtimeWriteAvailable,
@@ -304,8 +330,8 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
 
   useEffect(() => () => {
     onActivePositionChange?.(null);
-    onLoopRemainingChange?.({});
-  }, [onActivePositionChange, onLoopRemainingChange]);
+    onCommandRemainingChange?.({});
+  }, [onActivePositionChange, onCommandRemainingChange]);
 
   const activePlan = plan ?? previewPlan;
   const currentItem = status === 'RUNNING' ? executionItems[itemCursor] ?? null : null;

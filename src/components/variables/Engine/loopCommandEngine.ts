@@ -1,25 +1,16 @@
 import { canonicalInstructionAction } from '../../bot-job-details/grid/domain/instructionRelationshipPolicy';
 import type { VariablesSmokeTestStep } from '../domain/variablesSmokeTestTypes';
 import type { SmokeExecutionProgram } from './smokeExecutionProgram';
-import type { PlaywrightBrowserCommand } from './playwrightCommandBridge';
 import { refreshLoopPlaywrightCommand } from './refreshLoopCommandEngine';
+import type {
+  CommandRemainingByInstructionId,
+  ControlFlowCommandTransition,
+} from './controlFlowCommand.types';
 
 export type LoopCommandConfiguration = {
   intervalSeconds: number;
   repetitions: number;
 };
-
-export type LoopCommandTransition = {
-  instructionId: number;
-  nextCursor: number;
-  nextRemaining: number;
-  waitMs: number;
-  message: string;
-  warning: string | null;
-  playwrightCommand: PlaywrightBrowserCommand | null;
-};
-
-export type LoopRemainingByInstructionId = Readonly<Record<number, number>>;
 
 const isLoopAction = (action: string): boolean => {
   const canonical = canonicalInstructionAction(action);
@@ -56,7 +47,7 @@ const loopAnchorInstructionId = (step: VariablesSmokeTestStep): number | null =>
 
 export const initialLoopRemaining = (
   program: SmokeExecutionProgram,
-): LoopRemainingByInstructionId => Object.freeze(
+): CommandRemainingByInstructionId => Object.freeze(
   program.items.reduce<Record<number, number>>((remaining, item) => {
     if (item.kind !== 'STEP' || item.step.instructionId === null) return remaining;
     const configuration = parseLoopCommandConfiguration(item.step);
@@ -75,8 +66,8 @@ export const initialLoopRemaining = (
 export const resolveLoopCommandTransition = (
   program: SmokeExecutionProgram,
   cursor: number,
-  remainingByInstructionId: LoopRemainingByInstructionId,
-): LoopCommandTransition | null => {
+  remainingByInstructionId: CommandRemainingByInstructionId,
+): ControlFlowCommandTransition | null => {
   const item = program.items[cursor];
   if (item?.kind !== 'STEP' || !isLoopAction(item.step.action)) return null;
   const instructionId = item.step.instructionId;

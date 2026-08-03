@@ -6,7 +6,7 @@ export interface InstructionIntrinsicValuesProps {
   action: string;
   operation?: string | null;
   onHoldSeconds?: number | null;
-  loopRemaining?: number | null;
+  remainingCount?: number | null;
 }
 
 type IntrinsicValuePresentation = {
@@ -76,8 +76,9 @@ const InstructionIntrinsicValues: React.FC<InstructionIntrinsicValuesProps> = (p
   const presentation = instructionIntrinsicValuePresentation(props);
   if (presentation === null) return null;
   const canonicalAction = canonicalInstructionAction(props.action);
-  const rendersLoopCountdown = canonicalAction === 'LOOP'
-    || canonicalAction === 'REFRESH_LOOP';
+  const rendersCountdown = canonicalAction === 'LOOP'
+    || canonicalAction === 'REFRESH_LOOP'
+    || canonicalAction === 'GOTO';
 
   return (
     <span className={styles.values} title={presentation.title}>
@@ -85,10 +86,10 @@ const InstructionIntrinsicValues: React.FC<InstructionIntrinsicValuesProps> = (p
         <span key={row.label} className={styles.row}>
           <span className={styles.label}>{row.label}</span>
           <span className={styles.number}>
-            {rendersLoopCountdown
+            {rendersCountdown
               && row.label === 'L:'
-              && typeof props.loopRemaining === 'number'
-                ? props.loopRemaining
+              && typeof props.remainingCount === 'number'
+                ? props.remainingCount
                 : row.value}
           </span>
         </span>
