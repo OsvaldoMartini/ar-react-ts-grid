@@ -2285,6 +2285,16 @@ const VariablesPage: React.FC<Props> = ({
     }
     const linkedCount = plan.parentRepairInstructionIds.length;
     const variableCount = plan.variableOwnerIds.length;
+    const familyCount = plan.familyDeleteInstructionIds.length;
+    if (familyCount > 0) {
+      setCommandDeleteConfirmation({
+        plan,
+        title: 'Delete Complete IF Family?',
+        body: `Deleting #${plan.instruction.instructionOrder ?? '?'} ${plan.instruction.name || plan.instruction.command} (ID ${plan.instruction.id}) removes its complete IF family — ${familyCount + 1} boundaries (IF, ELSEIF, ELSE, ENDIF) from Block ${plan.instruction.blockName || `#${plan.instruction.blockId}`}.`,
+        details: `IF-family boundaries are always deleted together (IDs ${[plan.instruction.id, ...plan.familyDeleteInstructionIds].join(', ')}). Positional body commands remain. ${linkedCount} connected command(s) and ${variableCount} variable owner connection(s) will be disconnected and remain available for reconnection.`,
+      });
+      return;
+    }
     setCommandDeleteConfirmation({
       plan,
       title: 'Delete Command?',

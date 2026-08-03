@@ -154,6 +154,7 @@ export const useVariablesCommandDelete = ({
           instructionId: plan.instruction.id,
           expectedBlockId: plan.instruction.blockId,
           expectedInstructionOrder: plan.instruction.instructionOrder,
+          familyDeleteInstructionIds: plan.familyDeleteInstructionIds,
           parentRepairInstructionIds: plan.parentRepairInstructionIds,
           variableOwnerIds: plan.variableOwnerIds,
         }),
