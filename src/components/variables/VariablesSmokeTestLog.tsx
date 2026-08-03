@@ -4,9 +4,13 @@ import styles from './VariablesSmokeTestLog.module.scss';
 
 export interface VariablesSmokeTestLogProps {
   entries: readonly VariablesSmokeTestLogEntry[];
+  sequenceLabel?: string;
 }
 
-const VariablesSmokeTestLog: React.FC<VariablesSmokeTestLogProps> = ({ entries }) => {
+const VariablesSmokeTestLog: React.FC<VariablesSmokeTestLogProps> = ({
+  entries,
+  sequenceLabel = 'NEXT',
+}) => {
   const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -29,7 +33,7 @@ const VariablesSmokeTestLog: React.FC<VariablesSmokeTestLogProps> = ({ entries }
       return (
         <article className={styles[entry.tone.toLocaleLowerCase()]} key={entry.id}>
           <div className={styles.sequence}>
-            <span>NEXT</span>
+            <span>{sequenceLabel}</span>
             <b>{entry.sequence}</b>
           </div>
           <div className={styles.result}>

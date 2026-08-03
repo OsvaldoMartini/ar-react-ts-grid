@@ -4,6 +4,7 @@ import type {
   VariablesSmokeTestCounters,
   VariablesSmokeTestLogEntry,
 } from './domain/variablesSmokeTestTypes';
+import VariablesSmokeTestLog from './VariablesSmokeTestLog';
 import styles from './VariablesSmokeTestReportModal.module.scss';
 
 export interface VariablesSmokeTestReportModalProps {
@@ -88,12 +89,12 @@ const VariablesSmokeTestReportModal: React.FC<VariablesSmokeTestReportModalProps
         <div className={styles.list}>
           {reportEntries.length === 0 ? (
             <p className={styles.empty}>No {LABELS[counter].toLocaleLowerCase()} results were recorded.</p>
-          ) : reportEntries.map(entry => (
-            <article key={entry.id}>
-              <time dateTime={entry.timestamp}>{new Date(entry.timestamp).toLocaleTimeString()}</time>
-              <p>{entry.message}</p>
-            </article>
-          ))}
+          ) : (
+            <VariablesSmokeTestLog
+              entries={reportEntries}
+              sequenceLabel="STEP"
+            />
+          )}
         </div>
 
         <footer>
