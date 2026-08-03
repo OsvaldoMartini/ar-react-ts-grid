@@ -5,6 +5,7 @@ import React, {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { CircleHelp, X } from 'lucide-react';
+import '@xyflow/react/dist/style.css';
 import ExcelGotoHelpGraph from './ExcelGotoHelpGraph';
 import IfFamilyHelpGraph from './IfFamilyHelpGraph';
 import styles from './VariablesConnectionGraphHelpModal.module.scss';

@@ -1,14 +1,18 @@
 import React, {
+  Suspense,
+  lazy,
   useEffect,
   useId,
   useRef,
   useState,
 } from 'react';
 import { CircleHelp, X } from 'lucide-react';
-import VariablesConnectionGraphHelpModal, {
-  type VariablesConnectionGraphKind,
-} from './connection-help/VariablesConnectionGraphHelpModal';
+import type { VariablesConnectionGraphKind } from './connection-help/VariablesConnectionGraphHelpModal';
 import styles from './VariablesConnectionsHelpModal.module.scss';
+
+const VariablesConnectionGraphHelpModal = lazy(
+  () => import('./connection-help/VariablesConnectionGraphHelpModal'),
+);
 
 export interface VariablesConnectionsHelpModalProps {
   onClose: () => void;
@@ -255,10 +259,12 @@ const VariablesConnectionsHelpModal: React.FC<
         </section>
       </div>
       {graphHelp && (
-        <VariablesConnectionGraphHelpModal
-          kind={graphHelp}
-          onClose={() => setGraphHelp(null)}
-        />
+        <Suspense fallback={null}>
+          <VariablesConnectionGraphHelpModal
+            kind={graphHelp}
+            onClose={() => setGraphHelp(null)}
+          />
+        </Suspense>
       )}
     </>
   );

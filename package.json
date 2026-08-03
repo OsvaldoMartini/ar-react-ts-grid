@@ -17,6 +17,7 @@
     "@types/node": "^16.18.108",
     "@types/react": "^18.3.8",
     "@types/react-dom": "^18.3.0",
+    "@xyflow/react": "^12.11.2",
     "abr-react-ts-grid": "file:",
     "css-box-model": "^1.2.0",
     "i18next": "^25.8.17",
