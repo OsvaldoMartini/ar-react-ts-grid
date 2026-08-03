@@ -1069,7 +1069,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                                 <button
                                   type="button"
                                   className={styles.connectedParent}
-                                  aria-label={`${structuralLabels.connected} (id: ${connectedStructuralId})`}
+                                  aria-label={`Connected structural target, id: ${connectedStructuralId}`}
                                   title={structuralLabels.change}
                                   disabled={disabled}
                                   onMouseDown={event => event.stopPropagation()}
@@ -1083,25 +1083,25 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                                 >
                                   <Link2 size={11} aria-hidden="true" />
                                   <span className={styles.relationshipLabelFull}>
-                                    {structuralLabels.connected} (id: {connectedStructuralId})
+                                    (id: {connectedStructuralId})
                                   </span>
                                   <span className={styles.relationshipLabelCompact}>
-                                    ID {connectedStructuralId}
+                                    (id: {connectedStructuralId})
                                   </span>
                                 </button>
                               )
                             : (
                                 <span
                                   className={`${styles.connectedParent} ${styles.connectedStatic}`}
-                                  aria-label={`${structuralLabels.connected} (id: ${connectedStructuralId})`}
-                                  title={`${structuralLabels.connected} (id: ${connectedStructuralId})`}
+                                  aria-label={`Connected structural target, id: ${connectedStructuralId}`}
+                                  title={`(id: ${connectedStructuralId})`}
                                 >
                                   <Link2 size={11} aria-hidden="true" />
                                   <span className={styles.relationshipLabelFull}>
-                                    {structuralLabels.connected} (id: {connectedStructuralId})
+                                    (id: {connectedStructuralId})
                                   </span>
                                   <span className={styles.relationshipLabelCompact}>
-                                    ID {connectedStructuralId}
+                                    (id: {connectedStructuralId})
                                   </span>
                                 </span>
                               )

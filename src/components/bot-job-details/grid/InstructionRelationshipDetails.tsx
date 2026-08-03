@@ -341,21 +341,9 @@ const InstructionRelationshipDetails: React.FC<
     : requiresVariableBinding
       ? configuredVariableId
       : null;
-  // The chip is the single parent display: "Parent connected (id: N) Name".
-  const connectedParentName = connectedParentId === null
-    ? ''
-    : structuralKind === 'BLOCK_TARGET'
-      ? (workspaceBlocks.find(block => block.blockId === connectedParentId)
-          ?.blockName
-        ?? allInstructions.find(row => row.blockId === connectedParentId)
-          ?.blockName
-        ?? '')
-      : (allInstructions.find(row => row.id === connectedParentId)?.name ?? '');
   const connectedParentText = structuralKind === 'ELEMENT_TARGET'
     ? `id: ${connectedParentId}`
-    : connectedParentName
-      ? `${structuralLabels.connected} (id: ${connectedParentId}) ${connectedParentName}`
-      : `${structuralLabels.connected} (id: ${connectedParentId})`;
+    : `(id: ${connectedParentId})`;
   const connectedVariableName = connectedVariableId === null
     ? ''
     : variableLinks.find(variable => variable.id === connectedVariableId)
