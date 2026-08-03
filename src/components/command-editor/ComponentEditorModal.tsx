@@ -1,6 +1,7 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { PencilLine, X } from 'lucide-react';
 import SearchBox, { type SearchBoxOption } from '../SearchBox';
+import InstructionCommandBadge from '../bot-job-details/grid/InstructionCommandBadge';
 import type {
   ComponentEditorBlockOption,
   ComponentEditorCommand,
@@ -124,6 +125,7 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
     return catalog.map(option => ({
       value: option.code,
       label: option.label,
+      icon: <InstructionCommandBadge action={option.code} iconOnly />,
       sublabel: `command code ${option.code}`,
       badges: option.code === originalCommandCode
         ? [{ text: 'CURRENT', tone: 'green' as const }]

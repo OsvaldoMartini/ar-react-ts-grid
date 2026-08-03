@@ -166,6 +166,15 @@
   color: #17293f;
 }
 
+.optionIcon {
+  align-items: center;
+  display: inline-flex;
+  flex: 0 0 auto;
+  justify-content: center;
+  min-height: 20px;
+  min-width: 22px;
+}
+
 .optionSublabel {
   font-size: 0.66rem;
   color: #7d8ea3;

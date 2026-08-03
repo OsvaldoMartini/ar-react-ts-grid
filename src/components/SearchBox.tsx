@@ -26,6 +26,8 @@ export interface SearchBoxOption {
   badges?: SearchBoxBadge[];
   /** Extra text that participates in filtering but is not rendered. */
   keywords?: string;
+  /** Optional leading visual rendered before the option title. */
+  icon?: React.ReactNode;
 }
 
 export interface SearchBoxProps {
@@ -267,6 +269,11 @@ const SearchBox: React.FC<SearchBoxProps> = ({
                     onClick={() => commit(option.value)}
                   >
                     <span className={styles.optionTitleLine}>
+                      {option.icon && (
+                        <span className={styles.optionIcon} aria-hidden="true">
+                          {option.icon}
+                        </span>
+                      )}
                       <strong>{option.label}</strong>
                       {(option.badges ?? []).map(badge => (
                         <span

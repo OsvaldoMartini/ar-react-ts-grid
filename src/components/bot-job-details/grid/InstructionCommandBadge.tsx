@@ -61,6 +61,7 @@ export interface InstructionCommandBadgeProps {
   className?: string;
   label?: React.ReactNode;
   title?: string;
+  iconOnly?: boolean;
 }
 
 /**
@@ -73,6 +74,7 @@ const InstructionCommandBadge: React.FC<InstructionCommandBadgeProps> = ({
   className,
   label,
   title,
+  iconOnly = false,
 }) => {
   const presentation = instructionCommandPresentation(action, tagName);
   const imageSrc = COMMAND_ICON_ASSETS[presentation.icon] ?? null;
@@ -98,7 +100,7 @@ const InstructionCommandBadge: React.FC<InstructionCommandBadgeProps> = ({
           )}
         </span>
       )}
-      <span className={styles.label}>{visibleLabel}</span>
+      {!iconOnly && <span className={styles.label}>{visibleLabel}</span>}
     </span>
   );
 };
