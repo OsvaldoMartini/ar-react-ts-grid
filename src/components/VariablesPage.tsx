@@ -2696,8 +2696,8 @@ const VariablesPage: React.FC<Props> = ({
       && missingVariableSlots(command).length > 0);
     console.info('[CheckOperandDriver] trigger', { hasCheckValue });
     if (!hasCheckValue) return;
-    // Once both defaults exist, the isolated driver connects Right_Operand to
-    // every free CheckValue RIGHT spot. Automatic LEFT connection is paused.
+    // Once both defaults exist, the driver connects Left_Operand first and then
+    // Right_Operand to every free CheckValue spot.
     checkOperandIntentRef.current = { kind: 'RESOLVE_CHECKVALUES' };
     checkOperandAttemptsRef.current = 0;
     setCheckOperandKick(kick => kick + 1);
@@ -2732,9 +2732,8 @@ const VariablesPage: React.FC<Props> = ({
     });
   }, [pendingConnections, submitVariableCreate]);
 
-  // ISOLATED CheckValue RIGHT driver: one intent, one effect. RESOLVE connects
-  // Right_Operand through the dedicated backend operation; automatic LEFT is
-  // temporarily commented out below. RELEASE clears the queued right spots.
+  // CONSOLIDATED CheckValue driver: one intent, one effect. RESOLVE connects
+  // LEFT first and RIGHT second; RELEASE clears the queued RIGHT spots.
   useEffect(() => {
     const intent = checkOperandIntentRef.current;
     if (!intent || !snapshot) return;
@@ -2787,16 +2786,12 @@ const VariablesPage: React.FC<Props> = ({
       .filter(command => missingVariableSlots(command).includes('RIGHT'))
       .map(command => command.id as number);
     console.info('[CheckOperandDriver] workload', { leftIds, rightIds });
-    if (rightIds.length === 0) {
-      finish('ok', 'CheckValue RIGHT variables connected. Automatic LEFT connection is disabled.');
+    if (leftIds.length === 0 && rightIds.length === 0) {
+      finish('ok', 'CheckValue variables connected (left and right).');
       return;
     }
     const variableByName = new Map(snapshot.variables.map(
       variable => [variable.name.trim().toLowerCase(), variable.id]));
-    /*
-     * TEMPORARILY DISABLED: automatic Left_Operand connection.
-     * Keep this proven implementation available while the copied RIGHT flow
-     * below is isolated and verified against the new RIGHT slot persistence.
     if (leftIds.length > 0) {
       const leftOperandId = variableByName.get('left_operand');
       const capability = snapshot.mutationCapability;
@@ -2838,7 +2833,6 @@ const VariablesPage: React.FC<Props> = ({
       );
       return;
     }
-    */
     const rightOperandId = variableByName.get('right_operand');
     if (!rightOperandId) {
       stalled('Right_Operand is not available to connect.');
