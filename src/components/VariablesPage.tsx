@@ -2414,6 +2414,7 @@ const VariablesPage: React.FC<Props> = ({
           ? { kind: 'RELEASE', instructionIds: occupiedRightIds }
           : null;
         checkOperandAttemptsRef.current = 0;
+        setCheckOperandKick(kick => kick + 1);
       }
       submitVariablesMutation(
         pending.plan.draft,
@@ -2676,25 +2677,30 @@ const VariablesPage: React.FC<Props> = ({
     | null
   >(null);
   const checkOperandAttemptsRef = useRef(0);
+  // Refs never re-render: this kick is the ONLY reliable way to wake the
+  // driver effect right after an intent is set (its other deps may not move).
+  const [checkOperandKick, setCheckOperandKick] = useState(0);
   const createCheckValueDefaultVariables = useCallback(() => {
     const current = snapshotRef.current;
     if (!current || !pendingConnections || pendingConnections.mode !== 'RESOLVE') {
       return;
     }
-    const commandsById = new Map(
-      current.commands.flatMap(command =>
-        command.id === null ? [] : [[command.id, command] as const]),
-    );
-    const checkActions = new Set(['CK', 'CSV CHECK', 'PDF CHECK']);
-    const hasCheckValue = pendingConnections.review.items.some(item =>
-      item.kind === 'VARIABLE_BINDING'
-      && checkActions.has(canonicalInstructionAction(
-        commandsById.get(item.sourceInstructionId)?.command)));
+    // Detect CheckValues by their MISSING SLOTS in the frozen scope - never by
+    // the review items: a CK whose LEFT is already bound vanishes from the
+    // VARIABLE_BINDING issue list while its RIGHT spot is still empty.
+    const scopeIds = new Set(pendingConnections.scope.instructionIds);
+    const hasCheckValue = current.commands.some(command =>
+      command.id !== null
+      && scopeIds.has(command.id)
+      && requiredVariableSlots(command.command).includes('RIGHT')
+      && missingVariableSlots(command).length > 0);
+    console.info('[CheckOperandDriver] trigger', { hasCheckValue });
     if (!hasCheckValue) return;
-    // Once the defaults exist, the consolidated driver connects Left_Operand
-    // (LEFT spot) and Right_Operand (RIGHT spot) to every free CheckValue spot.
+    // Once both defaults exist, the isolated driver connects Right_Operand to
+    // every free CheckValue RIGHT spot. Automatic LEFT connection is paused.
     checkOperandIntentRef.current = { kind: 'RESOLVE_CHECKVALUES' };
     checkOperandAttemptsRef.current = 0;
+    setCheckOperandKick(kick => kick + 1);
     const existingNames = new Set(
       current.variables.map(variable => variable.name.trim().toLowerCase()),
     );
@@ -2726,11 +2732,9 @@ const VariablesPage: React.FC<Props> = ({
     });
   }, [pendingConnections, submitVariableCreate]);
 
-  // CONSOLIDATED CheckValue-operand driver (2026-08-03 cleanup): one intent,
-  // one effect. RESOLVE runs LEFT (Left_Operand -> instruction binding) then
-  // RIGHT (Right_Operand -> checkOperand op) until nothing is missing; RELEASE
-  // clears the queued right spots. The intent survives failed submits and gives
-  // up VISIBLY after 8 stalled passes - never a silent dead-end, never a loop.
+  // ISOLATED CheckValue RIGHT driver: one intent, one effect. RESOLVE connects
+  // Right_Operand through the dedicated backend operation; automatic LEFT is
+  // temporarily commented out below. RELEASE clears the queued right spots.
   useEffect(() => {
     const intent = checkOperandIntentRef.current;
     if (!intent || !snapshot) return;
@@ -2783,12 +2787,16 @@ const VariablesPage: React.FC<Props> = ({
       .filter(command => missingVariableSlots(command).includes('RIGHT'))
       .map(command => command.id as number);
     console.info('[CheckOperandDriver] workload', { leftIds, rightIds });
-    if (leftIds.length === 0 && rightIds.length === 0) {
-      finish('ok', 'CheckValue variables connected (left and right).');
+    if (rightIds.length === 0) {
+      finish('ok', 'CheckValue RIGHT variables connected. Automatic LEFT connection is disabled.');
       return;
     }
     const variableByName = new Map(snapshot.variables.map(
       variable => [variable.name.trim().toLowerCase(), variable.id]));
+    /*
+     * TEMPORARILY DISABLED: automatic Left_Operand connection.
+     * Keep this proven implementation available while the copied RIGHT flow
+     * below is isolated and verified against the new RIGHT slot persistence.
     if (leftIds.length > 0) {
       const leftOperandId = variableByName.get('left_operand');
       const capability = snapshot.mutationCapability;
@@ -2830,6 +2838,7 @@ const VariablesPage: React.FC<Props> = ({
       );
       return;
     }
+    */
     const rightOperandId = variableByName.get('right_operand');
     if (!rightOperandId) {
       stalled('Right_Operand is not available to connect.');
@@ -2847,6 +2856,7 @@ const VariablesPage: React.FC<Props> = ({
       stalled('The right-operand connection could not be submitted. Try again.');
     }
   }, [
+    checkOperandKick,
     pendingCheckOperandConnectRequestId,
     pendingCreateRequestId,
     pendingMutationRequestId,
