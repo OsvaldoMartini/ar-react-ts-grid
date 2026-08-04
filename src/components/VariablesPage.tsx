@@ -2381,6 +2381,30 @@ const VariablesPage: React.FC<Props> = ({
         });
         return;
       }
+      // Release ALL includes the CheckValue RIGHT spots (user order 2026-08-03):
+      // queue the occupied right operands of the scoped CheckValues; the driver
+      // effect releases them once the graph release commits.
+      const releaseSnapshot = snapshotRef.current;
+      if (releaseSnapshot) {
+        const checkActions = new Set(['CK', 'CSV CHECK', 'PDF CHECK']);
+        const scopeIds = new Set(pending.scope.instructionIds);
+        const occupiedRightIds = releaseSnapshot.commands.flatMap((command) => {
+          if (command.id === null
+            || !scopeIds.has(command.id)
+            || !checkActions.has(canonicalInstructionAction(command.command))) {
+            return [];
+          }
+          const configuration = command.commandConfiguration;
+          return configuration
+            && configuration.operandKind === 'VARIABLE'
+            && typeof configuration.operandVariableId === 'number'
+            && configuration.operandVariableId > 0
+            ? [command.id]
+            : [];
+        });
+        checkOperandReleasePendingRef.current =
+          occupiedRightIds.length > 0 ? occupiedRightIds : null;
+      }
       submitVariablesMutation(
         pending.plan.draft,
         pending.plan.mutationProfile,
@@ -2634,6 +2658,7 @@ const VariablesPage: React.FC<Props> = ({
   // Left_Operand / Right_Operand variables are created DIRECTLY when absent -
   // never duplicated, never blocked, no existence messages. Nothing else runs.
   const checkOperandConnectPendingRef = useRef(false);
+  const checkOperandReleasePendingRef = useRef<readonly number[] | null>(null);
   const createCheckValueDefaultVariables = useCallback(() => {
     const current = snapshotRef.current;
     if (!current || !pendingConnections || pendingConnections.mode !== 'RESOLVE') {
@@ -2723,6 +2748,31 @@ const VariablesPage: React.FC<Props> = ({
   }, [
     pendingCheckOperandConnectRequestId,
     pendingCreateRequestId,
+    snapshot,
+    submitCheckOperandConnect,
+  ]);
+
+  // Release-side driver (user order 2026-08-03): after "Release Connections"
+  // commits, clear the queued CheckValue RIGHT spots (config -> VOID, slot row
+  // deleted). One-shot list; a refusal never loops.
+  useEffect(() => {
+    const releaseIds = checkOperandReleasePendingRef.current;
+    if (!releaseIds || !snapshot) return;
+    if (pendingMutationRequestId !== null
+      || pendingCheckOperandConnectRequestId !== null) {
+      return;
+    }
+    checkOperandReleasePendingRef.current = null;
+    const requestId = submitCheckOperandConnect(null, releaseIds, 'RELEASE');
+    if (requestId) {
+      setStatus({
+        level: 'warn',
+        text: `Releasing the right operand of ${releaseIds.length} CheckValue command(s)...`,
+      });
+    }
+  }, [
+    pendingCheckOperandConnectRequestId,
+    pendingMutationRequestId,
     snapshot,
     submitCheckOperandConnect,
   ]);
