@@ -107,6 +107,7 @@ export interface VariablesCommandBoardProps {
     instructionId: number,
     edge?: InstructionRelationshipEdge,
   ) => void;
+  onReconnectRightVariable?: (instructionId: number) => void;
   /** Middle-shim dropdown: changes only the stored comparison operator. */
   onChangeCheckOperator?: (instructionId: number, comparisonOperator: string) => void;
   onEditCommand?: (instruction: VariableInstructionNode) => void;
@@ -193,6 +194,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
   onDropTarget,
   onReconnectParent,
   onReconnectVariable,
+  onReconnectRightVariable,
   onChangeCheckOperator,
   onEditCommand,
   onDeleteCommand,
@@ -791,9 +793,9 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                         ts: instructionId ?? index,
                       }
                     : null;
-                // THE variable model (2026-08-03): GET/E need OUTPUT, SET needs
-                // SOURCE, CheckValue needs LEFT + RIGHT. This chip covers only
-                // the PRIMARY spot (LEFT/OUTPUT/SOURCE) - the RIGHT spot has
+                // Variable flow: GET uses GET_WRITE, SET uses READ_SET, E uses READ,
+                // and CheckValue uses LEFT + RIGHT. This chip covers only the
+                // primary spot (LEFT/GET_WRITE/READ_SET/READ); RIGHT has
                 // its own dedicated "Variable 2" chip further right, so the two
                 // never duplicate.
                 const missingSlots = missingVariableSlots(instruction);
@@ -1192,11 +1194,12 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                             className={`${styles.connectedVariable} ${styles.variableButton}`}
                             aria-label={`${variableNamesById.get(secondCheckVariableId)?.trim() || 'Variable'}, id: ${secondCheckVariableId}`}
                             title="Change second comparison variable"
-                            disabled={disabled || !onEditCommand}
+                            disabled={disabled || !onReconnectRightVariable}
                             onMouseDown={event => event.stopPropagation()}
                             onClick={(event) => {
                               event.stopPropagation();
-                              onEditCommand?.(instruction);
+                              if (instructionId === null) return;
+                              onReconnectRightVariable?.(instructionId);
                             }}
                           >
                             <Variable size={11} aria-hidden="true" />
@@ -1227,10 +1230,13 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                               animate={false}
                               pulse
                               iconNode={<Variable size={11} aria-hidden="true" />}
-                              title="Reconnect variable 2 in Command Editor"
-                              disabled={disabled || !onEditCommand}
-                              onClick={onEditCommand
-                                ? () => onEditCommand(instruction)
+                              title="Reconnect variable 2"
+                              disabled={disabled || !onReconnectRightVariable}
+                              onClick={onReconnectRightVariable
+                                ? () => {
+                                    if (instructionId === null) return;
+                                    onReconnectRightVariable(instructionId);
+                                  }
                                 : undefined}
                             />
                           </span>

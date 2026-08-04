@@ -48,6 +48,14 @@ type PendingMutation = {
   callbacks: BotJobGraphMutationCallbacks;
   timeoutId: ReturnType<typeof setTimeout>;
   webSocket: WebSocket;
+  responseSessionId: string;
+  responseOperationId: string;
+};
+
+export type BotJobGraphMutationTransport = {
+  operationType: string;
+  responseType: string;
+  sessionId?: string;
 };
 
 type MutationEnvelope = {
@@ -70,6 +78,8 @@ const parseBody = (value: unknown): unknown => {
 
 const parseResponseEnvelope = (
   raw: unknown,
+  responseSessionId: string,
+  responseOperationId: string,
 ): BotJobGraphMutationResponse | null => {
   let envelopeValue = raw;
   if (typeof raw === 'string') {
@@ -82,8 +92,8 @@ const parseResponseEnvelope = (
   if (!envelopeValue || typeof envelopeValue !== 'object') return null;
   const envelope = envelopeValue as MutationEnvelope;
   if (
-    envelope.sessionId !== BOT_JOB_SESSION_ID
-    || envelope.operationId !== BOT_JOB_GRAPH_MUTATION_RESPONSE
+    envelope.sessionId !== responseSessionId
+    || envelope.operationId !== responseOperationId
   ) {
     return null;
   }
@@ -221,6 +231,7 @@ export const useBotJobInstructionGraphMutation = ({
   const submitMutation = useCallback((
     draft: BotJobGraphMutationDraft,
     callbacks: BotJobGraphMutationCallbacks,
+    transport?: BotJobGraphMutationTransport,
   ): string | null => {
     if (
       !webSocket
@@ -257,13 +268,15 @@ export const useBotJobInstructionGraphMutation = ({
       callbacks,
       timeoutId,
       webSocket,
+      responseSessionId: transport?.sessionId ?? BOT_JOB_SESSION_ID,
+      responseOperationId: transport?.responseType ?? BOT_JOB_GRAPH_MUTATION_RESPONSE,
     };
     setPendingRequestId(nextRequestId);
 
     try {
       webSocket.send(JSON.stringify({
-        type: BOT_JOB_GRAPH_MUTATION_TYPE,
-        sessionId: BOT_JOB_SESSION_ID,
+        type: transport?.operationType ?? BOT_JOB_GRAPH_MUTATION_TYPE,
+        sessionId: transport?.sessionId ?? BOT_JOB_SESSION_ID,
         ...request,
       }));
       return nextRequestId;
@@ -275,11 +288,15 @@ export const useBotJobInstructionGraphMutation = ({
   }, [capability, clearPending, connected, timeoutMs, webSocket]);
 
   const handleMutationMessage = useCallback((raw: unknown): boolean => {
-    const response = parseResponseEnvelope(raw);
     const pending = pendingRef.current;
+    if (!pending) return false;
+    const response = parseResponseEnvelope(
+      raw,
+      pending.responseSessionId,
+      pending.responseOperationId,
+    );
     if (
       !response
-      || !pending
       || response.requestId !== pending.request.requestId
       || response.workspaceEpoch !== pending.request.workspaceEpoch
       || !sameInstructionGraphOwner(

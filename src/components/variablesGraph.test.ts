@@ -122,7 +122,7 @@ test('classifies canonical command roles and builds every edge type', () => {
   expect(commandById(first, 112).role).toBe('CONSUMER');
   expect(commandById(first, 113).role).toBe('CONSUMER');
   expect(commandById(first, 114).role).toBe('CONSUMER');
-  expect(commandById(first, 115).role).toBe('LITERAL_ASSIGNMENT');
+  expect(commandById(first, 115).role).toBe('CONSUMER');
   expect(commandById(first, 116).role).toBe('INVALID_LINK');
   expect(codes(first.diagnostics)).toContain('NON_VARIABLE_ACTION_LINK');
 

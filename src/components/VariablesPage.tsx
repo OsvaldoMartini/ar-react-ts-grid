@@ -19,6 +19,7 @@ import DetachedPageShell from './DetachedPageShell';
 import PagesOpenButton from './PagesOpenButton';
 import ReconnectWebElement from './ReconnectWebElement';
 import type {
+  InstructionRelationshipEdge,
   RelationshipTarget,
 } from './bot-job-details/grid/domain/instructionRelationshipGraph';
 import { INSTRUCTION_GRAPH_MUTATION_CONTRACT_VERSION } from './bot-job-details/grid/domain/instructionGraphMutation.contract';
@@ -847,6 +848,8 @@ const VariablesPage: React.FC<Props> = ({
     useState<VariablesCommandDropTarget | null>(null);
   const [pendingReconnect, setPendingReconnect] =
     useState<PendingReconnect | null>(null);
+  const [rightVariableReconnectInstructionId, setRightVariableReconnectInstructionId] =
+    useState<number | null>(null);
   const [pendingConnections, setPendingConnections] =
     useState<PendingConnections | null>(null);
   const [pendingBlockTransfer, setPendingBlockTransfer] =
@@ -3470,6 +3473,58 @@ const VariablesPage: React.FC<Props> = ({
       ].join(' '),
     }))
     : [];
+  const rightVariableReconnectInstruction = snapshot
+    && rightVariableReconnectInstructionId !== null
+    ? snapshot.commands.find(command => command.id === rightVariableReconnectInstructionId) ?? null
+    : null;
+  const rightVariableReconnectCurrentId = rightVariableReconnectInstruction
+    ? connectedVariableSlots(rightVariableReconnectInstruction).get('RIGHT') ?? null
+    : null;
+  const rightVariableReconnectOwner = snapshot ? {
+    workspaceKind: 'BOT_JOB' as const,
+    homeBankingId: snapshot.botJob.homeBankingId,
+    botJobId: snapshot.botJob.id,
+  } : null;
+  const rightVariableReconnectEdge: InstructionRelationshipEdge | null =
+    snapshot
+    && rightVariableReconnectInstruction?.id !== null
+    && rightVariableReconnectInstruction?.id !== undefined
+    && rightVariableReconnectOwner
+      ? {
+          id: `second-operand:${rightVariableReconnectInstruction.id}`,
+          kind: 'VARIABLE_BINDING',
+          source: {
+            entity: 'INSTRUCTION',
+            owner: rightVariableReconnectOwner,
+            id: rightVariableReconnectInstruction.id,
+          },
+          target: rightVariableReconnectCurrentId === null
+            ? null
+            : {
+                entity: 'VARIABLE',
+                owner: rightVariableReconnectOwner,
+                id: rightVariableReconnectCurrentId,
+              },
+          state: rightVariableReconnectCurrentId === null
+            ? 'RECONNECT_VARIABLE'
+            : 'CONNECTED',
+          code: null,
+          required: true,
+          compatibleTargets: snapshot.variables.map(variable => ({
+            entity: 'VARIABLE' as const,
+            owner: rightVariableReconnectOwner,
+            id: variable.id,
+          })),
+        }
+      : null;
+  const rightVariableReconnectOptions = snapshot && rightVariableReconnectEdge
+    ? rightVariableReconnectEdge.compatibleTargets.map(target => ({
+        target,
+        label: relationshipTargetLabel(snapshot, target) ?? `Variable ID ${target.id}`,
+        sublabel: 'VARIABLE',
+        keywords: `${target.id} ${relationshipTargetLabel(snapshot, target) ?? ''}`,
+      }))
+    : [];
 
   const filterButtons: Array<{ id: HealthFilter; label: string; count?: number }> = [
     { id: 'ALL', label: 'All', count: snapshot?.summary.variableCount ?? 0 },
@@ -3703,6 +3758,7 @@ const VariablesPage: React.FC<Props> = ({
                 }}
                 onReconnectVariable={(instructionId) =>
                   openReconnect(instructionId, 'VARIABLE_BINDING')}
+                onReconnectRightVariable={setRightVariableReconnectInstructionId}
                 onChangeCheckOperator={changeCheckOperator}
                 onEditCommand={(instruction) => {
                   if (instruction.id === null) return;
@@ -4198,6 +4254,41 @@ const VariablesPage: React.FC<Props> = ({
                 level: 'warn',
                 text: 'Reconnect cancelled. No relationship was changed.',
               });
+            }}
+          />
+        )}
+        {snapshot && rightVariableReconnectInstruction && rightVariableReconnectEdge && (
+          <ReconnectWebElement
+            edge={rightVariableReconnectEdge}
+            sourceLabel={`#${rightVariableReconnectInstruction.instructionOrder ?? '?'} ${
+              rightVariableReconnectInstruction.name || rightVariableReconnectInstruction.command
+            } · ID ${rightVariableReconnectInstruction.id} · second comparison variable`}
+            currentTargetLabel={relationshipTargetLabel(
+              snapshot,
+              rightVariableReconnectEdge.target,
+            )}
+            compatibleTargets={rightVariableReconnectOptions}
+            pending={pendingCheckValueRightRequestId !== null}
+            onDisconnect={() => {
+              if (rightVariableReconnectInstruction.id === null) return;
+              const requestId = submitCheckValueRight(
+                null,
+                [rightVariableReconnectInstruction.id],
+                'RELEASE',
+              );
+              if (requestId) setRightVariableReconnectInstructionId(null);
+            }}
+            onConnect={(target) => {
+              if (rightVariableReconnectInstruction.id === null) return;
+              const requestId = submitCheckValueRight(
+                target.id,
+                [rightVariableReconnectInstruction.id],
+              );
+              if (requestId) setRightVariableReconnectInstructionId(null);
+            }}
+            onCancel={() => {
+              if (pendingCheckValueRightRequestId !== null) return;
+              setRightVariableReconnectInstructionId(null);
             }}
           />
         )}

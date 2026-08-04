@@ -410,9 +410,9 @@ export function useGridData(deps: UseGridDataDeps) {
   const botJobRelationshipMutationAvailable =
     botJobRelationshipMutationAuthorityKey !== null;
   const pendingCheckOperandRequestRef = useRef<string | null>(null);
-  // CHECKVALUE second comparison variable (typed right operand). Persisted by the
-  // dedicated commandEditor.checkOperand backend op against the durable
-  // bot_job_variable_definition table; the server pushes the refreshed grid.
+  // CHECKVALUE second comparison variable (typed right operand). GridItem owns an
+  // independent variablesWorkspace.graphMutationRight call authorized by its current
+  // Bot Job graph capability. The backend persists the RIGHT slot and config mirror.
   const submitCheckOperand = useCallback((
     instructionId: number,
     operandVariableId: number | null,
@@ -422,29 +422,33 @@ export function useGridData(deps: UseGridDataDeps) {
       || !webSocket
       || !connected
       || webSocket.readyState !== WebSocket.OPEN
-      || !moveGraphRevision
+      || !botJobGraphMutationCapability
     ) {
       return false;
     }
-    const requestId = `${Date.now()}-${instructionId}-check-operand`;
+    const requestId = `${Date.now()}-${instructionId}-grid-right-operand`;
     pendingCheckOperandRequestRef.current = requestId;
     webSocket.send(JSON.stringify({
-      type: 'commandEditor.checkOperand',
+      type: 'variablesWorkspace.graphMutationRight',
       sessionId,
       homeBankingId,
       body: JSON.stringify({
+        contractVersion: 1,
         requestId,
         targetSessionId,
         botJobId,
         homeBankingId,
-        instructionId,
-        operandVariableId,
-        graphRevision: moveGraphRevision,
+        workspaceEpoch: botJobGraphMutationCapability.workspaceEpoch,
+        baseGraphVersion: botJobGraphMutationCapability.graphVersion,
+        graphRevision: botJobGraphMutationCapability.graphRevision,
+        rightVariableId: operandVariableId,
+        instructionIds: [instructionId],
+        operation: operandVariableId === null ? 'RELEASE' : 'CONNECT',
       }),
     }));
     return true;
   }, [
-    workspaceKind, webSocket, connected, moveGraphRevision, sessionId,
+    workspaceKind, webSocket, connected, botJobGraphMutationCapability, sessionId,
     homeBankingId, botJobId, targetSessionId,
   ]);
 
@@ -579,7 +583,13 @@ export function useGridData(deps: UseGridDataDeps) {
         setAlertAlternateAction(undefined);
         setErrorFlag(true);
       },
-    });
+    }, edge.kind === 'VARIABLE_BINDING'
+      ? {
+          operationType: 'variablesWorkspace.graphMutationLeft',
+          responseType: 'variablesWorkspace.graphMutationLeftResponse',
+          sessionId: 'botJobTasks',
+        }
+      : undefined);
     if (!requestId) {
       setAlertImage(forbiddenImage);
       setAlertClass('construction-image');
@@ -1232,7 +1242,8 @@ export function useGridData(deps: UseGridDataDeps) {
             setAlertAlternateAction(undefined);
             setErrorFlag(true);
           }
-        } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "commandEditor.checkOperandResponse") {
+        } else if (sessionId === parsedMessage.sessionId
+          && parsedMessage.operationId === "variablesWorkspace.graphMutationRightResponse") {
           const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
           if (String(bodyData?.requestId || '') !== pendingCheckOperandRequestRef.current) return;
           pendingCheckOperandRequestRef.current = null;

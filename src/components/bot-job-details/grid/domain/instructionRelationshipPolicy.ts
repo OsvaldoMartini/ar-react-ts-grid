@@ -9,7 +9,8 @@ export type VariableCommandSemantics =
   | 'NONE'
   | 'PRODUCER'
   | 'RUNTIME_CONSUMER'
-  | 'LITERAL_ASSIGNMENT'
+  | 'READ_SET'
+  | 'READ_EXPORT'
   | 'OUTPUT_VALIDATION';
 
 export type StructuralBoundarySemantics =
@@ -70,15 +71,14 @@ const POLICIES: Record<string, InstructionActionPolicy> = {
   }),
   SET: policy('SET', {
     role: 'VARIABLE_COMMAND',
-    variableSemantics: 'LITERAL_ASSIGNMENT',
+    variableSemantics: 'READ_SET',
     requirements: ['ELEMENT_TARGET', 'VARIABLE_BINDING'],
     allowedVariableTypes: VARIABLE_TYPES,
     allowedElementTags: WRITABLE_TAGS,
-    writesRuntimeValue: true,
   }),
   E: policy('E', {
     role: 'VARIABLE_COMMAND',
-    variableSemantics: 'RUNTIME_CONSUMER',
+    variableSemantics: 'READ_EXPORT',
     requirements: ['ELEMENT_TARGET', 'VARIABLE_BINDING', 'VARIABLE_ORDER'],
     allowedVariableTypes: VARIABLE_TYPES,
   }),
@@ -185,9 +185,9 @@ export const isVariableProducerAction = (action: unknown): boolean =>
   ).variableSemantics === 'PRODUCER';
 
 export const isVariableConsumerAction = (action: unknown): boolean =>
-  instructionRelationshipPolicy(
+  ['RUNTIME_CONSUMER', 'READ_SET', 'READ_EXPORT'].includes(instructionRelationshipPolicy(
     typeof action === 'string' ? action : '',
-  ).variableSemantics === 'RUNTIME_CONSUMER';
+  ).variableSemantics);
 
 export const writesRuntimeVariableValue = (action: unknown): boolean =>
   instructionRelationshipPolicy(

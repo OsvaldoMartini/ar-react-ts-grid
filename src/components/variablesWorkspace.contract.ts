@@ -76,7 +76,7 @@ export interface VariableInstructionNode {
   active: boolean | null;
   blockActive: boolean | null;
   commandConfiguration?: VariableCommandConfiguration | null;
-  /** Uniform connections from instruction_variable_slot (LEFT/RIGHT/OUTPUT/SOURCE). */
+  /** Uniform connections from instruction_variable_slot (LEFT/RIGHT/GET_WRITE/READ_SET/READ). */
   variableSlots?: readonly VariableSlotLink[];
 }
 

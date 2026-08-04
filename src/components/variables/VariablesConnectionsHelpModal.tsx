@@ -26,6 +26,7 @@ const VariablesConnectionsHelpModal: React.FC<
   const [graphHelp, setGraphHelp] = useState<
     VariablesConnectionGraphKind | null
   >(null);
+  const [variableFlowHelpOpen, setVariableFlowHelpOpen] = useState(false);
 
   useEffect(() => {
     closeButtonRef.current?.focus();
@@ -130,6 +131,17 @@ const VariablesConnectionsHelpModal: React.FC<
                 <strong>Return Block</strong> and an <strong>End Block</strong>.
               </li>
             </ul>
+            <div className={styles.sectionHelpAction}>
+              <button
+                type="button"
+                className={styles.helpPlaceholder}
+                aria-label="Open variable flow conventions"
+                title="Variable flow conventions"
+                onClick={() => setVariableFlowHelpOpen(true)}
+              >
+                <CircleHelp size={15} aria-hidden="true" />
+              </button>
+            </div>
           </section>
 
           <section className={styles.section}>
@@ -283,6 +295,58 @@ const VariablesConnectionsHelpModal: React.FC<
             onClose={() => setGraphHelp(null)}
           />
         </Suspense>
+      )}
+      {variableFlowHelpOpen && (
+        <div
+          className={styles.detailBackdrop}
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setVariableFlowHelpOpen(false);
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-label="Variable flow conventions"
+            className={styles.detailDialog}
+            onKeyDown={(event) => {
+              event.stopPropagation();
+              if (event.key === 'Escape') setVariableFlowHelpOpen(false);
+            }}
+          >
+            <header className={styles.detailHeader}>
+              <div className={styles.titleLine}>
+                <CircleHelp size={20} aria-hidden="true" />
+                <h2>Variable flow conventions</h2>
+              </div>
+              <button
+                type="button"
+                className={styles.closeButton}
+                aria-label="Close variable flow conventions"
+                title="Close"
+                onClick={() => setVariableFlowHelpOpen(false)}
+              >
+                <X size={18} aria-hidden="true" />
+              </button>
+            </header>
+            <div className={styles.detailBody}>
+              <table className={styles.flowTable}>
+                <thead>
+                  <tr>
+                    <th scope="col">Command</th>
+                    <th scope="col">Persisted slot</th>
+                    <th scope="col">Direction</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><th scope="row">GET</th><td>GET_WRITE</td><td>Web Element → Variable</td></tr>
+                  <tr><th scope="row">SET</th><td>READ_SET</td><td>Variable → Web Element</td></tr>
+                  <tr><th scope="row">ExcelWrite</th><td>READ</td><td>Variable → Excel/CSV</td></tr>
+                  <tr><th scope="row">CheckValue</th><td>LEFT, RIGHT</td><td>Variables → Comparison</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
       )}
     </>
   );

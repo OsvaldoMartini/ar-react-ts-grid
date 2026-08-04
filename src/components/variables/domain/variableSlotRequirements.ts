@@ -4,8 +4,9 @@ import type { VariableInstructionNode } from '../../variablesWorkspace.contract'
 /**
  * THE variable model (user decision 2026-08-03):
  * an instruction is a Web Element or a Command; commands need 0, 1 or 2
- * variables — GET/E write into one (OUTPUT), SET reads from one (SOURCE),
- * CheckValue compares two (LEFT + RIGHT). Everything else needs none.
+ * GET extracts an external value and writes it through GET_WRITE; SET reads a
+ * variable through READ_SET; E reads a variable through READ; CheckValue compares
+ * LEFT + RIGHT. Everything else needs no variable slot.
  *
  * This map is the single source of truth for "how many variables and which
  * spots". Connections live as instruction_variable_slot rows; while the slot
@@ -13,19 +14,18 @@ import type { VariableInstructionNode } from '../../variablesWorkspace.contract'
  * storages (instruction.variable_id, config operand) so the UI stays truthful.
  */
 
-export type VariableSlotName = 'LEFT' | 'RIGHT' | 'OUTPUT' | 'SOURCE';
+export type VariableSlotName = 'LEFT' | 'RIGHT' | 'GET_WRITE' | 'READ_SET' | 'READ';
 
 const CHECK_ACTIONS = new Set(['CK', 'CSV CHECK', 'PDF CHECK']);
-const OUTPUT_ACTIONS = new Set(['GET', 'E']);
-const SOURCE_ACTIONS = new Set(['SET']);
 
 export const requiredVariableSlots = (
   action: string | null | undefined,
 ): readonly VariableSlotName[] => {
   const canonical = canonicalInstructionAction(action);
   if (CHECK_ACTIONS.has(canonical)) return ['LEFT', 'RIGHT'];
-  if (OUTPUT_ACTIONS.has(canonical)) return ['OUTPUT'];
-  if (SOURCE_ACTIONS.has(canonical)) return ['SOURCE'];
+  if (canonical === 'GET') return ['GET_WRITE'];
+  if (canonical === 'SET') return ['READ_SET'];
+  if (canonical === 'E') return ['READ'];
   return [];
 };
 
