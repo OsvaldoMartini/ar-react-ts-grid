@@ -88,7 +88,9 @@ const reconnectOption = (
     : instructions.find(candidate => candidate.id === variable.instructionId);
   return {
     target,
-    label: `Variable ID ${target.id}`,
+    label: variable?.name?.trim()
+      ? `${variable.name.trim()} · Variable ID ${target.id}`
+      : `Variable ID ${target.id}`,
     sublabel: [
       variable?.type || 'Variable',
       owner ? `Owner: ${owner.name || `Instruction ${owner.id}`}` : null,
