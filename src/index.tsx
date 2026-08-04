@@ -291,9 +291,15 @@ const App: React.FC = () => {
         return;
       }
       const parsedSourceBotJobId = sourceBotJobId ? Number(sourceBotJobId) : -9999;
+      const requestedBackendPort = Number(search.get('backendPort'));
+      const detachedWorkspacePort = process.env.NODE_ENV === 'development'
+        && Number.isSafeInteger(requestedBackendPort)
+        && requestedBackendPort > 0
+          ? requestedBackendPort
+          : Number(window.location.port);
       onSessionOpen(
         openWorkspace,
-        Number(window.location.port),
+        detachedWorkspacePort,
         Number.isSafeInteger(parsedSourceBotJobId) && parsedSourceBotJobId > 0 ? parsedSourceBotJobId : undefined,
       );
       return;

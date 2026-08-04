@@ -9,13 +9,9 @@ import {
   type VariableWorkspaceSnapshot,
 } from '../variablesWorkspace.contract';
 
-export const VARIABLES_CHECK_OPERAND_CONNECT_OPERATION =
-  'variablesWorkspace.graphMutationRight' as const;
-export const VARIABLES_CHECK_OPERAND_CONNECT_RESPONSE =
-  'variablesWorkspace.graphMutationRightResponse' as const;
-export const VARIABLES_CHECK_OPERAND_CONNECT_CONTRACT_VERSION = 1 as const;
+export const VARIABLES_GRAPH_MUTATION_RIGHT_CONTRACT_VERSION = 1 as const;
 
-export type VariablesCheckOperandConnectResult = {
+export type VariablesGraphMutationRightResult = {
   ok: boolean;
   requestId: string;
   message: string;
@@ -29,7 +25,9 @@ type Context = {
   connected: boolean;
   sessionId: string;
   snapshot: VariableWorkspaceSnapshot | null;
-  onResult: (result: VariablesCheckOperandConnectResult) => void;
+  operationType: 'variablesWorkspace.graphMutationRight';
+  responseType: 'variablesWorkspace.graphMutationRightResponse';
+  onResult: (result: VariablesGraphMutationRightResult) => void;
   timeoutMs?: number;
 };
 
@@ -58,11 +56,13 @@ const nextRequestId = (): string => {
  * Right_Operand connection for the given CheckValue commands. Java fills only
  * FREE right spots (slot table + config mirror) and never overwrites.
  */
-export const useVariablesCheckOperandConnect = ({
+export const useVariablesGraphMutationRight = ({
   webSocket,
   connected,
   sessionId,
   snapshot,
+  operationType,
+  responseType,
   onResult,
   timeoutMs = DEFAULT_TIMEOUT_MS,
 }: Context) => {
@@ -125,10 +125,10 @@ export const useVariablesCheckOperandConnect = ({
     setPendingRequestId(requestId);
     try {
       webSocket.send(JSON.stringify({
-        type: VARIABLES_CHECK_OPERAND_CONNECT_OPERATION,
+        type: operationType,
         sessionId,
         body: JSON.stringify({
-          contractVersion: VARIABLES_CHECK_OPERAND_CONNECT_CONTRACT_VERSION,
+          contractVersion: VARIABLES_GRAPH_MUTATION_RIGHT_CONTRACT_VERSION,
           requestId,
           bindingEpoch: snapshot.bindingEpoch,
           workspaceEpoch: snapshot.workspaceEpoch,
@@ -153,7 +153,7 @@ export const useVariablesCheckOperandConnect = ({
       });
       return null;
     }
-  }, [clearPending, connected, onResult, sessionId, snapshot, timeoutMs, webSocket]);
+  }, [clearPending, connected, onResult, operationType, sessionId, snapshot, timeoutMs, webSocket]);
 
   const handleMessage = useCallback((raw: unknown): boolean => {
     let envelope;
@@ -162,7 +162,7 @@ export const useVariablesCheckOperandConnect = ({
     } catch (_) {
       return false;
     }
-    if (envelope.operationId !== VARIABLES_CHECK_OPERAND_CONNECT_RESPONSE) return false;
+    if (envelope.operationId !== responseType) return false;
     const body = objectValue(envelope.body);
     if (!body) return true;
     const pending = pendingRef.current;
@@ -186,7 +186,7 @@ export const useVariablesCheckOperandConnect = ({
         : 0,
     });
     return true;
-  }, [clearPending, onResult]);
+  }, [clearPending, onResult, responseType]);
 
   return {
     pendingRequestId,

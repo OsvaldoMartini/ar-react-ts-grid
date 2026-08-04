@@ -21,6 +21,7 @@ import ReconnectWebElement from './ReconnectWebElement';
 import type {
   RelationshipTarget,
 } from './bot-job-details/grid/domain/instructionRelationshipGraph';
+import { INSTRUCTION_GRAPH_MUTATION_CONTRACT_VERSION } from './bot-job-details/grid/domain/instructionGraphMutation.contract';
 import { instructionCommandPresentation } from './bot-job-details/grid/domain/instructionCommandPresentation';
 import {
   canonicalInstructionAction,
@@ -101,15 +102,17 @@ import {
   requiredVariableSlots,
 } from './variables/domain/variableSlotRequirements';
 import {
-  useVariablesCheckOperandConnect,
-  type VariablesCheckOperandConnectResult,
-} from './variables/useVariablesCheckOperandConnect';
+  useVariablesGraphMutationRight,
+  type VariablesGraphMutationRightResult,
+} from './variables/useVariablesGraphMutationRight';
 import {
   planVariableAutoResolve,
   type VariableAutoResolvePlan,
 } from './variables/domain/variableAutoResolvePlan';
 import { commandEditorConfiguration } from './command-editor/commandEditorDraft';
-import { useVariablesGraphMutation } from './variables/useVariablesGraphMutation';
+import { useVariablesGraphMutationParent } from './variables/useVariablesGraphMutationParent';
+import { useVariablesGraphMutationLeft } from './variables/useVariablesGraphMutationLeft';
+import { useVariablesGraphMutationCommandVariable } from './variables/useVariablesGraphMutationCommandVariable';
 import {
   useVariablesInstructionCopy,
   type VariablesInstructionCopyResult,
@@ -874,7 +877,7 @@ const VariablesPage: React.FC<Props> = ({
   const remainingVariableIntentRef = useRef<{
     instructionIds: readonly number[];
     creating: boolean;
-    submitted: boolean;
+    awaitingInstructionId: number | null;
   } | null>(null);
   const [remainingVariableKick, setRemainingVariableKick] = useState(0);
   const pendingCheckStartGraphVersionRef = useRef<number | null>(null);
@@ -890,39 +893,33 @@ const VariablesPage: React.FC<Props> = ({
     submit: submitGraphMutation,
     handleMessage: handleGraphMutationMessage,
     resetPending: resetGraphMutation,
-  } = useVariablesGraphMutation({
+  } = useVariablesGraphMutationParent({
     webSocket,
     connected,
     snapshot,
-    operationType: 'variablesWorkspace.graphMutationParent',
-    responseType: 'variablesWorkspace.graphMutationParentResponse',
   });
   const {
     pendingRequestId: pendingCheckValueLeftRequestId,
     submit: submitCheckValueLeft,
     handleMessage: handleCheckValueLeftMessage,
     resetPending: resetCheckValueLeft,
-  } = useVariablesGraphMutation({
+  } = useVariablesGraphMutationLeft({
     webSocket,
     connected,
     snapshot,
-    operationType: 'variablesWorkspace.graphMutationLeft',
-    responseType: 'variablesWorkspace.graphMutationLeftResponse',
   });
   const {
-    pendingRequestId: pendingCommandVariableRequestId,
-    submit: submitCommandVariableMutation,
-    handleMessage: handleCommandVariableMutationMessage,
-    resetPending: resetCommandVariableMutation,
-  } = useVariablesGraphMutation({
+    pendingRequestId: pendingGraphMutationCommandVariableRequestId,
+    submit: submitGraphMutationCommandVariable,
+    handleMessage: handleGraphMutationCommandVariableMessage,
+    resetPending: resetGraphMutationCommandVariable,
+  } = useVariablesGraphMutationCommandVariable({
     webSocket,
     connected,
     snapshot,
-    operationType: 'variablesWorkspace.graphMutationCommandVariable',
-    responseType: 'variablesWorkspace.graphMutationCommandVariableResponse',
   });
   const pendingMutationRequestId = pendingStructuralMutationRequestId
-    ?? pendingCommandVariableRequestId;
+    ?? pendingGraphMutationCommandVariableRequestId;
   const {
     reviewState: executionFlowReview,
     openReview: openExecutionFlowReview,
@@ -1157,8 +1154,8 @@ const VariablesPage: React.FC<Props> = ({
     onResult: handleCommandDeleteResult,
   });
 
-  const handleCheckOperandConnectResult = useCallback((
-    result: VariablesCheckOperandConnectResult,
+  const handleGraphMutationRightResult = useCallback((
+    result: VariablesGraphMutationRightResult,
   ) => {
     if (!result.ok && checkOperandIntentRef.current?.kind === 'RESOLVE_CHECKVALUES') {
       checkOperandIntentRef.current = null;
@@ -1176,15 +1173,17 @@ const VariablesPage: React.FC<Props> = ({
   }, []);
 
   const {
-    pendingRequestId: pendingCheckOperandConnectRequestId,
-    submit: submitCheckOperandConnect,
-    handleMessage: handleCheckOperandConnectMessage,
-  } = useVariablesCheckOperandConnect({
+    pendingRequestId: pendingCheckValueRightRequestId,
+    submit: submitCheckValueRight,
+    handleMessage: handleCheckValueRightMessage,
+  } = useVariablesGraphMutationRight({
     webSocket,
     connected,
     sessionId,
     snapshot,
-    onResult: handleCheckOperandConnectResult,
+    operationType: 'variablesWorkspace.graphMutationRight',
+    responseType: 'variablesWorkspace.graphMutationRightResponse',
+    onResult: handleGraphMutationRightResult,
   });
 
   // Middle-shim dropdown (2026-08-04, user order): a direct, single-command
@@ -1194,7 +1193,7 @@ const VariablesPage: React.FC<Props> = ({
     instructionId: number,
     comparisonOperator: string,
   ) => {
-    const requestId = submitCheckOperandConnect(
+    const requestId = submitCheckValueRight(
       null, [instructionId], 'UPDATE_OPERATOR', comparisonOperator,
     );
     if (!requestId) {
@@ -1208,7 +1207,7 @@ const VariablesPage: React.FC<Props> = ({
       level: 'warn',
       text: `Updating the comparison operator for command #${instructionId}...`,
     });
-  }, [submitCheckOperandConnect]);
+  }, [submitCheckValueRight]);
 
   const handleInstructionStatusResult = useCallback((
     result: VariablesInstructionStatusResult,
@@ -1409,7 +1408,7 @@ const VariablesPage: React.FC<Props> = ({
     clearPendingRequest();
     resetGraphMutation();
     resetCheckValueLeft();
-    resetCommandVariableMutation();
+    resetGraphMutationCommandVariable();
     resetInstructionCopy();
     resetCommandUpdate();
     resetCommandCopy();
@@ -1438,7 +1437,7 @@ const VariablesPage: React.FC<Props> = ({
     closeExecutionFlowReview,
     resetGraphMutation,
     resetCheckValueLeft,
-    resetCommandVariableMutation,
+    resetGraphMutationCommandVariable,
     resetInstructionCopy,
     resetCommandCopy,
     resetCommandCreate,
@@ -1480,10 +1479,10 @@ const VariablesPage: React.FC<Props> = ({
       if (handleVariableCreateMessage(raw)) return;
       if (handleVariableDeleteMessage(raw)) return;
       if (handleCommandDeleteMessage(raw)) return;
-      if (handleCheckOperandConnectMessage(raw)) return;
+      if (handleCheckValueRightMessage(raw)) return;
       if (handleInstructionStatusMessage(raw)) return;
       if (handleCheckValueLeftMessage(raw)) return;
-      if (handleCommandVariableMutationMessage(raw)) return;
+      if (handleGraphMutationCommandVariableMessage(raw)) return;
       if (handleGraphMutationMessage(raw)) return;
       if (handleRuntimeMemoryMessage(raw)) return;
       let envelope: VariablesWorkspaceEnvelope;
@@ -1563,7 +1562,7 @@ const VariablesPage: React.FC<Props> = ({
     clearPendingRequest,
     handleGraphMutationMessage,
     handleCheckValueLeftMessage,
-    handleCommandVariableMutationMessage,
+    handleGraphMutationCommandVariableMessage,
     handleCommandCreateMessage,
     handleCommandCopyMessage,
     handleCommandUpdateMessage,
@@ -1572,7 +1571,7 @@ const VariablesPage: React.FC<Props> = ({
     handleVariableCreateMessage,
     handleVariableDeleteMessage,
     handleCommandDeleteMessage,
-    handleCheckOperandConnectMessage,
+    handleCheckValueRightMessage,
     handleInstructionStatusMessage,
     messages,
     replaceSnapshot,
@@ -1809,7 +1808,7 @@ const VariablesPage: React.FC<Props> = ({
     const keepConnectionsOpen = options.keepConnectionsOpen === true;
     setStatus({ level: 'warn', text: pendingText });
     const mutationSubmit = draft.variableBindingPatches.length > 0
-      ? submitCommandVariableMutation
+      ? submitGraphMutationCommandVariable
       : submitGraphMutation;
     const requestId = mutationSubmit(draft, {
       committed: response => {
@@ -1853,7 +1852,7 @@ const VariablesPage: React.FC<Props> = ({
         text: `Variables is busy or disconnected. Instruction #${sourceInstructionId} was not changed.`,
       });
     }
-  }, [sendWorkspaceRequest, submitCommandVariableMutation, submitGraphMutation]);
+  }, [sendWorkspaceRequest, submitGraphMutationCommandVariable, submitGraphMutation]);
 
   // IF-family links are a CLOSED rule (user decision 2026-08-03): one IF root
   // per Block has exactly one valid wiring, so broken links repair themselves
@@ -2758,7 +2757,7 @@ const VariablesPage: React.FC<Props> = ({
     remainingVariableIntentRef.current = {
       instructionIds: [...instructionIds],
       creating: false,
-      submitted: false,
+      awaitingInstructionId: null,
     };
     setRemainingVariableKick(kick => kick + 1);
   }, []);
@@ -2864,13 +2863,13 @@ const VariablesPage: React.FC<Props> = ({
       || pendingCreateRequestId !== null
       || pendingMutationRequestId !== null
       || pendingCheckValueLeftRequestId !== null
-      || pendingCheckOperandConnectRequestId !== null) {
+      || pendingCheckValueRightRequestId !== null) {
       console.info('[CheckOperandDriver] waiting', {
         batch: createVariableBatchRef.current !== null,
         pendingCreate: pendingCreateRequestId,
         pendingMutation: pendingMutationRequestId,
         pendingLeft: pendingCheckValueLeftRequestId,
-        pendingConnect: pendingCheckOperandConnectRequestId,
+        pendingConnect: pendingCheckValueRightRequestId,
       });
       return;
     }
@@ -2893,7 +2892,7 @@ const VariablesPage: React.FC<Props> = ({
       if (checkOperandAttemptsRef.current > 8) finish('error', text);
     };
     if (intent.kind === 'RELEASE') {
-      const requestId = submitCheckOperandConnect(null, intent.instructionIds, 'RELEASE');
+      const requestId = submitCheckValueRight(null, intent.instructionIds, 'RELEASE');
       if (requestId) {
         checkOperandIntentRef.current = null;
         checkOperandAttemptsRef.current = 0;
@@ -2914,6 +2913,14 @@ const VariablesPage: React.FC<Props> = ({
       command.id !== null
       && scopedIds.has(command.id)
       && requiredVariableSlots(command.command).includes('RIGHT'));
+    const effectiveMissingSlots = (command: typeof checkCommands[number]) => {
+      const fact = snapshot.mutationCapability?.instructionFacts.find(
+        item => item.instructionId === command.id,
+      );
+      return missingVariableSlots(command).filter(
+        slot => slot !== 'LEFT' || !fact || fact.variableId === null,
+      );
+    };
     if (intent.awaitingSlot) {
       const awaitedCommand = checkCommands.find(
         command => command.id === intent.awaitingSlot?.instructionId,
@@ -2931,11 +2938,11 @@ const VariablesPage: React.FC<Props> = ({
       delete intent.awaitingSlot;
     }
     const nextCommand = checkCommands.find(
-      command => missingVariableSlots(command).length > 0,
+      command => effectiveMissingSlots(command).length > 0,
     );
     console.info('[CheckOperandDriver] next command', {
       instructionId: nextCommand?.id ?? null,
-      missingSlots: nextCommand ? missingVariableSlots(nextCommand) : [],
+      missingSlots: nextCommand ? effectiveMissingSlots(nextCommand) : [],
     });
     if (!nextCommand || nextCommand.id === null) {
       finish('ok', 'CheckValue variables connected (left and right).');
@@ -2944,7 +2951,7 @@ const VariablesPage: React.FC<Props> = ({
     const variableByName = new Map(snapshot.variables.map(
       variable => [variable.name.trim().toLowerCase(), variable.id]));
     const nextInstructionId = nextCommand.id;
-    if (missingVariableSlots(nextCommand).includes('LEFT')) {
+    if (effectiveMissingSlots(nextCommand).includes('LEFT')) {
       const leftOperandId = variableByName.get('left_operand');
       const capability = snapshot.mutationCapability;
       if (!leftOperandId || !capability) {
@@ -3007,7 +3014,7 @@ const VariablesPage: React.FC<Props> = ({
     }
     checkOperandAttemptsRef.current += 1;
     intent.awaitingSlot = { instructionId: nextInstructionId, slot: 'RIGHT' };
-    const requestId = submitCheckOperandConnect(rightOperandId, [nextInstructionId]);
+    const requestId = submitCheckValueRight(rightOperandId, [nextInstructionId]);
     console.info('[CheckOperandDriver] right submit', {
       rightOperandId,
       instructionId: nextInstructionId,
@@ -3024,7 +3031,7 @@ const VariablesPage: React.FC<Props> = ({
     }
   }, [
     checkOperandKick,
-    pendingCheckOperandConnectRequestId,
+    pendingCheckValueRightRequestId,
     pendingCreateRequestId,
     pendingMutationRequestId,
     pendingCheckValueLeftRequestId,
@@ -3033,7 +3040,7 @@ const VariablesPage: React.FC<Props> = ({
     sendWorkspaceRequest,
     startRemainingVariableConnections,
     submitCheckValueLeft,
-    submitCheckOperandConnect,
+    submitCheckValueRight,
   ]);
 
   // Final resolver lane: one shared Variable_1 is created when absent and one
@@ -3044,13 +3051,18 @@ const VariablesPage: React.FC<Props> = ({
     if (pendingCreateRequestId !== null
       || pendingMutationRequestId !== null
       || pendingCheckValueLeftRequestId !== null
-      || pendingCheckOperandConnectRequestId !== null) return;
+      || pendingCheckValueRightRequestId !== null) return;
     const capability = snapshot.mutationCapability;
     if (!capability) return;
     const scopeIds = new Set(intent.instructionIds);
     const factsById = new Map(
       capability.instructionFacts.map(fact => [fact.instructionId, fact]),
     );
+    if (intent.awaitingInstructionId !== null) {
+      const awaited = factsById.get(intent.awaitingInstructionId);
+      if (!awaited || awaited.variableId === null) return;
+      intent.awaitingInstructionId = null;
+    }
     const remainingIds = snapshot.commands.flatMap((command) => {
       if (command.id === null
         || !scopeIds.has(command.id)
@@ -3080,29 +3092,27 @@ const VariablesPage: React.FC<Props> = ({
       }
       return;
     }
-    if (intent.submitted) return;
-    intent.submitted = true;
-    const requestId = submitCommandVariableMutation(
+    const nextInstructionId = remainingIds[0];
+    intent.awaitingInstructionId = nextInstructionId;
+    const requestId = submitGraphMutationCommandVariable(
       {
         mutationKind: 'RELATIONSHIP_UPDATE',
         draggedInstructionId: null,
         layoutRows: capability.layoutRows.map(row => ({ ...row })),
         instructionRelationPatches: [],
-        variableBindingPatches: remainingIds.map(instructionId => ({
-          instructionId,
+        variableBindingPatches: [{
+          instructionId: nextInstructionId,
           operation: 'SET' as const,
-          expected: { value: factsById.get(instructionId)?.variableId ?? null },
+          expected: { value: factsById.get(nextInstructionId)?.variableId ?? null },
           replacement: { value: defaultVariable.id },
-        })),
+        }],
         variableOwnerPatches: [],
       },
       {
         committed: () => {
-          remainingVariableIntentRef.current = null;
-          setPendingConnections(null);
           setStatus({
-            level: 'ok',
-            text: `Variable_1 connected to ${remainingIds.length} remaining command(s).`,
+            level: 'warn',
+            text: `Variable_1 connected to command #${nextInstructionId}. Connecting the next command...`,
           });
           sendWorkspaceRequest('variablesWorkspace.refresh');
         },
@@ -3117,19 +3127,19 @@ const VariablesPage: React.FC<Props> = ({
       VARIABLES_REACT_AUTHORED_PROFILE,
     );
     if (!requestId) {
-      intent.submitted = false;
+      intent.awaitingInstructionId = null;
       remainingVariableIntentRef.current = null;
       setStatus({ level: 'error', text: 'Remaining variable connections could not be submitted.' });
     }
   }, [
-    pendingCheckOperandConnectRequestId,
+    pendingCheckValueRightRequestId,
     pendingCheckValueLeftRequestId,
     pendingCreateRequestId,
     pendingMutationRequestId,
     remainingVariableKick,
     sendWorkspaceRequest,
     snapshot,
-    submitCommandVariableMutation,
+    submitGraphMutationCommandVariable,
     submitVariableCreate,
   ]);
 
@@ -3138,7 +3148,7 @@ const VariablesPage: React.FC<Props> = ({
     if (!run || !snapshot || !snapshot.mutationCapability) return;
     if (pendingMutationRequestId !== null
       || pendingCheckValueLeftRequestId !== null
-      || pendingCheckOperandConnectRequestId !== null) return;
+      || pendingCheckValueRightRequestId !== null) return;
     const capability = snapshot.mutationCapability;
     const scopeIds = new Set(run.instructionIds);
     const facts = capability.instructionFacts.filter(fact => scopeIds.has(fact.instructionId));
@@ -3233,32 +3243,31 @@ const VariablesPage: React.FC<Props> = ({
         return;
       }
       run.awaitingInstructionId = next.id;
-      const requestId = submitCheckOperandConnect(null, [next.id], 'RELEASE');
+      const requestId = submitCheckValueRight(null, [next.id], 'RELEASE');
       if (!requestId) releaseSequenceRef.current = null;
       return;
     }
-    const patches = facts.flatMap(fact => {
+    const next = facts.find(fact => {
       const command = commandsById.get(fact.instructionId);
-      if (fact.variableId === null
-        || (command && requiredVariableSlots(command.command).includes('RIGHT'))) return [];
-      return [{
-        instructionId: fact.instructionId,
-        operation: 'CLEAR' as const,
-        expected: { value: fact.variableId },
-        replacement: { value: null },
-      }];
+      return fact.variableId !== null
+        && !(command && requiredVariableSlots(command.command).includes('RIGHT'));
     });
-    if (patches.length === 0) {
+    if (!next) {
       releaseSequenceRef.current = null;
       setPendingConnections(null);
       setStatus({ level: 'ok', text: 'All scoped connections released.' });
       return;
     }
-    run.awaitingInstructionId = patches[0].instructionId;
-    const requestId = submitCommandVariableMutation({
+    run.awaitingInstructionId = next.instructionId;
+    const requestId = submitGraphMutationCommandVariable({
       ...baseDraft,
       instructionRelationPatches: [],
-      variableBindingPatches: patches,
+      variableBindingPatches: [{
+        instructionId: next.instructionId,
+        operation: 'CLEAR',
+        expected: { value: next.variableId },
+        replacement: { value: null },
+      }],
     }, {
       committed: () => sendWorkspaceRequest('variablesWorkspace.refresh'),
       refused: (_response, reason) => {
@@ -3268,15 +3277,15 @@ const VariablesPage: React.FC<Props> = ({
     }, VARIABLES_REACT_AUTHORED_PROFILE);
     if (!requestId) releaseSequenceRef.current = null;
   }, [
-    pendingCheckOperandConnectRequestId,
+    pendingCheckValueRightRequestId,
     pendingCheckValueLeftRequestId,
     pendingMutationRequestId,
     releaseSequenceKick,
     sendWorkspaceRequest,
     snapshot,
-    submitCheckOperandConnect,
+    submitCheckValueRight,
     submitCheckValueLeft,
-    submitCommandVariableMutation,
+    submitGraphMutationCommandVariable,
     submitGraphMutation,
   ]);
 
@@ -3323,6 +3332,70 @@ const VariablesPage: React.FC<Props> = ({
       text: 'Auto-resolve: connecting variables to commands...',
     });
   }, []);
+
+  const sendDirectMutationProbe = useCallback((operationType: string) => {
+    const current = snapshotRef.current;
+    const capability = current?.mutationCapability;
+    if (!current || !capability || !webSocket || webSocket.readyState !== WebSocket.OPEN) {
+      console.error(`[Variables direct probe] ${operationType} was not sent: WebSocket/snapshot unavailable.`);
+      return;
+    }
+    const requestId = `${Date.now().toString(36)}-direct-${operationType.split('.').pop()}`;
+    const checkValue = current.commands.find(command =>
+      command.id !== null && requiredVariableSlots(command.command).includes('RIGHT'));
+    const rightVariable = current.variables.find(variable =>
+      variable.name.trim().toLowerCase() === 'right_operand') ?? current.variables[0];
+    const body = operationType === 'variablesWorkspace.graphMutationRight'
+      ? {
+          contractVersion: 1,
+          requestId,
+          bindingEpoch: current.bindingEpoch,
+          workspaceEpoch: current.workspaceEpoch,
+          baseGraphVersion: capability.graphVersion,
+          graphRevision: capability.graphRevision,
+          rightVariableId: rightVariable?.id ?? null,
+          instructionIds: checkValue?.id === null || checkValue?.id === undefined
+            ? []
+            : [checkValue.id],
+          operation: 'CONNECT',
+        }
+      : {
+          contractVersion: INSTRUCTION_GRAPH_MUTATION_CONTRACT_VERSION,
+          mutationKind: 'RELATIONSHIP_UPDATE',
+          requestId,
+          baseGraphVersion: capability.graphVersion,
+          graphRevision: capability.graphRevision,
+          workspaceEpoch: current.workspaceEpoch,
+          ownerAssertion: capability.ownerAssertion,
+          draggedInstructionId: null,
+          layoutRows: capability.layoutRows.map(row => ({ ...row })),
+          instructionRelationPatches: [],
+          variableBindingPatches: [],
+          variableOwnerPatches: [],
+          bindingEpoch: current.bindingEpoch,
+          mutationProfile: capability.reactAuthoredProfile ?? capability.profile,
+        };
+    const envelope = {
+      type: operationType,
+      sessionId: VARIABLES_MANAGER_SESSION_ID,
+      body: JSON.stringify(body),
+    };
+    console.info(`[Variables direct probe] SEND ${operationType}`, { requestId });
+    try {
+      webSocket.send(JSON.stringify(envelope));
+    } catch (error) {
+      console.error(`[Variables direct probe] SEND FAILED ${operationType}`, error);
+    }
+  }, [webSocket]);
+
+  const sendAllDirectMutationProbes = useCallback(() => {
+    [
+      'variablesWorkspace.graphMutationParent',
+      'variablesWorkspace.graphMutationLeft',
+      'variablesWorkspace.graphMutationRight',
+      'variablesWorkspace.graphMutationCommandVariable',
+    ].forEach(sendDirectMutationProbe);
+  }, [sendDirectMutationProbe]);
 
   const confirmClearAllValues = useCallback(() => {
     if (!clearAllValues()) {
@@ -3481,6 +3554,26 @@ const VariablesPage: React.FC<Props> = ({
               </span>
             </div>
             <div className={styles.toolbarActions}>
+              <button type="button" className={styles.refreshButton}
+                onClick={() => sendDirectMutationProbe('variablesWorkspace.graphMutationParent')}>
+                Parent WS
+              </button>
+              <button type="button" className={styles.refreshButton}
+                onClick={() => sendDirectMutationProbe('variablesWorkspace.graphMutationLeft')}>
+                LEFT WS
+              </button>
+              <button type="button" className={styles.refreshButton}
+                onClick={() => sendDirectMutationProbe('variablesWorkspace.graphMutationRight')}>
+                RIGHT WS
+              </button>
+              <button type="button" className={styles.refreshButton}
+                onClick={() => sendDirectMutationProbe('variablesWorkspace.graphMutationCommandVariable')}>
+                Variable WS
+              </button>
+              <button type="button" className={styles.refreshButton}
+                onClick={sendAllDirectMutationProbes}>
+                ALL 4 WS
+              </button>
               <button
                 type="button"
                 className={styles.refreshButton}
@@ -3578,7 +3671,10 @@ const VariablesPage: React.FC<Props> = ({
                   if (draggingInstructionId === null || mutationDisabled) return;
                   event.preventDefault();
                   event.dataTransfer.dropEffect = 'move';
-                  setActiveDropTarget(target);
+                  setActiveDropTarget(current =>
+                    current?.blockId === target.blockId && current.index === target.index
+                      ? current
+                      : target);
                 }}
                 onDropTargetDragLeave={(event, target) => {
                   if (event.currentTarget.contains(event.relatedTarget as Node)) return;

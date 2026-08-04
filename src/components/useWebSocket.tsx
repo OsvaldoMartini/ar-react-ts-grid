@@ -238,6 +238,15 @@ export const useWebSocket = (socketPort: number, sessionId: string) => {
         }
         const controlOperation = applicationControlOperation(event.data, sessionId);
         if (controlOperation) {
+          const keepManualDevWorkspaceOpen = process.env.NODE_ENV === 'development'
+            && controlOperation === 'application.workspaceClose'
+            && new URLSearchParams(window.location.search).has('openWorkspace');
+          if (keepManualDevWorkspaceOpen) {
+            console.warn(
+              `[WebSocket] Ignored application.workspaceClose for manually opened development workspace ${sessionId}.`,
+            );
+            return;
+          }
           disposedRef.current = true;
           clearReconnectTimeout();
           stopPing();

@@ -1,6 +1,7 @@
 import React, {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type DragEvent,
 } from 'react';
@@ -434,12 +435,22 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
     return references;
   }, [instructions, relationshipEdges]);
 
+  const rowBoundsRef = useRef<WeakMap<HTMLElement, DOMRect>>(new WeakMap());
+
+  useEffect(() => {
+    rowBoundsRef.current = new WeakMap();
+  }, [draggingInstructionId]);
+
   const rowDropTarget = (
     event: DragEvent<HTMLElement>,
     blockId: number,
     rowIndex: number,
   ): VariablesCommandDropTarget => {
-    const bounds = event.currentTarget.getBoundingClientRect();
+    let bounds = rowBoundsRef.current.get(event.currentTarget);
+    if (!bounds) {
+      bounds = event.currentTarget.getBoundingClientRect();
+      rowBoundsRef.current.set(event.currentTarget, bounds);
+    }
     const placementIndex = event.clientY < bounds.top + bounds.height / 2
       ? rowIndex
       : rowIndex + 1;

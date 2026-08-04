@@ -102,7 +102,7 @@ const parseEnvelope = (
  * It intentionally does not share pending state or session IDs with Bot Job,
  * Components, or Memory List drag controllers.
  */
-export const useVariablesGraphMutation = ({
+export const useVariablesGraphMutationParent = ({
   webSocket,
   connected,
   snapshot,
