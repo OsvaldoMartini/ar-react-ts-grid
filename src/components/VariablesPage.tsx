@@ -2738,8 +2738,18 @@ const VariablesPage: React.FC<Props> = ({
       || pendingCreateRequestId !== null
       || pendingMutationRequestId !== null
       || pendingCheckOperandConnectRequestId !== null) {
+      console.info('[CheckOperandDriver] waiting', {
+        batch: createVariableBatchRef.current !== null,
+        pendingCreate: pendingCreateRequestId,
+        pendingMutation: pendingMutationRequestId,
+        pendingConnect: pendingCheckOperandConnectRequestId,
+      });
       return;
     }
+    console.info('[CheckOperandDriver] pass', {
+      intent: intent.kind,
+      attempts: checkOperandAttemptsRef.current,
+    });
     const finish = (level: 'ok' | 'error', text: string) => {
       checkOperandIntentRef.current = null;
       checkOperandAttemptsRef.current = 0;
@@ -2772,6 +2782,7 @@ const VariablesPage: React.FC<Props> = ({
     const rightIds = checkCommands
       .filter(command => missingVariableSlots(command).includes('RIGHT'))
       .map(command => command.id as number);
+    console.info('[CheckOperandDriver] workload', { leftIds, rightIds });
     if (leftIds.length === 0 && rightIds.length === 0) {
       finish('ok', 'CheckValue variables connected (left and right).');
       return;
@@ -2826,6 +2837,7 @@ const VariablesPage: React.FC<Props> = ({
     }
     checkOperandAttemptsRef.current += 1;
     const requestId = submitCheckOperandConnect(rightOperandId, rightIds);
+    console.info('[CheckOperandDriver] right submit', { rightOperandId, rightIds, requestId });
     if (requestId) {
       setStatus({
         level: 'warn',

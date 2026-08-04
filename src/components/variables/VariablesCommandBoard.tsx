@@ -40,7 +40,10 @@ import InstructionReferenceIcons, {
 } from './InstructionReferenceIcons';
 import { isVariablesCommandEditorEligible } from '../command-editor/commandEditorEligibility';
 import { isIfFamilyAction } from './domain/ifFamilyRules';
-import { missingVariableSlots } from './domain/variableSlotRequirements';
+import {
+  connectedVariableSlots,
+  missingVariableSlots,
+} from './domain/variableSlotRequirements';
 import styles from './VariablesCommandBoard.module.scss';
 
 export type VariablesCommandDropTarget = {
@@ -710,11 +713,8 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                   || instruction.operation.split(':')[1]?.trim()
                   || '=';
                 const secondCheckVariableId = variableOnlyCheck
-                  && typeof instruction.commandConfiguration?.operandVariableId === 'number'
-                  && Number.isSafeInteger(instruction.commandConfiguration.operandVariableId)
-                  && instruction.commandConfiguration.operandVariableId > 0
-                    ? instruction.commandConfiguration.operandVariableId
-                    : null;
+                  ? connectedVariableSlots(instruction).get('RIGHT') ?? null
+                  : null;
                 const structuralKind = otherParentEdge?.kind
                   ?? (policy.requirements.includes('LOOP_ANCHOR')
                     ? 'LOOP_ANCHOR' as const
@@ -777,20 +777,21 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                       }
                     : null;
                 // THE variable model (2026-08-03): GET/E need OUTPUT, SET needs
-                // SOURCE, CheckValue needs LEFT + RIGHT. The resolver reads slot
-                // rows first and falls back to the legacy columns.
+                // SOURCE, CheckValue needs LEFT + RIGHT. This chip covers only
+                // the PRIMARY spot (LEFT/OUTPUT/SOURCE) - the RIGHT spot has
+                // its own dedicated "Variable 2" chip further right, so the two
+                // never duplicate.
                 const missingSlots = missingVariableSlots(instruction);
-                const reconnectVariable = missingSlots.length > 0;
+                const missingPrimarySlots = missingSlots.filter(
+                  slot => slot !== 'RIGHT',
+                );
+                const reconnectVariable = missingPrimarySlots.length > 0;
                 const reconnectVariableEvent: RulesCardEvent | null =
                   reconnectVariable
                     ? {
                         color: 'red',
                         rules: variableOnlyCheck
-                          ? missingSlots.length === 2
-                            ? 'Reconnect Variables (2)'
-                            : missingSlots.includes('LEFT')
-                              ? 'Reconnect Variable 1'
-                              : 'Reconnect Variable 2'
+                          ? 'Reconnect Variable 1'
                           : 'Reconnect Variable',
                         context: '',
                         ts: instructionId ?? index,
@@ -1082,11 +1083,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                           >
                             <RulesCard
                               event={reconnectVariableEvent}
-                              compactLabel={variableOnlyCheck
-                                ? missingSlots.length === 2
-                                  ? 'VAR 1+2'
-                                  : missingSlots.includes('LEFT') ? 'VAR 1' : 'VAR 2'
-                                : 'VAR'}
+                              compactLabel={variableOnlyCheck ? 'VAR 1' : 'VAR'}
                               ariaLabel={relationshipTitle(
                                 variableOnlyCheck
                                   ? 'Reconnect variable 1'
