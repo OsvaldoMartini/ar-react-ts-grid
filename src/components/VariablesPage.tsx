@@ -96,6 +96,11 @@ import {
 } from './variables/domain/variablesConditionalFamilyWatcher';
 import { planIfFamilyAutoRepair } from './variables/domain/ifFamilyAutoRepair';
 import {
+  connectedVariableSlots,
+  missingVariableSlots,
+  requiredVariableSlots,
+} from './variables/domain/variableSlotRequirements';
+import {
   useVariablesCheckOperandConnect,
   type VariablesCheckOperandConnectResult,
 } from './variables/useVariablesCheckOperandConnect';
@@ -494,6 +499,15 @@ const batchResolveModalItems = (
   review: VariablesBatchResolveReview,
 ): VariablesConnectionReviewItem[] => review.items.map((item) => {
   const source = batchSourceLabels(snapshot, item.sourceInstructionId);
+  // A CheckValue missing both operands counts as TWO variable repairs.
+  const missingSlotCount = item.kind === 'VARIABLE_BINDING'
+    ? (() => {
+        const command = snapshot.commands.find(
+          candidate => candidate.id === item.sourceInstructionId,
+        );
+        return command ? Math.max(missingVariableSlots(command).length, 1) : 1;
+      })()
+    : undefined;
   const stateTone: VariablesConnectionReviewItem['stateTone'] =
     item.resolution === 'AUTO' || item.resolution === 'REVIEWED'
       ? 'green'
@@ -521,6 +535,7 @@ const batchResolveModalItems = (
     relationLabel: batchRelationshipLabel(item.kind),
     state,
     stateTone,
+    missingSlotCount,
     currentTargetLabel: relationshipTargetLabel(
       snapshot,
       item.currentTarget,
@@ -2386,24 +2401,19 @@ const VariablesPage: React.FC<Props> = ({
       // effect releases them once the graph release commits.
       const releaseSnapshot = snapshotRef.current;
       if (releaseSnapshot) {
-        const checkActions = new Set(['CK', 'CSV CHECK', 'PDF CHECK']);
         const scopeIds = new Set(pending.scope.instructionIds);
         const occupiedRightIds = releaseSnapshot.commands.flatMap((command) => {
           if (command.id === null
             || !scopeIds.has(command.id)
-            || !checkActions.has(canonicalInstructionAction(command.command))) {
+            || !requiredVariableSlots(command.command).includes('RIGHT')) {
             return [];
           }
-          const configuration = command.commandConfiguration;
-          return configuration
-            && configuration.operandKind === 'VARIABLE'
-            && typeof configuration.operandVariableId === 'number'
-            && configuration.operandVariableId > 0
-            ? [command.id]
-            : [];
+          return connectedVariableSlots(command).has('RIGHT') ? [command.id] : [];
         });
-        checkOperandReleasePendingRef.current =
-          occupiedRightIds.length > 0 ? occupiedRightIds : null;
+        checkOperandIntentRef.current = occupiedRightIds.length > 0
+          ? { kind: 'RELEASE', instructionIds: occupiedRightIds }
+          : null;
+        checkOperandAttemptsRef.current = 0;
       }
       submitVariablesMutation(
         pending.plan.draft,
@@ -2657,8 +2667,15 @@ const VariablesPage: React.FC<Props> = ({
   // variable list contains any CK / CSV CHECK / PDF CHECK command, the
   // Left_Operand / Right_Operand variables are created DIRECTLY when absent -
   // never duplicated, never blocked, no existence messages. Nothing else runs.
-  const checkOperandConnectPendingRef = useRef(false);
-  const checkOperandReleasePendingRef = useRef<readonly number[] | null>(null);
+  // ONE consolidated CheckValue-operand intent (2026-08-03 cleanup): the intent
+  // clears only after a successful submit or completion; a stalled intent shows
+  // a visible error after 8 attempts - never a silent dead-end, never a loop.
+  const checkOperandIntentRef = useRef<
+    | { kind: 'RESOLVE_CHECKVALUES' }
+    | { kind: 'RELEASE'; instructionIds: readonly number[] }
+    | null
+  >(null);
+  const checkOperandAttemptsRef = useRef(0);
   const createCheckValueDefaultVariables = useCallback(() => {
     const current = snapshotRef.current;
     if (!current || !pendingConnections || pendingConnections.mode !== 'RESOLVE') {
@@ -2674,9 +2691,10 @@ const VariablesPage: React.FC<Props> = ({
       && checkActions.has(canonicalInstructionAction(
         commandsById.get(item.sourceInstructionId)?.command)));
     if (!hasCheckValue) return;
-    // Step 1 of the NEW variable rules: once Right_Operand exists, the driver
-    // effect below connects it to every CheckValue with a FREE right spot.
-    checkOperandConnectPendingRef.current = true;
+    // Once the defaults exist, the consolidated driver connects Left_Operand
+    // (LEFT spot) and Right_Operand (RIGHT spot) to every free CheckValue spot.
+    checkOperandIntentRef.current = { kind: 'RESOLVE_CHECKVALUES' };
+    checkOperandAttemptsRef.current = 0;
     const existingNames = new Set(
       current.variables.map(variable => variable.name.trim().toLowerCase()),
     );
@@ -2708,73 +2726,121 @@ const VariablesPage: React.FC<Props> = ({
     });
   }, [pendingConnections, submitVariableCreate]);
 
-  // NEW variable rules step 1 driver: after the red Resolve click, once
-  // Right_Operand is visible in the snapshot, connect it to every CheckValue
-  // whose RIGHT spot is FREE. Occupied spots are skipped by Java; the flag is
-  // one-shot so a refusal never loops.
+  // CONSOLIDATED CheckValue-operand driver (2026-08-03 cleanup): one intent,
+  // one effect. RESOLVE runs LEFT (Left_Operand -> instruction binding) then
+  // RIGHT (Right_Operand -> checkOperand op) until nothing is missing; RELEASE
+  // clears the queued right spots. The intent survives failed submits and gives
+  // up VISIBLY after 8 stalled passes - never a silent dead-end, never a loop.
   useEffect(() => {
-    if (!checkOperandConnectPendingRef.current || !snapshot) return;
+    const intent = checkOperandIntentRef.current;
+    if (!intent || !snapshot) return;
     if (createVariableBatchRef.current !== null
       || pendingCreateRequestId !== null
+      || pendingMutationRequestId !== null
       || pendingCheckOperandConnectRequestId !== null) {
       return;
     }
-    const rightOperand = snapshot.variables.find(
-      variable => variable.name.trim().toLowerCase() === 'right_operand',
-    );
-    if (!rightOperand) return;
-    const checkActions = new Set(['CK', 'CSV CHECK', 'PDF CHECK']);
-    const freeRightSpotIds = snapshot.commands.flatMap((command) => {
-      if (command.id === null
-        || !checkActions.has(canonicalInstructionAction(command.command))) {
-        return [];
+    const finish = (level: 'ok' | 'error', text: string) => {
+      checkOperandIntentRef.current = null;
+      checkOperandAttemptsRef.current = 0;
+      setStatus({ level, text });
+    };
+    const stalled = (text: string) => {
+      checkOperandAttemptsRef.current += 1;
+      if (checkOperandAttemptsRef.current > 8) finish('error', text);
+    };
+    if (intent.kind === 'RELEASE') {
+      const requestId = submitCheckOperandConnect(null, intent.instructionIds, 'RELEASE');
+      if (requestId) {
+        checkOperandIntentRef.current = null;
+        checkOperandAttemptsRef.current = 0;
+        setStatus({
+          level: 'warn',
+          text: `Releasing the right operand of ${intent.instructionIds.length} CheckValue command(s)...`,
+        });
+      } else {
+        stalled('The right-operand release could not be submitted. Try again.');
       }
-      const configuration = command.commandConfiguration;
-      const occupied = configuration
-        && configuration.operandKind === 'VARIABLE'
-        && typeof configuration.operandVariableId === 'number'
-        && configuration.operandVariableId > 0;
-      return occupied ? [] : [command.id];
-    });
-    checkOperandConnectPendingRef.current = false;
-    if (freeRightSpotIds.length === 0) return;
-    const requestId = submitCheckOperandConnect(rightOperand.id, freeRightSpotIds);
+      return;
+    }
+    const checkCommands = snapshot.commands.filter(command =>
+      command.id !== null
+      && requiredVariableSlots(command.command).includes('RIGHT'));
+    const leftIds = checkCommands
+      .filter(command => missingVariableSlots(command).includes('LEFT'))
+      .map(command => command.id as number);
+    const rightIds = checkCommands
+      .filter(command => missingVariableSlots(command).includes('RIGHT'))
+      .map(command => command.id as number);
+    if (leftIds.length === 0 && rightIds.length === 0) {
+      finish('ok', 'CheckValue variables connected (left and right).');
+      return;
+    }
+    const variableByName = new Map(snapshot.variables.map(
+      variable => [variable.name.trim().toLowerCase(), variable.id]));
+    if (leftIds.length > 0) {
+      const leftOperandId = variableByName.get('left_operand');
+      const capability = snapshot.mutationCapability;
+      if (!leftOperandId || !capability) {
+        stalled('Left_Operand is not available to connect.');
+        return;
+      }
+      const factById = new Map(
+        capability.instructionFacts.map(fact => [fact.instructionId, fact]));
+      const patches = leftIds.flatMap((id) => {
+        const fact = factById.get(id);
+        if (!fact || fact.variableId !== null) return [];
+        return [{
+          instructionId: id,
+          operation: 'SET' as const,
+          expected: { value: fact.variableId },
+          replacement: { value: leftOperandId },
+        }];
+      });
+      if (patches.length === 0) {
+        stalled('The left-operand connections are not ready yet.');
+        return;
+      }
+      checkOperandAttemptsRef.current += 1;
+      submitVariablesMutation(
+        {
+          mutationKind: 'RELATIONSHIP_UPDATE',
+          draggedInstructionId: null,
+          layoutRows: capability.layoutRows.map(row => ({ ...row })),
+          instructionRelationPatches: [],
+          variableBindingPatches: patches,
+          variableOwnerPatches: [],
+        },
+        VARIABLES_REACT_AUTHORED_PROFILE,
+        leftIds[0],
+        `Connecting Left_Operand to ${patches.length} CheckValue command(s)...`,
+        'Left operands connected.',
+        { keepConnectionsOpen: true },
+      );
+      return;
+    }
+    const rightOperandId = variableByName.get('right_operand');
+    if (!rightOperandId) {
+      stalled('Right_Operand is not available to connect.');
+      return;
+    }
+    checkOperandAttemptsRef.current += 1;
+    const requestId = submitCheckOperandConnect(rightOperandId, rightIds);
     if (requestId) {
       setStatus({
         level: 'warn',
-        text: `Connecting Right_Operand to ${freeRightSpotIds.length} CheckValue command(s)...`,
+        text: `Connecting Right_Operand to ${rightIds.length} CheckValue command(s)...`,
       });
+    } else {
+      stalled('The right-operand connection could not be submitted. Try again.');
     }
   }, [
     pendingCheckOperandConnectRequestId,
     pendingCreateRequestId,
-    snapshot,
-    submitCheckOperandConnect,
-  ]);
-
-  // Release-side driver (user order 2026-08-03): after "Release Connections"
-  // commits, clear the queued CheckValue RIGHT spots (config -> VOID, slot row
-  // deleted). One-shot list; a refusal never loops.
-  useEffect(() => {
-    const releaseIds = checkOperandReleasePendingRef.current;
-    if (!releaseIds || !snapshot) return;
-    if (pendingMutationRequestId !== null
-      || pendingCheckOperandConnectRequestId !== null) {
-      return;
-    }
-    checkOperandReleasePendingRef.current = null;
-    const requestId = submitCheckOperandConnect(null, releaseIds, 'RELEASE');
-    if (requestId) {
-      setStatus({
-        level: 'warn',
-        text: `Releasing the right operand of ${releaseIds.length} CheckValue command(s)...`,
-      });
-    }
-  }, [
-    pendingCheckOperandConnectRequestId,
     pendingMutationRequestId,
     snapshot,
     submitCheckOperandConnect,
+    submitVariablesMutation,
   ]);
 
   const startVariableAutoResolve = useCallback(() => {

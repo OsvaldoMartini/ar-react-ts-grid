@@ -50,6 +50,8 @@ export interface VariablesConnectionReviewItem {
   currentTargetLabel?: string | null;
   compatibleOptions?: readonly VariablesConnectionOption[];
   initialOptionValue?: string | null;
+  /** Variable items: how many spots are missing (a CheckValue can need 2). */
+  missingSlotCount?: number;
 }
 
 export interface VariablesConnectionResolution {
@@ -145,9 +147,11 @@ export const resolveConnectionsConfirmEvent = (
     return { color: hasRedVariable ? 'red' : 'green', rules: 'Resolving...', ts: 0 };
   }
   if (hasRedVariable) {
+    const missingSpots = variableItems.reduce(
+      (total, item) => total + (item.missingSlotCount ?? 1), 0);
     return {
       color: 'red',
-      rules: `Resolve Parents(${parentItems.length}) Vars(${variableItems.length})`,
+      rules: `Resolve Parents(${parentItems.length}) Vars(${missingSpots})`,
       ts: 0,
     };
   }

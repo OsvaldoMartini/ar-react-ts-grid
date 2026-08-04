@@ -76,6 +76,13 @@ export interface VariableInstructionNode {
   active: boolean | null;
   blockActive: boolean | null;
   commandConfiguration?: VariableCommandConfiguration | null;
+  /** Uniform connections from instruction_variable_slot (LEFT/RIGHT/OUTPUT/SOURCE). */
+  variableSlots?: readonly VariableSlotLink[];
+}
+
+export interface VariableSlotLink {
+  slot: string;
+  variableId: number;
 }
 
 export interface VariableCommandConfiguration {
@@ -542,6 +549,14 @@ const normalizeInstruction = (value: unknown): VariableInstructionNode | null =>
       externalSourceKey: textValue(storedConfiguration.externalSourceKey),
       formatPolicy: textValue(storedConfiguration.formatPolicy),
     } : null,
+    variableSlots: Array.isArray(candidate.variableSlots)
+      ? candidate.variableSlots.flatMap((entry: unknown) => {
+          const slotEntry = asObject(entry);
+          const slot = slotEntry ? textValue(slotEntry.slot) : '';
+          const variableId = slotEntry ? positiveInteger(slotEntry.variableId) : null;
+          return slot && variableId !== null ? [{ slot, variableId }] : [];
+        })
+      : [],
   };
 };
 

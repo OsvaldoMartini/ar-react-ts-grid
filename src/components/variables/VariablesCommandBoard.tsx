@@ -40,6 +40,7 @@ import InstructionReferenceIcons, {
 } from './InstructionReferenceIcons';
 import { isVariablesCommandEditorEligible } from '../command-editor/commandEditorEligibility';
 import { isIfFamilyAction } from './domain/ifFamilyRules';
+import { missingVariableSlots } from './domain/variableSlotRequirements';
 import styles from './VariablesCommandBoard.module.scss';
 
 export type VariablesCommandDropTarget = {
@@ -775,14 +776,21 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                         ts: instructionId ?? index,
                       }
                     : null;
-                const reconnectVariable =
-                  requiresVariableBinding && connectedVariableId === null;
+                // THE variable model (2026-08-03): GET/E need OUTPUT, SET needs
+                // SOURCE, CheckValue needs LEFT + RIGHT. The resolver reads slot
+                // rows first and falls back to the legacy columns.
+                const missingSlots = missingVariableSlots(instruction);
+                const reconnectVariable = missingSlots.length > 0;
                 const reconnectVariableEvent: RulesCardEvent | null =
                   reconnectVariable
                     ? {
                         color: 'red',
                         rules: variableOnlyCheck
-                          ? 'Reconnect Variable 1'
+                          ? missingSlots.length === 2
+                            ? 'Reconnect Variables (2)'
+                            : missingSlots.includes('LEFT')
+                              ? 'Reconnect Variable 1'
+                              : 'Reconnect Variable 2'
                           : 'Reconnect Variable',
                         context: '',
                         ts: instructionId ?? index,
@@ -1074,7 +1082,11 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                           >
                             <RulesCard
                               event={reconnectVariableEvent}
-                              compactLabel={variableOnlyCheck ? 'VAR 1' : 'VAR'}
+                              compactLabel={variableOnlyCheck
+                                ? missingSlots.length === 2
+                                  ? 'VAR 1+2'
+                                  : missingSlots.includes('LEFT') ? 'VAR 1' : 'VAR 2'
+                                : 'VAR'}
                               ariaLabel={relationshipTitle(
                                 variableOnlyCheck
                                   ? 'Reconnect variable 1'
