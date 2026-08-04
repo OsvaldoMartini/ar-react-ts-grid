@@ -29,6 +29,8 @@ type Context = {
   connected: boolean;
   snapshot: VariableWorkspaceSnapshot | null;
   timeoutMs?: number;
+  operationType?: string;
+  responseType?: string;
 };
 
 type Callbacks = {
@@ -73,6 +75,7 @@ const parseMutationBody = (body: unknown) => {
 
 const parseEnvelope = (
   raw: unknown,
+  responseType: string,
 ): ReturnType<typeof parseMutationBody> => {
   let value = raw;
   if (typeof value === 'string') {
@@ -86,7 +89,7 @@ const parseEnvelope = (
   const envelope = value as Record<string, unknown>;
   if (
     envelope.sessionId !== VARIABLES_MANAGER_SESSION_ID
-    || envelope.operationId !== VARIABLES_GRAPH_MUTATION_RESPONSE
+    || envelope.operationId !== responseType
   ) {
     return null;
   }
@@ -104,6 +107,8 @@ export const useVariablesGraphMutation = ({
   connected,
   snapshot,
   timeoutMs = DEFAULT_TIMEOUT_MS,
+  operationType = VARIABLES_GRAPH_MUTATION_TYPE,
+  responseType = VARIABLES_GRAPH_MUTATION_RESPONSE,
 }: Context) => {
   const pendingRef = useRef<Pending | null>(null);
   const [pendingRequestId, setPendingRequestId] = useState<string | null>(null);
@@ -207,7 +212,7 @@ export const useVariablesGraphMutation = ({
     setPendingRequestId(requestId);
     try {
       webSocket.send(JSON.stringify({
-        type: VARIABLES_GRAPH_MUTATION_TYPE,
+        type: operationType,
         sessionId: VARIABLES_MANAGER_SESSION_ID,
         body: JSON.stringify({
           ...request,
@@ -220,10 +225,10 @@ export const useVariablesGraphMutation = ({
       clearPending()?.callbacks.refused(null, 'SEND_FAILED');
       return null;
     }
-  }, [clearPending, connected, snapshot, timeoutMs, webSocket]);
+  }, [clearPending, connected, operationType, snapshot, timeoutMs, webSocket]);
 
   const handleMessage = useCallback((raw: unknown): boolean => {
-    const response = parseEnvelope(raw);
+    const response = parseEnvelope(raw, responseType);
     const pending = pendingRef.current;
     if (
       !response
@@ -249,7 +254,7 @@ export const useVariablesGraphMutation = ({
     if (response.ok) completed.callbacks.committed(response);
     else completed.callbacks.refused(response, response.errorCode);
     return true;
-  }, [clearPending]);
+  }, [clearPending, responseType]);
 
   return {
     pendingRequestId,

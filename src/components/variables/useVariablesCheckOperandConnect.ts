@@ -10,9 +10,9 @@ import {
 } from '../variablesWorkspace.contract';
 
 export const VARIABLES_CHECK_OPERAND_CONNECT_OPERATION =
-  'variablesWorkspace.checkOperand.connect' as const;
+  'variablesWorkspace.graphMutationRight' as const;
 export const VARIABLES_CHECK_OPERAND_CONNECT_RESPONSE =
-  'variablesWorkspace.checkOperand.connectResponse' as const;
+  'variablesWorkspace.graphMutationRightResponse' as const;
 export const VARIABLES_CHECK_OPERAND_CONNECT_CONTRACT_VERSION = 1 as const;
 
 export type VariablesCheckOperandConnectResult = {

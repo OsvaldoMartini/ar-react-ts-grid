@@ -861,6 +861,16 @@ const VariablesPage: React.FC<Props> = ({
     level: 'warn',
     text: 'Waiting for Variables workspace',
   });
+  const checkOperandIntentRef = useRef<
+    | {
+      kind: 'RESOLVE_CHECKVALUES';
+      awaitingSlot?: { instructionId: number; slot: 'LEFT' | 'RIGHT' };
+    }
+    | { kind: 'RELEASE'; instructionIds: readonly number[] }
+    | null
+  >(null);
+  const checkOperandAttemptsRef = useRef(0);
+  const [checkOperandKick, setCheckOperandKick] = useState(0);
   const {
     pendingRequestId: pendingMutationRequestId,
     submit: submitGraphMutation,
@@ -870,6 +880,18 @@ const VariablesPage: React.FC<Props> = ({
     webSocket,
     connected,
     snapshot,
+  });
+  const {
+    pendingRequestId: pendingCheckValueLeftRequestId,
+    submit: submitCheckValueLeft,
+    handleMessage: handleCheckValueLeftMessage,
+    resetPending: resetCheckValueLeft,
+  } = useVariablesGraphMutation({
+    webSocket,
+    connected,
+    snapshot,
+    operationType: 'variablesWorkspace.graphMutationLeft',
+    responseType: 'variablesWorkspace.graphMutationLeftResponse',
   });
   const {
     reviewState: executionFlowReview,
@@ -1105,6 +1127,10 @@ const VariablesPage: React.FC<Props> = ({
   const handleCheckOperandConnectResult = useCallback((
     result: VariablesCheckOperandConnectResult,
   ) => {
+    if (!result.ok && checkOperandIntentRef.current?.kind === 'RESOLVE_CHECKVALUES') {
+      checkOperandIntentRef.current = null;
+      checkOperandAttemptsRef.current = 0;
+    }
     setStatus({
       level: result.ok ? 'ok' : 'error',
       text: result.ok
@@ -1323,6 +1349,7 @@ const VariablesPage: React.FC<Props> = ({
     createVariableBatchRef.current = null;
     clearPendingRequest();
     resetGraphMutation();
+    resetCheckValueLeft();
     resetInstructionCopy();
     resetCommandUpdate();
     resetCommandCopy();
@@ -1350,6 +1377,7 @@ const VariablesPage: React.FC<Props> = ({
     clearPendingRequest,
     closeExecutionFlowReview,
     resetGraphMutation,
+    resetCheckValueLeft,
     resetInstructionCopy,
     resetCommandCopy,
     resetCommandCreate,
@@ -1393,6 +1421,7 @@ const VariablesPage: React.FC<Props> = ({
       if (handleCommandDeleteMessage(raw)) return;
       if (handleCheckOperandConnectMessage(raw)) return;
       if (handleInstructionStatusMessage(raw)) return;
+      if (handleCheckValueLeftMessage(raw)) return;
       if (handleGraphMutationMessage(raw)) return;
       if (handleRuntimeMemoryMessage(raw)) return;
       let envelope: VariablesWorkspaceEnvelope;
@@ -1471,6 +1500,7 @@ const VariablesPage: React.FC<Props> = ({
   }, [
     clearPendingRequest,
     handleGraphMutationMessage,
+    handleCheckValueLeftMessage,
     handleCommandCreateMessage,
     handleCommandCopyMessage,
     handleCommandUpdateMessage,
@@ -2671,15 +2701,6 @@ const VariablesPage: React.FC<Props> = ({
   // ONE consolidated CheckValue-operand intent (2026-08-03 cleanup): the intent
   // clears only after a successful submit or completion; a stalled intent shows
   // a visible error after 8 attempts - never a silent dead-end, never a loop.
-  const checkOperandIntentRef = useRef<
-    | { kind: 'RESOLVE_CHECKVALUES' }
-    | { kind: 'RELEASE'; instructionIds: readonly number[] }
-    | null
-  >(null);
-  const checkOperandAttemptsRef = useRef(0);
-  // Refs never re-render: this kick is the ONLY reliable way to wake the
-  // driver effect right after an intent is set (its other deps may not move).
-  const [checkOperandKick, setCheckOperandKick] = useState(0);
   const createCheckValueDefaultVariables = useCallback(() => {
     const current = snapshotRef.current;
     if (!current || !pendingConnections || pendingConnections.mode !== 'RESOLVE') {
@@ -2740,11 +2761,13 @@ const VariablesPage: React.FC<Props> = ({
     if (createVariableBatchRef.current !== null
       || pendingCreateRequestId !== null
       || pendingMutationRequestId !== null
+      || pendingCheckValueLeftRequestId !== null
       || pendingCheckOperandConnectRequestId !== null) {
       console.info('[CheckOperandDriver] waiting', {
         batch: createVariableBatchRef.current !== null,
         pendingCreate: pendingCreateRequestId,
         pendingMutation: pendingMutationRequestId,
+        pendingLeft: pendingCheckValueLeftRequestId,
         pendingConnect: pendingCheckOperandConnectRequestId,
       });
       return;
@@ -2779,58 +2802,81 @@ const VariablesPage: React.FC<Props> = ({
     const checkCommands = snapshot.commands.filter(command =>
       command.id !== null
       && requiredVariableSlots(command.command).includes('RIGHT'));
-    const leftIds = checkCommands
-      .filter(command => missingVariableSlots(command).includes('LEFT'))
-      .map(command => command.id as number);
-    const rightIds = checkCommands
-      .filter(command => missingVariableSlots(command).includes('RIGHT'))
-      .map(command => command.id as number);
-    console.info('[CheckOperandDriver] workload', { leftIds, rightIds });
-    if (leftIds.length === 0 && rightIds.length === 0) {
+    if (intent.awaitingSlot) {
+      const awaitedCommand = checkCommands.find(
+        command => command.id === intent.awaitingSlot?.instructionId,
+      );
+      if (awaitedCommand
+        && missingVariableSlots(awaitedCommand).includes(intent.awaitingSlot.slot)) {
+        return;
+      }
+      delete intent.awaitingSlot;
+    }
+    const nextCommand = checkCommands.find(
+      command => missingVariableSlots(command).length > 0,
+    );
+    console.info('[CheckOperandDriver] next command', {
+      instructionId: nextCommand?.id ?? null,
+      missingSlots: nextCommand ? missingVariableSlots(nextCommand) : [],
+    });
+    if (!nextCommand || nextCommand.id === null) {
       finish('ok', 'CheckValue variables connected (left and right).');
       return;
     }
     const variableByName = new Map(snapshot.variables.map(
       variable => [variable.name.trim().toLowerCase(), variable.id]));
-    if (leftIds.length > 0) {
+    const nextInstructionId = nextCommand.id;
+    if (missingVariableSlots(nextCommand).includes('LEFT')) {
       const leftOperandId = variableByName.get('left_operand');
       const capability = snapshot.mutationCapability;
       if (!leftOperandId || !capability) {
         stalled('Left_Operand is not available to connect.');
         return;
       }
-      const factById = new Map(
-        capability.instructionFacts.map(fact => [fact.instructionId, fact]));
-      const patches = leftIds.flatMap((id) => {
-        const fact = factById.get(id);
-        if (!fact || fact.variableId !== null) return [];
-        return [{
-          instructionId: id,
-          operation: 'SET' as const,
-          expected: { value: fact.variableId },
-          replacement: { value: leftOperandId },
-        }];
-      });
-      if (patches.length === 0) {
+      const fact = capability.instructionFacts.find(
+        item => item.instructionId === nextInstructionId,
+      );
+      if (!fact || fact.variableId !== null) {
         stalled('The left-operand connections are not ready yet.');
         return;
       }
       checkOperandAttemptsRef.current += 1;
-      submitVariablesMutation(
+      intent.awaitingSlot = { instructionId: nextInstructionId, slot: 'LEFT' };
+      const requestId = submitCheckValueLeft(
         {
           mutationKind: 'RELATIONSHIP_UPDATE',
           draggedInstructionId: null,
           layoutRows: capability.layoutRows.map(row => ({ ...row })),
           instructionRelationPatches: [],
-          variableBindingPatches: patches,
+          variableBindingPatches: [{
+            instructionId: nextInstructionId,
+            operation: 'SET',
+            expected: { value: fact.variableId },
+            replacement: { value: leftOperandId },
+          }],
           variableOwnerPatches: [],
         },
+        {
+          committed: () => setStatus({
+            level: 'warn',
+            text: `Left_Operand connected to CheckValue #${nextInstructionId}. Connecting its Right_Operand next...`,
+          }),
+          refused: (_response, reason) => finish(
+            'error',
+            `Left_Operand connection for CheckValue #${nextInstructionId} was refused (${reason}).`,
+          ),
+        },
         VARIABLES_REACT_AUTHORED_PROFILE,
-        leftIds[0],
-        `Connecting Left_Operand to ${patches.length} CheckValue command(s)...`,
-        'Left operands connected.',
-        { keepConnectionsOpen: true },
       );
+      if (!requestId) {
+        delete intent.awaitingSlot;
+        stalled(`The Left_Operand connection for CheckValue #${nextInstructionId} could not be submitted.`);
+        return;
+      }
+      setStatus({
+        level: 'warn',
+        text: `Connecting Left_Operand to CheckValue #${nextInstructionId}...`,
+      });
       return;
     }
     const rightOperandId = variableByName.get('right_operand');
@@ -2839,14 +2885,20 @@ const VariablesPage: React.FC<Props> = ({
       return;
     }
     checkOperandAttemptsRef.current += 1;
-    const requestId = submitCheckOperandConnect(rightOperandId, rightIds);
-    console.info('[CheckOperandDriver] right submit', { rightOperandId, rightIds, requestId });
+    intent.awaitingSlot = { instructionId: nextInstructionId, slot: 'RIGHT' };
+    const requestId = submitCheckOperandConnect(rightOperandId, [nextInstructionId]);
+    console.info('[CheckOperandDriver] right submit', {
+      rightOperandId,
+      instructionId: nextInstructionId,
+      requestId,
+    });
     if (requestId) {
       setStatus({
         level: 'warn',
-        text: `Connecting Right_Operand to ${rightIds.length} CheckValue command(s)...`,
+        text: `Connecting Right_Operand to CheckValue #${nextInstructionId}...`,
       });
     } else {
+      delete intent.awaitingSlot;
       stalled('The right-operand connection could not be submitted. Try again.');
     }
   }, [
@@ -2854,9 +2906,10 @@ const VariablesPage: React.FC<Props> = ({
     pendingCheckOperandConnectRequestId,
     pendingCreateRequestId,
     pendingMutationRequestId,
+    pendingCheckValueLeftRequestId,
     snapshot,
+    submitCheckValueLeft,
     submitCheckOperandConnect,
-    submitVariablesMutation,
   ]);
 
   const startVariableAutoResolve = useCallback(() => {
