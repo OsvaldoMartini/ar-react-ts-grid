@@ -88,7 +88,8 @@ export const useVariablesCheckOperandConnect = ({
   const submit = useCallback((
     rightVariableId: number | null,
     instructionIds: readonly number[],
-    operation: 'CONNECT' | 'RELEASE' = 'CONNECT',
+    operation: 'CONNECT' | 'RELEASE' | 'UPDATE_OPERATOR' = 'CONNECT',
+    comparisonOperator?: string,
   ): string | null => {
     const capability = snapshot?.mutationCapability;
     if (
@@ -136,6 +137,7 @@ export const useVariablesCheckOperandConnect = ({
           rightVariableId,
           instructionIds,
           operation,
+          comparisonOperator,
         }),
       }));
       return requestId;

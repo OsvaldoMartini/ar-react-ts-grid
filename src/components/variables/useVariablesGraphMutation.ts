@@ -20,9 +20,9 @@ import {
 } from '../variablesWorkspace.contract';
 
 export const VARIABLES_GRAPH_MUTATION_TYPE =
-  'variablesWorkspace.graphMutationV3' as const;
+  'variablesWorkspace.graphMutationParent' as const;
 export const VARIABLES_GRAPH_MUTATION_RESPONSE =
-  'variablesWorkspace.graphMutationV3Response' as const;
+  'variablesWorkspace.graphMutationParentResponse' as const;
 
 type Context = {
   webSocket: WebSocket | null;

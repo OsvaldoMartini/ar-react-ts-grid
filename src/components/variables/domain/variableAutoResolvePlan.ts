@@ -20,7 +20,7 @@ import type {
  *
  * Only MISSING slots are filled — existing bindings and configured right
  * operands are never overwritten. Persistence reuses the proven ops: variable
- * create, graphMutationV3 variable-binding patches, and Command Editor UPDATE.
+ * create, graphMutationCommandVariable binding patches, and Command Editor UPDATE.
  */
 
 const CHECK_ACTIONS = new Set(['CK', 'PDF CHECK', 'CSV CHECK']);

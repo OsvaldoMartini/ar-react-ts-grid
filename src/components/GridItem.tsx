@@ -198,6 +198,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
     handleSaveInstruction,
     submitInstructionRelationshipMutation,
     submitCheckOperand,
+    submitCheckOperatorUpdate,
     handleMoveRowUp,
     handleMoveRowDown,
     handleRowSelectedClick,
@@ -859,6 +860,10 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                                       authorityKey:
                                         botJobRelationshipMutationAuthorityKey ?? '',
                                     })}
+                                onChangeCheckOperator={componentWorkspace
+                                  ? undefined
+                                  : (comparisonOperator) =>
+                                      submitCheckOperatorUpdate(instruction.id, comparisonOperator)}
                               />
                             )}
                             deviceOptionsRow={renderDeviceOptionsRow(instruction)}

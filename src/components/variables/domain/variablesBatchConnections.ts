@@ -560,6 +560,7 @@ const deriveResolveReview = (
       reviewId,
       compatibleTargets,
       indexed.choices,
+      true,
     );
     if ('ok' in selection) return selection;
     remainingChoiceIds.delete(reviewId);

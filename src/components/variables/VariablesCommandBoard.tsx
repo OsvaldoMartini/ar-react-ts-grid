@@ -40,6 +40,7 @@ import InstructionReferenceIcons, {
 } from './InstructionReferenceIcons';
 import { isVariablesCommandEditorEligible } from '../command-editor/commandEditorEligibility';
 import { isIfFamilyAction } from './domain/ifFamilyRules';
+import { binaryComparisonOperators } from '../command-editor/editors/CheckValueCommandEditor';
 import {
   connectedVariableSlots,
   missingVariableSlots,
@@ -105,6 +106,8 @@ export interface VariablesCommandBoardProps {
     instructionId: number,
     edge?: InstructionRelationshipEdge,
   ) => void;
+  /** Middle-shim dropdown: changes only the stored comparison operator. */
+  onChangeCheckOperator?: (instructionId: number, comparisonOperator: string) => void;
   onEditCommand?: (instruction: VariableInstructionNode) => void;
   onDeleteCommand?: (instruction: VariableInstructionNode) => void;
   pendingStatusInstructionId?: number | null;
@@ -189,6 +192,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
   onDropTarget,
   onReconnectParent,
   onReconnectVariable,
+  onChangeCheckOperator,
   onEditCommand,
   onDeleteCommand,
   pendingStatusInstructionId = null,
@@ -1153,13 +1157,23 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                               )
                         )}
                         {variableOnlyCheck && (
-                          <span
+                          <select
                             className={styles.checkOperator}
                             aria-label={`Comparison operator ${checkOperator}`}
-                            title={`Comparison operator ${checkOperator}`}
+                            title="Change comparison operator"
+                            value={checkOperator}
+                            disabled={disabled || !onChangeCheckOperator || instructionId === null}
+                            onMouseDown={event => event.stopPropagation()}
+                            onClick={event => event.stopPropagation()}
+                            onChange={(event) => {
+                              if (instructionId === null) return;
+                              onChangeCheckOperator?.(instructionId, event.target.value);
+                            }}
                           >
-                            {checkOperator}
-                          </span>
+                            {binaryComparisonOperators.map(operator => (
+                              <option key={operator} value={operator}>{operator}</option>
+                            ))}
+                          </select>
                         )}
                         {variableOnlyCheck && secondCheckVariableId !== null && (
                           <button

@@ -13,6 +13,7 @@ import type {
 } from './domain/instructionRelationshipGraph';
 import { instructionRelationshipPolicy } from './domain/instructionRelationshipPolicy';
 import { isIfFamilyAction } from '../../variables/domain/ifFamilyRules';
+import { binaryComparisonOperators } from '../../command-editor/editors/CheckValueCommandEditor';
 import type { WorkspaceBlock } from './domain/workspaceBlocks';
 import type { VariableCommandConfiguration } from '../../variablesWorkspace.contract';
 import InstructionCommandValues from './InstructionCommandValues';
@@ -39,6 +40,8 @@ export interface InstructionRelationshipDetailsProps {
   /** Opens the typed command editor for comparison-variable changes. */
   onEditCommand?: () => void;
   onReconnectSecondVariable?: () => void;
+  /** Middle-shim dropdown: changes only the stored comparison operator. */
+  onChangeCheckOperator?: (comparisonOperator: string) => void;
   reconnectDisabled?: boolean;
 }
 
@@ -121,6 +124,7 @@ const InstructionRelationshipDetails: React.FC<
   onReconnect,
   onEditCommand,
   onReconnectSecondVariable,
+  onChangeCheckOperator,
   reconnectDisabled = false,
 }) => {
   // Every structural attachment a command can carry via parent_id/parent_block_id
@@ -434,13 +438,20 @@ const InstructionRelationshipDetails: React.FC<
                 )
           )}
           {variableOnlyCheck && (
-            <span
+            <select
               className={styles.checkOperator}
               aria-label={`Comparison operator ${comparisonOperator}`}
-              title={`Comparison operator ${comparisonOperator}`}
+              title="Change comparison operator"
+              value={comparisonOperator}
+              disabled={reconnectDisabled || !onChangeCheckOperator}
+              onMouseDown={event => event.stopPropagation()}
+              onClick={event => event.stopPropagation()}
+              onChange={(event) => onChangeCheckOperator?.(event.target.value)}
             >
-              {comparisonOperator}
-            </span>
+              {binaryComparisonOperators.map(operator => (
+                <option key={operator} value={operator}>{operator}</option>
+              ))}
+            </select>
           )}
           {variableOnlyCheck && secondVariableId !== null && (
             <button

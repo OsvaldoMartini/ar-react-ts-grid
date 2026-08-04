@@ -871,8 +871,22 @@ const VariablesPage: React.FC<Props> = ({
   >(null);
   const checkOperandAttemptsRef = useRef(0);
   const [checkOperandKick, setCheckOperandKick] = useState(0);
+  const remainingVariableIntentRef = useRef<{
+    instructionIds: readonly number[];
+    creating: boolean;
+    submitted: boolean;
+  } | null>(null);
+  const [remainingVariableKick, setRemainingVariableKick] = useState(0);
+  const pendingCheckStartGraphVersionRef = useRef<number | null>(null);
+  const suppressIfFamilyAutoRepairRef = useRef(false);
+  const releaseSequenceRef = useRef<{
+    instructionIds: readonly number[];
+    phase: 'PARENT' | 'LEFT' | 'RIGHT' | 'OTHER';
+    awaitingInstructionId: number | null;
+  } | null>(null);
+  const [releaseSequenceKick, setReleaseSequenceKick] = useState(0);
   const {
-    pendingRequestId: pendingMutationRequestId,
+    pendingRequestId: pendingStructuralMutationRequestId,
     submit: submitGraphMutation,
     handleMessage: handleGraphMutationMessage,
     resetPending: resetGraphMutation,
@@ -880,6 +894,8 @@ const VariablesPage: React.FC<Props> = ({
     webSocket,
     connected,
     snapshot,
+    operationType: 'variablesWorkspace.graphMutationParent',
+    responseType: 'variablesWorkspace.graphMutationParentResponse',
   });
   const {
     pendingRequestId: pendingCheckValueLeftRequestId,
@@ -893,6 +909,20 @@ const VariablesPage: React.FC<Props> = ({
     operationType: 'variablesWorkspace.graphMutationLeft',
     responseType: 'variablesWorkspace.graphMutationLeftResponse',
   });
+  const {
+    pendingRequestId: pendingCommandVariableRequestId,
+    submit: submitCommandVariableMutation,
+    handleMessage: handleCommandVariableMutationMessage,
+    resetPending: resetCommandVariableMutation,
+  } = useVariablesGraphMutation({
+    webSocket,
+    connected,
+    snapshot,
+    operationType: 'variablesWorkspace.graphMutationCommandVariable',
+    responseType: 'variablesWorkspace.graphMutationCommandVariableResponse',
+  });
+  const pendingMutationRequestId = pendingStructuralMutationRequestId
+    ?? pendingCommandVariableRequestId;
   const {
     reviewState: executionFlowReview,
     openReview: openExecutionFlowReview,
@@ -974,6 +1004,9 @@ const VariablesPage: React.FC<Props> = ({
   const handleVariableCreateResult = useCallback((
     result: VariablesCreateResult,
   ) => {
+    if (!result.ok && remainingVariableIntentRef.current) {
+      remainingVariableIntentRef.current = null;
+    }
     const autoRun = variableAutoResolveRunRef.current;
     if (autoRun && autoRun.phase === 'CREATING') {
       const creation = autoRun.plan.creations[autoRun.createIndex];
@@ -1131,6 +1164,9 @@ const VariablesPage: React.FC<Props> = ({
       checkOperandIntentRef.current = null;
       checkOperandAttemptsRef.current = 0;
     }
+    if (!result.ok && releaseSequenceRef.current?.phase === 'RIGHT') {
+      releaseSequenceRef.current = null;
+    }
     setStatus({
       level: result.ok ? 'ok' : 'error',
       text: result.ok
@@ -1150,6 +1186,29 @@ const VariablesPage: React.FC<Props> = ({
     snapshot,
     onResult: handleCheckOperandConnectResult,
   });
+
+  // Middle-shim dropdown (2026-08-04, user order): a direct, single-command
+  // action - independent of the RESOLVE/RELEASE auto driver above. Never
+  // touches operand connectivity; Java updates only comparison_operator.
+  const changeCheckOperator = useCallback((
+    instructionId: number,
+    comparisonOperator: string,
+  ) => {
+    const requestId = submitCheckOperandConnect(
+      null, [instructionId], 'UPDATE_OPERATOR', comparisonOperator,
+    );
+    if (!requestId) {
+      setStatus({
+        level: 'error',
+        text: 'Variables is busy, disconnected, or read-only. The operator was not changed.',
+      });
+      return;
+    }
+    setStatus({
+      level: 'warn',
+      text: `Updating the comparison operator for command #${instructionId}...`,
+    });
+  }, [submitCheckOperandConnect]);
 
   const handleInstructionStatusResult = useCallback((
     result: VariablesInstructionStatusResult,
@@ -1350,6 +1409,7 @@ const VariablesPage: React.FC<Props> = ({
     clearPendingRequest();
     resetGraphMutation();
     resetCheckValueLeft();
+    resetCommandVariableMutation();
     resetInstructionCopy();
     resetCommandUpdate();
     resetCommandCopy();
@@ -1378,6 +1438,7 @@ const VariablesPage: React.FC<Props> = ({
     closeExecutionFlowReview,
     resetGraphMutation,
     resetCheckValueLeft,
+    resetCommandVariableMutation,
     resetInstructionCopy,
     resetCommandCopy,
     resetCommandCreate,
@@ -1422,6 +1483,7 @@ const VariablesPage: React.FC<Props> = ({
       if (handleCheckOperandConnectMessage(raw)) return;
       if (handleInstructionStatusMessage(raw)) return;
       if (handleCheckValueLeftMessage(raw)) return;
+      if (handleCommandVariableMutationMessage(raw)) return;
       if (handleGraphMutationMessage(raw)) return;
       if (handleRuntimeMemoryMessage(raw)) return;
       let envelope: VariablesWorkspaceEnvelope;
@@ -1501,6 +1563,7 @@ const VariablesPage: React.FC<Props> = ({
     clearPendingRequest,
     handleGraphMutationMessage,
     handleCheckValueLeftMessage,
+    handleCommandVariableMutationMessage,
     handleCommandCreateMessage,
     handleCommandCopyMessage,
     handleCommandUpdateMessage,
@@ -1741,11 +1804,14 @@ const VariablesPage: React.FC<Props> = ({
     sourceInstructionId: number,
     pendingText: string,
     committedText: string,
-    options: { keepConnectionsOpen?: boolean } = {},
+    options: { keepConnectionsOpen?: boolean; onCommitted?: () => void } = {},
   ) => {
     const keepConnectionsOpen = options.keepConnectionsOpen === true;
     setStatus({ level: 'warn', text: pendingText });
-    const requestId = submitGraphMutation(draft, {
+    const mutationSubmit = draft.variableBindingPatches.length > 0
+      ? submitCommandVariableMutation
+      : submitGraphMutation;
+    const requestId = mutationSubmit(draft, {
       committed: response => {
         setPendingReconnect(null);
         if (!keepConnectionsOpen) setPendingConnections(null);
@@ -1757,6 +1823,7 @@ const VariablesPage: React.FC<Props> = ({
           text: response.message || committedText,
         });
         sendWorkspaceRequest('variablesWorkspace.refresh');
+        options.onCommitted?.();
       },
       refused: (response, reason) => {
         setPendingReconnect(null);
@@ -1786,7 +1853,7 @@ const VariablesPage: React.FC<Props> = ({
         text: `Variables is busy or disconnected. Instruction #${sourceInstructionId} was not changed.`,
       });
     }
-  }, [sendWorkspaceRequest, submitGraphMutation]);
+  }, [sendWorkspaceRequest, submitCommandVariableMutation, submitGraphMutation]);
 
   // IF-family links are a CLOSED rule (user decision 2026-08-03): one IF root
   // per Block has exactly one valid wiring, so broken links repair themselves
@@ -1795,7 +1862,10 @@ const VariablesPage: React.FC<Props> = ({
   // until the graph changes.
   const ifFamilyAutoRepairAttemptRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!snapshot || !connected || pendingMutationRequestId !== null) return;
+    if (!snapshot
+      || !connected
+      || suppressIfFamilyAutoRepairRef.current
+      || pendingMutationRequestId !== null) return;
     const plan = planIfFamilyAutoRepair(snapshot);
     if (!plan || ifFamilyAutoRepairAttemptRef.current === plan.authorityKey) return;
     ifFamilyAutoRepairAttemptRef.current = plan.authorityKey;
@@ -2426,33 +2496,14 @@ const VariablesPage: React.FC<Props> = ({
         });
         return;
       }
-      // Release ALL includes the CheckValue RIGHT spots (user order 2026-08-03):
-      // queue the occupied right operands of the scoped CheckValues; the driver
-      // effect releases them once the graph release commits.
-      const releaseSnapshot = snapshotRef.current;
-      if (releaseSnapshot) {
-        const scopeIds = new Set(pending.scope.instructionIds);
-        const occupiedRightIds = releaseSnapshot.commands.flatMap((command) => {
-          if (command.id === null
-            || !scopeIds.has(command.id)
-            || !requiredVariableSlots(command.command).includes('RIGHT')) {
-            return [];
-          }
-          return connectedVariableSlots(command).has('RIGHT') ? [command.id] : [];
-        });
-        checkOperandIntentRef.current = occupiedRightIds.length > 0
-          ? { kind: 'RELEASE', instructionIds: occupiedRightIds }
-          : null;
-        checkOperandAttemptsRef.current = 0;
-        setCheckOperandKick(kick => kick + 1);
-      }
-      submitVariablesMutation(
-        pending.plan.draft,
-        pending.plan.mutationProfile,
-        pending.plan.changedInstructionIds[0] ?? 0,
-        `Releasing ${pending.items.length} direct connection(s)...`,
-        `${pending.items.length} direct connection(s) released.`,
-      );
+      suppressIfFamilyAutoRepairRef.current = true;
+      releaseSequenceRef.current = {
+        instructionIds: [...pending.scope.instructionIds],
+        phase: 'PARENT',
+        awaitingInstructionId: null,
+      };
+      setReleaseSequenceKick(kick => kick + 1);
+      setStatus({ level: 'warn', text: 'Releasing parent connections first...' });
       return;
     }
 
@@ -2701,7 +2752,18 @@ const VariablesPage: React.FC<Props> = ({
   // ONE consolidated CheckValue-operand intent (2026-08-03 cleanup): the intent
   // clears only after a successful submit or completion; a stalled intent shows
   // a visible error after 8 attempts - never a silent dead-end, never a loop.
-  const createCheckValueDefaultVariables = useCallback(() => {
+  const startRemainingVariableConnections = useCallback((
+    instructionIds: readonly number[],
+  ) => {
+    remainingVariableIntentRef.current = {
+      instructionIds: [...instructionIds],
+      creating: false,
+      submitted: false,
+    };
+    setRemainingVariableKick(kick => kick + 1);
+  }, []);
+
+  const startCheckValueDefaultVariables = useCallback(() => {
     const current = snapshotRef.current;
     if (!current || !pendingConnections || pendingConnections.mode !== 'RESOLVE') {
       return;
@@ -2716,7 +2778,10 @@ const VariablesPage: React.FC<Props> = ({
       && requiredVariableSlots(command.command).includes('RIGHT')
       && missingVariableSlots(command).length > 0);
     console.info('[CheckOperandDriver] trigger', { hasCheckValue });
-    if (!hasCheckValue) return;
+    if (!hasCheckValue) {
+      startRemainingVariableConnections(pendingConnections.scope.instructionIds);
+      return;
+    }
     // Once both defaults exist, the driver connects Left_Operand first and then
     // Right_Operand to every free CheckValue spot.
     checkOperandIntentRef.current = { kind: 'RESOLVE_CHECKVALUES' };
@@ -2751,7 +2816,44 @@ const VariablesPage: React.FC<Props> = ({
       level: 'warn',
       text: `Creating CheckValue default variable “${toCreate[0]}”...`,
     });
-  }, [pendingConnections, submitVariableCreate]);
+  }, [pendingConnections, startRemainingVariableConnections, submitVariableCreate]);
+
+  const createCheckValueDefaultVariables = useCallback(() => {
+    suppressIfFamilyAutoRepairRef.current = false;
+    const pending = pendingConnections;
+    if (!pending || pending.mode !== 'RESOLVE') return;
+    const built = buildVariablesBatchResolveMutation(pending.plan, []);
+    if (built.ok && built.mutation.draft.instructionRelationPatches.length > 0) {
+      const expectedGraphVersion =
+        pending.plan.basis.snapshot.mutationCapability!.graphVersion + 1;
+      submitVariablesMutation(
+        {
+          ...built.mutation.draft,
+          variableBindingPatches: [],
+        },
+        built.mutation.mutationProfile,
+        built.mutation.changedInstructionIds[0] ?? 0,
+        'Resolving parent connections first...',
+        'Parent connections resolved.',
+        {
+          keepConnectionsOpen: true,
+          onCommitted: () => {
+            pendingCheckStartGraphVersionRef.current = expectedGraphVersion;
+          },
+        },
+      );
+      return;
+    }
+    startCheckValueDefaultVariables();
+  }, [pendingConnections, startCheckValueDefaultVariables, submitVariablesMutation]);
+
+  useEffect(() => {
+    const expected = pendingCheckStartGraphVersionRef.current;
+    const current = snapshot?.mutationCapability?.graphVersion;
+    if (expected === null || current === undefined || current < expected) return;
+    pendingCheckStartGraphVersionRef.current = null;
+    startCheckValueDefaultVariables();
+  }, [snapshot, startCheckValueDefaultVariables]);
 
   // CONSOLIDATED CheckValue driver: one intent, one effect. RESOLVE connects
   // LEFT first and RIGHT second; RELEASE clears the queued RIGHT spots.
@@ -2780,6 +2882,11 @@ const VariablesPage: React.FC<Props> = ({
       checkOperandIntentRef.current = null;
       checkOperandAttemptsRef.current = 0;
       setStatus({ level, text });
+      if (level === 'ok' && intent.kind === 'RESOLVE_CHECKVALUES') {
+        startRemainingVariableConnections(
+          pendingConnections?.scope.instructionIds ?? [],
+        );
+      }
     };
     const stalled = (text: string) => {
       checkOperandAttemptsRef.current += 1;
@@ -2799,15 +2906,26 @@ const VariablesPage: React.FC<Props> = ({
       }
       return;
     }
+    const scopedIds = new Set(
+      pendingConnections?.scope.instructionIds
+        ?? snapshot.commands.flatMap(command => command.id === null ? [] : [command.id]),
+    );
     const checkCommands = snapshot.commands.filter(command =>
       command.id !== null
+      && scopedIds.has(command.id)
       && requiredVariableSlots(command.command).includes('RIGHT'));
     if (intent.awaitingSlot) {
       const awaitedCommand = checkCommands.find(
         command => command.id === intent.awaitingSlot?.instructionId,
       );
-      if (awaitedCommand
-        && missingVariableSlots(awaitedCommand).includes(intent.awaitingSlot.slot)) {
+      const awaitedFact = snapshot.mutationCapability?.instructionFacts.find(
+        fact => fact.instructionId === intent.awaitingSlot?.instructionId,
+      );
+      const stillMissing = intent.awaitingSlot.slot === 'LEFT'
+        ? !awaitedFact || awaitedFact.variableId === null
+        : Boolean(awaitedCommand
+          && missingVariableSlots(awaitedCommand).includes('RIGHT'));
+      if (stillMissing) {
         return;
       }
       delete intent.awaitingSlot;
@@ -2857,10 +2975,13 @@ const VariablesPage: React.FC<Props> = ({
           variableOwnerPatches: [],
         },
         {
-          committed: () => setStatus({
-            level: 'warn',
-            text: `Left_Operand connected to CheckValue #${nextInstructionId}. Connecting its Right_Operand next...`,
-          }),
+          committed: () => {
+            setStatus({
+              level: 'warn',
+              text: `Left_Operand connected to CheckValue #${nextInstructionId}. Connecting its Right_Operand next...`,
+            });
+            sendWorkspaceRequest('variablesWorkspace.refresh');
+          },
           refused: (_response, reason) => finish(
             'error',
             `Left_Operand connection for CheckValue #${nextInstructionId} was refused (${reason}).`,
@@ -2907,9 +3028,256 @@ const VariablesPage: React.FC<Props> = ({
     pendingCreateRequestId,
     pendingMutationRequestId,
     pendingCheckValueLeftRequestId,
+    pendingConnections,
     snapshot,
+    sendWorkspaceRequest,
+    startRemainingVariableConnections,
     submitCheckValueLeft,
     submitCheckOperandConnect,
+  ]);
+
+  // Final resolver lane: one shared Variable_1 is created when absent and one
+  // dedicated command-variable mutation connects every remaining scoped command.
+  useEffect(() => {
+    const intent = remainingVariableIntentRef.current;
+    if (!intent || !snapshot) return;
+    if (pendingCreateRequestId !== null
+      || pendingMutationRequestId !== null
+      || pendingCheckValueLeftRequestId !== null
+      || pendingCheckOperandConnectRequestId !== null) return;
+    const capability = snapshot.mutationCapability;
+    if (!capability) return;
+    const scopeIds = new Set(intent.instructionIds);
+    const factsById = new Map(
+      capability.instructionFacts.map(fact => [fact.instructionId, fact]),
+    );
+    const remainingIds = snapshot.commands.flatMap((command) => {
+      if (command.id === null
+        || !scopeIds.has(command.id)
+        || requiredVariableSlots(command.command).includes('RIGHT')
+        || !instructionRelationshipPolicy(command.command)
+          .requirements.includes('VARIABLE_BINDING')) return [];
+      return factsById.get(command.id)?.variableId === null ? [command.id] : [];
+    });
+    if (remainingIds.length === 0) {
+      remainingVariableIntentRef.current = null;
+      setPendingConnections(null);
+      setStatus({ level: 'ok', text: 'All parent and variable connections resolved.' });
+      return;
+    }
+    const defaultVariable = snapshot.variables.find(
+      variable => variable.name.trim().toLowerCase() === 'variable_1',
+    );
+    if (!defaultVariable) {
+      if (intent.creating) return;
+      intent.creating = true;
+      const requestId = submitVariableCreate({ name: 'Variable_1' });
+      if (!requestId) {
+        remainingVariableIntentRef.current = null;
+        setStatus({ level: 'error', text: 'Variable_1 could not be created.' });
+      } else {
+        setStatus({ level: 'warn', text: 'Creating default Variable_1...' });
+      }
+      return;
+    }
+    if (intent.submitted) return;
+    intent.submitted = true;
+    const requestId = submitCommandVariableMutation(
+      {
+        mutationKind: 'RELATIONSHIP_UPDATE',
+        draggedInstructionId: null,
+        layoutRows: capability.layoutRows.map(row => ({ ...row })),
+        instructionRelationPatches: [],
+        variableBindingPatches: remainingIds.map(instructionId => ({
+          instructionId,
+          operation: 'SET' as const,
+          expected: { value: factsById.get(instructionId)?.variableId ?? null },
+          replacement: { value: defaultVariable.id },
+        })),
+        variableOwnerPatches: [],
+      },
+      {
+        committed: () => {
+          remainingVariableIntentRef.current = null;
+          setPendingConnections(null);
+          setStatus({
+            level: 'ok',
+            text: `Variable_1 connected to ${remainingIds.length} remaining command(s).`,
+          });
+          sendWorkspaceRequest('variablesWorkspace.refresh');
+        },
+        refused: (_response, reason) => {
+          remainingVariableIntentRef.current = null;
+          setStatus({
+            level: 'error',
+            text: `Remaining variable connections were refused (${reason}).`,
+          });
+        },
+      },
+      VARIABLES_REACT_AUTHORED_PROFILE,
+    );
+    if (!requestId) {
+      intent.submitted = false;
+      remainingVariableIntentRef.current = null;
+      setStatus({ level: 'error', text: 'Remaining variable connections could not be submitted.' });
+    }
+  }, [
+    pendingCheckOperandConnectRequestId,
+    pendingCheckValueLeftRequestId,
+    pendingCreateRequestId,
+    pendingMutationRequestId,
+    remainingVariableKick,
+    sendWorkspaceRequest,
+    snapshot,
+    submitCommandVariableMutation,
+    submitVariableCreate,
+  ]);
+
+  useEffect(() => {
+    const run = releaseSequenceRef.current;
+    if (!run || !snapshot || !snapshot.mutationCapability) return;
+    if (pendingMutationRequestId !== null
+      || pendingCheckValueLeftRequestId !== null
+      || pendingCheckOperandConnectRequestId !== null) return;
+    const capability = snapshot.mutationCapability;
+    const scopeIds = new Set(run.instructionIds);
+    const facts = capability.instructionFacts.filter(fact => scopeIds.has(fact.instructionId));
+    const commandsById = new Map(snapshot.commands.flatMap(command =>
+      command.id === null ? [] : [[command.id, command] as const]));
+    if (run.awaitingInstructionId !== null) {
+      const fact = facts.find(item => item.instructionId === run.awaitingInstructionId);
+      const command = commandsById.get(run.awaitingInstructionId);
+      const stillConnected = run.phase === 'PARENT'
+        ? Boolean(fact && (fact.parentId !== null || fact.parentBlockId !== null))
+        : run.phase === 'LEFT' || run.phase === 'OTHER'
+          ? Boolean(fact && fact.variableId !== null)
+          : Boolean(command && connectedVariableSlots(command).has('RIGHT'));
+      if (stillConnected) return;
+      run.awaitingInstructionId = null;
+    }
+    const baseDraft = {
+      mutationKind: 'RELATIONSHIP_UPDATE' as const,
+      draggedInstructionId: null,
+      layoutRows: capability.layoutRows.map(row => ({ ...row })),
+      variableOwnerPatches: [],
+    };
+    if (run.phase === 'PARENT') {
+      const patches = facts.flatMap(fact =>
+        fact.parentId === null && fact.parentBlockId === null ? [] : [{
+          instructionId: fact.instructionId,
+          relationKind: fact.relationKind,
+          operation: 'CLEAR' as const,
+          expected: { parentId: fact.parentId, parentBlockId: fact.parentBlockId },
+          replacement: { parentId: null, parentBlockId: null },
+        }]);
+      if (patches.length === 0) {
+        run.phase = 'LEFT';
+        setReleaseSequenceKick(kick => kick + 1);
+        return;
+      }
+      run.awaitingInstructionId = patches[0].instructionId;
+      const requestId = submitGraphMutation({
+        ...baseDraft,
+        instructionRelationPatches: patches,
+        variableBindingPatches: [],
+      }, {
+        committed: () => sendWorkspaceRequest('variablesWorkspace.refresh'),
+        refused: (_response, reason) => {
+          releaseSequenceRef.current = null;
+          setStatus({ level: 'error', text: `Parent release was refused (${reason}).` });
+        },
+      }, VARIABLES_REACT_AUTHORED_PROFILE);
+      if (!requestId) releaseSequenceRef.current = null;
+      return;
+    }
+    if (run.phase === 'LEFT') {
+      const next = facts.find(fact => {
+        const command = commandsById.get(fact.instructionId);
+        return fact.variableId !== null
+          && Boolean(command && requiredVariableSlots(command.command).includes('RIGHT'));
+      });
+      if (!next) {
+        run.phase = 'RIGHT';
+        setReleaseSequenceKick(kick => kick + 1);
+        return;
+      }
+      run.awaitingInstructionId = next.instructionId;
+      const requestId = submitCheckValueLeft({
+        ...baseDraft,
+        instructionRelationPatches: [],
+        variableBindingPatches: [{
+          instructionId: next.instructionId,
+          operation: 'CLEAR',
+          expected: { value: next.variableId },
+          replacement: { value: null },
+        }],
+      }, {
+        committed: () => sendWorkspaceRequest('variablesWorkspace.refresh'),
+        refused: (_response, reason) => {
+          releaseSequenceRef.current = null;
+          setStatus({ level: 'error', text: `LEFT release was refused (${reason}).` });
+        },
+      }, VARIABLES_REACT_AUTHORED_PROFILE);
+      if (!requestId) releaseSequenceRef.current = null;
+      return;
+    }
+    if (run.phase === 'RIGHT') {
+      const next = snapshot.commands.find(command =>
+        command.id !== null
+        && scopeIds.has(command.id)
+        && requiredVariableSlots(command.command).includes('RIGHT')
+        && connectedVariableSlots(command).has('RIGHT'));
+      if (!next || next.id === null) {
+        run.phase = 'OTHER';
+        setReleaseSequenceKick(kick => kick + 1);
+        return;
+      }
+      run.awaitingInstructionId = next.id;
+      const requestId = submitCheckOperandConnect(null, [next.id], 'RELEASE');
+      if (!requestId) releaseSequenceRef.current = null;
+      return;
+    }
+    const patches = facts.flatMap(fact => {
+      const command = commandsById.get(fact.instructionId);
+      if (fact.variableId === null
+        || (command && requiredVariableSlots(command.command).includes('RIGHT'))) return [];
+      return [{
+        instructionId: fact.instructionId,
+        operation: 'CLEAR' as const,
+        expected: { value: fact.variableId },
+        replacement: { value: null },
+      }];
+    });
+    if (patches.length === 0) {
+      releaseSequenceRef.current = null;
+      setPendingConnections(null);
+      setStatus({ level: 'ok', text: 'All scoped connections released.' });
+      return;
+    }
+    run.awaitingInstructionId = patches[0].instructionId;
+    const requestId = submitCommandVariableMutation({
+      ...baseDraft,
+      instructionRelationPatches: [],
+      variableBindingPatches: patches,
+    }, {
+      committed: () => sendWorkspaceRequest('variablesWorkspace.refresh'),
+      refused: (_response, reason) => {
+        releaseSequenceRef.current = null;
+        setStatus({ level: 'error', text: `Remaining-variable release was refused (${reason}).` });
+      },
+    }, VARIABLES_REACT_AUTHORED_PROFILE);
+    if (!requestId) releaseSequenceRef.current = null;
+  }, [
+    pendingCheckOperandConnectRequestId,
+    pendingCheckValueLeftRequestId,
+    pendingMutationRequestId,
+    releaseSequenceKick,
+    sendWorkspaceRequest,
+    snapshot,
+    submitCheckOperandConnect,
+    submitCheckValueLeft,
+    submitCommandVariableMutation,
+    submitGraphMutation,
   ]);
 
   const startVariableAutoResolve = useCallback(() => {
@@ -3239,6 +3607,7 @@ const VariablesPage: React.FC<Props> = ({
                 }}
                 onReconnectVariable={(instructionId) =>
                   openReconnect(instructionId, 'VARIABLE_BINDING')}
+                onChangeCheckOperator={changeCheckOperator}
                 onEditCommand={(instruction) => {
                   if (instruction.id === null) return;
                   setAddingCommand(false);
