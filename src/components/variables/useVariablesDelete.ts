@@ -13,7 +13,7 @@ export const VARIABLES_DELETE_OPERATION =
   'variablesWorkspace.variables.delete' as const;
 export const VARIABLES_DELETE_RESPONSE =
   'variablesWorkspace.variables.deleteResponse' as const;
-export const VARIABLES_DELETE_CONTRACT_VERSION = 1 as const;
+export const VARIABLES_DELETE_CONTRACT_VERSION = 2 as const;
 
 export type VariablesDeleteMode = 'SINGLE' | 'ALL';
 
@@ -139,13 +139,11 @@ export const useVariablesDelete = ({
     mode: VariablesDeleteMode,
     requestedIds: readonly number[],
   ): string | null => {
-    const capability = snapshot?.mutationCapability;
     const variableIds = [...new Set(requestedIds)]
       .filter(id => Number.isSafeInteger(id) && id > 0)
       .sort((left, right) => left - right);
     if (
       !snapshot
-      || !capability
       || !connected
       || !webSocket
       || webSocket.readyState !== WebSocket.OPEN
@@ -185,8 +183,6 @@ export const useVariablesDelete = ({
         requestId,
         bindingEpoch: snapshot.bindingEpoch,
         workspaceEpoch: snapshot.workspaceEpoch,
-        baseGraphVersion: capability.graphVersion,
-        graphRevision: capability.graphRevision,
         mode,
         variableIds: mode === 'ALL' ? [] : variableIds,
       }));

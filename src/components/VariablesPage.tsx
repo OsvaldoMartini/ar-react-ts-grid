@@ -3462,7 +3462,6 @@ const VariablesPage: React.FC<Props> = ({
     || pendingMutationRequestId !== null
     || pendingCopyRequestId !== null
     || pendingCreateRequestId !== null
-    || pendingDeleteRequestId !== null
     || pendingCommandDeleteRequestId !== null
     || pendingStatusInstructionId !== null
     || pendingReconnect !== null
@@ -4070,11 +4069,7 @@ const VariablesPage: React.FC<Props> = ({
                 pendingVariableIds={pendingVariableIds}
                 onCommitValue={updateRuntimeValue}
                 deletingVariableIds={deletingVariableIds}
-                deleteDisabled={
-                  !connected
-                  || pendingDeleteRequestId !== null
-                  || snapshot.mutationCapability === null
-                }
+                deleteDisabled={false}
                 onRequestAdd={() => {
                   setStatus({
                     level: 'warn',

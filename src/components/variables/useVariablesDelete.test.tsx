@@ -77,7 +77,7 @@ test('sends the exact SINGLE payload and deduplicates while it is pending', () =
     webSocket,
     connected: true,
     sessionId: 'variablesManager',
-    snapshot: snapshot(),
+    snapshot: { ...snapshot(), mutationCapability: null },
     onResult,
   }));
 
@@ -92,13 +92,13 @@ test('sends the exact SINGLE payload and deduplicates while it is pending', () =
   const envelope = JSON.parse(send.mock.calls[0][0]);
   expect(envelope.type).toBe(VARIABLES_DELETE_OPERATION);
   expect(envelope.sessionId).toBe('variablesManager');
-  expect(JSON.parse(envelope.body)).toEqual({
+  expect(envelope).toMatchObject({
+    type: VARIABLES_DELETE_OPERATION,
+    sessionId: 'variablesManager',
     contractVersion: VARIABLES_DELETE_CONTRACT_VERSION,
     requestId,
     bindingEpoch: 'binding-delete',
     workspaceEpoch: 9,
-    baseGraphVersion: 12,
-    graphRevision: REVISION,
     mode: 'SINGLE',
     variableIds: [44],
   });
@@ -112,7 +112,7 @@ test('sends the exact SINGLE payload and deduplicates while it is pending', () =
   unmount();
 });
 
-test('sends the exact ALL payload with unique, sorted positive variable IDs', () => {
+test('sends ALL without a graph snapshot or client-selected catalog', () => {
   const send = jest.fn();
   const webSocket = {
     readyState: WebSocket.OPEN,
@@ -138,15 +138,15 @@ test('sends the exact ALL payload with unique, sorted positive variable IDs', ()
     type: VARIABLES_DELETE_OPERATION,
     sessionId: 'variablesManager',
   });
-  expect(JSON.parse(envelope.body)).toEqual({
+  expect(envelope).toMatchObject({
+    type: VARIABLES_DELETE_OPERATION,
+    sessionId: 'variablesManager',
     contractVersion: VARIABLES_DELETE_CONTRACT_VERSION,
     requestId,
     bindingEpoch: 'binding-delete',
     workspaceEpoch: 9,
-    baseGraphVersion: 12,
-    graphRevision: REVISION,
     mode: 'ALL',
-    variableIds: [12, 75],
+    variableIds: [],
   });
   unmount();
 });

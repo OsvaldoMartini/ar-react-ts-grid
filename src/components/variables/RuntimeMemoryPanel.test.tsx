@@ -134,7 +134,7 @@ test('routes row delete, Clear All Values, Delete All, and + ADD independently',
     .not.toHaveTextContent('++');
 });
 
-test('disables destructive actions while deletion is pending', () => {
+test('keeps destructive actions available while another deletion is pending', () => {
   render(
     <RuntimeMemoryPanel
       items={items}
@@ -147,10 +147,10 @@ test('disables destructive actions while deletion is pending', () => {
 
   expect(screen.getByRole('button', {
     name: 'Delete variable Account owner',
-  })).toBeDisabled();
+  })).toBeEnabled();
   expect(screen.getByRole('button', {
     name: 'Delete all variables',
-  })).toBeDisabled();
+  })).toBeEnabled();
   expect(screen.getByRole('button', {
     name: 'Delete variable Payment amount',
   })).toBeEnabled();
