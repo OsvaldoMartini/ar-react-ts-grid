@@ -27,6 +27,7 @@ import type { VariablesSmokeTestPosition } from './domain/variablesSmokeTestType
 import BlockMultiSelectSearchBox, {
   type BlockMultiSelectOption,
 } from '../BlockMultiSelectSearchBox';
+import SearchBox, { type SearchBoxOption } from '../SearchBox';
 import VariablesSmokeTestPanel from './VariablesSmokeTestPanel';
 import InstructionIntrinsicValues, {
   instructionIntrinsicValuePresentation,
@@ -87,6 +88,7 @@ const VariablesExecutionFlowReviewModal: React.FC<
   const smokeBlockRefs = useRef(new Map<string, HTMLElement>());
   const [activeSmokePosition, setActiveSmokePosition] = useState<VariablesSmokeTestPosition | null>(null);
   const [flowOpen, setFlowOpen] = useState(false);
+  const [selectedVariableId, setSelectedVariableId] = useState<number | null>(null);
   const [commandRemainingByInstructionId, setCommandRemainingByInstructionId] =
     useState<Readonly<Record<number, number>>>({});
   const [localSelectedBlockIds, setLocalSelectedBlockIds] = useState<number[]>(() =>
@@ -147,6 +149,38 @@ const VariablesExecutionFlowReviewModal: React.FC<
     () => new Set(visibleVariableFlows.map(flow => flow.variableId)),
     [visibleVariableFlows],
   );
+  const variableSearchOptions = useMemo<SearchBoxOption[]>(() =>
+    visibleVariableFlows.map(flow => {
+      const relatedInstructionIds = [
+        ...flow.endpointInstructionIds,
+        ...flow.commandInstructionIds,
+        ...flow.producerInstructionIds,
+        ...flow.readerInstructionIds,
+      ];
+      const relatedSearchText = relatedInstructionIds.map(id => {
+        const step = stepsById.get(id);
+        return step
+          ? `${id} ${step.instructionName} ${step.action} ${step.blockName}`
+          : String(id);
+      }).join(' ');
+      return {
+        value: String(flow.variableId),
+        label: flow.variableName,
+        sublabel: `${flow.variableType || 'Variable'} · ID ${flow.variableId}`,
+        keywords: `${flow.variableId} ${flow.variableName} ${relatedSearchText}`,
+      };
+    }), [stepsById, visibleVariableFlows]);
+  useEffect(() => {
+    if (
+      selectedVariableId === null
+      || !visibleVariableIds.has(selectedVariableId)
+    ) {
+      setSelectedVariableId(visibleVariableFlows[0]?.variableId ?? null);
+    }
+  }, [selectedVariableId, visibleVariableFlows, visibleVariableIds]);
+  const selectedVariableFlow = selectedVariableId === null
+    ? null
+    : visibleVariableFlows.find(flow => flow.variableId === selectedVariableId) ?? null;
   const visibleUnassignedConnections = useMemo(() => allBlocksSelected
     ? review.unassignedConnections
     : review.unassignedConnections.filter(connection => {
@@ -370,25 +404,36 @@ const VariablesExecutionFlowReviewModal: React.FC<
                 <Variable size={17} aria-hidden="true" />
                 <div>
                   <h3>Variable flows</h3>
-                  <p>Declaration Web Field → producer → variable → readers.</p>
+                  <p>Web Element endpoints → GET producer → variable → readers.</p>
                 </div>
               </header>
+              <SearchBox
+                label="Variable flow"
+                placeholder="Search variable, command, or Web Element name / ID..."
+                headerRight="Connected relationships"
+                countLabel={count => `${count} VARIABLE${count === 1 ? '' : 'S'}`}
+                options={variableSearchOptions}
+                value={selectedVariableId === null ? null : String(selectedVariableId)}
+                onChange={value => setSelectedVariableId(value === null ? null : Number(value))}
+              />
               <div className={styles.variableList}>
-                {visibleVariableFlows.map((flow) => {
-                  const owner = flow.ownerInstructionId === null
-                    ? null
-                    : stepsById.get(flow.ownerInstructionId) ?? null;
+                {selectedVariableFlow && [selectedVariableFlow].map((flow) => {
+                  const endpoints = flow.endpointInstructionIds
+                    .map(id => stepsById.get(id) ?? null)
+                    .filter((step): step is NonNullable<typeof step> => step !== null);
                   return (
                     <article className={styles.variableFlow} key={flow.variableId}>
                       <div className={styles.flowNode}>
-                        <span>Declaration Web Field</span>
-                        <strong>{owner
-                          ? `#${owner.instructionOrder} ${owner.instructionName}`
-                          : 'Owner missing'}</strong>
+                        <span>Web Element endpoints</span>
+                        <strong>{endpoints.length > 0
+                          ? endpoints.map(endpoint =>
+                              `#${endpoint.instructionOrder} ${endpoint.instructionName}`
+                            ).join(', ')
+                          : 'No Web Element endpoint'}</strong>
                       </div>
                       <ArrowRight size={16} aria-hidden="true" />
                       <div className={styles.flowNode}>
-                        <span>GET / SET producer</span>
+                        <span>GET producer</span>
                         <strong>{flow.producerInstructionIds.length > 0
                           ? flow.producerInstructionIds.map(id => {
                               const step = stepsById.get(id);

@@ -1,7 +1,6 @@
 import React, {
   useEffect,
   useMemo,
-  useRef,
   useState,
   type DragEvent,
 } from 'react';
@@ -268,6 +267,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
         instruction.command,
         instruction.tagName,
       );
+      const rightVariableId = instruction.commandConfiguration?.operandVariableId ?? null;
       const haystack = [
         instruction.id,
         instruction.name,
@@ -282,13 +282,16 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
         instruction.parentId,
         instruction.parentBlockId,
         instruction.variableId,
+        instruction.variableId == null ? null : variableNamesById.get(instruction.variableId),
+        rightVariableId,
+        rightVariableId == null ? null : variableNamesById.get(rightVariableId),
       ]
         .filter(value => value !== null && value !== undefined)
         .join(' ')
         .toLocaleLowerCase();
       return tokens.every(token => haystack.includes(token));
     });
-  }, [commandSearch, instructions, selectedBlockIds]);
+  }, [commandSearch, instructions, selectedBlockIds, variableNamesById]);
 
   const visibleConnectionScope = useMemo<VariablesConnectionScope>(() => {
     const selectedBlocks = blocks.filter(block => selectedBlockIds.has(block.id));
@@ -437,27 +440,10 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
     return references;
   }, [instructions, relationshipEdges]);
 
-  const rowBoundsRef = useRef<WeakMap<HTMLElement, DOMRect>>(new WeakMap());
-
-  useEffect(() => {
-    rowBoundsRef.current = new WeakMap();
-  }, [draggingInstructionId]);
-
   const rowDropTarget = (
-    event: DragEvent<HTMLElement>,
     blockId: number,
     rowIndex: number,
-  ): VariablesCommandDropTarget => {
-    let bounds = rowBoundsRef.current.get(event.currentTarget);
-    if (!bounds) {
-      bounds = event.currentTarget.getBoundingClientRect();
-      rowBoundsRef.current.set(event.currentTarget, bounds);
-    }
-    const placementIndex = event.clientY < bounds.top + bounds.height / 2
-      ? rowIndex
-      : rowIndex + 1;
-    return { blockId, index: placementIndex };
-  };
+  ): VariablesCommandDropTarget => ({ blockId, index: rowIndex });
 
   const dropPositionNumber = (blockId: number, index: number) => {
     if (draggingInstructionId === null) return index + 1;
@@ -861,13 +847,13 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                         ? undefined
                         : event => onDropTargetDragOver?.(
                             event,
-                            rowDropTarget(event, group.blockId as number, index),
+                            rowDropTarget(group.blockId as number, index),
                           )}
                       onDrop={group.blockId === null
                         ? undefined
                         : event => onDropTarget?.(
                             event,
-                            rowDropTarget(event, group.blockId as number, index),
+                            rowDropTarget(group.blockId as number, index),
                           )}
                     >
                       <span className={styles.grip} aria-hidden="true">

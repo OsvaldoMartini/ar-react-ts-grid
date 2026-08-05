@@ -1,4 +1,5 @@
 import React, {
+  useEffect,
   useId,
   useMemo,
   useRef,
@@ -21,10 +22,6 @@ import { RulesCard, type RulesCardEvent } from '../RulesCard';
 import type { VariableWorkspaceBlock } from '../variablesWorkspace.contract';
 import VariablesConnectionsHelpModal from './VariablesConnectionsHelpModal';
 import type { VariableResolutionMode } from './domain/variableResolutionAssignments';
-import {
-  readVariableResolutionModePreference,
-  writeVariableResolutionModePreference,
-} from './domain/variableResolutionPreference';
 import styles from './VariablesConnectionsModal.module.scss';
 
 export type VariablesConnectionsModalMode = 'RESOLVE' | 'RELEASE';
@@ -92,6 +89,8 @@ export interface VariablesConnectionsModalProps {
    * existing LEFT, RIGHT, and regular-command transports.
    */
   onCreateCheckValueDefaults?: (variableMode: VariableResolutionMode) => void;
+  variableMode?: VariableResolutionMode;
+  onVariableModeChange?: (mode: VariableResolutionMode) => void;
 }
 
 const focusableSelector = [
@@ -181,6 +180,8 @@ const VariablesConnectionsModal: React.FC<
   onCancel,
   onConfirm,
   onCreateCheckValueDefaults,
+  variableMode: controlledVariableMode = 'SAME',
+  onVariableModeChange,
 }) => {
   const titleId = useId();
   const descriptionId = useId();
@@ -188,9 +189,8 @@ const VariablesConnectionsModal: React.FC<
   const [localBlockFilters, setLocalBlockFilters] = useState<number[]>(() =>
     blocks.map(block => block.id));
   const [helpOpen, setHelpOpen] = useState(false);
-  const [variableMode, setVariableMode] = useState<VariableResolutionMode>(
-    readVariableResolutionModePreference,
-  );
+  const [variableMode, setVariableMode] = useState<VariableResolutionMode>(controlledVariableMode);
+  useEffect(() => setVariableMode(controlledVariableMode), [controlledVariableMode]);
   const blockFilters = controlledBlockFilters === undefined
     ? localBlockFilters
     : controlledBlockFilters;
@@ -537,7 +537,7 @@ const VariablesConnectionsModal: React.FC<
                 disabled={false}
                 onClick={() => setVariableMode((current) => {
                   const next = current === 'SAME' ? 'DISTINCT' : 'SAME';
-                  writeVariableResolutionModePreference(next);
+                  onVariableModeChange?.(next);
                   return next;
                 })}
               >

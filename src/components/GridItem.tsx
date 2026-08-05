@@ -263,6 +263,25 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
     });
     return [...unique.values()];
   }, [variableLinks]);
+  const gridInstructionMatchesFind = React.useCallback((
+    instruction: BlockLoopInstructionLoadDTO,
+    query: string,
+  ) => {
+    if (instructionMatchesFind(instruction, query)) return true;
+    const variableIds = new Set<number>();
+    if (instruction.variableId != null) variableIds.add(instruction.variableId);
+    const configuredRightId = commandConfigurations
+      .get(instruction.id)?.operandVariableId;
+    if (configuredRightId != null) variableIds.add(configuredRightId);
+    variableLinks.forEach(variable => {
+      if (variable.instructionId === instruction.id && variable.id != null) {
+        variableIds.add(variable.id);
+      }
+    });
+    return variableLinks.some(variable => variable.id != null
+      && variableIds.has(variable.id)
+      && (`${variable.name ?? ''} ${variable.id}`).toLowerCase().includes(query));
+  }, [commandConfigurations, variableLinks]);
   const openGridCommandEditor = React.useCallback((
     instruction: BlockLoopInstructionLoadDTO,
   ) => {
@@ -881,7 +900,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                     const blockMatch = (blockData.blockName ?? "").toLowerCase().includes(q);
 
                     const instructionMatch = (blockData.instructions ?? []).some(
-                      (ins) => instructionMatchesFind(ins, q)
+                      (ins) => gridInstructionMatchesFind(ins, q)
                     );
 
                     return blockMatch || instructionMatch;
@@ -989,7 +1008,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                         blockName={blockData.blockName ?? ""}
                         findText={findText}
                         dropZone={activeDraggedInstructionId === null ? 'none' : (memoryCapabilities.get(activeDraggedInstructionId)?.allowedBlockIds.includes(Number(blockData.instructions[0].blockId)) ? 'valid' : 'invalid')}
-                        instructionMatchesFind={instructionMatchesFind}
+                        instructionMatchesFind={gridInstructionMatchesFind}
                         onListDragOver={handleGridDragOver}
                         onListDrop={handleListDrop(blockGroupIndex, blockData.instructions.length)}
                         renderRow={(instruction, index) => (
@@ -1144,7 +1163,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                               ?.allowedBlockIds.includes(block.blockId)
                             ? 'valid'
                             : 'invalid'}
-                        instructionMatchesFind={instructionMatchesFind}
+                        instructionMatchesFind={gridInstructionMatchesFind}
                         onListDragOver={handleGridDragOver}
                         onListDrop={handleListDrop(String(block.blockId), 0)}
                         renderRow={() => null}

@@ -67,6 +67,8 @@ export type VariablesExecutionVariableFlow = {
   runtimeRawValue: string;
   runtimeVoidReason: string | null;
   ownerInstructionId: number | null;
+  endpointInstructionIds: readonly number[];
+  commandInstructionIds: readonly number[];
   producerInstructionIds: readonly number[];
   readerInstructionIds: readonly number[];
   connectionIds: readonly string[];
@@ -436,6 +438,15 @@ export const buildVariablesExecutionFlowReview = (
           && connection.target.id === variable.id));
       const producerInstructionIds = new Set<number>();
       const readerInstructionIds = new Set<number>();
+      const endpointInstructionIds = new Set<number>();
+      const commandInstructionIds = new Set<number>();
+      variable.commands.forEach(command => {
+        if (positiveInteger(command.id)) commandInstructionIds.add(command.id);
+        const action = canonicalInstructionAction(command.command);
+        if ((action === 'GET' || action === 'SET') && positiveInteger(command.parentId)) {
+          endpointInstructionIds.add(command.parentId);
+        }
+      });
       variable.producers.forEach(command => {
         if (positiveInteger(command.id)) producerInstructionIds.add(command.id);
       });
@@ -451,8 +462,8 @@ export const buildVariablesExecutionFlowReview = (
           && connection.source.entity === 'INSTRUCTION'
         ) {
           const step = commandsById.get(connection.source.id);
-          const action = (step?.command ?? '').trim().toLocaleUpperCase();
-          if (action === 'GET' || action === 'SET') {
+          const action = canonicalInstructionAction(step?.command ?? '');
+          if (action === 'GET') {
             producerInstructionIds.add(connection.source.id);
           } else {
             readerInstructionIds.add(connection.source.id);
@@ -482,6 +493,8 @@ export const buildVariablesExecutionFlowReview = (
             ? 'NO_RUNTIME_VALUE'
             : null,
         ownerInstructionId: variable.owner?.id ?? null,
+        endpointInstructionIds: Object.freeze([...endpointInstructionIds]),
+        commandInstructionIds: Object.freeze([...commandInstructionIds]),
         producerInstructionIds: Object.freeze([...producerInstructionIds]),
         readerInstructionIds: Object.freeze([...readerInstructionIds]),
         connectionIds: Object.freeze(variableConnections.map(item => item.id)),

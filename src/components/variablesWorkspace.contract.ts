@@ -202,6 +202,7 @@ export interface VariableWorkspaceSnapshot {
   diagnostics: VariableDiagnostic[];
   runtimeMemory: RuntimeVariableMemorySnapshot;
   mutationCapability: VariablesMutationCapability | null;
+  preferences?: { variableResolutionMode: 'SAME' | 'DISTINCT' };
 }
 
 export interface VariablesWorkspaceEnvelope {
@@ -980,5 +981,11 @@ export const normalizeVariablesWorkspaceSnapshot = (
     diagnostics,
     runtimeMemory,
     mutationCapability,
+    preferences: {
+      variableResolutionMode:
+        asObject(candidate.preferences)?.variableResolutionMode === 'DISTINCT'
+          ? 'DISTINCT'
+          : 'SAME',
+    },
   };
 };

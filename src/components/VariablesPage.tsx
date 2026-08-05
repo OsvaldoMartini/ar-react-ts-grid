@@ -109,7 +109,6 @@ import {
   useVariablesGraphMutationRight,
   type VariablesGraphMutationRightResult,
 } from './variables/useVariablesGraphMutationRight';
-import { readVariableResolutionModePreference } from './variables/domain/variableResolutionPreference';
 import {
   planVariableAutoResolve,
   type VariableAutoResolvePlan,
@@ -857,6 +856,8 @@ const VariablesPage: React.FC<Props> = ({
   const [healthFilter, setHealthFilter] = useState<HealthFilter>('ALL');
   const [selectedInstructionId, setSelectedInstructionId] =
     useState<number | null>(null);
+  const [variableResolutionMode, setVariableResolutionMode] =
+    useState<VariableResolutionMode>('SAME');
   const [editingCommandId, setEditingCommandId] = useState<number | null>(null);
   const [addingCommand, setAddingCommand] = useState(false);
   const [sharedBlockFilters, setSharedBlockFilters] = useState<number[]>([]);
@@ -864,6 +865,11 @@ const VariablesPage: React.FC<Props> = ({
     useState<number | null>(null);
   const [activeDropTarget, setActiveDropTarget] =
     useState<VariablesCommandDropTarget | null>(null);
+  const commandDragSourceRef = useRef<{
+    instructionId: number;
+    blockId: number;
+    index: number;
+  } | null>(null);
   const [pendingReconnect, setPendingReconnect] =
     useState<PendingReconnect | null>(null);
   const [rightVariableReconnectInstructionId, setRightVariableReconnectInstructionId] =
@@ -957,6 +963,7 @@ const VariablesPage: React.FC<Props> = ({
     const previous = snapshotRef.current;
     snapshotRef.current = next;
     setSnapshot(next);
+    setVariableResolutionMode(next.preferences?.variableResolutionMode ?? 'SAME');
     setSharedBlockFilters(current => previous === null || ownerChanged
       ? next.blocks.map(block => block.id)
       : current.filter(blockId => next.blocks.some(block => block.id === blockId)));
@@ -2158,7 +2165,8 @@ const VariablesPage: React.FC<Props> = ({
     target: VariablesCommandDropTarget,
   ) => {
     const current = snapshotRef.current;
-    const sourceInstructionId = draggingInstructionId;
+    const sourceInstructionId = commandDragSourceRef.current?.instructionId
+      ?? draggingInstructionId;
     if (!current || sourceInstructionId === null) {
       setStatus({
         level: 'error',
@@ -3505,7 +3513,7 @@ const VariablesPage: React.FC<Props> = ({
     if (!current || pendingVariableAutoResolveRequestId !== null) return;
     const requestId = submitVariableAutoResolve(
       current.commands.flatMap(command => command.id === null ? [] : [command.id]),
-      readVariableResolutionModePreference(),
+      variableResolutionMode,
     );
     if (!requestId) {
       setStatus({
@@ -3518,7 +3526,7 @@ const VariablesPage: React.FC<Props> = ({
       level: 'warn',
       text: 'AUTO is creating and connecting variables in one transaction...',
     });
-  }, [pendingVariableAutoResolveRequestId, submitVariableAutoResolve]);
+  }, [pendingVariableAutoResolveRequestId, submitVariableAutoResolve, variableResolutionMode]);
 
   const confirmClearAllValues = useCallback(() => {
     if (!clearAllValues()) {
@@ -3799,6 +3807,19 @@ const VariablesPage: React.FC<Props> = ({
                 }}
                 onInstructionDragStart={(event, instruction) => {
                   if (instruction.id === null) return;
+                  const sourceRows = snapshot.commands
+                    .filter(candidate => candidate.blockId === instruction.blockId)
+                    .slice()
+                    .sort((left, right) =>
+                      (left.instructionOrder ?? Number.MAX_SAFE_INTEGER)
+                        - (right.instructionOrder ?? Number.MAX_SAFE_INTEGER)
+                      || (left.id ?? Number.MAX_SAFE_INTEGER)
+                        - (right.id ?? Number.MAX_SAFE_INTEGER));
+                  commandDragSourceRef.current = {
+                    instructionId: instruction.id,
+                    blockId: instruction.blockId ?? -1,
+                    index: sourceRows.findIndex(candidate => candidate.id === instruction.id),
+                  };
                   event.dataTransfer.effectAllowed = 'move';
                   event.dataTransfer.setData(
                     'application/x-ar-variables-instruction',
@@ -3808,30 +3829,21 @@ const VariablesPage: React.FC<Props> = ({
                   setActiveDropTarget(null);
                 }}
                 onInstructionDragEnd={() => {
+                  commandDragSourceRef.current = null;
                   setDraggingInstructionId(null);
                   setActiveDropTarget(null);
                 }}
-                onDropTargetDragOver={(event, target) => {
-                  if (draggingInstructionId === null || mutationDisabled) return;
+                onDropTargetDragOver={(event) => {
+                  if (commandDragSourceRef.current === null || mutationDisabled) return;
                   event.preventDefault();
                   event.dataTransfer.dropEffect = 'move';
-                  setActiveDropTarget(current =>
-                    current?.blockId === target.blockId && current.index === target.index
-                      ? current
-                      : target);
                 }}
-                onDropTargetDragLeave={(event, target) => {
-                  if (event.currentTarget.contains(event.relatedTarget as Node)) return;
-                  setActiveDropTarget(current =>
-                    current?.blockId === target.blockId
-                      && current.index === target.index
-                      ? null
-                      : current);
-                }}
+                onDropTargetDragLeave={() => undefined}
                 onDropTarget={(event, target) => {
                   event.preventDefault();
                   event.stopPropagation();
                   handleCommandDrop(target);
+                  commandDragSourceRef.current = null;
                 }}
                 onReconnectParent={(instructionId, edge) => {
                   const relationKind = edge?.kind
@@ -4180,6 +4192,23 @@ const VariablesPage: React.FC<Props> = ({
             pending={pendingMutationRequestId !== null}
             onConfirm={submitVisibleConnections}
             onCreateCheckValueDefaults={createCheckValueDefaultVariables}
+            variableMode={variableResolutionMode}
+            onVariableModeChange={(mode) => {
+              setVariableResolutionMode(mode);
+              if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
+                setStatus({ level: 'error', text: 'The Variables preference could not be saved while disconnected.' });
+                return;
+              }
+              webSocket.send(JSON.stringify({
+                type: 'variablesWorkspace.preferences.update',
+                sessionId,
+                body: JSON.stringify({
+                  requestId: `${Date.now().toString(36)}-variable-mode`,
+                  bindingEpoch: snapshot.bindingEpoch,
+                  variableResolutionMode: mode,
+                }),
+              }));
+            }}
             onCancel={() => {
               if (pendingMutationRequestId !== null) return;
               setPendingConnections(null);

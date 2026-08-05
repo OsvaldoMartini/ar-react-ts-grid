@@ -186,11 +186,12 @@ export const useVariablesGraphMutationParent = ({
     }
     const requestId = nextRequestId();
     const compactRelationship = draft.mutationKind === 'RELATIONSHIP_UPDATE';
+    const currentLayoutById = draft.mutationKind === 'ROW_MOVE'
+      ? new Map(capability.layoutRows.map(row => [row.instructionId, row]))
+      : null;
     const compactMoveRows = draft.mutationKind === 'ROW_MOVE'
       ? draft.layoutRows.filter((row) => {
-        const current = capability.layoutRows.find(
-          candidate => candidate.instructionId === row.instructionId,
-        );
+        const current = currentLayoutById?.get(row.instructionId);
         return !current
           || current.blockId !== row.blockId
           || current.instructionOrderNumber !== row.instructionOrderNumber;
