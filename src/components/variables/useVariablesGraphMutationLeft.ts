@@ -5,13 +5,11 @@ import {
   useState,
 } from 'react';
 import {
-  INSTRUCTION_GRAPH_MUTATION_CONTRACT_VERSION,
-  isBotJobGraphMutationResponse,
   sameInstructionGraphOwner,
   type BotJobGraphMutationDraft,
   type BotJobGraphMutationErrorResponse,
   type BotJobGraphMutationSuccessResponse,
-  type InstructionGraphMutationV3Request,
+  type InstructionGraphOwnerAssertion,
 } from '../bot-job-details/grid/domain/instructionGraphMutation.contract';
 import {
   VARIABLES_MANAGER_SESSION_ID,
@@ -42,12 +40,32 @@ type Callbacks = {
 };
 
 type Pending = {
-  request: InstructionGraphMutationV3Request;
+  request: CompactLeftRequest;
   bindingEpoch: string;
   webSocket: WebSocket;
   callbacks: Callbacks;
   mutationProfile: VariablesMutationProfile;
   timeoutId: ReturnType<typeof setTimeout>;
+};
+
+type CompactLeftRequest = {
+  contractVersion: 3;
+  mutationKind: 'RELATIONSHIP_UPDATE';
+  requestId: string;
+  workspaceEpoch: number;
+  baseGraphVersion: number;
+  graphRevision: string;
+  ownerAssertion: InstructionGraphOwnerAssertion;
+  draggedInstructionId: null;
+  instructionRelationPatches: readonly [];
+  variableBindingPatches: readonly [{
+    instructionId: number;
+    slot: 'LEFT';
+    operation: 'SET' | 'CLEAR';
+    expected: { value: number | null };
+    replacement: { value: number | null };
+  }];
+  variableOwnerPatches: readonly [];
 };
 
 const DEFAULT_TIMEOUT_MS = 12_000;
@@ -70,7 +88,15 @@ const parseMutationBody = (body: unknown) => {
       return null;
     }
   }
-  return isBotJobGraphMutationResponse(value) ? value : null;
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as Record<string, unknown>;
+  return typeof candidate.ok === 'boolean'
+    && typeof candidate.requestId === 'string'
+    && typeof candidate.workspaceEpoch === 'number'
+    && candidate.ownerAssertion !== null
+    && typeof candidate.ownerAssertion === 'object'
+      ? value as BotJobGraphMutationSuccessResponse | BotJobGraphMutationErrorResponse
+      : null;
 };
 
 const parseEnvelope = (
@@ -183,19 +209,33 @@ export const useVariablesGraphMutationLeft = ({
       return null;
     }
     const requestId = nextRequestId();
-    const request: InstructionGraphMutationV3Request = {
-      contractVersion: INSTRUCTION_GRAPH_MUTATION_CONTRACT_VERSION,
-      mutationKind: draft.mutationKind,
+    if (
+      draft.instructionRelationPatches.length !== 0
+      || draft.variableOwnerPatches.length !== 0
+      || draft.variableBindingPatches.length !== 1
+    ) {
+      return null;
+    }
+    const patch = draft.variableBindingPatches[0];
+    const leftVariableId = patch.replacement.value;
+    const request: CompactLeftRequest = {
+      contractVersion: 3,
+      mutationKind: 'RELATIONSHIP_UPDATE',
       requestId,
       baseGraphVersion: capability.graphVersion,
       graphRevision: capability.graphRevision,
       workspaceEpoch: snapshot.workspaceEpoch,
       ownerAssertion: capability.ownerAssertion,
-      draggedInstructionId: draft.draggedInstructionId,
-      layoutRows: [...draft.layoutRows],
-      instructionRelationPatches: [...draft.instructionRelationPatches],
-      variableBindingPatches: [...draft.variableBindingPatches],
-      variableOwnerPatches: [...draft.variableOwnerPatches],
+      draggedInstructionId: null,
+      instructionRelationPatches: [],
+      variableBindingPatches: [{
+        instructionId: patch.instructionId,
+        slot: 'LEFT',
+        operation: leftVariableId === null ? 'CLEAR' : 'SET',
+        expected: { value: patch.expected.value },
+        replacement: { value: leftVariableId },
+      }],
+      variableOwnerPatches: [],
     };
     const timeoutId = setTimeout(() => {
       if (pendingRef.current?.request.requestId !== requestId) return;
@@ -214,11 +254,9 @@ export const useVariablesGraphMutationLeft = ({
       webSocket.send(JSON.stringify({
         type: operationType,
         sessionId: VARIABLES_MANAGER_SESSION_ID,
-        body: JSON.stringify({
-          ...request,
-          bindingEpoch: snapshot.bindingEpoch,
-          mutationProfile: selectedProfile,
-        }),
+        ...request,
+        bindingEpoch: snapshot.bindingEpoch,
+        mutationProfile: selectedProfile,
       }));
       return requestId;
     } catch (_) {

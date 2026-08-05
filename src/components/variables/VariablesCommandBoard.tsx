@@ -558,7 +558,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                   glow={false}
                   onClick={() =>
                     onResolveVisibleConnections(visibleConnectionScope)}
-                  disabled={disabled}
+                  disabled={false}
                   title={`Resolve connections for ${visibleConnectionScope.label}`}
                 />
               )}
@@ -577,7 +577,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                   glow={false}
                   onClick={() =>
                     onReleaseVisibleConnections(visibleConnectionScope)}
-                  disabled={disabled || visibleConnectionScope.visibleCount === 0}
+                  disabled={false}
                   title={`Release connections for ${visibleConnectionScope.label}`}
                 />
               )}
@@ -964,7 +964,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                                 'Reconnect parent',
                                 elementParentEdge,
                               )}
-                              disabled={disabled || !onReconnectParent}
+                              disabled={false}
                               onClick={onReconnectParent
                                 ? () => onReconnectParent(
                                     instructionId,
@@ -982,7 +982,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                                   className={styles.connectedParent}
                                   aria-label={`Parent connected, id: ${connectedParentId}`}
                                   title="Change connected Web Element"
-                                  disabled={disabled}
+                                  disabled={false}
                                   onMouseDown={event => event.stopPropagation()}
                                   onClick={(event) => {
                                     event.stopPropagation();
@@ -1039,7 +1039,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                                 structuralLabels.broken,
                                 otherParentEdge,
                               )}
-                              disabled={disabled || !onReconnectParent}
+                              disabled={false}
                               onClick={onReconnectParent
                                 ? () => onReconnectParent(
                                     instructionId,
@@ -1058,7 +1058,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                                   className={styles.connectedParent}
                                   aria-label={`Connected structural target, id: ${connectedStructuralId}`}
                                   title={structuralLabels.change}
-                                  disabled={disabled}
+                                  disabled={false}
                                   onMouseDown={event => event.stopPropagation()}
                                   onClick={(event) => {
                                     event.stopPropagation();
@@ -1116,7 +1116,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                                 'Reconnect variable',
                                 variableBindingEdge,
                               )}
-                              disabled={disabled || !onReconnectVariable}
+                              disabled={false}
                               onClick={onReconnectVariable
                                 ? () => onReconnectVariable(
                                     instructionId,
@@ -1134,7 +1134,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                                   className={`${styles.connectedVariable} ${styles.variableButton}`}
                                   aria-label={`${connectedVariableName}, id: ${connectedVariableId}`}
                                   title="Change connected variable"
-                                  disabled={disabled}
+                                  disabled={false}
                                   onMouseDown={event => event.stopPropagation()}
                                   onClick={(event) => {
                                     event.stopPropagation();
@@ -1194,7 +1194,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                             className={`${styles.connectedVariable} ${styles.variableButton}`}
                             aria-label={`${variableNamesById.get(secondCheckVariableId)?.trim() || 'Variable'}, id: ${secondCheckVariableId}`}
                             title="Change second comparison variable"
-                            disabled={disabled || !onReconnectRightVariable}
+                            disabled={false}
                             onMouseDown={event => event.stopPropagation()}
                             onClick={(event) => {
                               event.stopPropagation();
@@ -1231,7 +1231,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
                               pulse
                               iconNode={<Variable size={11} aria-hidden="true" />}
                               title="Reconnect variable 2"
-                              disabled={disabled || !onReconnectRightVariable}
+                              disabled={false}
                               onClick={onReconnectRightVariable
                                 ? () => {
                                     if (instructionId === null) return;

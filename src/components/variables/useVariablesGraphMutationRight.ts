@@ -8,8 +8,9 @@ import {
   parseVariablesWorkspaceMessage,
   type VariableWorkspaceSnapshot,
 } from '../variablesWorkspace.contract';
+import { connectedVariableSlots } from './domain/variableSlotRequirements';
 
-export const VARIABLES_GRAPH_MUTATION_RIGHT_CONTRACT_VERSION = 1 as const;
+export const VARIABLES_GRAPH_MUTATION_RIGHT_CONTRACT_VERSION = 3 as const;
 
 export type VariablesGraphMutationRightResult = {
   ok: boolean;
@@ -53,8 +54,8 @@ const nextRequestId = (): string => {
 
 /**
  * NEW variable rules step 1 (2026-08-03): submits the React-authored
- * Right_Operand connection for the given CheckValue commands. Java fills only
- * FREE right spots (slot table + config mirror) and never overwrites.
+ * Right_Operand connection for the given CheckValue commands. This WebSocket
+ * contract owns only RIGHT-slot CONNECT and DISCONNECT persistence.
  */
 export const useVariablesGraphMutationRight = ({
   webSocket,
@@ -88,8 +89,7 @@ export const useVariablesGraphMutationRight = ({
   const submit = useCallback((
     rightVariableId: number | null,
     instructionIds: readonly number[],
-    operation: 'CONNECT' | 'RELEASE' | 'UPDATE_OPERATOR' = 'CONNECT',
-    comparisonOperator?: string,
+    operation: 'CONNECT' | 'DISCONNECT' = 'CONNECT',
   ): string | null => {
     const capability = snapshot?.mutationCapability;
     if (
@@ -99,7 +99,7 @@ export const useVariablesGraphMutationRight = ({
       || !webSocket
       || webSocket.readyState !== WebSocket.OPEN
       || pendingRef.current
-      || instructionIds.length === 0
+      || instructionIds.length !== 1
     ) {
       return null;
     }
@@ -124,21 +124,32 @@ export const useVariablesGraphMutationRight = ({
     };
     setPendingRequestId(requestId);
     try {
+      const instructionId = instructionIds[0];
+      const command = snapshot.commands.find(entry => entry.id === instructionId);
+      const expectedVariableId = command
+        ? connectedVariableSlots(command).get('RIGHT') ?? null
+        : null;
       webSocket.send(JSON.stringify({
         type: operationType,
         sessionId,
-        body: JSON.stringify({
-          contractVersion: VARIABLES_GRAPH_MUTATION_RIGHT_CONTRACT_VERSION,
-          requestId,
-          bindingEpoch: snapshot.bindingEpoch,
-          workspaceEpoch: snapshot.workspaceEpoch,
-          baseGraphVersion: capability.graphVersion,
-          graphRevision: capability.graphRevision,
-          rightVariableId,
-          instructionIds,
-          operation,
-          comparisonOperator,
-        }),
+        contractVersion: 3,
+        mutationKind: 'RELATIONSHIP_UPDATE',
+        requestId,
+        bindingEpoch: snapshot.bindingEpoch,
+        workspaceEpoch: snapshot.workspaceEpoch,
+        baseGraphVersion: capability.graphVersion,
+        graphRevision: capability.graphRevision,
+        ownerAssertion: capability.ownerAssertion,
+        draggedInstructionId: null,
+        instructionRelationPatches: [],
+        variableBindingPatches: [{
+          instructionId,
+          slot: 'RIGHT',
+          operation: operation === 'DISCONNECT' ? 'CLEAR' : 'SET',
+          expected: { value: expectedVariableId },
+          replacement: { value: rightVariableId },
+        }],
+        variableOwnerPatches: [],
       }));
       return requestId;
     } catch (_) {

@@ -327,7 +327,7 @@ const InstructionRelationshipDetails: React.FC<
                 pulse
                 iconNode={<Link2 size={10} aria-hidden="true" />}
                 title={reconnectParentLabel}
-                disabled={reconnectDisabled}
+                disabled={false}
                 onClick={onReconnect && structuralParentEdge
                   ? () => onReconnect(structuralParentEdge)
                   : undefined}
@@ -348,7 +348,7 @@ const InstructionRelationshipDetails: React.FC<
                     aria-label={connectedParentText}
                     title={structuralLabels.change}
                     data-relationship-state="CONNECTED"
-                    disabled={reconnectDisabled}
+                    disabled={false}
                     onMouseDown={event => event.stopPropagation()}
                     onClick={(event) => {
                       event.stopPropagation();
@@ -390,7 +390,7 @@ const InstructionRelationshipDetails: React.FC<
                 pulse
                 iconNode={<Variable size={10} aria-hidden="true" />}
                 title={reconnectVariableLabel}
-                disabled={reconnectDisabled}
+                disabled={false}
                 onClick={onReconnect && variableBindingEdge
                   ? () => onReconnect(variableBindingEdge)
                   : undefined}
@@ -410,7 +410,7 @@ const InstructionRelationshipDetails: React.FC<
                     aria-label={connectedVariableText}
                     title="Change connected variable"
                     data-relationship-state="CONNECTED"
-                    disabled={reconnectDisabled}
+                    disabled={false}
                     onMouseDown={event => event.stopPropagation()}
                     onClick={(event) => {
                       event.stopPropagation();
@@ -443,7 +443,7 @@ const InstructionRelationshipDetails: React.FC<
               aria-label={`Comparison operator ${comparisonOperator}`}
               title="Change comparison operator"
               value={comparisonOperator}
-              disabled={reconnectDisabled || !onChangeCheckOperator}
+              disabled={false}
               onMouseDown={event => event.stopPropagation()}
               onClick={event => event.stopPropagation()}
               onChange={(event) => onChangeCheckOperator?.(event.target.value)}
@@ -463,7 +463,7 @@ const InstructionRelationshipDetails: React.FC<
               ].join(' ')}
               aria-label={secondVariableText}
               title="Change second comparison variable"
-              disabled={reconnectDisabled || !onReconnectSecondVariable}
+              disabled={false}
               onMouseDown={event => event.stopPropagation()}
               onClick={(event) => {
                 event.stopPropagation();
@@ -494,7 +494,7 @@ const InstructionRelationshipDetails: React.FC<
                 pulse
                 iconNode={<Variable size={10} aria-hidden="true" />}
                 title="Reconnect variable 2"
-                disabled={reconnectDisabled || !onReconnectSecondVariable}
+                disabled={false}
                 onClick={onReconnectSecondVariable}
               />
             </span>
@@ -533,7 +533,7 @@ const InstructionRelationshipDetails: React.FC<
                   aria-label={accessibleLabel}
                   title={accessibleLabel}
                   data-relationship-state={state}
-                  disabled={reconnectDisabled}
+                  disabled={false}
                   onMouseDown={event => event.stopPropagation()}
                   onClick={(event) => {
                     event.stopPropagation();

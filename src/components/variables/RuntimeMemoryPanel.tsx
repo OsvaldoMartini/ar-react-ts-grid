@@ -202,7 +202,7 @@ const RuntimeMemoryRow: React.FC<RuntimeMemoryRowProps> = ({
           className={styles.deleteButton}
           aria-label={`Delete variable ${item.name || item.variableId}`}
           title={`Delete variable ID ${item.variableId}`}
-          disabled={deleteDisabled || deleting || !onRequestDelete}
+          disabled={false}
           onClick={() => onRequestDelete?.(item.variableId)}
         >
           <X size={14} aria-hidden="true" />
@@ -275,7 +275,7 @@ const RuntimeMemoryPanel: React.FC<RuntimeMemoryPanelProps> = ({
           animate={false}
           title="Define a new Bot Job variable"
           onClick={() => onRequestAdd?.()}
-          disabled={disabled || clearingValues || !onRequestAdd}
+          disabled={false}
         />
         <RulesCard
           event={{
@@ -290,12 +290,7 @@ const RuntimeMemoryPanel: React.FC<RuntimeMemoryPanelProps> = ({
           iconNode={<Eraser size={12} aria-hidden="true" />}
           title="Reset every runtime value to VOID without deleting variables"
           onClick={() => onRequestClearAll?.()}
-          disabled={
-            disabled
-            || clearingValues
-            || items.length === 0
-            || !onRequestClearAll
-          }
+          disabled={false}
         />
         <RulesCard
           event={{
@@ -310,13 +305,7 @@ const RuntimeMemoryPanel: React.FC<RuntimeMemoryPanelProps> = ({
           iconNode={<Trash2 size={12} aria-hidden="true" />}
           title="Delete all variables from this Bot Job"
           onClick={() => onRequestDeleteAll?.()}
-          disabled={
-            deleteDisabled
-            || clearingValues
-            || items.length === 0
-            || !onRequestDeleteAll
-            || (deletingVariableIds?.size ?? 0) > 0
-          }
+          disabled={false}
         />
       </div>
 

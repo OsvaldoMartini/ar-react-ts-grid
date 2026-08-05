@@ -251,13 +251,9 @@ const VariablesConnectionsModal: React.FC<
     () => resolveConnectionsWorkloads(visibleItems),
     [visibleItems],
   );
-  const hasRedVariable = workloads.variableItems.some(
-    item => item.stateTone === 'red',
-  );
   // The red Parents/Vars button is ALWAYS clickable - even when nothing is
   // resolvable yet, it triggers the CheckValue default-variable creation.
-  const confirmDisabled = pending
-    || (confirmCount === 0 && !(mode === 'RESOLVE' && hasRedVariable));
+  const confirmDisabled = false;
 
   const confirmEvent = useMemo<RulesCardEvent>(() => (
     mode === 'RESOLVE'
@@ -372,7 +368,7 @@ const VariablesConnectionsModal: React.FC<
             className={styles.closeButton}
             aria-label={`Cancel ${title.toLocaleLowerCase()}`}
             title="Cancel"
-            disabled={pending}
+            disabled={false}
             onClick={cancel}
           >
             <X size={18} aria-hidden="true" />
@@ -420,7 +416,7 @@ const VariablesConnectionsModal: React.FC<
               setLocalBlockFilters(values);
               onBlockFiltersChange?.(values);
             }}
-            disabled={pending}
+            disabled={false}
           />
           {!resolving && (
             <p className={styles.releaseSummary}>
@@ -479,7 +475,7 @@ const VariablesConnectionsModal: React.FC<
                         headerRight={item.state}
                         countLabel={count =>
                           `${count} COMPATIBLE OPTION${count === 1 ? '' : 'S'}`}
-                        disabled={pending}
+                        disabled={false}
                       />
                       {options.length === 0 && (
                         <p className={styles.emptyState} role="status">
@@ -511,7 +507,7 @@ const VariablesConnectionsModal: React.FC<
           <button
             type="button"
             className={styles.cancelButton}
-            disabled={pending}
+            disabled={false}
             onClick={cancel}
           >
             Cancel

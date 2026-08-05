@@ -205,10 +205,10 @@ const ReconnectWebElement: React.FC<
   }), [pending]);
 
   const cancel = () => {
-    if (!pending) onCancel();
+    onCancel();
   };
   const handleConnect = () => {
-    if (!pending && selectedOption) onConnect(selectedOption.target);
+    if (selectedOption) onConnect(selectedOption.target);
   };
   const handleDialogKeyDown = (
     event: React.KeyboardEvent<HTMLElement>,
@@ -276,7 +276,7 @@ const ReconnectWebElement: React.FC<
               className={styles.closeButton}
               aria-label="Cancel reconnect"
               title="Cancel"
-              disabled={pending}
+              disabled={false}
               onClick={cancel}
             >
               <X size={18} aria-hidden="true" />
@@ -324,7 +324,7 @@ const ReconnectWebElement: React.FC<
             headerRight={copy.relationLabel}
             countLabel={count =>
               `${count} COMPATIBLE TARGET${count === 1 ? '' : 'S'}`}
-            disabled={pending}
+            disabled={false}
           />
           {compatibleTargets.length === 0 && (
             <p className={styles.emptyState} role="status">
@@ -345,7 +345,7 @@ const ReconnectWebElement: React.FC<
               animate={false}
               pulse={false}
               onClick={onDisconnect}
-              disabled={pending || !actionsEnabled}
+              disabled={false}
               title={actionsEnabled
                 ? 'Remove the current relationship'
                 : actionDisabledTitle}
@@ -355,7 +355,7 @@ const ReconnectWebElement: React.FC<
           <button
             type="button"
             className={styles.cancelButton}
-            disabled={pending}
+            disabled={false}
             onClick={cancel}
           >
             Cancel
@@ -366,11 +366,7 @@ const ReconnectWebElement: React.FC<
               animate={false}
               pulse={false}
               onClick={handleConnect}
-              disabled={
-                pending
-                || !actionsEnabled
-                || selectedOption === null
-              }
+              disabled={false}
               title={actionsEnabled
                 ? 'Save the selected relationship'
                 : actionDisabledTitle}

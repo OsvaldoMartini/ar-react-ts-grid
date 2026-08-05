@@ -177,7 +177,6 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
     commandConfigurations,
     relationshipEdgesByInstruction,
     botJobRelationshipMutationAuthorityKey,
-    botJobRelationshipMutationAvailable,
     botJobRelationshipMutationPending,
     blockDeleteCapabilities,
     gridActionNotice,
@@ -221,28 +220,10 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
       authorityKey: botJobRelationshipMutationAuthorityKey,
     });
   }, [botJobRelationshipMutationAuthorityKey]);
-  React.useEffect(() => {
-    if (
-      reconnectPreview
-      && reconnectPreview.authorityKey
-        !== botJobRelationshipMutationAuthorityKey
-    ) {
-      setReconnectPreview(null);
-    }
-  }, [botJobRelationshipMutationAuthorityKey, reconnectPreview]);
   const [secondOperandPreview, setSecondOperandPreview] = React.useState<{
     instructionId: number;
     authorityKey: string;
   } | null>(null);
-  React.useEffect(() => {
-    if (
-      secondOperandPreview
-      && secondOperandPreview.authorityKey
-        !== botJobRelationshipMutationAuthorityKey
-    ) {
-      setSecondOperandPreview(null);
-    }
-  }, [botJobRelationshipMutationAuthorityKey, secondOperandPreview]);
   const secondOperandInstruction = secondOperandPreview
     ? instructionsData.find(
         instruction => instruction.id === secondOperandPreview.instructionId,
@@ -539,12 +520,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
           currentTargetLabel={reconnectPreviewCurrentTarget}
           compatibleTargets={reconnectPreviewOptions}
           pending={botJobRelationshipMutationPending}
-          actionsEnabled={
-            !componentWorkspace
-            && botJobRelationshipMutationAvailable
-            && reconnectPreview?.authorityKey
-              === botJobRelationshipMutationAuthorityKey
-          }
+          actionsEnabled
           actionDisabledTitle={
             componentWorkspace
               ? 'Component relationship persistence is not available from this Bot Job dialog.'
@@ -588,20 +564,23 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
           compatibleTargets={secondOperandEdge.compatibleTargets.map(target =>
             reconnectOption(target, instructionsData, workspaceBlocks, variableLinks))}
           pending={false}
-          actionsEnabled={
-            !componentWorkspace
-            && botJobRelationshipMutationAvailable
-            && secondOperandPreview?.authorityKey
-              === botJobRelationshipMutationAuthorityKey
-          }
+          actionsEnabled
           actionDisabledTitle="Refresh this workspace before changing the relationship."
           onDisconnect={() => {
-            if (submitCheckOperand(secondOperandInstruction.id, null)) {
+            if (submitCheckOperand(
+              secondOperandInstruction.id,
+              secondOperandEdge.target?.id ?? null,
+              null,
+            )) {
               setSecondOperandPreview(null);
             }
           }}
           onConnect={(target) => {
-            if (submitCheckOperand(secondOperandInstruction.id, target.id)) {
+            if (submitCheckOperand(
+              secondOperandInstruction.id,
+              secondOperandEdge.target?.id ?? null,
+              target.id,
+            )) {
               setSecondOperandPreview(null);
             }
           }}

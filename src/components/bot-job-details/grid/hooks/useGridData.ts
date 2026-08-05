@@ -410,11 +410,60 @@ export function useGridData(deps: UseGridDataDeps) {
   const botJobRelationshipMutationAvailable =
     botJobRelationshipMutationAuthorityKey !== null;
   const pendingCheckOperandRequestRef = useRef<string | null>(null);
+  const pendingCheckLeftRequestRef = useRef<{
+    requestId: string;
+    callbacks: InstructionRelationshipMutationCallbacks;
+  } | null>(null);
+  const submitCheckLeftOperand = useCallback((
+    instructionId: number,
+    expectedVariableId: number | null,
+    variableId: number | null,
+    callbacks: InstructionRelationshipMutationCallbacks,
+  ): boolean => {
+    if (
+      workspaceKind !== 'BOT_JOB'
+      || !webSocket
+      || !connected
+      || webSocket.readyState !== WebSocket.OPEN
+      || !botJobGraphMutationCapability
+      || pendingCheckLeftRequestRef.current !== null
+    ) {
+      return false;
+    }
+    const requestId = `${Date.now()}-${instructionId}-grid-left-operand`;
+    pendingCheckLeftRequestRef.current = { requestId, callbacks };
+    webSocket.send(JSON.stringify({
+      type: 'variablesWorkspace.graphMutationLeft',
+      sessionId,
+      contractVersion: 3,
+      mutationKind: 'RELATIONSHIP_UPDATE',
+      requestId,
+      baseGraphVersion: botJobGraphMutationCapability.graphVersion,
+      graphRevision: botJobGraphMutationCapability.graphRevision,
+      workspaceEpoch: botJobGraphMutationCapability.workspaceEpoch,
+      ownerAssertion: botJobGraphMutationCapability.ownerAssertion,
+      draggedInstructionId: null,
+      instructionRelationPatches: [],
+      variableBindingPatches: [{
+        instructionId,
+        slot: 'LEFT',
+        operation: variableId === null ? 'CLEAR' : 'SET',
+        expected: { value: expectedVariableId },
+        replacement: { value: variableId },
+      }],
+      variableOwnerPatches: [],
+    }));
+    return true;
+  }, [
+    workspaceKind, webSocket, connected, botJobGraphMutationCapability,
+    sessionId, homeBankingId, botJobId, targetSessionId,
+  ]);
   // CHECKVALUE second comparison variable (typed right operand). GridItem owns an
   // independent variablesWorkspace.graphMutationRight call authorized by its current
-  // Bot Job graph capability. The backend persists the RIGHT slot and config mirror.
+  // Bot Job graph capability. The backend persists only the independent RIGHT slot.
   const submitCheckOperand = useCallback((
     instructionId: number,
+    expectedVariableId: number | null,
     operandVariableId: number | null,
   ): boolean => {
     if (
@@ -431,20 +480,23 @@ export function useGridData(deps: UseGridDataDeps) {
     webSocket.send(JSON.stringify({
       type: 'variablesWorkspace.graphMutationRight',
       sessionId,
-      homeBankingId,
-      body: JSON.stringify({
-        contractVersion: 1,
-        requestId,
-        targetSessionId,
-        botJobId,
-        homeBankingId,
-        workspaceEpoch: botJobGraphMutationCapability.workspaceEpoch,
-        baseGraphVersion: botJobGraphMutationCapability.graphVersion,
-        graphRevision: botJobGraphMutationCapability.graphRevision,
-        rightVariableId: operandVariableId,
-        instructionIds: [instructionId],
-        operation: operandVariableId === null ? 'RELEASE' : 'CONNECT',
-      }),
+      contractVersion: 3,
+      mutationKind: 'RELATIONSHIP_UPDATE',
+      requestId,
+      baseGraphVersion: botJobGraphMutationCapability.graphVersion,
+      graphRevision: botJobGraphMutationCapability.graphRevision,
+      workspaceEpoch: botJobGraphMutationCapability.workspaceEpoch,
+      ownerAssertion: botJobGraphMutationCapability.ownerAssertion,
+      draggedInstructionId: null,
+      instructionRelationPatches: [],
+      variableBindingPatches: [{
+        instructionId,
+        slot: 'RIGHT',
+        operation: operandVariableId === null ? 'CLEAR' : 'SET',
+        expected: { value: expectedVariableId },
+        replacement: { value: operandVariableId },
+      }],
+      variableOwnerPatches: [],
     }));
     return true;
   }, [
@@ -527,6 +579,13 @@ export function useGridData(deps: UseGridDataDeps) {
       instructionsData,
     );
     if (!mutation.ok) {
+      // Parked for possible future use. Real-time relationship updates make the
+      // NO_CHANGE informational modal unnecessary in the current workflow.
+      const showRelationshipNotChangedAlert = false;
+      if (mutation.code === 'NO_CHANGE' && !showRelationshipNotChangedAlert) {
+        callbacks.settled?.();
+        return true;
+      }
       setAlertImage(forbiddenImage);
       setAlertClass('construction-image');
       setAlertMessageHeader(
@@ -542,6 +601,22 @@ export function useGridData(deps: UseGridDataDeps) {
       setAlertAlternateAction(undefined);
       setErrorFlag(mutation.code !== 'NO_CHANGE');
       return false;
+    }
+
+    if (edge.kind === 'VARIABLE_BINDING') {
+      const patch = mutation.draft.variableBindingPatches[0];
+      const instruction = patch
+        ? instructionsData.find(row => row.id === patch.instructionId)
+        : null;
+      const action = String(instruction?.actions || '').trim().toUpperCase();
+      if (patch && ['CK', 'CHECKVALUE', 'CSV CHECK', 'PDF CHECK'].includes(action)) {
+        return submitCheckLeftOperand(
+          patch.instructionId,
+          patch.expected.value,
+          patch.replacement.value,
+          callbacks,
+        );
+      }
     }
 
     const requestId = submitBotJobGraphMutation(mutation.draft, {
@@ -583,13 +658,7 @@ export function useGridData(deps: UseGridDataDeps) {
         setAlertAlternateAction(undefined);
         setErrorFlag(true);
       },
-    }, edge.kind === 'VARIABLE_BINDING'
-      ? {
-          operationType: 'variablesWorkspace.graphMutationLeft',
-          responseType: 'variablesWorkspace.graphMutationLeftResponse',
-          sessionId: 'botJobTasks',
-        }
-      : undefined);
+    });
     if (!requestId) {
       setAlertImage(forbiddenImage);
       setAlertClass('construction-image');
@@ -617,6 +686,7 @@ export function useGridData(deps: UseGridDataDeps) {
     setAlertOnConfirm,
     setErrorFlag,
     submitBotJobGraphMutation,
+    submitCheckLeftOperand,
     workspaceKind,
   ]);
 
@@ -1238,6 +1308,31 @@ export function useGridData(deps: UseGridDataDeps) {
               || 'The comparison operator was not saved.',
             ));
             setAlertMessageFooter('The current comparison operator remains unchanged.');
+            setAlertOnConfirm(undefined);
+            setAlertAlternateAction(undefined);
+            setErrorFlag(true);
+          }
+        } else if (sessionId === parsedMessage.sessionId
+          && parsedMessage.operationId === "variablesWorkspace.graphMutationLeftResponse") {
+          const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
+          const pendingLeft = pendingCheckLeftRequestRef.current;
+          if (!pendingLeft || String(bodyData?.requestId || '') !== pendingLeft.requestId) return;
+          pendingCheckLeftRequestRef.current = null;
+          pendingLeft.callbacks.settled?.();
+          if (bodyData?.ok === true) {
+            setBotJobGraphMutationCapability(current => current
+              ? {
+                  ...current,
+                  graphVersion: Number(bodyData.committedGraphVersion),
+                  graphRevision: String(bodyData.graphRevision),
+                }
+              : current);
+          } else {
+            setAlertImage(forbiddenImage);
+            setAlertClass('construction-image');
+            setAlertMessageHeader('Variable 1 Not Saved');
+            setAlertMessageBody(String(bodyData?.message || 'The LEFT variable was not saved.'));
+            setAlertMessageFooter('The current LEFT variable remains unchanged.');
             setAlertOnConfirm(undefined);
             setAlertAlternateAction(undefined);
             setErrorFlag(true);

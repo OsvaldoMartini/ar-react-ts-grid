@@ -1157,61 +1157,6 @@ const VariablesPage: React.FC<Props> = ({
     onResult: handleCommandDeleteResult,
   });
 
-  const handleGraphMutationRightResult = useCallback((
-    result: VariablesGraphMutationRightResult,
-  ) => {
-    if (!result.ok && checkOperandIntentRef.current?.kind === 'RESOLVE_CHECKVALUES') {
-      checkOperandIntentRef.current = null;
-      checkOperandAttemptsRef.current = 0;
-    }
-    if (!result.ok && releaseSequenceRef.current?.phase === 'RIGHT') {
-      releaseSequenceRef.current = null;
-    }
-    setStatus({
-      level: result.ok ? 'ok' : 'error',
-      text: result.ok
-        ? result.message || 'CheckValue right operands connected.'
-        : result.error || 'The right-operand connection was refused.',
-    });
-  }, []);
-
-  const {
-    pendingRequestId: pendingCheckValueRightRequestId,
-    submit: submitCheckValueRight,
-    handleMessage: handleCheckValueRightMessage,
-  } = useVariablesGraphMutationRight({
-    webSocket,
-    connected,
-    sessionId,
-    snapshot,
-    operationType: 'variablesWorkspace.graphMutationRight',
-    responseType: 'variablesWorkspace.graphMutationRightResponse',
-    onResult: handleGraphMutationRightResult,
-  });
-
-  // Middle-shim dropdown (2026-08-04, user order): a direct, single-command
-  // action - independent of the RESOLVE/RELEASE auto driver above. Never
-  // touches operand connectivity; Java updates only comparison_operator.
-  const changeCheckOperator = useCallback((
-    instructionId: number,
-    comparisonOperator: string,
-  ) => {
-    const requestId = submitCheckValueRight(
-      null, [instructionId], 'UPDATE_OPERATOR', comparisonOperator,
-    );
-    if (!requestId) {
-      setStatus({
-        level: 'error',
-        text: 'Variables is busy, disconnected, or read-only. The operator was not changed.',
-      });
-      return;
-    }
-    setStatus({
-      level: 'warn',
-      text: `Updating the comparison operator for command #${instructionId}...`,
-    });
-  }, [submitCheckValueRight]);
-
   const handleInstructionStatusResult = useCallback((
     result: VariablesInstructionStatusResult,
   ) => {
@@ -1301,6 +1246,41 @@ const VariablesPage: React.FC<Props> = ({
     return true;
   }, [clearPendingRequest, sessionId, webSocket]);
 
+  const handleGraphMutationRightResult = useCallback((
+    result: VariablesGraphMutationRightResult,
+  ) => {
+    if (!result.ok && checkOperandIntentRef.current?.kind === 'RESOLVE_CHECKVALUES') {
+      checkOperandIntentRef.current = null;
+      checkOperandAttemptsRef.current = 0;
+    }
+    if (!result.ok && releaseSequenceRef.current?.phase === 'RIGHT') {
+      releaseSequenceRef.current = null;
+    }
+    setStatus({
+      level: result.ok ? 'ok' : 'error',
+      text: result.ok
+        ? result.message || 'CheckValue right operand changed.'
+        : result.error || 'The right-operand connection was refused.',
+    });
+    if (result.ok) {
+      sendWorkspaceRequest('variablesWorkspace.refresh');
+    }
+  }, [sendWorkspaceRequest]);
+
+  const {
+    pendingRequestId: pendingCheckValueRightRequestId,
+    submit: submitCheckValueRight,
+    handleMessage: handleCheckValueRightMessage,
+  } = useVariablesGraphMutationRight({
+    webSocket,
+    connected,
+    sessionId,
+    snapshot,
+    operationType: 'variablesWorkspace.graphMutationRight',
+    responseType: 'variablesWorkspace.graphMutationRightResponse',
+    onResult: handleGraphMutationRightResult,
+  });
+
   const handleInstructionCopyResult = useCallback((
     result: VariablesInstructionCopyResult,
   ) => {
@@ -1357,6 +1337,60 @@ const VariablesPage: React.FC<Props> = ({
     snapshot,
     onResult: handleCommandUpdateResult,
   });
+
+  // Operator edits use the command-update contract. graphMutationRight remains
+  // exclusively responsible for CHECKVALUE RIGHT-slot connect/disconnect.
+  const changeCheckOperator = useCallback((
+    instructionId: number,
+    comparisonOperator: string,
+  ) => {
+    const current = snapshotRef.current;
+    const command = current?.commands.find(entry => entry.id === instructionId);
+    if (!command || command.blockId === null) {
+      setStatus({ level: 'error', text: 'The CheckValue command is not available.' });
+      return;
+    }
+    const configuration = commandEditorConfiguration(
+      command.command,
+      command.operation,
+      command.onHoldSeconds ?? null,
+      command.commandConfiguration ?? null,
+      command.variableId ?? null,
+    );
+    if (configuration.kind !== 'CHECK_VALUE' && configuration.kind !== 'EXTERNAL_CHECK') {
+      setStatus({ level: 'error', text: 'The selected command is not a CheckValue.' });
+      return;
+    }
+    const requestId = submitCommandUpdate({
+      action: 'UPDATE',
+      sourceInstructionId: instructionId,
+      targetBlockId: command.blockId,
+      placement: { kind: 'KEEP' },
+      draft: {
+        name: command.name,
+        action: command.command,
+        operation: command.operation,
+        configuration: {
+          ...configuration,
+          operator: comparisonOperator as typeof configuration.operator,
+        },
+      },
+      allowRelationshipDisconnect: false,
+      allowConditionalFamilyDissolve: false,
+      conditionalFamilyDeleteIds: [],
+    });
+    if (!requestId) {
+      setStatus({
+        level: 'error',
+        text: 'Variables is busy, disconnected, or read-only. The operator was not changed.',
+      });
+      return;
+    }
+    setStatus({
+      level: 'warn',
+      text: `Updating the comparison operator for command #${instructionId}...`,
+    });
+  }, [submitCommandUpdate]);
 
   const handleCommandCopyResult = useCallback((
     result: VariablesCommandCopyResult,
@@ -2326,6 +2360,53 @@ const VariablesPage: React.FC<Props> = ({
       setStatus({ level: 'error', text: built.message });
       return;
     }
+    const sourceCommand = current.commands.find(
+      command => command.id === pending.plan.sourceInstructionId,
+    );
+    const isCheckValueLeft = pending.plan.relationKind === 'VARIABLE_BINDING'
+      && Boolean(sourceCommand
+        && requiredVariableSlots(sourceCommand.command).includes('RIGHT'));
+    if (isCheckValueLeft) {
+      const disconnecting = target === null;
+      setStatus({
+        level: 'warn',
+        text: disconnecting
+          ? 'Disconnecting left comparison variable...'
+          : 'Connecting left comparison variable...',
+      });
+      const requestId = submitCheckValueLeft(
+        built.draft,
+        {
+          committed: response => {
+            setPendingReconnect(null);
+            setStatus({
+              level: 'ok',
+              text: response.message || (disconnecting
+                ? 'Left comparison variable disconnected.'
+                : 'Left comparison variable connected.'),
+            });
+            sendWorkspaceRequest('variablesWorkspace.refresh');
+          },
+          refused: (response, reason) => {
+            setPendingReconnect(null);
+            setStatus({
+              level: 'error',
+              text: response?.message
+                || `The left comparison variable was not changed (${reason}).`,
+            });
+          },
+        },
+        built.mutationProfile,
+      );
+      if (!requestId) {
+        setPendingReconnect(null);
+        setStatus({
+          level: 'error',
+          text: 'Variables is busy or disconnected. The left comparison variable was not changed.',
+        });
+      }
+      return;
+    }
     submitVariablesMutation(
       built.draft,
       built.mutationProfile,
@@ -2337,6 +2418,8 @@ const VariablesPage: React.FC<Props> = ({
     );
   }, [
     pendingReconnect,
+    sendWorkspaceRequest,
+    submitCheckValueLeft,
     submitVariablesMutation,
   ]);
 
@@ -2895,7 +2978,7 @@ const VariablesPage: React.FC<Props> = ({
       if (checkOperandAttemptsRef.current > 8) finish('error', text);
     };
     if (intent.kind === 'RELEASE') {
-      const requestId = submitCheckValueRight(null, intent.instructionIds, 'RELEASE');
+      const requestId = submitCheckValueRight(null, intent.instructionIds, 'DISCONNECT');
       if (requestId) {
         checkOperandIntentRef.current = null;
         checkOperandAttemptsRef.current = 0;
@@ -3246,7 +3329,7 @@ const VariablesPage: React.FC<Props> = ({
         return;
       }
       run.awaitingInstructionId = next.id;
-      const requestId = submitCheckValueRight(null, [next.id], 'RELEASE');
+      const requestId = submitCheckValueRight(null, [next.id], 'DISCONNECT');
       if (!requestId) releaseSequenceRef.current = null;
       return;
     }
@@ -4274,7 +4357,7 @@ const VariablesPage: React.FC<Props> = ({
               const requestId = submitCheckValueRight(
                 null,
                 [rightVariableReconnectInstruction.id],
-                'RELEASE',
+                'DISCONNECT',
               );
               if (requestId) setRightVariableReconnectInstructionId(null);
             }}
