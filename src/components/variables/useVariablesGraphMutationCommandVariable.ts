@@ -11,13 +11,14 @@ import {
   type BotJobGraphMutationDraft,
   type BotJobGraphMutationErrorResponse,
   type BotJobGraphMutationSuccessResponse,
-  type InstructionGraphMutationV3Request,
+  type InstructionGraphOwnerAssertion,
 } from '../bot-job-details/grid/domain/instructionGraphMutation.contract';
 import {
   VARIABLES_MANAGER_SESSION_ID,
   type VariableWorkspaceSnapshot,
   type VariablesMutationProfile,
 } from '../variablesWorkspace.contract';
+import { requiredVariableSlots } from './domain/variableSlotRequirements';
 
 export const VARIABLES_GRAPH_MUTATION_TYPE =
   'variablesWorkspace.graphMutationCommandVariable' as const;
@@ -42,12 +43,32 @@ type Callbacks = {
 };
 
 type Pending = {
-  request: InstructionGraphMutationV3Request;
+  request: CompactCommandVariableRequest;
   bindingEpoch: string;
   webSocket: WebSocket;
   callbacks: Callbacks;
   mutationProfile: VariablesMutationProfile;
   timeoutId: ReturnType<typeof setTimeout>;
+};
+
+type CompactCommandVariableRequest = {
+  contractVersion: 3;
+  mutationKind: 'RELATIONSHIP_UPDATE';
+  requestId: string;
+  baseGraphVersion: number;
+  graphRevision: string;
+  workspaceEpoch: number;
+  ownerAssertion: InstructionGraphOwnerAssertion;
+  draggedInstructionId: null;
+  instructionRelationPatches: readonly [];
+  variableBindingPatches: ReadonlyArray<{
+    instructionId: number;
+    slot: 'GET_WRITE' | 'READ_SET' | 'READ';
+    operation: 'SET' | 'CLEAR';
+    expected: { value: number | null };
+    replacement: { value: number | null };
+  }>;
+  variableOwnerPatches: readonly [];
 };
 
 const DEFAULT_TIMEOUT_MS = 12_000;
@@ -183,19 +204,45 @@ export const useVariablesGraphMutationCommandVariable = ({
       return null;
     }
     const requestId = nextRequestId();
-    const request: InstructionGraphMutationV3Request = {
+    if (
+      draft.mutationKind !== 'RELATIONSHIP_UPDATE'
+      || draft.draggedInstructionId !== null
+      || draft.instructionRelationPatches.length !== 0
+      || draft.variableBindingPatches.length === 0
+      || draft.variableOwnerPatches.length !== 0
+    ) {
+      return null;
+    }
+    const compactPatches = draft.variableBindingPatches.flatMap((patch) => {
+      const command = snapshot.commands.find(entry => entry.id === patch.instructionId);
+      const slots = command
+        ? requiredVariableSlots(command.command).filter(
+            slot => slot !== 'LEFT' && slot !== 'RIGHT',
+          )
+        : [];
+      if (slots.length !== 1) return [];
+      const replacementVariableId = patch.replacement.value;
+      return [{
+        instructionId: patch.instructionId,
+        slot: slots[0] as 'GET_WRITE' | 'READ_SET' | 'READ',
+        operation: replacementVariableId === null ? 'CLEAR' as const : 'SET' as const,
+        expected: { value: patch.expected.value },
+        replacement: { value: replacementVariableId },
+      }];
+    });
+    if (compactPatches.length !== draft.variableBindingPatches.length) return null;
+    const request: CompactCommandVariableRequest = {
       contractVersion: INSTRUCTION_GRAPH_MUTATION_CONTRACT_VERSION,
-      mutationKind: draft.mutationKind,
+      mutationKind: 'RELATIONSHIP_UPDATE',
       requestId,
       baseGraphVersion: capability.graphVersion,
       graphRevision: capability.graphRevision,
       workspaceEpoch: snapshot.workspaceEpoch,
       ownerAssertion: capability.ownerAssertion,
-      draggedInstructionId: draft.draggedInstructionId,
-      layoutRows: [...draft.layoutRows],
-      instructionRelationPatches: [...draft.instructionRelationPatches],
-      variableBindingPatches: [...draft.variableBindingPatches],
-      variableOwnerPatches: [...draft.variableOwnerPatches],
+      draggedInstructionId: null,
+      instructionRelationPatches: [],
+      variableBindingPatches: compactPatches,
+      variableOwnerPatches: [],
     };
     const timeoutId = setTimeout(() => {
       if (pendingRef.current?.request.requestId !== requestId) return;
@@ -214,11 +261,9 @@ export const useVariablesGraphMutationCommandVariable = ({
       webSocket.send(JSON.stringify({
         type: operationType,
         sessionId: VARIABLES_MANAGER_SESSION_ID,
-        body: JSON.stringify({
-          ...request,
-          bindingEpoch: snapshot.bindingEpoch,
-          mutationProfile: selectedProfile,
-        }),
+        ...request,
+        bindingEpoch: snapshot.bindingEpoch,
+        mutationProfile: selectedProfile,
       }));
       return requestId;
     } catch (_) {

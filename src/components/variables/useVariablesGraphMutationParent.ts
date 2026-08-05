@@ -42,13 +42,15 @@ type Callbacks = {
 };
 
 type Pending = {
-  request: InstructionGraphMutationV3Request;
+  request: InstructionGraphMutationV3Request | CompactParentRequest;
   bindingEpoch: string;
   webSocket: WebSocket;
   callbacks: Callbacks;
   mutationProfile: VariablesMutationProfile;
   timeoutId: ReturnType<typeof setTimeout>;
 };
+
+type CompactParentRequest = Omit<InstructionGraphMutationV3Request, 'layoutRows'>;
 
 const DEFAULT_TIMEOUT_MS = 12_000;
 let sequence = 0;
@@ -183,7 +185,19 @@ export const useVariablesGraphMutationParent = ({
       return null;
     }
     const requestId = nextRequestId();
-    const request: InstructionGraphMutationV3Request = {
+    const compactRelationship = draft.mutationKind === 'RELATIONSHIP_UPDATE';
+    if (
+      compactRelationship
+      && (
+        draft.draggedInstructionId !== null
+        || draft.instructionRelationPatches.length === 0
+        || draft.variableBindingPatches.length !== 0
+        || draft.variableOwnerPatches.length !== 0
+      )
+    ) {
+      return null;
+    }
+    const request: InstructionGraphMutationV3Request | CompactParentRequest = {
       contractVersion: INSTRUCTION_GRAPH_MUTATION_CONTRACT_VERSION,
       mutationKind: draft.mutationKind,
       requestId,
@@ -192,7 +206,7 @@ export const useVariablesGraphMutationParent = ({
       workspaceEpoch: snapshot.workspaceEpoch,
       ownerAssertion: capability.ownerAssertion,
       draggedInstructionId: draft.draggedInstructionId,
-      layoutRows: [...draft.layoutRows],
+      ...(compactRelationship ? {} : { layoutRows: [...draft.layoutRows] }),
       instructionRelationPatches: [...draft.instructionRelationPatches],
       variableBindingPatches: [...draft.variableBindingPatches],
       variableOwnerPatches: [...draft.variableOwnerPatches],
@@ -214,11 +228,9 @@ export const useVariablesGraphMutationParent = ({
       webSocket.send(JSON.stringify({
         type: operationType,
         sessionId: VARIABLES_MANAGER_SESSION_ID,
-        body: JSON.stringify({
-          ...request,
-          bindingEpoch: snapshot.bindingEpoch,
-          mutationProfile: selectedProfile,
-        }),
+        ...request,
+        bindingEpoch: snapshot.bindingEpoch,
+        mutationProfile: selectedProfile,
       }));
       return requestId;
     } catch (_) {
