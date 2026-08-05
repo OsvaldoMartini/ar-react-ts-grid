@@ -181,16 +181,14 @@ export const useVariablesDelete = ({
       webSocket.send(JSON.stringify({
         type: VARIABLES_DELETE_OPERATION,
         sessionId,
-        body: JSON.stringify({
-          contractVersion: VARIABLES_DELETE_CONTRACT_VERSION,
-          requestId,
-          bindingEpoch: snapshot.bindingEpoch,
-          workspaceEpoch: snapshot.workspaceEpoch,
-          baseGraphVersion: capability.graphVersion,
-          graphRevision: capability.graphRevision,
-          mode,
-          variableIds,
-        }),
+        contractVersion: VARIABLES_DELETE_CONTRACT_VERSION,
+        requestId,
+        bindingEpoch: snapshot.bindingEpoch,
+        workspaceEpoch: snapshot.workspaceEpoch,
+        baseGraphVersion: capability.graphVersion,
+        graphRevision: capability.graphRevision,
+        mode,
+        variableIds: mode === 'ALL' ? [] : variableIds,
       }));
       return requestId;
     } catch (_) {
