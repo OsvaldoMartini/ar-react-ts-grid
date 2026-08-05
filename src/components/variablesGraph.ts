@@ -61,6 +61,7 @@ interface RawCommand {
   active: boolean | null;
   blockActive: boolean | null;
   commandConfiguration: Raw | null;
+  variableSlots: Array<{ slot: string; variableId: number }>;
 }
 
 interface RawVariable {
@@ -94,6 +95,16 @@ const parseRawCommand = (value: unknown): RawCommand | null => {
   const id = intOrNull(raw.instructionId);
   const variableId = intOrNull(raw.variableId);
   if (id === null) return null;
+  const variableSlots = Array.isArray(raw.variableSlots)
+    ? raw.variableSlots.flatMap((value: unknown) => {
+        const slot = asObject(value);
+        const slotName = text(slot?.slot).trim();
+        const slotVariableId = intOrNull(slot?.variableId);
+        return slotName && slotVariableId !== null && slotVariableId > 0
+          ? [{ slot: slotName, variableId: slotVariableId }]
+          : [];
+      })
+    : [];
   return {
     id,
     name: text(raw.instructionName),
@@ -112,6 +123,7 @@ const parseRawCommand = (value: unknown): RawCommand | null => {
     active: boolOrNull(raw.active),
     blockActive: boolOrNull(raw.blockActive),
     commandConfiguration: asObject(raw.commandConfiguration),
+    variableSlots,
   };
 };
 
@@ -181,6 +193,7 @@ const commandJson = (command: RawCommand, commandRole: string): Raw => ({
   blockActive: command.blockActive,
   effectiveActive: isEffectivelyActive(command),
   commandConfiguration: command.commandConfiguration,
+  variableSlots: command.variableSlots,
 });
 
 /**
