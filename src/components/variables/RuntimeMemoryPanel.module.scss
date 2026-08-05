@@ -47,20 +47,33 @@
 }
 
 .helpButton {
-  width: 24px;
-  height: 24px;
-  display: inline-grid;
-  place-items: center;
+  width: 25px;
+  height: 25px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 0;
-  border: 1px solid #5d8fc2;
-  border-radius: 50%;
-  background: #eaf3fc;
-  color: #0b5394;
+  border: 0;
+  border-radius: 9999px;
+  background: #2e75b6;
+  box-shadow: 0 3px 10px rgba(11, 83, 148, 0.26);
+  color: #ffffff;
   cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 900;
+  line-height: 1;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
 
 .helpButton:hover {
-  background: #d8ebff;
+  background: #0b5394;
+  box-shadow: 0 5px 14px rgba(11, 83, 148, 0.38);
+  transform: translateY(-1px);
+}
+
+.helpButton:focus-visible {
+  outline: 2px solid #0b5394;
+  outline-offset: 2px;
 }
 
 .eyebrow {

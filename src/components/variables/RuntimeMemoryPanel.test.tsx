@@ -146,11 +146,15 @@ test('routes ADD, AUTO, CLEAR, ALL, and row delete independently', () => {
 test('opens concise Memory variable rules help', () => {
   render(<RuntimeMemoryPanel items={items} onCommitValue={jest.fn()} />);
 
-  fireEvent.click(screen.getByRole('button', {
+  const helpButton = screen.getByRole('button', {
     name: 'Open Memory variable rules',
-  }));
+  });
+  expect(helpButton).toHaveTextContent('?');
+  fireEvent.click(helpButton);
   expect(screen.getByRole('dialog', { name: 'Memory variable rules' }))
     .toBeInTheDocument();
+  expect(screen.getByText('Share one variable set')).toBeInTheDocument();
+  expect(screen.getByText('Delete every variable')).toBeInTheDocument();
   expect(screen.getByText(/Variables are free to come and go/i))
     .toBeInTheDocument();
 });

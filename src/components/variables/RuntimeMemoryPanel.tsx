@@ -7,7 +7,6 @@ import React, {
 } from 'react';
 import {
   Database,
-  CircleHelp,
   Eraser,
   Loader2,
   Search,
@@ -268,7 +267,7 @@ const RuntimeMemoryPanel: React.FC<RuntimeMemoryPanelProps> = ({
               title="Memory variable rules"
               onClick={() => setHelpOpen(true)}
             >
-              <CircleHelp size={15} aria-hidden="true" />
+              ?
             </button>
           </div>
         </div>
