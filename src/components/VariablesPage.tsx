@@ -102,6 +102,10 @@ import {
   requiredVariableSlots,
 } from './variables/domain/variableSlotRequirements';
 import {
+  buildVariableResolutionAssignments,
+  type VariableResolutionMode,
+} from './variables/domain/variableResolutionAssignments';
+import {
   useVariablesGraphMutationRight,
   type VariablesGraphMutationRightResult,
 } from './variables/useVariablesGraphMutationRight';
@@ -879,6 +883,7 @@ const VariablesPage: React.FC<Props> = ({
   const checkOperandIntentRef = useRef<
     | {
       kind: 'RESOLVE_CHECKVALUES';
+      variableMode: VariableResolutionMode;
       awaitingSlot?: { instructionId: number; slot: 'LEFT' | 'RIGHT' };
     }
     | { kind: 'RELEASE'; instructionIds: readonly number[] }
@@ -888,11 +893,13 @@ const VariablesPage: React.FC<Props> = ({
   const [checkOperandKick, setCheckOperandKick] = useState(0);
   const remainingVariableIntentRef = useRef<{
     instructionIds: readonly number[];
-    creating: boolean;
+    variableMode: VariableResolutionMode;
+    creatingName: string | null;
     awaitingInstructionId: number | null;
   } | null>(null);
   const [remainingVariableKick, setRemainingVariableKick] = useState(0);
   const pendingCheckStartGraphVersionRef = useRef<number | null>(null);
+  const pendingVariableResolutionModeRef = useRef<VariableResolutionMode>('SAME');
   const suppressIfFamilyAutoRepairRef = useRef(false);
   const releaseSequenceRef = useRef<{
     instructionIds: readonly number[];
@@ -992,6 +999,8 @@ const VariablesPage: React.FC<Props> = ({
   const submitVariableCreateRef = useRef<(
     draft: AddVariableDraft,
   ) => string | null>(() => null);
+  const refreshVariablesWorkspaceRef = useRef<() => boolean>(() => false);
+  const variableCreationRefreshRequiredRef = useRef(false);
   const createVariableBatchRef = useRef<{
     names: string[];
     nextIndex: number;
@@ -1078,6 +1087,8 @@ const VariablesPage: React.FC<Props> = ({
       }
       createVariableBatchRef.current = null;
       setAddVariableSuccessVersion(current => current + 1);
+      variableCreationRefreshRequiredRef.current = true;
+      refreshVariablesWorkspaceRef.current();
       setStatus({
         level: 'ok',
         text: batch.names.length === 1
@@ -1085,6 +1096,10 @@ const VariablesPage: React.FC<Props> = ({
           : `${batch.names.length} variables created. The modal remains open.`,
       });
       return;
+    }
+    if (result.ok && remainingVariableIntentRef.current) {
+      variableCreationRefreshRequiredRef.current = true;
+      refreshVariablesWorkspaceRef.current();
     }
     createVariableBatchRef.current = null;
     setStatus({
@@ -1254,6 +1269,16 @@ const VariablesPage: React.FC<Props> = ({
     });
     return true;
   }, [clearPendingRequest, sessionId, webSocket]);
+  refreshVariablesWorkspaceRef.current = () => {
+    const sent = sendWorkspaceRequest('variablesWorkspace.refresh');
+    if (sent) variableCreationRefreshRequiredRef.current = false;
+    return sent;
+  };
+
+  useEffect(() => {
+    if (!variableCreationRefreshRequiredRef.current || pendingRequest !== null) return;
+    refreshVariablesWorkspaceRef.current();
+  }, [pendingRequest, sendWorkspaceRequest]);
 
   const handleGraphMutationRightResult = useCallback((
     result: VariablesGraphMutationRightResult,
@@ -2858,16 +2883,20 @@ const VariablesPage: React.FC<Props> = ({
   // a visible error after 8 attempts - never a silent dead-end, never a loop.
   const startRemainingVariableConnections = useCallback((
     instructionIds: readonly number[],
+    variableMode: VariableResolutionMode,
   ) => {
     remainingVariableIntentRef.current = {
       instructionIds: [...instructionIds],
-      creating: false,
+      variableMode,
+      creatingName: null,
       awaitingInstructionId: null,
     };
     setRemainingVariableKick(kick => kick + 1);
   }, []);
 
-  const startCheckValueDefaultVariables = useCallback(() => {
+  const startCheckValueDefaultVariables = useCallback((
+    variableMode: VariableResolutionMode,
+  ) => {
     const current = snapshotRef.current;
     if (!current || !pendingConnections || pendingConnections.mode !== 'RESOLVE') {
       return;
@@ -2883,26 +2912,42 @@ const VariablesPage: React.FC<Props> = ({
       && missingVariableSlots(command).length > 0);
     console.info('[CheckOperandDriver] trigger', { hasCheckValue });
     if (!hasCheckValue) {
-      startRemainingVariableConnections(pendingConnections.scope.instructionIds);
+      startRemainingVariableConnections(
+        pendingConnections.scope.instructionIds,
+        variableMode,
+      );
       return;
     }
-    // Once both defaults exist, the driver connects Left_Operand first and then
-    // Right_Operand to every free CheckValue spot.
-    checkOperandIntentRef.current = { kind: 'RESOLVE_CHECKVALUES' };
+    // Once the required names exist, the driver connects LEFT first and RIGHT
+    // second for each CheckValue in stable execution order.
+    checkOperandIntentRef.current = { kind: 'RESOLVE_CHECKVALUES', variableMode };
     checkOperandAttemptsRef.current = 0;
     setCheckOperandKick(kick => kick + 1);
-    const existingNames = new Set(
-      current.variables.map(variable => variable.name.trim().toLowerCase()),
+    const assignments = buildVariableResolutionAssignments(
+      current,
+      pendingConnections.scope.instructionIds,
+      variableMode,
     );
-    const toCreate = [
-      ...(existingNames.has('left_operand') ? [] : ['Left_Operand']),
-      ...(existingNames.has('right_operand') ? [] : ['Right_Operand']),
-    ];
+    const commandsById = new Map(current.commands.flatMap(command =>
+      command.id === null ? [] : [[command.id, command] as const]));
+    const existingNames = new Set(current.variables.map(
+      variable => variable.name.trim().toLowerCase()));
+    const requiredNames = assignments.checks.flatMap((assignment) => {
+      const command = commandsById.get(assignment.instructionId);
+      const missing = command ? missingVariableSlots(command) : [];
+      return [
+        ...(missing.includes('LEFT') ? [assignment.leftName] : []),
+        ...(missing.includes('RIGHT') ? [assignment.rightName] : []),
+      ];
+    });
+    const toCreate = [...new Set(requiredNames)].filter(
+      name => !existingNames.has(name.toLowerCase()),
+    );
     if (toCreate.length === 0) {
       // Nothing to create - wake the step-1 driver so it connects directly.
       setStatus({
         level: 'warn',
-        text: 'Connecting CheckValue right operands...',
+        text: `Connecting CheckValue variables (${variableMode === 'SAME' ? 'Same Vars' : 'Distinct'})...`,
       });
       return;
     }
@@ -2922,8 +2967,11 @@ const VariablesPage: React.FC<Props> = ({
     });
   }, [pendingConnections, startRemainingVariableConnections, submitVariableCreate]);
 
-  const createCheckValueDefaultVariables = useCallback(() => {
+  const createCheckValueDefaultVariables = useCallback((
+    variableMode: VariableResolutionMode,
+  ) => {
     suppressIfFamilyAutoRepairRef.current = false;
+    pendingVariableResolutionModeRef.current = variableMode;
     const pending = pendingConnections;
     if (!pending || pending.mode !== 'RESOLVE') return;
     const built = buildVariablesBatchResolveMutation(pending.plan, []);
@@ -2948,7 +2996,7 @@ const VariablesPage: React.FC<Props> = ({
       );
       return;
     }
-    startCheckValueDefaultVariables();
+    startCheckValueDefaultVariables(variableMode);
   }, [pendingConnections, startCheckValueDefaultVariables, submitVariablesMutation]);
 
   useEffect(() => {
@@ -2956,7 +3004,7 @@ const VariablesPage: React.FC<Props> = ({
     const current = snapshot?.mutationCapability?.graphVersion;
     if (expected === null || current === undefined || current < expected) return;
     pendingCheckStartGraphVersionRef.current = null;
-    startCheckValueDefaultVariables();
+    startCheckValueDefaultVariables(pendingVariableResolutionModeRef.current);
   }, [snapshot, startCheckValueDefaultVariables]);
 
   // CONSOLIDATED CheckValue driver: one intent, one effect. RESOLVE connects
@@ -2966,6 +3014,8 @@ const VariablesPage: React.FC<Props> = ({
     if (!intent || !snapshot) return;
     if (createVariableBatchRef.current !== null
       || pendingCreateRequestId !== null
+      || variableCreationRefreshRequiredRef.current
+      || pendingRequest !== null
       || pendingMutationRequestId !== null
       || pendingCheckValueLeftRequestId !== null
       || pendingCheckValueRightRequestId !== null) {
@@ -2989,6 +3039,7 @@ const VariablesPage: React.FC<Props> = ({
       if (level === 'ok' && intent.kind === 'RESOLVE_CHECKVALUES') {
         startRemainingVariableConnections(
           pendingConnections?.scope.instructionIds ?? [],
+          intent.variableMode,
         );
       }
     };
@@ -3014,11 +3065,18 @@ const VariablesPage: React.FC<Props> = ({
       pendingConnections?.scope.instructionIds
         ?? snapshot.commands.flatMap(command => command.id === null ? [] : [command.id]),
     );
-    const checkCommands = snapshot.commands.filter(command =>
-      command.id !== null
-      && scopedIds.has(command.id)
-      && requiredVariableSlots(command.command).includes('RIGHT'));
-    const effectiveMissingSlots = (command: typeof checkCommands[number]) => {
+    const assignments = buildVariableResolutionAssignments(
+      snapshot,
+      [...scopedIds],
+      intent.variableMode,
+    );
+    const checkCommands = assignments.checks.flatMap(assignment => {
+      const command = snapshot.commands.find(
+        candidate => candidate.id === assignment.instructionId,
+      );
+      return command ? [{ command, assignment }] : [];
+    });
+    const effectiveMissingSlots = (command: typeof checkCommands[number]['command']) => {
       const fact = snapshot.mutationCapability?.instructionFacts.find(
         item => item.instructionId === command.id,
       );
@@ -3028,8 +3086,8 @@ const VariablesPage: React.FC<Props> = ({
     };
     if (intent.awaitingSlot) {
       const awaitedCommand = checkCommands.find(
-        command => command.id === intent.awaitingSlot?.instructionId,
-      );
+        item => item.command.id === intent.awaitingSlot?.instructionId,
+      )?.command;
       const awaitedFact = snapshot.mutationCapability?.instructionFacts.find(
         fact => fact.instructionId === intent.awaitingSlot?.instructionId,
       );
@@ -3043,24 +3101,26 @@ const VariablesPage: React.FC<Props> = ({
       delete intent.awaitingSlot;
     }
     const nextCommand = checkCommands.find(
-      command => effectiveMissingSlots(command).length > 0,
+      item => effectiveMissingSlots(item.command).length > 0,
     );
     console.info('[CheckOperandDriver] next command', {
-      instructionId: nextCommand?.id ?? null,
-      missingSlots: nextCommand ? effectiveMissingSlots(nextCommand) : [],
+      instructionId: nextCommand?.command.id ?? null,
+      missingSlots: nextCommand ? effectiveMissingSlots(nextCommand.command) : [],
     });
-    if (!nextCommand || nextCommand.id === null) {
+    if (!nextCommand || nextCommand.command.id === null) {
       finish('ok', 'CheckValue variables connected (left and right).');
       return;
     }
     const variableByName = new Map(snapshot.variables.map(
       variable => [variable.name.trim().toLowerCase(), variable.id]));
-    const nextInstructionId = nextCommand.id;
-    if (effectiveMissingSlots(nextCommand).includes('LEFT')) {
-      const leftOperandId = variableByName.get('left_operand');
+    const nextInstructionId = nextCommand.command.id;
+    if (effectiveMissingSlots(nextCommand.command).includes('LEFT')) {
+      const leftOperandId = variableByName.get(
+        nextCommand.assignment.leftName.toLowerCase(),
+      );
       const capability = snapshot.mutationCapability;
       if (!leftOperandId || !capability) {
-        stalled('Left_Operand is not available to connect.');
+        stalled(`${nextCommand.assignment.leftName} is not available to connect.`);
         return;
       }
       const fact = capability.instructionFacts.find(
@@ -3090,31 +3150,33 @@ const VariablesPage: React.FC<Props> = ({
           committed: () => {
             setStatus({
               level: 'warn',
-              text: `Left_Operand connected to CheckValue #${nextInstructionId}. Connecting its Right_Operand next...`,
+              text: `${nextCommand.assignment.leftName} connected to CheckValue #${nextInstructionId}. Connecting ${nextCommand.assignment.rightName} next...`,
             });
             sendWorkspaceRequest('variablesWorkspace.refresh');
           },
           refused: (_response, reason) => finish(
             'error',
-            `Left_Operand connection for CheckValue #${nextInstructionId} was refused (${reason}).`,
+            `${nextCommand.assignment.leftName} connection for CheckValue #${nextInstructionId} was refused (${reason}).`,
           ),
         },
         VARIABLES_REACT_AUTHORED_PROFILE,
       );
       if (!requestId) {
         delete intent.awaitingSlot;
-        stalled(`The Left_Operand connection for CheckValue #${nextInstructionId} could not be submitted.`);
+        stalled(`The ${nextCommand.assignment.leftName} connection for CheckValue #${nextInstructionId} could not be submitted.`);
         return;
       }
       setStatus({
         level: 'warn',
-        text: `Connecting Left_Operand to CheckValue #${nextInstructionId}...`,
+        text: `Connecting ${nextCommand.assignment.leftName} to CheckValue #${nextInstructionId}...`,
       });
       return;
     }
-    const rightOperandId = variableByName.get('right_operand');
+    const rightOperandId = variableByName.get(
+      nextCommand.assignment.rightName.toLowerCase(),
+    );
     if (!rightOperandId) {
-      stalled('Right_Operand is not available to connect.');
+      stalled(`${nextCommand.assignment.rightName} is not available to connect.`);
       return;
     }
     checkOperandAttemptsRef.current += 1;
@@ -3128,7 +3190,7 @@ const VariablesPage: React.FC<Props> = ({
     if (requestId) {
       setStatus({
         level: 'warn',
-        text: `Connecting Right_Operand to CheckValue #${nextInstructionId}...`,
+        text: `Connecting ${nextCommand.assignment.rightName} to CheckValue #${nextInstructionId}...`,
       });
     } else {
       delete intent.awaitingSlot;
@@ -3139,6 +3201,7 @@ const VariablesPage: React.FC<Props> = ({
     pendingCheckValueRightRequestId,
     pendingCreateRequestId,
     pendingMutationRequestId,
+    pendingRequest,
     pendingCheckValueLeftRequestId,
     pendingConnections,
     snapshot,
@@ -3148,12 +3211,14 @@ const VariablesPage: React.FC<Props> = ({
     submitCheckValueRight,
   ]);
 
-  // Final resolver lane: one shared Variable_1 is created when absent and one
-  // dedicated command-variable mutation connects every remaining scoped command.
+  // Final resolver lane: Same Vars shares Variable_1; Distinct assigns the
+  // stable sequential Variable_N belonging to each regular command.
   useEffect(() => {
     const intent = remainingVariableIntentRef.current;
     if (!intent || !snapshot) return;
     if (pendingCreateRequestId !== null
+      || variableCreationRefreshRequiredRef.current
+      || pendingRequest !== null
       || pendingMutationRequestId !== null
       || pendingCheckValueLeftRequestId !== null
       || pendingCheckValueRightRequestId !== null) return;
@@ -3168,36 +3233,43 @@ const VariablesPage: React.FC<Props> = ({
       if (!awaited || awaited.variableId === null) return;
       intent.awaitingInstructionId = null;
     }
-    const remainingIds = snapshot.commands.flatMap((command) => {
-      if (command.id === null
-        || !scopeIds.has(command.id)
-        || requiredVariableSlots(command.command).includes('RIGHT')
-        || !instructionRelationshipPolicy(command.command)
-          .requirements.includes('VARIABLE_BINDING')) return [];
-      return factsById.get(command.id)?.variableId === null ? [command.id] : [];
-    });
-    if (remainingIds.length === 0) {
+    const assignments = buildVariableResolutionAssignments(
+      snapshot,
+      [...scopeIds],
+      intent.variableMode,
+    );
+    const nextAssignment = assignments.commands.find(assignment =>
+      factsById.get(assignment.instructionId)?.variableId === null);
+    if (!nextAssignment) {
       remainingVariableIntentRef.current = null;
       setPendingConnections(null);
       setStatus({ level: 'ok', text: 'All parent and variable connections resolved.' });
       return;
     }
-    const defaultVariable = snapshot.variables.find(
-      variable => variable.name.trim().toLowerCase() === 'variable_1',
+    const targetVariable = snapshot.variables.find(
+      variable => variable.name.trim().toLowerCase()
+        === nextAssignment.variableName.toLowerCase(),
     );
-    if (!defaultVariable) {
-      if (intent.creating) return;
-      intent.creating = true;
-      const requestId = submitVariableCreate({ name: 'Variable_1' });
+    if (!targetVariable) {
+      if (intent.creatingName === nextAssignment.variableName) return;
+      intent.creatingName = nextAssignment.variableName;
+      const requestId = submitVariableCreate({ name: nextAssignment.variableName });
       if (!requestId) {
         remainingVariableIntentRef.current = null;
-        setStatus({ level: 'error', text: 'Variable_1 could not be created.' });
+        setStatus({
+          level: 'error',
+          text: `${nextAssignment.variableName} could not be created.`,
+        });
       } else {
-        setStatus({ level: 'warn', text: 'Creating default Variable_1...' });
+        setStatus({
+          level: 'warn',
+          text: `Creating ${nextAssignment.variableName}...`,
+        });
       }
       return;
     }
-    const nextInstructionId = remainingIds[0];
+    intent.creatingName = null;
+    const nextInstructionId = nextAssignment.instructionId;
     intent.awaitingInstructionId = nextInstructionId;
     const requestId = submitGraphMutationCommandVariable(
       {
@@ -3209,7 +3281,7 @@ const VariablesPage: React.FC<Props> = ({
           instructionId: nextInstructionId,
           operation: 'SET' as const,
           expected: { value: factsById.get(nextInstructionId)?.variableId ?? null },
-          replacement: { value: defaultVariable.id },
+          replacement: { value: targetVariable.id },
         }],
         variableOwnerPatches: [],
       },
@@ -3217,7 +3289,7 @@ const VariablesPage: React.FC<Props> = ({
         committed: () => {
           setStatus({
             level: 'warn',
-            text: `Variable_1 connected to command #${nextInstructionId}. Connecting the next command...`,
+            text: `${nextAssignment.variableName} connected to command #${nextInstructionId}. Connecting the next command...`,
           });
           sendWorkspaceRequest('variablesWorkspace.refresh');
         },
@@ -3241,6 +3313,7 @@ const VariablesPage: React.FC<Props> = ({
     pendingCheckValueLeftRequestId,
     pendingCreateRequestId,
     pendingMutationRequestId,
+    pendingRequest,
     remainingVariableKick,
     sendWorkspaceRequest,
     snapshot,
@@ -3608,15 +3681,6 @@ const VariablesPage: React.FC<Props> = ({
                   ? status.text
                   : `Reconnecting${reconnectAttempts ? ` (${reconnectAttempts})` : ''}`}
               </div>
-              <button
-                type="button"
-                className={styles.autoVariablesButton}
-                title="Create and connect missing command variables (rules 5+6)"
-                disabled={mutationDisabled}
-                onClick={startVariableAutoResolve}
-              >
-                AUTO VARIABLES
-              </button>
               <PagesOpenButton
                 webSocket={webSocket}
                 connected={connected}
@@ -4077,6 +4141,7 @@ const VariablesPage: React.FC<Props> = ({
                   });
                   setAddVariableOpen(true);
                 }}
+                onRequestAuto={startVariableAutoResolve}
                 onRequestClearAll={() => setClearValuesConfirmation(true)}
                 clearingValues={pendingClearAll}
                 onRequestDelete={requestDeleteVariable}

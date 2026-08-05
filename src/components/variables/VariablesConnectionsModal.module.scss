@@ -392,6 +392,39 @@
   }
 }
 
+.resolveActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.variableModeToggle {
+  min-height: 38px;
+  padding: 0 15px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: transform 140ms ease, box-shadow 140ms ease, background 140ms ease;
+}
+
+.variableModeToggle:hover {
+  transform: translateY(-1px);
+}
+
+.variableModeSame {
+  background: linear-gradient(135deg, #15803d, #22c55e);
+  box-shadow: 0 8px 20px rgb(34 197 94 / 22%);
+}
+
+.variableModeDistinct {
+  background: linear-gradient(135deg, #c2410c, #f97316);
+  box-shadow: 0 8px 20px rgb(249 115 22 / 22%);
+}
+
 .helpButton {
   align-items: center;
   background: rgb(46, 117, 182);

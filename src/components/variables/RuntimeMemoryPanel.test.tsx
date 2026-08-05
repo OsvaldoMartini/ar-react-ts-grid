@@ -90,8 +90,9 @@ test('renders the ID, Name, Value, and row-action columns', () => {
   })).toBeInTheDocument();
 });
 
-test('routes row delete, Clear All Values, Delete All, and + ADD independently', () => {
+test('routes ADD, AUTO, CLEAR, ALL, and row delete independently', () => {
   const onRequestAdd = jest.fn();
+  const onRequestAuto = jest.fn();
   const onRequestClearAll = jest.fn();
   const onRequestDelete = jest.fn();
   const onRequestDeleteAll = jest.fn();
@@ -100,6 +101,7 @@ test('routes row delete, Clear All Values, Delete All, and + ADD independently',
       items={items}
       onCommitValue={jest.fn()}
       onRequestAdd={onRequestAdd}
+      onRequestAuto={onRequestAuto}
       onRequestClearAll={onRequestClearAll}
       onRequestDelete={onRequestDelete}
       onRequestDeleteAll={onRequestDeleteAll}
@@ -131,7 +133,26 @@ test('routes row delete, Clear All Values, Delete All, and + ADD independently',
   expect(onRequestAdd).toHaveBeenCalledTimes(1);
   expect(onRequestDeleteAll).toHaveBeenCalledTimes(1);
   expect(screen.getByRole('button', { name: 'Add variable' }))
-    .not.toHaveTextContent('++');
+    .toHaveTextContent('ADD');
+
+  fireEvent.click(screen.getByRole('button', { name: 'Auto resolve variables' }));
+  expect(onRequestAuto).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole('button', { name: 'Clear all variable values' }))
+    .toHaveTextContent('CLEAR');
+  expect(screen.getByRole('button', { name: 'Delete all variables' }))
+    .toHaveTextContent('ALL');
+});
+
+test('opens concise Memory variable rules help', () => {
+  render(<RuntimeMemoryPanel items={items} onCommitValue={jest.fn()} />);
+
+  fireEvent.click(screen.getByRole('button', {
+    name: 'Open Memory variable rules',
+  }));
+  expect(screen.getByRole('dialog', { name: 'Memory variable rules' }))
+    .toBeInTheDocument();
+  expect(screen.getByText(/Variables are free to come and go/i))
+    .toBeInTheDocument();
 });
 
 test('keeps destructive actions available while another deletion is pending', () => {

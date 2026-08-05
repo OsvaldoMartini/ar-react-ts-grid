@@ -112,8 +112,8 @@ const VariablesConnectionsHelpModal: React.FC<
                 <strong>CHECKVALUE VARIABLES:</strong>{' '}
                 <strong>CHECKVALUE</strong> requires two independent variables.
                 The oldest compatible variable becomes{' '}
-                <strong>Left_Operand</strong>, and the next becomes{' '}
-                <strong>Right_Operand</strong>. Missing operands are created
+                <strong>Left_Operand_1</strong>, and the next becomes{' '}
+                <strong>Right_Operand_1</strong>. Missing operands are created
                 automatically.
               </li>
               <li>
@@ -220,8 +220,8 @@ const VariablesConnectionsHelpModal: React.FC<
                     <th scope="row">CHECKVALUE</th>
                     <td>
                       Uses two variables and an operator:{' '}
-                      <strong>Left_Operand</strong> <strong>Operator</strong>{' '}
-                      <strong>Right_Operand</strong>. It does not require a{' '}
+                      <strong>Left_Operand_1</strong> <strong>Operator</strong>{' '}
+                      <strong>Right_Operand_1</strong>. It does not require a{' '}
                       <strong>Web Element</strong> parent.
                     </td>
                     <td />

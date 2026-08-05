@@ -20,6 +20,11 @@ import BlockMultiSelectSearchBox, {
 import { RulesCard, type RulesCardEvent } from '../RulesCard';
 import type { VariableWorkspaceBlock } from '../variablesWorkspace.contract';
 import VariablesConnectionsHelpModal from './VariablesConnectionsHelpModal';
+import type { VariableResolutionMode } from './domain/variableResolutionAssignments';
+import {
+  readVariableResolutionModePreference,
+  writeVariableResolutionModePreference,
+} from './domain/variableResolutionPreference';
 import styles from './VariablesConnectionsModal.module.scss';
 
 export type VariablesConnectionsModalMode = 'RESOLVE' | 'RELEASE';
@@ -83,10 +88,10 @@ export interface VariablesConnectionsModalProps {
   onConfirm: (submission: VariablesConnectionsModalSubmission) => void;
   /**
    * NEW 2026-08-03 (user order): the red "Resolve Parents(X) Vars(Y)" click
-   * only creates the missing CheckValue default variables (Left_Operand /
-   * Right_Operand). The owner page performs the creation.
+   * creates the mode-specific missing variables and connects them through the
+   * existing LEFT, RIGHT, and regular-command transports.
    */
-  onCreateCheckValueDefaults?: () => void;
+  onCreateCheckValueDefaults?: (variableMode: VariableResolutionMode) => void;
 }
 
 const focusableSelector = [
@@ -183,6 +188,9 @@ const VariablesConnectionsModal: React.FC<
   const [localBlockFilters, setLocalBlockFilters] = useState<number[]>(() =>
     blocks.map(block => block.id));
   const [helpOpen, setHelpOpen] = useState(false);
+  const [variableMode, setVariableMode] = useState<VariableResolutionMode>(
+    readVariableResolutionModePreference,
+  );
   const blockFilters = controlledBlockFilters === undefined
     ? localBlockFilters
     : controlledBlockFilters;
@@ -285,7 +293,7 @@ const VariablesConnectionsModal: React.FC<
         item => item.stateTone === 'red',
       );
       if (redVariables.length > 0) {
-        onCreateCheckValueDefaults?.();
+        onCreateCheckValueDefaults?.(variableMode);
         return;
       }
     }
@@ -512,17 +520,42 @@ const VariablesConnectionsModal: React.FC<
           >
             Cancel
           </button>
-          <div className={styles.ruleAction}>
-            <RulesCard
-              event={confirmEvent}
-              animate={false}
-              pulse={false}
-              onClick={confirm}
-              disabled={confirmDisabled}
-              title={resolving
-                ? 'Apply the selected compatible targets'
-                : 'Disconnect every reviewed relationship'}
-            />
+          <div className={styles.resolveActions}>
+            {resolving && (
+              <button
+                type="button"
+                className={`${styles.variableModeToggle} ${
+                  variableMode === 'SAME'
+                    ? styles.variableModeSame
+                    : styles.variableModeDistinct
+                }`}
+                aria-label="Variable resolution mode"
+                aria-pressed={variableMode === 'DISTINCT'}
+                title={variableMode === 'SAME'
+                  ? 'Same Vars: share Left_Operand_1, Right_Operand_1, and Variable_1'
+                  : 'Distinct: assign sequential variables to each command'}
+                disabled={false}
+                onClick={() => setVariableMode((current) => {
+                  const next = current === 'SAME' ? 'DISTINCT' : 'SAME';
+                  writeVariableResolutionModePreference(next);
+                  return next;
+                })}
+              >
+                {variableMode === 'SAME' ? 'Same Vars' : 'Distinct'}
+              </button>
+            )}
+            <div className={styles.ruleAction}>
+              <RulesCard
+                event={confirmEvent}
+                animate={false}
+                pulse={false}
+                onClick={confirm}
+                disabled={confirmDisabled}
+                title={resolving
+                  ? 'Apply the selected compatible targets'
+                  : 'Disconnect every reviewed relationship'}
+              />
+            </div>
           </div>
         </footer>
         {resolving && (

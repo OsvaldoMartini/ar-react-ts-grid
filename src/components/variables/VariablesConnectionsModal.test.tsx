@@ -5,6 +5,8 @@ import VariablesConnectionsModal, {
   type VariablesConnectionsModalProps,
 } from './VariablesConnectionsModal';
 
+beforeEach(() => window.localStorage.clear());
+
 const resolveItems: VariablesConnectionReviewItem[] = [
   {
     id: 'ELEMENT_TARGET:101',
@@ -164,4 +166,39 @@ test('shows unavailable targets and locks modal actions while pending', () => {
   fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
   expect(onCancel).not.toHaveBeenCalled();
   expect(onConfirm).not.toHaveBeenCalled();
+});
+
+test('defaults variable resolution to Same Vars and allows Distinct resolution', () => {
+  const onCreateCheckValueDefaults = jest.fn();
+  const first = renderModal({
+    onCreateCheckValueDefaults,
+    items: [{ ...resolveItems[1], blockId: 1, stateTone: 'red' }],
+    blocks: [{ id: 1, order: 1, name: 'Login', active: true }],
+  });
+
+  const modeToggle = screen.getByRole('button', {
+    name: 'Variable resolution mode',
+  });
+  expect(modeToggle).toHaveAttribute('aria-pressed', 'false');
+
+  fireEvent.click(modeToggle);
+  const distinctToggle = screen.getByRole('button', {
+    name: 'Variable resolution mode',
+  });
+  expect(distinctToggle).toHaveAttribute('aria-pressed', 'true');
+
+  fireEvent.click(screen.getByRole('button', {
+    name: /Resolve Parents\(0\) Vars\(1\)/i,
+  }));
+  expect(onCreateCheckValueDefaults).toHaveBeenCalledWith('DISTINCT');
+
+  first.unmount();
+  renderModal({
+    onCreateCheckValueDefaults,
+    items: [{ ...resolveItems[1], blockId: 1, stateTone: 'red' }],
+    blocks: [{ id: 1, order: 1, name: 'Login', active: true }],
+  });
+  expect(screen.getByRole('button', {
+    name: 'Variable resolution mode',
+  })).toHaveAttribute('aria-pressed', 'true');
 });

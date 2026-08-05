@@ -36,6 +36,33 @@
   font-size: 0.82rem;
 }
 
+.memoryTitleLine {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.memoryTitleLine h2 {
+  margin: 2px 0 0;
+}
+
+.helpButton {
+  width: 24px;
+  height: 24px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid #5d8fc2;
+  border-radius: 50%;
+  background: #eaf3fc;
+  color: #0b5394;
+  cursor: pointer;
+}
+
+.helpButton:hover {
+  background: #d8ebff;
+}
+
 .eyebrow {
   color: #5b7187;
   font-size: 0.57rem;
@@ -59,8 +86,8 @@
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  justify-content: flex-start;
+  gap: 6px;
   padding: 7px 10px;
   border-bottom: 1px solid #dce6f0;
   background: #ffffff;

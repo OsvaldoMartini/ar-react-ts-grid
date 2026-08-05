@@ -7,6 +7,7 @@ import React, {
 } from 'react';
 import {
   Database,
+  CircleHelp,
   Eraser,
   Loader2,
   Search,
@@ -14,6 +15,7 @@ import {
   X,
 } from 'lucide-react';
 import { RulesCard } from '../RulesCard';
+import MemoryVariablesHelpModal from './MemoryVariablesHelpModal';
 import styles from './RuntimeMemoryPanel.module.scss';
 
 export type RuntimeMemoryValueState = 'VALUE' | 'VOID';
@@ -41,6 +43,7 @@ export interface RuntimeMemoryPanelProps {
   onEditStart?: (variableId: number) => void;
   onEditCancel?: (variableId: number) => void;
   onRequestAdd?: () => void;
+  onRequestAuto?: () => void;
   onRequestClearAll?: () => void;
   onRequestDelete?: (variableId: number) => void;
   onRequestDeleteAll?: () => void;
@@ -221,6 +224,7 @@ const RuntimeMemoryPanel: React.FC<RuntimeMemoryPanelProps> = ({
   onEditStart,
   onEditCancel,
   onRequestAdd,
+  onRequestAuto,
   onRequestClearAll,
   onRequestDelete,
   onRequestDeleteAll,
@@ -230,6 +234,7 @@ const RuntimeMemoryPanel: React.FC<RuntimeMemoryPanelProps> = ({
   className,
 }) => {
   const [memorySearch, setMemorySearch] = useState('');
+  const [helpOpen, setHelpOpen] = useState(false);
   const visibleItems = useMemo(() => {
     const tokens = memorySearch
       .trim()
@@ -251,10 +256,21 @@ const RuntimeMemoryPanel: React.FC<RuntimeMemoryPanelProps> = ({
       <header className={styles.header}>
         <div>
           <span className={styles.eyebrow}>Live runtime</span>
-          <h2>
-            <Database size={16} aria-hidden="true" />
-            Memory variables
-          </h2>
+          <div className={styles.memoryTitleLine}>
+            <h2>
+              <Database size={16} aria-hidden="true" />
+              Memory variables
+            </h2>
+            <button
+              type="button"
+              className={styles.helpButton}
+              aria-label="Open Memory variable rules"
+              title="Memory variable rules"
+              onClick={() => setHelpOpen(true)}
+            >
+              <CircleHelp size={15} aria-hidden="true" />
+            </button>
+          </div>
         </div>
         <span className={styles.count}>
           {visibleItems.length}
@@ -266,7 +282,7 @@ const RuntimeMemoryPanel: React.FC<RuntimeMemoryPanelProps> = ({
         <RulesCard
           event={{
             color: 'green',
-            rules: '+ ADD',
+            rules: 'ADD',
             ts: 1,
           }}
           ariaLabel="Add variable"
@@ -278,9 +294,19 @@ const RuntimeMemoryPanel: React.FC<RuntimeMemoryPanelProps> = ({
           disabled={false}
         />
         <RulesCard
+          event={{ color: 'green', rules: 'AUTO', ts: 2 }}
+          ariaLabel="Auto resolve variables"
+          glow={false}
+          border
+          animate={false}
+          title="Create and connect missing command variables"
+          onClick={() => onRequestAuto?.()}
+          disabled={false}
+        />
+        <RulesCard
           event={{
             color: 'orange',
-            rules: 'CLEAR ALL VALUES',
+            rules: 'CLEAR',
             ts: 2,
           }}
           ariaLabel="Clear all variable values"
@@ -295,7 +321,7 @@ const RuntimeMemoryPanel: React.FC<RuntimeMemoryPanelProps> = ({
         <RulesCard
           event={{
             color: 'red',
-            rules: 'Delete All',
+            rules: 'ALL',
             ts: 2,
           }}
           ariaLabel="Delete all variables"
@@ -308,6 +334,8 @@ const RuntimeMemoryPanel: React.FC<RuntimeMemoryPanelProps> = ({
           disabled={false}
         />
       </div>
+
+      {helpOpen && <MemoryVariablesHelpModal onClose={() => setHelpOpen(false)} />}
 
       <label className={styles.memorySearch}>
         <span>Variables</span>
