@@ -22,7 +22,6 @@ import type {
   InstructionRelationshipEdge,
   RelationshipTarget,
 } from './bot-job-details/grid/domain/instructionRelationshipGraph';
-import { INSTRUCTION_GRAPH_MUTATION_CONTRACT_VERSION } from './bot-job-details/grid/domain/instructionGraphMutation.contract';
 import { instructionCommandPresentation } from './bot-job-details/grid/domain/instructionCommandPresentation';
 import {
   canonicalInstructionAction,
@@ -3419,70 +3418,6 @@ const VariablesPage: React.FC<Props> = ({
     });
   }, []);
 
-  const sendDirectMutationProbe = useCallback((operationType: string) => {
-    const current = snapshotRef.current;
-    const capability = current?.mutationCapability;
-    if (!current || !capability || !webSocket || webSocket.readyState !== WebSocket.OPEN) {
-      console.error(`[Variables direct probe] ${operationType} was not sent: WebSocket/snapshot unavailable.`);
-      return;
-    }
-    const requestId = `${Date.now().toString(36)}-direct-${operationType.split('.').pop()}`;
-    const checkValue = current.commands.find(command =>
-      command.id !== null && requiredVariableSlots(command.command).includes('RIGHT'));
-    const rightVariable = current.variables.find(variable =>
-      variable.name.trim().toLowerCase() === 'right_operand') ?? current.variables[0];
-    const body = operationType === 'variablesWorkspace.graphMutationRight'
-      ? {
-          contractVersion: 1,
-          requestId,
-          bindingEpoch: current.bindingEpoch,
-          workspaceEpoch: current.workspaceEpoch,
-          baseGraphVersion: capability.graphVersion,
-          graphRevision: capability.graphRevision,
-          rightVariableId: rightVariable?.id ?? null,
-          instructionIds: checkValue?.id === null || checkValue?.id === undefined
-            ? []
-            : [checkValue.id],
-          operation: 'CONNECT',
-        }
-      : {
-          contractVersion: INSTRUCTION_GRAPH_MUTATION_CONTRACT_VERSION,
-          mutationKind: 'RELATIONSHIP_UPDATE',
-          requestId,
-          baseGraphVersion: capability.graphVersion,
-          graphRevision: capability.graphRevision,
-          workspaceEpoch: current.workspaceEpoch,
-          ownerAssertion: capability.ownerAssertion,
-          draggedInstructionId: null,
-          layoutRows: capability.layoutRows.map(row => ({ ...row })),
-          instructionRelationPatches: [],
-          variableBindingPatches: [],
-          variableOwnerPatches: [],
-          bindingEpoch: current.bindingEpoch,
-          mutationProfile: capability.reactAuthoredProfile ?? capability.profile,
-        };
-    const envelope = {
-      type: operationType,
-      sessionId: VARIABLES_MANAGER_SESSION_ID,
-      body: JSON.stringify(body),
-    };
-    console.info(`[Variables direct probe] SEND ${operationType}`, { requestId });
-    try {
-      webSocket.send(JSON.stringify(envelope));
-    } catch (error) {
-      console.error(`[Variables direct probe] SEND FAILED ${operationType}`, error);
-    }
-  }, [webSocket]);
-
-  const sendAllDirectMutationProbes = useCallback(() => {
-    [
-      'variablesWorkspace.graphMutationParent',
-      'variablesWorkspace.graphMutationLeft',
-      'variablesWorkspace.graphMutationRight',
-      'variablesWorkspace.graphMutationCommandVariable',
-    ].forEach(sendDirectMutationProbe);
-  }, [sendDirectMutationProbe]);
-
   const confirmClearAllValues = useCallback(() => {
     if (!clearAllValues()) {
       setStatus({
@@ -3692,26 +3627,6 @@ const VariablesPage: React.FC<Props> = ({
               </span>
             </div>
             <div className={styles.toolbarActions}>
-              <button type="button" className={styles.refreshButton}
-                onClick={() => sendDirectMutationProbe('variablesWorkspace.graphMutationParent')}>
-                Parent WS
-              </button>
-              <button type="button" className={styles.refreshButton}
-                onClick={() => sendDirectMutationProbe('variablesWorkspace.graphMutationLeft')}>
-                LEFT WS
-              </button>
-              <button type="button" className={styles.refreshButton}
-                onClick={() => sendDirectMutationProbe('variablesWorkspace.graphMutationRight')}>
-                RIGHT WS
-              </button>
-              <button type="button" className={styles.refreshButton}
-                onClick={() => sendDirectMutationProbe('variablesWorkspace.graphMutationCommandVariable')}>
-                Variable WS
-              </button>
-              <button type="button" className={styles.refreshButton}
-                onClick={sendAllDirectMutationProbes}>
-                ALL 4 WS
-              </button>
               <button
                 type="button"
                 className={styles.refreshButton}

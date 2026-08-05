@@ -186,6 +186,16 @@ export const useVariablesGraphMutationParent = ({
     }
     const requestId = nextRequestId();
     const compactRelationship = draft.mutationKind === 'RELATIONSHIP_UPDATE';
+    const compactMoveRows = draft.mutationKind === 'ROW_MOVE'
+      ? draft.layoutRows.filter((row) => {
+        const current = capability.layoutRows.find(
+          candidate => candidate.instructionId === row.instructionId,
+        );
+        return !current
+          || current.blockId !== row.blockId
+          || current.instructionOrderNumber !== row.instructionOrderNumber;
+      })
+      : draft.layoutRows;
     if (
       compactRelationship
       && (
@@ -206,7 +216,7 @@ export const useVariablesGraphMutationParent = ({
       workspaceEpoch: snapshot.workspaceEpoch,
       ownerAssertion: capability.ownerAssertion,
       draggedInstructionId: draft.draggedInstructionId,
-      ...(compactRelationship ? {} : { layoutRows: [...draft.layoutRows] }),
+      ...(compactRelationship ? {} : { layoutRows: [...compactMoveRows] }),
       instructionRelationPatches: [...draft.instructionRelationPatches],
       variableBindingPatches: [...draft.variableBindingPatches],
       variableOwnerPatches: [...draft.variableOwnerPatches],
