@@ -226,6 +226,49 @@ test('normalizes a coordinate-consistent Variables mutation capability', () => {
   expect(snapshot?.mutationCapability?.crossBlockProfile).toBeNull();
 });
 
+test('keeps mutation capability when CheckValue is linked through its RIGHT slot', () => {
+  const rightLinkedCheck = {
+    ...canonicalSnapshot.variables[0].commands[1],
+    variableId: 12,
+    variableSlots: [
+      { slot: 'LEFT', variableId: 12 },
+      { slot: 'RIGHT', variableId: 13 },
+    ],
+  };
+  const snapshot = normalizeVariablesWorkspaceSnapshot({
+    ...canonicalSnapshot,
+    commands: [
+      { ...canonicalSnapshot.variables[0].owner, variableId: 12 },
+      ...canonicalSnapshot.variables[0].commands.map(command =>
+        command.instructionId === 191
+          ? rightLinkedCheck
+          : { ...command, variableId: 12 }),
+      { ...canonicalSnapshot.variables[1].owner, variableId: 13 },
+    ],
+    variables: [
+      {
+        ...canonicalSnapshot.variables[0],
+        commands: canonicalSnapshot.variables[0].commands.map(command =>
+          command.instructionId === 191 ? rightLinkedCheck : command),
+      },
+      {
+        ...canonicalSnapshot.variables[1],
+        unused: false,
+        commands: [{ ...rightLinkedCheck, variableId: 12 }],
+      },
+    ],
+    mutationCapability: {
+      ...canonicalMutationCapability,
+      reactAuthoredProfile: 'VARIABLES_REACT_AUTHORED_V1',
+    },
+  });
+
+  expect(snapshot).not.toBeNull();
+  expect(snapshot?.mutationCapability?.reactAuthoredProfile).toBe(
+    'VARIABLES_REACT_AUTHORED_V1',
+  );
+});
+
 test('accepts only the exact separately advertised Variables cross-block profile', () => {
   const enabled = normalizeVariablesWorkspaceSnapshot({
     ...canonicalSnapshot,

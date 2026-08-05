@@ -381,7 +381,11 @@ const normalizeMutationCapability = (
           === canonicalInstructionAction(command.command)
         && fact?.parentId === command.parentId
         && fact?.parentBlockId === command.parentBlockId
-        && fact?.variableId === variable.id;
+        && (
+          command.variableSlots && command.variableSlots.length > 0
+            ? command.variableSlots.some(slot => slot.variableId === variable.id)
+            : fact?.variableId === variable.id
+        );
     })
     && (
       variable.owner === null
