@@ -109,6 +109,7 @@ import {
   useVariablesGraphMutationRight,
   type VariablesGraphMutationRightResult,
 } from './variables/useVariablesGraphMutationRight';
+import { readVariableResolutionModePreference } from './variables/domain/variableResolutionPreference';
 import {
   planVariableAutoResolve,
   type VariableAutoResolvePlan,
@@ -125,6 +126,10 @@ import {
   useVariablesCreate,
   type VariablesCreateResult,
 } from './variables/useVariablesCreate';
+import {
+  useVariablesAutoResolve,
+  type VariablesAutoResolveResult,
+} from './variables/useVariablesAutoResolve';
 import {
   useVariablesDelete,
   type VariablesDeleteMode,
@@ -1006,18 +1011,17 @@ const VariablesPage: React.FC<Props> = ({
     nextIndex: number;
     createdIds: number[];
   } | null>(null);
-
-  // Resolve Connections rules 5+6 (independent TS rebuild, 2026-08-03):
-  // user-triggered run that creates missing variables, binds them, then saves
-  // CK right operands - each phase through the existing proven persistence ops.
-  const variableAutoResolveRunRef = useRef<{
+  type LegacyVariableAutoResolveRun = {
     phase: 'CREATING' | 'BINDINGS' | 'RIGHT_OPERANDS';
     plan: VariableAutoResolvePlan;
     createIndex: number;
     createdIdByName: Map<string, number>;
     submittedBindings: boolean;
     stalls: number;
-  } | null>(null);
+  };
+  // Transitional compatibility only; the production AUTO/Resolve entry points
+  // now use the single atomic backend batch request and never populate this ref.
+  const variableAutoResolveRunRef = useRef<LegacyVariableAutoResolveRun | null>(null);
 
   const handleVariableCreateResult = useCallback((
     result: VariablesCreateResult,
@@ -1123,6 +1127,30 @@ const VariablesPage: React.FC<Props> = ({
     onResult: handleVariableCreateResult,
   });
   submitVariableCreateRef.current = submitVariableCreate;
+
+  const handleVariableAutoResolveResult = useCallback((
+    result: VariablesAutoResolveResult,
+  ) => {
+    setPendingConnections(null);
+    setStatus({
+      level: result.ok ? 'ok' : 'error',
+      text: result.ok
+        ? result.message || 'Variables created and connected in one transaction.'
+        : result.error || 'Variable auto-resolution was refused.',
+    });
+  }, []);
+
+  const {
+    pendingRequestId: pendingVariableAutoResolveRequestId,
+    submit: submitVariableAutoResolve,
+    handleMessage: handleVariableAutoResolveMessage,
+  } = useVariablesAutoResolve({
+    webSocket,
+    connected,
+    sessionId,
+    snapshot,
+    onResult: handleVariableAutoResolveResult,
+  });
 
   const handleVariableDeleteResult = useCallback((
     result: VariablesDeleteResult,
@@ -1543,6 +1571,7 @@ const VariablesPage: React.FC<Props> = ({
     processedMessagesRef.current = messages.length;
 
     pending.forEach(raw => {
+      if (handleVariableAutoResolveMessage(raw)) return;
       if (handleCommandCreateMessage(raw)) return;
       if (handleCommandCopyMessage(raw)) return;
       if (handleCommandUpdateMessage(raw)) return;
@@ -1640,6 +1669,7 @@ const VariablesPage: React.FC<Props> = ({
     handleInstructionCopyMessage,
     handleRuntimeMemoryMessage,
     handleVariableCreateMessage,
+    handleVariableAutoResolveMessage,
     handleVariableDeleteMessage,
     handleCommandDeleteMessage,
     handleCheckValueRightMessage,
@@ -2901,11 +2931,29 @@ const VariablesPage: React.FC<Props> = ({
     if (!current || !pendingConnections || pendingConnections.mode !== 'RESOLVE') {
       return;
     }
+    const activeSnapshot = current;
+    const activeConnections = pendingConnections;
+    const batchRequestId = submitVariableAutoResolve(
+      activeConnections.scope.instructionIds,
+      variableMode,
+    );
+    if (!batchRequestId) {
+      setStatus({
+        level: 'error',
+        text: 'Variables is busy, disconnected, or read-only. Batch resolution was not started.',
+      });
+      return;
+    }
+    setStatus({
+      level: 'warn',
+      text: 'Creating and connecting all scoped variables in one transaction...',
+    });
+    return;
     // Detect CheckValues by their MISSING SLOTS in the frozen scope - never by
     // the review items: a CK whose LEFT is already bound vanishes from the
     // VARIABLE_BINDING issue list while its RIGHT spot is still empty.
-    const scopeIds = new Set(pendingConnections.scope.instructionIds);
-    const hasCheckValue = current.commands.some(command =>
+    const scopeIds = new Set(activeConnections.scope.instructionIds);
+    const hasCheckValue = activeSnapshot.commands.some(command =>
       command.id !== null
       && scopeIds.has(command.id)
       && requiredVariableSlots(command.command).includes('RIGHT')
@@ -2913,7 +2961,7 @@ const VariablesPage: React.FC<Props> = ({
     console.info('[CheckOperandDriver] trigger', { hasCheckValue });
     if (!hasCheckValue) {
       startRemainingVariableConnections(
-        pendingConnections.scope.instructionIds,
+        activeConnections.scope.instructionIds,
         variableMode,
       );
       return;
@@ -2924,13 +2972,13 @@ const VariablesPage: React.FC<Props> = ({
     checkOperandAttemptsRef.current = 0;
     setCheckOperandKick(kick => kick + 1);
     const assignments = buildVariableResolutionAssignments(
-      current,
-      pendingConnections.scope.instructionIds,
+      activeSnapshot,
+      activeConnections.scope.instructionIds,
       variableMode,
     );
-    const commandsById = new Map(current.commands.flatMap(command =>
+    const commandsById = new Map(activeSnapshot.commands.flatMap(command =>
       command.id === null ? [] : [[command.id, command] as const]));
-    const existingNames = new Set(current.variables.map(
+    const existingNames = new Set(activeSnapshot.variables.map(
       variable => variable.name.trim().toLowerCase()));
     const requiredNames = assignments.checks.flatMap((assignment) => {
       const command = commandsById.get(assignment.instructionId);
@@ -2965,7 +3013,12 @@ const VariablesPage: React.FC<Props> = ({
       level: 'warn',
       text: `Creating CheckValue default variable “${toCreate[0]}”...`,
     });
-  }, [pendingConnections, startRemainingVariableConnections, submitVariableCreate]);
+  }, [
+    pendingConnections,
+    startRemainingVariableConnections,
+    submitVariableAutoResolve,
+    submitVariableCreate,
+  ]);
 
   const createCheckValueDefaultVariables = useCallback((
     variableMode: VariableResolutionMode,
@@ -3467,7 +3520,7 @@ const VariablesPage: React.FC<Props> = ({
     submitGraphMutation,
   ]);
 
-  const startVariableAutoResolve = useCallback(() => {
+  const startVariableAutoResolveLegacy = useCallback(() => {
     const current = snapshotRef.current;
     if (!current || variableAutoResolveRunRef.current) return;
     const plan = planVariableAutoResolve(current);
@@ -3510,6 +3563,26 @@ const VariablesPage: React.FC<Props> = ({
       text: 'Auto-resolve: connecting variables to commands...',
     });
   }, []);
+
+  const startVariableAutoResolve = useCallback(() => {
+    const current = snapshotRef.current;
+    if (!current || pendingVariableAutoResolveRequestId !== null) return;
+    const requestId = submitVariableAutoResolve(
+      current.commands.flatMap(command => command.id === null ? [] : [command.id]),
+      readVariableResolutionModePreference(),
+    );
+    if (!requestId) {
+      setStatus({
+        level: 'error',
+        text: 'Variables is busy, disconnected, or read-only. AUTO was not started.',
+      });
+      return;
+    }
+    setStatus({
+      level: 'warn',
+      text: 'AUTO is creating and connecting variables in one transaction...',
+    });
+  }, [pendingVariableAutoResolveRequestId, submitVariableAutoResolve]);
 
   const confirmClearAllValues = useCallback(() => {
     if (!clearAllValues()) {
