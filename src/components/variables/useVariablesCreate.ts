@@ -107,11 +107,9 @@ export const useVariablesCreate = ({
   }, []);
 
   const submit = useCallback((draft: VariablesCreateDraft): string | null => {
-    const capability = snapshot?.mutationCapability;
     const name = draft.name.trim();
     if (
       !snapshot
-      || !capability
       || !connected
       || !webSocket
       || webSocket.readyState !== WebSocket.OPEN
@@ -150,8 +148,6 @@ export const useVariablesCreate = ({
           requestId,
           bindingEpoch: snapshot.bindingEpoch,
           workspaceEpoch: snapshot.workspaceEpoch,
-          baseGraphVersion: capability.graphVersion,
-          graphRevision: capability.graphRevision,
           name,
           initialState: 'VOID',
         }),

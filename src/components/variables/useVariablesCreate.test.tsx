@@ -9,10 +9,7 @@ import {
 const snapshot = {
   bindingEpoch: 'binding-create',
   workspaceEpoch: 8,
-  mutationCapability: {
-    graphVersion: 21,
-    graphRevision: 'a'.repeat(64),
-  },
+  mutationCapability: null,
 } as VariableWorkspaceSnapshot;
 
 test('creates a standalone variable as VOID', () => {
@@ -40,8 +37,6 @@ test('creates a standalone variable as VOID', () => {
     contractVersion: VARIABLES_CREATE_CONTRACT_VERSION,
     bindingEpoch: 'binding-create',
     workspaceEpoch: 8,
-    baseGraphVersion: 21,
-    graphRevision: 'a'.repeat(64),
     name: 'payment_text',
     initialState: 'VOID',
   });
