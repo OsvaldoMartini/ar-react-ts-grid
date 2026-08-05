@@ -1422,3 +1422,16 @@
   color: #777777;
   font-style: italic;
 }
+
+.commandEditRuleCard {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.commandEditRuleCard > button {
+  min-height: 24px;
+  padding: 2px 6px;
+  font-size: 0.66rem;
+  line-height: 1;
+}

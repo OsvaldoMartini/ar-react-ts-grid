@@ -32,6 +32,7 @@ const baseProps = {
   operations: null,
   deviceOptionsRow: null,
   editButton: null,
+  commandEditButton: null,
   moveButtons: null,
   testClick: null,
   onChangeName: () => {},

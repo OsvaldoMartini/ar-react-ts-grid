@@ -1,4 +1,5 @@
 import React from 'react';
+import { SquarePen } from 'lucide-react';
 import { BlockLoopInstructionLoadDTO } from './instructionsMockData';
 
 import editImage from '../assets/edit.png';
@@ -40,6 +41,11 @@ import { instructionMatchesFind } from './bot-job-details/grid/hooks/useInstruct
 import { useInstructionGrid } from './bot-job-details/grid/hooks/useInstructionGrid';
 import type { UseInstructionGridProps } from './bot-job-details/grid/types/instructionGrid.types';
 import styles from './Griditem.module.scss';
+import ComponentEditorModal from './command-editor/ComponentEditorModal';
+import type { ComponentEditorCommand } from './command-editor/componentEditor.types';
+import type { CommandEditorMutationIntent } from './command-editor/commandEditorMutation';
+import { RulesCard } from './RulesCard';
+import { instructionRelationshipPolicy } from './bot-job-details/grid/domain/instructionRelationshipPolicy';
 
 const reconnectOption = (
   target: RelationshipTarget,
@@ -140,6 +146,15 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
     edge: InstructionRelationshipEdge;
     authorityKey: string | null;
   } | null>(null);
+  const [gridCommandEditorInstructionId, setGridCommandEditorInstructionId] =
+    React.useState<number | null>(null);
+  const [gridCommandEditorPending, setGridCommandEditorPending] =
+    React.useState<{ requestId: string; responseType: string } | null>(null);
+  const [gridCommandEditorStatus, setGridCommandEditorStatus] = React.useState<{
+    level: 'ok' | 'warn' | 'error';
+    text: string;
+  }>({ level: 'ok', text: 'Edit the selected Bot Job command.' });
+  const gridCommandEditorMessageIndexRef = React.useRef(0);
 
   const {
     webSocket, connected, reconnectAttempts, messages, error,
@@ -173,6 +188,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
     editingBlockId, blockName, setBlockName,
     activeDraggedInstructionId,
     moveGraphRevision,
+    botJobGraphMutationCapability,
     variableLinks,
     commandConfigurations,
     relationshipEdgesByInstruction,
@@ -189,7 +205,6 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
     handleCreateComponent,
     handleBlockSelectionChange,
     handleBlockDelete,
-    handleOpenCommandEditor,
     handleRemoveInstruction,
     handleInstructionStatus,
     handleInstructionForceChange,
@@ -211,6 +226,148 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
     handleMoveBlockUp, handleMoveBlockDown,
   } = grid;
   const componentWorkspace = workspacePolicy.kind === 'COMPONENT';
+  const gridEditorCommands = React.useMemo<ComponentEditorCommand[]>(() =>
+    instructionsData
+      .filter(instruction =>
+        instructionRelationshipPolicy(instruction.actions).role !== 'WEB_ELEMENT')
+      .map(instruction => ({
+        instructionId: instruction.id,
+        instructionOrder: instruction.instructionOrderNumber,
+        instructionName: instruction.name,
+        action: instruction.actions,
+        operation: instruction.operation ?? '',
+        onHoldSeconds: instruction.onHoldSeconds ?? null,
+        blockId: instruction.blockId,
+        blockOrder: instruction.blockOrderNumber,
+        blockName: instruction.blockName,
+        active: instruction.instructionActive,
+        parentId: instruction.parentId ?? null,
+        parentBlockId: instruction.parentBlockId ?? null,
+        variableId: instruction.variableId ?? null,
+        storedConfiguration: commandConfigurations.get(instruction.id) ?? null,
+      })), [commandConfigurations, instructionsData]);
+  const gridEditingCommand = gridCommandEditorInstructionId === null
+    ? null
+    : gridEditorCommands.find(
+        command => command.instructionId === gridCommandEditorInstructionId,
+      ) ?? null;
+  const gridEditorVariables = React.useMemo(() => {
+    const unique = new Map<number, { variableId: number; name: string; type: string }>();
+    variableLinks.forEach((variable) => {
+      if (variable.id === null || unique.has(variable.id)) return;
+      unique.set(variable.id, {
+        variableId: variable.id,
+        name: variable.name?.trim() || `Variable ${variable.id}`,
+        type: variable.type?.trim() || 'Variable',
+      });
+    });
+    return [...unique.values()];
+  }, [variableLinks]);
+  const openGridCommandEditor = React.useCallback((
+    instruction: BlockLoopInstructionLoadDTO,
+  ) => {
+    if (componentWorkspace
+      || instructionRelationshipPolicy(instruction.actions).role === 'WEB_ELEMENT') return;
+    setGridCommandEditorStatus({
+      level: 'ok',
+      text: 'Edit the selected Bot Job command.',
+    });
+    setGridCommandEditorInstructionId(instruction.id);
+  }, [componentWorkspace]);
+  const submitGridCommandEditor = React.useCallback((
+    intent: CommandEditorMutationIntent,
+  ) => {
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN
+      || !connected || !botJobGraphMutationCapability || gridCommandEditorPending) {
+      setGridCommandEditorStatus({
+        level: 'error', text: 'GridItem is not ready to save this command.',
+      });
+      return;
+    }
+    const configuration = intent.draft.configuration.kind === 'LEGACY'
+      ? { kind: 'NONE' }
+      : intent.draft.configuration;
+    const copy = intent.action === 'COPY_NEW';
+    const requestId = `${Date.now()}-grid-command-${copy ? 'copy' : 'update'}-${intent.sourceInstructionId}`;
+    const responseType = copy
+      ? 'variablesWorkspace.commandEditor.copyResponse'
+      : 'variablesWorkspace.commandEditor.updateResponse';
+    const common = {
+      contractVersion: 1,
+      requestId,
+      homeBankingId: botJobGraphMutationCapability.ownerAssertion.homeBankingId,
+      botJobId,
+      botJobName,
+      workspaceEpoch: botJobGraphMutationCapability.workspaceEpoch,
+      baseGraphVersion: botJobGraphMutationCapability.graphVersion,
+      graphRevision: botJobGraphMutationCapability.graphRevision,
+      sourceInstructionId: intent.sourceInstructionId,
+      targetBlockId: intent.targetBlockId,
+      placement: {
+        kind: intent.placement.kind,
+        referenceInstructionId: intent.placement.kind === 'AFTER_INSTRUCTION'
+          ? intent.placement.instructionId : null,
+      },
+      configuration,
+      targetAction: intent.draft.action,
+    };
+    const body = copy
+      ? { ...common, createBlank: false }
+      : {
+          ...common,
+          allowRelationshipDisconnect: intent.allowRelationshipDisconnect,
+          allowConditionalFamilyDissolve: intent.allowConditionalFamilyDissolve,
+          conditionalFamilyDeleteIds: [...intent.conditionalFamilyDeleteIds],
+        };
+    setGridCommandEditorPending({ requestId, responseType });
+    setGridCommandEditorStatus({ level: 'warn', text: copy ? 'Copying command...' : 'Updating command...' });
+    try {
+      webSocket.send(JSON.stringify({
+        type: copy
+          ? 'variablesWorkspace.commandEditor.copy'
+          : 'variablesWorkspace.commandEditor.update',
+        sessionId,
+        homeBankingId: botJobGraphMutationCapability.ownerAssertion.homeBankingId,
+        body: JSON.stringify(body),
+      }));
+    } catch (_) {
+      setGridCommandEditorPending(null);
+      setGridCommandEditorStatus({ level: 'error', text: 'The command request could not be sent.' });
+    }
+  }, [
+    botJobGraphMutationCapability, botJobId, botJobName, connected,
+    gridCommandEditorPending, sessionId, webSocket,
+  ]);
+
+  React.useEffect(() => {
+    if (gridCommandEditorMessageIndexRef.current > messages.length) {
+      gridCommandEditorMessageIndexRef.current = 0;
+    }
+    const nextMessages = messages.slice(gridCommandEditorMessageIndexRef.current);
+    gridCommandEditorMessageIndexRef.current = messages.length;
+    if (!gridCommandEditorPending) return;
+    nextMessages.forEach((raw) => {
+      try {
+        const envelope = typeof raw === 'string' ? JSON.parse(raw) : raw as any;
+        const operation = String(envelope?.type ?? envelope?.operationId ?? '');
+        const body = typeof envelope?.body === 'string'
+          ? JSON.parse(envelope.body) : envelope?.body ?? envelope;
+        if (operation !== gridCommandEditorPending.responseType
+          || String(body?.requestId ?? '') !== gridCommandEditorPending.requestId) return;
+        setGridCommandEditorPending(null);
+        if (body?.ok === true && body?.committed !== false) {
+          setGridCommandEditorStatus({ level: 'ok', text: body?.message || 'Command saved.' });
+          setGridCommandEditorInstructionId(null);
+        } else {
+          setGridCommandEditorStatus({
+            level: 'error', text: body?.message || body?.error || 'The command was not saved.',
+          });
+        }
+      } catch (_) {
+        // Other GridItem messages are intentionally ignored by this modal adapter.
+      }
+    });
+  }, [gridCommandEditorPending, messages]);
   const reconnectPreviewEdge = reconnectPreview?.edge ?? null;
   const openReconnectPreview = React.useCallback((
     edge: InstructionRelationshipEdge,
@@ -446,7 +603,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
       {componentWorkspace ? (
         <ComponentWorkspaceHeader
           botJobId={botJobId}
-          botJobName={botJobName}
+          botJobName={botJobName ?? ''}
           connected={connected}
           reconnectAttempts={reconnectAttempts}
           error={error}
@@ -498,6 +655,39 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
           context={saveComponentContext}
           onSubmit={submitSaveComponent}
           onClose={() => setSaveComponentContext(null)}
+        />
+      )}
+      {gridEditingCommand && (
+        <ComponentEditorModal
+          botJobId={Number(botJobId)}
+          botJobName={botJobName ?? ''}
+          scopeLabel="Edit Bot Job command from GridItem"
+          status={gridCommandEditorStatus}
+          blocks={workspaceBlocks.map(block => ({
+            blockId: block.blockId,
+            blockOrder: block.blockOrderNumber,
+            blockName: block.blockName,
+            commandCount: instructionsData.filter(
+              instruction => instruction.blockId === block.blockId
+                && instructionRelationshipPolicy(instruction.actions).role !== 'WEB_ELEMENT',
+            ).length,
+            active: block.blockActive,
+          }))}
+          connectionCount={relationshipEdgesByInstruction.get(
+            gridEditingCommand.instructionId,
+          )?.filter(edge => edge.target !== null).length ?? 0}
+          diagnosticCount={0}
+          command={gridEditingCommand}
+          commands={gridEditorCommands}
+          variables={gridEditorVariables}
+          pending={gridCommandEditorPending !== null}
+          mode="EDIT"
+          enabledActions={['UPDATE', 'COPY_NEW']}
+          onSubmit={submitGridCommandEditor}
+          onClose={() => {
+            if (gridCommandEditorPending !== null) return;
+            setGridCommandEditorInstructionId(null);
+          }}
         />
       )}
       {alertMessageBody && alertMessageBody.length > 0 && (
@@ -762,7 +952,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                               alt=""
                               className={styles.editButton}
                               title="Open Command Editor"
-                              onClick={() => handleOpenCommandEditor(excelGotoInstruction)}
+                              onClick={() => openGridCommandEditor(excelGotoInstruction)}
                             />
                             <DeleteButton
                               title="Delete instruction"
@@ -831,7 +1021,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                                   commandConfigurations.get(instruction.id) ?? null
                                 }
                                 onReconnect={openReconnectPreview}
-                                onEditCommand={() => handleOpenCommandEditor(instruction)}
+                                onEditCommand={() => openGridCommandEditor(instruction)}
                                 onReconnectSecondVariable={componentWorkspace
                                   ? undefined
                                   : () => setSecondOperandPreview({
@@ -847,6 +1037,24 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                             )}
                             deviceOptionsRow={renderDeviceOptionsRow(instruction)}
                             editButton={renderEditButton(instruction.actions, editImage, instruction)}
+                            commandEditButton={
+                              !componentWorkspace
+                              && instructionRelationshipPolicy(instruction.actions).role !== 'WEB_ELEMENT' ? (
+                                <span className={styles.commandEditRuleCard}>
+                                  <RulesCard
+                                    event={{ color: 'green', rules: 'Edit', ts: 0 }}
+                                    ariaLabel={`Edit ${instruction.name || instruction.actions}`}
+                                    title="Edit this command"
+                                    iconNode={<SquarePen size={14} aria-hidden="true" />}
+                                    animate={false}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      openGridCommandEditor(instruction);
+                                    }}
+                                  />
+                                </span>
+                              ) : null
+                            }
                             moveButtons={renderMoveButtons(instruction.id)}
                             testClick={renderTestClick(instruction.actions, instruction)}
                             onChangeName={setInstructionName}
@@ -859,7 +1067,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                               handleAddConnectedGroupToMemory(instruction);
                             }}
                             onRemove={() => handleRemoveInstruction(instruction.id)}
-                            onOpenCommandEditor={() => handleOpenCommandEditor(instruction)}
+                            onOpenCommandEditor={() => openGridCommandEditor(instruction)}
                           />
                         )}
                       />}

@@ -3409,6 +3409,7 @@ export function useGridData(deps: UseGridDataDeps) {
     // drag / capability state
     activeDraggedInstructionId,
     moveGraphRevision,
+    botJobGraphMutationCapability,
     variableLinks,
     commandConfigurations,
     relationshipChipsV1,

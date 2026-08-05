@@ -48,6 +48,7 @@ export interface InstructionRowProps {
   operations: React.ReactNode;
   deviceOptionsRow: React.ReactNode;
   editButton: React.ReactNode;
+  commandEditButton: React.ReactNode;
   moveButtons: React.ReactNode;
   testClick: React.ReactNode;
   onChangeName: (value: string) => void;
@@ -88,6 +89,7 @@ const InstructionRow: React.FC<InstructionRowProps> = ({
   operations,
   deviceOptionsRow,
   editButton,
+  commandEditButton,
   moveButtons,
   testClick,
   onChangeName,
@@ -162,6 +164,7 @@ const InstructionRow: React.FC<InstructionRowProps> = ({
         {deviceOptionsRow}
         <div className={styles.moveButtons}>
           {editButton}
+          {commandEditButton}
           {moveButtons}
           {testClick}
           <DeleteButton
