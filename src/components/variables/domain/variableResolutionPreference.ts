@@ -6,11 +6,11 @@ export const VARIABLE_RESOLUTION_MODE_PREFERENCE_KEY =
 export const readVariableResolutionModePreference = (): VariableResolutionMode => {
   try {
     return window.localStorage.getItem(VARIABLE_RESOLUTION_MODE_PREFERENCE_KEY)
-      === 'DISTINCT'
-      ? 'DISTINCT'
-      : 'SAME';
+      === 'SAME'
+      ? 'SAME'
+      : 'DISTINCT';
   } catch (_) {
-    return 'SAME';
+    return 'DISTINCT';
   }
 };
 

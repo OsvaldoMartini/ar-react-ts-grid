@@ -26,6 +26,8 @@ test('marks the current surface and dispatches React-owned workspace navigation'
   expect(onAction).toHaveBeenCalledWith('SHOW_COMPONENTS');
   fireEvent.click(screen.getByRole('button', { name: 'Variables' }));
   expect(onAction).toHaveBeenCalledWith('SHOW_VARIABLES');
+  fireEvent.click(screen.getByRole('button', { name: 'Excel Data' }));
+  expect(onAction).toHaveBeenCalledWith('SHOW_EXCEL_DATA');
 });
 
 test('leaves Close ownership to the Bot Job Details page title', () => {

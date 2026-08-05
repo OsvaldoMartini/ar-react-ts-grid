@@ -155,6 +155,9 @@ const initialDashboardPosition = () => {
 const desktopShellPosition = () => ({ x: 0, y: 0 });
 
 const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, onSessionOpen }) => {
+  useEffect(() => {
+    document.title = 'Main';
+  }, []);
   const desktopShell = new URLSearchParams(window.location.search).get('desktopShell') === '1';
   const { webSocket, connected, messages, error } = useWebSocket(socketPort, sessionId);
   const processedMessageCountRef = useRef(0);

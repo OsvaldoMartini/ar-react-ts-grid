@@ -87,7 +87,11 @@ const VariablesExecutionFlowReviewModal: React.FC<
   const smokeStepRefs = useRef(new Map<string, HTMLElement>());
   const smokeBlockRefs = useRef(new Map<string, HTMLElement>());
   const [activeSmokePosition, setActiveSmokePosition] = useState<VariablesSmokeTestPosition | null>(null);
+  const [smokeExecutionTrace, setSmokeExecutionTrace] =
+    useState<readonly VariablesSmokeTestPosition[]>([]);
   const [flowOpen, setFlowOpen] = useState(false);
+  const [dynamicFlowEnabled, setDynamicFlowEnabled] = useState(false);
+  const [dynamicFlowWindow, setDynamicFlowWindow] = useState<Window | null>(null);
   const [selectedVariableId, setSelectedVariableId] = useState<number | null>(null);
   const [commandRemainingByInstructionId, setCommandRemainingByInstructionId] =
     useState<Readonly<Record<number, number>>>({});
@@ -96,6 +100,9 @@ const VariablesExecutionFlowReviewModal: React.FC<
   const selectedBlockIds = controlledBlockFilters === undefined
     ? localSelectedBlockIds
     : controlledBlockFilters;
+  useEffect(() => () => {
+    if (dynamicFlowWindow && !dynamicFlowWindow.closed) dynamicFlowWindow.close();
+  }, [dynamicFlowWindow]);
   const returnFocusRef = useRef<HTMLElement | null>(
     returnFocusElement
     ?? (typeof document !== 'undefined'
@@ -296,6 +303,29 @@ const VariablesExecutionFlowReviewModal: React.FC<
       first.focus();
     }
   };
+  const openDynamicFlowWindow = () => {
+    const existing = dynamicFlowWindow;
+    if (existing && !existing.closed) {
+      existing.focus();
+      setFlowOpen(true);
+      return true;
+    }
+    const popup = window.open(
+      '',
+      `arweb-dynamic-flow-${review.botJobId}`,
+      'popup=yes,width=1400,height=900,resizable=yes,scrollbars=yes',
+    );
+    if (!popup) return false;
+    setDynamicFlowWindow(popup);
+    setFlowOpen(true);
+    return true;
+  };
+  const closeFlow = () => {
+    if (dynamicFlowWindow && !dynamicFlowWindow.closed) dynamicFlowWindow.close();
+    setDynamicFlowWindow(null);
+    setFlowOpen(false);
+    if (dynamicFlowEnabled) setDynamicFlowEnabled(false);
+  };
 
   return (
     <div
@@ -359,18 +389,38 @@ const VariablesExecutionFlowReviewModal: React.FC<
                 <strong>{visibleDiagnostics.length}</strong>
               </div>
             </section>
-            <button
-              type="button"
-              className={styles.flowButton}
-              aria-label={`Open execution flow for ${visibleScopeLabel}`}
-              title={visibleBlocks.length === 0
-                ? 'Select at least one Block to open its flow graph'
-                : `Open separated flow graph${visibleBlocks.length === 1 ? '' : 's'} for ${visibleScopeLabel}`}
-              disabled={visibleBlocks.length === 0}
-              onClick={() => setFlowOpen(true)}
-            >
-              FLOW
-            </button>
+            <div className={styles.flowActions}>
+              <button
+                type="button"
+                className={styles.flowButton}
+                aria-label={`Open execution flow for ${visibleScopeLabel}`}
+                title={visibleBlocks.length === 0
+                  ? 'Select at least one Block to open its flow graph'
+                  : `Open separated flow graph${visibleBlocks.length === 1 ? '' : 's'} for ${visibleScopeLabel}`}
+                disabled={visibleBlocks.length === 0}
+                onClick={() => {
+                  if (dynamicFlowEnabled) openDynamicFlowWindow();
+                  else setFlowOpen(true);
+                }}
+              >
+                FLOW
+              </button>
+              <button
+                type="button"
+                className={`${styles.dynamicFlowToggle} ${dynamicFlowEnabled ? styles.dynamicFlowOn : styles.dynamicFlowOff}`}
+                aria-pressed={dynamicFlowEnabled}
+                title="Show only the execution path reached by the running Smoke Test"
+                onClick={() => {
+                  if (dynamicFlowEnabled) {
+                    closeFlow();
+                    return;
+                  }
+                  if (openDynamicFlowWindow()) setDynamicFlowEnabled(true);
+                }}
+              >
+                {dynamicFlowEnabled ? 'ON' : 'OFF'}
+              </button>
+            </div>
           </div>
 
           {!review.relationshipsAvailable && (
@@ -643,6 +693,7 @@ const VariablesExecutionFlowReviewModal: React.FC<
             runtimeWriteAvailable={runtimeWriteAvailable}
             onCommitRuntimeValue={onCommitRuntimeValue}
             onActivePositionChange={setActiveSmokePosition}
+            onExecutionTraceChange={setSmokeExecutionTrace}
             onCommandRemainingChange={setCommandRemainingByInstructionId}
           />
         </div>
@@ -664,7 +715,11 @@ const VariablesExecutionFlowReviewModal: React.FC<
             botJobName={review.botJobName}
             blocks={visibleBlocks}
             scopeLabel={visibleScopeLabel}
-            onClose={() => setFlowOpen(false)}
+            dynamic={dynamicFlowEnabled}
+            executionTrace={smokeExecutionTrace}
+            activePosition={activeSmokePosition}
+            detachedWindow={dynamicFlowWindow}
+            onClose={closeFlow}
           />
         </Suspense>
       )}

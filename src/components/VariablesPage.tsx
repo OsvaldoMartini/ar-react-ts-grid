@@ -838,6 +838,9 @@ const VariablesPage: React.FC<Props> = ({
   sessionId,
   onClose,
 }) => {
+  useEffect(() => {
+    document.title = 'Variables';
+  }, []);
   const {
     webSocket,
     connected,
@@ -857,7 +860,7 @@ const VariablesPage: React.FC<Props> = ({
   const [selectedInstructionId, setSelectedInstructionId] =
     useState<number | null>(null);
   const [variableResolutionMode, setVariableResolutionMode] =
-    useState<VariableResolutionMode>('SAME');
+    useState<VariableResolutionMode>('DISTINCT');
   const [editingCommandId, setEditingCommandId] = useState<number | null>(null);
   const [addingCommand, setAddingCommand] = useState(false);
   const [sharedBlockFilters, setSharedBlockFilters] = useState<number[]>([]);
@@ -910,7 +913,7 @@ const VariablesPage: React.FC<Props> = ({
   } | null>(null);
   const [remainingVariableKick, setRemainingVariableKick] = useState(0);
   const pendingCheckStartGraphVersionRef = useRef<number | null>(null);
-  const pendingVariableResolutionModeRef = useRef<VariableResolutionMode>('SAME');
+  const pendingVariableResolutionModeRef = useRef<VariableResolutionMode>('DISTINCT');
   const suppressIfFamilyAutoRepairRef = useRef(false);
   const releaseSequenceRef = useRef<{
     instructionIds: readonly number[];
@@ -963,7 +966,7 @@ const VariablesPage: React.FC<Props> = ({
     const previous = snapshotRef.current;
     snapshotRef.current = next;
     setSnapshot(next);
-    setVariableResolutionMode(next.preferences?.variableResolutionMode ?? 'SAME');
+    setVariableResolutionMode(next.preferences?.variableResolutionMode ?? 'DISTINCT');
     setSharedBlockFilters(current => previous === null || ownerChanged
       ? next.blocks.map(block => block.id)
       : current.filter(blockId => next.blocks.some(block => block.id === blockId)));

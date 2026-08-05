@@ -50,6 +50,7 @@ export interface VariablesSmokeTestPanelProps {
   runtimeWriteAvailable?: boolean;
   onCommitRuntimeValue?: (variableId: number, value: string) => boolean;
   onActivePositionChange?: (position: VariablesSmokeTestPosition | null) => void;
+  onExecutionTraceChange?: (positions: readonly VariablesSmokeTestPosition[]) => void;
   onCommandRemainingChange?: (remaining: CommandRemainingByInstructionId) => void;
 }
 
@@ -105,6 +106,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   runtimeWriteAvailable = false,
   onCommitRuntimeValue,
   onActivePositionChange,
+  onExecutionTraceChange,
   onCommandRemainingChange,
 }) => {
   const [status, setStatus] = useState<VariablesSmokeTestStatus>('IDLE');
@@ -121,6 +123,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   const conditionalStateRef = useRef<ConditionalExecutionState>(
     initialConditionalExecutionState(),
   );
+  const executionTraceRef = useRef<readonly VariablesSmokeTestPosition[]>([]);
   const previewPlan = useMemo(
     () => buildVariablesSmokeTestPlan(review, selectedBlockIds),
     [review, selectedBlockIds],
@@ -177,6 +180,8 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     setCounters(EMPTY_COUNTERS);
     setReportCounter(null);
     onActivePositionChange?.(null);
+    executionTraceRef.current = [];
+    onExecutionTraceChange?.([]);
     setStatus(nextProgram.items.length === 0 ? 'COMPLETED' : 'RUNNING');
     setEntries([]);
   };
@@ -197,10 +202,13 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
 
     const item = executionItems[itemCursor];
     const blockKey = variablesSmokeTestBlockKey(item.block);
-    onActivePositionChange?.({
+    const activePosition = {
       blockKey,
       stepKey: item.kind === 'STEP' ? item.step.key : null,
-    });
+    };
+    onActivePositionChange?.(activePosition);
+    executionTraceRef.current = [...executionTraceRef.current, activePosition];
+    onExecutionTraceChange?.(executionTraceRef.current);
     const activeStep = item.kind === 'STEP' && item.step.active;
     const loopTransition = activeStep
       ? resolveLoopCommandTransition(
@@ -370,6 +378,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     conditionalIndex,
     itemCursor,
     onActivePositionChange,
+    onExecutionTraceChange,
     onCommitRuntimeValue,
     onCommandRemainingChange,
     plan,
@@ -382,8 +391,9 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
 
   useEffect(() => () => {
     onActivePositionChange?.(null);
+    onExecutionTraceChange?.([]);
     onCommandRemainingChange?.({});
-  }, [onActivePositionChange, onCommandRemainingChange]);
+  }, [onActivePositionChange, onCommandRemainingChange, onExecutionTraceChange]);
 
   const activePlan = plan ?? previewPlan;
   const currentItem = status === 'RUNNING' ? executionItems[itemCursor] ?? null : null;

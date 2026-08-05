@@ -80,6 +80,12 @@ const BotJobDetailsHeader: React.FC<BotJobDetailsHeaderProps> = ({
         tone: 'primary',
         disabled: pending || unavailable || !canUseWorkspaceActions,
       },
+      {
+        id: 'SHOW_EXCEL_DATA',
+        label: pendingAction === 'SHOW_EXCEL_DATA' ? 'Opening Excel Data…' : 'Excel Data',
+        tone: 'primary',
+        disabled: pending || unavailable || !canUseWorkspaceActions,
+      },
       { id: 'SHOW_PRE_SCAN', label: 'Pre Scan', tone: 'success', active: activeSurface === 'preScan', disabled: pending || unavailable || !canUsePreScan || activeSurface === 'preScan' },
     ];
   }, [activeSurface, botJobId, busy, canShowComponents, canUsePreScan, canUseWorkspaceActions, connected, pendingAction]);

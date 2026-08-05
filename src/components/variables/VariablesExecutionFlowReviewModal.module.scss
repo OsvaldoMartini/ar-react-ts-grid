@@ -183,9 +183,9 @@
   font-weight: 900;
   gap: 4px;
   justify-content: center;
-  min-height: 24px;
-  min-width: 30px;
-  padding: 3px 7px;
+  height: 28px;
+  min-width: 48px;
+  padding: 4px 10px;
   white-space: nowrap;
 
   &:hover:not(:disabled) {
@@ -201,6 +201,43 @@
   &:disabled {
     cursor: not-allowed;
   }
+}
+
+.flowActions {
+  align-items: center;
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 6px;
+}
+
+.dynamicFlowToggle {
+  appearance: none;
+  border: 1px solid;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.6rem;
+  font-weight: 900;
+  height: 28px;
+  min-width: 48px;
+  padding: 4px 10px;
+
+  &:focus-visible {
+    outline: 3px solid rgba(46, 117, 182, 0.25);
+    outline-offset: 2px;
+  }
+}
+
+.dynamicFlowOn {
+  background: #e7f7ed;
+  border-color: #3a9a5b;
+  color: #1d6d38;
+}
+
+.dynamicFlowOff {
+  background: #fff0f0;
+  border-color: #d45a5a;
+  color: #a61b1b;
 }
 
 .relationshipsUnavailable {

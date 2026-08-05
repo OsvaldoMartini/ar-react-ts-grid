@@ -983,9 +983,9 @@ export const normalizeVariablesWorkspaceSnapshot = (
     mutationCapability,
     preferences: {
       variableResolutionMode:
-        asObject(candidate.preferences)?.variableResolutionMode === 'DISTINCT'
-          ? 'DISTINCT'
-          : 'SAME',
+        asObject(candidate.preferences)?.variableResolutionMode === 'SAME'
+          ? 'SAME'
+          : 'DISTINCT',
     },
   };
 };

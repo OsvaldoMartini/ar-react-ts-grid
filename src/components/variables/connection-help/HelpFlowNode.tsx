@@ -29,6 +29,8 @@ export interface HelpFlowNodeData extends Record<string, unknown> {
   detail: string;
   eyebrow?: string;
   tone: HelpFlowNodeTone;
+  compact?: boolean;
+  callCount?: number;
 }
 
 export type HelpFlowNodeModel = Node<HelpFlowNodeData, 'helpFlow'>;
@@ -53,7 +55,11 @@ const toneIcon = (tone: HelpFlowNodeTone): React.ReactNode => {
 };
 
 const HelpFlowNode: React.FC<NodeProps<HelpFlowNodeModel>> = ({ data }) => (
-  <article className={styles.xyNode} data-tone={data.tone}>
+  <article
+    className={styles.xyNode}
+    data-tone={data.tone}
+    data-compact={data.compact === true ? 'true' : 'false'}
+  >
     <Handle id="targetLeft" type="target" position={Position.Left} />
     <Handle id="targetRight" type="target" position={Position.Right} />
     <Handle id="targetTop" type="target" position={Position.Top} />
@@ -64,6 +70,11 @@ const HelpFlowNode: React.FC<NodeProps<HelpFlowNodeModel>> = ({ data }) => (
     <Handle id="sourceBottom" type="source" position={Position.Bottom} />
 
     <div className={styles.xyNodeIcon}>{toneIcon(data.tone)}</div>
+    {(data.callCount ?? 0) > 1 && (
+      <b className={styles.xyNodeCallCount} aria-label={`${data.callCount} calls`}>
+        ×{data.callCount}
+      </b>
+    )}
     <div className={styles.xyNodeText}>
       {data.eyebrow && <span>{data.eyebrow}</span>}
       <strong>{data.title}</strong>

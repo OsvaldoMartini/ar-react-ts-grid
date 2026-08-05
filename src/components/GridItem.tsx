@@ -134,6 +134,9 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
   onDetachedClose,
   workspaceMode,
 }) => {
+  React.useEffect(() => {
+    document.title = 'Bot Jobs';
+  }, []);
   // Phase 6, step 10 — hook composition + non-render wiring now lives in the
   // composition-root hook useInstructionGrid. GridItem stays purely presentational,
   // destructuring the same names its render helpers / JSX / dead code already use.

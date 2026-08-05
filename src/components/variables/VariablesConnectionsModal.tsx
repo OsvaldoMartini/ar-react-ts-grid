@@ -180,7 +180,7 @@ const VariablesConnectionsModal: React.FC<
   onCancel,
   onConfirm,
   onCreateCheckValueDefaults,
-  variableMode: controlledVariableMode = 'SAME',
+  variableMode: controlledVariableMode = 'DISTINCT',
   onVariableModeChange,
 }) => {
   const titleId = useId();

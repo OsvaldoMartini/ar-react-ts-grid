@@ -25,6 +25,7 @@ import MemoryDragDemo from './components/MemoryDragDemo';
 import PagesOpen, { PAGES_OPEN_SESSION_ID } from './components/PagesOpen';
 import CommandEditorPage, { COMMAND_EDITOR_SESSION_ID } from './components/CommandEditorPage';
 import VariablesPage, { VARIABLES_MANAGER_SESSION_ID } from './components/VariablesPage';
+import ExcelDataPage, { EXCEL_DATA_SESSION_ID } from './components/ExcelDataPage';
 import InfoPage, { INFO_PAGE_SESSION_ID } from './components/InfoPage';
 import LicensePage, { LICENSE_PAGE_SESSION_ID } from './components/LicensePage';
 import ActivationRequired from './components/ActivationRequired';
@@ -282,6 +283,7 @@ const App: React.FC = () => {
           PAGES_OPEN_SESSION_ID,
           COMMAND_EDITOR_SESSION_ID,
           VARIABLES_MANAGER_SESSION_ID,
+          EXCEL_DATA_SESSION_ID,
           INFO_PAGE_SESSION_ID,
           LICENSE_PAGE_SESSION_ID,
         ]
@@ -703,6 +705,14 @@ const App: React.FC = () => {
       )}
       {sessionId === VARIABLES_MANAGER_SESSION_ID && (
         <VariablesPage
+          key={sessionId}
+          socketPort={socketPort}
+          sessionId={sessionId}
+          onClose={closeDetachedWorkspace}
+        />
+      )}
+      {sessionId === EXCEL_DATA_SESSION_ID && (
+        <ExcelDataPage
           key={sessionId}
           socketPort={socketPort}
           sessionId={sessionId}
