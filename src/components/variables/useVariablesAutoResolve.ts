@@ -41,6 +41,7 @@ export const useVariablesAutoResolve = ({
   const submit = useCallback((
     instructionIds: readonly number[],
     variableMode: VariableResolutionMode,
+    operation: 'RESOLVE' | 'RELEASE' = 'RESOLVE',
   ): string | null => {
     const capability = snapshot?.mutationCapability;
     if (!snapshot || !capability || !connected || pendingRef.current
@@ -62,6 +63,7 @@ export const useVariablesAutoResolve = ({
           graphRevision: capability.graphRevision,
           instructionIds: [...new Set(instructionIds)],
           variableMode,
+          operation,
         }),
       }));
       return requestId;

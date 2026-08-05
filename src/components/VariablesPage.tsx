@@ -3432,81 +3432,19 @@ const VariablesPage: React.FC<Props> = ({
       return;
     }
     if (run.phase === 'LEFT') {
-      const next = facts.find(fact => {
-        const command = commandsById.get(fact.instructionId);
-        return fact.variableId !== null
-          && Boolean(command && requiredVariableSlots(command.command).includes('RIGHT'));
-      });
-      if (!next) {
-        run.phase = 'RIGHT';
-        setReleaseSequenceKick(kick => kick + 1);
-        return;
-      }
-      run.awaitingInstructionId = next.instructionId;
-      const requestId = submitCheckValueLeft({
-        ...baseDraft,
-        instructionRelationPatches: [],
-        variableBindingPatches: [{
-          instructionId: next.instructionId,
-          operation: 'CLEAR',
-          expected: { value: next.variableId },
-          replacement: { value: null },
-        }],
-      }, {
-        committed: () => sendWorkspaceRequest('variablesWorkspace.refresh'),
-        refused: (_response, reason) => {
-          releaseSequenceRef.current = null;
-          setStatus({ level: 'error', text: `LEFT release was refused (${reason}).` });
-        },
-      }, VARIABLES_REACT_AUTHORED_PROFILE);
-      if (!requestId) releaseSequenceRef.current = null;
-      return;
-    }
-    if (run.phase === 'RIGHT') {
-      const next = snapshot.commands.find(command =>
-        command.id !== null
-        && scopeIds.has(command.id)
-        && requiredVariableSlots(command.command).includes('RIGHT')
-        && connectedVariableSlots(command).has('RIGHT'));
-      if (!next || next.id === null) {
-        run.phase = 'OTHER';
-        setReleaseSequenceKick(kick => kick + 1);
-        return;
-      }
-      run.awaitingInstructionId = next.id;
-      const requestId = submitCheckValueRight(null, [next.id], 'DISCONNECT');
-      if (!requestId) releaseSequenceRef.current = null;
-      return;
-    }
-    const next = facts.find(fact => {
-      const command = commandsById.get(fact.instructionId);
-      return fact.variableId !== null
-        && !(command && requiredVariableSlots(command.command).includes('RIGHT'));
-    });
-    if (!next) {
       releaseSequenceRef.current = null;
-      setPendingConnections(null);
-      setStatus({ level: 'ok', text: 'All scoped connections released.' });
+      const batchReleaseRequestId = submitVariableAutoResolve(
+        run.instructionIds,
+        pendingVariableResolutionModeRef.current,
+        'RELEASE',
+      );
+      if (!batchReleaseRequestId) {
+        setStatus({ level: 'error', text: 'The variable release batch could not be submitted.' });
+      } else {
+        setStatus({ level: 'warn', text: 'Releasing all scoped variable connections in one transaction...' });
+      }
       return;
     }
-    run.awaitingInstructionId = next.instructionId;
-    const requestId = submitGraphMutationCommandVariable({
-      ...baseDraft,
-      instructionRelationPatches: [],
-      variableBindingPatches: [{
-        instructionId: next.instructionId,
-        operation: 'CLEAR',
-        expected: { value: next.variableId },
-        replacement: { value: null },
-      }],
-    }, {
-      committed: () => sendWorkspaceRequest('variablesWorkspace.refresh'),
-      refused: (_response, reason) => {
-        releaseSequenceRef.current = null;
-        setStatus({ level: 'error', text: `Remaining-variable release was refused (${reason}).` });
-      },
-    }, VARIABLES_REACT_AUTHORED_PROFILE);
-    if (!requestId) releaseSequenceRef.current = null;
   }, [
     pendingCheckValueRightRequestId,
     pendingCheckValueLeftRequestId,
@@ -3514,10 +3452,8 @@ const VariablesPage: React.FC<Props> = ({
     releaseSequenceKick,
     sendWorkspaceRequest,
     snapshot,
-    submitCheckValueRight,
-    submitCheckValueLeft,
-    submitGraphMutationCommandVariable,
     submitGraphMutation,
+    submitVariableAutoResolve,
   ]);
 
   const startVariableAutoResolveLegacy = useCallback(() => {
