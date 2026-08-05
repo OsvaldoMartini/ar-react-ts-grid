@@ -703,7 +703,7 @@ const normalizeCommands = (candidate: Record<string, any>): VariableCommandLink[
 };
 
 const healthFor = (
-  owner: VariableInstructionNode | null,
+  _owner: VariableInstructionNode | null,
   commands: VariableCommandLink[],
   diagnostics: VariableDiagnostic[],
   unused: boolean,
@@ -718,8 +718,7 @@ const healthFor = (
   }
   const producerCount = commands.filter(command => command.role === 'PRODUCER').length;
   if (
-    !owner
-    || diagnostics.length > 0
+    diagnostics.length > 0
     || commands.some(command =>
       command.role === 'INVALID_LINK' || command.diagnostics.length > 0)
     || producerCount > 1

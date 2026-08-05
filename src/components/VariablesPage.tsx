@@ -642,8 +642,9 @@ const buildPendingReleaseConnections = (
 const InstructionCard: React.FC<{
   instruction: VariableInstructionNode;
   tone: 'owner' | 'producer' | 'consumer' | 'literal' | 'invalid';
+  connectedVariableId?: number;
   emptyLabel?: never;
-}> = ({ instruction, tone }) => (
+}> = ({ instruction, tone, connectedVariableId }) => (
   <article
     className={`${styles.instructionCard} ${styles[`instruction_${tone}`]}`}
     title={instruction.id ? `Instruction ${instruction.id}` : undefined}
@@ -665,6 +666,13 @@ const InstructionCard: React.FC<{
     {(instruction.active === false || instruction.blockActive === false) && (
       <span className={styles.inactivePill}>Inactive in execution</span>
     )}
+    {connectedVariableId !== undefined && instruction.variableSlots
+      ?.filter(slot => slot.variableId === connectedVariableId)
+      .map(slot => (
+        <span key={`${instruction.id}:${slot.slot}`} className={styles.slotPill}>
+          {slot.slot}
+        </span>
+      ))}
   </article>
 );
 
@@ -685,7 +693,8 @@ const RelationGroup: React.FC<{
   items: VariableCommandLink[];
   tone: 'consumer' | 'literal' | 'invalid';
   emptyText: string;
-}> = ({ title, count, items, tone, emptyText }) => (
+  connectedVariableId?: number;
+}> = ({ title, count, items, tone, emptyText, connectedVariableId }) => (
   <section className={styles.relationGroup}>
     <div className={styles.relationGroupTitle}>
       <span>{title}</span>
@@ -698,6 +707,7 @@ const RelationGroup: React.FC<{
             key={`${tone}:${command.id ?? command.name}`}
             instruction={command}
             tone={tone}
+            connectedVariableId={connectedVariableId}
           />
         ))
         : <span className={styles.relationEmpty}>{emptyText}</span>}
@@ -1675,6 +1685,16 @@ const VariablesPage: React.FC<Props> = ({
       entry => entry.variableId === selectedVariable.id,
     ) ?? null
     : null;
+  const selectedWebElementEndpoints = selectedVariable && snapshot
+    ? [...new Set(selectedVariable.commands
+      .filter(command => ['GET', 'SET'].includes(
+        canonicalInstructionAction(command.command),
+      ))
+      .map(command => command.parentId)
+      .filter((id): id is number => id !== null))]
+      .map(parentId => snapshot.commands.find(command => command.id === parentId) ?? null)
+      .filter((command): command is VariableInstructionNode => command !== null)
+    : [];
   const orderedRuntimeMemory = useMemo(
     () => snapshot
       ? orderRuntimeVariablesByExecution(
@@ -3620,7 +3640,6 @@ const VariablesPage: React.FC<Props> = ({
               <span><b>{snapshot?.summary.variableCount ?? 0}</b> Variables</span>
               <span><b>{snapshot?.summary.producerCount ?? 0}</b> GET writes</span>
               <span><b>{snapshot?.summary.consumerCount ?? 0}</b> Reads</span>
-              <span><b>{snapshot?.summary.literalAssignmentCount ?? 0}</b> Literal SET</span>
               <span><b>{snapshot?.edges.length ?? 0}</b> Graph links</span>
               <span className={(snapshot?.summary.warningCount ?? 0) > 0 ? styles.summaryWarning : ''}>
                 <b>{snapshot?.summary.warningCount ?? 0}</b> Diagnostics
@@ -3913,20 +3932,20 @@ const VariablesPage: React.FC<Props> = ({
                       <div className={styles.flowColumn}>
                         <div className={styles.flowTitle}>
                           <span>1</span>
-                          Declaration Web Field
+                          Web Element endpoints
                         </div>
-                        {selectedVariable.owner
-                          ? (
+                        {selectedWebElementEndpoints.length > 0
+                          ? selectedWebElementEndpoints.map(endpoint => (
                             <InstructionCard
-                              instruction={selectedVariable.owner}
+                              key={`endpoint:${endpoint.id}`}
+                              instruction={endpoint}
                               tone="owner"
                             />
-                          )
+                          ))
                           : (
                             <EmptyRelation
-                              title="Owner missing"
-                              detail="The declaration no longer resolves to a Web Field."
-                              danger
+                              title="No Web Element endpoint"
+                              detail="This variable currently has no GET source or SET target Web Element."
                             />
                           )}
                       </div>
@@ -3945,17 +3964,13 @@ const VariablesPage: React.FC<Props> = ({
                                 key={`producer:${producer.id ?? producer.name}`}
                                 instruction={producer}
                                 tone="producer"
+                                connectedVariableId={selectedVariable.id}
                               />
                             ))
                             : (
                               <EmptyRelation
-                                title={(selectedValuePresentation?.activeConsumers.length ?? 0) > 0
-                                  ? 'GET missing'
-                                  : 'No active GET producer'}
-                                detail={(selectedValuePresentation?.activeConsumers.length ?? 0) > 0
-                                  ? 'Active readers exist, but no active GET command produces a value.'
-                                  : 'No active GET producer is present in the declared graph.'}
-                                danger={(selectedValuePresentation?.activeConsumers.length ?? 0) > 0}
+                                title="No active GET producer"
+                                detail="The variable may still receive a configured, manual, or runtime value."
                               />
                             )}
                         </div>
@@ -3990,7 +4005,8 @@ const VariablesPage: React.FC<Props> = ({
                           count={selectedVariable.consumers.length}
                           items={selectedVariable.consumers}
                           tone="consumer"
-                          emptyText="No E, CK, PDF CHECK, or CSV CHECK readers."
+                          emptyText="No SET, ExcelWrite, or CheckValue readers."
+                          connectedVariableId={selectedVariable.id}
                         />
                         {(selectedVariable.invalidLinks.length > 0) && (
                           <RelationGroup
@@ -4003,49 +4019,6 @@ const VariablesPage: React.FC<Props> = ({
                         )}
                       </div>
                     </section>
-
-                    {selectedVariable.literalAssignments.length > 0 && (
-                      <section className={styles.literalLane}>
-                        <div className={styles.literalLaneHeading}>
-                          <div>
-                            <strong>Literal SET assignments</strong>
-                            <span>
-                              These commands write a literal into the declaration Web Field;
-                              they do not read the variable at runtime.
-                            </span>
-                          </div>
-                          <b>{selectedVariable.literalAssignments.length}</b>
-                        </div>
-                        <div className={styles.literalFlow}>
-                          <div className={styles.literalCommands}>
-                            {selectedVariable.literalAssignments.map(command => (
-                              <InstructionCard
-                                key={`literal:${command.id ?? command.name}`}
-                                instruction={command}
-                                tone="literal"
-                              />
-                            ))}
-                          </div>
-                          <div className={styles.literalArrow} aria-hidden="true">→</div>
-                          <div className={styles.literalTarget}>
-                            {selectedVariable.owner
-                              ? (
-                                <InstructionCard
-                                  instruction={selectedVariable.owner}
-                                  tone="owner"
-                                />
-                              )
-                              : (
-                                <EmptyRelation
-                                  title="Target Web Field missing"
-                                  detail="The literal SET target cannot be resolved."
-                                  danger
-                                />
-                              )}
-                          </div>
-                        </div>
-                      </section>
-                    )}
 
                     {selectedVariable.diagnostics.length > 0 && (
                       <DiagnosticsPanel

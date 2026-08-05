@@ -13,7 +13,7 @@ import { canonicalInstructionAction } from './bot-job-details/grid/domain/instru
  * (variablesWorkspace.contract.ts) validates it identically to a Java-derived graph.
  */
 
-const CONSUMER_ACTIONS = new Set(['E', 'CK', 'PDF CHECK', 'CSV CHECK']);
+const CONSUMER_ACTIONS = new Set(['SET', 'E', 'CK', 'PDF CHECK', 'CSV CHECK']);
 
 export const isVariableProducerAction = (action: unknown): boolean =>
   canonicalInstructionAction(typeof action === 'string' ? action : '') === 'GET';
@@ -94,7 +94,8 @@ const parseRawCommand = (value: unknown): RawCommand | null => {
   if (!raw) return null;
   const id = intOrNull(raw.instructionId);
   const variableId = intOrNull(raw.variableId);
-  if (id === null) return null;
+  const action = text(raw.action);
+  if (id === null || !action.trim()) return null;
   const variableSlots = Array.isArray(raw.variableSlots)
     ? raw.variableSlots.flatMap((value: unknown) => {
         const slot = asObject(value);
@@ -108,7 +109,7 @@ const parseRawCommand = (value: unknown): RawCommand | null => {
   return {
     id,
     name: text(raw.instructionName),
-    action: text(raw.action),
+    action,
     operation: text(raw.operation),
     onHoldSeconds: intOrNull(raw.onHoldSeconds ?? raw.on_hold_seconds),
     variableId,
@@ -153,10 +154,21 @@ const parseRawVariable = (value: unknown): RawVariable | null => {
   };
 };
 
-const role = (action: string): string => {
-  if (isVariableProducerAction(action)) return 'PRODUCER';
-  if (isVariableConsumerAction(action)) return 'CONSUMER';
-  if (canonicalInstructionAction(action) === 'SET') return 'LITERAL_ASSIGNMENT';
+const role = (command: RawCommand, variableId: number): string => {
+  const connectedSlots = new Set(command.variableSlots
+    .filter(slot => slot.variableId === variableId)
+    .map(slot => slot.slot.trim().toUpperCase()));
+  const action = canonicalInstructionAction(command.action);
+  if (action === 'GET' && connectedSlots.has('GET_WRITE')) return 'PRODUCER';
+  if (action === 'SET' && connectedSlots.has('READ_SET')) return 'CONSUMER';
+  if (action === 'E' && connectedSlots.has('READ')) return 'CONSUMER';
+  if (['CK', 'PDF CHECK', 'CSV CHECK'].includes(action)
+    && (connectedSlots.has('LEFT') || connectedSlots.has('RIGHT'))) return 'CONSUMER';
+  // Compatibility for snapshots created before slot facts were available.
+  if (command.variableSlots.length === 0) {
+    if (isVariableProducerAction(action)) return 'PRODUCER';
+    if (isVariableConsumerAction(action)) return 'CONSUMER';
+  }
   return 'INVALID_LINK';
 };
 
@@ -223,21 +235,16 @@ export const buildVariableRelationshipGraph = (payload: unknown): Raw | null => 
 
   const commandsByVariable = new Map<number, RawCommand[]>();
   rawCommands.forEach((command) => {
-    if (command.variableId === null) return;
-    const rows = commandsByVariable.get(command.variableId) ?? [];
-    rows.push(command);
-    commandsByVariable.set(command.variableId, rows);
+    const connectedVariableIds = command.variableSlots.length > 0
+      ? [...new Set(command.variableSlots.map(slot => slot.variableId))]
+      : command.variableId === null ? [] : [command.variableId];
+    connectedVariableIds.forEach((variableId) => {
+      const rows = commandsByVariable.get(variableId) ?? [];
+      rows.push(command);
+      commandsByVariable.set(variableId, rows);
+    });
   });
   commandsByVariable.forEach(rows => rows.sort(commandOrder));
-
-  const declarationsByOwner = new Map<number, number>();
-  rawVariables.forEach((variable) => {
-    if (variable.ownerInstructionId === null) return;
-    declarationsByOwner.set(
-      variable.ownerInstructionId,
-      (declarationsByOwner.get(variable.ownerInstructionId) ?? 0) + 1,
-    );
-  });
 
   const variableJson: Raw[] = [];
   const edges: Raw[] = [];
@@ -250,52 +257,13 @@ export const buildVariableRelationshipGraph = (payload: unknown): Raw | null => 
   let warningCount = 0;
 
   const variableIds = new Set(rawVariables.map(variable => variable.id));
+  const commandIds = new Set(rawCommands.map(command => command.id));
 
   for (const variable of rawVariables) {
     // The owning Web Field declares the variable. A stale self-link must not turn
     // that field into an apparent executable variable command.
-    const related = (commandsByVariable.get(variable.id) ?? []).filter(
-      command => variable.resolvedOwnerId === null || command.id !== variable.resolvedOwnerId,
-    );
+    const related = commandsByVariable.get(variable.id) ?? [];
     const diagnostics: Raw[] = [];
-
-    if (variable.ownerInstructionId === null || variable.resolvedOwnerId === null) {
-      diagnostics.push(diagnostic(
-        'MISSING_OWNER',
-        'ERROR',
-        'The variable declaration does not have an authoritative Web Field.',
-        variable.id,
-        variable.ownerInstructionId,
-      ));
-      warningCount += 1;
-    } else {
-      edges.push(edge(
-        `owner:${variable.ownerInstructionId}:variable:${variable.id}`,
-        `instruction:${variable.ownerInstructionId}`,
-        `variable:${variable.id}`,
-        'DECLARES',
-      ));
-      if ((declarationsByOwner.get(variable.ownerInstructionId) ?? 0) > 1) {
-        diagnostics.push(diagnostic(
-          'DUPLICATE_DECLARATION',
-          'WARNING',
-          'This Web Field owns more than one variable declaration.',
-          variable.id,
-          variable.ownerInstructionId,
-        ));
-        warningCount += 1;
-      }
-      if (variable.ownerBlockId === null || variable.resolvedOwnerBlockId === null) {
-        diagnostics.push(diagnostic(
-          'OWNER_BLOCK_MISMATCH',
-          'ERROR',
-          'The variable owner is not attached to a block in this Bot Job.',
-          variable.id,
-          variable.ownerInstructionId,
-        ));
-        warningCount += 1;
-      }
-    }
 
     const effectiveRelated = related.filter(isEffectivelyActive);
     inactiveLinkCount += related.length - effectiveRelated.length;
@@ -308,20 +276,10 @@ export const buildVariableRelationshipGraph = (payload: unknown): Raw | null => 
     producerCount += producers.length;
     consumerCount += consumers.length;
     literalAssignmentCount += effectiveRelated.filter(
-      command => canonicalInstructionAction(command.action) === 'SET',
+      command => role(command, variable.id) === 'LITERAL_ASSIGNMENT',
     ).length;
     if (related.length === 0) unusedCount += 1;
 
-    if (consumers.length > 0 && producers.length === 0) {
-      diagnostics.push(diagnostic(
-        'MISSING_PRODUCER',
-        'ERROR',
-        'One or more commands read this variable, but no GET command produces it.',
-        variable.id,
-        null,
-      ));
-      warningCount += 1;
-    }
     if (producers.length > 1) {
       diagnostics.push(diagnostic(
         'MULTIPLE_PRODUCERS',
@@ -350,7 +308,7 @@ export const buildVariableRelationshipGraph = (payload: unknown): Raw | null => 
 
     const commandRows: Raw[] = [];
     for (const command of related) {
-      const commandRole = role(command.action);
+      const commandRole = role(command, variable.id);
       commandRows.push(commandJson(command, commandRole));
       if (command.blockId === null || command.resolvedBlockId === null) {
         diagnostics.push(diagnostic(
@@ -361,32 +319,14 @@ export const buildVariableRelationshipGraph = (payload: unknown): Raw | null => 
           command.id,
         ));
         warningCount += 1;
-      } else if (
-        variable.resolvedOwnerBlockId !== null
-        && variable.resolvedOwnerBlockId !== command.resolvedBlockId
-      ) {
-        diagnostics.push(diagnostic(
-          'COMMAND_OWNER_BLOCK_MISMATCH',
-          'WARNING',
-          'A linked command is stored in a different block than its variable owner.',
-          variable.id,
-          command.id,
-        ));
-        warningCount += 1;
       }
-      if (
-        commandRole === 'PRODUCER'
-        && variable.resolvedOwnerId !== null
-        && (command.parentId === null
-          || command.parentId !== variable.resolvedOwnerId
-          || (variable.resolvedOwnerBlockId !== null
-            && command.resolvedBlockId !== null
-            && variable.resolvedOwnerBlockId !== command.resolvedBlockId))
-      ) {
+      const action = canonicalInstructionAction(command.action);
+      if ((action === 'GET' || action === 'SET')
+        && (command.parentId === null || !commandIds.has(command.parentId))) {
         diagnostics.push(diagnostic(
-          'PRODUCER_OWNER_MISMATCH',
+          'COMMAND_WEB_ELEMENT_MISSING',
           'ERROR',
-          "The GET producer does not point to this variable's owning Web Field.",
+          `${action} #${command.id} does not resolve to a Web Element parent.`,
           variable.id,
           command.id,
         ));
@@ -406,13 +346,6 @@ export const buildVariableRelationshipGraph = (payload: unknown): Raw | null => 
           `instruction:${command.id}`,
           'READS',
         ));
-      } else if (commandRole === 'LITERAL_ASSIGNMENT' && variable.ownerInstructionId !== null) {
-        edges.push(edge(
-          `command:${command.id}:assigns:${variable.ownerInstructionId}`,
-          `instruction:${command.id}`,
-          `instruction:${variable.ownerInstructionId}`,
-          'ASSIGNS_LITERAL',
-        ));
       } else if (commandRole === 'INVALID_LINK') {
         diagnostics.push(diagnostic(
           'NON_VARIABLE_ACTION_LINK',
@@ -431,19 +364,6 @@ export const buildVariableRelationshipGraph = (payload: unknown): Raw | null => 
       }
     }
 
-    const owner = variable.ownerInstructionId === null || variable.resolvedOwnerId === null
-      ? null
-      : {
-          instructionId: variable.ownerInstructionId,
-          instructionName: variable.ownerName,
-          action: variable.ownerAction,
-          blockId: variable.ownerBlockId,
-          blockName: variable.ownerBlockName,
-          blockOrder: variable.ownerBlockOrder,
-          instructionOrder: variable.ownerInstructionOrder,
-          active: variable.ownerActive,
-          blockActive: variable.ownerBlockActive,
-        };
     variableJson.push({
       id: variable.id,
       name: variable.name,
@@ -451,7 +371,7 @@ export const buildVariableRelationshipGraph = (payload: unknown): Raw | null => 
       configuredValue: variable.configuredValue,
       localFormat: variable.localFormat,
       delimiter: variable.delimiter,
-      owner,
+      owner: null,
       unused: related.length === 0,
       commands: commandRows,
       diagnostics,
@@ -459,16 +379,20 @@ export const buildVariableRelationshipGraph = (payload: unknown): Raw | null => 
   }
 
   for (const command of rawCommands) {
-    if (command.variableId === null) continue;
-    if (variableIds.has(command.variableId)) continue;
-    graphDiagnostics.push(diagnostic(
-      'DANGLING_VARIABLE_LINK',
-      'ERROR',
-      'An instruction references a variable that does not exist in this Bot Job.',
-      command.variableId,
-      command.id,
-    ));
-    warningCount += 1;
+    const linkedIds = command.variableSlots.length > 0
+      ? [...new Set(command.variableSlots.map(slot => slot.variableId))]
+      : command.variableId === null ? [] : [command.variableId];
+    for (const linkedId of linkedIds) {
+      if (variableIds.has(linkedId)) continue;
+      graphDiagnostics.push(diagnostic(
+        'DANGLING_VARIABLE_LINK',
+        'ERROR',
+        'An instruction slot references a variable that does not exist in this Bot Job.',
+        linkedId,
+        command.id,
+      ));
+      warningCount += 1;
+    }
   }
 
   return {
@@ -488,7 +412,7 @@ export const buildVariableRelationshipGraph = (payload: unknown): Raw | null => 
       .sort(commandOrder)
       .map(command => commandJson(
         command,
-        command.variableId === null ? 'INVALID_LINK' : role(command.action),
+        command.variableId === null ? 'INVALID_LINK' : role(command, command.variableId),
       )),
     variables: variableJson,
     edges,

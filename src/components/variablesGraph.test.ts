@@ -97,7 +97,7 @@ test('classifies canonical command roles and builds every edge type', () => {
   const graph = buildVariableRelationshipGraph(payload(
     [ownedVariable(1, 100), ownedVariable(2, 101)],
     [
-      rawCommand({ instructionId: 100, action: 'CLICK', instructionOrder: 1 }),
+      rawCommand({ instructionId: 100, action: 'CLICK', variableId: null, instructionOrder: 1 }),
       rawCommand({ instructionId: 110, action: 'GET', parentId: 100, instructionOrder: 3 }),
       rawCommand({ instructionId: 111, action: 'E', blockId: 11, resolvedBlockId: 11, blockOrder: 2, instructionOrder: 1 }),
       rawCommand({ instructionId: 112, action: 'CK', blockId: 11, resolvedBlockId: 11, blockOrder: 2, instructionOrder: 2 }),
@@ -112,7 +112,7 @@ test('classifies canonical command roles and builds every edge type', () => {
   if (!graph) return;
   const first = variableById(graph, 1);
   const second = variableById(graph, 2);
-  // The stale owner self-link (100) is excluded from executable commands.
+  // The Web Element endpoint is not a variable-linked executable command.
   expect(first.commands).toHaveLength(7);
   expect(second.commands).toHaveLength(0);
   expect(first.unused).toBe(false);
@@ -128,15 +128,13 @@ test('classifies canonical command roles and builds every edge type', () => {
 
   expect(graph.summary.variableCount).toBe(2);
   expect(graph.summary.producerCount).toBe(1);
-  expect(graph.summary.consumerCount).toBe(4);
-  expect(graph.summary.literalAssignmentCount).toBe(1);
+  expect(graph.summary.consumerCount).toBe(5);
+  expect(graph.summary.literalAssignmentCount).toBe(0);
   expect(graph.summary.unusedCount).toBe(1);
 
   const edgeTypes = graph.edges.map((edge: Raw) => edge.type);
-  expect(edgeTypes).toContain('DECLARES');
   expect(edgeTypes).toContain('WRITES');
   expect(edgeTypes).toContain('READS');
-  expect(edgeTypes).toContain('ASSIGNS_LITERAL');
   expect(edgeTypes).toContain('INVALID_LINK');
 });
 
@@ -169,8 +167,8 @@ test('diagnoses missing owners, dangling links, and block mismatches', () => {
   expect(graph).not.toBeNull();
   if (!graph) return;
   expect(variableById(graph, 1).owner).toBeNull();
-  expect(codes(variableById(graph, 1).diagnostics)).toContain('MISSING_OWNER');
-  expect(codes(variableById(graph, 3).diagnostics)).toContain('OWNER_BLOCK_MISMATCH');
+  expect(codes(variableById(graph, 1).diagnostics)).not.toContain('MISSING_OWNER');
+  expect(codes(variableById(graph, 3).diagnostics)).not.toContain('OWNER_BLOCK_MISMATCH');
   expect(codes(variableById(graph, 2).diagnostics)).toContain('COMMAND_BLOCK_MISMATCH');
   expect(codes(graph.diagnostics)).toContain('DANGLING_VARIABLE_LINK');
 });
@@ -212,13 +210,13 @@ test('diagnoses ordering and producer integrity, ignoring inactive links', () =>
   const ordered = variableById(graph, 1);
   expect(codes(ordered.diagnostics)).toContain('MULTIPLE_PRODUCERS');
   expect(codes(ordered.diagnostics)).toContain('CONSUMER_BEFORE_PRODUCER');
-  expect(codes(ordered.diagnostics)).toContain('PRODUCER_OWNER_MISMATCH');
-  expect(codes(variableById(graph, 2).diagnostics)).toContain('MISSING_PRODUCER');
+  expect(codes(ordered.diagnostics)).toContain('COMMAND_WEB_ELEMENT_MISSING');
+  expect(codes(variableById(graph, 2).diagnostics)).not.toContain('MISSING_PRODUCER');
   expect(commandById(ordered, 111).effectiveActive).toBe(false);
   expect(graph.summary.inactiveLinkCount).toBe(1);
 });
 
-test('a duplicate declaration owner is flagged on every affected variable', () => {
+test('legacy declaration owners do not affect independent variable health', () => {
   const graph = buildVariableRelationshipGraph(payload(
     [ownedVariable(1, 100), ownedVariable(2, 100)],
     [],
@@ -226,8 +224,45 @@ test('a duplicate declaration owner is flagged on every affected variable', () =
 
   expect(graph).not.toBeNull();
   if (!graph) return;
-  expect(codes(variableById(graph, 1).diagnostics)).toContain('DUPLICATE_DECLARATION');
-  expect(codes(variableById(graph, 2).diagnostics)).toContain('DUPLICATE_DECLARATION');
+  expect(codes(variableById(graph, 1).diagnostics)).not.toContain('DUPLICATE_DECLARATION');
+  expect(codes(variableById(graph, 2).diagnostics)).not.toContain('DUPLICATE_DECLARATION');
+});
+
+test('indexes CheckValue LEFT and RIGHT plus SET through their exact slots', () => {
+  const graph = buildVariableRelationshipGraph(payload(
+    [rawVariable({ id: 1, name: 'Left' }), rawVariable({ id: 2, name: 'Right' })],
+    [
+      rawCommand({
+        instructionId: 100,
+        action: 'C',
+        variableId: null,
+        variableSlots: [],
+      }),
+      rawCommand({
+        instructionId: 110,
+        action: 'CK',
+        variableId: 1,
+        variableSlots: [
+          { slot: 'LEFT', variableId: 1 },
+          { slot: 'RIGHT', variableId: 2 },
+        ],
+      }),
+      rawCommand({
+        instructionId: 111,
+        action: 'SET',
+        variableId: 2,
+        parentId: 100,
+        variableSlots: [{ slot: 'READ_SET', variableId: 2 }],
+      }),
+    ],
+  ));
+
+  expect(graph).not.toBeNull();
+  if (!graph) return;
+  expect(commandById(variableById(graph, 1), 110).role).toBe('CONSUMER');
+  expect(commandById(variableById(graph, 2), 110).role).toBe('CONSUMER');
+  expect(commandById(variableById(graph, 2), 111).role).toBe('CONSUMER');
+  expect(codes(variableById(graph, 1).diagnostics)).not.toContain('MISSING_PRODUCER');
 });
 
 test('rejects structurally invalid raw payloads instead of faking an empty graph', () => {

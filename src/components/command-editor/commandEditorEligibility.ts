@@ -2,6 +2,7 @@ import { canonicalInstructionAction } from '../bot-job-details/grid/domain/instr
 
 const EDITABLE_COMMANDS = new Set([
   'GET',
+  'SET',
   'LOOP',
   'REFRESH_LOOP',
   'H',
@@ -23,7 +24,7 @@ const EDITABLE_COMMANDS = new Set([
  *
  * GET opens the editor with no intrinsic configuration (placement and command
  * transformation only); its variable link stays in the reconnect workflow.
- * SET remains reconnect-only. ELSE and ENDIF can be transformed only through
+ * GET and SET keep their variable links in the reconnect workflow. ELSE and ENDIF can be transformed only through
  * the guarded IF-family dissolution flow.
  */
 export const isVariablesCommandEditorEligible = (

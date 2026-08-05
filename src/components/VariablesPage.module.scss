@@ -876,6 +876,18 @@
   text-transform: uppercase;
 }
 
+.slotPill {
+  display: inline-block;
+  margin: 6px 4px 0 0;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #e8ddff;
+  color: #573098;
+  font-size: 0.54rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
 .emptyRelation {
   display: flex;
   flex-direction: column;

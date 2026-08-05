@@ -371,9 +371,9 @@ test('retains runtime memory when a GET becomes inactive', async () => {
   await waitFor(() =>
     expect(screen.getAllByText('125.00').length).toBeGreaterThan(0));
   expect(screen.getAllByText('Not configured').length).toBeGreaterThan(0);
-  expect(screen.getByText('GET missing')).toBeInTheDocument();
+  expect(screen.getByText('No active GET producer')).toBeInTheDocument();
   expect(screen.getByText(
-    'Active readers exist, but no active GET command produces a value.',
+    'The variable may still receive a configured, manual, or runtime value.',
   )).toBeInTheDocument();
   expect(screen.queryByText('VOID - no active GET producer')).not.toBeInTheDocument();
   expect(screen.queryByText(/Variable-dependent work is bypassed/)).not.toBeInTheDocument();

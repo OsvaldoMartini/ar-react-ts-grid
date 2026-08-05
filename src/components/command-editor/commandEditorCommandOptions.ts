@@ -11,6 +11,7 @@ export interface CommandEditorCommandOption {
 
 export const COMMAND_EDITOR_COMMAND_OPTIONS: readonly CommandEditorCommandOption[] = Object.freeze([
   { code: 'GET', label: 'Get Value' },
+  { code: 'SET', label: 'Set Value' },
   { code: 'CK', label: 'Check Value' },
   // PARKED (user request 2026-08-02): { code: 'PDF CHECK', label: 'PDF Check' },
   // PARKED (user request 2026-08-02): { code: 'CSV CHECK', label: 'CSV Check' },
