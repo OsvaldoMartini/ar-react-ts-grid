@@ -7,6 +7,7 @@ export type BotJobWorkspaceAction =
   | 'SHOW_VARIABLES'
   | 'SHOW_EXCEL_DATA'
   | 'SHOW_SMOKE_TEST'
+  | 'SHOW_RUNTIME_VARIABLES'
   | 'HIDE_COMPONENTS'
   | 'SHOW_PRE_SCAN'
   | 'OPEN_ORGANIZATIONS'

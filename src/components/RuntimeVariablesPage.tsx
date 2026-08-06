@@ -63,13 +63,16 @@ const RuntimeVariablesPage: React.FC<RuntimeVariablesPageProps> = ({
 }) => {
   useEffect(() => { document.title = 'Runtime Variables'; }, []);
 
-  const sourceBotJobId = useMemo(() => {
+  const initialSourceBotJobId = useMemo(() => {
     if (Number.isInteger(sourceBotJobIdProp) && Number(sourceBotJobIdProp) > 0) {
       return Number(sourceBotJobIdProp);
     }
     const parsed = Number(new URLSearchParams(window.location.search).get('sourceBotJobId'));
     return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
   }, [sourceBotJobIdProp]);
+  const [sourceBotJobId, setSourceBotJobId] = useState<number | null>(
+    initialSourceBotJobId,
+  );
   const { webSocket, connected, messages } = useWebSocket(socketPort, sessionId);
   const processedMessagesRef = useRef(0);
   const requestSequenceRef = useRef(0);
@@ -268,10 +271,12 @@ const RuntimeVariablesPage: React.FC<RuntimeVariablesPageProps> = ({
         return;
       }
       const normalized = normalizeVariablesWorkspaceSnapshot(envelope.body);
-      if (!normalized || normalized.botJob.id !== sourceBotJobId) {
+      if (!normalized || (envelope.operationId?.endsWith('Response')
+        && normalized.botJob.id !== sourceBotJobId)) {
         setStatus({ level: 'error', text: 'Runtime Variables returned the wrong Bot Job.' });
         return;
       }
+      setSourceBotJobId(normalized.botJob.id);
       replaceSnapshot(normalized);
       setStatus({ level: 'ok', text: responseText(body, 'Runtime Variables ready.') });
     });

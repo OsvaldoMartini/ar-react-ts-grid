@@ -14,7 +14,8 @@
   grid-template-columns: minmax(160px, 1fr) minmax(96px, auto) max-content !important;
 }
 
-.smokeTestButton {
+.smokeTestButton,
+.runtimeVariablesButton {
   align-items: center;
   background: #0891b2;
   border: 1px solid #0e7490;
@@ -31,8 +32,10 @@
   white-space: nowrap;
 }
 
-.smokeTestButton:disabled { cursor: not-allowed; opacity: 0.5; }
-.smokeTestButton:focus-visible { outline: 3px solid rgb(6 182 212 / 30%); outline-offset: 2px; }
+.smokeTestButton:disabled,
+.runtimeVariablesButton:disabled { cursor: not-allowed; opacity: 0.5; }
+.smokeTestButton:focus-visible,
+.runtimeVariablesButton:focus-visible { outline: 3px solid rgb(6 182 212 / 30%); outline-offset: 2px; }
 
 @media (max-width: 900px) {
   .keepButtonsOnTop {
