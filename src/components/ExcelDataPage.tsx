@@ -238,18 +238,18 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
             <span className={`${styles.status} ${snapshot?.mode === 'SYNTHETIC' ? styles.syntheticStatus : styles.realStatus}`}>{status}</span>
             <ExcelDataModeToggle mode={snapshot?.mode ?? 'REAL'}
               onChange={selectMode} disabled={!connected || generating} />
-            <button type="button" onClick={() => setPendingAction('STANDARD')} disabled={!connected || generating || snapshot?.mode !== 'REAL'}><FilePlus2 size={14} />Recreate Columns</button>
-            <button type="button" onClick={addRow} disabled={!connected || generating || !snapshot || snapshot.rowCount < 1}><CopyPlus size={14} />Add Row</button>
-            <button type="button" className={styles.clear} onClick={() => snapshot?.mode === 'REAL' ? setPendingAction('CLEAR') : clearRows()}
+            <button type="button" className={styles.actionButton} onClick={() => setPendingAction('STANDARD')} disabled={!connected || generating || snapshot?.mode !== 'REAL'}><FilePlus2 size={14} />Recreate Columns</button>
+            <button type="button" className={styles.actionButton} onClick={addRow} disabled={!connected || generating || !snapshot || snapshot.rowCount < 1}><CopyPlus size={14} />Add Row</button>
+            <button type="button" className={`${styles.actionButton} ${styles.clear}`} onClick={() => snapshot?.mode === 'REAL' ? setPendingAction('CLEAR') : clearRows()}
               disabled={!connected || generating || !snapshot || snapshot.rowCount < 1}><Trash2 size={14} />Clean Rows</button>
             {snapshot?.mode === 'SYNTHETIC'
-              ? <button type="button" className={styles.save} onClick={() => setPendingAction('SAVE')} disabled={!connected || generating || !snapshot.dirty}><Save size={14} />SAVE DB</button>
+              ? <button type="button" className={`${styles.actionButton} ${styles.save}`} onClick={() => setPendingAction('SAVE')} disabled={!connected || generating || !snapshot.dirty}><Save size={14} />SAVE DB</button>
               : <>
-                <button type="button" className={styles.save} onClick={() => setPendingAction('SAVE')} disabled={!connected || generating || !snapshot?.dirty}><Save size={14} />Save to Excel</button>
-                <button type="button" onClick={refresh} disabled={!connected || generating}><RefreshCw size={14} />RELOAD FILE</button>
+                <button type="button" className={`${styles.actionButton} ${styles.save}`} onClick={() => setPendingAction('SAVE')} disabled={!connected || generating || !snapshot?.dirty}><Save size={14} />Save to Excel</button>
+                <button type="button" className={styles.actionButton} onClick={refresh} disabled={!connected || generating}><RefreshCw size={14} />RELOAD FILE</button>
               </>}
             <PagesOpenButton webSocket={webSocket} connected={connected} messages={messages} sessionId={sessionId} />
-            <button type="button" className={styles.close} onClick={close}><X size={14} />Close</button>
+            <button type="button" className={`${styles.actionButton} ${styles.close}`} onClick={close}><X size={14} />Close</button>
           </div>
         </header>
         {snapshot && <section className={styles.summary}>
