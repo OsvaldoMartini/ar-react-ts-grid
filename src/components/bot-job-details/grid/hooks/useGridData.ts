@@ -2348,7 +2348,6 @@ export function useGridData(deps: UseGridDataDeps) {
   const handleOpenCommandEditorCreate = (targetBlockId: number | null) => {
     const currentBotJobId = Number(botJobId);
     const currentHomeBankingId = Number(homeBankingId);
-    const capability = botJobGraphMutationCapability;
     const normalizedTargetBlockId = Number(targetBlockId);
     if (
       workspaceKind !== 'BOT_JOB'
@@ -2359,15 +2358,12 @@ export function useGridData(deps: UseGridDataDeps) {
       || currentBotJobId <= 0
       || !Number.isSafeInteger(currentHomeBankingId)
       || currentHomeBankingId <= 0
-      || !capability
-      || capability.ownerAssertion.botJobId !== currentBotJobId
-      || capability.ownerAssertion.homeBankingId !== currentHomeBankingId
     ) {
       setAlertImage(warningRedImage);
       setAlertClass('construction-image');
       setAlertMessageHeader('Command Editor Not Opened');
       setAlertMessageBody('Bot Job Details is not ready to add a command.');
-      setAlertMessageFooter('Wait for the Bot Job graph to finish loading and try again.');
+      setAlertMessageFooter('Check the backend connection and Bot Job selection, then try again.');
       setErrorFlag(true);
       setAlertOnConfirm(undefined);
       return;
@@ -2389,10 +2385,6 @@ export function useGridData(deps: UseGridDataDeps) {
           homeBankingId: currentHomeBankingId,
           botJobId: currentBotJobId,
           ...(hasTargetBlock ? { targetBlockId: normalizedTargetBlockId } : {}),
-          workspaceEpoch: capability.workspaceEpoch,
-          baseGraphVersion: capability.graphVersion,
-          graphRevision: capability.graphRevision,
-          ownerAssertion: capability.ownerAssertion,
         }),
       }));
     } catch (openError) {

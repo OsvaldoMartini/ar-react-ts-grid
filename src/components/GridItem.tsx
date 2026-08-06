@@ -151,7 +151,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
   const {
     webSocket, connected, reconnectAttempts, messages, error,
     workspacePolicy,
-    homeBankingId, botJobId, botJobName,
+    botJobId, botJobName,
     gridScrollRef, instructionRef, blockRef, dropdownRef,
     openDropdown, selectedBlockIds,
     saveComponentContext, setSaveComponentContext,
@@ -227,16 +227,6 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
     )[0];
     return firstBlock?.blockId ?? null;
   }, [workspaceBlocks]);
-  const addCommandAvailable = Boolean(
-    !componentWorkspace
-    && connected
-    && webSocket?.readyState === WebSocket.OPEN
-    && Number.isSafeInteger(Number(botJobId))
-    && Number(botJobId) > 0
-    && botJobGraphMutationCapability
-    && botJobGraphMutationCapability.ownerAssertion.botJobId === Number(botJobId)
-    && botJobGraphMutationCapability.ownerAssertion.homeBankingId === Number(homeBankingId),
-  );
   const canonicalMemoryItemCount = useMemoryListSummary({
     webSocket,
     connected,
@@ -675,8 +665,6 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
           onOpenMemory={requestMemoryListOpen}
           beforeMemory={!componentWorkspace ? (
             <BotJobAddCommandButton
-              disabled={!addCommandAvailable}
-              disabledReason="Wait for the Bot Job graph to finish loading."
               onAdd={() => handleOpenCommandEditorCreate(createCommandTargetBlockId)}
             />
           ) : undefined}
