@@ -377,6 +377,16 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
             </section>
           ) : (
             <section className={styles.workspace}>
+              <SmokeTestSimulationWorkspace
+                review={review}
+                selectedBlockIds={blockFilters}
+                runtimeWriteAvailable={connected}
+                onCommitRuntimeValue={updateRuntimeValue}
+                onActivePositionChange={setActiveSmokePosition}
+                onExecutionTraceChange={setSmokeExecutionTrace}
+                onCommandRemainingChange={setCommandRemainingByInstructionId}
+                onRunStart={openSupportingWorkspaces}
+              />
               <SmokeTestConnectionReview
                 review={review}
                 scopeLabel="Complete Bot Job"
@@ -387,16 +397,6 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
                 commandRemainingByInstructionId={commandRemainingByInstructionId}
                 embedded
                 onClose={() => undefined}
-              />
-              <SmokeTestSimulationWorkspace
-                review={review}
-                selectedBlockIds={blockFilters}
-                runtimeWriteAvailable={connected}
-                onCommitRuntimeValue={updateRuntimeValue}
-                onActivePositionChange={setActiveSmokePosition}
-                onExecutionTraceChange={setSmokeExecutionTrace}
-                onCommandRemainingChange={setCommandRemainingByInstructionId}
-                onRunStart={openSupportingWorkspaces}
               />
             </section>
           )}

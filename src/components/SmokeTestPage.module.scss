@@ -319,8 +319,8 @@
   flex: 1 1 auto;
   display: grid;
   grid-template-columns:
-    minmax(500px, 1fr)
-    minmax(310px, 0.45fr);
+    minmax(310px, 0.45fr)
+    minmax(500px, 1fr);
   gap: 10px;
   overflow: hidden;
   padding: 10px;
@@ -1267,16 +1267,6 @@
 
   .toolbarActions {
     width: 100%;
-  }
-
-  .workspace {
-    overflow: auto;
-    grid-template-columns: minmax(340px, 1fr) minmax(460px, 1.25fr);
-    grid-template-rows: minmax(420px, 1fr) minmax(280px, 0.65fr);
-  }
-
-  .workspace > :last-child {
-    grid-column: 1 / -1;
   }
 
   .valuePanel {
