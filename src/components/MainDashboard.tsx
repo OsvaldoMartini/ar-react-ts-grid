@@ -272,16 +272,18 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, on
     {
       id: 'selected',
       header: (
-        <input
-          ref={selectAllCheckboxRef}
-          type="checkbox"
-          className={styles.selectionCheckbox}
-          checked={allLoadedBotJobsSelected}
-          disabled={botJobs.length === 0 || bulkDeletePending}
-          aria-label={`${allLoadedBotJobsSelected ? 'Unselect' : 'Select'} all loaded Bot Jobs`}
-          title="Select or unselect all loaded Bot Jobs"
-          onChange={event => toggleAllBotJobs(event.target.checked)}
-        />
+        <span className={styles.selectionCell}>
+          <input
+            ref={selectAllCheckboxRef}
+            type="checkbox"
+            className={styles.selectionCheckbox}
+            checked={allLoadedBotJobsSelected}
+            disabled={botJobs.length === 0 || bulkDeletePending}
+            aria-label={`${allLoadedBotJobsSelected ? 'Unselect' : 'Select'} all loaded Bot Jobs`}
+            title="Select or unselect all loaded Bot Jobs"
+            onChange={event => toggleAllBotJobs(event.target.checked)}
+          />
+        </span>
       ),
       width: 44,
       alignment: 'center',
@@ -289,17 +291,19 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, on
       renderCell: row => {
         const checked = loadedSelectedBotJobIds.has(row.id);
         return (
-          <input
-            type="checkbox"
-            className={styles.selectionCheckbox}
-            checked={checked}
-            disabled={bulkDeletePending}
-            aria-label={`${checked ? 'Unselect' : 'Select'} Bot Job #${row.id} ${row.name}`}
-            title={`${checked ? 'Unselect' : 'Select'} Bot Job #${row.id} ${row.name}`}
-            onClick={event => event.stopPropagation()}
-            onDoubleClick={event => event.stopPropagation()}
-            onChange={event => toggleBotJobSelection(row.id, event.target.checked)}
-          />
+          <span className={styles.selectionCell}>
+            <input
+              type="checkbox"
+              className={styles.selectionCheckbox}
+              checked={checked}
+              disabled={bulkDeletePending}
+              aria-label={`${checked ? 'Unselect' : 'Select'} Bot Job #${row.id} ${row.name}`}
+              title={`${checked ? 'Unselect' : 'Select'} Bot Job #${row.id} ${row.name}`}
+              onClick={event => event.stopPropagation()}
+              onDoubleClick={event => event.stopPropagation()}
+              onChange={event => toggleBotJobSelection(row.id, event.target.checked)}
+            />
+          </span>
         );
       },
     },
