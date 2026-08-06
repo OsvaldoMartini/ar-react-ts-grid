@@ -44,6 +44,7 @@ import { variableValuePresentation } from './variables/domain/variableValuePrese
 import { hidesLegacyVariableOperation } from './variables/domain/legacyVariableOperation';
 import { orderRuntimeVariablesByExecution } from './variables/domain/variableExecutionOrder';
 import RuntimeMemoryPanel from './variables/RuntimeMemoryPanel';
+import { runtimeMemoryPanelItems } from './variables/runtimeMemoryPanelModel';
 import AddVariableModal, {
   type AddVariableBatchDraft,
   type AddVariableDraft,
@@ -4142,14 +4143,7 @@ const VariablesPage: React.FC<Props> = ({
 
               <RuntimeMemoryPanel
                 key={`variables-runtime-memory:${workspaceIdentityKey}`}
-                items={orderedRuntimeMemory.map(entry => ({
-                  variableId: entry.variableId,
-                  name: entry.name,
-                  state: entry.state,
-                  value: entry.state === 'VALUE' ? entry.value : null,
-                  voidReason: entry.voidReason,
-                  editable: true,
-                }))}
+                items={runtimeMemoryPanelItems(orderedRuntimeMemory)}
                 disabled={!connected}
                 disabledReason={!connected
                   ? 'Variables is reconnecting. Runtime values remain visible.'
