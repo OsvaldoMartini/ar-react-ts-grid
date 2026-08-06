@@ -331,7 +331,6 @@ const normalizeMutationCapability = (
   if (
     layoutRows.some(row => row === null)
     || instructionFacts.some(row => row === null)
-    || layoutRows.length === 0
     || layoutRows.length !== instructionFacts.length
   ) {
     return null;

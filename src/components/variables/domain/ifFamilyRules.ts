@@ -25,12 +25,17 @@ export type IfFamilyCreatePlacement =
   | { kind: 'AFTER_INSTRUCTION'; instructionId: number }
   | { kind: 'KEEP' };
 
-type OrderedBlockRow = { instructionId: number; action: string };
+export type IfFamilyCreateRow = {
+  instructionId: number;
+  blockId: number;
+  instructionOrderNumber: number;
+  action: string;
+};
 
 const orderedBlockRows = (
   snapshot: VariableWorkspaceSnapshot,
   blockId: number,
-): OrderedBlockRow[] => {
+): IfFamilyCreateRow[] => {
   const capability = snapshot.mutationCapability;
   if (!capability) return [];
   const actionById = new Map(
@@ -47,12 +52,70 @@ const orderedBlockRows = (
       || left.instructionId - right.instructionId)
     .map(row => ({
       instructionId: row.instructionId,
+      blockId: row.blockId,
+      instructionOrderNumber: row.instructionOrderNumber,
       action: actionById.get(row.instructionId) ?? '',
     }));
 };
 
-const firstActionIndex = (rows: readonly OrderedBlockRow[], action: string): number =>
+const firstActionIndex = (rows: readonly IfFamilyCreateRow[], action: string): number =>
   rows.findIndex(row => row.action === action);
+
+export const validateIfFamilyCreateRows = (
+  sourceRows: readonly IfFamilyCreateRow[],
+  targetBlockId: number,
+  targetAction: string,
+  placement: IfFamilyCreatePlacement,
+): IfFamilyCreateRefusal | null => {
+  const action = canonicalInstructionAction(targetAction);
+  if (action !== 'IF' && action !== 'ELSEIF') return null;
+  const rows = sourceRows
+    .filter(row => row.blockId === targetBlockId)
+    .slice()
+    .sort((left, right) =>
+      left.instructionOrderNumber - right.instructionOrderNumber
+      || left.instructionId - right.instructionId);
+
+  if (action === 'IF') {
+    return rows.some(row => canonicalInstructionAction(row.action) === 'IF')
+      ? {
+        code: 'COMMAND_CREATE_CONDITIONAL_ROOT_EXISTS',
+        message: 'This Block already contains its IF family.',
+      }
+      : null;
+  }
+
+  const canonicalRows = rows.map(row => ({
+    ...row,
+    action: canonicalInstructionAction(row.action),
+  }));
+  const rootIndex = firstActionIndex(canonicalRows, 'IF');
+  const elseIndex = firstActionIndex(canonicalRows, 'ELSE');
+  const endifIndex = firstActionIndex(canonicalRows, 'ENDIF');
+  if (rootIndex < 0 || elseIndex < 0 || endifIndex < 0 || elseIndex >= endifIndex) {
+    return {
+      code: 'COMMAND_CREATE_CONDITIONAL_FAMILY_MISSING',
+      message: 'Add ELSEIF only to a complete IF, ELSE, and ENDIF family.',
+    };
+  }
+  let index: number;
+  if (placement.kind === 'TOP') index = 0;
+  else if (placement.kind === 'END') index = canonicalRows.length;
+  else if (placement.kind === 'AFTER_INSTRUCTION') {
+    const referenceIndex = canonicalRows.findIndex(
+      row => row.instructionId === placement.instructionId,
+    );
+    if (referenceIndex < 0) return null;
+    index = referenceIndex + 1;
+  } else return null;
+  if (index <= rootIndex || index > elseIndex) {
+    return {
+      code: 'COMMAND_CREATE_ELSEIF_PLACEMENT_INVALID',
+      message: 'Place ELSEIF after IF or another ELSEIF and before ELSE.',
+    };
+  }
+  return null;
+};
 
 /**
  * Validates ADD COMMAND for IF and ELSEIF against the in-memory workspace.
@@ -68,43 +131,10 @@ export const validateIfFamilyCreate = (
   targetAction: string,
   placement: IfFamilyCreatePlacement,
 ): IfFamilyCreateRefusal | null => {
-  const action = canonicalInstructionAction(targetAction);
-  if (action !== 'IF' && action !== 'ELSEIF') return null;
-  const rows = orderedBlockRows(snapshot, targetBlockId);
-
-  if (action === 'IF') {
-    return rows.some(row => row.action === 'IF')
-      ? {
-        code: 'COMMAND_CREATE_CONDITIONAL_ROOT_EXISTS',
-        message: 'This Block already contains its IF family.',
-      }
-      : null;
-  }
-
-  const rootIndex = firstActionIndex(rows, 'IF');
-  const elseIndex = firstActionIndex(rows, 'ELSE');
-  const endifIndex = firstActionIndex(rows, 'ENDIF');
-  if (rootIndex < 0 || elseIndex < 0 || endifIndex < 0 || elseIndex >= endifIndex) {
-    return {
-      code: 'COMMAND_CREATE_CONDITIONAL_FAMILY_MISSING',
-      message: 'Add ELSEIF only to a complete IF, ELSE, and ENDIF family.',
-    };
-  }
-  let index: number;
-  if (placement.kind === 'TOP') index = 0;
-  else if (placement.kind === 'END') index = rows.length;
-  else if (placement.kind === 'AFTER_INSTRUCTION') {
-    const referenceIndex = rows.findIndex(
-      row => row.instructionId === placement.instructionId,
-    );
-    if (referenceIndex < 0) return null; // generic placement refusal stays server-side
-    index = referenceIndex + 1;
-  } else return null;
-  if (index <= rootIndex || index > elseIndex) {
-    return {
-      code: 'COMMAND_CREATE_ELSEIF_PLACEMENT_INVALID',
-      message: 'Place ELSEIF after IF or another ELSEIF and before ELSE.',
-    };
-  }
-  return null;
+  return validateIfFamilyCreateRows(
+    orderedBlockRows(snapshot, targetBlockId),
+    targetBlockId,
+    targetAction,
+    placement,
+  );
 };

@@ -1873,7 +1873,12 @@ const VariablesPage: React.FC<Props> = ({
   const addCommandBlock = snapshot?.blocks.find(block =>
     sharedBlockFilters.length === 1 && block.id === sharedBlockFilters[0])
     ?? snapshot?.blocks[0]
-    ?? null;
+    ?? (snapshot ? {
+        id: 0,
+        name: 'Default Block (created with command)',
+        order: 1,
+        active: true,
+      } : null);
   const addCommandDraft: ComponentEditorCommand | null = addCommandBlock
     ? {
         instructionId: 0,
@@ -3614,6 +3619,17 @@ const VariablesPage: React.FC<Props> = ({
     || pendingConnections !== null
     || pendingBlockTransfer !== null
     || snapshot?.mutationCapability?.reactAuthoredProfile == null;
+  const addCommandDisabled = !connected
+    || pendingRequest !== null
+    || pendingMutationRequestId !== null
+    || pendingCopyRequestId !== null
+    || pendingCreateRequestId !== null
+    || pendingCommandDeleteRequestId !== null
+    || pendingStatusInstructionId !== null
+    || pendingReconnect !== null
+    || pendingConnections !== null
+    || pendingBlockTransfer !== null
+    || snapshot?.mutationCapability == null;
   const blockTransferSource = snapshot && pendingBlockTransfer
     ? snapshot.commands.find(
       command => command.id === pendingBlockTransfer.sourceInstructionId,
@@ -3835,6 +3851,7 @@ const VariablesPage: React.FC<Props> = ({
                 variables={snapshot.variables}
                 relationshipEdges={relationshipGraph?.edges ?? []}
                 disabled={mutationDisabled}
+                addCommandDisabled={addCommandDisabled}
                 unavailableReason={pendingMutationRequestId
                   ? 'Saving...'
                   : pendingReconnect
@@ -4295,7 +4312,12 @@ const VariablesPage: React.FC<Props> = ({
             scopeLabel={addingCommand
               ? 'Create a new Bot Job command'
               : editorScopeLabel}
-            blocks={snapshot.blocks.map(block => ({
+            blocks={(snapshot.blocks.length > 0 ? snapshot.blocks : [{
+              id: 0,
+              name: 'Default Block (created with command)',
+              order: 1,
+              active: true,
+            }]).map(block => ({
               blockId: block.id,
               blockOrder: block.order ?? block.id,
               blockName: block.name,

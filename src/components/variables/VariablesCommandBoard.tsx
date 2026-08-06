@@ -72,6 +72,7 @@ export interface VariablesCommandBoardProps {
   blockFilters?: readonly number[];
   onBlockFiltersChange?: (blockIds: number[]) => void;
   disabled?: boolean;
+  addCommandDisabled?: boolean;
   unavailableReason?: string;
   selectedInstructionId?: number | null;
   draggingInstructionId?: number | null;
@@ -180,6 +181,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
   blockFilters: controlledBlockFilters,
   onBlockFiltersChange,
   disabled = false,
+  addCommandDisabled,
   unavailableReason,
   selectedInstructionId = null,
   draggingInstructionId = null,
@@ -570,7 +572,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
               {onAddCommand && (
                 <VariablesAddCommandButton
                   onAdd={onAddCommand}
-                  disabled={disabled || blocks.length === 0}
+                  disabled={addCommandDisabled ?? disabled}
                 />
               )}
             </div>

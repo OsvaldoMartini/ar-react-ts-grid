@@ -149,7 +149,7 @@ export const useVariablesCommandEditorCreate = ({
           workspaceEpoch: snapshot.workspaceEpoch,
           baseGraphVersion: capability.graphVersion,
           graphRevision: capability.graphRevision,
-          targetBlockId: intent.targetBlockId,
+          ...(intent.targetBlockId > 0 ? { targetBlockId: intent.targetBlockId } : {}),
           placement: {
             kind: intent.placement.kind,
             referenceInstructionId: intent.placement.kind === 'AFTER_INSTRUCTION'

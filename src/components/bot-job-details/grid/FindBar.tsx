@@ -8,6 +8,7 @@ export interface FindBarProps {
   placeholder?: string;
   memoryCount?: number;
   onOpenMemory?: () => void;
+  beforeMemory?: React.ReactNode;
 }
 
 /**
@@ -24,6 +25,7 @@ const FindBar: React.FC<FindBarProps> = ({
   placeholder = 'Type to find…',
   memoryCount = 0,
   onOpenMemory,
+  beforeMemory,
 }) => (
   <>
     <span className={styles.label}>{label}</span>
@@ -47,6 +49,7 @@ const FindBar: React.FC<FindBarProps> = ({
         </button>
       )}
     </div>
+    {beforeMemory}
     {onOpenMemory && (
       <button
         type="button"

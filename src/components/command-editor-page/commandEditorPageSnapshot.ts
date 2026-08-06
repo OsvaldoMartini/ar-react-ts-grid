@@ -35,8 +35,8 @@ export interface CommandEditorPageGraphCapability {
 }
 
 export interface CommandEditorPageSnapshot {
-  selectedBlockId: number;
-  selectedInstructionId: number;
+  selectedBlockId: number | null;
+  selectedInstructionId: number | null;
   selectionRevision: number;
   graphRevision: string;
   instructions: CommandEditorPageInstruction[];
@@ -146,6 +146,10 @@ const graphCapabilityFromPayload = (
 
 export const commandEditorPageSnapshotFromPayload = (
   payload: any,
+  options: {
+    mode?: 'EDIT' | 'CREATE';
+    targetBlockId?: number | null;
+  } = {},
 ): CommandEditorPageSnapshot | null => {
   const body = payload?.snapshot && typeof payload.snapshot === 'object'
     ? { ...payload, ...payload.snapshot }
@@ -164,19 +168,48 @@ export const commandEditorPageSnapshotFromPayload = (
     .map(commandEditorPageInstructionFromPayload)
     .filter((row: CommandEditorPageInstruction | null): row is CommandEditorPageInstruction =>
       row !== null);
+  const blocks: ComponentEditorBlockOption[] = body.blocks.flatMap((row: any) => {
+    const blockId = positiveInteger(row?.id ?? row?.blockId);
+    if (blockId === null) return [];
+    return [{
+      blockId,
+      blockOrder: positiveInteger(row?.blockOrderNumber ?? row?.blockOrder) ?? blockId,
+      blockName: text(row?.name ?? row?.blockName) || `Block ${blockId}`,
+      commandCount: instructions.filter(command => command.blockId === blockId).length,
+      active: typeof (row?.active ?? row?.blockActive) === 'boolean'
+        ? Boolean(row?.active ?? row?.blockActive)
+        : undefined,
+    }];
+  });
+  const mode = options.mode ?? 'EDIT';
   const selectedInstructionId = positiveInteger(
     body?.selectedInstructionId ?? body?.instruction?.id,
   );
   const selectedBlockId = positiveInteger(
-    body?.selectedBlockId ?? body?.instruction?.blockId,
+    body?.selectedBlockId ?? body?.instruction?.blockId ?? options.targetBlockId,
   );
-  if (
-    selectedInstructionId === null
-    || selectedBlockId === null
-    || !instructions.some(row =>
-      row.id === selectedInstructionId && row.blockId === selectedBlockId)
-  ) {
-    return null;
+  if (mode === 'EDIT') {
+    if (
+      selectedInstructionId === null
+      || selectedBlockId === null
+      || !instructions.some(row =>
+        row.id === selectedInstructionId && row.blockId === selectedBlockId)
+    ) {
+      return null;
+    }
+  } else {
+    const expectedTargetBlockId = positiveInteger(options.targetBlockId);
+    if (
+      selectedInstructionId !== null
+      || (
+        expectedTargetBlockId !== null
+        && selectedBlockId !== expectedTargetBlockId
+      )
+      || (
+        selectedBlockId !== null
+        && !blocks.some(block => block.blockId === selectedBlockId)
+      )
+    ) return null;
   }
 
   const configurations = new Map<number, ComponentEditorStoredConfiguration>();
@@ -206,20 +239,6 @@ export const commandEditorPageSnapshotFromPayload = (
     storedConfiguration: configurations.get(row.id) ?? null,
   }));
 
-  const blocks: ComponentEditorBlockOption[] = body.blocks.flatMap((row: any) => {
-    const blockId = positiveInteger(row?.id ?? row?.blockId);
-    if (blockId === null) return [];
-    return [{
-      blockId,
-      blockOrder: positiveInteger(row?.blockOrderNumber ?? row?.blockOrder) ?? blockId,
-      blockName: text(row?.name ?? row?.blockName) || `Block ${blockId}`,
-      commandCount: instructions.filter(command => command.blockId === blockId).length,
-      active: typeof (row?.active ?? row?.blockActive) === 'boolean'
-        ? Boolean(row?.active ?? row?.blockActive)
-        : undefined,
-    }];
-  });
-
   const variables: ComponentEditorVariableOption[] = body.variables.flatMap((row: any) => {
     const variableId = positiveInteger(row?.id ?? row?.variableId);
     if (variableId === null) return [];
@@ -230,13 +249,15 @@ export const commandEditorPageSnapshotFromPayload = (
     }];
   });
 
-  const selected = instructions.find(row => row.id === selectedInstructionId)!;
+  const selected = selectedInstructionId === null
+    ? null
+    : instructions.find(row => row.id === selectedInstructionId) ?? null;
   const explicitConnectionCount = nonNegativeInteger(body?.connectionCount);
   const selectedVariableLinks = Array.isArray(body?.variableLinks)
     ? body.variableLinks.filter((row: any) => Number(row?.instructionId) === selectedInstructionId)
     : [];
-  const inferredConnectionCount = Number(selected.parentId !== null)
-    + Number(selected.parentBlockId !== null)
+  const inferredConnectionCount = Number(selected?.parentId != null)
+    + Number(selected?.parentBlockId != null)
     + selectedVariableLinks.length;
   const diagnosticCount = nonNegativeInteger(body?.diagnosticCount)
     ?? (Array.isArray(body?.diagnostics) ? body.diagnostics.length : 0);

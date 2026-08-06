@@ -701,7 +701,6 @@ export function useGridData(deps: UseGridDataDeps) {
   useEffect(() => {
     if (pendingBotJobGraphMutationRequestId
       || !webSocket || !connected
-      || (instructionsData.length === 0 && workspaceBlocks.length === 0)
       || !Number.isSafeInteger(homeBankingId)
       || homeBankingId <= 0
       || botJobId == null
@@ -733,7 +732,8 @@ export function useGridData(deps: UseGridDataDeps) {
       }),
     }));
   }, [webSocket, connected, instructionsData, workspaceBlocks, botJobId, homeBankingId,
-    pendingBotJobGraphMutationRequestId, sessionId, targetSessionId, workspaceEpoch]);
+    pendingBotJobGraphMutationRequestId, sessionId, targetSessionId, workspaceEpoch,
+    workspaceKind]);
 
   useEffect(() => {
     if (!memoryListOpenRequestedRef.current && !memoryListOpenedRef.current) return;
@@ -2345,6 +2345,68 @@ export function useGridData(deps: UseGridDataDeps) {
     }
   };
 
+  const handleOpenCommandEditorCreate = (targetBlockId: number | null) => {
+    const currentBotJobId = Number(botJobId);
+    const currentHomeBankingId = Number(homeBankingId);
+    const capability = botJobGraphMutationCapability;
+    const normalizedTargetBlockId = Number(targetBlockId);
+    if (
+      workspaceKind !== 'BOT_JOB'
+      || !webSocket
+      || !connected
+      || webSocket.readyState !== WebSocket.OPEN
+      || !Number.isSafeInteger(currentBotJobId)
+      || currentBotJobId <= 0
+      || !Number.isSafeInteger(currentHomeBankingId)
+      || currentHomeBankingId <= 0
+      || !capability
+      || capability.ownerAssertion.botJobId !== currentBotJobId
+      || capability.ownerAssertion.homeBankingId !== currentHomeBankingId
+    ) {
+      setAlertImage(warningRedImage);
+      setAlertClass('construction-image');
+      setAlertMessageHeader('Command Editor Not Opened');
+      setAlertMessageBody('Bot Job Details is not ready to add a command.');
+      setAlertMessageFooter('Wait for the Bot Job graph to finish loading and try again.');
+      setErrorFlag(true);
+      setAlertOnConfirm(undefined);
+      return;
+    }
+
+    const requestId = `${Date.now()}-command-editor-create`;
+    pendingCommandEditorOpenRequestRef.current = requestId;
+    const hasTargetBlock = Number.isSafeInteger(normalizedTargetBlockId)
+      && normalizedTargetBlockId > 0;
+    try {
+      webSocket.send(JSON.stringify({
+        type: 'commandEditor.workspaceOpen',
+        sessionId,
+        homeBankingId: currentHomeBankingId,
+        body: JSON.stringify({
+          requestId,
+          targetSessionId: commandEditorTargetSessionId,
+          editorMode: 'CREATE',
+          homeBankingId: currentHomeBankingId,
+          botJobId: currentBotJobId,
+          ...(hasTargetBlock ? { targetBlockId: normalizedTargetBlockId } : {}),
+          workspaceEpoch: capability.workspaceEpoch,
+          baseGraphVersion: capability.graphVersion,
+          graphRevision: capability.graphRevision,
+          ownerAssertion: capability.ownerAssertion,
+        }),
+      }));
+    } catch (openError) {
+      pendingCommandEditorOpenRequestRef.current = null;
+      setAlertImage(warningRedImage);
+      setAlertClass('construction-image');
+      setAlertMessageHeader('Command Editor Not Opened');
+      setAlertMessageBody('The Add Command request could not be sent.');
+      setAlertMessageFooter('Check the backend connection and try again.');
+      setErrorFlag(true);
+      setAlertOnConfirm(undefined);
+    }
+  };
+
   const handleCreateComponent = (blockGroupId: number) => {
     // A reusable component cannot be saved as another component through the
     // Bot Job-only componentSave protocol. The component UI also hides this.
@@ -3430,6 +3492,7 @@ export function useGridData(deps: UseGridDataDeps) {
     submitDeleteBlocks,
     handleRemoveBlock,
     handleOpenCommandEditor,
+    handleOpenCommandEditorCreate,
     handleRemoveInstruction,
     handleInstructionStatus,
     handleInstructionForceChange,

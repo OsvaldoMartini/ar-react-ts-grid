@@ -18,6 +18,7 @@ import SaveComponentPanel from './SaveComponentPanel';
 import BotJobDetailsChrome from './bot-job-details/BotJobDetailsChrome';
 import ComponentWorkspaceHeader from './bot-job-details/ComponentWorkspaceHeader';
 import FindBar from './bot-job-details/grid/FindBar';
+import BotJobAddCommandButton from './bot-job-details/grid/BotJobAddCommandButton';
 import DeleteButton from './bot-job-details/grid/DeleteButton';
 import InstructionRow from './bot-job-details/grid/InstructionRow';
 import InstructionList from './bot-job-details/grid/InstructionList';
@@ -150,7 +151,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
   const {
     webSocket, connected, reconnectAttempts, messages, error,
     workspacePolicy,
-    botJobId, botJobName,
+    homeBankingId, botJobId, botJobName,
     gridScrollRef, instructionRef, blockRef, dropdownRef,
     openDropdown, selectedBlockIds,
     saveComponentContext, setSaveComponentContext,
@@ -197,6 +198,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
     handleBlockSelectionChange,
     handleBlockDelete,
     handleOpenCommandEditor,
+    handleOpenCommandEditorCreate,
     handleRemoveInstruction,
     handleInstructionStatus,
     handleInstructionForceChange,
@@ -218,6 +220,23 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
     handleMoveBlockUp, handleMoveBlockDown,
   } = grid;
   const componentWorkspace = workspacePolicy.kind === 'COMPONENT';
+  const createCommandTargetBlockId = React.useMemo(() => {
+    const firstBlock = workspaceBlocks.slice().sort(
+      (left, right) => left.blockOrderNumber - right.blockOrderNumber
+        || left.blockId - right.blockId,
+    )[0];
+    return firstBlock?.blockId ?? null;
+  }, [workspaceBlocks]);
+  const addCommandAvailable = Boolean(
+    !componentWorkspace
+    && connected
+    && webSocket?.readyState === WebSocket.OPEN
+    && Number.isSafeInteger(Number(botJobId))
+    && Number(botJobId) > 0
+    && botJobGraphMutationCapability
+    && botJobGraphMutationCapability.ownerAssertion.botJobId === Number(botJobId)
+    && botJobGraphMutationCapability.ownerAssertion.homeBankingId === Number(homeBankingId),
+  );
   const canonicalMemoryItemCount = useMemoryListSummary({
     webSocket,
     connected,
@@ -654,6 +673,13 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
           onChange={setFindText}
           memoryCount={canonicalMemoryItemCount}
           onOpenMemory={requestMemoryListOpen}
+          beforeMemory={!componentWorkspace ? (
+            <BotJobAddCommandButton
+              disabled={!addCommandAvailable}
+              disabledReason="Wait for the Bot Job graph to finish loading."
+              onAdd={() => handleOpenCommandEditorCreate(createCommandTargetBlockId)}
+            />
+          ) : undefined}
         />
       </div>
       {createBlockOpen && (

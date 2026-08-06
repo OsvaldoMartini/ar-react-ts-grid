@@ -112,7 +112,7 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
   const initialTargetBlockId = command.blockId ?? 0;
   const [targetBlockId, setTargetBlockId] = useState(initialTargetBlockId);
   const [placementValue, setPlacementValue] = useState(
-    mode === 'CREATE' ? 'TOP' : 'KEEP',
+    mode === 'CREATE' ? (initialTargetBlockId > 0 ? 'TOP' : 'END') : 'KEEP',
   );
   const originalCommandCode = canonicalInstructionAction(command.action);
   const [selectedCommandCode, setSelectedCommandCode] = useState(originalCommandCode);
@@ -206,7 +206,9 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
           boundary => boundary.instructionId,
         ) ?? [],
       );
-      return conditionalPositionLocked
+      return mode === 'CREATE'
+        ? options.filter(option => option.placement.kind !== 'KEEP')
+        : conditionalPositionLocked
         ? options.filter(option => option.placement.kind === 'KEEP')
         : options;
     }, [
@@ -214,6 +216,7 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
       commands,
       conditionalImpactPreview,
       conditionalPositionLocked,
+      mode,
       targetBlockId,
     ],
   );
@@ -235,7 +238,7 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
   useEffect(() => {
     const nextTargetBlockId = command.blockId ?? 0;
     setTargetBlockId(nextTargetBlockId);
-    setPlacementValue(mode === 'CREATE' ? 'TOP' : 'KEEP');
+    setPlacementValue(mode === 'CREATE' ? (nextTargetBlockId > 0 ? 'TOP' : 'END') : 'KEEP');
     setRelationshipWarning(null);
     setConditionalFamilyWarning(null);
     setSelectedCommandCode(canonicalInstructionAction(command.action));
@@ -405,7 +408,7 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
   const canSubmit = Boolean(
     onSubmit
     && !pending
-    && targetBlockId > 0
+    && (targetBlockId > 0 || (mode === 'CREATE' && targetBlockId === 0))
     && placement
     && isCommandEditorBaseDraftValid(draft)
     && !(
@@ -560,15 +563,20 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
             headerRight="Commands per block"
             countLabel={count => `${count} BLOCK${count === 1 ? '' : 'S'}`}
             options={blockSearchOptions}
-            value={targetBlockId > 0 ? String(targetBlockId) : null}
+            value={targetBlockId >= 0 ? String(targetBlockId) : null}
             onChange={(value) => {
               if (value === null) return;
               const nextTargetBlockId = Number(value);
-              if (!Number.isSafeInteger(nextTargetBlockId) || nextTargetBlockId <= 0) return;
+              if (
+                !Number.isSafeInteger(nextTargetBlockId)
+                || nextTargetBlockId < 0
+                || (nextTargetBlockId === 0 && mode !== 'CREATE')
+              ) return;
               if (conditionalPositionLocked) return;
               setTargetBlockId(nextTargetBlockId);
-              setPlacementValue(mode === 'CREATE' || nextTargetBlockId !== command.blockId
-                ? 'TOP'
+              setPlacementValue(mode === 'CREATE'
+                ? (nextTargetBlockId > 0 ? 'TOP' : 'END')
+                : nextTargetBlockId !== command.blockId ? 'TOP'
                 : 'KEEP');
             }}
           />

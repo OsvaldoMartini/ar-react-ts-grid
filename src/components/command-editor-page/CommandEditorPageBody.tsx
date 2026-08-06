@@ -31,7 +31,10 @@ import type {
   CommandEditorMutationAction,
   CommandEditorMutationIntent,
 } from '../command-editor/commandEditorMutation';
-import type { ComponentEditorVariableSlot } from '../command-editor/componentEditor.types';
+import type {
+  ComponentEditorCommand,
+  ComponentEditorVariableSlot,
+} from '../command-editor/componentEditor.types';
 import {
   commandEditorVariableBindings,
   updateCommandEditorVariableBinding,
@@ -61,6 +64,8 @@ interface Props {
   snapshot: CommandEditorPageSnapshot;
   status: CommandEditorPageBodyStatus | null;
   pending: boolean;
+  mode?: 'EDIT' | 'CREATE';
+  createTargetBlockId?: number | null;
   onSubmit?: (intent: CommandEditorMutationIntent) => void;
   onCancel: () => void;
 }
@@ -72,15 +77,54 @@ const CommandEditorPageBody: React.FC<Props> = ({
   snapshot,
   status,
   pending,
+  mode = 'EDIT',
+  createTargetBlockId = null,
   onSubmit,
   onCancel,
 }) => {
-  const command = snapshot.commands.find(
+  const selectedCommand = snapshot.commands.find(
     candidate => candidate.instructionId === snapshot.selectedInstructionId,
   );
-  const initialTargetBlockId = command?.blockId ?? 0;
+  const availableBlocks = useMemo(() => snapshot.blocks.length > 0
+    ? snapshot.blocks
+    : [{
+        blockId: 0,
+        blockOrder: 1,
+        blockName: 'Default Block (created with command)',
+        commandCount: 0,
+        active: true,
+      }], [snapshot.blocks]);
+  const initialTargetBlockId = mode === 'CREATE'
+    ? (availableBlocks.some(block => block.blockId === createTargetBlockId)
+      ? Number(createTargetBlockId)
+      : availableBlocks[0]?.blockId ?? 0)
+    : selectedCommand?.blockId ?? 0;
+  const createCommand = useMemo<ComponentEditorCommand>(() => {
+    const block = availableBlocks.find(candidate => candidate.blockId === initialTargetBlockId)
+      ?? availableBlocks[0];
+    return {
+      instructionId: 0,
+      instructionOrder: null,
+      instructionName: 'GetValue',
+      action: 'GET',
+      operation: '',
+      onHoldSeconds: null,
+      blockId: block?.blockId ?? 0,
+      blockOrder: block?.blockOrder ?? 1,
+      blockName: block?.blockName ?? 'Default Block (created with command)',
+      active: true,
+      parentId: null,
+      parentBlockId: null,
+      variableId: null,
+      variableSlots: [],
+      storedConfiguration: null,
+    };
+  }, [availableBlocks, initialTargetBlockId]);
+  const command = mode === 'CREATE' ? createCommand : selectedCommand;
   const [targetBlockId, setTargetBlockId] = useState(initialTargetBlockId);
-  const [placementValue, setPlacementValue] = useState('KEEP');
+  const [placementValue, setPlacementValue] = useState(
+    mode === 'CREATE' ? (initialTargetBlockId > 0 ? 'TOP' : 'END') : 'KEEP',
+  );
   const originalCommandCode = canonicalInstructionAction(command?.action ?? '');
   const [selectedCommandCode, setSelectedCommandCode] = useState(originalCommandCode);
   const [draft, setDraft] = useState(() => command
@@ -99,11 +143,11 @@ const CommandEditorPageBody: React.FC<Props> = ({
   } | null>(null);
 
   const commandChanged = selectedCommandCode !== originalCommandCode;
-  const lockCommandSelection = command
+  const lockCommandSelection = mode === 'EDIT' && command
     ? instructionRelationshipPolicy(command.action).role === 'WEB_ELEMENT'
     : false;
   const blockSearchOptions = useMemo<SearchBoxOption[]>(() =>
-    snapshot.blocks.map(block => ({
+    availableBlocks.map(block => ({
       value: String(block.blockId),
       label: `#${block.blockOrder} ${block.blockName}`,
       sublabel: `${block.commandCount} command(s) · block ID ${block.blockId}`,
@@ -111,7 +155,7 @@ const CommandEditorPageBody: React.FC<Props> = ({
         ? { text: 'INACTIVE', tone: 'red' as const }
         : { text: 'ACTIVE', tone: 'green' as const }],
       keywords: `${block.blockId} ${block.blockOrder} ${block.blockName}`,
-    })), [snapshot.blocks]);
+    })), [availableBlocks]);
   const commandSearchOptions = useMemo<SearchBoxOption[]>(() => {
     if (!command) return [];
     const catalog = COMMAND_EDITOR_COMMAND_OPTIONS.some(
@@ -123,7 +167,8 @@ const CommandEditorPageBody: React.FC<Props> = ({
           ...COMMAND_EDITOR_COMMAND_OPTIONS,
         ];
     return catalog
-      .filter(option => !isCommandEditorConditionalBoundary(option.code)
+      .filter(option => mode === 'CREATE'
+        || !isCommandEditorConditionalBoundary(option.code)
         || option.code === originalCommandCode)
       .map(option => ({
         value: option.code,
@@ -135,16 +180,17 @@ const CommandEditorPageBody: React.FC<Props> = ({
           : [],
         keywords: `${option.code} ${option.label}`,
       }));
-  }, [command, originalCommandCode]);
+  }, [command, mode, originalCommandCode]);
 
   const conditionalImpactPreview = useMemo(
-    () => command
+    () => mode === 'EDIT' && command
       ? commandEditorConditionalFamilyImpact(command, selectedCommandCode, snapshot.commands)
       : null,
-    [command, selectedCommandCode, snapshot.commands],
+    [command, mode, selectedCommandCode, snapshot.commands],
   );
   const conditionalPositionLocked = Boolean(
-    command
+    mode === 'EDIT'
+    && command
     && isCommandEditorConditionalBoundary(originalCommandCode)
     && !commandChanged,
   );
@@ -156,19 +202,27 @@ const CommandEditorPageBody: React.FC<Props> = ({
         conditionalImpactPreview?.boundariesToDelete.map(
           boundary => boundary.instructionId,
         ) ?? [],
-      ).filter(option => !conditionalPositionLocked || option.placement.kind === 'KEEP')
+      ).filter(option => mode === 'CREATE'
+        ? option.placement.kind !== 'KEEP'
+        : !conditionalPositionLocked || option.placement.kind === 'KEEP')
     : [], [
       command,
       conditionalImpactPreview,
       conditionalPositionLocked,
+      mode,
       snapshot.commands,
       targetBlockId,
     ]);
 
   useEffect(() => {
     if (!command) return;
-    setTargetBlockId(command.blockId ?? 0);
-    setPlacementValue('KEEP');
+    const nextTargetBlockId = mode === 'CREATE'
+      ? initialTargetBlockId
+      : command.blockId ?? 0;
+    setTargetBlockId(nextTargetBlockId);
+    setPlacementValue(mode === 'CREATE'
+      ? (nextTargetBlockId > 0 ? 'TOP' : 'END')
+      : 'KEEP');
     setRelationshipWarning(null);
     setConditionalFamilyWarning(null);
     setSelectedCommandCode(canonicalInstructionAction(command.action));
@@ -185,7 +239,7 @@ const CommandEditorPageBody: React.FC<Props> = ({
         command.variableId ?? null,
       ),
     });
-  }, [command]);
+  }, [command, initialTargetBlockId, mode]);
 
   useEffect(() => {
     if (!command || !conditionalPositionLocked) return;
@@ -358,12 +412,13 @@ const CommandEditorPageBody: React.FC<Props> = ({
           bindings={variableBindings}
           variables={snapshot.variables}
           disabled={pending}
+          disconnectedOnly={mode === 'CREATE'}
           onChange={setDesiredVariableBinding}
         />
       )
     : null;
 
-  const targetBlock = snapshot.blocks.find(block => block.blockId === targetBlockId) ?? null;
+  const targetBlock = availableBlocks.find(block => block.blockId === targetBlockId) ?? null;
   const targetCommandCount = snapshot.commands.filter(
     candidate => candidate.blockId === targetBlockId,
   ).length;
@@ -371,7 +426,7 @@ const CommandEditorPageBody: React.FC<Props> = ({
   const canSubmit = Boolean(
     onSubmit
     && !pending
-    && targetBlockId > 0
+    && (targetBlockId > 0 || (mode === 'CREATE' && targetBlockId === 0))
     && placement
     && isCommandEditorBaseDraftValid(draft)
     && !(
@@ -379,7 +434,8 @@ const CommandEditorPageBody: React.FC<Props> = ({
       && (targetBlockId !== command.blockId || placement?.kind !== 'KEEP')
     )
     && !(
-      ['ELSE', 'ENDIF'].includes(originalCommandCode)
+      mode === 'EDIT'
+      && ['ELSE', 'ENDIF'].includes(originalCommandCode)
       && !commandChanged
     ),
   );
@@ -443,7 +499,7 @@ const CommandEditorPageBody: React.FC<Props> = ({
         <section className={styles.context} aria-label="Command Editor context">
           <div><span>Bot Job</span><strong>#{botJobId} {botJobName}</strong></div>
           <div><span>Original position</span><strong>{scopeLabel}</strong></div>
-          <b>EDIT MODE</b>
+          <b>{mode === 'CREATE' ? 'ADD MODE' : 'EDIT MODE'}</b>
         </section>
 
         <section className={styles.summary} aria-label="Command Editor summary">
@@ -459,13 +515,19 @@ const CommandEditorPageBody: React.FC<Props> = ({
           headerRight="Commands per block"
           countLabel={count => `${count} BLOCK${count === 1 ? '' : 'S'}`}
           options={blockSearchOptions}
-          value={targetBlockId > 0 ? String(targetBlockId) : null}
+          value={targetBlockId >= 0 ? String(targetBlockId) : null}
           onChange={(value) => {
             if (value === null || conditionalPositionLocked) return;
             const nextTargetBlockId = Number(value);
-            if (!Number.isSafeInteger(nextTargetBlockId) || nextTargetBlockId <= 0) return;
+            if (
+              !Number.isSafeInteger(nextTargetBlockId)
+              || nextTargetBlockId < 0
+              || (nextTargetBlockId === 0 && mode !== 'CREATE')
+            ) return;
             setTargetBlockId(nextTargetBlockId);
-            setPlacementValue(nextTargetBlockId !== command.blockId ? 'TOP' : 'KEEP');
+            setPlacementValue(mode === 'CREATE'
+              ? (nextTargetBlockId > 0 ? 'TOP' : 'END')
+              : nextTargetBlockId !== command.blockId ? 'TOP' : 'KEEP');
           }}
         />
 
@@ -511,7 +573,9 @@ const CommandEditorPageBody: React.FC<Props> = ({
                 ({command.instructionId}) {command.instructionName}
               </strong>
             ) : (
-              <strong>#{command.instructionOrder ?? '?'} {command.instructionName}</strong>
+              <strong>{mode === 'CREATE'
+                ? `New command · ${command.instructionName}`
+                : `#${command.instructionOrder ?? '?'} ${command.instructionName}`}</strong>
             )}
           </div>
           <div>
@@ -521,10 +585,12 @@ const CommandEditorPageBody: React.FC<Props> = ({
               {commandChanged ? ` → ${selectedCommandCode}` : ''}
             </strong>
           </div>
-          <div><span>Instruction ID</span><strong>{command.instructionId}</strong></div>
+          <div><span>Instruction ID</span><strong>{mode === 'CREATE' ? 'NEW' : command.instructionId}</strong></div>
           <div>
             <span>Block</span>
-            <strong>#{command.blockOrder ?? '?'} {command.blockName || 'Unknown Block'}</strong>
+            <strong>{mode === 'CREATE'
+              ? `#${targetBlock?.blockOrder ?? '?'} ${targetBlock?.blockName || 'Unknown Block'}`
+              : `#${command.blockOrder ?? '?'} ${command.blockName || 'Unknown Block'}`}</strong>
           </div>
         </section>
 
@@ -552,30 +618,46 @@ const CommandEditorPageBody: React.FC<Props> = ({
         <button type="button" className={styles.cancelButton} disabled={pending} onClick={onCancel}>
           CANCEL
         </button>
-        <button
-          type="button"
-          className={styles.copyButton}
-          disabled={!canSubmit || isCommandEditorConditionalBoundary(originalCommandCode)}
-          title={isCommandEditorConditionalBoundary(originalCommandCode)
-            ? 'Copy the complete IF family through Block transfer'
-            : onSubmit
-              ? 'Create a disconnected copy with a new instruction ID'
+        {mode === 'CREATE' ? (
+          <button
+            type="button"
+            className={styles.updateButton}
+            disabled={!canSubmit}
+            title={onSubmit
+              ? 'Create this disconnected command'
               : 'Command persistence is not available for this workspace'}
-          onClick={() => submit('COPY_NEW')}
-        >
-          COPY NEW
-        </button>
-        <button
-          type="button"
-          className={styles.updateButton}
-          disabled={!canSubmit}
-          title={onSubmit
-            ? 'Update the selected instruction'
-            : 'Command persistence is not available for this workspace'}
-          onClick={() => submit('UPDATE')}
-        >
-          UPDATE
-        </button>
+            onClick={() => submit('CREATE_NEW')}
+          >
+            CREATE NEW
+          </button>
+        ) : (
+          <>
+            <button
+              type="button"
+              className={styles.copyButton}
+              disabled={!canSubmit || isCommandEditorConditionalBoundary(originalCommandCode)}
+              title={isCommandEditorConditionalBoundary(originalCommandCode)
+                ? 'Copy the complete IF family through Block transfer'
+                : onSubmit
+                  ? 'Create a disconnected copy with a new instruction ID'
+                  : 'Command persistence is not available for this workspace'}
+              onClick={() => submit('COPY_NEW')}
+            >
+              COPY NEW
+            </button>
+            <button
+              type="button"
+              className={styles.updateButton}
+              disabled={!canSubmit}
+              title={onSubmit
+                ? 'Update the selected instruction'
+                : 'Command persistence is not available for this workspace'}
+              onClick={() => submit('UPDATE')}
+            >
+              UPDATE
+            </button>
+          </>
+        )}
       </footer>
 
       {relationshipWarning && (
