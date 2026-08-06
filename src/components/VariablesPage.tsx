@@ -76,6 +76,10 @@ import {
   type VariablesCommandCreateResult,
 } from './command-editor/useVariablesCommandEditorCreate';
 import {
+  useCommandEditorVariableSave,
+  type CommandEditorVariableSaveResult,
+} from './command-editor/useCommandEditorVariableSave';
+import {
   buildVariablesBatchResolveMutation,
   planVariablesBatchRelease,
   planVariablesBatchResolve,
@@ -1411,6 +1415,46 @@ const VariablesPage: React.FC<Props> = ({
     onResult: handleCommandUpdateResult,
   });
 
+  const commandEditorSaveAuthority = useMemo(() => {
+    const capability = snapshot?.mutationCapability;
+    if (!snapshot || !capability) return null;
+    return {
+      sessionId,
+      bindingEpoch: snapshot.bindingEpoch,
+      workspaceEpoch: snapshot.workspaceEpoch,
+      graphVersion: capability.graphVersion,
+      graphRevision: capability.graphRevision,
+      ownerAssertion: capability.ownerAssertion,
+      botJobName: snapshot.botJob.name,
+    } as const;
+  }, [sessionId, snapshot]);
+
+  const handleCommandEditorVariableSaveResult = useCallback((
+    result: CommandEditorVariableSaveResult,
+  ) => {
+    setStatus({
+      level: result.ok ? 'ok' : 'error',
+      text: result.message || (result.ok
+        ? 'Command and variable connections saved.'
+        : `The ${result.stage.toLocaleLowerCase()} save was refused.`),
+    });
+    // UPDATE can commit before a later slot mutation is refused. Always reload
+    // the final authoritative state after this isolated sequence finishes.
+    sendWorkspaceRequest('variablesWorkspace.refresh');
+  }, [sendWorkspaceRequest]);
+
+  const {
+    pendingRequestId: pendingCommandEditorVariableSaveRequestId,
+    submit: submitCommandEditorVariableSave,
+    handleMessage: handleCommandEditorVariableSaveMessage,
+    resetPending: resetCommandEditorVariableSave,
+  } = useCommandEditorVariableSave({
+    webSocket,
+    connected,
+    authority: commandEditorSaveAuthority,
+    onResult: handleCommandEditorVariableSaveResult,
+  });
+
   // Operator edits use the command-update contract. graphMutationRight remains
   // exclusively responsible for CHECKVALUE RIGHT-slot connect/disconnect.
   const changeCheckOperator = useCallback((
@@ -1448,6 +1492,7 @@ const VariablesPage: React.FC<Props> = ({
           operator: comparisonOperator as typeof configuration.operator,
         },
       },
+      variableBindings: [],
       allowRelationshipDisconnect: false,
       allowConditionalFamilyDissolve: false,
       conditionalFamilyDeleteIds: [],
@@ -1521,6 +1566,7 @@ const VariablesPage: React.FC<Props> = ({
     resetGraphMutationCommandVariable();
     resetInstructionCopy();
     resetCommandUpdate();
+    resetCommandEditorVariableSave();
     resetCommandCopy();
     resetCommandCreate();
     resetVariableCreate();
@@ -1552,6 +1598,7 @@ const VariablesPage: React.FC<Props> = ({
     resetCommandCopy,
     resetCommandCreate,
     resetCommandUpdate,
+    resetCommandEditorVariableSave,
     resetRuntimeMemory,
     resetVariableCreate,
     resetVariableDelete,
@@ -1582,6 +1629,7 @@ const VariablesPage: React.FC<Props> = ({
     processedMessagesRef.current = messages.length;
 
     pending.forEach(raw => {
+      if (handleCommandEditorVariableSaveMessage(raw)) return;
       if (handleVariableAutoResolveMessage(raw)) return;
       if (handleCommandCreateMessage(raw)) return;
       if (handleCommandCopyMessage(raw)) return;
@@ -1672,6 +1720,7 @@ const VariablesPage: React.FC<Props> = ({
   }, [
     clearPendingRequest,
     handleGraphMutationMessage,
+    handleCommandEditorVariableSaveMessage,
     handleCheckValueLeftMessage,
     handleGraphMutationCommandVariableMessage,
     handleCommandCreateMessage,
@@ -1797,6 +1846,7 @@ const VariablesPage: React.FC<Props> = ({
         parentId: editingCommandNode.parentId,
         parentBlockId: editingCommandNode.parentBlockId,
         variableId: editingCommandNode.variableId,
+        variableSlots: editingCommandNode.variableSlots,
         storedConfiguration: editingCommandNode.commandConfiguration ?? null,
       };
   const editorCommands: ComponentEditorCommand[] = snapshot?.commands.flatMap(command =>
@@ -1814,6 +1864,7 @@ const VariablesPage: React.FC<Props> = ({
       parentId: command.parentId,
       parentBlockId: command.parentBlockId,
       variableId: command.variableId,
+      variableSlots: command.variableSlots,
       storedConfiguration: command.commandConfiguration ?? null,
     }]) ?? [];
   const editorScopeLabel = editingCommand
@@ -2140,6 +2191,7 @@ const VariablesPage: React.FC<Props> = ({
             operandVariableId: replacement,
           },
         },
+        variableBindings: [],
         allowRelationshipDisconnect: false,
         allowConditionalFamilyDissolve: false,
         conditionalFamilyDeleteIds: [],
@@ -4256,6 +4308,7 @@ const VariablesPage: React.FC<Props> = ({
             diagnosticCount={snapshot.diagnostics.length}
             pending={
               pendingCommandUpdateRequestId !== null
+              || pendingCommandEditorVariableSaveRequestId !== null
               || pendingCommandCopyRequestId !== null
               || pendingCommandCreateRequestId !== null
             }
@@ -4268,7 +4321,7 @@ const VariablesPage: React.FC<Props> = ({
                 ? submitCommandCreate(intent)
                 : intent.action === 'COPY_NEW'
                   ? submitCommandCopy(intent)
-                  : submitCommandUpdate(intent);
+                  : submitCommandEditorVariableSave(intent);
               if (requestId) {
                 setStatus({
                   level: 'warn',

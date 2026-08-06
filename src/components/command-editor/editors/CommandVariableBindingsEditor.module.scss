@@ -1,0 +1,40 @@
+.editor {
+  display: grid;
+  gap: 10px;
+}
+
+.editor header {
+  display: grid;
+  gap: 3px;
+}
+
+.editor header > span {
+  color: #0b5394;
+  font-size: .78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.editor header > small,
+.field > small {
+  color: #66788a;
+  font-size: .7rem;
+}
+
+.fields {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+@media (max-width: 720px) {
+  .fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

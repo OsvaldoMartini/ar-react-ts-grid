@@ -1,7 +1,11 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import DetachedPageShell from './DetachedPageShell';
 import CommandEditorPageBody from './command-editor-page/CommandEditorPageBody';
 import type { CommandEditorMutationIntent } from './command-editor/commandEditorMutation';
+import {
+  useCommandEditorVariableSave,
+  type CommandEditorVariableSaveResult,
+} from './command-editor/useCommandEditorVariableSave';
 import {
   commandEditorPageInstructionFromPayload,
   commandEditorPageSnapshotFromPayload,
@@ -166,6 +170,44 @@ const CommandEditorPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) 
     }
   }, [send]);
 
+  const variableSaveAuthority = useMemo(() => {
+    const capability = snapshot?.graphCapability;
+    if (!target || !capability || target.targetSessionId !== 'botJobTasks') return null;
+    return {
+      sessionId,
+      bindingEpoch: target.bindingEpoch,
+      workspaceEpoch: capability.workspaceEpoch,
+      graphVersion: capability.graphVersion,
+      graphRevision: capability.graphRevision,
+      ownerAssertion: capability.ownerAssertion,
+      botJobName: target.botJobName,
+      targetSessionId: target.targetSessionId,
+      selectionRevision: target.selectionRevision,
+    } as const;
+  }, [sessionId, snapshot?.graphCapability, target]);
+
+  const handleVariableSaveResult = useCallback((result: CommandEditorVariableSaveResult) => {
+    const current = targetRef.current;
+    setStatus({
+      level: result.ok ? 'ok' : 'error',
+      text: result.message || (result.ok
+        ? 'Command and variable connections saved.'
+        : `The ${result.stage.toLocaleLowerCase()} save was refused.`),
+    });
+    if (current) requestWorkspaceBootstrap(current);
+  }, [requestWorkspaceBootstrap]);
+
+  const {
+    pendingRequestId: pendingVariableSaveRequestId,
+    submit: submitVariableSave,
+    handleMessage: handleVariableSaveMessage,
+  } = useCommandEditorVariableSave({
+    webSocket,
+    connected,
+    authority: variableSaveAuthority,
+    onResult: handleVariableSaveResult,
+  });
+
   useEffect(() => {
     if (!connected) return;
     // A reconnected manager transport receives a new backend binding epoch. Bootstrap without the
@@ -300,6 +342,8 @@ const CommandEditorPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) 
           return;
         }
 
+        if (handleVariableSaveMessage(raw)) return;
+
         if (
           operationId === 'variablesWorkspace.commandEditor.updateResponse'
           || operationId === 'variablesWorkspace.commandEditor.copyResponse'
@@ -374,6 +418,7 @@ const CommandEditorPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) 
   }, [
     acceptWorkspaceSnapshot,
     clearPendingMutation,
+    handleVariableSaveMessage,
     messages,
     requestWorkspaceBootstrap,
     snapshot,
@@ -439,6 +484,19 @@ const CommandEditorPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) 
     }
 
     const copy = intent.action === 'COPY_NEW';
+    const botJobVariableUpdate = !copy && current.targetSessionId === 'botJobTasks';
+    if (botJobVariableUpdate) {
+      const requestId = submitVariableSave(intent);
+      if (requestId) {
+        setStatus({ level: 'warn', text: 'Updating command and variable connections...' });
+      } else {
+        setStatus({
+          level: 'error',
+          text: 'Command and variable persistence is not available for this workspace.',
+        });
+      }
+      return;
+    }
     const operationType = copy
       ? 'variablesWorkspace.commandEditor.copy'
       : 'variablesWorkspace.commandEditor.update';
@@ -510,6 +568,7 @@ const CommandEditorPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) 
     requestWorkspaceBootstrap,
     send,
     snapshot,
+    submitVariableSave,
     webSocket,
   ]);
 
@@ -603,10 +662,10 @@ const CommandEditorPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) 
                 scopeLabel={`#${target.instruction.blockOrderNumber} ${target.instruction.blockName} · #${target.instruction.instructionOrderNumber} instruction`}
                 snapshot={snapshot}
                 status={status}
-                pending={mutationPending}
+                pending={mutationPending || pendingVariableSaveRequestId !== null}
                 onSubmit={snapshot.graphCapability ? submitCommandMutation : undefined}
                 onCancel={() => {
-                  if (mutationPending) return;
+                  if (mutationPending || pendingVariableSaveRequestId !== null) return;
                   if (onClose) {
                     onClose();
                   } else {

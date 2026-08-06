@@ -7,6 +7,7 @@ import type {
   ComponentEditorBlockOption,
   ComponentEditorCommand,
   ComponentEditorVariableOption,
+  ComponentEditorVariableSlot,
 } from './componentEditor.types';
 import { commandEditorPlacementOptions } from './commandEditorPlacement';
 import { commandEditorPlacementFromValue } from './commandEditorPlacement';
@@ -26,6 +27,7 @@ import ExcelWriteCommandEditor from './editors/ExcelWriteCommandEditor';
 import GotoCommandEditor from './editors/GotoCommandEditor';
 import SwipeCommandEditor from './editors/SwipeCommandEditor';
 import ConditionalCommandEditor from './editors/ConditionalCommandEditor';
+import CommandVariableBindingsEditor from './editors/CommandVariableBindingsEditor';
 import CommandEditorRelationshipWarningModal from './CommandEditorRelationshipWarningModal';
 import CommandEditorConditionalFamilyWarningModal from './CommandEditorConditionalFamilyWarningModal';
 import {
@@ -42,6 +44,10 @@ import type {
   CommandEditorMutationAction,
   CommandEditorMutationIntent,
 } from './commandEditorMutation';
+import {
+  commandEditorVariableBindings,
+  updateCommandEditorVariableBinding,
+} from './commandEditorVariableBindings';
 import styles from './ComponentEditorModal.module.scss';
 
 export interface ComponentEditorModalStatus {
@@ -111,6 +117,8 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
   const originalCommandCode = canonicalInstructionAction(command.action);
   const [selectedCommandCode, setSelectedCommandCode] = useState(originalCommandCode);
   const [draft, setDraft] = useState(() => commandEditorBaseDraft(command));
+  const [variableBindings, setVariableBindings] = useState(() =>
+    commandEditorVariableBindings(command, command.action));
   const commandChanged = selectedCommandCode !== originalCommandCode;
   const [relationshipWarning, setRelationshipWarning] = useState<{
     impact: CommandEditorRelationshipImpact;
@@ -165,6 +173,7 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
     if (lockCommandSelection) return;
     if (value === null || value === selectedCommandCode) return;
     setSelectedCommandCode(value);
+    setVariableBindings(commandEditorVariableBindings(command, value));
     setDraft(current => value === originalCommandCode
       ? commandEditorBaseDraft(command)
       : {
@@ -230,6 +239,12 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
     setRelationshipWarning(null);
     setConditionalFamilyWarning(null);
     setSelectedCommandCode(canonicalInstructionAction(command.action));
+    setVariableBindings(commandEditorVariableBindings({
+      action: command.action,
+      variableId: command.variableId,
+      variableSlots: command.variableSlots,
+      storedConfiguration: command.storedConfiguration,
+    }, command.action));
     setDraft({
       name: command.instructionName,
       action: command.action,
@@ -251,8 +266,41 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
     command.operation,
     command.storedConfiguration,
     command.variableId,
+    command.variableSlots,
     mode,
   ]);
+
+  const setDesiredVariableBinding = (
+    slot: ComponentEditorVariableSlot,
+    variableId: number | null,
+  ) => {
+    setVariableBindings(current => updateCommandEditorVariableBinding(
+      current,
+      slot,
+      variableId,
+    ));
+    if (slot !== 'LEFT' && slot !== 'RIGHT') return;
+    setDraft(current => {
+      const configuration = current.configuration;
+      if (
+        configuration.kind !== 'CHECK_VALUE'
+        && configuration.kind !== 'EXTERNAL_CHECK'
+      ) {
+        return current;
+      }
+      return {
+        ...current,
+        configuration: slot === 'LEFT'
+          ? { ...configuration, leftVariableId: variableId }
+          : {
+              ...configuration,
+              operandKind: 'VARIABLE',
+              operandRawValue: '',
+              operandVariableId: variableId,
+            },
+      };
+    });
+  };
 
   const configurationEditor = draft.configuration.kind === 'LOOP'
     ? (
@@ -291,7 +339,6 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
           ? (
               <CheckValueCommandEditor
                 value={draft.configuration}
-                variables={variables}
                 disabled={pending}
                 onChange={(configuration) => setDraft(current => ({ ...current, configuration }))}
               />
@@ -300,7 +347,6 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
             ? (
                 <ExternalCheckCommandEditor
                   value={draft.configuration}
-                  variables={variables}
                   disabled={pending}
                   onChange={(configuration) => setDraft(current => ({ ...current, configuration }))}
                 />
@@ -340,6 +386,18 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
                       )
         : null;
 
+  const variableBindingsEditor = variableBindings.length > 0
+    ? (
+        <CommandVariableBindingsEditor
+          bindings={variableBindings}
+          variables={variables}
+          disabled={pending}
+          disconnectedOnly={mode === 'CREATE'}
+          onChange={setDesiredVariableBinding}
+        />
+      )
+    : null;
+
   const placement = commandEditorPlacementFromValue(
     placementOptions,
     placementValue,
@@ -371,6 +429,7 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
       targetBlockId,
       placement: submittedPlacement,
       draft: { ...draft, name: draft.name.trim() },
+      variableBindings: action === 'UPDATE' ? variableBindings : [],
       allowRelationshipDisconnect: false,
       allowConditionalFamilyDissolve: false,
       conditionalFamilyDeleteIds: [],
@@ -575,8 +634,9 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
             </div>
           </section>
 
-          {(configurationEditor || children) && (
+          {(variableBindingsEditor || configurationEditor || children) && (
             <section className={styles.editorContent} aria-label="Command configuration">
+              {variableBindingsEditor}
               {configurationEditor}
               {children}
             </section>

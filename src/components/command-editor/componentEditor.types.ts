@@ -20,7 +20,20 @@ export interface ComponentEditorCommand {
   parentId: number | null;
   parentBlockId: number | null;
   variableId?: number | null;
+  variableSlots?: readonly ComponentEditorVariableSlotLink[];
   storedConfiguration?: ComponentEditorStoredConfiguration | null;
+}
+
+export type ComponentEditorVariableSlot =
+  | 'LEFT'
+  | 'RIGHT'
+  | 'GET_WRITE'
+  | 'READ_SET'
+  | 'READ';
+
+export interface ComponentEditorVariableSlotLink {
+  slot: string;
+  variableId: number;
 }
 
 export interface ComponentEditorVariableOption {

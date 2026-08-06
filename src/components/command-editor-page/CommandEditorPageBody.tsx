@@ -14,6 +14,7 @@ import LoopCommandEditor from '../command-editor/editors/LoopCommandEditor';
 import RefreshLoopCommandEditor from '../command-editor/editors/RefreshLoopCommandEditor';
 import SwipeCommandEditor from '../command-editor/editors/SwipeCommandEditor';
 import WaitCommandEditor from '../command-editor/editors/WaitCommandEditor';
+import CommandVariableBindingsEditor from '../command-editor/editors/CommandVariableBindingsEditor';
 import CommandEditorConditionalFamilyWarningModal from '../command-editor/CommandEditorConditionalFamilyWarningModal';
 import CommandEditorRelationshipWarningModal from '../command-editor/CommandEditorRelationshipWarningModal';
 import {
@@ -30,6 +31,11 @@ import type {
   CommandEditorMutationAction,
   CommandEditorMutationIntent,
 } from '../command-editor/commandEditorMutation';
+import type { ComponentEditorVariableSlot } from '../command-editor/componentEditor.types';
+import {
+  commandEditorVariableBindings,
+  updateCommandEditorVariableBinding,
+} from '../command-editor/commandEditorVariableBindings';
 import {
   commandEditorPlacementFromValue,
   commandEditorPlacementOptions,
@@ -80,6 +86,9 @@ const CommandEditorPageBody: React.FC<Props> = ({
   const [draft, setDraft] = useState(() => command
     ? commandEditorBaseDraft(command)
     : null);
+  const [variableBindings, setVariableBindings] = useState(() => command
+    ? commandEditorVariableBindings(command, command.action)
+    : []);
   const [relationshipWarning, setRelationshipWarning] = useState<{
     impact: CommandEditorRelationshipImpact;
     intent: CommandEditorMutationIntent;
@@ -163,6 +172,7 @@ const CommandEditorPageBody: React.FC<Props> = ({
     setRelationshipWarning(null);
     setConditionalFamilyWarning(null);
     setSelectedCommandCode(canonicalInstructionAction(command.action));
+    setVariableBindings(commandEditorVariableBindings(command, command.action));
     setDraft({
       name: command.instructionName,
       action: command.action,
@@ -202,6 +212,7 @@ const CommandEditorPageBody: React.FC<Props> = ({
   const selectCommand = (value: string | null) => {
     if (lockCommandSelection || value === null || value === selectedCommandCode) return;
     setSelectedCommandCode(value);
+    setVariableBindings(commandEditorVariableBindings(command, value));
     setDraft(current => {
       if (!current) return current;
       return value === originalCommandCode
@@ -212,6 +223,39 @@ const CommandEditorPageBody: React.FC<Props> = ({
             operation: '',
             configuration: commandEditorConfiguration(value, '', null, null),
           };
+    });
+  };
+
+  const setDesiredVariableBinding = (
+    slot: ComponentEditorVariableSlot,
+    variableId: number | null,
+  ) => {
+    setVariableBindings(current => updateCommandEditorVariableBinding(
+      current,
+      slot,
+      variableId,
+    ));
+    if (slot !== 'LEFT' && slot !== 'RIGHT') return;
+    setDraft(current => {
+      if (!current) return current;
+      const configuration = current.configuration;
+      if (
+        configuration.kind !== 'CHECK_VALUE'
+        && configuration.kind !== 'EXTERNAL_CHECK'
+      ) {
+        return current;
+      }
+      return {
+        ...current,
+        configuration: slot === 'LEFT'
+          ? { ...configuration, leftVariableId: variableId }
+          : {
+              ...configuration,
+              operandKind: 'VARIABLE',
+              operandRawValue: '',
+              operandVariableId: variableId,
+            },
+      };
     });
   };
 
@@ -249,7 +293,6 @@ const CommandEditorPageBody: React.FC<Props> = ({
           ? (
               <CheckValueCommandEditor
                 value={draft.configuration}
-                variables={snapshot.variables}
                 disabled={pending}
                 onChange={configuration => setDraft(current => current
                   ? { ...current, configuration }
@@ -260,7 +303,6 @@ const CommandEditorPageBody: React.FC<Props> = ({
             ? (
                 <ExternalCheckCommandEditor
                   value={draft.configuration}
-                  variables={snapshot.variables}
                   disabled={pending}
                   onChange={configuration => setDraft(current => current
                     ? { ...current, configuration }
@@ -307,8 +349,19 @@ const CommandEditorPageBody: React.FC<Props> = ({
                             ? { ...current, configuration }
                             : current)}
                         />
-                      )
+                    )
                     : null;
+
+  const variableBindingsEditor = variableBindings.length > 0
+    ? (
+        <CommandVariableBindingsEditor
+          bindings={variableBindings}
+          variables={snapshot.variables}
+          disabled={pending}
+          onChange={setDesiredVariableBinding}
+        />
+      )
+    : null;
 
   const targetBlock = snapshot.blocks.find(block => block.blockId === targetBlockId) ?? null;
   const targetCommandCount = snapshot.commands.filter(
@@ -342,6 +395,7 @@ const CommandEditorPageBody: React.FC<Props> = ({
       targetBlockId,
       placement: submittedPlacement,
       draft: { ...draft, name: draft.name.trim() },
+      variableBindings: action === 'UPDATE' ? variableBindings : [],
       allowRelationshipDisconnect: false,
       allowConditionalFamilyDissolve: false,
       conditionalFamilyDeleteIds: [],
@@ -467,8 +521,9 @@ const CommandEditorPageBody: React.FC<Props> = ({
           </div>
         </section>
 
-        {configurationEditor && (
+        {(variableBindingsEditor || configurationEditor) && (
           <section className={styles.editorContent} aria-label="Command configuration">
+            {variableBindingsEditor}
             {configurationEditor}
           </section>
         )}
