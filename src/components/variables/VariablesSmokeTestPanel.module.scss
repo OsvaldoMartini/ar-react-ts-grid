@@ -188,10 +188,12 @@
 }
 
 .runButton {
+  min-width: 132px;
   background: #176a3a;
   border: 1px solid #12582f;
   color: #fff;
   box-shadow: 0 0 9px rgba(23, 106, 58, 0.34);
+  white-space: nowrap;
 }
 
 .stopButton {

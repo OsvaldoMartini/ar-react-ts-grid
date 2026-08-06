@@ -152,6 +152,23 @@
   background: #ffffff;
 }
 
+.centerState {
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 7px;
+  padding: 30px;
+  color: #60758a;
+  text-align: center;
+}
+
+.centerState strong { color: #284b6c; font-size: 0.78rem; }
+.centerState span { max-width: 460px; font-size: 0.66rem; line-height: 1.4; }
+
 .summaryStrip {
   min-width: 0;
   display: flex;
