@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CopyPlus, Database, FilePlus2, RefreshCw, Save, X } from 'lucide-react';
+import { CopyPlus, Database, FilePlus2, RefreshCw, Save, Trash2, X } from 'lucide-react';
 import DetachedPageShell from './DetachedPageShell';
 import PagesOpenButton from './PagesOpenButton';
 import QuestionsCard from './QuestionsCard';
@@ -44,7 +44,7 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
   const cursor = useRef(0);
   const [snapshot, setSnapshot] = useState<ExcelSnapshot | null>(null);
   const [status, setStatus] = useState('Connecting to Excel dataset…');
-  const [pendingAction, setPendingAction] = useState<'STANDARD' | 'SYNTHETIC' | 'SAVE' | null>(null);
+  const [pendingAction, setPendingAction] = useState<'STANDARD' | 'SYNTHETIC' | 'SAVE' | 'CLEAR' | null>(null);
   const [generating, setGenerating] = useState(false);
   const [activeCell, setActiveCell] = useState<ActiveCell | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -123,6 +123,15 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     else setStatus('Copying the previous row in memory…');
   }, [send]);
 
+  const clearRows = useCallback(() => {
+    setPendingAction(null);
+    if (!send('excelData.rows.clear', { confirmed: true })) {
+      setStatus('Excel Data is not connected.');
+    } else {
+      setStatus('Clearing all rows from memory…');
+    }
+  }, [send]);
+
   const selectMode = useCallback((mode: 'REAL' | 'SYNTHETIC') => {
     if (send('excelData.mode.update', { mode })) setStatus(`Selecting ${mode} data…`);
   }, [send]);
@@ -182,7 +191,8 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
         } else if (operationId === 'excelData.addRowResponse'
           || operationId === 'excelData.mode.updateResponse'
           || operationId === 'excelData.refreshResponse'
-          || operationId === 'excelData.cell.updateResponse') {
+          || operationId === 'excelData.cell.updateResponse'
+          || operationId === 'excelData.rows.clearResponse') {
           if (body?.ok === false) {
             setStatus(body.error || 'The Excel operation failed.');
             if (operationId === 'excelData.refreshResponse') showExcelError(body);
@@ -230,8 +240,14 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
               onChange={selectMode} disabled={!connected || generating} />
             <button type="button" onClick={() => setPendingAction('STANDARD')} disabled={!connected || generating || snapshot?.mode !== 'REAL'}><FilePlus2 size={14} />Recreate Columns</button>
             <button type="button" onClick={addRow} disabled={!connected || generating || !snapshot || snapshot.rowCount < 1}><CopyPlus size={14} />Add Row</button>
-            <button type="button" className={styles.save} onClick={() => setPendingAction('SAVE')} disabled={!connected || generating || !snapshot?.dirty}><Save size={14} />{snapshot?.mode === 'SYNTHETIC' ? 'Save Synthetic Data' : 'Save to Excel'}</button>
-            <button type="button" onClick={refresh} disabled={!connected}><RefreshCw size={14} />{snapshot?.mode === 'SYNTHETIC' ? 'RELOAD DB' : 'RELOAD FILE'}</button>
+            <button type="button" className={styles.clear} onClick={() => snapshot?.mode === 'REAL' ? setPendingAction('CLEAR') : clearRows()}
+              disabled={!connected || generating || !snapshot || snapshot.rowCount < 1}><Trash2 size={14} />Clean Rows</button>
+            {snapshot?.mode === 'SYNTHETIC'
+              ? <button type="button" className={styles.save} onClick={() => setPendingAction('SAVE')} disabled={!connected || generating || !snapshot.dirty}><Save size={14} />SAVE DB</button>
+              : <>
+                <button type="button" className={styles.save} onClick={() => setPendingAction('SAVE')} disabled={!connected || generating || !snapshot?.dirty}><Save size={14} />Save to Excel</button>
+                <button type="button" onClick={refresh} disabled={!connected || generating}><RefreshCw size={14} />RELOAD FILE</button>
+              </>}
             <PagesOpenButton webSocket={webSocket} connected={connected} messages={messages} sessionId={sessionId} />
             <button type="button" className={styles.close} onClick={close}><X size={14} />Close</button>
           </div>
@@ -292,20 +308,25 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
             mode="confirm"
             header={pendingAction === 'SYNTHETIC'
               ? 'Generate Synthetic Memory Data?'
+              : pendingAction === 'CLEAR' ? 'Clear All Real Rows?'
               : pendingAction === 'SAVE' ? (snapshot?.mode === 'SYNTHETIC' ? 'Save Synthetic Memory Data?' : 'Save Memory Data to Excel?') : 'Recreate Excel Columns?'}
             body={pendingAction === 'SYNTHETIC'
               ? `Replace synthetic memory with ${syntheticRowCount} ${syntheticContext.trim() || 'Financial'} test row${syntheticRowCount === 1 ? '' : 's'}? The real workbook will not be changed.`
+              : pendingAction === 'CLEAR'
+                ? 'Remove every REAL data row from memory while preserving the Excel columns?'
               : pendingAction === 'SAVE'
                 ? snapshot?.mode === 'SYNTHETIC'
                   ? 'Save the current synthetic rows for this Bot Job and organization in the database?'
                   : 'Atomically replace the original Bot Job workbook with the current in-memory rows?'
                 : 'Rebuild the active Bot Job workbook from its current Blocks and input fields while preserving existing row values?'}
-            extraMsg={pendingAction === 'SAVE'
+            extraMsg={pendingAction === 'CLEAR'
+              ? 'The original workbook remains unchanged until you choose Save to Excel.'
+              : pendingAction === 'SAVE'
               ? 'Smoke Test and Test Run already use this shared memory dataset; saving makes it durable on disk.'
               : 'The in-memory dataset remains the authoritative source for this open Excel Data workspace.'}
-            okLabel={pendingAction === 'SYNTHETIC' ? 'Generate in Memory' : pendingAction === 'SAVE' ? (snapshot?.mode === 'SYNTHETIC' ? 'Save Synthetic Data' : 'Save to Excel') : 'Recreate Columns'}
+            okLabel={pendingAction === 'SYNTHETIC' ? 'Generate in Memory' : pendingAction === 'CLEAR' ? 'Clean Rows' : pendingAction === 'SAVE' ? (snapshot?.mode === 'SYNTHETIC' ? 'Save DB' : 'Save to Excel') : 'Recreate Columns'}
             destructive={pendingAction !== 'SYNTHETIC'}
-            onSubmit={() => pendingAction === 'SAVE' ? save() : generate(pendingAction)}
+            onSubmit={() => pendingAction === 'SAVE' ? save() : pendingAction === 'CLEAR' ? clearRows() : generate(pendingAction)}
             onCancel={() => setPendingAction(null)}
           />
         )}
