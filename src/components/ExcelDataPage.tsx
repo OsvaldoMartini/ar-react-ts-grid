@@ -131,11 +131,17 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     pending.forEach(raw => {
       try {
         const { operationId, body } = parse(raw);
-        if (operationId === 'excelData.bootstrapResponse') {
+        if (operationId === 'excelData.bootstrapResponse' || operationId === 'excelData.retarget') {
           if (body?.ok === false) setStatus(body.error || 'Excel dataset is unavailable.');
           else {
+            if (operationId === 'excelData.retarget') {
+              setSearchQuery('');
+              setActiveCell(null);
+            }
             setSnapshot(body as ExcelSnapshot);
-            setStatus(`Loaded ${body.rowCount ?? 0} Excel row${body.rowCount === 1 ? '' : 's'} into memory`);
+            setStatus(operationId === 'excelData.retarget'
+              ? body.message || 'Excel Data reloaded for the selected Bot Job.'
+              : `Loaded ${body.rowCount ?? 0} Excel row${body.rowCount === 1 ? '' : 's'} into memory`);
           }
         } else if (operationId === 'excelData.generateResponse'
           || operationId === 'excelData.generateSyntheticResponse') {
