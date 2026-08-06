@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import CommandEditorPage from './CommandEditorPage';
 
 const mockSend = jest.fn();
@@ -48,6 +48,10 @@ const instruction = (
 const loginWait = instruction(21, 7, 'Login', 1, 1, 'Wait for Login');
 const loginContinue = instruction(22, 7, 'Login', 1, 2, 'Continue');
 const accountsBalance = instruction(31, 8, 'Accounts', 2, 1, 'Read Balance');
+const usernameElement = {
+  ...instruction(41, 7, 'Login', 1, 3, 'Username'),
+  actions: 'C',
+};
 
 const snapshotBody = ({
   bindingEpoch = 'binding-1',
@@ -79,7 +83,11 @@ const snapshotBody = ({
     { id: 7, name: 'Login', blockOrderNumber: 1 },
     { id: 8, name: 'Accounts', blockOrderNumber: 2 },
   ],
-  instructions: [loginWait, loginContinue, accountsBalance],
+  instructions: [loginWait, loginContinue, accountsBalance].some(
+    row => row.id === selectedInstruction.id,
+  )
+    ? [loginWait, loginContinue, accountsBalance]
+    : [loginWait, loginContinue, accountsBalance, selectedInstruction],
   variables: [{
     id: 501,
     type: '$String',
@@ -104,6 +112,36 @@ const snapshotBody = ({
     editAllowed: true,
   }],
   graphRevision: `graph-${selectionRevision}`,
+  commandConfigurations: [{
+    instructionId: selectedInstruction.id,
+    commandType: selectedInstruction.actions,
+    conditionSource: '',
+    leftVariableId: null,
+    operandKind: '',
+    comparisonOperator: '',
+    operandRawValue: '',
+    operandVariableId: null,
+    outputKey: '',
+    outputColumn: '',
+    outputFile: '',
+    externalSourceKey: '',
+    formatPolicy: '',
+  }],
+  variableLinks: [],
+  workspaceCapabilities: targetSessionId === 'botJobTasks' ? {
+    botJobGraphMutationV3: {
+      enabled: true,
+      contractVersion: 3,
+      workspaceEpoch: 41,
+      graphVersion: 8,
+      graphRevision: `graph-${selectionRevision}`,
+      ownerAssertion: {
+        workspaceKind: 'BOT_JOB',
+        homeBankingId: 2,
+        botJobId: 5,
+      },
+    },
+  } : {},
   draft: null,
   rowCapabilities: { canInsertElseIf: false, canSplit: false },
 });
@@ -131,25 +169,26 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-test('hydrates the complete first workspace snapshot without a child bootstrap', async () => {
+test('hydrates the independent modern editor body without legacy panel actions', async () => {
   render(
     <CommandEditorPage socketPort={7357} sessionId="commandEditorManager" />,
   );
 
-  const blockSelect = await screen.findByLabelText('Command Editor Block');
-  const instructionSelect = screen.getByLabelText('Command Editor Instruction');
-
-  expect(blockSelect).toHaveValue('7');
-  expect(within(blockSelect).getAllByRole('option')).toHaveLength(2);
-  expect(instructionSelect).toHaveValue('21');
-  expect(within(instructionSelect).getAllByRole('option')).toHaveLength(2);
-  expect(screen.getByText('3 instructions loaded')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: /Add command before/ })).toBeEnabled();
+  expect(await screen.findByLabelText('Command Editor workspace')).toBeInTheDocument();
+  expect(screen.getByLabelText('Target Block')).toHaveValue('#1 Login');
+  expect(screen.getByLabelText('Command')).toHaveValue('Wait');
+  expect(screen.getByLabelText('Command placement')).toHaveValue('KEEP');
+  expect(screen.getByLabelText('Wait seconds')).toHaveValue(2);
+  expect(screen.getByRole('button', { name: 'COPY NEW' })).toBeEnabled();
+  expect(screen.getByRole('button', { name: 'UPDATE' })).toBeEnabled();
+  expect(screen.queryByText('Add command before')).not.toBeInTheDocument();
+  expect(screen.queryByText('Add command after')).not.toBeInTheDocument();
+  expect(screen.queryByText('Insert ElseIf')).not.toBeInTheDocument();
   expect(requests('commandEditor.workspaceBootstrap')).toHaveLength(1);
   expect(requests('commandEditor.bootstrap')).toHaveLength(0);
 });
 
-test('hydrates an authoritative Components instruction workspace', async () => {
+test('hydrates a Components target but keeps unavailable persistence fail-closed', async () => {
   mockMessages = [
     envelope('commandEditor.workspaceBootstrapResponse', snapshotBody({
       requestId: BOOTSTRAP_REQUEST_ID,
@@ -161,77 +200,153 @@ test('hydrates an authoritative Components instruction workspace', async () => {
     <CommandEditorPage socketPort={7357} sessionId="commandEditorManager" />,
   );
 
-  expect(await screen.findByLabelText('Command Editor Instruction')).toHaveValue('21');
-  expect(screen.getByText('3 instructions loaded')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: /Add command before/ })).toBeEnabled();
+  expect(await screen.findByLabelText('Command Editor workspace')).toBeInTheDocument();
+  expect(screen.getByLabelText('Command')).toHaveValue('Wait');
+  expect(screen.getByRole('button', { name: 'COPY NEW' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'UPDATE' })).toBeDisabled();
 });
 
-test('selects another instruction once and ignores stale select and snapshot responses', async () => {
-  const page = render(
+test('locks Web Element transformation while retaining placement, copy, and update', async () => {
+  mockMessages = [
+    envelope('commandEditor.workspaceBootstrapResponse', snapshotBody({
+      requestId: BOOTSTRAP_REQUEST_ID,
+      selectedInstruction: usernameElement,
+    })),
+  ];
+
+  render(
     <CommandEditorPage socketPort={7357} sessionId="commandEditorManager" />,
   );
 
-  const instructionSelect = await screen.findByLabelText('Command Editor Instruction');
-  mockSend.mockClear();
-  fireEvent.change(instructionSelect, { target: { value: '22' } });
+  expect(await screen.findByLabelText('Command Editor workspace')).toBeInTheDocument();
+  expect(screen.getByLabelText('Command')).toBeDisabled();
+  expect(screen.getByLabelText('Command placement')).toBeEnabled();
+  expect(screen.getByText(/Web Element type is locked/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'COPY NEW' })).toBeEnabled();
+  expect(screen.getByRole('button', { name: 'UPDATE' })).toBeEnabled();
+});
 
-  const selectRequests = requests('commandEditor.select');
-  expect(selectRequests).toHaveLength(1);
-  const selectBody = JSON.parse(selectRequests[0].body);
-  expect(selectBody).toEqual(expect.objectContaining({
+test('submits the reduced modern UPDATE contract and refreshes after its correlated response', async () => {
+  const view = render(
+    <CommandEditorPage socketPort={7357} sessionId="commandEditorManager" />,
+  );
+
+  const updateButton = await screen.findByRole('button', { name: 'UPDATE' });
+  mockSend.mockClear();
+  fireEvent.click(updateButton);
+
+  const updateRequests = requests('variablesWorkspace.commandEditor.update');
+  expect(updateRequests).toHaveLength(1);
+  const updateBody = JSON.parse(updateRequests[0].body);
+  expect(updateBody).toEqual(expect.objectContaining({
+    contractVersion: 1,
     bindingEpoch: 'binding-1',
     selectionRevision: 1,
-    selectedBlockId: 7,
-    selectedInstructionId: 22,
+    homeBankingId: 2,
+    botJobId: 5,
+    workspaceEpoch: 41,
+    baseGraphVersion: 8,
+    graphRevision: 'graph-1',
+    sourceInstructionId: 21,
+    targetBlockId: 7,
+    placement: { kind: 'KEEP', referenceInstructionId: null },
+    targetAction: 'H',
   }));
-  expect(instructionSelect).toBeDisabled();
+  expect(updateBody.configuration).toEqual({ kind: 'WAIT', waitSeconds: 2 });
+  expect(screen.getByRole('button', { name: 'UPDATE' })).toBeDisabled();
 
   mockMessages = [
     ...mockMessages,
-    envelope('commandEditor.selectResponse', snapshotBody({
-      bindingEpoch: 'stale-binding',
-      selectionRevision: 2,
-      selectedInstruction: loginContinue,
-      requestId: 'another-request',
-    })),
+    envelope('variablesWorkspace.commandEditor.updateResponse', {
+      ok: true,
+      committed: true,
+      requestId: updateBody.requestId,
+      bindingEpoch: 'binding-1',
+      message: 'Command updated',
+    }),
   ];
-  page.rerender(
-    <CommandEditorPage socketPort={7357} sessionId="commandEditorManager" />,
-  );
-
-  expect(await screen.findByLabelText('Command Editor Instruction')).toHaveValue('21');
-  expect(screen.getByLabelText('Command Editor Instruction')).toBeDisabled();
-
-  mockMessages = [
-    ...mockMessages,
-    envelope('commandEditor.selectResponse', snapshotBody({
-      bindingEpoch: 'binding-2',
-      selectionRevision: 2,
-      selectedInstruction: loginContinue,
-      requestId: selectBody.requestId,
-    })),
-  ];
-  page.rerender(
+  view.rerender(
     <CommandEditorPage socketPort={7357} sessionId="commandEditorManager" />,
   );
 
   await waitFor(() => {
-    expect(screen.getByLabelText('Command Editor Instruction')).toHaveValue('22');
-    expect(screen.getByLabelText('Command Editor Instruction')).toBeEnabled();
+    expect(requests('commandEditor.workspaceBootstrap')).toHaveLength(1);
   });
+  expect(JSON.parse(requests('commandEditor.workspaceBootstrap')[0].body)).toEqual(
+    expect.objectContaining({ bindingEpoch: 'binding-1', selectionRevision: 1 }),
+  );
+});
 
-  mockMessages = [
-    ...mockMessages,
-    envelope('commandEditor.snapshot', snapshotBody({
-      bindingEpoch: 'binding-1',
-      selectionRevision: 1,
-      selectedInstruction: loginWait,
-    })),
-  ];
-  page.rerender(
+test('submits COPY NEW independently with modal-equivalent placement semantics', async () => {
+  render(
     <CommandEditorPage socketPort={7357} sessionId="commandEditorManager" />,
   );
 
-  expect(screen.getByLabelText('Command Editor Instruction')).toHaveValue('22');
-  expect(requests('commandEditor.select')).toHaveLength(1);
+  const copyButton = await screen.findByRole('button', { name: 'COPY NEW' });
+  mockSend.mockClear();
+  fireEvent.click(copyButton);
+
+  const copyRequests = requests('variablesWorkspace.commandEditor.copy');
+  expect(copyRequests).toHaveLength(1);
+  expect(JSON.parse(copyRequests[0].body)).toEqual(expect.objectContaining({
+    bindingEpoch: 'binding-1',
+    sourceInstructionId: 21,
+    targetBlockId: 7,
+    placement: { kind: 'AFTER_INSTRUCTION', referenceInstructionId: 21 },
+    createBlank: false,
+  }));
+});
+
+test('surfaces a correlated contract refusal even when it precedes backend binding', async () => {
+  const view = render(
+    <CommandEditorPage socketPort={7357} sessionId="commandEditorManager" />,
+  );
+
+  const updateButton = await screen.findByRole('button', { name: 'UPDATE' });
+  mockSend.mockClear();
+  fireEvent.click(updateButton);
+  const updateBody = JSON.parse(requests('variablesWorkspace.commandEditor.update')[0].body);
+
+  mockMessages = [
+    ...mockMessages,
+    envelope('variablesWorkspace.commandEditor.updateResponse', {
+      ok: false,
+      committed: false,
+      requestId: updateBody.requestId,
+      error: 'The Command Editor request contract is invalid.',
+    }),
+  ];
+  view.rerender(
+    <CommandEditorPage socketPort={7357} sessionId="commandEditorManager" />,
+  );
+
+  await waitFor(() => expect(screen.getByRole('button', { name: 'UPDATE' })).toBeEnabled());
+  expect(screen.getAllByText('The Command Editor request contract is invalid.')).not.toHaveLength(0);
+});
+
+test('reloads authoritative state before retry after a mutation response is lost', async () => {
+  render(
+    <CommandEditorPage socketPort={7357} sessionId="commandEditorManager" />,
+  );
+
+  const updateButton = await screen.findByRole('button', { name: 'UPDATE' });
+  mockSend.mockClear();
+  jest.useFakeTimers();
+  try {
+    fireEvent.click(updateButton);
+    expect(updateButton).toBeDisabled();
+
+    act(() => {
+      jest.advanceTimersByTime(15_000);
+    });
+
+    expect(screen.queryByRole('button', { name: 'UPDATE' })).not.toBeInTheDocument();
+    expect(screen.getByText('Loading Command Editor...')).toBeInTheDocument();
+    expect(requests('commandEditor.workspaceBootstrap')).toHaveLength(1);
+    expect(JSON.parse(requests('commandEditor.workspaceBootstrap')[0].body)).toEqual(
+      expect.objectContaining({ bindingEpoch: 'binding-1', selectionRevision: 1 }),
+    );
+  } finally {
+    jest.useRealTimers();
+  }
 });
