@@ -1,9 +1,13 @@
 .controls { display: flex; align-items: flex-end; gap: 8px; min-width: 0; padding: 9px 10px; border: 1px solid #c4b5fd; border-radius: 8px; background: #faf7ff; box-shadow: 0 3px 10px #6d28d912; }
 .controls button { display: inline-flex; align-items: center; gap: 5px; min-height: 34px; padding: 6px 10px; border: 1px solid #8b5cf6; border-radius: 6px; background: #7c3aed; color: #fff; cursor: pointer; font-size: .7rem; font-weight: 800; white-space: nowrap; }
+.generate { display: grid; gap: 3px; }.generate > span { color: #5b4380; font-size: .58rem; font-weight: 900; text-align: center; text-transform: uppercase; }
 .controls button:disabled { cursor: not-allowed; opacity: .55; }
 .controls label { display: grid; gap: 3px; color: #5b4380; font-size: .58rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
 .controls input { box-sizing: border-box; min-height: 34px; border: 1px solid #c4b5fd; border-radius: 6px; background: #fff; color: #38265a; font: inherit; font-size: .72rem; font-weight: 600; }
 .controls input[type='number'] { width: 68px; padding: 6px; }
 .controls input[type='search'] { width: 170px; padding: 6px 8px; }
 .controls input:focus { border-color: #7c3aed; outline: 2px solid #ddd6fe; }
+.contextSearch { position: relative; }.contextOptions { position: absolute; z-index: 5; top: calc(100% + 3px); left: 0; width: 100%; display: grid; padding: 4px; border: 1px solid #c4b5fd; border-radius: 6px; background: #fff; box-shadow: 0 8px 20px #312e8160; }
+.contextOptions button { min-height: 28px; justify-content: flex-start; border: 0; background: #fff; color: #38265a; text-align: left; }.contextOptions button:hover { background: #f3e8ff; }
+.controls .helpButton { width: 30px; min-width: 30px; height: 30px; min-height: 30px; align-self: flex-end; justify-content: center; padding: 0; border-radius: 999px; border-color: #2e75b6; background: #2e75b6; box-shadow: 0 0 9px #2e75b666; font-size: .82rem; }
 @media (max-width: 900px) { .controls { flex-wrap: wrap; } }

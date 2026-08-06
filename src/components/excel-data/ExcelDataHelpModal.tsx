@@ -8,10 +8,11 @@ const rules = [
   ['REAL DATA', 'Loads and edits the active Bot Job workbook. Save to Excel makes memory changes durable in that file.'],
   ['SYNTHETIC DATA', 'Uses an isolated database dataset. It never overwrites the real workbook.'],
   ['RECREATE COLUMNS', 'Rebuilds the real workbook columns from the Bot Job Blocks and input fields.'],
-  ['RELOAD FILE / DB', 'Discards unsaved memory changes and reloads the selected REAL file or SYNTHETIC database dataset.'],
+  ['RELOAD FILE', 'Discards unsaved REAL memory changes and reloads the active Bot Job workbook. Selecting SYNTHETIC reloads its database dataset automatically.'],
   ['GENERATE DATA TEST', 'Creates the requested number of synthetic rows using the selected business context.'],
   ['ADD ROW', 'Copies the last memory row so it can be edited as a new test case.'],
-  ['SAVE', 'Save to Excel writes REAL memory to the workbook. Save Synthetic Data writes SYNTHETIC memory to SQLite.'],
+  ['SAVE', 'Save to Excel writes REAL memory to the workbook. SAVE DB writes SYNTHETIC memory to SQLite.'],
+  ['DELETE', 'The red X removes one logical row across every Block. Clean Rows removes all rows while preserving columns.'],
   ['SEARCH', 'Filters Blocks, columns, and values without changing the memory dataset.'],
   ['EXECUTION', 'The currently used cell is highlighted during Test Run or Smoke Test.'],
 ] as const;

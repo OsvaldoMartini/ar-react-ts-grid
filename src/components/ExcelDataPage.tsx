@@ -8,6 +8,7 @@ import ExcelDataSearchBox, { filterExcelDataBlocks } from './excel-data/ExcelDat
 import ExcelSyntheticControls from './excel-data/ExcelSyntheticControls';
 import ExcelDataHelpModal from './excel-data/ExcelDataHelpModal';
 import ExcelDataModeToggle from './excel-data/ExcelDataModeToggle';
+import { generateSyntheticBlocks, SYNTHETIC_CONTEXTS, type SyntheticContext } from './excel-data/syntheticDataProfiles';
 import styles from './ExcelDataPage.module.scss';
 
 export const EXCEL_DATA_SESSION_ID = 'excelDataManager';
@@ -26,6 +27,7 @@ type ExcelSnapshot = {
   blocks: ExcelBlock[];
   dirty?: boolean;
   mode: 'REAL' | 'SYNTHETIC';
+  syntheticContext?: string;
 };
 
 type Props = { socketPort: number; sessionId: string; onClose?: () => void };
@@ -50,7 +52,7 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
   const [deletingRowIndex, setDeletingRowIndex] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [syntheticRowCount, setSyntheticRowCount] = useState(1);
-  const [syntheticContext, setSyntheticContext] = useState('Financial');
+  const [syntheticContext, setSyntheticContext] = useState<SyntheticContext>('Bank Account');
   const [helpOpen, setHelpOpen] = useState(false);
   const [alert, setAlert] = useState<ExcelAlert | null>(null);
 
@@ -101,11 +103,15 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
       body: JSON.stringify({
         confirmed: true,
         ...(kind === 'SYNTHETIC'
-          ? { rowCount: syntheticRowCount, context: syntheticContext.trim() || 'Financial' }
+          ? {
+            rowCount: syntheticRowCount,
+            context: syntheticContext,
+            blocks: generateSyntheticBlocks(snapshot?.blocks ?? [], syntheticRowCount, syntheticContext),
+          }
           : {}),
       }),
     }));
-  }, [sessionId, syntheticContext, syntheticRowCount, webSocket]);
+  }, [sessionId, snapshot?.blocks, syntheticContext, syntheticRowCount, webSocket]);
 
   const showExcelError = useCallback((body: any) => {
     const titles: Record<string, string> = {
@@ -146,6 +152,15 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     if (send('excelData.mode.update', { mode })) setStatus(`Selecting ${mode} data…`);
   }, [send]);
 
+  const selectSyntheticContext = useCallback((context: SyntheticContext) => {
+    setSyntheticContext(context);
+    if (!send('excelData.context.update', { context })) {
+      setStatus('Excel Data is not connected.');
+    } else {
+      setStatus(`Saving ${context} synthetic context…`);
+    }
+  }, [send]);
+
   const updateCell = useCallback((blockName: string, column: string, rowIndex: number, value: string) => {
     if (!send('excelData.cell.update', { blockName, column, rowIndex, value })) {
       setStatus('Excel Data is not connected.');
@@ -183,6 +198,9 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
               setActiveCell(null);
             }
             setSnapshot(body as ExcelSnapshot);
+            if (SYNTHETIC_CONTEXTS.includes(body.syntheticContext as SyntheticContext)) {
+              setSyntheticContext(body.syntheticContext as SyntheticContext);
+            }
             setStatus(operationId === 'excelData.retarget'
               ? body.message || 'Excel Data reloaded for the selected Bot Job.'
               : `Loaded ${body.rowCount ?? 0} Excel row${body.rowCount === 1 ? '' : 's'} into memory`);
@@ -200,6 +218,7 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
           }
         } else if (operationId === 'excelData.addRowResponse'
           || operationId === 'excelData.mode.updateResponse'
+          || operationId === 'excelData.context.updateResponse'
           || operationId === 'excelData.refreshResponse'
           || operationId === 'excelData.cell.updateResponse'
           || operationId === 'excelData.row.deleteResponse'
@@ -211,6 +230,9 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
           }
           else {
             setSnapshot(body as ExcelSnapshot);
+            if (SYNTHETIC_CONTEXTS.includes(body.syntheticContext as SyntheticContext)) {
+              setSyntheticContext(body.syntheticContext as SyntheticContext);
+            }
             setStatus(body.message || 'Excel memory updated.');
           }
         } else if (operationId === 'excelData.saveResponse') {
@@ -286,7 +308,7 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
               context={syntheticContext}
               disabled={!connected || generating}
               onRowCountChange={setSyntheticRowCount}
-              onContextChange={setSyntheticContext}
+              onContextChange={selectSyntheticContext}
               onGenerate={() => setPendingAction('SYNTHETIC')}
             />}
           </div>}
@@ -328,7 +350,7 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
               : pendingAction === 'CLEAR' ? 'Clear All Real Rows?'
               : pendingAction === 'SAVE' ? (snapshot?.mode === 'SYNTHETIC' ? 'Save Synthetic Memory Data?' : 'Save Memory Data to Excel?') : 'Recreate Excel Columns?'}
             body={pendingAction === 'SYNTHETIC'
-              ? `Replace synthetic memory with ${syntheticRowCount} ${syntheticContext.trim() || 'Financial'} test row${syntheticRowCount === 1 ? '' : 's'}? The real workbook will not be changed.`
+              ? `Replace synthetic memory with ${syntheticRowCount} ${syntheticContext} test row${syntheticRowCount === 1 ? '' : 's'}? The real workbook will not be changed.`
               : pendingAction === 'CLEAR'
                 ? 'Remove every REAL data row from memory while preserving the Excel columns?'
               : pendingAction === 'SAVE'

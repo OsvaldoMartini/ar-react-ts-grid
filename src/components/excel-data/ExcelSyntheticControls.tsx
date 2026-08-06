@@ -1,30 +1,31 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { FlaskConical } from 'lucide-react';
 import styles from './ExcelSyntheticControls.module.scss';
-
-export const EXCEL_DATA_CONTEXTS = [
-  'Bank Account',
-  'Bank Trading',
-  'Trading Platform',
-  'Financial',
-] as const;
+import ExcelSyntheticContextHelpModal from './ExcelSyntheticContextHelpModal';
+import { SYNTHETIC_CONTEXTS, type SyntheticContext } from './syntheticDataProfiles';
 
 type Props = {
   rowCount: number;
-  context: string;
+  context: SyntheticContext;
   disabled?: boolean;
   onRowCountChange: (value: number) => void;
-  onContextChange: (value: string) => void;
+  onContextChange: (value: SyntheticContext) => void;
   onGenerate: () => void;
 };
 
 const ExcelSyntheticControls: React.FC<Props> = ({
   rowCount, context, disabled = false, onRowCountChange, onContextChange, onGenerate,
-}) => (
-  <section className={styles.controls} aria-label="Synthetic Excel data generator">
-    <button type="button" onClick={onGenerate} disabled={disabled}>
+}) => {
+  const [query, setQuery] = useState('');
+  const [helpOpen, setHelpOpen] = useState(false);
+  const options = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return needle ? SYNTHETIC_CONTEXTS.filter(option => option.toLowerCase().includes(needle)) : [];
+  }, [query]);
+  return <section className={styles.controls} aria-label="Synthetic Excel data generator">
+    <div className={styles.generate}><span>{context}</span><button type="button" onClick={onGenerate} disabled={disabled}>
       <FlaskConical size={15} aria-hidden="true" /> Generate Data Test
-    </button>
+    </button></div>
     <label>
       <span>Rows</span>
       <input
@@ -36,21 +37,22 @@ const ExcelSyntheticControls: React.FC<Props> = ({
         onChange={event => onRowCountChange(Math.min(1000, Math.max(1, Number(event.currentTarget.value) || 1)))}
       />
     </label>
-    <label>
+    <label className={styles.contextSearch}>
       <span>Context</span>
       <input
         type="search"
-        list="excel-data-contexts"
-        value={context}
+        value={query}
         disabled={disabled}
         placeholder="Search context"
-        onChange={event => onContextChange(event.currentTarget.value)}
+        onChange={event => setQuery(event.currentTarget.value)}
       />
-      <datalist id="excel-data-contexts">
-        {EXCEL_DATA_CONTEXTS.map(option => <option key={option} value={option} />)}
-      </datalist>
+      {options.length > 0 && <div className={styles.contextOptions}>{options.map(option => <button
+        key={option} type="button" onClick={() => { onContextChange(option); setQuery(''); }}>{option}</button>)}</div>}
     </label>
+    <button type="button" className={styles.helpButton} aria-label="How synthetic contexts work"
+      title="How synthetic contexts work" onClick={() => setHelpOpen(true)}>?</button>
+    {helpOpen && <ExcelSyntheticContextHelpModal onClose={() => setHelpOpen(false)} />}
   </section>
-);
+};
 
 export default ExcelSyntheticControls;
