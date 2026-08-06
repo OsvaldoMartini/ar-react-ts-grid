@@ -425,7 +425,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
           disabled={selectedBlockIds.length === 0}
           onClick={run}
         >
-          <Play size={14} aria-hidden="true" /> RUN SMOKE TEST
+          <Play size={14} aria-hidden="true" /> RUN
         </button>
         <label className={styles.speedSelector}>
           <span>Speed</span>

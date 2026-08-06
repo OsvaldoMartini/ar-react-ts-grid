@@ -67,7 +67,7 @@ const OCRResultsWorkspace: React.FC<Props> = ({
   const [error, setError] = useState('');
 
   useEffect(() => {
-    document.title = 'AR Web - OCR Results';
+    document.title = 'OCR Results';
   }, []);
 
   const sendCommand = useCallback((

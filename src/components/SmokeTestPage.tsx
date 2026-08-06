@@ -249,7 +249,7 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     () => snapshot ? buildVariablesExecutionFlowReview(snapshot) : null,
     [snapshot],
   );
-  const openRuntimeVariables = useCallback(() => {
+  const openSupportingWorkspaces = useCallback(() => {
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN || !snapshotRef.current) {
       setStatus({
         level: 'error',
@@ -262,6 +262,15 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
       sessionId,
       body: JSON.stringify({
         requestId: `${Date.now()}-smoke-runtime-open`,
+        bindingEpoch: snapshotRef.current.bindingEpoch,
+        workspaceEpoch: snapshotRef.current.workspaceEpoch,
+      }),
+    }));
+    webSocket.send(JSON.stringify({
+      type: 'excelDataWorkspace.open',
+      sessionId,
+      body: JSON.stringify({
+        requestId: `${Date.now()}-smoke-excel-data-open`,
         bindingEpoch: snapshotRef.current.bindingEpoch,
         workspaceEpoch: snapshotRef.current.workspaceEpoch,
       }),
@@ -387,7 +396,7 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
                 onActivePositionChange={setActiveSmokePosition}
                 onExecutionTraceChange={setSmokeExecutionTrace}
                 onCommandRemainingChange={setCommandRemainingByInstructionId}
-                onRunStart={openRuntimeVariables}
+                onRunStart={openSupportingWorkspaces}
               />
             </section>
           )}

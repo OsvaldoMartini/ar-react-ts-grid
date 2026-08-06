@@ -283,6 +283,9 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
   });
   const [collapsedBlocks, setCollapsedBlocks] = useState<Set<string>>(new Set());
   const isDetachedPageScanner = isPageScannerWorkspaceSession(sessionId);
+  useEffect(() => {
+    if (isDetachedPageScanner) document.title = 'Page Scanner';
+  }, [isDetachedPageScanner]);
   const isPreScanMode = mode === 'preScan'
     || sessionId.includes(PRE_SCANNER_GRID_SESSION_ID)
     || isDetachedPageScanner;

@@ -67,7 +67,11 @@
 .actions {
   display: grid;
   gap: 7px;
-  grid-template-columns: minmax(0, 1fr) minmax(78px, auto) minmax(96px, auto) auto;
+  grid-template-columns: repeat(4, minmax(72px, 1fr));
+
+  > * {
+    min-width: 72px;
+  }
 
   button {
     align-items: center;
@@ -199,7 +203,7 @@
 }
 
 .runButton {
-  min-width: 132px;
+  min-width: 72px;
   background: #176a3a;
   border: 1px solid #12582f;
   color: #fff;
