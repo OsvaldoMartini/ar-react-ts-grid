@@ -505,7 +505,14 @@ const CommandEditorPageBody: React.FC<Props> = ({
         <section className={styles.selectedCommand} aria-label="Selected command">
           <div>
             <span>Selected command</span>
-            <strong>#{command.instructionOrder ?? '?'} {command.instructionName}</strong>
+            {lockCommandSelection ? (
+              <strong className={styles.selectedInstructionIdentity}>
+                <InstructionCommandBadge action={command.action} iconOnly />
+                ({command.instructionId}) {command.instructionName}
+              </strong>
+            ) : (
+              <strong>#{command.instructionOrder ?? '?'} {command.instructionName}</strong>
+            )}
           </div>
           <div>
             <span>Command</span>

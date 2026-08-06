@@ -142,6 +142,12 @@
   overflow-wrap: anywhere;
 }
 
+.selectedInstructionIdentity {
+  align-items: center;
+  display: inline-flex;
+  gap: 7px;
+}
+
 .editorContent {
   background: #f9fbfd;
   border: 1px solid #cfdae5;
