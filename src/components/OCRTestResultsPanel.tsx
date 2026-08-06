@@ -1,23 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { CheckCheck } from 'lucide-react';
+import OCRResultsGrid from './OCRResultsGrid';
+import type { OCRTestResult, OCRTestRow } from './ocr/OCRResults.types';
 import styles from './OCRTestResultsPanel.module.scss';
 
-export type OCRTestRow = {
-  definedName: string;
-  quality: string;
-  tag: string;
-  domText: string;
-  ocrText: string;
-  xPath: string;
-};
-
-export type OCRTestResult = {
-  source: string;
-  wordCount: number;
-  counts: Record<string, number>;
-  rows: OCRTestRow[];
-  annotatedImage?: string;
-};
+export type { OCRTestResult, OCRTestRow } from './ocr/OCRResults.types';
 
 type Props = {
   result: OCRTestResult;
@@ -47,11 +34,11 @@ const OCRTestResultsPanel: React.FC<Props> = ({
     ))
     .map(row => ({ xPath: row.xPath, clientNamed: row.ocrText.trim() })), [approved, result.rows]);
 
-  const toggle = (path: string) => setApproved(current => {
+  const toggle = useCallback((path: string) => setApproved(current => {
     const next = new Set(current);
     next.has(path) ? next.delete(path) : next.add(path);
     return next;
-  });
+  }), []);
   const statusText = error
     || (busy ? 'Loading OCR Results...' : 'OCR Results loaded');
   const statusClass = error
@@ -103,27 +90,13 @@ const OCRTestResultsPanel: React.FC<Props> = ({
       </div>
 
       <div className={styles.content}>
-        <div className={styles.tableWrap}>
-          <table>
-            <thead><tr><th>Approved</th><th>Name</th><th>Quality</th><th>Tag</th><th>DOM text</th><th>OCR text</th></tr></thead>
-            <tbody>
-              {result.rows.map(row => (
-                <tr
-                  key={row.xPath}
-                  onClick={() => setSelected(row)}
-                  className={selected?.xPath === row.xPath ? styles.selected : ''}
-                >
-                  <td><input aria-label={`Approve ${row.definedName}`} type="checkbox" checked={approved.has(row.xPath)} onChange={() => toggle(row.xPath)} /></td>
-                  <td>{row.definedName}</td>
-                  <td><span data-quality={row.quality}>{row.quality}</span></td>
-                  <td>{row.tag}</td>
-                  <td>{row.domText}</td>
-                  <td>{row.ocrText}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <OCRResultsGrid
+          rows={result.rows}
+          approved={approved}
+          selectedPath={selected?.xPath}
+          onToggleApproved={toggle}
+          onSelect={setSelected}
+        />
         <aside>
           {result.annotatedImage
             ? <img src={result.annotatedImage} alt="OCR annotated scanner result" />
