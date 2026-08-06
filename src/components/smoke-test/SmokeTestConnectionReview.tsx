@@ -410,7 +410,8 @@ const SmokeTestConnectionReview: React.FC<
                 title="Show only the execution path reached by the running Smoke Test"
                 onClick={() => {
                   if (dynamicFlowEnabled) {
-                    closeFlow();
+                    setDynamicFlowEnabled(false);
+                    dynamicFlowWindow?.focus();
                     return;
                   }
                   if (openDynamicFlowWindow()) setDynamicFlowEnabled(true);
