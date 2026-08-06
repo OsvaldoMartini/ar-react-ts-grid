@@ -52,6 +52,7 @@ export interface VariablesSmokeTestPanelProps {
   onActivePositionChange?: (position: VariablesSmokeTestPosition | null) => void;
   onExecutionTraceChange?: (positions: readonly VariablesSmokeTestPosition[]) => void;
   onCommandRemainingChange?: (remaining: CommandRemainingByInstructionId) => void;
+  onRunStart?: () => void;
 }
 
 const SPEED_OPTIONS = [
@@ -108,6 +109,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   onActivePositionChange,
   onExecutionTraceChange,
   onCommandRemainingChange,
+  onRunStart,
 }) => {
   const [status, setStatus] = useState<VariablesSmokeTestStatus>('IDLE');
   const [plan, setPlan] = useState<VariablesSmokeTestPlan | null>(null);
@@ -144,6 +146,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   );
 
   const run = () => {
+    onRunStart?.();
     const nextPlan = buildVariablesSmokeTestPlan(review, selectedBlockIds);
     const nextProgram = buildSmokeExecutionProgram(nextPlan);
     const nextCommandRemaining = Object.freeze({

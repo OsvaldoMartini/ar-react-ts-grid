@@ -235,6 +235,24 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     () => snapshot ? buildVariablesExecutionFlowReview(snapshot) : null,
     [snapshot],
   );
+  const openRuntimeVariables = useCallback(() => {
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN || !snapshotRef.current) {
+      setStatus({
+        level: 'error',
+        text: 'Runtime Variables could not be opened because Smoke Test is disconnected.',
+      });
+      return;
+    }
+    webSocket.send(JSON.stringify({
+      type: 'runtimeVariablesWorkspace.open',
+      sessionId,
+      body: JSON.stringify({
+        requestId: `${Date.now()}-smoke-runtime-open`,
+        bindingEpoch: snapshotRef.current.bindingEpoch,
+        workspaceEpoch: snapshotRef.current.workspaceEpoch,
+      }),
+    }));
+  }, [sessionId, webSocket]);
   useEffect(() => {
     setActiveSmokePosition(null);
     setSmokeExecutionTrace([]);
@@ -355,6 +373,7 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
                 onActivePositionChange={setActiveSmokePosition}
                 onExecutionTraceChange={setSmokeExecutionTrace}
                 onCommandRemainingChange={setCommandRemainingByInstructionId}
+                onRunStart={openRuntimeVariables}
               />
             </section>
           )}

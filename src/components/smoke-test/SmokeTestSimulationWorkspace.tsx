@@ -13,6 +13,7 @@ type Props = {
   onActivePositionChange: (position: VariablesSmokeTestPosition | null) => void;
   onExecutionTraceChange: (positions: readonly VariablesSmokeTestPosition[]) => void;
   onCommandRemainingChange: (remaining: CommandRemainingByInstructionId) => void;
+  onRunStart: () => void;
 };
 
 const SmokeTestSimulationWorkspace: React.FC<Props> = ({
@@ -23,6 +24,7 @@ const SmokeTestSimulationWorkspace: React.FC<Props> = ({
   onActivePositionChange,
   onExecutionTraceChange,
   onCommandRemainingChange,
+  onRunStart,
 }) => (
   <section className={styles.workspace} aria-label="Simulation workspace Smoke Tests">
     <VariablesSmokeTestPanel
@@ -33,6 +35,7 @@ const SmokeTestSimulationWorkspace: React.FC<Props> = ({
       onActivePositionChange={onActivePositionChange}
       onExecutionTraceChange={onExecutionTraceChange}
       onCommandRemainingChange={onCommandRemainingChange}
+      onRunStart={onRunStart}
     />
   </section>
 );
