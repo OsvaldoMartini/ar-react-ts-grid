@@ -53,11 +53,12 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     document.title = 'Smoke Test';
   }, []);
 
-  const sourceBotJobId = useMemo(() => {
+  const initialSourceBotJobId = useMemo(() => {
     const value = new URLSearchParams(window.location.search).get('sourceBotJobId');
     const parsed = Number(value);
     return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
   }, []);
+  const [sourceBotJobId, setSourceBotJobId] = useState<number | null>(initialSourceBotJobId);
   const {
     webSocket,
     connected,
@@ -92,12 +93,19 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
 
   const replaceSnapshot = useCallback((next: VariableWorkspaceSnapshot) => {
     const previous = snapshotRef.current;
+    const botJobChanged = previous !== null && previous.botJob.id !== next.botJob.id;
     snapshotRef.current = next;
     setSnapshot(next);
-    setBlockFilters(current => previous === null
+    setBlockFilters(current => previous === null || botJobChanged
       ? next.blocks.map(block => block.id)
       : current.filter(blockId => next.blocks.some(block => block.id === blockId)));
-  }, []);
+    if (botJobChanged) {
+      clearPending();
+      setActiveSmokePosition(null);
+      setSmokeExecutionTrace([]);
+      setCommandRemainingByInstructionId({});
+    }
+  }, [clearPending]);
 
   const replaceRuntimeMemory = useCallback((
     runtimeMemory: VariableWorkspaceSnapshot['runtimeMemory'],
@@ -119,6 +127,10 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     onMemory: replaceRuntimeMemory,
     onStatus: setStatus,
   });
+
+  useEffect(() => {
+    resetRuntimeMemory();
+  }, [resetRuntimeMemory, sourceBotJobId]);
 
   const sendSnapshotRequest = useCallback((
     operation: PendingRequest['operation'],
@@ -210,13 +222,15 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
         return;
       }
       const normalized = normalizeVariablesWorkspaceSnapshot(envelope.body);
-      if (!normalized || normalized.botJob.id !== sourceBotJobId) {
+      if (!normalized || (envelope.operationId.endsWith('Response')
+        && normalized.botJob.id !== sourceBotJobId)) {
         setStatus({
           level: 'error',
           text: 'The Smoke Test snapshot did not match the requested Bot Job.',
         });
         return;
       }
+      setSourceBotJobId(normalized.botJob.id);
       replaceSnapshot(normalized);
       setStatus({
         level: 'ok',

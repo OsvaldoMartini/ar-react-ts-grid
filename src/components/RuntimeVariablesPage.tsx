@@ -103,9 +103,19 @@ const RuntimeVariablesPage: React.FC<RuntimeVariablesPageProps> = ({
   }, []);
 
   const replaceSnapshot = useCallback((next: VariableWorkspaceSnapshot) => {
+    const botJobChanged = snapshotRef.current !== null
+      && snapshotRef.current.botJob.id !== next.botJob.id;
     snapshotRef.current = next;
     setSnapshot(next);
-  }, []);
+    if (botJobChanged) {
+      clearPending();
+      createQueueRef.current = [];
+      setClearConfirmation(false);
+      setAddVariableOpen(false);
+      setDeleteConfirmation(null);
+      setDeletingVariableIds(new Set());
+    }
+  }, [clearPending]);
 
   const replaceRuntimeMemory = useCallback((
     runtimeMemory: VariableWorkspaceSnapshot['runtimeMemory'],
@@ -130,6 +140,10 @@ const RuntimeVariablesPage: React.FC<RuntimeVariablesPageProps> = ({
     onMemory: replaceRuntimeMemory,
     onStatus: setStatus,
   });
+
+  useEffect(() => {
+    resetRuntimeMemory();
+  }, [resetRuntimeMemory, sourceBotJobId]);
 
   const sendSnapshotRequest = useCallback((operation: SnapshotOperation): boolean => {
     if (sourceBotJobId === null || !webSocket
