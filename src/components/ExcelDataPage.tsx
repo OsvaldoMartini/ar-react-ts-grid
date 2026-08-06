@@ -5,6 +5,8 @@ import PagesOpenButton from './PagesOpenButton';
 import QuestionsCard from './QuestionsCard';
 import { useWebSocket } from './useWebSocket';
 import ExcelDataSearchBox, { filterExcelDataBlocks } from './excel-data/ExcelDataSearchBox';
+import ExcelSyntheticControls from './excel-data/ExcelSyntheticControls';
+import ExcelDataHelpModal from './excel-data/ExcelDataHelpModal';
 import styles from './ExcelDataPage.module.scss';
 
 export const EXCEL_DATA_SESSION_ID = 'excelDataManager';
@@ -27,6 +29,7 @@ type ExcelSnapshot = {
 
 type Props = { socketPort: number; sessionId: string; onClose?: () => void };
 type ActiveCell = { blockName: string; column: string; rowIndex: number; instructionId?: number };
+type ExcelAlert = { title: string; message: string };
 
 const parse = (raw: string) => {
   const envelope = JSON.parse(raw);
@@ -44,6 +47,10 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
   const [generating, setGenerating] = useState(false);
   const [activeCell, setActiveCell] = useState<ActiveCell | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [syntheticRowCount, setSyntheticRowCount] = useState(1);
+  const [syntheticContext, setSyntheticContext] = useState('Financial');
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [alert, setAlert] = useState<ExcelAlert | null>(null);
 
   const filteredBlocks = useMemo(
     () => filterExcelDataBlocks(snapshot?.blocks ?? [], searchQuery),
@@ -89,9 +96,26 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     webSocket.send(JSON.stringify({
       type: operation,
       sessionId,
-      body: JSON.stringify({ confirmed: true }),
+      body: JSON.stringify({
+        confirmed: true,
+        ...(kind === 'SYNTHETIC'
+          ? { rowCount: syntheticRowCount, context: syntheticContext.trim() || 'Financial' }
+          : {}),
+      }),
     }));
-  }, [sessionId, webSocket]);
+  }, [sessionId, syntheticContext, syntheticRowCount, webSocket]);
+
+  const showExcelError = useCallback((body: any) => {
+    const titles: Record<string, string> = {
+      EXCEL_FILE_IN_USE: 'Excel File in Use',
+      EXCEL_FILE_CORRUPTED: 'Excel File Corrupted',
+      EXCEL_FILE_OPERATION_FAILED: 'Excel File Not Saved',
+    };
+    setAlert({
+      title: titles[String(body?.errorCode)] || 'Excel Operation Failed',
+      message: body?.error || 'The Excel operation could not be completed.',
+    });
+  }, []);
 
   const addRow = useCallback(() => {
     if (!send('excelData.addRow')) setStatus('Excel Data is not connected.');
@@ -146,7 +170,10 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
         } else if (operationId === 'excelData.generateResponse'
           || operationId === 'excelData.generateSyntheticResponse') {
           setGenerating(false);
-          if (body?.ok === false) setStatus(body.error || 'Excel generation failed.');
+          if (body?.ok === false) {
+            setStatus(body.error || 'Excel generation failed.');
+            showExcelError(body);
+          }
           else {
             setSnapshot(body as ExcelSnapshot);
             setStatus(body.message || 'Excel data generated and loaded.');
@@ -155,14 +182,20 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
           || operationId === 'excelData.mode.updateResponse'
           || operationId === 'excelData.refreshResponse'
           || operationId === 'excelData.cell.updateResponse') {
-          if (body?.ok === false) setStatus(body.error || 'The Excel row was not added.');
+          if (body?.ok === false) {
+            setStatus(body.error || 'The Excel operation failed.');
+            if (operationId === 'excelData.refreshResponse') showExcelError(body);
+          }
           else {
             setSnapshot(body as ExcelSnapshot);
             setStatus(body.message || 'Excel memory updated.');
           }
         } else if (operationId === 'excelData.saveResponse') {
           setGenerating(false);
-          if (body?.ok === false) setStatus(body.error || 'The Excel dataset was not saved.');
+          if (body?.ok === false) {
+            setStatus(body.error || 'The Excel dataset was not saved.');
+            showExcelError(body);
+          }
           else {
             setSnapshot(body as ExcelSnapshot);
             setStatus(body.message || 'Excel dataset saved.');
@@ -180,7 +213,7 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
         setStatus('The Excel Data response could not be read.');
       }
     });
-  }, [messages, onClose]);
+  }, [messages, onClose, showExcelError]);
 
   return (
     <DetachedPageShell title="Excel Data" testId="excel-data-page" showCloseButton={false}>
@@ -191,18 +224,17 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
             <p>{snapshot ? `${snapshot.botJobName} · ${snapshot.fileName}` : 'Bot Job execution dataset'}</p>
           </div>
           <div className={styles.actions} data-floating-drag-ignore="true">
-            <span className={styles.status}>{status}</span>
-            <button type="button" className={snapshot?.mode === 'SYNTHETIC' ? styles.synthetic : styles.real}
+            <span className={`${styles.status} ${snapshot?.mode === 'SYNTHETIC' ? styles.syntheticStatus : styles.realStatus}`}>{status}</span>
+            <button type="button" className={`${styles.modeToggle} ${snapshot?.mode === 'SYNTHETIC' ? styles.syntheticSelected : styles.realSelected}`}
               onClick={() => selectMode(snapshot?.mode === 'SYNTHETIC' ? 'REAL' : 'SYNTHETIC')}
               disabled={!connected || generating}>
               {snapshot?.mode === 'SYNTHETIC' ? <FlaskConical size={14} /> : <Database size={14} />}
               {snapshot?.mode === 'SYNTHETIC' ? 'SYNTHETIC DATA' : 'REAL DATA'}
             </button>
             <button type="button" onClick={() => setPendingAction('STANDARD')} disabled={!connected || generating || snapshot?.mode !== 'REAL'}><FilePlus2 size={14} />Recreate Columns</button>
-            {snapshot?.mode === 'SYNTHETIC' && <button type="button" className={styles.synthetic} onClick={() => setPendingAction('SYNTHETIC')} disabled={!connected || generating}><FlaskConical size={14} />Generate Data</button>}
             <button type="button" onClick={addRow} disabled={!connected || generating || !snapshot || snapshot.rowCount < 1}><CopyPlus size={14} />Add Row</button>
             <button type="button" className={styles.save} onClick={() => setPendingAction('SAVE')} disabled={!connected || generating || !snapshot?.dirty}><Save size={14} />{snapshot?.mode === 'SYNTHETIC' ? 'Save Synthetic Data' : 'Save to Excel'}</button>
-            <button type="button" onClick={refresh} disabled={!connected}><RefreshCw size={14} />Refresh Memory</button>
+            <button type="button" onClick={refresh} disabled={!connected}><RefreshCw size={14} />{snapshot?.mode === 'SYNTHETIC' ? 'RELOAD DB' : 'RELOAD FILE'}</button>
             <PagesOpenButton webSocket={webSocket} connected={connected} messages={messages} sessionId={sessionId} />
             <button type="button" className={styles.close} onClick={close}><X size={14} />Close</button>
           </div>
@@ -217,13 +249,22 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
         </section>}
         <section className={styles.content}>
           {!snapshot && <div className={styles.empty}>Waiting for the authoritative Excel dataset.</div>}
-          {snapshot && <ExcelDataSearchBox
-            query={searchQuery}
-            onQueryChange={setSearchQuery}
-            blockCount={filteredBlocks.length}
-            columnCount={filteredColumnCount}
-            rowCount={filteredRowCount}
-          />}
+          {snapshot && <div className={styles.searchRow}><ExcelDataSearchBox
+              query={searchQuery}
+              onQueryChange={setSearchQuery}
+              blockCount={filteredBlocks.length}
+              columnCount={filteredColumnCount}
+              rowCount={filteredRowCount}
+            />
+            {snapshot.mode === 'SYNTHETIC' && <ExcelSyntheticControls
+              rowCount={syntheticRowCount}
+              context={syntheticContext}
+              disabled={!connected || generating}
+              onRowCountChange={setSyntheticRowCount}
+              onContextChange={setSyntheticContext}
+              onGenerate={() => setPendingAction('SYNTHETIC')}
+            />}
+          </div>}
           {snapshot && searchQuery.trim() && filteredBlocks.length === 0 && (
             <div className={styles.empty}>No Excel Block, column, or value matches “{searchQuery.trim()}”.</div>
           )}
@@ -256,7 +297,7 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
               ? 'Generate Synthetic Memory Data?'
               : pendingAction === 'SAVE' ? (snapshot?.mode === 'SYNTHETIC' ? 'Save Synthetic Memory Data?' : 'Save Memory Data to Excel?') : 'Recreate Excel Columns?'}
             body={pendingAction === 'SYNTHETIC'
-              ? 'Replace the current in-memory dataset with three deterministic synthetic rows for every Excel input column? The workbook is not changed until Save to Excel.'
+              ? `Replace synthetic memory with ${syntheticRowCount} ${syntheticContext.trim() || 'Financial'} test row${syntheticRowCount === 1 ? '' : 's'}? The real workbook will not be changed.`
               : pendingAction === 'SAVE'
                 ? snapshot?.mode === 'SYNTHETIC'
                   ? 'Save the current synthetic rows for this Bot Job and organization in the database?'
@@ -271,6 +312,11 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
             onCancel={() => setPendingAction(null)}
           />
         )}
+        <button type="button" className={styles.helpButton} aria-label="Open Excel Data rules"
+          title="Excel Data rules" onClick={() => setHelpOpen(true)}>?</button>
+        {helpOpen && <ExcelDataHelpModal onClose={() => setHelpOpen(false)} />}
+        {alert && <QuestionsCard mode="alert" header={alert.title} body={alert.message}
+          error okLabel="OK" onSubmit={() => setAlert(null)} onCancel={() => setAlert(null)} />}
       </main>
     </DetachedPageShell>
   );
