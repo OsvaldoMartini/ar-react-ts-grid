@@ -43,7 +43,6 @@ import {
 import { variableValuePresentation } from './variables/domain/variableValuePresentation';
 import { hidesLegacyVariableOperation } from './variables/domain/legacyVariableOperation';
 import { orderRuntimeVariablesByExecution } from './variables/domain/variableExecutionOrder';
-import RuntimeMemoryPanel from './variables/RuntimeMemoryPanel';
 import AddVariableModal, {
   type AddVariableBatchDraft,
   type AddVariableDraft,
@@ -61,6 +60,7 @@ import VariablesConnectionsModal, {
 } from './variables/VariablesConnectionsModal';
 import VariablesExecutionFlowReviewModal from './variables/VariablesExecutionFlowReviewModal';
 import SmokeTestConnectionReview from './smoke-test/SmokeTestConnectionReview';
+import SmokeTestSimulationWorkspace from './smoke-test/SmokeTestSimulationWorkspace';
 import ComponentEditorModal from './command-editor/ComponentEditorModal';
 import type { ComponentEditorCommand } from './command-editor/componentEditor.types';
 import {
@@ -838,7 +838,12 @@ const SmokeTestPage: React.FC<Props> = ({
   onClose,
 }) => {
   useEffect(() => {
-    document.title = 'Variables';
+    document.title = 'Smoke Test';
+  }, []);
+  const sourceBotJobId = useMemo(() => {
+    const value = new URLSearchParams(window.location.search).get('sourceBotJobId');
+    const parsed = Number(value);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
   }, []);
   const {
     webSocket,
@@ -1263,6 +1268,7 @@ const SmokeTestPage: React.FC<Props> = ({
     const requestId = `${Date.now()}-variables-${requestCounterRef.current}`;
     const body = {
       requestId,
+      botJobId: sourceBotJobId,
       bindingEpoch: operation.endsWith('refresh')
         ? snapshotRef.current?.bindingEpoch || ''
         : '',
@@ -1305,7 +1311,7 @@ const SmokeTestPage: React.FC<Props> = ({
         : 'Loading variable relationships...',
     });
     return true;
-  }, [clearPendingRequest, sessionId, webSocket]);
+  }, [clearPendingRequest, sessionId, sourceBotJobId, webSocket]);
   refreshVariablesWorkspaceRef.current = () => {
     const sent = sendWorkspaceRequest('variablesWorkspace.refresh');
     if (sent) variableCreationRefreshRequiredRef.current = false;
@@ -4157,37 +4163,14 @@ const SmokeTestPage: React.FC<Props> = ({
                 </section>
               </section>
 
-              <RuntimeMemoryPanel
-                key={`variables-runtime-memory:${workspaceIdentityKey}`}
-                items={orderedRuntimeMemory.map(entry => ({
-                  variableId: entry.variableId,
-                  name: entry.name,
-                  state: entry.state,
-                  value: entry.state === 'VALUE' ? entry.value : null,
-                  voidReason: entry.voidReason,
-                  editable: true,
-                }))}
-                disabled={!connected}
-                disabledReason={!connected
-                  ? 'Variables is reconnecting. Runtime values remain visible.'
-                  : undefined}
-                pendingVariableIds={pendingVariableIds}
-                onCommitValue={updateRuntimeValue}
-                deletingVariableIds={deletingVariableIds}
-                deleteDisabled={false}
-                onRequestAdd={() => {
-                  setStatus({
-                    level: 'warn',
-                    text: 'Define a new Bot Job variable.',
-                  });
-                  setAddVariableOpen(true);
-                }}
-                onRequestAuto={startVariableAutoResolve}
-                onRequestClearAll={() => setClearValuesConfirmation(true)}
-                clearingValues={pendingClearAll}
-                onRequestDelete={requestDeleteVariable}
-                onRequestDeleteAll={requestDeleteAllVariables}
-              />
+              {smokeTestReview && (
+                <SmokeTestSimulationWorkspace
+                  review={smokeTestReview}
+                  selectedBlockIds={sharedBlockFilters}
+                  runtimeWriteAvailable={connected}
+                  onCommitRuntimeValue={updateRuntimeValue}
+                />
+              )}
             </section>
           )}
         </section>
