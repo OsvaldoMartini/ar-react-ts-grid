@@ -30,6 +30,7 @@ const responseMessage = (body: any, fallback: string): string =>
   );
 
 const PagesOpen: React.FC<PagesOpenProps> = ({ socketPort, sessionId, onClose }) => {
+  useEffect(() => { document.title = 'Pages Open'; }, []);
   const { webSocket, connected, messages, error } = useWebSocket(socketPort, sessionId);
   const processedMessageCountRef = useRef(0);
   const [pages, setPages] = useState<OpenPageEntry[]>([]);

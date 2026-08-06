@@ -61,7 +61,7 @@ const RuntimeVariablesPage: React.FC<RuntimeVariablesPageProps> = ({
   sourceBotJobId: sourceBotJobIdProp,
   onClose,
 }) => {
-  useEffect(() => { document.title = 'Variables'; }, []);
+  useEffect(() => { document.title = 'RuntTime Variables'; }, []);
 
   const initialSourceBotJobId = useMemo(() => {
     if (Number.isInteger(sourceBotJobIdProp) && Number(sourceBotJobIdProp) > 0) {

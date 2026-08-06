@@ -34,6 +34,7 @@ const parse = (raw: string) => {
 };
 
 const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
+  useEffect(() => { document.title = 'Excel DATA'; }, []);
   const { webSocket, connected, messages, error } = useWebSocket(socketPort, sessionId);
   const cursor = useRef(0);
   const [snapshot, setSnapshot] = useState<ExcelSnapshot | null>(null);

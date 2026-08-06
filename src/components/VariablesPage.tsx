@@ -840,7 +840,7 @@ const VariablesPage: React.FC<Props> = ({
   onClose,
 }) => {
   useEffect(() => {
-    document.title = 'Variables';
+    document.title = 'Modify Variable';
   }, []);
   const {
     webSocket,
