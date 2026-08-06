@@ -268,6 +268,7 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, on
   }, [botJobs]);
 
   const dashboardColumns = useMemo<readonly GridTempAColumn<BotJobRow>[]>(() => [
+    ...BOT_JOB_COLUMNS,
     {
       id: 'selected',
       header: (
@@ -282,7 +283,7 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, on
           onChange={event => toggleAllBotJobs(event.target.checked)}
         />
       ),
-      width: 42,
+      width: 44,
       alignment: 'center',
       className: styles.selectionColumn,
       renderCell: row => {
@@ -302,7 +303,6 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, on
         );
       },
     },
-    ...BOT_JOB_COLUMNS,
   ], [
     allLoadedBotJobsSelected,
     botJobs.length,
@@ -728,7 +728,7 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, on
           actions={{
             header: (
               <RulesCard
-                event={{ color: 'red', rules: 'ALL', ts: 1 }}
+                event={{ color: 'red', rules: `ALL (${selectedBotJobCount})`, ts: 1 }}
                 className={styles.bulkDeleteControl}
                 ariaLabel="Delete selected Bot Jobs"
                 glow={false}
@@ -742,8 +742,9 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, on
                 disabled={selectedBotJobCount === 0 || bulkDeletePending}
               />
             ),
-            width: 76,
+            width: 100,
             alignment: 'center',
+            className: styles.deleteColumn,
             render: row => (
               <button
                 type="button"
@@ -768,7 +769,7 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, on
             noMatchesMessage: 'No Bot Jobs match Find',
           }}
           className={styles.gridPanel}
-          minTableWidth={1102}
+          minTableWidth={1128}
           maxViewportHeight="none"
           selectedRowKey={selectedId}
           initialSort={{ columnId: 'id', direction: 'asc' }}

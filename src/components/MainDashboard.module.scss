@@ -579,15 +579,20 @@
 }
 
 .selectionColumn {
+  width: 44px !important;
+  min-width: 44px !important;
+  max-width: 44px !important;
   padding-right: 4px !important;
   padding-left: 4px !important;
+  text-align: center !important;
   overflow: visible !important;
 }
 
 .selectionCheckbox {
   width: 16px;
   height: 16px;
-  margin: 0;
+  display: block;
+  margin: 0 auto;
   accent-color: #0b5394;
   cursor: pointer;
   vertical-align: middle;
@@ -602,8 +607,18 @@
   }
 }
 
+.deleteColumn {
+  width: 100px !important;
+  min-width: 100px !important;
+  max-width: 100px !important;
+  text-align: center !important;
+}
+
 .bulkDeleteControl {
-  max-width: 100%;
+  width: 84px;
+  min-width: 84px;
+  max-width: 84px;
+  box-sizing: border-box;
   justify-content: center;
 }
 

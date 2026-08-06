@@ -76,10 +76,10 @@ test('uses GridTemp_A while preserving dashboard sorting, selection, open, delet
   const rowIdOrder = () => within(grid)
     .getAllByRole('row')
     .slice(1)
-    .map(row => within(row).getAllByRole('cell')[1].textContent);
+    .map(row => within(row).getAllByRole('cell')[0].textContent);
 
   expect(viewport).toHaveStyle({ maxHeight: 'none' });
-  expect(within(grid).getByRole('table')).toHaveStyle({ minWidth: '1102px' });
+  expect(within(grid).getByRole('table')).toHaveStyle({ minWidth: '1128px' });
   expect(screen.getByTestId('main-dashboard-bot-jobs-grid-count')).toHaveTextContent('2');
   expect(within(grid).getByRole('button', { name: 'Delete selected Bot Jobs' })).toBeDisabled();
   expect(within(grid).getByRole('checkbox', { name: 'Select all loaded Bot Jobs' })).not.toBeChecked();
@@ -131,7 +131,7 @@ test('uses GridTemp_A while preserving dashboard sorting, selection, open, delet
   const visibleJobNames = () => within(table)
     .getAllByRole('row')
     .slice(1)
-    .map(row => within(row).getAllByRole('cell')[2]?.textContent);
+    .map(row => within(row).getAllByRole('cell')[1]?.textContent);
 
   expect(find).toHaveAttribute('id', 'main-dashboard-find');
   expect(find).toHaveAttribute(
