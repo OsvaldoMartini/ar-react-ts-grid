@@ -76,12 +76,13 @@ test('uses GridTemp_A while preserving dashboard sorting, selection, open, delet
   const rowIdOrder = () => within(grid)
     .getAllByRole('row')
     .slice(1)
-    .map(row => within(row).getAllByRole('cell')[0].textContent);
+    .map(row => within(row).getAllByRole('cell')[1].textContent);
 
   expect(viewport).toHaveStyle({ maxHeight: 'none' });
-  expect(within(grid).getByRole('table')).toHaveStyle({ minWidth: '1060px' });
+  expect(within(grid).getByRole('table')).toHaveStyle({ minWidth: '1102px' });
   expect(screen.getByTestId('main-dashboard-bot-jobs-grid-count')).toHaveTextContent('2');
-  expect(within(grid).getByRole('columnheader', { name: 'Actions' })).toBeInTheDocument();
+  expect(within(grid).getByRole('button', { name: 'Delete selected Bot Jobs' })).toBeDisabled();
+  expect(within(grid).getByRole('checkbox', { name: 'Select all loaded Bot Jobs' })).not.toBeChecked();
   expect(within(grid).getAllByTitle('Delete Bot Job')).toHaveLength(2);
   expect(rowIdOrder()).toEqual(['101', '202']);
 
@@ -130,7 +131,7 @@ test('uses GridTemp_A while preserving dashboard sorting, selection, open, delet
   const visibleJobNames = () => within(table)
     .getAllByRole('row')
     .slice(1)
-    .map(row => within(row).getAllByRole('cell')[1]?.textContent);
+    .map(row => within(row).getAllByRole('cell')[2]?.textContent);
 
   expect(find).toHaveAttribute('id', 'main-dashboard-find');
   expect(find).toHaveAttribute(
@@ -162,4 +163,80 @@ test('uses GridTemp_A while preserving dashboard sorting, selection, open, delet
   expect(find).toHaveValue('');
   expect(visibleJobNames()).toEqual(['Alpha Mobile', 'Zulu Web']);
   expect(screen.getByTestId('main-dashboard-bot-jobs-grid-count')).toHaveTextContent('2');
+});
+
+test('selects loaded Bot Jobs independently and submits one correlated bulk delete', async () => {
+  const rows = [
+    { id: 202, name: 'Alpha Mobile', active: false, priority: 'Android', blockCount: 2 },
+    { id: 101, name: 'Zulu Web', active: true, priority: 'Web App', blockCount: 9 },
+  ];
+  mockMessages = [listResponse(rows)];
+
+  const { rerender } = render(
+    <MainDashboard socketPort={7357} sessionId="mainDashboard" />,
+  );
+
+  const grid = await screen.findByTestId('main-dashboard-bot-jobs-grid');
+  const bulkDelete = within(grid).getByRole('button', { name: 'Delete selected Bot Jobs' });
+  const selectAll = within(grid).getByRole('checkbox', { name: 'Select all loaded Bot Jobs' });
+  const alphaSelection = within(grid).getByRole('checkbox', {
+    name: 'Select Bot Job #202 Alpha Mobile',
+  });
+
+  fireEvent.click(alphaSelection);
+  expect(screen.getByRole('button', { name: 'Open Job' })).toBeDisabled();
+  expect(selectAll).toHaveProperty('indeterminate', true);
+  expect(bulkDelete).toBeEnabled();
+
+  fireEvent.click(selectAll);
+  expect(selectAll).toBeChecked();
+  expect(within(grid).getByRole('checkbox', {
+    name: 'Unselect Bot Job #202 Alpha Mobile',
+  })).toBeChecked();
+  expect(within(grid).getByRole('checkbox', {
+    name: 'Unselect Bot Job #101 Zulu Web',
+  })).toBeChecked();
+
+  fireEvent.click(bulkDelete);
+  const confirmation = screen.getByRole('dialog', { name: 'Delete Selected Bot Jobs' });
+  expect(confirmation).toHaveTextContent('#202 Alpha Mobile');
+  expect(confirmation).toHaveTextContent('#101 Zulu Web');
+  expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus();
+  fireEvent.click(screen.getByRole('button', { name: 'Delete selected' }));
+
+  const bulkRequests = requests('mainDashboard.deleteBotJobs');
+  expect(bulkRequests).toHaveLength(1);
+  const requestBody = JSON.parse(bulkRequests[0].body);
+  expect(requestBody).toEqual({
+    contractVersion: 1,
+    requestId: expect.any(String),
+    botJobIds: [202, 101],
+  });
+  expect(bulkDelete).toBeDisabled();
+  expect(within(grid).getAllByTitle('Delete Bot Job')).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ disabled: true }),
+      expect.objectContaining({ disabled: true }),
+    ]),
+  );
+
+  mockMessages = [
+    listResponse(rows),
+    JSON.stringify({
+      operationId: 'mainDashboard.deleteBotJobsResponse',
+      body: JSON.stringify({
+        contractVersion: 1,
+        requestId: requestBody.requestId,
+        ok: true,
+        committed: true,
+        deletedBotJobIds: [202, 101],
+        deletedCount: 2,
+        message: '2 Bot Jobs deleted',
+      }),
+    }),
+  ];
+  rerender(<MainDashboard socketPort={7357} sessionId="mainDashboard" />);
+
+  expect(await screen.findByText('No Bot Jobs loaded')).toBeInTheDocument();
+  expect(within(grid).getByRole('button', { name: 'Delete selected Bot Jobs' })).toBeDisabled();
 });

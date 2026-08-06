@@ -569,60 +569,42 @@
   cursor: pointer;
 }
 
-.rowDeleteBtn:hover {
+.rowDeleteBtn:hover:not(:disabled) {
   background: #ffebee;
 }
 
-.confirmBackdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 10000;
-  display: flex;
-  align-items: center;
+.rowDeleteBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.selectionColumn {
+  padding-right: 4px !important;
+  padding-left: 4px !important;
+  overflow: visible !important;
+}
+
+.selectionCheckbox {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: #0b5394;
+  cursor: pointer;
+  vertical-align: middle;
+
+  &:focus-visible {
+    outline: 2px solid #1d6fa5;
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+  }
+}
+
+.bulkDeleteControl {
+  max-width: 100%;
   justify-content: center;
-  background: rgba(15, 23, 42, 0.35);
-}
-
-.confirmDialog {
-  width: min(460px, calc(100vw - 28px));
-  border: 1px solid #0b5394;
-  border-radius: 8px;
-  background: #ffffff;
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
-  overflow: hidden;
-}
-
-.confirmHeader {
-  padding: 9px 12px;
-  background: #0b5394;
-  color: #ffffff;
-  font-size: 0.9rem;
-  font-weight: bold;
-}
-
-.confirmBody {
-  padding: 13px 14px;
-  color: #1f2933;
-  font-size: 13px;
-  line-height: 1.4;
-}
-
-.confirmBody p {
-  margin: 0 0 8px;
-}
-
-.confirmWarning {
-  color: #c62828;
-  font-weight: bold;
-}
-
-.confirmFooter {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 9px 12px;
-  border-top: 1px solid #d9d9d9;
-  background: #ececec;
 }
 
 .shell.desktopShell {

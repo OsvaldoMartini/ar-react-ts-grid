@@ -12,6 +12,7 @@ type Props = {
   alert?: boolean;
   showHeaderClose?: boolean;
   autoDismissMs?: number;
+  initialFocus?: 'confirm' | 'cancel' | 'none';
   onConfirm: () => void;
   onCancel: () => void;
 };
@@ -27,6 +28,7 @@ const ConfirmationDialog: React.FC<Props> = ({
   alert = false,
   showHeaderClose = false,
   autoDismissMs,
+  initialFocus = 'confirm',
   onConfirm,
   onCancel,
 }) => {
@@ -81,13 +83,18 @@ const ConfirmationDialog: React.FC<Props> = ({
         </div>
         <footer className={styles.footer}>
           {!alert && (
-            <button type="button" className={styles.cancelButton} onClick={onCancel}>
+            <button
+              type="button"
+              autoFocus={initialFocus === 'cancel'}
+              className={styles.cancelButton}
+              onClick={onCancel}
+            >
               {cancelLabel}
             </button>
           )}
           <button
             type="button"
-            autoFocus
+            autoFocus={initialFocus === 'confirm'}
             className={destructive || error ? styles.dangerButton : styles.confirmButton}
             onClick={onConfirm}
           >
