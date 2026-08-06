@@ -21,6 +21,7 @@ import CloneJobPage from './components/CloneJobPage';
 import ConfigPage from './components/ConfigPage';
 import ATemplate from './components/ATemplate';
 import MemoryList, { MEMORY_LIST_SESSION_ID } from './components/MemoryList';
+import RuntimeVariablesPage, { RUNTIME_VARIABLES_SESSION_ID } from './components/RuntimeVariablesPage';
 import MemoryDragDemo from './components/MemoryDragDemo';
 import PagesOpen, { PAGES_OPEN_SESSION_ID } from './components/PagesOpen';
 import CommandEditorPage, { COMMAND_EDITOR_SESSION_ID } from './components/CommandEditorPage';
@@ -686,6 +687,15 @@ const App: React.FC = () => {
           key={sessionId}
           socketPort={socketPort}
           sessionId={sessionId}
+          onClose={closeDetachedWorkspace}
+        />
+      )}
+      {sessionId === RUNTIME_VARIABLES_SESSION_ID && (
+        <RuntimeVariablesPage
+          key={sessionId}
+          socketPort={socketPort}
+          sessionId={sessionId}
+          sourceBotJobId={botJobId}
           onClose={closeDetachedWorkspace}
         />
       )}
