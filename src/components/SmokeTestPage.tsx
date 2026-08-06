@@ -6,6 +6,8 @@ import SmokeTestConnectionReview from './smoke-test/SmokeTestConnectionReview';
 import SmokeTestSimulationWorkspace from './smoke-test/SmokeTestSimulationWorkspace';
 import { useWebSocket } from './useWebSocket';
 import { buildVariablesExecutionFlowReview } from './variables/domain/variablesExecutionFlowReview';
+import type { VariablesSmokeTestPosition } from './variables/domain/variablesSmokeTestTypes';
+import type { CommandRemainingByInstructionId } from './variables/Engine/controlFlowCommand.types';
 import { useVariablesRuntimeMemory } from './variables/useVariablesRuntimeMemory';
 import {
   normalizeVariablesWorkspaceSnapshot,
@@ -70,6 +72,12 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
   const [snapshot, setSnapshot] = useState<VariableWorkspaceSnapshot | null>(null);
   const [pending, setPending] = useState<PendingRequest | null>(null);
   const [blockFilters, setBlockFilters] = useState<number[]>([]);
+  const [activeSmokePosition, setActiveSmokePosition] =
+    useState<VariablesSmokeTestPosition | null>(null);
+  const [smokeExecutionTrace, setSmokeExecutionTrace] =
+    useState<readonly VariablesSmokeTestPosition[]>([]);
+  const [commandRemainingByInstructionId, setCommandRemainingByInstructionId] =
+    useState<CommandRemainingByInstructionId>({});
   const [status, setStatus] = useState<Status>({
     level: 'warn',
     text: 'Waiting for Smoke Test workspace',
@@ -227,6 +235,11 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     () => snapshot ? buildVariablesExecutionFlowReview(snapshot) : null,
     [snapshot],
   );
+  useEffect(() => {
+    setActiveSmokePosition(null);
+    setSmokeExecutionTrace([]);
+    setCommandRemainingByInstructionId({});
+  }, [snapshot?.botJob.id, snapshot?.graphRevision]);
   const statusClass = status.level === 'error'
     ? styles.statusError
     : status.level === 'ok'
@@ -328,6 +341,9 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
                 scopeLabel="Complete Bot Job"
                 blockFilters={blockFilters}
                 onBlockFiltersChange={setBlockFilters}
+                activeSmokePosition={activeSmokePosition}
+                smokeExecutionTrace={smokeExecutionTrace}
+                commandRemainingByInstructionId={commandRemainingByInstructionId}
                 embedded
                 onClose={() => undefined}
               />
@@ -336,6 +352,9 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
                 selectedBlockIds={blockFilters}
                 runtimeWriteAvailable={connected}
                 onCommitRuntimeValue={updateRuntimeValue}
+                onActivePositionChange={setActiveSmokePosition}
+                onExecutionTraceChange={setSmokeExecutionTrace}
+                onCommandRemainingChange={setCommandRemainingByInstructionId}
               />
             </section>
           )}

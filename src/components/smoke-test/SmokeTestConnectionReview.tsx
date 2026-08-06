@@ -28,12 +28,12 @@ import BlockMultiSelectSearchBox, {
   type BlockMultiSelectOption,
 } from '../BlockMultiSelectSearchBox';
 import SearchBox, { type SearchBoxOption } from '../SearchBox';
-import VariablesSmokeTestPanel from '../variables/VariablesSmokeTestPanel';
 import InstructionIntrinsicValues, {
   instructionIntrinsicValuePresentation,
 } from '../variables/InstructionIntrinsicValues';
 import styles from './SmokeTestConnectionReview.module.scss';
 import { hidesLegacyVariableOperation } from '../variables/domain/legacyVariableOperation';
+import type { CommandRemainingByInstructionId } from '../variables/Engine/controlFlowCommand.types';
 
 const VariablesSmokeTestFlowModal = lazy(
   () => import('../variables/VariablesSmokeTestFlowModal'),
@@ -44,8 +44,9 @@ export interface SmokeTestConnectionReviewProps {
   scopeLabel: string;
   blockFilters?: readonly number[];
   onBlockFiltersChange?: (blockIds: number[]) => void;
-  runtimeWriteAvailable?: boolean;
-  onCommitRuntimeValue?: (variableId: number, value: string) => boolean;
+  activeSmokePosition: VariablesSmokeTestPosition | null;
+  smokeExecutionTrace: readonly VariablesSmokeTestPosition[];
+  commandRemainingByInstructionId: CommandRemainingByInstructionId;
   returnFocusElement?: HTMLElement | null;
   embedded?: boolean;
   onClose: () => void;
@@ -76,8 +77,9 @@ const SmokeTestConnectionReview: React.FC<
   scopeLabel,
   blockFilters: controlledBlockFilters,
   onBlockFiltersChange,
-  runtimeWriteAvailable = false,
-  onCommitRuntimeValue,
+  activeSmokePosition,
+  smokeExecutionTrace,
+  commandRemainingByInstructionId,
   returnFocusElement = null,
   embedded = false,
   onClose,
@@ -88,15 +90,10 @@ const SmokeTestConnectionReview: React.FC<
   const closeRef = useRef<HTMLButtonElement>(null);
   const smokeStepRefs = useRef(new Map<string, HTMLElement>());
   const smokeBlockRefs = useRef(new Map<string, HTMLElement>());
-  const [activeSmokePosition, setActiveSmokePosition] = useState<VariablesSmokeTestPosition | null>(null);
-  const [smokeExecutionTrace, setSmokeExecutionTrace] =
-    useState<readonly VariablesSmokeTestPosition[]>([]);
   const [flowOpen, setFlowOpen] = useState(false);
   const [dynamicFlowEnabled, setDynamicFlowEnabled] = useState(false);
   const [dynamicFlowWindow, setDynamicFlowWindow] = useState<Window | null>(null);
   const [selectedVariableId, setSelectedVariableId] = useState<number | null>(null);
-  const [commandRemainingByInstructionId, setCommandRemainingByInstructionId] =
-    useState<Readonly<Record<number, number>>>({});
   const [localSelectedBlockIds, setLocalSelectedBlockIds] = useState<number[]>(() =>
     review.blocks.flatMap(block => block.blockId === null ? [] : [block.blockId]));
   const selectedBlockIds = controlledBlockFilters === undefined
@@ -691,15 +688,6 @@ const SmokeTestConnectionReview: React.FC<
           )}
           </div>
 
-          {!embedded && <VariablesSmokeTestPanel
-            review={review}
-            selectedBlockIds={selectedBlockIds}
-            runtimeWriteAvailable={runtimeWriteAvailable}
-            onCommitRuntimeValue={onCommitRuntimeValue}
-            onActivePositionChange={setActiveSmokePosition}
-            onExecutionTraceChange={setSmokeExecutionTrace}
-            onCommandRemainingChange={setCommandRemainingByInstructionId}
-          />}
         </div>
 
         {!embedded && <footer className={styles.actions}>

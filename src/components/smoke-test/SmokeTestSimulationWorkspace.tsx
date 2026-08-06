@@ -1,6 +1,8 @@
 import React from 'react';
 import VariablesSmokeTestPanel from '../variables/VariablesSmokeTestPanel';
 import type { VariablesExecutionFlowReview } from '../variables/domain/variablesExecutionFlowReview';
+import type { VariablesSmokeTestPosition } from '../variables/domain/variablesSmokeTestTypes';
+import type { CommandRemainingByInstructionId } from '../variables/Engine/controlFlowCommand.types';
 import styles from './SmokeTestSimulationWorkspace.module.scss';
 
 type Props = {
@@ -8,6 +10,9 @@ type Props = {
   selectedBlockIds: readonly number[];
   runtimeWriteAvailable: boolean;
   onCommitRuntimeValue: (variableId: number, value: string) => boolean;
+  onActivePositionChange: (position: VariablesSmokeTestPosition | null) => void;
+  onExecutionTraceChange: (positions: readonly VariablesSmokeTestPosition[]) => void;
+  onCommandRemainingChange: (remaining: CommandRemainingByInstructionId) => void;
 };
 
 const SmokeTestSimulationWorkspace: React.FC<Props> = ({
@@ -15,6 +20,9 @@ const SmokeTestSimulationWorkspace: React.FC<Props> = ({
   selectedBlockIds,
   runtimeWriteAvailable,
   onCommitRuntimeValue,
+  onActivePositionChange,
+  onExecutionTraceChange,
+  onCommandRemainingChange,
 }) => (
   <section className={styles.workspace} aria-label="Simulation workspace Smoke Tests">
     <VariablesSmokeTestPanel
@@ -22,6 +30,9 @@ const SmokeTestSimulationWorkspace: React.FC<Props> = ({
       selectedBlockIds={selectedBlockIds}
       runtimeWriteAvailable={runtimeWriteAvailable}
       onCommitRuntimeValue={onCommitRuntimeValue}
+      onActivePositionChange={onActivePositionChange}
+      onExecutionTraceChange={onExecutionTraceChange}
+      onCommandRemainingChange={onCommandRemainingChange}
     />
   </section>
 );
