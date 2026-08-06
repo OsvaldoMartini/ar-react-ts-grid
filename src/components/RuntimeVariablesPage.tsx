@@ -4,10 +4,14 @@ import AlertModal from './AlertModal';
 import DetachedPageShell from './DetachedPageShell';
 import PagesOpenButton from './PagesOpenButton';
 import warningRedImage from '../assets/warning_red.png';
+import AddVariableModal, { type AddVariableBatchDraft } from './variables/AddVariableModal';
 import RuntimeMemoryPanel from './variables/RuntimeMemoryPanel';
 import { orderRuntimeVariablesByExecution } from './variables/domain/variableExecutionOrder';
 import { runtimeMemoryPanelItems } from './variables/runtimeMemoryPanelModel';
 import { useVariablesRuntimeMemory } from './variables/useVariablesRuntimeMemory';
+import { useVariablesCreate, type VariablesCreateResult } from './variables/useVariablesCreate';
+import { useVariablesDelete, type VariablesDeleteResult } from './variables/useVariablesDelete';
+import { useVariablesAutoResolve, type VariablesAutoResolveResult } from './variables/useVariablesAutoResolve';
 import { useWebSocket } from './useWebSocket';
 import {
   normalizeVariablesWorkspaceSnapshot,
@@ -28,6 +32,12 @@ interface RuntimeVariablesPageProps {
 type Status = { level: 'ok' | 'warn' | 'error'; text: string };
 type SnapshotOperation = 'variablesWorkspace.bootstrap' | 'variablesWorkspace.refresh';
 type PendingRequest = { requestId: string; operation: SnapshotOperation };
+type DeleteConfirmation = {
+  mode: 'SINGLE' | 'ALL';
+  variableIds: number[];
+  title: string;
+  body: string;
+};
 
 const REQUEST_TIMEOUT_MS = 12_000;
 
@@ -66,9 +76,17 @@ const RuntimeVariablesPage: React.FC<RuntimeVariablesPageProps> = ({
   const pendingRef = useRef<PendingRequest | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const snapshotRef = useRef<VariableWorkspaceSnapshot | null>(null);
+  const createSubmitRef = useRef<(draft: { name: string }) => string | null>(() => null);
+  const createQueueRef = useRef<string[]>([]);
   const [snapshot, setSnapshot] = useState<VariableWorkspaceSnapshot | null>(null);
   const [pending, setPending] = useState<PendingRequest | null>(null);
   const [clearConfirmation, setClearConfirmation] = useState(false);
+  const [addVariableOpen, setAddVariableOpen] = useState(false);
+  const [addVariableSuccessVersion, setAddVariableSuccessVersion] = useState(0);
+  const [deleteConfirmation, setDeleteConfirmation] = useState<DeleteConfirmation | null>(null);
+  const [deletingVariableIds, setDeletingVariableIds] = useState<ReadonlySet<number>>(
+    () => new Set(),
+  );
   const [status, setStatus] = useState<Status>({
     level: 'warn',
     text: 'Waiting for Runtime Variables workspace',
@@ -143,6 +161,68 @@ const RuntimeVariablesPage: React.FC<RuntimeVariablesPageProps> = ({
     return true;
   }, [clearPending, sessionId, sourceBotJobId, webSocket]);
 
+  const refreshAfterDefinitionChange = useCallback(() => {
+    sendSnapshotRequest('variablesWorkspace.refresh');
+  }, [sendSnapshotRequest]);
+
+  const handleCreateResult = useCallback((result: VariablesCreateResult) => {
+    if (!result.ok) {
+      createQueueRef.current = [];
+      setStatus({ level: 'error', text: result.error || 'Variable was not created.' });
+      return;
+    }
+    const remaining = createQueueRef.current.slice(1);
+    createQueueRef.current = remaining;
+    setAddVariableSuccessVersion(version => version + 1);
+    if (remaining.length > 0) {
+      createSubmitRef.current({ name: remaining[0] });
+      return;
+    }
+    setStatus({ level: 'ok', text: result.message || 'Variable created.' });
+    refreshAfterDefinitionChange();
+  }, [refreshAfterDefinitionChange]);
+  const {
+    pendingRequestId: pendingCreateRequestId,
+    submit: submitVariableCreate,
+    handleMessage: handleCreateMessage,
+  } = useVariablesCreate({
+    webSocket, connected, sessionId, snapshot, onResult: handleCreateResult,
+  });
+  createSubmitRef.current = submitVariableCreate;
+
+  const handleDeleteResult = useCallback((result: VariablesDeleteResult) => {
+    setDeletingVariableIds(new Set());
+    if (!result.ok) {
+      setStatus({ level: 'error', text: result.error || 'Variables were not deleted.' });
+      return;
+    }
+    setStatus({ level: 'ok', text: result.message || 'Variables deleted.' });
+    refreshAfterDefinitionChange();
+  }, [refreshAfterDefinitionChange]);
+  const {
+    pendingRequestId: pendingDeleteRequestId,
+    submit: submitVariableDelete,
+    handleMessage: handleDeleteMessage,
+  } = useVariablesDelete({
+    webSocket, connected, sessionId, snapshot, onResult: handleDeleteResult,
+  });
+
+  const handleAutoResolveResult = useCallback((result: VariablesAutoResolveResult) => {
+    if (!result.ok) {
+      setStatus({ level: 'error', text: result.error || 'Variables were not auto-resolved.' });
+      return;
+    }
+    setStatus({ level: 'ok', text: result.message || 'Variables auto-resolved.' });
+    refreshAfterDefinitionChange();
+  }, [refreshAfterDefinitionChange]);
+  const {
+    pendingRequestId: pendingAutoRequestId,
+    submit: submitAutoResolve,
+    handleMessage: handleAutoResolveMessage,
+  } = useVariablesAutoResolve({
+    webSocket, connected, sessionId, snapshot, onResult: handleAutoResolveResult,
+  });
+
   useEffect(() => {
     if (!connected) {
       clearPending();
@@ -160,6 +240,9 @@ const RuntimeVariablesPage: React.FC<RuntimeVariablesPageProps> = ({
     processedMessagesRef.current = messages.length;
     unread.forEach(raw => {
       if (handleRuntimeMemoryMessage(raw)) return;
+      if (handleCreateMessage(raw)) return;
+      if (handleDeleteMessage(raw)) return;
+      if (handleAutoResolveMessage(raw)) return;
       let envelope;
       try {
         envelope = parseVariablesWorkspaceMessage(String(raw));
@@ -192,7 +275,16 @@ const RuntimeVariablesPage: React.FC<RuntimeVariablesPageProps> = ({
       replaceSnapshot(normalized);
       setStatus({ level: 'ok', text: responseText(body, 'Runtime Variables ready.') });
     });
-  }, [clearPending, handleRuntimeMemoryMessage, messages, replaceSnapshot, sourceBotJobId]);
+  }, [
+    clearPending,
+    handleAutoResolveMessage,
+    handleCreateMessage,
+    handleDeleteMessage,
+    handleRuntimeMemoryMessage,
+    messages,
+    replaceSnapshot,
+    sourceBotJobId,
+  ]);
 
   const orderedRuntimeMemory = useMemo(
     () => snapshot
@@ -211,6 +303,72 @@ const RuntimeVariablesPage: React.FC<RuntimeVariablesPageProps> = ({
 
   const confirmClear = () => {
     if (clearAllValues()) setClearConfirmation(false);
+  };
+
+  const submitNewVariables = (draft: AddVariableBatchDraft) => {
+    const names = draft.variables.map(variable => variable.name.trim()).filter(Boolean);
+    if (names.length === 0 || pendingCreateRequestId !== null) return;
+    createQueueRef.current = names;
+    if (!submitVariableCreate({ name: names[0] })) {
+      createQueueRef.current = [];
+      setStatus({ level: 'error', text: 'Variable creation could not be started.' });
+    }
+  };
+
+  const requestDelete = (variableId: number) => {
+    const variable = snapshot?.variables.find(candidate => candidate.id === variableId);
+    if (!variable) return;
+    setDeleteConfirmation({
+      mode: 'SINGLE',
+      variableIds: [variableId],
+      title: 'Delete Variable?',
+      body: `Delete variable #${variableId} “${variable.name}”? Its instruction bindings will be cleared.`,
+    });
+  };
+
+  const requestDeleteAll = () => {
+    const variableIds = snapshot?.variables.map(variable => variable.id) ?? [];
+    if (variableIds.length === 0) {
+      setStatus({ level: 'warn', text: 'No variables are available to delete.' });
+      return;
+    }
+    setDeleteConfirmation({
+      mode: 'ALL',
+      variableIds,
+      title: 'Delete All Variables?',
+      body: `Delete all ${variableIds.length} variables and disconnect their instruction slots?`,
+    });
+  };
+
+  const confirmDelete = () => {
+    if (!deleteConfirmation || pendingDeleteRequestId !== null) return;
+    const requestId = submitVariableDelete(
+      deleteConfirmation.mode,
+      deleteConfirmation.variableIds,
+    );
+    if (!requestId) {
+      setStatus({ level: 'error', text: 'Variable deletion could not be started.' });
+      return;
+    }
+    setDeletingVariableIds(new Set(deleteConfirmation.variableIds));
+    setDeleteConfirmation(null);
+  };
+
+  const startAutoResolve = () => {
+    if (!snapshot || pendingAutoRequestId !== null) return;
+    const instructionIds = snapshot.commands
+      .map(command => command.id)
+      .filter((id): id is number => Number.isInteger(id) && id > 0);
+    const requestId = submitAutoResolve(
+      instructionIds,
+      snapshot.preferences?.variableResolutionMode ?? 'DISTINCT',
+      'RESOLVE',
+    );
+    if (!requestId) {
+      setStatus({ level: 'error', text: 'Variable auto-resolution could not be started.' });
+    } else {
+      setStatus({ level: 'warn', text: 'Creating and connecting missing variables...' });
+    }
   };
 
   return (
@@ -249,7 +407,12 @@ const RuntimeVariablesPage: React.FC<RuntimeVariablesPageProps> = ({
                 onCommitValue={updateValue}
                 onRequestClearAll={() => setClearConfirmation(true)}
                 clearingValues={pendingClearAll}
-                definitionActionsVisible={false}
+                onRequestAdd={() => setAddVariableOpen(true)}
+                onRequestAuto={startAutoResolve}
+                onRequestDelete={requestDelete}
+                onRequestDeleteAll={requestDeleteAll}
+                deletingVariableIds={deletingVariableIds}
+                deleteDisabled={false}
               />
             ) : (
               <div className={styles.emptyState}>
@@ -268,6 +431,31 @@ const RuntimeVariablesPage: React.FC<RuntimeVariablesPageProps> = ({
             extraMsg={'Variable definitions and instruction relationships are preserved. Empty VALUE("") is different from VOID.'}
             onClose={() => setClearConfirmation(false)}
             onConfirm={confirmClear}
+            imageSrc={warningRedImage}
+            imageClass="construction-image"
+            error
+          />
+        )}
+        {snapshot && addVariableOpen && (
+          <AddVariableModal
+            existingNames={snapshot.variables.map(variable => variable.name)}
+            pending={pendingCreateRequestId !== null}
+            successVersion={addVariableSuccessVersion}
+            onSubmit={submitNewVariables}
+            onCancel={() => {
+              if (pendingCreateRequestId === null) setAddVariableOpen(false);
+            }}
+          />
+        )}
+        {deleteConfirmation && (
+          <AlertModal
+            header={deleteConfirmation.title}
+            body={deleteConfirmation.body}
+            extraMsg="Variables may be recreated and reconnected later. Commands and Web Elements remain available."
+            onClose={() => {
+              if (pendingDeleteRequestId === null) setDeleteConfirmation(null);
+            }}
+            onConfirm={confirmDelete}
             imageSrc={warningRedImage}
             imageClass="construction-image"
             error
