@@ -15,7 +15,6 @@ import BlockStatusToggle from './BlockStatusToggle';
 import InstructionTypeBadge from './InstructionTypeBadge';
 import MemoryAddButton from './MemoryAddButton';
 import DeleteButton from './DeleteButton';
-import CommandEditorButton from './CommandEditorButton';
 
 export interface InstructionRowCapability {
   canMove?: boolean;
@@ -58,7 +57,6 @@ export interface InstructionRowProps {
   onToggleStatus: () => void;
   onAddToMemory: (event: React.MouseEvent<HTMLButtonElement>) => void;
   onRemove: () => void;
-  onOpenCommandEditor: () => void;
 }
 
 const CONDITIONAL_ACTIONS = ['IF', 'ELSEIF', 'ELSE', 'ENDIF'];
@@ -99,7 +97,6 @@ const InstructionRow: React.FC<InstructionRowProps> = ({
   onToggleStatus,
   onAddToMemory,
   onRemove,
-  onOpenCommandEditor,
 }) => {
   const findActive = findText.trim().length > 0;
   const dragDisabled = findActive || !capability?.canMove;
@@ -164,16 +161,15 @@ const InstructionRow: React.FC<InstructionRowProps> = ({
         {deviceOptionsRow}
         <div className={styles.moveButtons}>
           {editButton}
-          {commandEditButton}
           {moveButtons}
           {testClick}
+          {commandEditButton}
           <DeleteButton
             title="Delete instruction"
             onClick={onRemove}
           />
         </div>
       </div>
-      <CommandEditorButton onClick={onOpenCommandEditor} />
     </div>
   );
 };

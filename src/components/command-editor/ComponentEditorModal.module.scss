@@ -138,6 +138,17 @@
   margin-top: 12px;
 }
 
+.commandLockedNotice {
+  background: #eef6fd;
+  border: 1px solid #9fc4e4;
+  border-radius: 6px;
+  color: #17324d;
+  font-size: 0.68rem;
+  font-weight: 700;
+  margin: 7px 0 0;
+  padding: 7px 9px;
+}
+
 .selectedCommand {
   background: linear-gradient(135deg, #f8fbff, #eef6fd);
   border: 1px solid #b9cee0;

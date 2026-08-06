@@ -26,7 +26,7 @@ const CommandEditorRelationshipWarningModal: React.FC<
         {impact.messages.map(message => <li key={message}>{message}</li>)}
       </ul>
       <p className={styles.result}>
-        Continue will move the command and clear only the invalid parent or Block connection.
+        Continue will move the instruction and clear only the invalid parent or Block connection.
         You can reconnect it later with Resolve Connections.
       </p>
       <footer>

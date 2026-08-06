@@ -66,6 +66,7 @@ export interface ComponentEditorModalProps {
   onSubmit?: (intent: CommandEditorMutationIntent) => void;
   enabledActions?: readonly CommandEditorMutationAction[];
   mode?: 'EDIT' | 'CREATE';
+  lockCommandSelection?: boolean;
   onClose: () => void;
 }
 
@@ -95,6 +96,7 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
   onSubmit,
   enabledActions = ['UPDATE', 'COPY_NEW'],
   mode = 'EDIT',
+  lockCommandSelection = false,
   onClose,
 }) => {
   const titleId = useId();
@@ -160,6 +162,7 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
       }));
   }, [command.action, mode, originalCommandCode]);
   const selectCommand = (value: string | null) => {
+    if (lockCommandSelection) return;
     if (value === null || value === selectedCommandCode) return;
     setSelectedCommandCode(value);
     setDraft(current => value === originalCommandCode
@@ -534,7 +537,15 @@ const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
             options={commandSearchOptions}
             value={selectedCommandCode}
             onChange={selectCommand}
+            disabled={lockCommandSelection}
           />
+
+          {lockCommandSelection && (
+            <p className={styles.commandLockedNotice} role="note">
+              Web Element type is locked. It cannot be changed into a command;
+              Placement, UPDATE, and COPY NEW remain available.
+            </p>
+          )}
 
           <section className={styles.selectedCommand} aria-label="Selected command">
             <div>

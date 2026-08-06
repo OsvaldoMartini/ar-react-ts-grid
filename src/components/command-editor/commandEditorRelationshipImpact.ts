@@ -1,5 +1,6 @@
 import type { ComponentEditorCommand } from './componentEditor.types';
 import type { CommandEditorPlacement } from './commandEditorPlacement';
+import { instructionRelationshipPolicy } from '../bot-job-details/grid/domain/instructionRelationshipPolicy';
 
 export interface CommandEditorRelationshipImpact {
   clearParentId: boolean;
@@ -31,6 +32,45 @@ const targetIndex = (
   ));
 };
 
+const invalidDirectDependents = (
+  instruction: ComponentEditorCommand,
+  targetBlockId: number,
+  placement: CommandEditorPlacement,
+  instructions: readonly ComponentEditorCommand[],
+): ComponentEditorCommand[] => {
+  const dependents = instructions.filter(
+    candidate => candidate.parentId === instruction.instructionId,
+  );
+  if (dependents.length === 0) return [];
+
+  const targetRows = instructions
+    .filter(candidate => candidate.blockId === targetBlockId
+      && candidate.instructionId !== instruction.instructionId)
+    .slice()
+    .sort(commandOrder);
+  const finalRows = [...targetRows];
+  finalRows.splice(targetIndex(instruction, placement, targetRows), 0, instruction);
+  const instructionIndex = finalRows.findIndex(
+    candidate => candidate.instructionId === instruction.instructionId,
+  );
+  return dependents.filter((dependent) => {
+    if (dependent.parentBlockId !== null
+      && dependent.parentBlockId !== targetBlockId) return true;
+    if (dependent.blockId !== targetBlockId) return true;
+    const dependentIndex = finalRows.findIndex(
+      candidate => candidate.instructionId === dependent.instructionId,
+    );
+    return dependentIndex < 0 || instructionIndex >= dependentIndex;
+  });
+};
+
+const dependentDisconnectMessages = (
+  dependents: readonly ComponentEditorCommand[],
+): string[] => dependents.map(dependent =>
+  `Dependent instruction #${dependent.instructionOrder ?? '?'} ${dependent.instructionName}`
+  + ` (ID ${dependent.instructionId}) will lose its invalid parent connection.`,
+);
+
 /**
  * Predicts relationship clearing for the new Variables Command Editor only.
  * It deliberately does not participate in GridItem or Variables drag-and-drop.
@@ -41,20 +81,25 @@ export const commandEditorRelationshipImpact = (
   placement: CommandEditorPlacement,
   commands: readonly ComponentEditorCommand[],
 ): CommandEditorRelationshipImpact => {
+  const invalidDependents = instructionRelationshipPolicy(command.action).role === 'WEB_ELEMENT'
+    ? invalidDirectDependents(command, targetBlockId, placement, commands)
+    : [];
+  const dependentMessages = dependentDisconnectMessages(invalidDependents);
   const crossBlock = command.blockId !== targetBlockId;
   if (crossBlock) {
-    const clearParentId = command.parentId !== null;
-    const clearParentBlockId = command.parentBlockId !== null;
+    const clearParentId = command.parentId !== null || invalidDependents.length > 0;
+    const clearParentBlockId = command.parentBlockId !== null || invalidDependents.length > 0;
     return {
       clearParentId,
       clearParentBlockId,
       messages: [
-        ...(clearParentId
-          ? [`Parent instruction ID ${command.parentId} will be disconnected because the command is moving to another Block.`]
+        ...(command.parentId !== null
+          ? [`Parent instruction ID ${command.parentId} will be disconnected because the instruction is moving to another Block.`]
           : []),
-        ...(clearParentBlockId
+        ...(command.parentBlockId !== null
           ? [`Connected Block ID ${command.parentBlockId} will be disconnected by this cross-Block move.`]
           : []),
+        ...dependentMessages,
       ],
     };
   }
@@ -66,7 +111,11 @@ export const commandEditorRelationshipImpact = (
   }
 
   if (command.parentId === null || command.parentId === command.instructionId) {
-    return { clearParentId: false, clearParentBlockId: false, messages: [] };
+    return {
+      clearParentId: invalidDependents.length > 0,
+      clearParentBlockId: invalidDependents.length > 0,
+      messages: dependentMessages,
+    };
   }
 
   const targetRows = commands
@@ -82,7 +131,11 @@ export const commandEditorRelationshipImpact = (
     && command.parentBlockId !== targetBlockId;
   const parentWillNotPrecede = parentIndex < 0 || parentIndex >= commandIndex;
   if (!parentBlockMismatch && !parentWillNotPrecede) {
-    return { clearParentId: false, clearParentBlockId: false, messages: [] };
+    return {
+      clearParentId: invalidDependents.length > 0,
+      clearParentBlockId: invalidDependents.length > 0,
+      messages: dependentMessages,
+    };
   }
 
   const parent = commands.find(candidate => candidate.instructionId === command.parentId);
@@ -91,11 +144,12 @@ export const commandEditorRelationshipImpact = (
     : `instruction ID ${command.parentId}`;
   return {
     clearParentId: true,
-    clearParentBlockId: command.parentBlockId !== null,
+    clearParentBlockId: command.parentBlockId !== null || invalidDependents.length > 0,
     messages: [
       parentBlockMismatch
         ? `The connected parent ${parentLabel} is not in the selected target Block.`
-        : `The command will no longer run after its connected parent ${parentLabel}.`,
+        : `The instruction will no longer run after its connected parent ${parentLabel}.`,
+      ...dependentMessages,
     ],
   };
 };

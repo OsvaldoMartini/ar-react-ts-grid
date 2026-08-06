@@ -47,7 +47,7 @@ const FindBar: React.FC<FindBarProps> = ({
         </button>
       )}
     </div>
-    {memoryCount > 0 && onOpenMemory && (
+    {onOpenMemory && (
       <button
         type="button"
         className={styles.memory}

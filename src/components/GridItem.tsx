@@ -39,6 +39,7 @@ import type {
 } from './bot-job-details/grid/domain/workspaceBlocks';
 import { instructionMatchesFind } from './bot-job-details/grid/hooks/useInstructionFind';
 import { useInstructionGrid } from './bot-job-details/grid/hooks/useInstructionGrid';
+import { useMemoryListSummary } from './bot-job-details/grid/hooks/useMemoryListSummary';
 import type { UseInstructionGridProps } from './bot-job-details/grid/types/instructionGrid.types';
 import styles from './Griditem.module.scss';
 import ComponentEditorModal from './command-editor/ComponentEditorModal';
@@ -178,7 +179,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
     collapsedBlocks, toggleBlockCollapsed, focusInstructionTarget,
     excelExportContext, excelExportDirectory, choosingExcelExportDirectory,
     handleExcelFileBlockName, submitExcelExport, chooseExcelExportDirectory, closeExcelExport,
-    memoryItemCount, memoryBlockOptions, createBlockOpen, setCreateBlockOpen,
+    memoryBlockOptions, createBlockOpen, setCreateBlockOpen,
     memoryCapabilities, requestMemoryListOpen,
     handleAddConnectedGroupToMemory,
     handleAddBlockToMemory, handleStageComponentBlock,
@@ -229,10 +230,19 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
     handleMoveBlockUp, handleMoveBlockDown,
   } = grid;
   const componentWorkspace = workspacePolicy.kind === 'COMPONENT';
+  const canonicalMemoryItemCount = useMemoryListSummary({
+    webSocket,
+    connected,
+    messages,
+    sessionId,
+    homeBankingId: botJobGraphMutationCapability?.ownerAssertion.homeBankingId
+      ?? homeBankingIdInitial,
+    botJobId: Number.isSafeInteger(Number(botJobId)) && Number(botJobId) > 0
+      ? Number(botJobId)
+      : null,
+  });
   const gridEditorCommands = React.useMemo<ComponentEditorCommand[]>(() =>
     instructionsData
-      .filter(instruction =>
-        instructionRelationshipPolicy(instruction.actions).role !== 'WEB_ELEMENT')
       .map(instruction => ({
         instructionId: instruction.id,
         instructionOrder: instruction.instructionOrderNumber,
@@ -288,11 +298,13 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
   const openGridCommandEditor = React.useCallback((
     instruction: BlockLoopInstructionLoadDTO,
   ) => {
-    if (componentWorkspace
-      || instructionRelationshipPolicy(instruction.actions).role === 'WEB_ELEMENT') return;
+    if (componentWorkspace) return;
+    const webElement = instructionRelationshipPolicy(instruction.actions).role === 'WEB_ELEMENT';
     setGridCommandEditorStatus({
       level: 'ok',
-      text: 'Edit the selected Bot Job command.',
+      text: webElement
+        ? 'Web Element type is locked; placement and copy remain available.'
+        : 'Edit the selected Bot Job command.',
     });
     setGridCommandEditorInstructionId(instruction.id);
   }, [componentWorkspace]);
@@ -683,15 +695,14 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
         <ComponentEditorModal
           botJobId={Number(botJobId)}
           botJobName={botJobName ?? ''}
-          scopeLabel="Edit Bot Job command from GridItem"
+          scopeLabel="Edit Bot Job instruction from GridItem"
           status={gridCommandEditorStatus}
           blocks={workspaceBlocks.map(block => ({
             blockId: block.blockId,
             blockOrder: block.blockOrderNumber,
             blockName: block.blockName,
             commandCount: instructionsData.filter(
-              instruction => instruction.blockId === block.blockId
-                && instructionRelationshipPolicy(instruction.actions).role !== 'WEB_ELEMENT',
+              instruction => instruction.blockId === block.blockId,
             ).length,
             active: block.blockActive,
           }))}
@@ -704,6 +715,9 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
           variables={gridEditorVariables}
           pending={gridCommandEditorPending !== null}
           mode="EDIT"
+          lockCommandSelection={
+            instructionRelationshipPolicy(gridEditingCommand.action).role === 'WEB_ELEMENT'
+          }
           enabledActions={['UPDATE', 'COPY_NEW']}
           onSubmit={submitGridCommandEditor}
           onClose={() => {
@@ -821,7 +835,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
         <FindBar
           value={findText}
           onChange={setFindText}
-          memoryCount={memoryItemCount}
+          memoryCount={canonicalMemoryItemCount}
           onOpenMemory={requestMemoryListOpen}
         />
       </div>
@@ -1060,13 +1074,14 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                             deviceOptionsRow={renderDeviceOptionsRow(instruction)}
                             editButton={renderEditButton(instruction.actions, editImage, instruction)}
                             commandEditButton={
-                              !componentWorkspace
-                              && instructionRelationshipPolicy(instruction.actions).role !== 'WEB_ELEMENT' ? (
+                              !componentWorkspace ? (
                                 <span className={styles.commandEditRuleCard}>
                                   <RulesCard
                                     event={{ color: 'green', rules: 'Edit', ts: 0 }}
                                     ariaLabel={`Edit ${instruction.name || instruction.actions}`}
-                                    title="Edit this command"
+                                    title={instructionRelationshipPolicy(instruction.actions).role === 'WEB_ELEMENT'
+                                      ? 'Edit this Web Element placement'
+                                      : 'Edit this command'}
                                     iconNode={<SquarePen size={14} aria-hidden="true" />}
                                     animate={false}
                                     onClick={(event) => {
@@ -1089,7 +1104,6 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                               handleAddConnectedGroupToMemory(instruction);
                             }}
                             onRemove={() => handleRemoveInstruction(instruction.id)}
-                            onOpenCommandEditor={() => openGridCommandEditor(instruction)}
                           />
                         )}
                       />}

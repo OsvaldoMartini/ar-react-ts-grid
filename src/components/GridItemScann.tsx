@@ -69,6 +69,8 @@ import {
   type PendingLocatorApply,
 } from './scanner/PageScannerLocator';
 import { useScannerController } from './scanner/useScannerController';
+import FindBar from './bot-job-details/grid/FindBar';
+import { useMemoryListSummary } from './bot-job-details/grid/hooks/useMemoryListSummary';
 import type {
   MemoryListItem,
   MemoryListItemIcon,
@@ -250,6 +252,14 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
   const [homeBankingId, setHomeBankingId] = useState<number>(homeBankingIdInitial);
   const [botJobId, setBotJobId] = useState<number | null>(botJobIdInitial);
   const [botJobName, setBotJobName] = useState<string | null>(botJobNameInitial);
+  const canonicalMemoryItemCount = useMemoryListSummary({
+    webSocket,
+    connected,
+    messages,
+    sessionId,
+    homeBankingId,
+    botJobId,
+  });
 
   const [elementDTO, setElementDTO] = useState<ElementDTO[]>(dataDTO);
   const [elementGrouped, setElementGrouped] = useState<Record<string, { tagName: string; elements: ElementDTO[] }>>({});
@@ -3127,27 +3137,12 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
         />
       )}
       <div className={styles.gridFindRow}>
-        <span className={styles.gridFindLabel}>Find:</span>
-        <div className={styles.gridFindInputWrap}>
-          <input
-            className={styles.gridFindInput}
-            type="text"
-            value={findText}
-            onChange={(e) => setFindText(e.target.value)}
-            placeholder="Type to find…"
-          />
-          {findText.length > 0 && (
-            <button
-              type="button"
-              className={styles.gridFindClear}
-              aria-label="Clear find"
-              title="Clear find"
-              onClick={() => setFindText('')}
-            >
-              X
-            </button>
-          )}
-        </div>
+        <FindBar
+          value={findText}
+          onChange={setFindText}
+          memoryCount={canonicalMemoryItemCount}
+          onOpenMemory={requestMemoryListOpen}
+        />
         {isDetachedPageScanner && (
           <LocatorGeneratorPanel
             open={locatorPanelOpen}
@@ -3319,15 +3314,6 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
             >
               Clear Grid All
             </button>
-            {memoryElements.length > 0 && (
-              <button
-                type="button"
-                className={styles.memoryToggleButton}
-                onClick={requestMemoryListOpen}
-              >
-                Memory ({memoryElements.length})
-              </button>
-            )}
             <div className={styles.paginationControls}>
               <label>Rows per page: </label>
               <select
