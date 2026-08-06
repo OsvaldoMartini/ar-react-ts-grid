@@ -71,6 +71,36 @@
   color: #92400e;
 }
 
+.statusOk {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.statusError {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.refreshButton {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  border: 1px solid #ffffff80;
+  border-radius: 4px;
+  background: #ffffff18;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.refreshButton:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
 .closeButton {
   min-height: 28px;
   flex: 0 0 auto;
@@ -94,7 +124,7 @@
   min-height: 0;
   flex: 1 1 auto;
   display: grid;
-  place-items: center;
+  align-items: stretch;
   overflow: auto;
   padding: 20px;
 }
@@ -109,6 +139,15 @@
   background: #ffffff;
   color: #52677c;
   text-align: center;
+  place-self: center;
+}
+
+.loadingIcon {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .emptyState strong {

@@ -49,6 +49,7 @@ export interface RuntimeMemoryPanelProps {
   clearingValues?: boolean;
   deletingVariableIds?: ReadonlySet<number>;
   deleteDisabled?: boolean;
+  definitionActionsVisible?: boolean;
   className?: string;
 }
 
@@ -230,6 +231,7 @@ const RuntimeMemoryPanel: React.FC<RuntimeMemoryPanelProps> = ({
   clearingValues = false,
   deletingVariableIds,
   deleteDisabled = false,
+  definitionActionsVisible = true,
   className,
 }) => {
   const [memorySearch, setMemorySearch] = useState('');
@@ -277,7 +279,7 @@ const RuntimeMemoryPanel: React.FC<RuntimeMemoryPanelProps> = ({
         </span>
       </header>
 
-      <div className={styles.variableActions}>
+      {definitionActionsVisible && <div className={styles.variableActions}>
         <RulesCard
           event={{
             color: 'green',
@@ -332,7 +334,7 @@ const RuntimeMemoryPanel: React.FC<RuntimeMemoryPanelProps> = ({
           onClick={() => onRequestDeleteAll?.()}
           disabled={false}
         />
-      </div>
+      </div>}
 
       {helpOpen && <MemoryVariablesHelpModal onClose={() => setHelpOpen(false)} />}
 
