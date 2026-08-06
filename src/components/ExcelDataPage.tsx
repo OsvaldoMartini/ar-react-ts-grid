@@ -21,6 +21,7 @@ type ExcelSnapshot = {
   rowCount: number;
   blocks: ExcelBlock[];
   dirty?: boolean;
+  mode: 'REAL' | 'SYNTHETIC';
 };
 
 type Props = { socketPort: number; sessionId: string; onClose?: () => void };
@@ -41,14 +42,18 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
   const [generating, setGenerating] = useState(false);
   const [activeCell, setActiveCell] = useState<ActiveCell | null>(null);
 
-  const send = useCallback((type: string) => {
+  const send = useCallback((type: string, body: Record<string, unknown> = {}) => {
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN) return false;
-    webSocket.send(JSON.stringify({ type, sessionId, body: '{}' }));
+    webSocket.send(JSON.stringify({ type, sessionId, body: JSON.stringify(body) }));
     return true;
   }, [sessionId, webSocket]);
 
-  const refresh = useCallback(() => {
+  const bootstrap = useCallback(() => {
     if (send('excelData.bootstrap')) setStatus('Loading retained Excel dataset…');
+  }, [send]);
+
+  const refresh = useCallback(() => {
+    if (send('excelData.refresh')) setStatus('Reloading selected data source…');
   }, [send]);
 
   const close = useCallback(() => {
@@ -77,6 +82,16 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     else setStatus('Copying the previous row in memory…');
   }, [send]);
 
+  const selectMode = useCallback((mode: 'REAL' | 'SYNTHETIC') => {
+    if (send('excelData.mode.update', { mode })) setStatus(`Selecting ${mode} data…`);
+  }, [send]);
+
+  const updateCell = useCallback((blockName: string, column: string, rowIndex: number, value: string) => {
+    if (!send('excelData.cell.update', { blockName, column, rowIndex, value })) {
+      setStatus('Excel Data is not connected.');
+    }
+  }, [send]);
+
   const save = useCallback(() => {
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
       setStatus('Excel Data is not connected.');
@@ -90,7 +105,7 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     }));
   }, [sessionId, webSocket]);
 
-  useEffect(() => { if (connected) refresh(); }, [connected, refresh]);
+  useEffect(() => { if (connected) bootstrap(); }, [bootstrap, connected]);
   useEffect(() => { if (error) setStatus(error); }, [error]);
 
   useEffect(() => {
@@ -114,11 +129,14 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
             setSnapshot(body as ExcelSnapshot);
             setStatus(body.message || 'Excel data generated and loaded.');
           }
-        } else if (operationId === 'excelData.addRowResponse') {
+        } else if (operationId === 'excelData.addRowResponse'
+          || operationId === 'excelData.mode.updateResponse'
+          || operationId === 'excelData.refreshResponse'
+          || operationId === 'excelData.cell.updateResponse') {
           if (body?.ok === false) setStatus(body.error || 'The Excel row was not added.');
           else {
             setSnapshot(body as ExcelSnapshot);
-            setStatus(body.message || 'Excel row added in memory.');
+            setStatus(body.message || 'Excel memory updated.');
           }
         } else if (operationId === 'excelData.saveResponse') {
           setGenerating(false);
@@ -152,11 +170,17 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
           </div>
           <div className={styles.actions} data-floating-drag-ignore="true">
             <span className={styles.status}>{status}</span>
-            <button type="button" onClick={() => setPendingAction('STANDARD')} disabled={!connected || generating}><FilePlus2 size={14} />Generate</button>
-            <button type="button" className={styles.synthetic} onClick={() => setPendingAction('SYNTHETIC')} disabled={!connected || generating}><FlaskConical size={14} />Synthetic Data</button>
+            <button type="button" className={snapshot?.mode === 'SYNTHETIC' ? styles.synthetic : styles.real}
+              onClick={() => selectMode(snapshot?.mode === 'SYNTHETIC' ? 'REAL' : 'SYNTHETIC')}
+              disabled={!connected || generating}>
+              {snapshot?.mode === 'SYNTHETIC' ? <FlaskConical size={14} /> : <Database size={14} />}
+              {snapshot?.mode === 'SYNTHETIC' ? 'SYNTHETIC DATA' : 'REAL DATA'}
+            </button>
+            <button type="button" onClick={() => setPendingAction('STANDARD')} disabled={!connected || generating || snapshot?.mode !== 'REAL'}><FilePlus2 size={14} />Recreate Columns</button>
+            {snapshot?.mode === 'SYNTHETIC' && <button type="button" className={styles.synthetic} onClick={() => setPendingAction('SYNTHETIC')} disabled={!connected || generating}><FlaskConical size={14} />Generate Data</button>}
             <button type="button" onClick={addRow} disabled={!connected || generating || !snapshot || snapshot.rowCount < 1}><CopyPlus size={14} />Add Row</button>
-            <button type="button" className={styles.save} onClick={() => setPendingAction('SAVE')} disabled={!connected || generating || !snapshot?.dirty}><Save size={14} />Save to Excel</button>
-            <button type="button" onClick={refresh} disabled={!connected}><RefreshCw size={14} />Refresh Memory View</button>
+            <button type="button" className={styles.save} onClick={() => setPendingAction('SAVE')} disabled={!connected || generating || !snapshot?.dirty}><Save size={14} />{snapshot?.mode === 'SYNTHETIC' ? 'Save Synthetic Data' : 'Save to Excel'}</button>
+            <button type="button" onClick={refresh} disabled={!connected}><RefreshCw size={14} />Refresh Memory</button>
             <PagesOpenButton webSocket={webSocket} connected={connected} messages={messages} sessionId={sessionId} />
             <button type="button" className={styles.close} onClick={close}><X size={14} />Close</button>
           </div>
@@ -164,6 +188,7 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
         {snapshot && <section className={styles.summary}>
           <span>Bot Job <strong>#{snapshot.botJobId}</strong></span>
           <span>Rows <strong>{snapshot.rowCount}</strong></span>
+          <span>Source <strong>{snapshot.mode}</strong></span>
           <span>State <strong>{snapshot.dirty ? 'UNSAVED MEMORY' : 'SAVED'}</strong></span>
           <span>Loaded <strong>{new Date(snapshot.loadedAt).toLocaleTimeString()}</strong></span>
           <span className={styles.path} title={snapshot.filePath}>{snapshot.filePath}</span>
@@ -179,7 +204,13 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
                     const executing = activeCell?.blockName === block.name
                       && activeCell.column === column
                       && activeCell.rowIndex === row.index;
-                    return <td key={column} className={executing ? styles.activeCell : undefined}>{row.values[column] ?? <em>EMPTY</em>}{executing && <b className={styles.executing}>EXECUTING</b>}</td>;
+                    return <td key={column} className={executing ? styles.activeCell : undefined}>
+                      <input key={`${snapshot.mode}-${snapshot.loadedAt}-${column}-${row.index}`}
+                        aria-label={`${block.name} ${column} row ${row.index + 1}`}
+                        defaultValue={row.values[column] ?? ''}
+                        onBlur={event => updateCell(block.name, column, row.index, event.currentTarget.value)} />
+                      {executing && <b className={styles.executing}>EXECUTING</b>}
+                    </td>;
                   })}</tr>)}</tbody>
                 </table>
               </div>
@@ -191,16 +222,18 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
             mode="confirm"
             header={pendingAction === 'SYNTHETIC'
               ? 'Generate Synthetic Memory Data?'
-              : pendingAction === 'SAVE' ? 'Save Memory Data to Excel?' : 'Generate Excel Data File?'}
+              : pendingAction === 'SAVE' ? (snapshot?.mode === 'SYNTHETIC' ? 'Save Synthetic Memory Data?' : 'Save Memory Data to Excel?') : 'Recreate Excel Columns?'}
             body={pendingAction === 'SYNTHETIC'
               ? 'Replace the current in-memory dataset with three deterministic synthetic rows for every Excel input column? The workbook is not changed until Save to Excel.'
               : pendingAction === 'SAVE'
-                ? 'Atomically replace the original Bot Job workbook with the current in-memory rows?'
+                ? snapshot?.mode === 'SYNTHETIC'
+                  ? 'Save the current synthetic rows for this Bot Job and organization in the database?'
+                  : 'Atomically replace the original Bot Job workbook with the current in-memory rows?'
                 : 'Rebuild the active Bot Job workbook from its current Blocks and input fields while preserving existing row values?'}
             extraMsg={pendingAction === 'SAVE'
               ? 'Smoke Test and Test Run already use this shared memory dataset; saving makes it durable on disk.'
               : 'The in-memory dataset remains the authoritative source for this open Excel Data workspace.'}
-            okLabel={pendingAction === 'SYNTHETIC' ? 'Generate in Memory' : pendingAction === 'SAVE' ? 'Save to Excel' : 'Generate'}
+            okLabel={pendingAction === 'SYNTHETIC' ? 'Generate in Memory' : pendingAction === 'SAVE' ? (snapshot?.mode === 'SYNTHETIC' ? 'Save Synthetic Data' : 'Save to Excel') : 'Recreate Columns'}
             destructive={pendingAction !== 'SYNTHETIC'}
             onSubmit={() => pendingAction === 'SAVE' ? save() : generate(pendingAction)}
             onCancel={() => setPendingAction(null)}
