@@ -4,6 +4,7 @@ import DetachedPageShell from './DetachedPageShell';
 import PagesOpenButton from './PagesOpenButton';
 import SmokeTestConnectionReview from './smoke-test/SmokeTestConnectionReview';
 import SmokeTestSimulationWorkspace from './smoke-test/SmokeTestSimulationWorkspace';
+import type { ExcelDataMode } from './excel-data/ExcelDataModeToggle';
 import { useWebSocket } from './useWebSocket';
 import { buildVariablesExecutionFlowReview } from './variables/domain/variablesExecutionFlowReview';
 import type { VariablesSmokeTestPosition } from './variables/domain/variablesSmokeTestTypes';
@@ -79,6 +80,7 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     useState<readonly VariablesSmokeTestPosition[]>([]);
   const [commandRemainingByInstructionId, setCommandRemainingByInstructionId] =
     useState<CommandRemainingByInstructionId>({});
+  const [excelDataMode, setExcelDataMode] = useState<ExcelDataMode>('REAL');
   const [status, setStatus] = useState<Status>({
     level: 'warn',
     text: 'Waiting for Smoke Test workspace',
@@ -201,6 +203,19 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
       } catch (_) {
         return;
       }
+      const body = bodyObject(envelope.body);
+      if ([
+        'excelDataWorkspace.openResponse',
+        'excelDataWorkspace.mode.readResponse',
+        'excelDataWorkspace.mode.updateResponse',
+        'excelData.mode.changed',
+      ].includes(envelope.operationId ?? '')) {
+        if (body?.ok !== false && body?.botJobId === sourceBotJobId
+          && (body?.mode === 'REAL' || body?.mode === 'SYNTHETIC')) {
+          setExcelDataMode(body.mode);
+        }
+        return;
+      }
       if (
         envelope.operationId !== 'variablesWorkspace.bootstrapResponse'
         && envelope.operationId !== 'variablesWorkspace.refreshResponse'
@@ -208,7 +223,6 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
       ) {
         return;
       }
-      const body = bodyObject(envelope.body);
       if (envelope.operationId.endsWith('Response')) {
         const current = pendingRef.current;
         if (!current || body?.requestId !== current.requestId) return;
@@ -276,6 +290,22 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
       }),
     }));
   }, [sessionId, webSocket]);
+  const updateExcelDataMode = useCallback((mode: ExcelDataMode) => {
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) return;
+    webSocket.send(JSON.stringify({
+      type: 'excelDataWorkspace.mode.update',
+      sessionId,
+      body: JSON.stringify({ requestId: `${Date.now()}-smoke-excel-mode`, mode }),
+    }));
+  }, [sessionId, webSocket]);
+  useEffect(() => {
+    if (!connected || !webSocket || webSocket.readyState !== WebSocket.OPEN || !snapshot?.botJob.id) return;
+    webSocket.send(JSON.stringify({
+      type: 'excelDataWorkspace.mode.read',
+      sessionId,
+      body: JSON.stringify({ requestId: `${Date.now()}-smoke-excel-mode-read` }),
+    }));
+  }, [connected, sessionId, snapshot?.botJob.id, webSocket]);
   useEffect(() => {
     setActiveSmokePosition(null);
     setSmokeExecutionTrace([]);
@@ -386,6 +416,8 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
                 onExecutionTraceChange={setSmokeExecutionTrace}
                 onCommandRemainingChange={setCommandRemainingByInstructionId}
                 onRunStart={openSupportingWorkspaces}
+                excelDataMode={excelDataMode}
+                onExcelDataModeChange={updateExcelDataMode}
               />
               <SmokeTestConnectionReview
                 review={review}

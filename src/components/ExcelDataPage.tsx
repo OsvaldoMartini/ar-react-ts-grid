@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CopyPlus, Database, FilePlus2, FlaskConical, RefreshCw, Save, X } from 'lucide-react';
+import { CopyPlus, Database, FilePlus2, RefreshCw, Save, X } from 'lucide-react';
 import DetachedPageShell from './DetachedPageShell';
 import PagesOpenButton from './PagesOpenButton';
 import QuestionsCard from './QuestionsCard';
@@ -7,6 +7,7 @@ import { useWebSocket } from './useWebSocket';
 import ExcelDataSearchBox, { filterExcelDataBlocks } from './excel-data/ExcelDataSearchBox';
 import ExcelSyntheticControls from './excel-data/ExcelSyntheticControls';
 import ExcelDataHelpModal from './excel-data/ExcelDataHelpModal';
+import ExcelDataModeToggle from './excel-data/ExcelDataModeToggle';
 import styles from './ExcelDataPage.module.scss';
 
 export const EXCEL_DATA_SESSION_ID = 'excelDataManager';
@@ -225,12 +226,8 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
           </div>
           <div className={styles.actions} data-floating-drag-ignore="true">
             <span className={`${styles.status} ${snapshot?.mode === 'SYNTHETIC' ? styles.syntheticStatus : styles.realStatus}`}>{status}</span>
-            <button type="button" className={`${styles.modeToggle} ${snapshot?.mode === 'SYNTHETIC' ? styles.syntheticSelected : styles.realSelected}`}
-              onClick={() => selectMode(snapshot?.mode === 'SYNTHETIC' ? 'REAL' : 'SYNTHETIC')}
-              disabled={!connected || generating}>
-              {snapshot?.mode === 'SYNTHETIC' ? <FlaskConical size={14} /> : <Database size={14} />}
-              {snapshot?.mode === 'SYNTHETIC' ? 'SYNTHETIC DATA' : 'REAL DATA'}
-            </button>
+            <ExcelDataModeToggle mode={snapshot?.mode ?? 'REAL'}
+              onChange={selectMode} disabled={!connected || generating} />
             <button type="button" onClick={() => setPendingAction('STANDARD')} disabled={!connected || generating || snapshot?.mode !== 'REAL'}><FilePlus2 size={14} />Recreate Columns</button>
             <button type="button" onClick={addRow} disabled={!connected || generating || !snapshot || snapshot.rowCount < 1}><CopyPlus size={14} />Add Row</button>
             <button type="button" className={styles.save} onClick={() => setPendingAction('SAVE')} disabled={!connected || generating || !snapshot?.dirty}><Save size={14} />{snapshot?.mode === 'SYNTHETIC' ? 'Save Synthetic Data' : 'Save to Excel'}</button>

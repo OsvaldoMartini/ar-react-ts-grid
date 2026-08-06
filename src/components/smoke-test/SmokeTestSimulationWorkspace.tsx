@@ -4,6 +4,7 @@ import type { VariablesExecutionFlowReview } from '../variables/domain/variables
 import type { VariablesSmokeTestPosition } from '../variables/domain/variablesSmokeTestTypes';
 import type { CommandRemainingByInstructionId } from '../variables/Engine/controlFlowCommand.types';
 import styles from './SmokeTestSimulationWorkspace.module.scss';
+import type { ExcelDataMode } from '../excel-data/ExcelDataModeToggle';
 
 type Props = {
   review: VariablesExecutionFlowReview;
@@ -14,6 +15,8 @@ type Props = {
   onExecutionTraceChange: (positions: readonly VariablesSmokeTestPosition[]) => void;
   onCommandRemainingChange: (remaining: CommandRemainingByInstructionId) => void;
   onRunStart: () => void;
+  excelDataMode: ExcelDataMode;
+  onExcelDataModeChange: (mode: ExcelDataMode) => void;
 };
 
 const SmokeTestSimulationWorkspace: React.FC<Props> = ({
@@ -25,6 +28,8 @@ const SmokeTestSimulationWorkspace: React.FC<Props> = ({
   onExecutionTraceChange,
   onCommandRemainingChange,
   onRunStart,
+  excelDataMode,
+  onExcelDataModeChange,
 }) => (
   <section className={styles.workspace} aria-label="Simulation workspace Smoke Tests">
     <VariablesSmokeTestPanel
@@ -36,6 +41,8 @@ const SmokeTestSimulationWorkspace: React.FC<Props> = ({
       onExecutionTraceChange={onExecutionTraceChange}
       onCommandRemainingChange={onCommandRemainingChange}
       onRunStart={onRunStart}
+      excelDataMode={excelDataMode}
+      onExcelDataModeChange={onExcelDataModeChange}
     />
   </section>
 );

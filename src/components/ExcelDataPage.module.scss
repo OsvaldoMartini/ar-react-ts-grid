@@ -6,10 +6,6 @@
 .actions button { display: inline-flex; align-items: center; gap: 5px; min-height: 30px; padding: 5px 9px; border: 1px solid #b8d2ea; border-radius: 5px; background: #fff; color: #17466f; cursor: pointer; font-size: .72rem; font-weight: 700; }
 .actions button:disabled { cursor: not-allowed; opacity: .55; }
 .actions .close { border-color: #ef9a9a; color: #b91c1c; }
-.actions .modeToggle { border-width: 2px; transition: box-shadow .18s ease, transform .18s ease; }
-.actions .realSelected { border-color: #22c55e; background: #dcfce7; color: #14532d; box-shadow: 0 0 0 2px #86efac80, 0 0 14px #22c55e80; }
-.actions .syntheticSelected { border-color: #a855f7; background: #f3e8ff; color: #6b21a8; box-shadow: 0 0 0 2px #d8b4fe80, 0 0 14px #a855f780; }
-.actions .modeToggle:hover { transform: translateY(-1px); }
 .actions .save { border-color: #86efac; background: #f0fdf4; color: #166534; }
 .status { max-width: 380px; overflow: hidden; padding: 5px 8px; border-radius: 5px; background: #e0f2fe; color: #075985; font-size: .72rem; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
 .realStatus { background: #dcfce7; color: #166534; }

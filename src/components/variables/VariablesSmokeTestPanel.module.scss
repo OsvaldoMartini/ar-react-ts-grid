@@ -66,11 +66,11 @@
 
 .actions {
   display: grid;
-  gap: 7px;
-  grid-template-columns: repeat(4, minmax(72px, 1fr));
+  gap: 5px;
+  grid-template-columns: repeat(5, minmax(52px, 1fr));
 
   > * {
-    min-width: 72px;
+    min-width: 52px;
   }
 
   button {

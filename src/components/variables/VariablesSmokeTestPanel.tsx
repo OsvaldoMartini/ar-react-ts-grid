@@ -43,6 +43,7 @@ import {
   type ConditionalExecutionState,
 } from './Engine/ifElseCommandEngine';
 import styles from './VariablesSmokeTestPanel.module.scss';
+import ExcelDataModeToggle, { type ExcelDataMode } from '../excel-data/ExcelDataModeToggle';
 
 export interface VariablesSmokeTestPanelProps {
   review: VariablesExecutionFlowReview;
@@ -53,6 +54,8 @@ export interface VariablesSmokeTestPanelProps {
   onExecutionTraceChange?: (positions: readonly VariablesSmokeTestPosition[]) => void;
   onCommandRemainingChange?: (remaining: CommandRemainingByInstructionId) => void;
   onRunStart?: () => void;
+  excelDataMode?: ExcelDataMode;
+  onExcelDataModeChange?: (mode: ExcelDataMode) => void;
 }
 
 const SPEED_OPTIONS = [
@@ -110,6 +113,8 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   onExecutionTraceChange,
   onCommandRemainingChange,
   onRunStart,
+  excelDataMode = 'REAL',
+  onExcelDataModeChange,
 }) => {
   const [status, setStatus] = useState<VariablesSmokeTestStatus>('IDLE');
   const [plan, setPlan] = useState<VariablesSmokeTestPlan | null>(null);
@@ -427,6 +432,9 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
         >
           <Play size={14} aria-hidden="true" /> RUN
         </button>
+        <ExcelDataModeToggle mode={excelDataMode}
+          disabled={!onExcelDataModeChange || status === 'RUNNING'}
+          onChange={mode => onExcelDataModeChange?.(mode)} />
         <label className={styles.speedSelector}>
           <span>Speed</span>
           <select

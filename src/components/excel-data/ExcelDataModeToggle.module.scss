@@ -1,0 +1,5 @@
+.toggle { min-width: 72px; min-height: 36px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 4px 7px; border: 2px solid; border-radius: 6px; cursor: pointer; font-size: .66rem; font-weight: 800; line-height: 1; transition: box-shadow .18s ease, transform .18s ease; white-space: normal; }
+.toggle > span { display: grid; gap: 1px; text-align: center; }.toggle strong { font: inherit; }.toggle small { font-size: .52rem; font-weight: 900; text-transform: uppercase; }
+.toggle:hover:not(:disabled) { transform: translateY(-1px); }.toggle:disabled { cursor: not-allowed; opacity: .55; }
+.real { border-color: #22c55e; background: #dcfce7; color: #14532d; box-shadow: 0 0 0 2px #86efac80,0 0 14px #22c55e80; }
+.synthetic { border-color: #a855f7; background: #f3e8ff; color: #6b21a8; box-shadow: 0 0 0 2px #d8b4fe80,0 0 14px #a855f780; }
