@@ -228,6 +228,30 @@ test('Bot Job reconnect parent button opens the shared design modal without muta
     .not.toBeInTheDocument();
 });
 
+test('GridItem Edit opens the detached Command Editor instead of the inline modal', async () => {
+  render(<GridItem {...botJobProps} />);
+  await waitForCapabilityRequest();
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit Loop' }));
+
+  const openEnvelope = mockSend.mock.calls
+    .map(([payload]) => JSON.parse(payload))
+    .find(envelope => envelope.type === 'commandEditor.workspaceOpen');
+  expect(openEnvelope).toMatchObject({
+    type: 'commandEditor.workspaceOpen',
+    sessionId: 'botJobTasks',
+    homeBankingId: 2,
+  });
+  expect(JSON.parse(openEnvelope.body)).toMatchObject({
+    targetSessionId: 'botJobTasks',
+    homeBankingId: 2,
+    botJobId: 5,
+    instructionId: 918,
+  });
+  expect(screen.queryByRole('heading', { name: 'Command Editor' }))
+    .not.toBeInTheDocument();
+});
+
 test('Bot Job reconnect persists one exact parent patch through graph v3', async () => {
   const webElement: BlockLoopInstructionLoadDTO = {
     ...lateParent,

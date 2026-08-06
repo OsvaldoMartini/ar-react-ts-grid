@@ -209,6 +209,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
     handleCreateComponent,
     handleBlockSelectionChange,
     handleBlockDelete,
+    handleOpenCommandEditor,
     handleRemoveInstruction,
     handleInstructionStatus,
     handleInstructionForceChange,
@@ -299,15 +300,8 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
     instruction: BlockLoopInstructionLoadDTO,
   ) => {
     if (componentWorkspace) return;
-    const webElement = instructionRelationshipPolicy(instruction.actions).role === 'WEB_ELEMENT';
-    setGridCommandEditorStatus({
-      level: 'ok',
-      text: webElement
-        ? 'Web Element type is locked; placement and copy remain available.'
-        : 'Edit the selected Bot Job command.',
-    });
-    setGridCommandEditorInstructionId(instruction.id);
-  }, [componentWorkspace]);
+    handleOpenCommandEditor(instruction);
+  }, [componentWorkspace, handleOpenCommandEditor]);
   const submitGridCommandEditor = React.useCallback((
     intent: CommandEditorMutationIntent,
   ) => {
