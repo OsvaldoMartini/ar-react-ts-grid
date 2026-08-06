@@ -161,6 +161,7 @@ import {
   type VariableWorkspaceSnapshot,
 } from './variablesWorkspace.contract';
 import styles from './VariablesPage.module.scss';
+import smokeStyles from './SmokeTestPage.module.scss';
 
 export { VARIABLES_MANAGER_SESSION_ID };
 
@@ -3679,7 +3680,7 @@ const VariablesPage: React.FC<Props> = ({
 
   return (
     <DetachedPageShell
-      title="Variables"
+      title="Smoke Test"
       testId="variables-page"
       onClose={undefined}
       showCloseButton={false}
@@ -3690,7 +3691,7 @@ const VariablesPage: React.FC<Props> = ({
             <div className={styles.titleBlock}>
               <div className={styles.titleLine}>
                 <AppWindow size={18} aria-hidden="true" />
-                <h1 className={styles.title}>Variables</h1>
+                <h1 className={styles.title}>Smoke Test</h1>
                 <span className={styles.scopePill}>Bot Job scope</span>
               </div>
               <p className={styles.subtitle} title={subtitle}>{subtitle}</p>
@@ -3720,7 +3721,7 @@ const VariablesPage: React.FC<Props> = ({
 
           <section className={styles.toolbar} data-floating-drag-ignore="true">
             <div className={styles.summaryStrip} aria-label="Variable relationship summary">
-              <span><b>{snapshot?.summary.variableCount ?? 0}</b> Variables</span>
+              <span><b>{snapshot?.summary.variableCount ?? 0}</b> Smoke Test run</span>
               <span><b>{snapshot?.summary.producerCount ?? 0}</b> GET writes</span>
               <span><b>{snapshot?.summary.consumerCount ?? 0}</b> Reads</span>
               <span><b>{snapshot?.edges.length ?? 0}</b> Graph links</span>
@@ -3772,7 +3773,7 @@ const VariablesPage: React.FC<Props> = ({
                 </section>
               )
           ) : (
-            <section className={styles.workspace}>
+            <section className={`${styles.workspace} ${smokeStyles.workspace}`}>
               <VariablesCommandBoard
                 workspaceIdentityKey={workspaceIdentityKey}
                 blockFilters={sharedBlockFilters}
@@ -3892,7 +3893,7 @@ const VariablesPage: React.FC<Props> = ({
               />
 
               <section
-                className={styles.middleWorkspace}
+                className={`${styles.middleWorkspace} ${smokeStyles.middleWorkspace}`}
                 aria-label="Variables Block transfer and relationship workspace"
               >
                 <VariablesBlockTransferBoard
