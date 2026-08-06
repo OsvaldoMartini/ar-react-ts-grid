@@ -47,6 +47,7 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
   const [pendingAction, setPendingAction] = useState<'STANDARD' | 'SYNTHETIC' | 'SAVE' | 'CLEAR' | null>(null);
   const [generating, setGenerating] = useState(false);
   const [activeCell, setActiveCell] = useState<ActiveCell | null>(null);
+  const [deletingRowIndex, setDeletingRowIndex] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [syntheticRowCount, setSyntheticRowCount] = useState(1);
   const [syntheticContext, setSyntheticContext] = useState('Financial');
@@ -132,6 +133,15 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     }
   }, [send]);
 
+  const deleteRow = useCallback((rowIndex: number) => {
+    if (!send('excelData.row.delete', { rowIndex })) {
+      setStatus('Excel Data is not connected.');
+      return;
+    }
+    setDeletingRowIndex(rowIndex);
+    setStatus(`Deleting row ${rowIndex + 1} from memory…`);
+  }, [send]);
+
   const selectMode = useCallback((mode: 'REAL' | 'SYNTHETIC') => {
     if (send('excelData.mode.update', { mode })) setStatus(`Selecting ${mode} data…`);
   }, [send]);
@@ -192,7 +202,9 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
           || operationId === 'excelData.mode.updateResponse'
           || operationId === 'excelData.refreshResponse'
           || operationId === 'excelData.cell.updateResponse'
+          || operationId === 'excelData.row.deleteResponse'
           || operationId === 'excelData.rows.clearResponse') {
+          if (operationId === 'excelData.row.deleteResponse') setDeletingRowIndex(null);
           if (body?.ok === false) {
             setStatus(body.error || 'The Excel operation failed.');
             if (operationId === 'excelData.refreshResponse') showExcelError(body);
@@ -285,7 +297,7 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
             <article className={styles.block} key={`${block.name}-${blockIndex}`}>
               <h2>{block.name || 'Workbook data'} <span>{block.rows.length} rows</span></h2>
               <div className={styles.tableWrap}>
-                <table><thead><tr><th>Row</th>{block.columns.map(column => <th key={column}>{column}</th>)}</tr></thead>
+                <table><thead><tr><th>Row</th>{block.columns.map(column => <th key={column}>{column}</th>)}<th className={styles.rowActionHeader}>Delete</th></tr></thead>
                   <tbody>{block.rows.map(row => <tr key={row.index}><td>{row.index + 1}</td>{block.columns.map(column => {
                     const executing = activeCell?.blockName === block.name
                       && activeCell.column === column
@@ -297,7 +309,12 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
                         onBlur={event => updateCell(block.name, column, row.index, event.currentTarget.value)} />
                       {executing && <b className={styles.executing}>EXECUTING</b>}
                     </td>;
-                  })}</tr>)}</tbody>
+                  })}<td className={styles.rowActionCell}><button type="button"
+                    className={styles.rowDeleteButton}
+                    aria-label={`Delete row ${row.index + 1}`}
+                    title={`Delete row ${row.index + 1}`}
+                    disabled={!connected || generating || deletingRowIndex !== null}
+                    onClick={() => deleteRow(row.index)}><X size={14} aria-hidden="true" /></button></td></tr>)}</tbody>
                 </table>
               </div>
             </article>
