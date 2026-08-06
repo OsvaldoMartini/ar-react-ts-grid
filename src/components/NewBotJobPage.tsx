@@ -156,6 +156,8 @@ const NewBotJobPage: React.FC<Props> = ({
   onSessionOpen,
   onClose,
 }) => {
+  useEffect(() => { document.title = 'New Bot Job'; }, []);
+
   const { webSocket, connected, messages, error } = useWebSocket(socketPort, sessionId);
   const processedMessageCountRef = useRef(0);
   const feedbackIdRef = useRef(0);
