@@ -16,6 +16,8 @@ test('marks the current surface and dispatches React-owned workspace navigation'
       activeSurface="botJob"
       connected
       onAction={onAction}
+      jobState={state}
+      onToolbarAction={jest.fn()}
     />,
   );
 
@@ -28,6 +30,8 @@ test('marks the current surface and dispatches React-owned workspace navigation'
   expect(onAction).toHaveBeenCalledWith('SHOW_VARIABLES');
   fireEvent.click(screen.getByRole('button', { name: 'Excel Data' }));
   expect(onAction).toHaveBeenCalledWith('SHOW_EXCEL_DATA');
+  fireEvent.click(screen.getByRole('button', { name: 'Smoke Test' }));
+  expect(onAction).toHaveBeenCalledWith('SHOW_SMOKE_TEST');
 });
 
 test('leaves Close ownership to the Bot Job Details page title', () => {

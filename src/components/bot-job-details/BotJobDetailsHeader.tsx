@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Clock, Play, RefreshCw, Rocket, Square } from 'lucide-react';
+import { Beaker, Clock, Play, RefreshCw, Rocket, Square } from 'lucide-react';
 import QuestionsCard from '../QuestionsCard';
 import WorkspaceHeader, { type WorkspaceHeaderAction } from '../workspace/WorkspaceHeader';
 import BotJobDataActions from './BotJobDataActions';
@@ -261,6 +261,14 @@ const BotJobDetailsHeader: React.FC<BotJobDetailsHeaderProps> = ({
               transferPath={transferPath}
               onAction={onToolbarAction}
             />
+            <button
+              type="button"
+              className={styles.smokeTestButton}
+              disabled={!connected || !botJobId || botJobId <= 0 || busy || pendingAction !== null}
+              onClick={() => onAction('SHOW_SMOKE_TEST')}
+            >
+              <Beaker size={17} aria-hidden="true" /> Smoke Test
+            </button>
           </>
         )}
       />
