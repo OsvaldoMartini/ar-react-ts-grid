@@ -363,7 +363,7 @@ const RuntimeVariablesPage: React.FC<RuntimeVariablesPageProps> = ({
     if (!snapshot || pendingAutoRequestId !== null) return;
     const instructionIds = snapshot.commands
       .map(command => command.id)
-      .filter((id): id is number => Number.isInteger(id) && id > 0);
+      .filter((id): id is number => id !== null && Number.isInteger(id) && id > 0);
     const requestId = submitAutoResolve(
       instructionIds,
       snapshot.preferences?.variableResolutionMode ?? 'DISTINCT',
