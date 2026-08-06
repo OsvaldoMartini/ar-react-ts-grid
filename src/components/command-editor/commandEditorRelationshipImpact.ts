@@ -59,6 +59,12 @@ export const commandEditorRelationshipImpact = (
     };
   }
 
+  // KEEP changes command configuration only. The instruction remains at its authoritative
+  // position, so an incomplete editor projection must not invent a relationship disconnect.
+  if (placement.kind === 'KEEP') {
+    return { clearParentId: false, clearParentBlockId: false, messages: [] };
+  }
+
   if (command.parentId === null || command.parentId === command.instructionId) {
     return { clearParentId: false, clearParentBlockId: false, messages: [] };
   }
