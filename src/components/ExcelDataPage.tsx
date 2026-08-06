@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CopyPlus, Database, FilePlus2, FlaskConical, RefreshCw, Save, X } from 'lucide-react';
 import DetachedPageShell from './DetachedPageShell';
 import PagesOpenButton from './PagesOpenButton';
 import QuestionsCard from './QuestionsCard';
 import { useWebSocket } from './useWebSocket';
+import ExcelDataSearchBox, { filterExcelDataBlocks } from './excel-data/ExcelDataSearchBox';
 import styles from './ExcelDataPage.module.scss';
 
 export const EXCEL_DATA_SESSION_ID = 'excelDataManager';
@@ -42,6 +43,20 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
   const [pendingAction, setPendingAction] = useState<'STANDARD' | 'SYNTHETIC' | 'SAVE' | null>(null);
   const [generating, setGenerating] = useState(false);
   const [activeCell, setActiveCell] = useState<ActiveCell | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredBlocks = useMemo(
+    () => filterExcelDataBlocks(snapshot?.blocks ?? [], searchQuery),
+    [searchQuery, snapshot?.blocks],
+  );
+  const filteredColumnCount = useMemo(
+    () => filteredBlocks.reduce((total, block) => total + block.columns.length, 0),
+    [filteredBlocks],
+  );
+  const filteredRowCount = useMemo(
+    () => filteredBlocks.reduce((total, block) => total + block.rows.length, 0),
+    [filteredBlocks],
+  );
 
   const send = useCallback((type: string, body: Record<string, unknown> = {}) => {
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN) return false;
@@ -196,7 +211,17 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
         </section>}
         <section className={styles.content}>
           {!snapshot && <div className={styles.empty}>Waiting for the authoritative Excel dataset.</div>}
-          {snapshot?.blocks.map((block, blockIndex) => (
+          {snapshot && <ExcelDataSearchBox
+            query={searchQuery}
+            onQueryChange={setSearchQuery}
+            blockCount={filteredBlocks.length}
+            columnCount={filteredColumnCount}
+            rowCount={filteredRowCount}
+          />}
+          {snapshot && searchQuery.trim() && filteredBlocks.length === 0 && (
+            <div className={styles.empty}>No Excel Block, column, or value matches “{searchQuery.trim()}”.</div>
+          )}
+          {snapshot && filteredBlocks.map((block, blockIndex) => (
             <article className={styles.block} key={`${block.name}-${blockIndex}`}>
               <h2>{block.name || 'Workbook data'} <span>{block.rows.length} rows</span></h2>
               <div className={styles.tableWrap}>
