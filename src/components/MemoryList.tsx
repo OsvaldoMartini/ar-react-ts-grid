@@ -178,6 +178,8 @@ function createAndApplyFeedback(
 }
 
 const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose, demoMode = false }) => {
+  useEffect(() => { document.title = 'Memory List'; }, []);
+
   const { webSocket, connected, messages, error } = useWebSocket(socketPort, sessionId);
   const processedMessageCountRef = useRef(0);
   const commandSequenceRef = useRef(0);
