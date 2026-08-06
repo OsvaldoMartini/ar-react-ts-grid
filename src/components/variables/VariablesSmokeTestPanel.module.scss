@@ -67,10 +67,10 @@
 .actions {
   display: grid;
   gap: 5px;
-  grid-template-columns: repeat(5, minmax(52px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
 
   > * {
-    min-width: 52px;
+    min-width: 0;
   }
 
   button {
@@ -197,7 +197,7 @@
     cursor: pointer;
     font-size: 0.62rem;
     font-weight: 900;
-    min-width: 72px;
+    min-width: 62px;
     outline: none;
   }
 }

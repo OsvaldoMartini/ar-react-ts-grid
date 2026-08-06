@@ -7,3 +7,8 @@
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
 }
+
+.workspace > * {
+  box-sizing: border-box;
+  height: 100%;
+}
