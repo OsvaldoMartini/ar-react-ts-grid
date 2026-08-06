@@ -399,10 +399,7 @@ const SmokeTestConnectionReview: React.FC<
                   ? 'Select at least one Block to open its flow graph'
                   : `Open separated flow graph${visibleBlocks.length === 1 ? '' : 's'} for ${visibleScopeLabel}`}
                 disabled={visibleBlocks.length === 0}
-                onClick={() => {
-                  if (dynamicFlowEnabled) openDynamicFlowWindow();
-                  else setFlowOpen(true);
-                }}
+                onClick={openDynamicFlowWindow}
               >
                 FLOW
               </button>

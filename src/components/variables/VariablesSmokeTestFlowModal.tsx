@@ -261,6 +261,7 @@ const VariablesSmokeTestFlowModal: React.FC<VariablesSmokeTestFlowModalProps> = 
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const onCloseRef = useRef(onClose);
   const [detachedTarget, setDetachedTarget] = useState<HTMLElement | null>(null);
+  const detached = detachedWindow !== null && !detachedWindow.closed;
 
   useEffect(() => {
     if (!dynamic) closeButtonRef.current?.focus();
@@ -269,7 +270,7 @@ const VariablesSmokeTestFlowModal: React.FC<VariablesSmokeTestFlowModalProps> = 
     onCloseRef.current = onClose;
   }, [onClose]);
   useEffect(() => {
-    if (!dynamic || detachedWindow === null || detachedWindow.closed) {
+    if (!detached) {
       setDetachedTarget(null);
       return undefined;
     }
@@ -296,7 +297,7 @@ const VariablesSmokeTestFlowModal: React.FC<VariablesSmokeTestFlowModalProps> = 
       detachedWindow.removeEventListener('beforeunload', handleDetachedClose);
       setDetachedTarget(null);
     };
-  }, [detachedWindow, dynamic]);
+  }, [detached, detachedWindow]);
   const tracedBlockKeys = useMemo(
     () => new Set(executionTrace.map(position => position.blockKey)),
     [executionTrace],
@@ -318,10 +319,10 @@ const VariablesSmokeTestFlowModal: React.FC<VariablesSmokeTestFlowModalProps> = 
 
   const flowContent = (
       <section
-        role={dynamic ? 'region' : 'dialog'}
-        aria-modal={dynamic ? undefined : true}
+        role={detached ? 'region' : 'dialog'}
+        aria-modal={detached ? undefined : true}
         aria-labelledby={titleId}
-        className={`${graphStyles.dialog} ${styles.dialog} ${dynamic ? styles.detachedDialog : ''}`}
+        className={`${graphStyles.dialog} ${styles.dialog} ${detached ? styles.detachedDialog : ''}`}
         onKeyDown={(event) => {
           if (event.key !== 'Escape') return;
           event.preventDefault();
@@ -383,7 +384,7 @@ const VariablesSmokeTestFlowModal: React.FC<VariablesSmokeTestFlowModalProps> = 
         </div>
       </section>
   );
-  if (dynamic) {
+  if (detached) {
     return detachedTarget === null
       ? null
       : createPortal(

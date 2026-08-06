@@ -453,6 +453,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
           />
           <span aria-hidden="true"><i /></span>
           <b>{writeRuntimeValues ? 'ON' : 'OFF'}</b>
+          <small>Variables</small>
         </label>
         <button
           type="button"
