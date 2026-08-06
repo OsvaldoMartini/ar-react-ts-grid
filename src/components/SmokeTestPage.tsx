@@ -60,6 +60,7 @@ import VariablesConnectionsModal, {
   type VariablesConnectionsModalSubmission,
 } from './variables/VariablesConnectionsModal';
 import VariablesExecutionFlowReviewModal from './variables/VariablesExecutionFlowReviewModal';
+import SmokeTestConnectionReview from './smoke-test/SmokeTestConnectionReview';
 import ComponentEditorModal from './command-editor/ComponentEditorModal';
 import type { ComponentEditorCommand } from './command-editor/componentEditor.types';
 import {
@@ -148,10 +149,10 @@ import {
 } from './variables/domain/variablesCommandDelete';
 import { useVariablesRuntimeMemory } from './variables/useVariablesRuntimeMemory';
 import { useVariablesExecutionFlowReview } from './variables/useVariablesExecutionFlowReview';
+import { buildVariablesExecutionFlowReview } from './variables/domain/variablesExecutionFlowReview';
 import {
   normalizeVariablesWorkspaceSnapshot,
   parseVariablesWorkspaceMessage,
-  VARIABLES_MANAGER_SESSION_ID,
   type VariableCommandLink,
   type VariableDiagnostic,
   type VariableGraphEntry,
@@ -160,10 +161,7 @@ import {
   type VariablesWorkspaceEnvelope,
   type VariableWorkspaceSnapshot,
 } from './variablesWorkspace.contract';
-import styles from './VariablesPage.module.scss';
-import smokeStyles from './SmokeTestPage.module.scss';
-
-export { VARIABLES_MANAGER_SESSION_ID };
+import styles from './SmokeTestPage.module.scss';
 
 type Props = {
   socketPort: number;
@@ -834,7 +832,7 @@ const VariableTreeRow: React.FC<{
   );
 };
 
-const VariablesPage: React.FC<Props> = ({
+const SmokeTestPage: React.FC<Props> = ({
   socketPort,
   sessionId,
   onClose,
@@ -3677,11 +3675,16 @@ const VariablesPage: React.FC<Props> = ({
       ).length ?? 0,
     },
   ];
+  const smokeTestReview = useMemo(
+    () => snapshot ? buildVariablesExecutionFlowReview(snapshot) : null,
+    [snapshot],
+  );
+  const showLegacyCommandBoard = false;
 
   return (
     <DetachedPageShell
       title="Smoke Test"
-      testId="variables-page"
+      testId="smoke-test-page"
       onClose={undefined}
       showCloseButton={false}
     >
@@ -3711,7 +3714,7 @@ const VariablesPage: React.FC<Props> = ({
               <button
                 type="button"
                 className={styles.closeButton}
-                title="Close only this Variables window"
+                title="Close only this Smoke Test window"
                 onClick={onClose}
               >
                 Close
@@ -3753,7 +3756,7 @@ const VariablesPage: React.FC<Props> = ({
               ? (
                 <section className={styles.loadingState} role="alert">
                   <ShieldAlert className={styles.loadErrorIcon} size={30} aria-hidden="true" />
-                  <strong>Variables could not be loaded</strong>
+                  <strong>Smoke Test data could not be loaded</strong>
                   <span>{status.text}</span>
                   <button
                     type="button"
@@ -3768,13 +3771,13 @@ const VariablesPage: React.FC<Props> = ({
               : (
                 <section className={styles.loadingState} role="status">
                   <RefreshCw className={styles.loadingIcon} size={28} aria-hidden="true" />
-                  <strong>Loading Variables workspace...</strong>
+                  <strong>Loading Smoke Test workspace...</strong>
                   <span>The declared variable graph is being read from the active Bot Job.</span>
                 </section>
               )
           ) : (
-            <section className={`${styles.workspace} ${smokeStyles.workspace}`}>
-              <VariablesCommandBoard
+            <section className={styles.workspace}>
+              {showLegacyCommandBoard && <VariablesCommandBoard
                 workspaceIdentityKey={workspaceIdentityKey}
                 blockFilters={sharedBlockFilters}
                 onBlockFiltersChange={setSharedBlockFilters}
@@ -3890,10 +3893,23 @@ const VariablesPage: React.FC<Props> = ({
                   setEditingCommandId(null);
                   setAddingCommand(true);
                 }}
-              />
+              />}
+
+              {smokeTestReview && (
+                <SmokeTestConnectionReview
+                  review={smokeTestReview}
+                  scopeLabel="Complete Bot Job"
+                  blockFilters={sharedBlockFilters}
+                  onBlockFiltersChange={setSharedBlockFilters}
+                  runtimeWriteAvailable={connected}
+                  onCommitRuntimeValue={updateRuntimeValue}
+                  embedded
+                  onClose={() => undefined}
+                />
+              )}
 
               <section
-                className={`${styles.middleWorkspace} ${smokeStyles.middleWorkspace}`}
+                className={styles.middleWorkspace}
                 aria-label="Variables Block transfer and relationship workspace"
               >
                 <VariablesBlockTransferBoard
@@ -4493,4 +4509,4 @@ const VariablesPage: React.FC<Props> = ({
   );
 };
 
-export default VariablesPage;
+export default SmokeTestPage;
