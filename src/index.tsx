@@ -28,6 +28,7 @@ import CommandEditorPage, { COMMAND_EDITOR_SESSION_ID } from './components/Comma
 import VariablesPage, { VARIABLES_MANAGER_SESSION_ID } from './components/VariablesPage';
 import ExcelDataPage, { EXCEL_DATA_SESSION_ID } from './components/ExcelDataPage';
 import SmokeTestPage from './components/SmokeTestPage';
+import PageMappingsPage, { PAGE_MAPPINGS_SESSION_ID } from './components/PageMappingsPage';
 import InfoPage, { INFO_PAGE_SESSION_ID } from './components/InfoPage';
 import LicensePage, { LICENSE_PAGE_SESSION_ID } from './components/LicensePage';
 import ActivationRequired from './components/ActivationRequired';
@@ -288,6 +289,7 @@ const App: React.FC = () => {
           RUNTIME_VARIABLES_SESSION_ID,
           EXCEL_DATA_SESSION_ID,
           'smokeTestManager',
+          PAGE_MAPPINGS_SESSION_ID,
           INFO_PAGE_SESSION_ID,
           LICENSE_PAGE_SESSION_ID,
         ]
@@ -734,6 +736,14 @@ const App: React.FC = () => {
       )}
       {sessionId === 'smokeTestManager' && (
         <SmokeTestPage
+          key={sessionId}
+          socketPort={socketPort}
+          sessionId={sessionId}
+          onClose={closeDetachedWorkspace}
+        />
+      )}
+      {sessionId === PAGE_MAPPINGS_SESSION_ID && (
+        <PageMappingsPage
           key={sessionId}
           socketPort={socketPort}
           sessionId={sessionId}
