@@ -1,6 +1,6 @@
 // Scoped stylesheet for GridItemScann only. The content is a copy of
 // griditem.scss with one intentional difference: .instructionItem uses a
-// 5-column grid (26px 240px auto minmax(60px, 1fr) auto) to reserve the first
+// 4-column grid (26px label flexible-space actions) to reserve the first
 // 26px for the per-row "Keep" checkbox. Also includes the .keepCheckbox rule.
 // GridItem / GridItemComp / GridDrag2 / GridItemScannMobile still use the
 // shared 4-column griditem.scss — unchanged.
@@ -921,7 +921,7 @@
   // grid-template-columns: 250px auto minmax(120px, 1fr) auto;
   // First 26px column holds the Keep checkbox in GridItemScann; panes that
   // don't render a checkbox just get a small empty gutter.
-  grid-template-columns: 26px 30px auto minmax(60px, 1fr) auto;
+  grid-template-columns: 26px minmax(50px, 350px) minmax(60px, 1fr) auto;
   // gap: 8px; /* Decreased gap */
   // padding: 8px; /* Decreased padding */
   background-color: #e0f7fa;
@@ -952,7 +952,7 @@
   }
 
   > .optionsColumn {
-    grid-column: 5;
+    grid-column: 4;
   }
 
   > .attrSlot {
@@ -1055,6 +1055,9 @@
   display: flex;
   align-items: center; /* Align content vertically */
   gap: 3px; /* Add a 3px gap between elements */
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .instructionType span {
@@ -1063,6 +1066,7 @@
 
 .displayName {
   display: block;
+  flex: 1 1 auto;
   min-width: 50px;
   max-width: 350px;
   overflow: hidden;
@@ -1071,6 +1075,10 @@
 }
 
 @media (max-width: 1200px) {
+  .instructionItem {
+    grid-template-columns: 26px minmax(50px, 150px) minmax(60px, 1fr) auto;
+  }
+
   .displayName {
     max-width: 150px;
   }

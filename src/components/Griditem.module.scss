@@ -372,6 +372,11 @@
 .instructionLine {
   display: inline-flex; /* Ensures the elements inside are in a single line */
   align-items: center; /* Vertically aligns text and image */
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .refreshImage {
@@ -477,7 +482,7 @@
 /* Instruction Item */
 .instructionItem {
   display: grid;
-  grid-template-columns: 28px 240px minmax(60px, 1fr) auto;
+  grid-template-columns: 28px minmax(50px, 350px) minmax(60px, 1fr) auto;
   // gap: 8px; /* Decreased gap */
   // padding: 8px; /* Decreased padding */
   background-color: #e0f7fa;
@@ -500,6 +505,12 @@
       z-index: 100;
     }
 
+}
+
+@media (max-width: 1200px) {
+  .instructionItem {
+    grid-template-columns: 28px minmax(50px, 150px) minmax(60px, 1fr) auto;
+  }
 }
 
 /* Change background to white when dropdown is open */

@@ -35,6 +35,9 @@
   display: flex;
   align-items: center; // Align content vertically
   gap: 3px; // Add a 3px gap between elements
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .instructionType span {
@@ -43,6 +46,7 @@
 
 .displayName {
   display: block;
+  flex: 1 1 auto;
   min-width: 50px;
   max-width: 350px;
   overflow: hidden;
