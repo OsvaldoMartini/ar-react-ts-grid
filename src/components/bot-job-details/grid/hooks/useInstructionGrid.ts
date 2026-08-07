@@ -11,6 +11,10 @@ import { useInstructionMemory } from './useInstructionMemory';
 import { useExcelExport } from './useExcelExport';
 import { useBlockReorder } from './useBlockReorder';
 import { useGridData } from './useGridData';
+import {
+  useGridItemTestAction,
+  type GridItemTestActionResult,
+} from './useGridItemTestAction';
 import type { UseInstructionGridProps } from '../types/instructionGrid.types';
 import type {
   MemoryInstructionGroupBlock,
@@ -191,7 +195,6 @@ export function useInstructionGrid({
     submitCheckOperatorUpdate,
     handleMoveRowUp,
     handleMoveRowDown,
-    handleRowSelectedClick,
     submitSaveComponent,
     handleGridDragOver,
     handleListDrop,
@@ -219,6 +222,59 @@ export function useInstructionGrid({
     handleRemoveFromMemory, handleRemoveComponentMemoryItem,
     memoryListOpenRequestedRef, memoryListOpenedRef, memoryListOpenPendingRequestRef, memoryListOwnerEpochRef,
     pendingExcelExportDirectoryRequestRef, setChoosingExcelExportDirectory, setExcelExportDirectory,
+  });
+
+  const handleGridItemTestActionResult = useCallback((
+    result: GridItemTestActionResult,
+  ) => {
+    const actionLabel = result.action === 'INPUT' ? 'Input' : 'Click';
+    setAlertImage(result.ok ? constructionImage : warningRedImage);
+    setAlertClass('construction-image');
+    setErrorFlag(!result.ok);
+    setAlertMessageHeader(
+      result.ok ? `${actionLabel} Test Completed` : `${actionLabel} Test Failed`,
+    );
+    setAlertMessageBody(
+      result.ok
+        ? result.message || `The GridItem ${actionLabel.toLowerCase()} test completed successfully.`
+        : result.error || result.message || `The GridItem ${actionLabel.toLowerCase()} test was refused.`,
+    );
+    setAlertMessageFooter(
+      result.ok
+        ? result.action === 'INPUT'
+          ? result.valueSource === 'EXCEL_MEMORY'
+            ? 'The backend resolved the input from retained Excel memory.'
+            : 'The backend resolved the input without exposing its value to the grid.'
+          : 'The backend resolved and tested the persisted Web Element.'
+        : 'No Bot Job or Excel memory data was changed.',
+    );
+    setAlertOnConfirm(undefined);
+    setAlertAlternateAction(undefined);
+  }, [
+    setAlertAlternateAction,
+    setAlertClass,
+    setAlertImage,
+    setAlertMessageBody,
+    setAlertMessageFooter,
+    setAlertMessageHeader,
+    setAlertOnConfirm,
+    setErrorFlag,
+  ]);
+
+  const {
+    pendingRequestId: pendingGridItemTestRequestId,
+    pendingInstructionId: pendingGridItemTestInstructionId,
+    pendingAction: pendingGridItemTestAction,
+    submit: submitGridItemTestAction,
+  } = useGridItemTestAction({
+    webSocket,
+    connected,
+    messages,
+    sessionId,
+    homeBankingId,
+    botJobId,
+    capability: botJobGraphMutationCapability,
+    onResult: handleGridItemTestActionResult,
   });
 
   const orderedWorkspaceBlocks = useMemo(
@@ -874,7 +930,10 @@ export function useInstructionGrid({
     submitCheckOperatorUpdate,
     handleMoveRowUp,
     handleMoveRowDown,
-    handleRowSelectedClick,
+    pendingGridItemTestRequestId,
+    pendingGridItemTestInstructionId,
+    pendingGridItemTestAction,
+    submitGridItemTestAction,
     submitSaveComponent,
     handleGridDragOver,
     handleListDrop,

@@ -8,6 +8,7 @@ import upImage from '../assets/up.png';
 import downImage from '../assets/down.png';
 import excelGotoImage from "../assets/excel_goto2.png";
 import clickTestImage from "../assets/clickTest2.png";
+import testInputImage from "../assets/testInput.png";
 
 
 import AlertModal from './AlertModal';
@@ -40,6 +41,7 @@ import type {
 } from './bot-job-details/grid/domain/workspaceBlocks';
 import { instructionMatchesFind } from './bot-job-details/grid/hooks/useInstructionFind';
 import { useInstructionGrid } from './bot-job-details/grid/hooks/useInstructionGrid';
+import { gridItemTestActionForInstruction } from './bot-job-details/grid/hooks/useGridItemTestAction';
 import { useMemoryListSummary } from './bot-job-details/grid/hooks/useMemoryListSummary';
 import type { UseInstructionGridProps } from './bot-job-details/grid/types/instructionGrid.types';
 import styles from './Griditem.module.scss';
@@ -209,7 +211,10 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
     submitCheckOperatorUpdate,
     handleMoveRowUp,
     handleMoveRowDown,
-    handleRowSelectedClick,
+    pendingGridItemTestRequestId,
+    pendingGridItemTestInstructionId,
+    pendingGridItemTestAction,
+    submitGridItemTestAction,
     submitSaveComponent,
     handleGridDragOver,
     handleListDrop,
@@ -441,18 +446,54 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
   };
 
   // Function to render the move buttons based on the action type
-  const renderTestClick = (actionType: string, instruction: BlockLoopInstructionLoadDTO) => {
-    if (allSpecialOperations(actionType)) {
-      return null; // Don't render buttons for these action types
-    }
+  const renderTestAction = (actionType: string, instruction: BlockLoopInstructionLoadDTO) => {
+    if (componentWorkspace || sessionId !== 'botJobTasks') return null;
+    const testAction = gridItemTestActionForInstruction(actionType);
+    if (!testAction) return null;
+
+    const requestPending = pendingGridItemTestRequestId !== null;
+    const actionAvailable = connected
+      && webSocket?.readyState === WebSocket.OPEN
+      && Number.isSafeInteger(Number(botJobId))
+      && Number(botJobId) > 0;
+    const actionDisabled = !actionAvailable || requestPending;
+    const thisInstructionPending = requestPending
+      && pendingGridItemTestInstructionId === instruction.id
+      && pendingGridItemTestAction === testAction;
+    const actionLabel = testAction === 'INPUT' ? 'input' : 'click';
+    const invokeTest = (event: React.SyntheticEvent) => {
+      event.stopPropagation();
+      if (actionDisabled) return;
+      submitGridItemTestAction(instruction.id, testAction, 0);
+    };
 
     return (
-      <>
-        <img src={clickTestImage}
-          alt=""
-          className={styles.testButton}
-          onClick={(event) => handleRowSelectedClick(event, instruction, "TEST_CLICK_DTO")} />
-      </>
+      <img
+        src={testAction === 'INPUT' ? testInputImage : clickTestImage}
+        alt={`Test ${actionLabel}`}
+        title={thisInstructionPending
+          ? `Testing ${actionLabel}...`
+          : requestPending
+            ? 'Another GridItem test is in progress'
+            : !actionAvailable
+              ? `Test ${actionLabel} unavailable while Bot Job Details is disconnected`
+              : `Test ${actionLabel}`}
+        className={styles.testButton}
+        role="button"
+        tabIndex={actionDisabled ? -1 : 0}
+        aria-disabled={actionDisabled}
+        data-pending={thisInstructionPending ? 'true' : 'false'}
+        style={actionDisabled ? {
+          cursor: requestPending ? 'wait' : 'not-allowed',
+          opacity: 0.55,
+        } : undefined}
+        onClick={invokeTest}
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          invokeTest(event);
+        }}
+      />
     );
   };
 
@@ -924,7 +965,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                               ) : null
                             }
                             moveButtons={renderMoveButtons(instruction.id)}
-                            testClick={renderTestClick(instruction.actions, instruction)}
+                            testClick={renderTestAction(instruction.actions, instruction)}
                             onChangeName={setInstructionName}
                             onSaveName={() => handleSaveInstruction(instruction.id)}
                             onMoveUp={() => handleMoveRowUp(instruction.id)}

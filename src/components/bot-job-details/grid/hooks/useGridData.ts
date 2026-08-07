@@ -2,7 +2,6 @@ import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react
 import {
   BlockLoopInstructionLoadDTO,
   ComplexMessage,
-  ElementDTO,
 } from '../../../instructionsMockData';
 import { CreateBlockOption, CreateBlockPosition } from '../../../CreateNewBlock';
 import { SaveComponentContext } from '../../../SaveComponentPanel';
@@ -55,10 +54,6 @@ import {
 } from '../domain/workspaceBlocks';
 import { buildLaterBlockOrderUpdates } from '../../../instructionSplit';
 import type { MemoryListSnapshot } from '../../../memoryList.contract';
-import {
-  SCANNER_ELEMENT_PANE_SESSION_ID,
-  SCANNER_TOOL_SESSION_ID,
-} from '../../../scanner/Scanner.sessions';
 import type { MemoryCapability, PendingMemoryMove } from './useInstructionMemory';
 import type {
   ComponentMemoryListPayload,
@@ -2806,68 +2801,6 @@ export function useGridData(deps: UseGridDataDeps) {
     });
   };
 
-  const handleRowSelectedClick = (
-    event: React.MouseEvent<HTMLDivElement, MouseEvent>,
-    instruction: BlockLoopInstructionLoadDTO,
-    action: string
-  ) => {
-    event.stopPropagation();
-
-    // Example filled object
-    const clickElement: ElementDTO = {
-      id: instruction.id,
-      typeElement: instruction.tagName,
-      tagName: instruction.tagName,
-      xPath: "",
-      someText: "",
-      attribId: "",
-      attribName: "",
-      coordinates: "",
-      attributeData: [],
-      customXPath: "",
-      iFrameXPath: "",
-      attributeValue: "",
-      attributeType: "",
-      autoScroll: "",
-      autoEnter: "",
-      defaultValue: instruction.defaultValue,
-      blockId: instruction.blockId,
-    };
-
-    sendWebSocketMessage(clickElement, action);
-
-  };
-
-  const sendWebSocketMessage = (elementDTO: ElementDTO, action: string) => {
-    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
-      console.warn("🚨 WebSocket is not connected. Cannot send message.");
-      return;
-    }
-    const sessionDestine = action === "HOVERED_ROW"
-      ? SCANNER_TOOL_SESSION_ID
-      : SCANNER_ELEMENT_PANE_SESSION_ID;
-
-    const message = {
-      type: action,
-      homeBankingId: homeBankingId,
-      botJobId: botJobId,
-      sessionId: sessionDestine,
-      sourceSessionId: targetSessionId,
-      operationId: "TEST_STEP",
-      instructionId: elementDTO.id,
-      blockId: elementDTO.blockId,
-      elementDetails: [elementDTO],
-    };
-
-    try {
-      webSocket.send(JSON.stringify(message));
-      console.log("📤 Sent element DTO:", message);
-    } catch (error) {
-      console.error("❌ Error sending WebSocket message:", error);
-    }
-  };
-
-
   const showDeletePlanningFailure = (reason: string) => {
     setAlertImage(warningRedImage);
     setAlertClass('construction-image');
@@ -3495,7 +3428,6 @@ export function useGridData(deps: UseGridDataDeps) {
     submitCheckOperatorUpdate,
     handleMoveRowUp,
     handleMoveRowDown,
-    handleRowSelectedClick,
     submitSaveComponent,
     // drag handlers
     handleGridDragOver,
