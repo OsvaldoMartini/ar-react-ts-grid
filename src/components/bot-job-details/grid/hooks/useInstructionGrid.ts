@@ -227,6 +227,10 @@ export function useInstructionGrid({
   const handleGridItemTestActionResult = useCallback((
     result: GridItemTestActionResult,
   ) => {
+    // Successful GridItem CLICK tests are intentionally silent. The correlated
+    // backend response is still consumed, but it must not open AlertModal.
+    if (result.ok && result.action === 'CLICK') return;
+
     const actionLabel = result.action === 'INPUT' ? 'Input' : 'Click';
     setAlertImage(result.ok ? constructionImage : warningRedImage);
     setAlertClass('construction-image');
