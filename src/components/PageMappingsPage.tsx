@@ -18,6 +18,7 @@ type Snapshot = {
   status: 'READY' | 'FAILED' | string;
   pinned: boolean;
 };
+type CaptureElement = Record<string, unknown>;
 
 type Props = { socketPort: number; sessionId: string; onClose?: () => void };
 
@@ -27,7 +28,12 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
   const [selectedScanId, setSelectedScanId] = useState<string | null>(null);
   const [status, setStatus] = useState('Connecting to Page Mappings…');
+  const [captureElements, setCaptureElements] = useState<CaptureElement[]>([]);
+  const [captureImage, setCaptureImage] = useState<string | null>(null);
+  const [elementSearch, setElementSearch] = useState('');
+  const [captureLoading, setCaptureLoading] = useState(false);
   const cursor = useRef(0);
+  const captureCursor = useRef(0);
   const sourceBotJobId = useMemo(() => {
     const value = Number(new URLSearchParams(window.location.search).get('sourceBotJobId'));
     return Number.isSafeInteger(value) && value > 0 ? value : 0;
@@ -54,12 +60,20 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
     }));
   }, [homeBankingId, sessionId, sourceBotJobId, webSocket]);
 
+  const loadCapture = useCallback((scanId: string) => {
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) return;
+    setCaptureLoading(true);
+    webSocket.send(JSON.stringify({ type: 'pageMappings.capture', sessionId,
+      body: JSON.stringify({ scanId, botJobId: sourceBotJobId, homeBankingId }) }));
+  }, [homeBankingId, sessionId, sourceBotJobId, webSocket]);
+
   useEffect(() => {
     if (connected) bootstrap();
   }, [bootstrap, connected]);
 
   useEffect(() => {
-    for (const raw of messages.slice(cursor.current)) {
+    for (const raw of messages.slice(captureCursor.current)) {
+      captureCursor.current += 1;
       cursor.current += 1;
       try {
         const envelope = JSON.parse(raw);
@@ -77,6 +91,21 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
       } catch {
         setStatus('Page Mappings received an invalid response.');
       }
+    }
+  }, [messages]);
+
+  useEffect(() => {
+    for (const raw of messages.slice(cursor.current)) {
+      try {
+        const envelope = JSON.parse(raw);
+        if ((envelope.operationId || envelope.type) !== 'pageMappings.captureResponse') continue;
+        const body = typeof envelope.body === 'string' ? JSON.parse(envelope.body) : envelope.body || {};
+        setCaptureLoading(false);
+        if (!body.ok) { setStatus(body.message || 'The selected capture could not be loaded.'); continue; }
+        setCaptureElements(Array.isArray(body.elements) ? body.elements : []);
+        setCaptureImage(typeof body.screenshotBase64 === 'string'
+          ? `data:${body.screenshotMime || 'image/png'};base64,${body.screenshotBase64}` : null);
+      } catch { setCaptureLoading(false); }
     }
   }, [messages]);
 
@@ -105,7 +134,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
                 {snapshots.map(item => (
                   <button type="button" key={item.scanId}
                     className={`${styles.capture} ${item.scanId === selectedScanId ? styles.selected : ''}`}
-                    onClick={() => setSelectedScanId(item.scanId)}>
+                    onClick={() => { setSelectedScanId(item.scanId); setElementSearch(''); loadCapture(item.scanId); }}>
                     <strong>{new Date(item.capturedAt).toLocaleString()}</strong>
                     <span>{item.pageUrl || item.pageKey}</span>
                     <small>{item.elementCount} elements · {item.status}</small>
@@ -128,7 +157,21 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
                   <div><dt>Artifact folder</dt><dd>{selected.artifactPath || 'Unavailable'}</dd></div>
                   <div><dt>Manifest SHA-256</dt><dd className={styles.hash}>{selected.manifestSha256 || 'Unavailable'}</dd></div>
                 </dl>
-                <div className={styles.notice}>P2 storage explorer is read-only. Element overlays, search, and Memory List actions arrive in P3/P4.</div>
+                <div className={styles.notice}>Capture artifacts are read-only. Search is local to this immutable scan; Memory List actions arrive in P4.</div>
+                {captureLoading && <p className={styles.empty}>Loading immutable capture artifacts…</p>}
+                {captureImage && <img className={styles.captureImage} src={captureImage} alt="Selected scanned page capture" />}
+                <label className={styles.searchLabel}>
+                  Search captured elements
+                  <input value={elementSearch} onChange={event => setElementSearch(event.target.value)} placeholder="name, text, XPath, CSS…" />
+                </label>
+                <div className={styles.elementResults}>
+                  {captureElements.filter(element => JSON.stringify(element).toLowerCase().includes(elementSearch.toLowerCase())).slice(0, 200).map((element, index) => (
+                    <div className={styles.elementRow} key={`${selected.scanId}-${index}`}>
+                      <strong>{String(element.clientNamed || element.definedName || element.someText || element.tagName || 'Element')}</strong>
+                      <span>{String(element.typeElement || '')} · {String(element.xPath || element.cssSelector || 'locator unavailable')}</span>
+                    </div>
+                  ))}
+                </div>
               </>
             )}
           </section>
