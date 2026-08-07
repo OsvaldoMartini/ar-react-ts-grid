@@ -8,6 +8,9 @@ import ExcelDataSearchBox, { filterExcelDataBlocks } from './excel-data/ExcelDat
 import ExcelSyntheticControls from './excel-data/ExcelSyntheticControls';
 import ExcelDataHelpModal from './excel-data/ExcelDataHelpModal';
 import ExcelDataModeToggle from './excel-data/ExcelDataModeToggle';
+import ExcelDataRowControl, {
+  ExcelDataRowControlHeader,
+} from './excel-data/ExcelDataRowControl';
 import { generateSyntheticBlocks, SYNTHETIC_CONTEXTS, type SyntheticContext } from './excel-data/syntheticDataProfiles';
 import styles from './ExcelDataPage.module.scss';
 
@@ -25,6 +28,8 @@ type ExcelSnapshot = {
   loadedAt: string;
   rowCount: number;
   blocks: ExcelBlock[];
+  selectedRowIndex: number | null;
+  datasetRevision?: number;
   dirty?: boolean;
   mode: 'REAL' | 'SYNTHETIC';
   syntheticContext?: string;
@@ -33,6 +38,8 @@ type ExcelSnapshot = {
 type Props = { socketPort: number; sessionId: string; onClose?: () => void };
 type ActiveCell = { blockName: string; column: string; rowIndex: number; instructionId?: number };
 type ExcelAlert = { title: string; message: string };
+type ExcelRowMove = { fromIndex: number; toIndex: number };
+type ExcelRowDrag = { fromIndex: number; overIndex: number | null };
 
 const parse = (raw: string) => {
   const envelope = JSON.parse(raw);
@@ -50,6 +57,9 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
   const [generating, setGenerating] = useState(false);
   const [activeCell, setActiveCell] = useState<ActiveCell | null>(null);
   const [deletingRowIndex, setDeletingRowIndex] = useState<number | null>(null);
+  const [selectingRowIndex, setSelectingRowIndex] = useState<number | null>(null);
+  const [movingRow, setMovingRow] = useState<ExcelRowMove | null>(null);
+  const [draggingRow, setDraggingRow] = useState<ExcelRowDrag | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [syntheticRowCount, setSyntheticRowCount] = useState(1);
   const [syntheticContext, setSyntheticContext] = useState<SyntheticContext>('Bank Account');
@@ -74,6 +84,12 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     webSocket.send(JSON.stringify({ type, sessionId, body: JSON.stringify(body) }));
     return true;
   }, [sessionId, webSocket]);
+
+  const resetRowInteraction = useCallback(() => {
+    setSelectingRowIndex(null);
+    setMovingRow(null);
+    setDraggingRow(null);
+  }, []);
 
   const bootstrap = useCallback(() => {
     if (send('excelData.bootstrap')) setStatus('Loading retained Excel dataset…');
@@ -148,7 +164,44 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     setStatus(`Deleting row ${rowIndex + 1} from memory…`);
   }, [send]);
 
+  const selectRow = useCallback((rowIndex: number) => {
+    if (snapshot?.selectedRowIndex === rowIndex) return;
+    if (!send('excelData.row.select', { rowIndex })) {
+      setStatus('Excel Data is not connected.');
+      return;
+    }
+    setSelectingRowIndex(rowIndex);
+    setStatus(`Selecting row ${rowIndex + 1} for execution…`);
+  }, [send, snapshot?.selectedRowIndex]);
+
+  const startRowDrag = useCallback((rowIndex: number) => {
+    setDraggingRow({ fromIndex: rowIndex, overIndex: null });
+  }, []);
+
+  const moveRowOver = useCallback((rowIndex: number) => {
+    setDraggingRow(current => current && current.fromIndex !== rowIndex
+      ? { ...current, overIndex: rowIndex }
+      : current);
+  }, []);
+
+  const finishRowDrag = useCallback(() => {
+    setDraggingRow(null);
+  }, []);
+
+  const dropRow = useCallback((toIndex: number) => {
+    const fromIndex = draggingRow?.fromIndex;
+    setDraggingRow(null);
+    if (fromIndex == null || fromIndex === toIndex) return;
+    if (!send('excelData.row.move', { fromIndex, toIndex })) {
+      setStatus('Excel Data is not connected.');
+      return;
+    }
+    setMovingRow({ fromIndex, toIndex });
+    setStatus(`Moving row ${fromIndex + 1} to position ${toIndex + 1}…`);
+  }, [draggingRow?.fromIndex, send]);
+
   const selectMode = useCallback((mode: 'REAL' | 'SYNTHETIC') => {
+    setDraggingRow(null);
     if (send('excelData.mode.update', { mode })) setStatus(`Selecting ${mode} data…`);
   }, [send]);
 
@@ -182,6 +235,14 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
 
   useEffect(() => { if (connected) bootstrap(); }, [bootstrap, connected]);
   useEffect(() => { if (error) setStatus(error); }, [error]);
+  useEffect(() => {
+    if (!connected) resetRowInteraction();
+  }, [connected, resetRowInteraction]);
+  useEffect(() => {
+    setDraggingRow(null);
+    setMovingRow(null);
+    setSelectingRowIndex(null);
+  }, [snapshot?.botJobId, snapshot?.mode]);
 
   useEffect(() => {
     if (cursor.current > messages.length) cursor.current = 0;
@@ -191,12 +252,13 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
       try {
         const { operationId, body } = parse(raw);
         if (operationId === 'excelData.bootstrapResponse' || operationId === 'excelData.retarget') {
+          if (operationId === 'excelData.retarget') {
+            setSearchQuery('');
+            setActiveCell(null);
+            resetRowInteraction();
+          }
           if (body?.ok === false) setStatus(body.error || 'Excel dataset is unavailable.');
           else {
-            if (operationId === 'excelData.retarget') {
-              setSearchQuery('');
-              setActiveCell(null);
-            }
             setSnapshot(body as ExcelSnapshot);
             if (SYNTHETIC_CONTEXTS.includes(body.syntheticContext as SyntheticContext)) {
               setSyntheticContext(body.syntheticContext as SyntheticContext);
@@ -222,8 +284,15 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
           || operationId === 'excelData.refreshResponse'
           || operationId === 'excelData.cell.updateResponse'
           || operationId === 'excelData.row.deleteResponse'
+          || operationId === 'excelData.row.selectResponse'
+          || operationId === 'excelData.row.moveResponse'
           || operationId === 'excelData.rows.clearResponse') {
           if (operationId === 'excelData.row.deleteResponse') setDeletingRowIndex(null);
+          if (operationId === 'excelData.row.selectResponse') setSelectingRowIndex(null);
+          if (operationId === 'excelData.row.moveResponse') {
+            setMovingRow(null);
+            setDraggingRow(null);
+          }
           if (body?.ok === false) {
             setStatus(body.error || 'The Excel operation failed.');
             if (operationId === 'excelData.refreshResponse') showExcelError(body);
@@ -258,7 +327,7 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
         setStatus('The Excel Data response could not be read.');
       }
     });
-  }, [messages, onClose, showExcelError]);
+  }, [messages, onClose, resetRowInteraction, showExcelError]);
 
   return (
     <DetachedPageShell title="Excel Data" testId="excel-data-page" showCloseButton={false}>
@@ -271,16 +340,16 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
           <div className={styles.actions} data-floating-drag-ignore="true">
             <span className={`${styles.status} ${snapshot?.mode === 'SYNTHETIC' ? styles.syntheticStatus : styles.realStatus}`}>{status}</span>
             <ExcelDataModeToggle mode={snapshot?.mode ?? 'REAL'}
-              onChange={selectMode} disabled={!connected || generating} />
-            <button type="button" className={styles.actionButton} onClick={() => setPendingAction('STANDARD')} disabled={!connected || generating || snapshot?.mode !== 'REAL'}><FilePlus2 size={14} />Recreate Columns</button>
-            <button type="button" className={styles.actionButton} onClick={addRow} disabled={!connected || generating || !snapshot || snapshot.rowCount < 1}><CopyPlus size={14} />Add Row</button>
+              onChange={selectMode} disabled={!connected || generating || selectingRowIndex !== null || movingRow !== null} />
+            <button type="button" className={styles.actionButton} onClick={() => setPendingAction('STANDARD')} disabled={!connected || generating || selectingRowIndex !== null || movingRow !== null || snapshot?.mode !== 'REAL'}><FilePlus2 size={14} />Recreate Columns</button>
+            <button type="button" className={styles.actionButton} onClick={addRow} disabled={!connected || generating || selectingRowIndex !== null || movingRow !== null || !snapshot || snapshot.rowCount < 1}><CopyPlus size={14} />Add Row</button>
             <button type="button" className={`${styles.actionButton} ${styles.clear}`} onClick={() => snapshot?.mode === 'REAL' ? setPendingAction('CLEAR') : clearRows()}
-              disabled={!connected || generating || !snapshot || snapshot.rowCount < 1}><Trash2 size={14} />Clean Rows</button>
+              disabled={!connected || generating || selectingRowIndex !== null || movingRow !== null || !snapshot || snapshot.rowCount < 1}><Trash2 size={14} />Clean Rows</button>
             {snapshot?.mode === 'SYNTHETIC'
-              ? <button type="button" className={`${styles.actionButton} ${styles.save}`} onClick={() => setPendingAction('SAVE')} disabled={!connected || generating || !snapshot.dirty}><Save size={14} />SAVE DB</button>
+              ? <button type="button" className={`${styles.actionButton} ${styles.save}`} onClick={() => setPendingAction('SAVE')} disabled={!connected || generating || selectingRowIndex !== null || movingRow !== null || !snapshot.dirty}><Save size={14} />SAVE DB</button>
               : <>
-                <button type="button" className={`${styles.actionButton} ${styles.save}`} onClick={() => setPendingAction('SAVE')} disabled={!connected || generating || !snapshot?.dirty}><Save size={14} />Save to Excel</button>
-                <button type="button" className={styles.actionButton} onClick={refresh} disabled={!connected || generating}><RefreshCw size={14} />RELOAD FILE</button>
+                <button type="button" className={`${styles.actionButton} ${styles.save}`} onClick={() => setPendingAction('SAVE')} disabled={!connected || generating || selectingRowIndex !== null || movingRow !== null || !snapshot?.dirty}><Save size={14} />Save to Excel</button>
+                <button type="button" className={styles.actionButton} onClick={refresh} disabled={!connected || generating || selectingRowIndex !== null || movingRow !== null}><RefreshCw size={14} />RELOAD FILE</button>
               </>}
             <PagesOpenButton webSocket={webSocket} connected={connected} messages={messages} sessionId={sessionId} />
             <button type="button" className={`${styles.actionButton} ${styles.close}`} onClick={close}><X size={14} />Close</button>
@@ -306,7 +375,7 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
             {snapshot.mode === 'SYNTHETIC' && <ExcelSyntheticControls
               rowCount={syntheticRowCount}
               context={syntheticContext}
-              disabled={!connected || generating}
+              disabled={!connected || generating || selectingRowIndex !== null || movingRow !== null}
               onRowCountChange={setSyntheticRowCount}
               onContextChange={selectSyntheticContext}
               onGenerate={() => setPendingAction('SYNTHETIC')}
@@ -319,15 +388,39 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
             <article className={styles.block} key={`${block.name}-${blockIndex}`}>
               <h2>{block.name || 'Workbook data'} <span>{block.rows.length} rows</span></h2>
               <div className={styles.tableWrap}>
-                <table><thead><tr><th>Row</th>{block.columns.map(column => <th key={column}>{column}</th>)}<th className={styles.rowActionHeader}>Delete</th></tr></thead>
-                  <tbody>{block.rows.map(row => <tr key={row.index}><td>{row.index + 1}</td>{block.columns.map(column => {
+                <table><thead><tr><ExcelDataRowControlHeader /><th>Row</th>{block.columns.map(column => <th key={column}>{column}</th>)}<th className={styles.rowActionHeader}>Delete</th></tr></thead>
+                  <tbody>{block.rows.map(row => {
+                    const rowSelected = snapshot.selectedRowIndex === row.index;
+                    const rowDragging = draggingRow?.fromIndex === row.index;
+                    const rowDropTarget = draggingRow?.overIndex === row.index;
+                    const rowControlsDisabled = !connected || generating || deletingRowIndex !== null
+                      || selectingRowIndex !== null || movingRow !== null;
+                    return <tr
+                      key={row.index}
+                      className={`${rowSelected ? styles.selectedDataRow : ''} ${
+                        rowDragging ? styles.draggingDataRow : ''
+                      } ${rowDropTarget ? styles.dropTargetDataRow : ''}`}
+                    ><ExcelDataRowControl
+                      rowIndex={row.index}
+                      groupName={`excel-data-selected-row-${blockIndex}`}
+                      selected={rowSelected}
+                      disabled={rowControlsDisabled}
+                      dragging={rowDragging}
+                      dropTarget={rowDropTarget}
+                      onSelect={selectRow}
+                      onDragStart={startRowDrag}
+                      onDragOver={moveRowOver}
+                      onDrop={dropRow}
+                      onDragEnd={finishRowDrag}
+                    /><td>{row.index + 1}</td>{block.columns.map(column => {
                     const executing = activeCell?.blockName === block.name
                       && activeCell.column === column
                       && activeCell.rowIndex === row.index;
                     return <td key={column} className={executing ? styles.activeCell : undefined}>
-                      <input key={`${snapshot.mode}-${snapshot.loadedAt}-${column}-${row.index}`}
+                      <input key={`${snapshot.mode}-${snapshot.datasetRevision ?? snapshot.loadedAt}-${column}-${row.index}`}
                         aria-label={`${block.name} ${column} row ${row.index + 1}`}
                         defaultValue={row.values[column] ?? ''}
+                        disabled={generating || deletingRowIndex !== null || movingRow !== null}
                         onBlur={event => updateCell(block.name, column, row.index, event.currentTarget.value)} />
                       {executing && <b className={styles.executing}>EXECUTING</b>}
                     </td>;
@@ -335,8 +428,9 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
                     className={styles.rowDeleteButton}
                     aria-label={`Delete row ${row.index + 1}`}
                     title={`Delete row ${row.index + 1}`}
-                    disabled={!connected || generating || deletingRowIndex !== null}
-                    onClick={() => deleteRow(row.index)}><X size={14} aria-hidden="true" /></button></td></tr>)}</tbody>
+                    disabled={!connected || generating || deletingRowIndex !== null || selectingRowIndex !== null || movingRow !== null}
+                    onClick={() => deleteRow(row.index)}><X size={14} aria-hidden="true" /></button></td></tr>;
+                  })}</tbody>
                 </table>
               </div>
             </article>
