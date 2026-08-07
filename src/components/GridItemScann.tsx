@@ -30,6 +30,7 @@ import ScannerWorkspaceHeader from './scanner/ScannerWorkspaceHeader';
 import PageScannerWorkspaceHeader from './scanner/PageScannerWorkspaceHeader';
 import PageScannerExecutionControls from './scanner/PageScannerExecutionControls';
 import WebElementTypeToggle from './scanner/WebElementTypeToggle';
+import ScrollingBannerText from './shared/ScrollingBannerText';
 import type { WebElementExecutionType } from './webElementExecutionType';
 import {
   pageScannerExecutionTypeFor,
@@ -2732,7 +2733,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
             <NameDropdown dataArray={dataNames} onChange={handleNameChange} />
           </div>
         ) : (
-          <span className={styles.displayName} title={String(displayText ?? '')}>{displayText}</span>
+          <ScrollingBannerText className={styles.displayName} text={String(displayText ?? '')}>{displayText}</ScrollingBannerText>
         )}
       </div>
     );

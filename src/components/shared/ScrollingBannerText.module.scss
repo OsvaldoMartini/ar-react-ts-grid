@@ -1,0 +1,38 @@
+.viewport {
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.track {
+  display: inline-flex;
+  width: max-content;
+}
+
+.copy {
+  flex: 0 0 auto;
+}
+
+.moving .track {
+  animation: scrollingBanner 12s linear infinite;
+  will-change: transform;
+}
+
+.moving .copy {
+  padding-right: 48px;
+}
+
+@keyframes scrollingBanner {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .moving .track {
+    animation: none;
+    transform: none;
+  }
+
+  .moving .copy[aria-hidden='true'] {
+    display: none;
+  }
+}

@@ -25,6 +25,7 @@ import linkImage from '../../../assets/links-icon.png';
 import inputImage from '../../../assets/input_field.png';
 import outPutImage from '../../../assets/output1.png';
 import hiddenImage from '../../../assets/hidden-black.png';
+import ScrollingBannerText from '../../shared/ScrollingBannerText';
 import styles from './InstructionTypeBadge.module.scss';
 
 export interface InstructionTypeBadgeProps {
@@ -204,13 +205,13 @@ const InstructionTypeBadge: React.FC<InstructionTypeBadgeProps> = ({
         <>
           <img src={imageSrc} alt="" className={imageClass} />
           {hiddenField && <img src={hiddenImage} alt="hidden" className={styles.hiddenImage} />}
-          <span className={styles.displayName} title={text ?? undefined}>{text ? renderHighlighted(text, findText) : null}</span>
+          <ScrollingBannerText className={styles.displayName} text={text ?? ''}>{text ? renderHighlighted(text, findText) : null}</ScrollingBannerText>
         </>
       )}
       {!imageSrc && (
-        <span className={styles.displayName} title={text ?? undefined} style={{ fontWeight: isActionBold ? 'bold' : 'normal' }}>
+        <ScrollingBannerText className={styles.displayName} text={text ?? ''} style={{ fontWeight: isActionBold ? 'bold' : 'normal' }}>
           {text ? renderHighlighted(text, findText) : null}
-        </span>
+        </ScrollingBannerText>
       )}
     </div>
   );
