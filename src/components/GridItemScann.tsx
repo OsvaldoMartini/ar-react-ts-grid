@@ -29,6 +29,9 @@ import { useBotJobDetailsController } from './bot-job-details/useBotJobDetailsCo
 import ScannerWorkspaceHeader from './scanner/ScannerWorkspaceHeader';
 import PageScannerWorkspaceHeader from './scanner/PageScannerWorkspaceHeader';
 import PageScannerExecutionControls from './scanner/PageScannerExecutionControls';
+import WebElementTypeTogglePreview, {
+  type WebElementExecutionTypePreview,
+} from './scanner/WebElementTypeTogglePreview';
 import PageScannerFocusProfileEditor, {
   type PageScannerFocusProfileDraft,
 } from './scanner/PageScannerFocusProfileEditor';
@@ -144,6 +147,13 @@ const groupByTagName = (data: ElementDTO[]) => {
     result[groupTag].elements.push(item);
     return result;
   }, {} as Record<string, { tagName: string; elements: ElementDTO[] }>);
+};
+
+const executionTypePreviewFor = (item: ElementDTO): WebElementExecutionTypePreview => {
+  const tag = groupTagFor(item);
+  if (tag === 'input') return 'INPUT';
+  if (tag === 'button' || tag === 'a' || tag === 'link') return 'CLICK';
+  return 'OUTPUT';
 };
 
 const isElementActive = (element: ElementDTO): boolean => element.active !== false;
@@ -3515,6 +3525,10 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
                             +
                           </button>
                         </span>)}
+                      <WebElementTypeTogglePreview
+                        className={styles.executionTypePreview}
+                        value={executionTypePreviewFor(elementDTO)}
+                      />
                       {/* {showAttributes ? (
                         <div className="attr-slot">
                           <AttributeDropdown dataArray={elementDTO.attributeData} onChange={handleAttributeChange} />

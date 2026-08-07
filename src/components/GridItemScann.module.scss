@@ -921,7 +921,7 @@
   // grid-template-columns: 250px auto minmax(120px, 1fr) auto;
   // First 26px column holds the Keep checkbox in GridItemScann; panes that
   // don't render a checkbox just get a small empty gutter.
-  grid-template-columns: 26px 30px auto minmax(60px, 1fr) auto;
+  grid-template-columns: 26px 30px auto minmax(60px, 1fr) 98px auto;
   // gap: 8px; /* Decreased gap */
   // padding: 8px; /* Decreased padding */
   background-color: #e0f7fa;
@@ -952,7 +952,12 @@
   }
 
   > .optionsColumn {
+    grid-column: 6;
+  }
+
+  > .executionTypePreview {
     grid-column: 5;
+    justify-self: end;
   }
 
   > .attrSlot {
