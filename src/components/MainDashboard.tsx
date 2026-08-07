@@ -163,7 +163,7 @@ const desktopShellPosition = () => ({ x: 0, y: 0 });
 
 const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, onSessionOpen }) => {
   useEffect(() => {
-    document.title = 'Main';
+    document.title = 'Main Bot Jobs';
   }, []);
   const desktopShell = new URLSearchParams(window.location.search).get('desktopShell') === '1';
   const { webSocket, connected, messages, error } = useWebSocket(socketPort, sessionId);
@@ -632,7 +632,7 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, on
           <div className={styles.titleBlock}>
             <GripHorizontal className={styles.dragGrip} size={18} aria-hidden="true" />
             <div className={styles.titleText}>
-              <h1 className={styles.title}>AR Web</h1>
+              <h1 className={styles.title}>Multi Organizations - Automation Test</h1>
               <p className={styles.subtitle}>Main Dashboard</p>
             </div>
           </div>
