@@ -227,31 +227,21 @@ export function useInstructionGrid({
   const handleGridItemTestActionResult = useCallback((
     result: GridItemTestActionResult,
   ) => {
-    // Successful GridItem CLICK tests are intentionally silent. The correlated
-    // backend response is still consumed, but it must not open AlertModal.
-    if (result.ok && result.action === 'CLICK') return;
+    // Successful GridItem INPUT and CLICK tests are intentionally silent. The
+    // correlated backend response is still consumed, but it must not open AlertModal.
+    if (result.ok) return;
 
     const actionLabel = result.action === 'INPUT' ? 'Input' : 'Click';
-    setAlertImage(result.ok ? constructionImage : warningRedImage);
+    setAlertImage(warningRedImage);
     setAlertClass('construction-image');
-    setErrorFlag(!result.ok);
-    setAlertMessageHeader(
-      result.ok ? `${actionLabel} Test Completed` : `${actionLabel} Test Failed`,
-    );
+    setErrorFlag(true);
+    setAlertMessageHeader(`${actionLabel} Test Failed`);
     setAlertMessageBody(
-      result.ok
-        ? result.message || `The GridItem ${actionLabel.toLowerCase()} test completed successfully.`
-        : result.error || result.message || `The GridItem ${actionLabel.toLowerCase()} test was refused.`,
+      result.error
+        || result.message
+        || `The GridItem ${actionLabel.toLowerCase()} test was refused.`,
     );
-    setAlertMessageFooter(
-      result.ok
-        ? result.action === 'INPUT'
-          ? result.valueSource === 'EXCEL_MEMORY'
-            ? 'The backend resolved the input from retained Excel memory.'
-            : 'The backend resolved the input without exposing its value to the grid.'
-          : 'The backend resolved and tested the persisted Web Element.'
-        : 'No Bot Job or Excel memory data was changed.',
-    );
+    setAlertMessageFooter('No Bot Job or Excel memory data was changed.');
     setAlertOnConfirm(undefined);
     setAlertAlternateAction(undefined);
   }, [
