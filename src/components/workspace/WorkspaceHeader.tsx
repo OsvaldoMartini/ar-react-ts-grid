@@ -1,4 +1,5 @@
 import React from 'react';
+import WorkspaceHeaderActionScroller from './WorkspaceHeaderActionScroller';
 import styles from './WorkspaceHeader.module.scss';
 
 export type WorkspaceHeaderActionTone = 'default' | 'primary' | 'success' | 'warning' | 'danger';
@@ -27,6 +28,8 @@ interface WorkspaceHeaderProps<ActionId extends string = string> {
   extraActions?: React.ReactNode;
   /** Action id the extraActions content is inserted immediately before; appended at the end when omitted. */
   extraActionsBeforeId?: ActionId;
+  /** Keeps actions on one horizontal lane and adds overflow navigation when space is limited. */
+  scrollableActions?: boolean;
 }
 
 function WorkspaceHeader<ActionId extends string = string>({
@@ -42,7 +45,29 @@ function WorkspaceHeader<ActionId extends string = string>({
   className,
   extraActions,
   extraActionsBeforeId,
+  scrollableActions = false,
 }: WorkspaceHeaderProps<ActionId>): React.ReactElement {
+  const actionContent = (
+    <>
+      {actions.map((action) => (
+        <React.Fragment key={action.id}>
+          {extraActions && extraActionsBeforeId === action.id && extraActions}
+          <button
+            type="button"
+            className={`${styles.actionButton} ${styles[`tone_${action.tone || 'default'}`]} ${action.active ? styles.active : ''}`}
+            title={action.title || action.label}
+            aria-pressed={action.active || undefined}
+            disabled={action.disabled}
+            onClick={() => onAction?.(action.id)}
+          >
+            {action.label}
+          </button>
+        </React.Fragment>
+      ))}
+      {extraActions && extraActionsBeforeId === undefined && extraActions}
+    </>
+  );
+
   return (
   <header
     className={`${styles.header} ${compact ? styles.compact : ''} ${className || ''}`}
@@ -68,24 +93,18 @@ function WorkspaceHeader<ActionId extends string = string>({
     )}
 
     {(actions.length > 0 || extraActions) && (
-      <nav className={styles.actions} aria-label={`${title} actions`}>
-        {actions.map((action) => (
-          <React.Fragment key={action.id}>
-            {extraActions && extraActionsBeforeId === action.id && extraActions}
-            <button
-              type="button"
-              className={`${styles.actionButton} ${styles[`tone_${action.tone || 'default'}`]} ${action.active ? styles.active : ''}`}
-              title={action.title || action.label}
-              aria-pressed={action.active || undefined}
-              disabled={action.disabled}
-              onClick={() => onAction?.(action.id)}
-            >
-              {action.label}
-            </button>
-          </React.Fragment>
-        ))}
-        {extraActions && extraActionsBeforeId === undefined && extraActions}
-      </nav>
+      scrollableActions ? (
+        <WorkspaceHeaderActionScroller
+          ariaLabel={`${title} actions`}
+          navClassName={styles.actions}
+        >
+          {actionContent}
+        </WorkspaceHeaderActionScroller>
+      ) : (
+        <nav className={styles.actions} aria-label={`${title} actions`}>
+          {actionContent}
+        </nav>
+      )
     )}
   </header>
   );

@@ -154,6 +154,7 @@ const BotJobDetailsHeader: React.FC<BotJobDetailsHeaderProps> = ({
         onAction={onAction}
         compact={compact}
         className={styles.keepButtonsOnTop}
+        scrollableActions
         extraActions={onToolbarAction && (
           <BotJobDataActions
             state={jobState}
@@ -169,6 +170,7 @@ const BotJobDetailsHeader: React.FC<BotJobDetailsHeaderProps> = ({
         title={jobState?.executionState ?? 'IDLE'}
         compact={compact}
         className={styles.keepButtonsOnTop}
+        scrollableActions
         extraActions={onToolbarAction && (
           <>
             <div className={execStyles.inlineField}>

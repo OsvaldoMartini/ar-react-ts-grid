@@ -11,7 +11,8 @@
 }
 
 .keepButtonsOnTop {
-  grid-template-columns: minmax(160px, 1fr) minmax(96px, auto) max-content !important;
+  grid-template-columns: minmax(160px, 0.8fr) minmax(96px, auto) minmax(0, 2.2fr) !important;
+  min-width: 0;
 }
 
 .smokeTestButton,
