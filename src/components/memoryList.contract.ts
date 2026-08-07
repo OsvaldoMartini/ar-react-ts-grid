@@ -1,7 +1,7 @@
 import type { CreateBlockOption } from './CreateNewBlock';
 import type { ElementDTO } from './instructionsMockData';
 
-export type MemoryListSourceKind = 'BOT_JOB' | 'PAGE_SCANNER' | 'COMPONENT' | 'MIXED';
+export type MemoryListSourceKind = 'BOT_JOB' | 'PAGE_SCANNER' | 'PAGE_MAPPINGS' | 'COMPONENT' | 'MIXED';
 export type MemoryListItemSourceKind = Exclude<MemoryListSourceKind, 'MIXED'>;
 export type MemoryDependencySelectionScope = 'FULL' | 'DIRECT';
 
@@ -22,6 +22,13 @@ export interface BotJobMemoryListPayload {
 
 export interface PageScannerMemoryListPayload {
   elementDTO: ElementDTO;
+}
+
+export interface PageMappingsMemoryListPayload {
+  elementDTO: ElementDTO;
+  captureId: string;
+  pageKey: string;
+  expectedLastScannedAt?: string;
 }
 
 export interface ComponentInstructionMemoryListPayload {
@@ -71,6 +78,7 @@ export type ComponentMemoryListPayload =
 export type MemoryListItemPayload =
   | BotJobMemoryListPayload
   | PageScannerMemoryListPayload
+  | PageMappingsMemoryListPayload
   | ComponentMemoryListPayload;
 
 export interface MemoryListItem<

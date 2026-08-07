@@ -35,8 +35,12 @@
 .overlay:hover,.overlaySelected { border-color: #e18b15; background: #f6bd3947; z-index: 1; }
 .searchLabel { display: grid; gap: 6px; margin-top: 14px; font-size: .76rem; font-weight: 800; color: #4b687d; }
 .searchLabel input { border: 1px solid #b9cfdf; border-radius: 7px; padding: 9px 10px; color: #18324a; font: inherit; font-weight: 500; }
+.memoryDropZone { margin-top: 12px; border: 1px dashed #2b91b9; border-radius: 8px; padding: 10px; background: #f1fbfe; color: #356079; }
+.memoryHeader { display: flex; justify-content: space-between; align-items: center; color: #174d77; }.memoryHeader span { font-size: .72rem; font-weight: 800; }
+.memoryDropZone p { margin: 5px 0 0; font-size: .76rem; }.memoryChips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }.memoryChips span { padding: 3px 7px; border-radius: 10px; background: #d9f2fa; color: #12658b; font-size: .7rem; font-weight: 700; }
 .elementResults { display: grid; gap: 7px; margin-top: 10px; max-height: 260px; overflow: auto; }
-.elementRow { display: grid; width: 100%; gap: 3px; padding: 8px 10px; border: 1px solid #e1ebf3; border-radius: 7px; background: #fbfdff; color: inherit; text-align: left; cursor: pointer; }
+.elementRow { display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 10px; padding: 8px 10px; border: 1px solid #e1ebf3; border-radius: 7px; background: #fbfdff; color: inherit; text-align: left; cursor: grab; }
+.elementRow > div { display: grid; gap: 3px; min-width: 0; }.addButton { flex: 0 0 auto; border: 1px solid #86c6a2; border-radius: 6px; padding: 4px 9px; background: #e2f7e9; color: #14743d; font-size: .72rem; font-weight: 800; cursor: pointer; }.addButton:hover { background: #c9f0d8; }
 .elementRow:hover,.elementRowSelected { border-color: #e18b15; background: #fff8e8; }
 .elementRow strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.elementRow span { color: #5d7488; font-size: .74rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 780px) { .header { align-items: flex-start; flex-direction: column; }.workspace { grid-template-columns: 1fr; }.actions { width: 100%; } }

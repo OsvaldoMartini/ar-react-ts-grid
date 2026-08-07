@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import DetachedPageShell from './DetachedPageShell';
 import PagesOpenButton from './PagesOpenButton';
 import { useWebSocket } from './useWebSocket';
+import type { ElementDTO } from './instructionsMockData';
+import type { MemoryListItem, MemoryListItemIcon, MemoryListSnapshot } from './memoryList.contract';
 import styles from './PageMappingsPage.module.scss';
 
 export const PAGE_MAPPINGS_SESSION_ID = 'pageMappingsManager';
@@ -19,6 +21,7 @@ type Snapshot = {
   pinned: boolean;
 };
 type CaptureElement = Record<string, unknown>;
+type MappingMemoryItem = MemoryListItem & { payload: { elementDTO: ElementDTO; captureId: string; pageKey: string; expectedLastScannedAt?: string } };
 
 type Props = { socketPort: number; sessionId: string; onClose?: () => void };
 
@@ -34,8 +37,13 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
   const [captureLoading, setCaptureLoading] = useState(false);
   const [selectedElementIndex, setSelectedElementIndex] = useState<number | null>(null);
   const [captureImageSize, setCaptureImageSize] = useState({ width: 0, height: 0 });
+  const [memoryItems, setMemoryItems] = useState<MappingMemoryItem[]>([]);
+  const [memoryOwnerEpoch, setMemoryOwnerEpoch] = useState('');
+  const memoryOpenRequested = useRef(false);
+  const memoryOpened = useRef(false);
   const bootstrapCursor = useRef(0);
   const captureCursor = useRef(0);
+  const memoryCursor = useRef(0);
   const sourceBotJobId = useMemo(() => {
     const value = Number(new URLSearchParams(window.location.search).get('sourceBotJobId'));
     return Number.isSafeInteger(value) && value > 0 ? value : 0;
@@ -129,6 +137,102 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
     .slice(0, 200), [captureElements, elementSearch]);
 
   const selected = snapshots.find(item => item.scanId === selectedScanId) || null;
+
+  const toElementDTO = useCallback((element: CaptureElement): ElementDTO => ({
+    id: Number(element.id) || 0,
+    typeElement: String(element.typeElement || element.type || 'OUTPUT'),
+    tagName: String(element.tagName || ''),
+    xPath: String(element.xPath || ''),
+    someText: String(element.someText || element.text || ''),
+    attribId: String(element.attribId || ''),
+    attribName: String(element.attribName || ''),
+    coordinates: String(element.coordinates || ''),
+    attributeData: Array.isArray(element.attributeData) ? element.attributeData as ElementDTO['attributeData'] : [],
+    customXPath: String(element.customXPath || ''),
+    iFrameXPath: String(element.iFrameXPath || ''),
+    cssSelector: element.cssSelector == null ? null : String(element.cssSelector),
+    attributeValue: String(element.attributeValue || ''),
+    attributeType: String(element.attributeType || ''),
+    autoScroll: String(element.autoScroll || ''),
+    autoEnter: String(element.autoEnter || ''),
+    active: element.active == null ? true : Boolean(element.active),
+    definedName: element.definedName == null ? null : String(element.definedName),
+    clientNamed: element.clientNamed == null ? null : String(element.clientNamed),
+  }), []);
+
+  const memoryItemFor = useCallback((element: CaptureElement, index: number): MappingMemoryItem => {
+    const label = String(element.clientNamed || element.definedName || element.someText || element.tagName || `Element ${index + 1}`);
+    const sourceItemKey = `${selectedScanId || 'capture'}:${index}:${String(element.id || index)}`;
+    const icon = String(element.typeElement || '').toLowerCase().includes('input') ? 'input' : 'output';
+    return {
+      key: `PAGE_MAPPINGS:${sourceItemKey}`,
+      sourceKind: 'PAGE_MAPPINGS',
+      sourceItemKey,
+      label,
+      detail: `${String(element.tagName || '')} · ${String(element.xPath || element.cssSelector || 'locator unavailable')}`,
+      icon: icon as MemoryListItemIcon,
+      active: true,
+      payload: {
+        elementDTO: toElementDTO(element),
+        captureId: selectedScanId || '',
+        pageKey: selected?.pageKey || '',
+        expectedLastScannedAt: selected?.capturedAt,
+      },
+    };
+  }, [selectedScanId, selected, toElementDTO]);
+
+  const addToMemory = useCallback((element: CaptureElement, index: number) => {
+    const item = memoryItemFor(element, index);
+    setMemoryItems(current => current.some(existing => existing.sourceItemKey === item.sourceItemKey) ? current : [...current, item]);
+    memoryOpenRequested.current = true;
+  }, [memoryItemFor]);
+
+  const memorySnapshot = useMemo<MemoryListSnapshot>(() => ({
+    ownerEpoch: memoryOwnerEpoch,
+    sourceKind: 'PAGE_MAPPINGS',
+    homeBankingId,
+    botJobId: sourceBotJobId,
+    botJobName: '',
+    items: memoryItems,
+    blocks: [],
+    targetBlockId: null,
+    emptyMessage: 'Select a captured element to add it to Memory List.',
+    status: memoryItems.length ? `${memoryItems.length} mapping${memoryItems.length === 1 ? '' : 's'} selected.` : 'Memory List ready',
+    busy: false,
+    canApply: false,
+  }), [homeBankingId, memoryItems, memoryOwnerEpoch, sourceBotJobId]);
+
+  useEffect(() => {
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN || !sourceBotJobId || !memoryItems.length) return;
+    const operation = memoryOpenRequested.current || !memoryOpened.current ? 'memoryList.open' : 'memoryList.sync';
+    const requestId = `page-mappings-memory-${Date.now()}`;
+    webSocket.send(JSON.stringify({ type: operation, sessionId, homeBankingId, botJobId: sourceBotJobId,
+      body: JSON.stringify({ requestId, homeBankingId, botJobId: sourceBotJobId, ownerEpoch: memoryOwnerEpoch, snapshot: memorySnapshot }) }));
+    memoryOpenRequested.current = false;
+  }, [homeBankingId, memoryItems, memoryOwnerEpoch, memorySnapshot, sessionId, sourceBotJobId, webSocket]);
+
+  useEffect(() => {
+    for (const raw of messages.slice(memoryCursor.current)) {
+      memoryCursor.current += 1;
+      try {
+        const envelope = JSON.parse(raw);
+        const operation = envelope.operationId || envelope.type;
+        const body = typeof envelope.body === 'string' ? JSON.parse(envelope.body) : envelope.body || {};
+        if (operation === 'memoryList.openResponse' || operation === 'memoryList.syncResponse') {
+          if (!body.ok) { setStatus(body.message || 'Memory List could not be updated.'); continue; }
+          if (typeof body.ownerEpoch === 'string') setMemoryOwnerEpoch(body.ownerEpoch);
+          memoryOpened.current = true;
+          setStatus(body.message || 'Selected mapping added to Memory List.');
+        } else if (operation === 'memoryList.command') {
+          const command = String(body.command || body.action || '').toUpperCase();
+          const itemKey = String(body.payload?.sourceItemKey || body.payload?.itemKey || '');
+          if (command === 'CLEAR') setMemoryItems([]);
+          if (command === 'REMOVE' && itemKey) setMemoryItems(current => current.filter(item => item.sourceItemKey !== itemKey));
+        }
+      } catch { /* Ignore messages owned by other Page Mappings operations. */ }
+    }
+  }, [messages]);
+
   return (
     <DetachedPageShell title="Page Mappings" testId="page-mappings-workspace" onClose={onClose}>
       <main className={styles.page}>
@@ -176,7 +280,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
                   <div><dt>Artifact folder</dt><dd>{selected.artifactPath || 'Unavailable'}</dd></div>
                   <div><dt>Manifest SHA-256</dt><dd className={styles.hash}>{selected.manifestSha256 || 'Unavailable'}</dd></div>
                 </dl>
-                <div className={styles.notice}>Capture artifacts are read-only. Search is local to this immutable scan; Memory List actions arrive in P4.</div>
+                <div className={styles.notice}>Capture artifacts are read-only. Select an element or drag it into Memory List to stage it for the active Bot Job.</div>
                 {captureLoading && <p className={styles.empty}>Loading immutable capture artifacts…</p>}
                 {captureImage && <div className={styles.imageStage}>
                   <img className={styles.captureImage} src={captureImage} alt="Selected scanned page capture"
@@ -193,12 +297,26 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
                   Search captured elements
                   <input value={elementSearch} onChange={event => setElementSearch(event.target.value)} placeholder="name, text, XPath, CSS…" />
                 </label>
+                <section className={styles.memoryDropZone} aria-label="Selected elements for Memory List"
+                  onDragOver={event => event.preventDefault()}
+                  onDrop={event => {
+                    event.preventDefault();
+                    const index = Number(event.dataTransfer.getData('application/x-page-mapping-index'));
+                    if (Number.isInteger(index) && captureElements[index]) addToMemory(captureElements[index], index);
+                  }}>
+                  <div className={styles.memoryHeader}><strong>Memory List</strong><span>{memoryItems.length} selected</span></div>
+                  <p>Drop captured elements here, or use Add. The existing Memory List window opens automatically.</p>
+                  {memoryItems.length > 0 && <div className={styles.memoryChips}>{memoryItems.map(item => <span key={item.sourceItemKey}>{item.label}</span>)}</div>}
+                </section>
                 <div className={styles.elementResults}>
                   {filteredElements.map(({ element, index }) => (
-                    <button type="button" className={`${styles.elementRow} ${selectedElementIndex === index ? styles.elementRowSelected : ''}`} key={`${selected.scanId}-${index}`} onClick={() => setSelectedElementIndex(index)}>
-                      <strong>{String(element.clientNamed || element.definedName || element.someText || element.tagName || 'Element')}</strong>
-                      <span>{String(element.typeElement || '')} · {String(element.xPath || element.cssSelector || 'locator unavailable')}</span>
-                    </button>
+                    <div className={`${styles.elementRow} ${selectedElementIndex === index ? styles.elementRowSelected : ''}`} key={`${selected.scanId}-${index}`} draggable
+                      onDragStart={event => event.dataTransfer.setData('application/x-page-mapping-index', String(index))}
+                      onClick={() => setSelectedElementIndex(index)}>
+                      <div><strong>{String(element.clientNamed || element.definedName || element.someText || element.tagName || 'Element')}</strong>
+                        <span>{String(element.typeElement || '')} · {String(element.xPath || element.cssSelector || 'locator unavailable')}</span></div>
+                      <button type="button" className={styles.addButton} onClick={event => { event.stopPropagation(); addToMemory(element, index); }}>Add</button>
+                    </div>
                   ))}
                 </div>
               </>
