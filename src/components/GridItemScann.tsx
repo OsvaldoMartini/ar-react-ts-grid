@@ -2732,7 +2732,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
             <NameDropdown dataArray={dataNames} onChange={handleNameChange} />
           </div>
         ) : (
-          <span>{displayText}</span>
+          <span className={styles.displayName} title={String(displayText ?? '')}>{displayText}</span>
         )}
       </div>
     );
@@ -3656,13 +3656,6 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
                             +
                           </button>
                         </span>)}
-                      <WebElementTypeToggle
-                        className={styles.executionTypeToggle}
-                        value={pageScannerExecutionTypeFor(elementDTO)}
-                        onChange={(nextExecutionType) => {
-                          handleElementExecutionTypeChange(elementDTO, nextExecutionType);
-                        }}
-                      />
                       {/* {showAttributes ? (
                         <div className="attr-slot">
                           <AttributeDropdown dataArray={elementDTO.attributeData} onChange={handleAttributeChange} />
@@ -3705,6 +3698,13 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
                         {!isPreScanMode && (
                           <img src={saveImage} alt="" className={styles.saveButton} onClick={(event) => handleRowSelectedClick(event, elementDTO, "NEW_ELEMENT_DTO")} />
                         )}
+                        <WebElementTypeToggle
+                          className={styles.executionTypeToggle}
+                          value={pageScannerExecutionTypeFor(elementDTO)}
+                          onChange={(nextExecutionType) => {
+                            handleElementExecutionTypeChange(elementDTO, nextExecutionType);
+                          }}
+                        />
                         <img src={testInputImage} alt="Test Input" title="Test Input" className={styles.testButton} onClick={(event) => handleRowSelectedClick(event, elementDTO, "TEST_INPUT_DTO")} />
                         <img src={clickTestImage} alt="Test Click" title="Test Click" className={styles.testButton} onClick={(event) => handleRowSelectedClick(event, elementDTO, "TEST_CLICK_DTO")} />
                         <img src={crossImage} alt="" className={styles.crossButton} onClick={() => handleRemoveElementDTO(elementDTO)} />

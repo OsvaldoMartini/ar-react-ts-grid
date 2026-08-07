@@ -477,7 +477,7 @@
 /* Instruction Item */
 .instructionItem {
   display: grid;
-  grid-template-columns: 28px 240px auto minmax(60px, 1fr) auto;
+  grid-template-columns: 28px 240px minmax(60px, 1fr) auto;
   // gap: 8px; /* Decreased gap */
   // padding: 8px; /* Decreased padding */
   background-color: #e0f7fa;

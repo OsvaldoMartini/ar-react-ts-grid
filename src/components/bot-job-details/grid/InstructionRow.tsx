@@ -3,7 +3,7 @@ import { BlockLoopInstructionLoadDTO } from '../../instructionsMockData';
 import refreshLoopImage from '../../../assets/refresh-loop.png';
 import refreshOnlyImage from '../../../assets/refresh-only.png';
 // The instruction row keeps GridItem's grid-container + descendant styling
-// (`.instructionItem` 5-col grid, `.instructionItem .optionsColumn`,
+// (`.instructionItem` grid, `.instructionItem .optionsColumn`,
 // `.instructionItem .instructionDetails` from the helper nodes, etc.). Importing
 // the same CSS module keeps those scoped class names identical, so the design is
 // preserved exactly without duplicating the grid rules.
@@ -158,13 +158,13 @@ const InstructionRow: React.FC<InstructionRowProps> = ({
           )}
         </span>
       )}
-      {executionTypeControl}
       {operations}
       <div className={styles.optionsColumn}>
         {deviceOptionsRow}
         <div className={styles.moveButtons}>
           {editButton}
           {moveButtons}
+          {executionTypeControl}
           {testClick}
           {commandEditButton}
           <DeleteButton

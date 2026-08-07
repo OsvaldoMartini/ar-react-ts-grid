@@ -40,3 +40,12 @@
 .instructionType span {
   font-weight: bold; // Make the text bold
 }
+
+.displayName {
+  display: block;
+  min-width: 50px;
+  max-width: 350px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

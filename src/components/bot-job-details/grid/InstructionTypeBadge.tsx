@@ -204,11 +204,11 @@ const InstructionTypeBadge: React.FC<InstructionTypeBadgeProps> = ({
         <>
           <img src={imageSrc} alt="" className={imageClass} />
           {hiddenField && <img src={hiddenImage} alt="hidden" className={styles.hiddenImage} />}
-          <span>{text ? renderHighlighted(text, findText) : null}</span>
+          <span className={styles.displayName} title={text ?? undefined}>{text ? renderHighlighted(text, findText) : null}</span>
         </>
       )}
       {!imageSrc && (
-        <span style={{ fontWeight: isActionBold ? 'bold' : 'normal' }}>
+        <span className={styles.displayName} title={text ?? undefined} style={{ fontWeight: isActionBold ? 'bold' : 'normal' }}>
           {text ? renderHighlighted(text, findText) : null}
         </span>
       )}
