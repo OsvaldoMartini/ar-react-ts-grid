@@ -4,6 +4,7 @@ import type { VariablesExecutionFlowReview } from './domain/variablesExecutionFl
 import { buildVariablesSmokeTestPlan } from './domain/variablesSmokeTestPlan';
 import {
   simulateVariablesSmokeTestStep,
+  type VariablesSmokeTestStepResult,
   variablesSmokeTestBlockKey,
 } from './domain/variablesSmokeTestSimulation';
 import type {
@@ -13,6 +14,7 @@ import type {
   VariablesSmokeTestPosition,
   VariablesSmokeTestRuntimeValue,
   VariablesSmokeTestStatus,
+  VariablesSmokeTestStep,
 } from './domain/variablesSmokeTestTypes';
 import VariablesSmokeTestLog from './VariablesSmokeTestLog';
 import VariablesSmokeTestReportModal from './VariablesSmokeTestReportModal';
@@ -44,6 +46,11 @@ import {
 } from './Engine/ifElseCommandEngine';
 import styles from './VariablesSmokeTestPanel.module.scss';
 import ExcelDataModeToggle, { type ExcelDataMode } from '../excel-data/ExcelDataModeToggle';
+import type { SmokeTestIntegrationController } from '../smoke-test/integration/useSmokeTestIntegrationRun';
+import type {
+  SmokeTestExecutionMode,
+  SmokeTestIntegrationStepResult,
+} from '../smoke-test/integration/smokeTestIntegration.contract';
 
 export interface VariablesSmokeTestPanelProps {
   review: VariablesExecutionFlowReview;
@@ -56,6 +63,9 @@ export interface VariablesSmokeTestPanelProps {
   onRunStart?: () => void;
   excelDataMode?: ExcelDataMode;
   onExcelDataModeChange?: (mode: ExcelDataMode) => void;
+  executionMode?: SmokeTestExecutionMode;
+  integration?: SmokeTestIntegrationController;
+  onStatusChange?: (status: VariablesSmokeTestStatus) => void;
 }
 
 const SPEED_OPTIONS = [
@@ -104,6 +114,52 @@ const replaceSmokeStepDetail = (message: string, detail: string): string => {
   return separator < 0 ? detail : `${message.slice(0, separator)}: ${detail}`;
 };
 
+const localControlAction = (action: string): boolean => [
+  'CK',
+  'CHECKVALUE',
+  'CSV CHECK',
+  'PDF CHECK',
+  'LOOP',
+  'REFRESH_LOOP',
+  'GOTO',
+  'EXCEL GOTO',
+  'IF',
+  'ELSEIF',
+  'ELSE',
+  'ENDIF',
+  'H',
+  'HOLD',
+  'WAIT',
+  'PAUSE',
+].includes(action.trim().toLocaleUpperCase());
+
+const integrationResultForStep = (
+  step: VariablesSmokeTestStep,
+  result: SmokeTestIntegrationStepResult,
+): VariablesSmokeTestStepResult => {
+  const position = `Block #${step.blockOrder ?? step.blockId ?? '?'} ${step.blockName} - #${step.instructionOrder ?? '?'} ${step.instructionName}`;
+  const tone = result.outcome === 'PASSED'
+    ? 'SUCCESS'
+    : result.outcome === 'BYPASSED'
+      ? 'WARNING'
+      : result.outcome === 'WARNING'
+        ? 'WARNING'
+        : 'FAIL';
+  const counter = result.outcome === 'PASSED'
+    ? 'passed'
+    : result.outcome === 'BYPASSED'
+      ? 'bypassed'
+      : result.outcome === 'WARNING'
+        ? 'warning'
+        : 'failed';
+  return {
+    tone,
+    counter,
+    message: `${position}: ${result.message}`,
+    runtimeWrites: [],
+  };
+};
+
 const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   review,
   selectedBlockIds,
@@ -115,6 +171,9 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   onRunStart,
   excelDataMode = 'REAL',
   onExcelDataModeChange,
+  executionMode = 'SMOKE',
+  integration,
+  onStatusChange,
 }) => {
   const [status, setStatus] = useState<VariablesSmokeTestStatus>('IDLE');
   const [plan, setPlan] = useState<VariablesSmokeTestPlan | null>(null);
@@ -131,6 +190,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     initialConditionalExecutionState(),
   );
   const executionTraceRef = useRef<readonly VariablesSmokeTestPosition[]>([]);
+  const integrationRef = useRef(integration);
   const previewPlan = useMemo(
     () => buildVariablesSmokeTestPlan(review, selectedBlockIds),
     [review, selectedBlockIds],
@@ -150,7 +210,15 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     [executionProgram],
   );
 
-  const run = () => {
+  useEffect(() => {
+    onStatusChange?.(status);
+  }, [onStatusChange, status]);
+
+  useEffect(() => {
+    integrationRef.current = integration;
+  }, [integration]);
+
+  const run = async () => {
     onRunStart?.();
     const nextPlan = buildVariablesSmokeTestPlan(review, selectedBlockIds);
     const nextProgram = buildSmokeExecutionProgram(nextPlan);
@@ -161,28 +229,35 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     commandRemainingRef.current = nextCommandRemaining;
     conditionalStateRef.current = initialConditionalExecutionState();
     onCommandRemainingChange?.(nextCommandRemaining);
-    runtimeValuesRef.current = new Map(nextPlan.variableFlows.map((flow, index) => {
-      if (flow.runtimeState === 'VALUE') {
+    runtimeValuesRef.current = new Map<number, VariablesSmokeTestRuntimeValue>(
+      nextPlan.variableFlows.map((flow, index): [number, VariablesSmokeTestRuntimeValue] => {
+        if (flow.runtimeState === 'VALUE') {
+          return [flow.variableId, {
+            state: 'VALUE' as const,
+            value: flow.runtimeRawValue,
+          }];
+        }
+        if (executionMode === 'INTEGRATION') {
+          return [flow.variableId, {
+            state: 'VOID' as const,
+            value: '',
+          }];
+        }
+        const value = generatedSmokeValue(flow.variableType, index);
+        if (
+          writeRuntimeValues
+          && (!runtimeWriteAvailable
+            || !onCommitRuntimeValue
+            || !onCommitRuntimeValue(flow.variableId, value))
+        ) {
+          // The local Smoke value remains available even when durable memory is busy.
+        }
         return [flow.variableId, {
           state: 'VALUE' as const,
-          value: flow.runtimeRawValue,
+          value,
         }];
-      }
-      const value = generatedSmokeValue(flow.variableType, index);
-      if (
-        writeRuntimeValues
-        && (!runtimeWriteAvailable
-          || !onCommitRuntimeValue
-          || !onCommitRuntimeValue(flow.variableId, value))
-      ) {
-        // The local Smoke value remains available even when durable memory is busy.
-      }
-      return [flow.variableId, {
-        state: 'VALUE' as const,
-        value,
-      }];
-    }));
-    setPlan(nextPlan);
+      }),
+    );
     setItemCursor(0);
     setProcessedCommands(0);
     setCounters(EMPTY_COUNTERS);
@@ -190,21 +265,99 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     onActivePositionChange?.(null);
     executionTraceRef.current = [];
     onExecutionTraceChange?.([]);
-    setStatus(nextProgram.items.length === 0 ? 'COMPLETED' : 'RUNNING');
     setEntries([]);
+    if (executionMode === 'INTEGRATION') {
+      if (!integration) {
+        setStatus('STOPPED');
+        setEntries([logEntry(0, 'ERROR', 'Smoke Test Integration is unavailable.', 'failed')]);
+        setCounters({ ...EMPTY_COUNTERS, failed: 1 });
+        return;
+      }
+      setStatus('STARTING');
+      try {
+        const startedRun = await integration.start(
+          nextPlan,
+          excelDataMode,
+          writeRuntimeValues,
+        );
+        runtimeValuesRef.current = new Map<number, VariablesSmokeTestRuntimeValue>(
+          startedRun.runtimeSnapshot.values.map(value => [value.variableId, {
+            state: value.state,
+            value: value.value,
+          }]),
+        );
+      } catch (failure) {
+        const message = failure instanceof Error ? failure.message : 'Smoke Test Integration could not start.';
+        setStatus('STOPPED');
+        setEntries([logEntry(0, 'ERROR', message, 'failed')]);
+        setCounters({ ...EMPTY_COUNTERS, failed: 1 });
+        return;
+      }
+    }
+    setPlan(nextPlan);
+    if (nextProgram.items.length === 0) {
+      if (executionMode === 'INTEGRATION') {
+        try {
+          await integration?.finish();
+        } catch (_) {
+          // The empty run still has no instruction side effect to repeat.
+        }
+      }
+      setStatus('COMPLETED');
+      return;
+    }
+    setStatus('RUNNING');
   };
 
-  const stop = () => {
-    if (status !== 'RUNNING') return;
-    setStatus('STOPPED');
+  const stop = async () => {
+    const integrationCleanupPending = executionMode === 'INTEGRATION'
+      && Boolean(integrationRef.current?.activeRun);
+    if (status !== 'RUNNING' && !integrationCleanupPending) return;
+    setStatus('STOPPING');
     onActivePositionChange?.(null);
+    if (executionMode === 'INTEGRATION') {
+      try {
+        await integrationRef.current?.stop('USER_REQUEST');
+      } catch (failure) {
+        const message = failure instanceof Error ? failure.message : 'Integration stop was not acknowledged.';
+        setEntries(current => [...current, logEntry(processedCommands + 1, 'ERROR', message, 'failed')]);
+      }
+    }
+    setStatus('STOPPED');
   };
 
   useEffect(() => {
     if (status !== 'RUNNING' || plan === null || executionProgram === null) return undefined;
     if (itemCursor >= executionItems.length) {
-      setStatus('COMPLETED');
       onActivePositionChange?.(null);
+      if (executionMode === 'INTEGRATION') {
+        setStatus('STOPPING');
+        const finishRequest = integrationRef.current?.finish();
+        if (!finishRequest) {
+          setEntries(current => [
+            ...current,
+            logEntry(processedCommands + 1, 'ERROR', 'Integration finish is unavailable.', 'failed'),
+          ]);
+          setCounters(current => ({ ...current, failed: current.failed + 1 }));
+          setStatus('STOPPED');
+          return undefined;
+        }
+        void finishRequest
+          .then(() => setStatus('COMPLETED'))
+          .catch((failure) => {
+            const message = failure instanceof Error
+              ? failure.message
+              : 'Integration finish was not acknowledged.';
+            setEntries(current => [
+              ...current,
+              logEntry(processedCommands + 1, 'ERROR', message, 'failed'),
+            ]);
+            setCounters(current => ({ ...current, failed: current.failed + 1 }));
+            setStatus('STOPPED');
+          });
+      } else {
+        setStatus('COMPLETED');
+      }
       return undefined;
     }
 
@@ -249,6 +402,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     let cancelled = false;
     let timer: number | null = null;
     let playwrightResult: PlaywrightCommandResult | null = null;
+    let integrationStepResult: SmokeTestIntegrationStepResult | null = null;
 
     const completeCurrentItem = () => {
       let nextCursor = conditionalBoundaryTransition?.nextCursor
@@ -268,11 +422,17 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
         setCounters(current => ({ ...current, bypassed: current.bypassed + skipped }));
         setProcessedCommands(current => current + skipped);
       } else {
-        const result = simulateVariablesSmokeTestStep(
+        const simulatedResult = simulateVariablesSmokeTestStep(
           item.step,
           processedCommands + 1,
           runtimeValuesRef.current,
         );
+        const result = integrationStepResult !== null
+          && (!localControlAction(item.step.action)
+            || integrationStepResult.outcome === 'FAILED'
+            || integrationStepResult.disposition === 'UNSUPPORTED')
+          ? integrationResultForStep(item.step, integrationStepResult)
+          : simulatedResult;
         const engineWarning = controlTransition?.warning ?? waitExecution?.warning ?? null;
         const engineMessage = controlTransition === null
           ? conditionalBoundaryTransition?.message ?? waitExecution?.message ?? null
@@ -366,10 +526,50 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     };
 
     const scheduleCurrentItem = async () => {
-      if (controlTransition?.playwrightCommand) {
-        playwrightResult = await smokePlaywrightCommandBridge.dispatch(
-          controlTransition.playwrightCommand,
-        );
+      try {
+        if (executionMode === 'INTEGRATION' && activeStep && item.kind === 'STEP') {
+          if (item.step.instructionId === null) {
+            throw new Error('Integration cannot execute an instruction without a database ID.');
+          }
+          if (!integrationRef.current) {
+            throw new Error('Smoke Test Integration is unavailable.');
+          }
+          integrationStepResult = await integrationRef.current.executeStep(
+            item.step.instructionId,
+            0,
+          );
+          integrationStepResult.runtimeWrites.forEach((write) => {
+            runtimeValuesRef.current.set(write.variableId, {
+              state: 'VALUE',
+              value: write.value,
+            });
+          });
+          playwrightResult = {
+            status: integrationStepResult.outcome === 'FAILED' ? 'FAILED' : 'COMPLETED',
+            message: integrationStepResult.message,
+          };
+        } else if (controlTransition?.playwrightCommand) {
+          playwrightResult = await smokePlaywrightCommandBridge.dispatch(
+            controlTransition.playwrightCommand,
+          );
+        }
+      } catch (failure) {
+        if (cancelled) return;
+        const message = failure instanceof Error
+          ? failure.message
+          : 'Integration instruction failed without a correlated response.';
+        setEntries(current => [
+          ...current,
+          logEntry(processedCommands + 1, 'ERROR', message, 'failed'),
+        ]);
+        setCounters(current => ({ ...current, failed: current.failed + 1 }));
+        setProcessedCommands(current => current + 1);
+        onActivePositionChange?.(null);
+        setStatus('STOPPING');
+        void integrationRef.current?.stop('STEP_REQUEST_FAILED')
+          .catch(() => undefined)
+          .finally(() => setStatus('STOPPED'));
+        return;
       }
       if (cancelled) return;
       timer = window.setTimeout(completeCurrentItem, executionDelayMs);
@@ -383,6 +583,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   }, [
     executionItems,
     executionProgram,
+    executionMode,
     conditionalIndex,
     itemCursor,
     onActivePositionChange,
@@ -412,13 +613,18 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   const progress = activePlan.steps.length === 0
     ? status === 'COMPLETED' ? 100 : 0
     : Math.min(100, Math.round((processedCommands / activePlan.steps.length) * 100));
+  const executionActive = status === 'STARTING'
+    || status === 'RUNNING'
+    || status === 'STOPPING';
+  const integrationUnavailable = executionMode === 'INTEGRATION'
+    && (!runtimeWriteAvailable || !integration || integration.phase !== 'IDLE');
 
   return (
     <aside className={styles.panel} aria-label="Smoke Tests">
       <header className={styles.header}>
         <div>
-          <span>Simulation workspace</span>
-          <h3><FlaskConical size={17} aria-hidden="true" /> SMOKE TESTS</h3>
+          <span>{executionMode === 'INTEGRATION' ? 'Playwright workspace' : 'Simulation workspace'}</span>
+          <h3><FlaskConical size={17} aria-hidden="true" /> {executionMode === 'INTEGRATION' ? 'INTEGRATION' : 'SMOKE TESTS'}</h3>
         </div>
         <b data-status={status}>{status}</b>
       </header>
@@ -427,19 +633,20 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
         <button
           type="button"
           className={styles.runButton}
-          disabled={selectedBlockIds.length === 0}
-          onClick={run}
+          disabled={selectedBlockIds.length === 0 || executionActive || integrationUnavailable}
+          onClick={() => { void run(); }}
         >
           <Play size={14} aria-hidden="true" /> RUN
         </button>
         <ExcelDataModeToggle mode={excelDataMode}
-          disabled={!onExcelDataModeChange || status === 'RUNNING'}
+          disabled={!onExcelDataModeChange || executionActive}
           onChange={mode => onExcelDataModeChange?.(mode)} />
         <label className={styles.speedSelector}>
           <span>Speed</span>
           <select
             aria-label="Smoke Test speed"
             value={stepIntervalMs}
+            disabled={executionActive}
             onChange={event => setStepIntervalMs(Number(event.target.value))}
           >
             {SPEED_OPTIONS.map(option => (
@@ -456,7 +663,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
           <input
             type="checkbox"
             checked={writeRuntimeValues}
-            disabled={!runtimeWriteAvailable}
+            disabled={!runtimeWriteAvailable || executionActive}
             onChange={event => setWriteRuntimeValues(event.target.checked)}
           />
           <span aria-hidden="true"><i /></span>
@@ -466,8 +673,10 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
         <button
           type="button"
           className={styles.stopButton}
-          disabled={status !== 'RUNNING'}
-          onClick={stop}
+          disabled={executionMode === 'INTEGRATION'
+            ? !integration?.activeRun || status === 'STOPPING'
+            : status !== 'RUNNING'}
+          onClick={() => { void stop(); }}
         >
           <Octagon size={14} aria-hidden="true" /> STOP
         </button>
@@ -491,8 +700,12 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
           : currentInactiveBlock
             ? `BLOCK INACTIVE - ${currentInactiveBlock.steps.length} instruction(s) will be skipped.`
             : status === 'COMPLETED'
-              ? 'All visible commands were simulated.'
-              : 'Press Run Smoke Test to begin.'}</small>
+              ? executionMode === 'INTEGRATION'
+                ? 'All visible commands completed through the Playwright Integration path.'
+                : 'All visible commands were simulated.'
+              : executionMode === 'INTEGRATION'
+                ? 'Press Run to execute through Playwright Integration.'
+                : 'Press Run to begin the Smoke Test.'}</small>
         <div className={styles.progress} aria-label={`${progress}% completed`}>
           <span style={{ width: `${progress}%` }} />
         </div>
@@ -515,7 +728,9 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
 
       <footer className={styles.safety}>
         <ShieldCheck size={15} aria-hidden="true" />
-        <span>No Playwright, Web page, or production execution is called.</span>
+        <span>{executionMode === 'INTEGRATION'
+          ? 'Each active instruction uses a correlated WebSocket/Playwright step. Java executeJob() is not used.'
+          : 'No Playwright, Web page, or production execution is called.'}</span>
       </footer>
 
       {reportCounter !== null && (

@@ -5,9 +5,15 @@ import PagesOpenButton from './PagesOpenButton';
 import SmokeTestConnectionReview from './smoke-test/SmokeTestConnectionReview';
 import SmokeTestSimulationWorkspace from './smoke-test/SmokeTestSimulationWorkspace';
 import type { ExcelDataMode } from './excel-data/ExcelDataModeToggle';
+import SmokeTestExecutionModeToggle from './smoke-test/integration/SmokeTestExecutionModeToggle';
+import { useSmokeTestIntegrationRun } from './smoke-test/integration/useSmokeTestIntegrationRun';
+import type { SmokeTestExecutionMode } from './smoke-test/integration/smokeTestIntegration.contract';
 import { useWebSocket } from './useWebSocket';
 import { buildVariablesExecutionFlowReview } from './variables/domain/variablesExecutionFlowReview';
-import type { VariablesSmokeTestPosition } from './variables/domain/variablesSmokeTestTypes';
+import type {
+  VariablesSmokeTestPosition,
+  VariablesSmokeTestStatus,
+} from './variables/domain/variablesSmokeTestTypes';
 import type { CommandRemainingByInstructionId } from './variables/Engine/controlFlowCommand.types';
 import { useVariablesRuntimeMemory } from './variables/useVariablesRuntimeMemory';
 import {
@@ -81,6 +87,8 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
   const [commandRemainingByInstructionId, setCommandRemainingByInstructionId] =
     useState<CommandRemainingByInstructionId>({});
   const [excelDataMode, setExcelDataMode] = useState<ExcelDataMode>('REAL');
+  const [executionMode, setExecutionMode] = useState<SmokeTestExecutionMode>('SMOKE');
+  const [smokeRunStatus, setSmokeRunStatus] = useState<VariablesSmokeTestStatus>('IDLE');
   const [status, setStatus] = useState<Status>({
     level: 'warn',
     text: 'Waiting for Smoke Test workspace',
@@ -128,6 +136,13 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     snapshot,
     onMemory: replaceRuntimeMemory,
     onStatus: setStatus,
+  });
+  const integration = useSmokeTestIntegrationRun({
+    webSocket,
+    connected,
+    messages,
+    sessionId,
+    snapshot,
   });
 
   useEffect(() => {
@@ -311,6 +326,13 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     setSmokeExecutionTrace([]);
     setCommandRemainingByInstructionId({});
   }, [snapshot?.botJob.id, snapshot?.graphRevision]);
+  useEffect(() => {
+    if (!integration.error) return;
+    setStatus({ level: 'error', text: integration.error });
+  }, [integration.error]);
+  const smokeRunActive = smokeRunStatus === 'STARTING'
+    || smokeRunStatus === 'RUNNING'
+    || smokeRunStatus === 'STOPPING';
   const statusClass = status.level === 'error'
     ? styles.statusError
     : status.level === 'ok'
@@ -371,10 +393,18 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
               <span><b>{snapshot?.diagnostics.length ?? 0}</b> Diagnostics</span>
             </div>
             <div className={styles.toolbarActions}>
+              <SmokeTestExecutionModeToggle
+                mode={executionMode}
+                disabled={smokeRunActive || integration.phase !== 'IDLE'}
+                onChange={setExecutionMode}
+              />
               <button
                 type="button"
                 className={styles.refreshButton}
-                disabled={!connected || pending !== null || sourceBotJobId === null}
+                disabled={!connected
+                  || pending !== null
+                  || sourceBotJobId === null
+                  || smokeRunActive}
                 onClick={() => sendSnapshotRequest('variablesWorkspace.refresh')}
               >
                 <RefreshCw className={pending ? styles.loadingIcon : ''} size={15} />
@@ -418,6 +448,9 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
                 onRunStart={openSupportingWorkspaces}
                 excelDataMode={excelDataMode}
                 onExcelDataModeChange={updateExcelDataMode}
+                executionMode={executionMode}
+                integration={integration}
+                onStatusChange={setSmokeRunStatus}
               />
               <SmokeTestConnectionReview
                 review={review}

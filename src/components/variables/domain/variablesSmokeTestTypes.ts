@@ -4,7 +4,13 @@ import type {
   VariablesExecutionVariableFlow,
 } from './variablesExecutionFlowReview';
 
-export type VariablesSmokeTestStatus = 'IDLE' | 'RUNNING' | 'COMPLETED' | 'STOPPED';
+export type VariablesSmokeTestStatus =
+  | 'IDLE'
+  | 'STARTING'
+  | 'RUNNING'
+  | 'STOPPING'
+  | 'COMPLETED'
+  | 'STOPPED';
 
 export type VariablesSmokeTestRuntimeValue = {
   state: 'VALUE' | 'VOID';

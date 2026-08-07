@@ -1,10 +1,15 @@
 import React from 'react';
 import VariablesSmokeTestPanel from '../variables/VariablesSmokeTestPanel';
 import type { VariablesExecutionFlowReview } from '../variables/domain/variablesExecutionFlowReview';
-import type { VariablesSmokeTestPosition } from '../variables/domain/variablesSmokeTestTypes';
+import type {
+  VariablesSmokeTestPosition,
+  VariablesSmokeTestStatus,
+} from '../variables/domain/variablesSmokeTestTypes';
 import type { CommandRemainingByInstructionId } from '../variables/Engine/controlFlowCommand.types';
 import styles from './SmokeTestSimulationWorkspace.module.scss';
 import type { ExcelDataMode } from '../excel-data/ExcelDataModeToggle';
+import type { SmokeTestIntegrationController } from './integration/useSmokeTestIntegrationRun';
+import type { SmokeTestExecutionMode } from './integration/smokeTestIntegration.contract';
 
 type Props = {
   review: VariablesExecutionFlowReview;
@@ -17,6 +22,9 @@ type Props = {
   onRunStart: () => void;
   excelDataMode: ExcelDataMode;
   onExcelDataModeChange: (mode: ExcelDataMode) => void;
+  executionMode: SmokeTestExecutionMode;
+  integration: SmokeTestIntegrationController;
+  onStatusChange: (status: VariablesSmokeTestStatus) => void;
 };
 
 const SmokeTestSimulationWorkspace: React.FC<Props> = ({
@@ -30,6 +38,9 @@ const SmokeTestSimulationWorkspace: React.FC<Props> = ({
   onRunStart,
   excelDataMode,
   onExcelDataModeChange,
+  executionMode,
+  integration,
+  onStatusChange,
 }) => (
   <section className={styles.workspace} aria-label="Simulation workspace Smoke Tests">
     <VariablesSmokeTestPanel
@@ -43,6 +54,9 @@ const SmokeTestSimulationWorkspace: React.FC<Props> = ({
       onRunStart={onRunStart}
       excelDataMode={excelDataMode}
       onExcelDataModeChange={onExcelDataModeChange}
+      executionMode={executionMode}
+      integration={integration}
+      onStatusChange={onStatusChange}
     />
   </section>
 );
