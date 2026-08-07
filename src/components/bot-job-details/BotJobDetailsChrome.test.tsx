@@ -16,6 +16,7 @@ test('keeps capability-gated actions disabled until bootstrap state is available
     transferPath: '',
     status: 'Loading Bot Job details',
     statusTone: 'neutral',
+    reportStatus: jest.fn(),
     executionPause: null,
     executionPreflight: null,
     resolveExecutionPause: jest.fn(),
@@ -55,6 +56,7 @@ test('keeps Stop available but disables editing, navigation, and file mutations 
     transferPath: 'D:\\exports',
     status: 'TEST RUN active',
     statusTone: 'warning',
+    reportStatus: jest.fn(),
     executionPause: null,
     executionPreflight: null,
     resolveExecutionPause: jest.fn(),
@@ -78,7 +80,7 @@ test('keeps Stop available but disables editing, navigation, and file mutations 
 
   expect(screen.getByRole('button', { name: 'Close' })).toBeEnabled();
   expect(screen.getByRole('button', { name: 'Stop' })).toBeEnabled();
-  expect(screen.getByRole('button', { name: /Excel/ })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Excel' })).toBeDisabled();
   expect(screen.getByRole('button', { name: 'Export' })).toBeDisabled();
   expect(screen.getByRole('button', { name: 'Pre Scan' })).toBeDisabled();
 });
@@ -96,6 +98,7 @@ test('saves metadata through the restored editor entry point', () => {
     transferPath: '',
     status: 'Ready',
     statusTone: 'neutral',
+    reportStatus: jest.fn(),
     executionPause: null,
     executionPreflight: null,
     resolveExecutionPause: jest.fn(),
@@ -144,6 +147,7 @@ test('renders the standard React confirmation for an instruction PAUSE', () => {
     transferPath: '',
     status: 'Paused at Login',
     statusTone: 'warning',
+    reportStatus: jest.fn(),
     executionPause: {
       requestId: 'pause-1',
       botJobId: 42,
@@ -207,6 +211,7 @@ test('renders the authoritative WARN preflight and delegates row focus without a
     transferPath: '',
     status: 'TEST RUN started',
     statusTone: 'warning',
+    reportStatus: jest.fn(),
     executionPause: null,
     executionPreflight: {
       action: 'TEST_RUN',
@@ -271,6 +276,7 @@ test('requires a runtime-memory policy before TEST RUN and defaults to KEEP', ()
     transferPath: '',
     status: 'Ready',
     statusTone: 'neutral',
+    reportStatus: jest.fn(),
     executionPause: null,
     executionPreflight: null,
     resolveExecutionPause: jest.fn(),
@@ -321,6 +327,7 @@ test('can reset all runtime values before LAUNCH or cancel without dispatching',
     transferPath: '',
     status: 'Ready',
     statusTone: 'neutral',
+    reportStatus: jest.fn(),
     executionPause: null,
     executionPreflight: null,
     resolveExecutionPause: jest.fn(),

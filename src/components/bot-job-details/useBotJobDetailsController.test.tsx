@@ -59,6 +59,7 @@ const Harness: React.FC<HarnessProps> = ({ socket, messages, botJobId = 42, onSu
     <span data-testid="pending-toolbar">{controller.pendingToolbarAction || ''}</span>
     <span data-testid="transfer-path">{controller.transferPath}</span>
     <span data-testid="status">{controller.status}</span>
+    <span data-testid="status-tone">{controller.statusTone}</span>
     <span data-testid="pause-request">{controller.executionPause?.requestId || ''}</span>
     <span data-testid="preflight-status">{controller.executionPreflight?.report.status || ''}</span>
     <span data-testid="preflight-action">{controller.executionPreflight?.action || ''}</span>
@@ -77,8 +78,21 @@ const Harness: React.FC<HarnessProps> = ({ socket, messages, botJobId = 42, onSu
     <button type="button" onClick={() => controller.resolveExecutionPause('STOP')}>Stop pause</button>
     <button type="button" onClick={controller.dismissExecutionPreflight}>Dismiss preflight</button>
     <button type="button" onClick={controller.retryBootstrap}>Retry bootstrap</button>
+    <button type="button" onClick={() => controller.reportStatus('Input test failed', 'error')}>Report test failure</button>
   </div>;
 };
+
+test('publishes feature feedback through the shared Bot Job status', () => {
+  const send = jest.fn();
+  const socket = { readyState: WebSocket.OPEN, send } as unknown as WebSocket;
+  const view = render(<Harness socket={socket} messages={[]} />);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Report test failure' }));
+
+  expect(screen.getByTestId('status')).toHaveTextContent('Input test failed');
+  expect(screen.getByTestId('status-tone')).toHaveTextContent('error');
+  view.unmount();
+});
 
 function response(operationId: string, body: Record<string, unknown>, sessionId = 'botJobTasks'): string {
   return JSON.stringify({ sessionId, operationId, body: JSON.stringify(body) });

@@ -39,6 +39,7 @@ export interface BotJobDetailsControllerState {
   transferPath: string;
   status: string;
   statusTone: BotJobWorkspaceStatusTone;
+  reportStatus: (message: string, tone: BotJobWorkspaceStatusTone) => void;
   executionPause: BotJobExecutionPauseRequest | null;
   executionPreflight: {
     action: Extract<BotJobToolbarAction, 'TEST_RUN' | 'LAUNCH'>;
@@ -699,6 +700,7 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
     transferPath,
     status,
     statusTone,
+    reportStatus: setTransientStatus,
     executionPause,
     executionPreflight,
     resolveExecutionPause,

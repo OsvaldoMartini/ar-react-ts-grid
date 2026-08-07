@@ -27,6 +27,7 @@ import {
 import { buildInstructionRelationshipGraph } from '../domain/instructionRelationshipGraph';
 import type { InstructionRelationshipEdge } from '../domain/instructionRelationshipGraph';
 import { buildBotJobRelationshipFacts } from '../domain/instructionRelationshipFacts';
+import { gridItemTestActionFeedback } from '../domain/gridItemTestActionFeedback';
 import constructionImage from '../../../../assets/construction.png';
 import warningRedImage from '../../../../assets/warning_red.png';
 
@@ -76,6 +77,7 @@ export function useInstructionGrid({
     enabled: true,
     onSurfaceOpen: (targetSession, nextBotJobId) => onSessionOpen(targetSession, socketPort, nextBotJobId),
   });
+  const reportBotJobStatus = botJobHeader.reportStatus;
 
   useEffect(() => {
     if (!botJobHeader.state) return;
@@ -227,39 +229,17 @@ export function useInstructionGrid({
   const handleGridItemTestActionResult = useCallback((
     result: GridItemTestActionResult,
   ) => {
-    // Successful GridItem INPUT and CLICK tests are intentionally silent. The
-    // correlated backend response is still consumed, but it must not open AlertModal.
-    if (result.ok) return;
-
-    const actionLabel = result.action === 'INPUT' ? 'Input' : 'Click';
-    setAlertImage(warningRedImage);
-    setAlertClass('construction-image');
-    setErrorFlag(true);
-    setAlertMessageHeader(`${actionLabel} Test Failed`);
-    setAlertMessageBody(
-      result.error
-        || result.message
-        || `The GridItem ${actionLabel.toLowerCase()} test was refused.`,
-    );
-    setAlertMessageFooter('No Bot Job or Excel memory data was changed.');
-    setAlertOnConfirm(undefined);
-    setAlertAlternateAction(undefined);
+    const feedback = gridItemTestActionFeedback(result);
+    reportBotJobStatus(feedback.message, feedback.tone);
   }, [
-    setAlertAlternateAction,
-    setAlertClass,
-    setAlertImage,
-    setAlertMessageBody,
-    setAlertMessageFooter,
-    setAlertMessageHeader,
-    setAlertOnConfirm,
-    setErrorFlag,
+    reportBotJobStatus,
   ]);
 
   const {
     pendingRequestId: pendingGridItemTestRequestId,
     pendingInstructionId: pendingGridItemTestInstructionId,
     pendingAction: pendingGridItemTestAction,
-    submit: submitGridItemTestAction,
+    submit: submitGridItemTestActionRequest,
   } = useGridItemTestAction({
     webSocket,
     connected,
@@ -270,6 +250,23 @@ export function useInstructionGrid({
     capability: botJobGraphMutationCapability,
     onResult: handleGridItemTestActionResult,
   });
+
+  const submitGridItemTestAction = useCallback((
+    instructionId: number,
+    action: Parameters<typeof submitGridItemTestActionRequest>[1],
+    excelRowIndex = 0,
+  ): string | null => {
+    const requestId = submitGridItemTestActionRequest(
+      instructionId,
+      action,
+      excelRowIndex,
+    );
+    if (requestId) {
+      const label = action === 'INPUT' ? 'Input' : 'Click';
+      reportBotJobStatus(`${label} test running`, 'neutral');
+    }
+    return requestId;
+  }, [reportBotJobStatus, submitGridItemTestActionRequest]);
 
   const orderedWorkspaceBlocks = useMemo(
     () => [...workspaceBlocks].sort(
