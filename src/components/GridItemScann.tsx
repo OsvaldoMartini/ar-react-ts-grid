@@ -29,9 +29,13 @@ import { useBotJobDetailsController } from './bot-job-details/useBotJobDetailsCo
 import ScannerWorkspaceHeader from './scanner/ScannerWorkspaceHeader';
 import PageScannerWorkspaceHeader from './scanner/PageScannerWorkspaceHeader';
 import PageScannerExecutionControls from './scanner/PageScannerExecutionControls';
-import WebElementTypeTogglePreview, {
-  type WebElementExecutionTypePreview,
-} from './scanner/WebElementTypeTogglePreview';
+import WebElementTypeToggle from './scanner/WebElementTypeToggle';
+import type { WebElementExecutionType } from './webElementExecutionType';
+import {
+  pageScannerExecutionTypeFor,
+  pageScannerGroupTagFor,
+  replacePageScannerExecutionTypeOverride,
+} from './scanner/PageScannerExecutionType';
 import PageScannerFocusProfileEditor, {
   type PageScannerFocusProfileDraft,
 } from './scanner/PageScannerFocusProfileEditor';
@@ -134,19 +138,10 @@ export interface GridItemScannProps {
 // nothing ever mints a one-off group like "Select Text" (mat-select, svg, option…).
 // Undecided elements render as Output — same convention as the AR Web Factory pane
 // (input → input, click → button, link → a, output → label).
-const groupTagFor = (item: ElementDTO): string => {
-  const tag = (item.tagName ?? '').toLowerCase();
-  if (tag === 'input' || tag === 'textarea') return 'input';
-  if (tag === 'button') return 'button';
-  if (tag === 'a' || tag === 'link') return 'a';
-  if (tag === 'label') return 'label';
-
-  const type = ((item as any).typeElement ?? '').toLowerCase();
-  if (type === 'input') return 'input';
-  if (type === 'button') return 'button';
-  if (type === 'a' || type === 'link') return 'a';
-  return 'label';
-};
+// The override only changes the staged execution category. Raw scanner fields
+// remain unchanged, so locator keys and scanned-element registry identity stay
+// stable while the row moves to the selected visual group.
+const groupTagFor = pageScannerGroupTagFor;
 
 const groupByTagName = (data: ElementDTO[]) => {
   return data.reduce((result, item) => {
@@ -157,13 +152,6 @@ const groupByTagName = (data: ElementDTO[]) => {
     result[groupTag].elements.push(item);
     return result;
   }, {} as Record<string, { tagName: string; elements: ElementDTO[] }>);
-};
-
-const executionTypePreviewFor = (item: ElementDTO): WebElementExecutionTypePreview => {
-  const tag = groupTagFor(item);
-  if (tag === 'input') return 'INPUT';
-  if (tag === 'button' || tag === 'a' || tag === 'link') return 'CLICK';
-  return 'OUTPUT';
 };
 
 const isElementActive = (element: ElementDTO): boolean => element.active !== false;
@@ -834,6 +822,22 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
         ? { ...element, active: nextActive }
         : element
     ));
+  };
+
+  const handleElementExecutionTypeChange = (
+    target: ElementDTO,
+    nextExecutionType: WebElementExecutionType,
+  ) => {
+    const targetKey = pageScannerLocatorElementKey(target);
+    const updateElements = (current: ElementDTO[]) => (
+      replacePageScannerExecutionTypeOverride(current, targetKey, nextExecutionType)
+    );
+
+    setElementDTO(updateElements);
+    setElementGrouped((current) => groupByTagName(
+      updateElements(Object.values(current).flatMap((group) => group.elements)),
+    ));
+    setMemoryElements(updateElements);
   };
 
   const startLocatorPanelDrag = (e: React.MouseEvent) => {
@@ -3629,9 +3633,12 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
                             +
                           </button>
                         </span>)}
-                      <WebElementTypeTogglePreview
-                        className={styles.executionTypePreview}
-                        value={executionTypePreviewFor(elementDTO)}
+                      <WebElementTypeToggle
+                        className={styles.executionTypeToggle}
+                        value={pageScannerExecutionTypeFor(elementDTO)}
+                        onChange={(nextExecutionType) => {
+                          handleElementExecutionTypeChange(elementDTO, nextExecutionType);
+                        }}
                       />
                       {/* {showAttributes ? (
                         <div className="attr-slot">

@@ -84,4 +84,13 @@ describe('InstructionRow', () => {
     expect(container.firstChild).toHaveAttribute('data-instruction-id', '7');
     expect(container.firstChild).toHaveAttribute('tabindex', '-1');
   });
+
+  it('renders an isolated Web Element execution-type control when supplied', () => {
+    render(<InstructionRow
+      {...baseProps}
+      executionTypeControl={<button type="button">OUTPUT type</button>}
+    />);
+
+    expect(screen.getByRole('button', { name: 'OUTPUT type' })).toBeInTheDocument();
+  });
 });

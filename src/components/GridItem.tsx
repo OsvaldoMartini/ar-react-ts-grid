@@ -42,11 +42,15 @@ import type {
 import { instructionMatchesFind } from './bot-job-details/grid/hooks/useInstructionFind';
 import { useInstructionGrid } from './bot-job-details/grid/hooks/useInstructionGrid';
 import { gridItemTestActionsForInstruction } from './bot-job-details/grid/hooks/useGridItemTestAction';
+import {
+  gridItemWebElementTypeForAction,
+} from './bot-job-details/grid/hooks/useGridItemWebElementType';
 import { useMemoryListSummary } from './bot-job-details/grid/hooks/useMemoryListSummary';
 import type { UseInstructionGridProps } from './bot-job-details/grid/types/instructionGrid.types';
 import styles from './Griditem.module.scss';
 import { RulesCard } from './RulesCard';
 import { instructionRelationshipPolicy } from './bot-job-details/grid/domain/instructionRelationshipPolicy';
+import WebElementTypeToggle from './scanner/WebElementTypeToggle';
 
 const reconnectOption = (
   target: RelationshipTarget,
@@ -153,7 +157,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
   const {
     webSocket, connected, reconnectAttempts, messages, error,
     workspacePolicy,
-    botJobId, botJobName,
+    homeBankingId, botJobId, botJobName,
     gridScrollRef, instructionRef, blockRef, dropdownRef,
     openDropdown, selectedBlockIds,
     saveComponentContext, setSaveComponentContext,
@@ -215,6 +219,9 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
     pendingGridItemTestInstructionId,
     pendingGridItemTestAction,
     submitGridItemTestAction,
+    pendingWebElementTypeRequestId,
+    pendingWebElementTypeInstructionId,
+    submitGridItemWebElementType,
     submitSaveComponent,
     handleGridDragOver,
     handleListDrop,
@@ -501,6 +508,40 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
           );
         })}
       </>
+    );
+  };
+
+  const renderWebElementTypeToggle = (
+    instruction: BlockLoopInstructionLoadDTO,
+  ) => {
+    if (componentWorkspace || sessionId !== 'botJobTasks') return null;
+    const currentType = gridItemWebElementTypeForAction(instruction.actions);
+    if (!currentType) return null;
+
+    const mutationPending = pendingWebElementTypeRequestId !== null;
+    const thisInstructionPending = mutationPending
+      && pendingWebElementTypeInstructionId === instruction.id;
+    const capabilityMatches = botJobGraphMutationCapability?.enabled === true
+      && botJobGraphMutationCapability.ownerAssertion.workspaceKind === 'BOT_JOB'
+      && botJobGraphMutationCapability.ownerAssertion.homeBankingId === homeBankingId
+      && botJobGraphMutationCapability.ownerAssertion.botJobId === Number(botJobId);
+    const mutationAvailable = connected
+      && webSocket?.readyState === WebSocket.OPEN
+      && capabilityMatches;
+
+    return (
+      <WebElementTypeToggle
+        value={currentType}
+        disabled={!mutationAvailable || mutationPending}
+        pending={thisInstructionPending}
+        onChange={(replacementType) => {
+          submitGridItemWebElementType(
+            instruction.id,
+            currentType,
+            replacementType,
+          );
+        }}
+      />
     );
   };
 
@@ -923,6 +964,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                             instructionName={instructionName}
                             nameInputRef={instructionRef}
                             renderHighlighted={renderHighlighted}
+                            executionTypeControl={renderWebElementTypeToggle(instruction)}
                             operations={(
                               <InstructionRelationshipDetails
                                 instruction={instruction}

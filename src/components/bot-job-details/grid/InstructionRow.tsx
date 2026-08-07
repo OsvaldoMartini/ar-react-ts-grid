@@ -44,6 +44,7 @@ export interface InstructionRowProps {
   nameInputRef: React.RefObject<HTMLInputElement>;
   renderHighlighted: (text: string, query: string) => React.ReactNode;
   // Helper-rendered clusters (still produced by GridItem, passed as nodes).
+  executionTypeControl?: React.ReactNode;
   operations: React.ReactNode;
   deviceOptionsRow: React.ReactNode;
   editButton: React.ReactNode;
@@ -84,6 +85,7 @@ const InstructionRow: React.FC<InstructionRowProps> = ({
   instructionName,
   nameInputRef,
   renderHighlighted,
+  executionTypeControl,
   operations,
   deviceOptionsRow,
   editButton,
@@ -156,6 +158,7 @@ const InstructionRow: React.FC<InstructionRowProps> = ({
           )}
         </span>
       )}
+      {executionTypeControl}
       {operations}
       <div className={styles.optionsColumn}>
         {deviceOptionsRow}

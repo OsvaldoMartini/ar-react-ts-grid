@@ -1,4 +1,4 @@
-.preview {
+.toggle {
   align-items: center;
   background: linear-gradient(180deg, #ffffff 0%, #f3f8fc 100%);
   border: 1px solid #8aa8bf;
@@ -6,6 +6,7 @@
   box-shadow: 0 1px 3px rgba(15, 52, 77, 0.18);
   box-sizing: border-box;
   color: #17324d;
+  cursor: pointer;
   display: grid;
   gap: 2px;
   grid-template-rows: auto 3px;
@@ -14,12 +15,45 @@
   min-width: 94px;
   opacity: 1;
   padding: 3px 9px 4px;
+  transition: box-shadow 120ms ease, filter 120ms ease, transform 120ms ease;
   white-space: nowrap;
 }
 
-.preview:disabled {
-  cursor: default;
-  opacity: 1;
+.toggle:hover:not(:disabled) {
+  box-shadow: 0 2px 7px rgba(15, 52, 77, 0.28);
+  filter: brightness(0.98);
+}
+
+.toggle:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.toggle:focus-visible {
+  outline: 2px solid #0b6ba8;
+  outline-offset: 2px;
+}
+
+.toggle:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+.toggle:disabled:not([aria-busy='true']) {
+  cursor: not-allowed;
+}
+
+.pending .positions {
+  animation: pendingPulse 700ms ease-in-out infinite alternate;
+}
+
+@keyframes pendingPulse {
+  from {
+    opacity: 0.35;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 .currentType {

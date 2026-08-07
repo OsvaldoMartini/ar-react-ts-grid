@@ -15,6 +15,10 @@ import {
   useGridItemTestAction,
   type GridItemTestActionResult,
 } from './useGridItemTestAction';
+import {
+  useGridItemWebElementType,
+  type GridItemWebElementTypeResult,
+} from './useGridItemWebElementType';
 import type { UseInstructionGridProps } from '../types/instructionGrid.types';
 import type {
   MemoryInstructionGroupBlock,
@@ -267,6 +271,54 @@ export function useInstructionGrid({
     }
     return requestId;
   }, [reportBotJobStatus, submitGridItemTestActionRequest]);
+
+  const handleGridItemWebElementTypeResult = useCallback((
+    result: GridItemWebElementTypeResult,
+  ) => {
+    if (result.ok) {
+      reportBotJobStatus(
+        result.message || `Web Element type saved as ${result.committedType}.`,
+        result.resyncRequired ? 'warning' : 'success',
+      );
+      return;
+    }
+    reportBotJobStatus(
+      result.message || 'Web Element type was not changed.',
+      'error',
+    );
+  }, [reportBotJobStatus]);
+
+  const {
+    pendingRequestId: pendingWebElementTypeRequestId,
+    pendingInstructionId: pendingWebElementTypeInstructionId,
+    pendingReplacementType: pendingWebElementReplacementType,
+    submit: submitWebElementTypeRequest,
+  } = useGridItemWebElementType({
+    webSocket,
+    connected,
+    messages,
+    sessionId,
+    homeBankingId,
+    botJobId,
+    capability: botJobGraphMutationCapability,
+    onResult: handleGridItemWebElementTypeResult,
+  });
+
+  const submitGridItemWebElementType = useCallback((
+    instructionId: Parameters<typeof submitWebElementTypeRequest>[0],
+    expectedType: Parameters<typeof submitWebElementTypeRequest>[1],
+    replacementType: Parameters<typeof submitWebElementTypeRequest>[2],
+  ): string | null => {
+    const requestId = submitWebElementTypeRequest(
+      instructionId,
+      expectedType,
+      replacementType,
+    );
+    if (requestId) {
+      reportBotJobStatus(`Saving ${replacementType.toLowerCase()} Web Element type`, 'neutral');
+    }
+    return requestId;
+  }, [reportBotJobStatus, submitWebElementTypeRequest]);
 
   const orderedWorkspaceBlocks = useMemo(
     () => [...workspaceBlocks].sort(
@@ -925,6 +977,10 @@ export function useInstructionGrid({
     pendingGridItemTestInstructionId,
     pendingGridItemTestAction,
     submitGridItemTestAction,
+    pendingWebElementTypeRequestId,
+    pendingWebElementTypeInstructionId,
+    pendingWebElementReplacementType,
+    submitGridItemWebElementType,
     submitSaveComponent,
     handleGridDragOver,
     handleListDrop,

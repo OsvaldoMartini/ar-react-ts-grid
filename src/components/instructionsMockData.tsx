@@ -1,3 +1,5 @@
+import type { WebElementExecutionType } from './webElementExecutionType';
+
 // Sample data (mocketData)
 export interface BlockLoopInstructionLoadDTO {
   homeBankingId: number;
@@ -58,6 +60,9 @@ export interface ElementDTO {
   autoScroll: string;
   autoEnter: string;
   active?: boolean | null;
+  // Transient Page Scanner / Memory List execution override. It deliberately
+  // leaves the scanner's raw tag, locator, and persisted classification intact.
+  executionTypeOverride?: WebElementExecutionType | null;
   // Bitstring of F/E/T/N/S toggled in GridItemScann before the element is
   // promoted to an instruction. Flows through to instruction.force_coordinates
   // on save (NEW_ELEMENT_DTO message).
