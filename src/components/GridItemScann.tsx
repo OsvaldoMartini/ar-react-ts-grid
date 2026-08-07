@@ -3557,16 +3557,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
                         {!isPreScanMode && (
                           <img src={saveImage} alt="" className={styles.saveButton} onClick={(event) => handleRowSelectedClick(event, elementDTO, "NEW_ELEMENT_DTO")} />
                         )}
-                        {(() => {
-                          // Test Input only makes sense on typeable elements (inputs, selects,
-                          // textareas). For links / buttons / anchors the element can't accept
-                          // text, so we hide that button and keep Test Click only.
-                          const tag = (elementDTO.tagName || "").toLowerCase();
-                          const isTypeable = tag === "input" || tag === "select" || tag === "textarea";
-                          return isTypeable ? (
-                            <img src={testInputImage} alt="Test Input" title="Test Input" className={styles.testButton} onClick={(event) => handleRowSelectedClick(event, elementDTO, "TEST_INPUT_DTO")} />
-                          ) : null;
-                        })()}
+                        <img src={testInputImage} alt="Test Input" title="Test Input" className={styles.testButton} onClick={(event) => handleRowSelectedClick(event, elementDTO, "TEST_INPUT_DTO")} />
                         <img src={clickTestImage} alt="Test Click" title="Test Click" className={styles.testButton} onClick={(event) => handleRowSelectedClick(event, elementDTO, "TEST_CLICK_DTO")} />
                         <img src={crossImage} alt="" className={styles.crossButton} onClick={() => handleRemoveElementDTO(elementDTO)} />
                       </div>

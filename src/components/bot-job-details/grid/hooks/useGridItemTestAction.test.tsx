@@ -5,7 +5,7 @@ import {
   GRID_ITEM_TEST_ACTION_OPERATION,
   GRID_ITEM_TEST_ACTION_RESPONSE,
   GRID_ITEM_TEST_ACTION_TIMEOUT_MS,
-  gridItemTestActionForInstruction,
+  gridItemTestActionsForInstruction,
   useGridItemTestAction,
 } from './useGridItemTestAction';
 
@@ -35,15 +35,21 @@ const responseEnvelope = (body: Record<string, unknown>): string => JSON.stringi
   body: JSON.stringify({ botJobId: 32, ...body }),
 });
 
-test('maps only input and click Web Element actions to physical tests', () => {
-  expect(gridItemTestActionForInstruction('I:Account')).toBe('INPUT');
-  expect(gridItemTestActionForInstruction('input')).toBe('INPUT');
-  expect(gridItemTestActionForInstruction('C:Submit')).toBe('CLICK');
-  expect(gridItemTestActionForInstruction('click')).toBe('CLICK');
-  expect(gridItemTestActionForInstruction('O:Balance')).toBeNull();
-  expect(gridItemTestActionForInstruction('GET')).toBeNull();
-  expect(gridItemTestActionForInstruction('SET')).toBeNull();
-  expect(gridItemTestActionForInstruction(null)).toBeNull();
+test('offers input and click tests for every persisted Web Element action', () => {
+  const bothActions = ['INPUT', 'CLICK'];
+  expect(gridItemTestActionsForInstruction('I:Account')).toEqual(bothActions);
+  expect(gridItemTestActionsForInstruction('input')).toEqual(bothActions);
+  expect(gridItemTestActionsForInstruction('O:Balance')).toEqual(bothActions);
+  expect(gridItemTestActionsForInstruction('output')).toEqual(bothActions);
+  expect(gridItemTestActionsForInstruction('C:Submit')).toEqual(bothActions);
+  expect(gridItemTestActionsForInstruction('click')).toEqual(bothActions);
+  expect(gridItemTestActionsForInstruction('A:Terms')).toEqual(bothActions);
+  expect(gridItemTestActionsForInstruction('W:Custom')).toEqual(bothActions);
+  expect(gridItemTestActionsForInstruction('GET')).toEqual([]);
+  expect(gridItemTestActionsForInstruction('SET')).toEqual([]);
+  expect(gridItemTestActionsForInstruction('CK')).toEqual([]);
+  expect(gridItemTestActionsForInstruction('NEXT ROW')).toEqual([]);
+  expect(gridItemTestActionsForInstruction(null)).toEqual([]);
 });
 
 test('sends one compact correlated INPUT request with available graph authority', () => {

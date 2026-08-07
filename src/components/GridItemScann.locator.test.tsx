@@ -114,6 +114,32 @@ test('keeps the detached locator launcher available when the scan grid is empty'
   expect(screen.getByRole('button', { name: 'Open Locator Generator' })).toBeInTheDocument();
 });
 
+test('offers input and click tests for every scanned Web Element row', () => {
+  render(<GridItemScann {...props} />);
+
+  const inputTest = screen.getByAltText('Test Input');
+  const clickTest = screen.getByAltText('Test Click');
+  expect(inputTest).toBeInTheDocument();
+  expect(clickTest).toBeInTheDocument();
+
+  fireEvent.click(inputTest);
+  const inputRequest = sentMessage('pageScanner.testElement');
+  expect(inputRequest).toBeDefined();
+  expect(JSON.parse(inputRequest.body)).toMatchObject({
+    action: 'TEST_INPUT_DTO',
+    testAction: 'input',
+  });
+
+  mockSend.mockClear();
+  fireEvent.click(clickTest);
+  const clickRequest = sentMessage('pageScanner.testElement');
+  expect(clickRequest).toBeDefined();
+  expect(JSON.parse(clickRequest.body)).toMatchObject({
+    action: 'TEST_CLICK_DTO',
+    testAction: 'click',
+  });
+});
+
 test('sends exact-session requests and waits for persisted authoritative apply response', async () => {
   const view = render(<GridItemScann {...props} />);
   const generateMessage = await openAndGenerate();

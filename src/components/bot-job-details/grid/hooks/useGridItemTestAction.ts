@@ -13,14 +13,32 @@ export const GRID_ITEM_TEST_ACTION_TIMEOUT_MS = 25_000;
 
 export type GridItemTestAction = 'CLICK' | 'INPUT';
 
-export const gridItemTestActionForInstruction = (
+const GRID_ITEM_WEB_ELEMENT_ACTIONS = new Set([
+  'I',
+  'INPUT',
+  'O',
+  'OUTPUT',
+  'C',
+  'CLICK',
+  'A',
+  'ANCHOR',
+  'W',
+  'OTHER',
+]);
+
+export const GRID_ITEM_TEST_ACTIONS: readonly GridItemTestAction[] = [
+  'INPUT',
+  'CLICK',
+];
+
+export const gridItemTestActionsForInstruction = (
   instructionAction: unknown,
-): GridItemTestAction | null => {
-  if (typeof instructionAction !== 'string') return null;
+): readonly GridItemTestAction[] => {
+  if (typeof instructionAction !== 'string') return [];
   const action = instructionAction.split(':', 1)[0].trim().toUpperCase();
-  if (action === 'I' || action === 'INPUT') return 'INPUT';
-  if (action === 'C' || action === 'CLICK') return 'CLICK';
-  return null;
+  return GRID_ITEM_WEB_ELEMENT_ACTIONS.has(action)
+    ? GRID_ITEM_TEST_ACTIONS
+    : [];
 };
 
 export type GridItemTestActionResult = {
