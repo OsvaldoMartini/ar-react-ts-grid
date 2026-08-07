@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Beaker, Clock, Database, Play, RefreshCw, Rocket, Square } from 'lucide-react';
+import { Beaker, Clock, Database, Map, Play, RefreshCw, Rocket, Square } from 'lucide-react';
 import QuestionsCard from '../QuestionsCard';
 import WorkspaceHeader, { type WorkspaceHeaderAction } from '../workspace/WorkspaceHeader';
 import BotJobDataActions from './BotJobDataActions';
@@ -278,6 +278,15 @@ const BotJobDetailsHeader: React.FC<BotJobDetailsHeaderProps> = ({
               onClick={() => onAction('SHOW_RUNTIME_VARIABLES')}
             >
               <Database size={16} aria-hidden="true" /> RUNTIME
+            </button>
+            <button
+              type="button"
+              className={styles.runtimeVariablesButton}
+              disabled={!connected || !botJobId || botJobId <= 0 || busy || pendingAction !== null}
+              onClick={() => onAction('SHOW_PAGE_MAPPINGS')}
+              title="Open Page Mappings history"
+            >
+              <Map size={16} aria-hidden="true" /> MAPPINGS
             </button>
           </>
         )}

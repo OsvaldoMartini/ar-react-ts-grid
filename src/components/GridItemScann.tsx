@@ -2492,6 +2492,19 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
   const openOcrResults = (scope: Record<string, unknown> = {}) =>
     openOcrWorkspace(OCR_RESULTS_WORKSPACE_KIND, scope);
 
+  const openPageMappings = () => {
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
+      setOcrWorkspaceError('WebSocket is not connected.');
+      return;
+    }
+    webSocket.send(JSON.stringify({
+      type: 'pageMappings.open',
+      sessionId,
+      homeBankingId,
+      body: JSON.stringify({ botJobId, homeBankingId }),
+    }));
+  };
+
   const handleDashboardFocusChange = (value: string) => {
     selectDashboardProfile(value);
   };
@@ -3051,6 +3064,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
           messages={messages}
           sessionId={sessionId}
           onClose={closeDetachedPageScanner}
+          onOpenPageMappings={openPageMappings}
         />
       ) : isPreScanMode ? (
         <BotJobDetailsChrome
@@ -3132,6 +3146,15 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
               title="Open highlighted OCR results for the newest page scan"
             >
               OCR Results
+            </button>
+            <button
+              type="button"
+              className={styles.preScanButton}
+              onClick={openPageMappings}
+              disabled={!botJobId || botJobId <= 0}
+              title="Open historical Page Mappings captures"
+            >
+              Mappings
             </button>
             <button
               type="button"
