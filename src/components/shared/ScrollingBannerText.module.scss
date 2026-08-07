@@ -13,12 +13,16 @@
 }
 
 .moving .track {
-  animation: scrollingBanner 12s linear infinite;
+  animation: scrollingBanner var(--scroll-duration, 12s) linear infinite;
   will-change: transform;
 }
 
 .moving .copy {
   padding-right: 48px;
+}
+
+.moving:hover .track {
+  animation-play-state: paused;
 }
 
 @keyframes scrollingBanner {
