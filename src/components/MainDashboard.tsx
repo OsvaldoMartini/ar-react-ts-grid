@@ -632,7 +632,7 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, on
           <div className={styles.titleBlock}>
             <GripHorizontal className={styles.dragGrip} size={18} aria-hidden="true" />
             <div className={styles.titleText}>
-              <h1 className={styles.title}>Multi Organizations - Automation Test</h1>
+              <h1 className={styles.title}>Main Bot Jobs - Automation Test</h1>
               <p className={styles.subtitle}>Main Dashboard</p>
             </div>
           </div>
