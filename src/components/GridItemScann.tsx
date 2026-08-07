@@ -71,6 +71,16 @@ import {
   type LocatorResult,
   type PendingLocatorApply,
 } from './scanner/PageScannerLocator';
+import {
+  PAGE_SCANNER_ELEMENT_RENAME_RESPONSE,
+  applyPageScannerAliasesByXPath,
+  normalizePageScannerClientNamed,
+  pageScannerElementRenameMessage,
+  replacePageScannerElementAlias,
+  replacePageScannerGroupedElementAlias,
+  resolvePageScannerElementRenameResponse,
+  type PendingPageScannerElementRename,
+} from './scanner/PageScannerElementRename';
 import { useScannerController } from './scanner/useScannerController';
 import FindBar from './bot-job-details/grid/FindBar';
 import { useMemoryListSummary } from './bot-job-details/grid/hooks/useMemoryListSummary';
@@ -456,6 +466,8 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
   const locatorApplyRef = useRef<PendingLocatorApply | null>(null);
   const locatorRequestTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const locatorApplyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pageScannerElementRenameRef = useRef<PendingPageScannerElementRename | null>(null);
+  const pageScannerElementRenameTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [memoryTargetBlockId, setMemoryTargetBlockId] = useState<number | null>(null);
   const [memoryBlockOptions, setMemoryBlockOptions] = useState<CreateBlockOption[]>([]);
   const [createBlockOpen, setCreateBlockOpen] = useState<boolean>(false);
@@ -691,6 +703,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
     if (pageScannerCreateBlockTimerRef.current) clearTimeout(pageScannerCreateBlockTimerRef.current);
     if (locatorRequestTimerRef.current) clearTimeout(locatorRequestTimerRef.current);
     if (locatorApplyTimerRef.current) clearTimeout(locatorApplyTimerRef.current);
+    if (pageScannerElementRenameTimerRef.current) clearTimeout(pageScannerElementRenameTimerRef.current);
     clearPendingPageScannerRequests();
     pendingPageScannerProfileRequestsRef.current.clear();
     pageScannerProfileSocketRef.current = null;
@@ -1521,6 +1534,48 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
             break;
           }
 
+          case PAGE_SCANNER_ELEMENT_RENAME_RESPONSE: {
+            const pendingRename = pageScannerElementRenameRef.current;
+            const resolution = resolvePageScannerElementRenameResponse(bodyData, pendingRename);
+            if (resolution.status === 'stale' || !pendingRename) break;
+            if (pageScannerElementRenameTimerRef.current) {
+              clearTimeout(pageScannerElementRenameTimerRef.current);
+              pageScannerElementRenameTimerRef.current = null;
+            }
+            pageScannerElementRenameRef.current = null;
+            if (resolution.status === 'error') {
+              setPreScanStatus((current) => ({
+                ...current,
+                status: 'failed',
+                message: resolution.message,
+              }));
+              break;
+            }
+            setElementDTO((current) => replacePageScannerElementAlias(
+              current,
+              pendingRename.elementKey,
+              resolution.clientNamed,
+            ).elements);
+            setElementGrouped((current) => replacePageScannerGroupedElementAlias(
+              current,
+              pendingRename.elementKey,
+              resolution.clientNamed,
+            ));
+            setMemoryElements((current) => replacePageScannerElementAlias(
+              current,
+              pendingRename.elementKey,
+              resolution.clientNamed,
+            ).elements);
+            setEditingElementId(null);
+            setEditingElementTagName(null);
+            setPreScanStatus((current) => ({
+              ...current,
+              status: 'done',
+              message: 'Page Scanner name saved.',
+            }));
+            break;
+          }
+
           case 'pageScanner.scanResponse':
           case 'pageScanner.refreshResponse':
           case 'pageScanner.clearResponse':
@@ -1780,12 +1835,8 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
                 byXPath.set(s.xPath, s.clientNamed);
               }
             }
-            setElementDTO((prev) =>
-              prev.map((el) => {
-                const proposed = byXPath.get(el.xPath);
-                return proposed && proposed.length > 0 ? { ...el, clientNamed: proposed } : el;
-              })
-            );
+            setElementDTO((prev) => applyPageScannerAliasesByXPath(prev, byXPath));
+            setMemoryElements((prev) => applyPageScannerAliasesByXPath(prev, byXPath));
             // Trigger a re-grouping so the row labels refresh from the new clientNamed values.
             setIsElementGrouped(false);
             console.log(`[applyOcrSuggestions] applied ${byXPath.size} OCR-derived clientNamed value(s).`);
@@ -2755,7 +2806,6 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
       return;
     }
 
-    const { id } = selectedElement;
     // Roadmap 3 Phase 3d: someText and definedName are frozen at JS-injection time
     // and must NEVER be overwritten — they're what the backend writes to instruction.name.
     // The renamed value the user typed lives in clientNamed (the easy display label),
@@ -2764,17 +2814,71 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
     // produced from immutable fields (definedName / someText / tagName), clear the
     // override (null) so the row reverts to the canonical name.
     const typed = (elementName ?? "").trim();
+    const clientNamed = normalizePageScannerClientNamed(typed, elementToUpdate);
+    const elementKey = pageScannerLocatorElementKey(elementToUpdate);
+
+    if (isDetachedPageScanner) {
+      if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
+        setPreScanStatus((current) => ({
+          ...current,
+          status: 'failed',
+          message: 'Page Scanner is disconnected. The name was not changed.',
+        }));
+        return;
+      }
+      if (pageScannerElementRenameRef.current) return;
+      const requestId = createPageScannerRequestId('page-scanner-element-rename');
+      const pending: PendingPageScannerElementRename = {
+        requestId,
+        elementKey,
+        target: elementToUpdate,
+      };
+      pageScannerElementRenameRef.current = pending;
+      setPreScanStatus((current) => ({
+        ...current,
+        status: 'waiting',
+        message: 'Saving Page Scanner name...',
+      }));
+      try {
+        webSocket.send(JSON.stringify(pageScannerElementRenameMessage(
+          { sessionId, homeBankingId, botJobId },
+          pending,
+          clientNamed,
+        )));
+        pageScannerElementRenameTimerRef.current = setTimeout(() => {
+          if (pageScannerElementRenameRef.current?.requestId !== requestId) return;
+          pageScannerElementRenameRef.current = null;
+          pageScannerElementRenameTimerRef.current = null;
+          setPreScanStatus((current) => ({
+            ...current,
+            status: 'failed',
+            message: 'Page Scanner name save timed out. The current name was preserved.',
+          }));
+        }, PAGE_SCANNER_RESPONSE_TIMEOUT_MS);
+      } catch (sendError) {
+        pageScannerElementRenameRef.current = null;
+        setPreScanStatus((current) => ({
+          ...current,
+          status: 'failed',
+          message: sendError instanceof Error
+            ? sendError.message
+            : 'The Page Scanner name request could not be sent.',
+        }));
+      }
+      return;
+    }
+
     const updatedElements = elementDTO.map((element) => {
-      if (element.id !== id) return element;
-      const dn = (element as any).definedName as string | null | undefined;
-      const st = element.someText ?? "";
-      const tn = element.tagName ?? "";
-      const noOverride =
-        typed.length === 0 || typed === dn || typed === st || typed === tn;
-      return { ...element, clientNamed: noOverride ? null : typed };
+      if (pageScannerLocatorElementKey(element) !== elementKey) return element;
+      return { ...element, clientNamed };
     });
 
     setElementDTO(updatedElements);
+    setMemoryElements((current) => replacePageScannerElementAlias(
+      current,
+      elementKey,
+      clientNamed,
+    ).elements);
     setIsElementGrouped(false); // Trigger re-grouping
     setEditingElementId(null); // Exit edit mode
     setEditingElementTagName(null); // Exit edit mode
