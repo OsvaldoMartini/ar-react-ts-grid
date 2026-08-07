@@ -49,3 +49,9 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+@media (max-width: 1200px) {
+  .displayName {
+    max-width: 150px;
+  }
+}

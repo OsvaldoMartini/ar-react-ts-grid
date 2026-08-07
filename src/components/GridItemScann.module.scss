@@ -1070,6 +1070,12 @@
   white-space: nowrap;
 }
 
+@media (max-width: 1200px) {
+  .displayName {
+    max-width: 150px;
+  }
+}
+
 .instructionDetails {
   font-weight: bold; /* Make the text bold */
   margin-right: 3px; /* Add a 3px gap after the span */
