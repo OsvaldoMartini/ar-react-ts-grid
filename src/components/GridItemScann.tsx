@@ -36,6 +36,7 @@ import {
 } from './memoryList.sourceCorrelation';
 import {
   classifyMemoryListResponse,
+  createMemoryListRequestId,
   createPendingMemoryListRequest,
   type MemoryListRequestContext,
   type PendingMemoryListRequest,
@@ -453,6 +454,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
   const memoryListOpenedRef = useRef(false);
   const memoryListOpenPendingRequestRef = useRef<PendingMemoryListRequest | null>(null);
   const memoryListSyncPendingRequestRef = useRef<PendingMemoryListRequest | null>(null);
+  const memoryListRequestSequenceRef = useRef(0);
   const memoryListOwnerEpochRef = useRef('');
   const [memoryListOpenVersion, setMemoryListOpenVersion] = useState(0);
 
@@ -775,7 +777,10 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
         && memoryBlockOptions.some(block => block.blockId === memoryTargetBlockId),
     };
     const operation = memoryListOpenRequestedRef.current ? 'memoryList.open' : 'memoryList.sync';
-    const requestId = `memory-list-${Date.now()}-${operation === 'memoryList.open' ? 'open' : 'sync'}`;
+    const requestId = createMemoryListRequestId(
+      operation === 'memoryList.open' ? 'OPEN' : 'SYNC',
+      ++memoryListRequestSequenceRef.current,
+    );
     const requestContext: MemoryListRequestContext = {
       sessionId,
       homeBankingId,

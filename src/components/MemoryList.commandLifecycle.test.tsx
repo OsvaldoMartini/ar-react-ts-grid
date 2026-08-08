@@ -25,20 +25,33 @@ jest.mock('./DetachedPageShell', () => ({
   default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-const snapshotMessage = (sourceKind: 'BOT_JOB' | 'COMPONENT') => JSON.stringify({
+type SnapshotOverrides = Partial<{
+  ownerEpoch: string;
+  workspaceEpoch: number;
+  homeBankingId: number;
+  botJobId: number;
+  botJobName: string;
+  label: string;
+}>;
+
+const snapshotMessage = (
+  sourceKind: 'BOT_JOB' | 'COMPONENT',
+  overrides: SnapshotOverrides = {},
+) => JSON.stringify({
   operationId: 'memoryList.snapshot',
   sessionId: 'memoryListManager',
   body: JSON.stringify({
-    ownerEpoch: 'memory-owner-1',
+    ownerEpoch: overrides.ownerEpoch || 'memory-owner-1',
+    workspaceEpoch: overrides.workspaceEpoch || 7,
     sourceKind,
-    homeBankingId: 2,
-    botJobId: 5,
-    botJobName: 'Saldo Banca Stato',
+    homeBankingId: overrides.homeBankingId || 2,
+    botJobId: overrides.botJobId || 5,
+    botJobName: overrides.botJobName || 'Saldo Banca Stato',
     items: [{
       key: `${sourceKind}:row-1`,
       sourceKind,
       sourceItemKey: 'row-1',
-      label: 'Login',
+      label: overrides.label || 'Login',
       active: true,
       payload: sourceKind === 'COMPONENT'
         ? {
@@ -56,10 +69,23 @@ const snapshotMessage = (sourceKind: 'BOT_JOB' | 'COMPONENT') => JSON.stringify(
   }),
 });
 
-const commandResponseMessage = (body: Record<string, unknown>) => JSON.stringify({
+const commandResponseMessage = (
+  body: Record<string, unknown>,
+  includeDefaultGeneration = true,
+) => JSON.stringify({
   operationId: 'memoryList.commandResponse',
   sessionId: 'memoryListManager',
-  body: JSON.stringify(body),
+  body: JSON.stringify({
+    ...(includeDefaultGeneration
+      ? {
+          ownerEpoch: 'memory-owner-1',
+          workspaceEpoch: 7,
+          homeBankingId: 2,
+          botJobId: 5,
+        }
+      : {}),
+    ...body,
+  }),
 });
 
 const memoryCommands = () => mockSend.mock.calls
@@ -90,6 +116,7 @@ test('connected drag emits one correlated REORDER command with the complete orde
     sessionId: 'memoryListManager',
     body: JSON.stringify({
       ownerEpoch: 'memory-owner-1',
+      workspaceEpoch: 7,
       sourceKind: 'BOT_JOB',
       homeBankingId: 2,
       botJobId: 5,
@@ -246,7 +273,7 @@ test('keeps the dialog and rows available when create-and-apply fails', async ()
       committed: false,
       requestId,
       message: 'The new block could not be verified.',
-    }),
+    }, false),
   ];
   rerender(<MemoryList socketPort={7357} sessionId="memoryListManager" />);
 
@@ -311,4 +338,106 @@ test('reports a committed unsynchronized result as success with a refresh warnin
   expect(alert).toHaveTextContent('2 Memory List items were applied to "Verified Target" (ID 82).');
   expect(alert).toHaveTextContent('Bot Job Details is still waiting for its authoritative refresh.');
   expect(screen.queryByPlaceholderText('e.g. Login Flow')).not.toBeInTheDocument();
+});
+
+test('keeps a pending command through a same-generation snapshot before its response', async () => {
+  mockMessages = [snapshotMessage('BOT_JOB')];
+  const { rerender } = render(
+    <MemoryList socketPort={7357} sessionId="memoryListManager" />,
+  );
+
+  await openCreateAndApply();
+  const [{ requestId }] = memoryCommands();
+  mockMessages = [
+    ...mockMessages,
+    snapshotMessage('BOT_JOB'),
+    commandResponseMessage({
+      ok: true,
+      committed: true,
+      synchronized: true,
+      requestId,
+      createdBlockId: 83,
+      createdBlockName: 'Verified Target',
+      appliedCount: 1,
+      message: 'Same-generation command completed.',
+    }),
+  ];
+  rerender(<MemoryList socketPort={7357} sessionId="memoryListManager" />);
+
+  const alert = await screen.findByRole('alertdialog');
+  expect(alert).toHaveTextContent('Block Created and Instructions Applied');
+  expect(alert).toHaveTextContent('Same-generation command completed.');
+});
+
+test('retires owner A state before a same-batch owner B snapshot and late A response', async () => {
+  mockMessages = [snapshotMessage('BOT_JOB')];
+  const { rerender } = render(
+    <MemoryList socketPort={7357} sessionId="memoryListManager" />,
+  );
+
+  await openCreateAndApply();
+  const [{ requestId: ownerARequestId }] = memoryCommands();
+  mockMessages = [
+    ...mockMessages,
+    snapshotMessage('BOT_JOB', {
+      ownerEpoch: 'memory-owner-2',
+      workspaceEpoch: 8,
+      botJobId: 6,
+      botJobName: 'Owner B Job',
+      label: 'Owner B Row',
+    }),
+    commandResponseMessage({
+      ok: true,
+      committed: true,
+      synchronized: true,
+      requestId: ownerARequestId,
+      createdBlockId: 84,
+      appliedCount: 1,
+      message: 'Late owner A response.',
+    }),
+  ];
+  rerender(<MemoryList socketPort={7357} sessionId="memoryListManager" />);
+
+  expect(await screen.findByText('Owner B Row')).toBeInTheDocument();
+  expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+  expect(screen.queryByPlaceholderText('e.g. Login Flow')).not.toBeInTheDocument();
+  expect(screen.getByText(/previous action confirmation was retired/i)).toBeInTheDocument();
+
+  const apply = screen.getByRole('button', { name: 'Apply' });
+  await waitFor(() => expect(apply).toBeEnabled());
+  fireEvent.click(apply);
+  const commands = memoryCommands();
+  expect(commands).toHaveLength(2);
+  expect(commands[1]).toEqual(expect.objectContaining({
+    action: 'APPLY',
+    ownerEpoch: 'memory-owner-2',
+  }));
+});
+
+test('rejects and unlocks an exact-request success carrying another owner tuple', async () => {
+  mockMessages = [snapshotMessage('BOT_JOB')];
+  const { rerender } = render(
+    <MemoryList socketPort={7357} sessionId="memoryListManager" />,
+  );
+
+  await openCreateAndApply();
+  const [{ requestId }] = memoryCommands();
+  mockMessages = [
+    ...mockMessages,
+    commandResponseMessage({
+      ok: true,
+      committed: true,
+      synchronized: true,
+      requestId,
+      botJobId: 999,
+      createdBlockId: 85,
+      appliedCount: 1,
+    }),
+  ];
+  rerender(<MemoryList socketPort={7357} sessionId="memoryListManager" />);
+
+  expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+  expect(await screen.findByText(/confirmation did not match the active workspace/i)).toBeInTheDocument();
+  expect(screen.getByPlaceholderText('e.g. Login Flow')).toBeEnabled();
+  expect(screen.getByRole('button', { name: 'Create & Apply' })).toBeEnabled();
 });

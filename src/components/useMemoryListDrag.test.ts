@@ -32,6 +32,7 @@ test('uses the stable dragged key when a realtime snapshot changes row indices',
     ({ items }) => useMemoryListDrag({
       items,
       busy: false,
+      scopeKey: 'owner-a',
       onReorder,
       onRefusal,
     }),
@@ -60,6 +61,7 @@ test('moves a connected family once and refuses a drop inside that family', () =
   const { result } = renderHook(() => useMemoryListDrag({
     items,
     busy: false,
+    scopeKey: 'owner-a',
     onReorder,
     onRefusal,
   }));
@@ -82,4 +84,26 @@ test('moves a connected family once and refuses a drop inside that family', () =
   expect(onRefusal).toHaveBeenCalledWith(
     'Rows inside one connected group cannot be separated.',
   );
+});
+
+test('refuses a dragged key after the Memory List owner generation changes', () => {
+  const onReorder = jest.fn((_items: MemoryListItem[]) => true);
+  const onRefusal = jest.fn();
+  const { result, rerender } = renderHook(
+    ({ scopeKey }) => useMemoryListDrag({
+      items: [item('shared-1'), item('shared-2')],
+      busy: false,
+      scopeKey,
+      onReorder,
+      onRefusal,
+    }),
+    { initialProps: { scopeKey: 'owner-a' } },
+  );
+
+  act(() => result.current.handleRowDragStart('shared-1', dragEvent()));
+  rerender({ scopeKey: 'owner-b' });
+  act(() => result.current.handleRowDrop('shared-2', dragEvent()));
+
+  expect(onReorder).not.toHaveBeenCalled();
+  expect(onRefusal).toHaveBeenCalled();
 });

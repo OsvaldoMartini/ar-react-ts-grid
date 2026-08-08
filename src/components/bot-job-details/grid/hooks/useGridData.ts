@@ -74,6 +74,7 @@ import {
 } from '../../../memoryList.sourceCorrelation';
 import {
   classifyMemoryListResponse,
+  createMemoryListRequestId,
   createPendingMemoryListRequest,
   type MemoryListRequestContext,
   type PendingMemoryListRequest,
@@ -291,6 +292,7 @@ export function useGridData(deps: UseGridDataDeps) {
   ] = useState<BotJobGraphMutationCapability | null>(null);
   const [memoryWorkspaceEpoch, setMemoryWorkspaceEpoch] = useState(0);
   const memoryWorkspaceEpochRef = useRef(0);
+  const memoryListRequestSequenceRef = useRef(0);
   const memoryListSyncPendingRequestRef = useRef<PendingMemoryListRequest | null>(null);
   const installMemoryWorkspaceEpoch = useCallback((nextEpoch: number) => {
     if (memoryWorkspaceEpochRef.current === nextEpoch) return;
@@ -819,7 +821,10 @@ export function useGridData(deps: UseGridDataDeps) {
           && memoryBlockOptions.some(block => block.blockId === memoryTargetBlockId),
     };
     const operation = memoryListOpenRequestedRef.current ? 'memoryList.open' : 'memoryList.sync';
-    const requestId = `memory-list-${Date.now()}-${operation === 'memoryList.open' ? 'open' : 'sync'}`;
+    const requestId = createMemoryListRequestId(
+      operation === 'memoryList.open' ? 'OPEN' : 'SYNC',
+      ++memoryListRequestSequenceRef.current,
+    );
     const requestContext: MemoryListRequestContext = {
       sessionId,
       homeBankingId,

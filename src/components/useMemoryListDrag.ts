@@ -6,6 +6,7 @@ import { reorderMemoryItemsAsGroups } from './memoryList.groups';
 type MemoryListDragOptions = {
   items: readonly MemoryListItem[];
   busy: boolean;
+  scopeKey: string;
   onReorder: (items: MemoryListItem[]) => boolean;
   onRefusal: (reason: string) => void;
 };
@@ -20,10 +21,12 @@ type MemoryListDragOptions = {
 export const useMemoryListDrag = ({
   items,
   busy,
+  scopeKey,
   onReorder,
   onRefusal,
 }: MemoryListDragOptions) => {
   const draggedItemKeyRef = useRef<string | null>(null);
+  const draggedScopeKeyRef = useRef<string | null>(null);
   const [overItemKey, setOverItemKey] = useState<string | null>(null);
 
   const reorderByKeys = useCallback((sourceKey: string, targetKey: string) => {
@@ -67,6 +70,7 @@ export const useMemoryListDrag = ({
       return;
     }
     draggedItemKeyRef.current = itemKey;
+    draggedScopeKeyRef.current = scopeKey;
     setOverItemKey(itemKey);
     try {
       event.dataTransfer.effectAllowed = 'move';
@@ -74,7 +78,7 @@ export const useMemoryListDrag = ({
     } catch {
       // The stable ref remains authoritative when dataTransfer is restricted.
     }
-  }, [busy, items]);
+  }, [busy, items, scopeKey]);
 
   const handleRowDragOver = useCallback((
     itemKey: string,
@@ -92,19 +96,32 @@ export const useMemoryListDrag = ({
     event.preventDefault();
     event.stopPropagation();
     const sourceKey = draggedItemKeyRef.current;
+    const sourceScopeKey = draggedScopeKeyRef.current;
     draggedItemKeyRef.current = null;
+    draggedScopeKeyRef.current = null;
     setOverItemKey(null);
+    if (sourceScopeKey !== scopeKey) {
+      onRefusal('Memory List changed during the drag. Try the movement again.');
+      return false;
+    }
     if (!sourceKey) {
       onRefusal('No Memory List row is being moved.');
       return false;
     }
     return reorderByKeys(sourceKey, itemKey);
-  }, [onRefusal, reorderByKeys]);
+  }, [onRefusal, reorderByKeys, scopeKey]);
 
   const handleRowDragEnd = useCallback(() => {
     draggedItemKeyRef.current = null;
+    draggedScopeKeyRef.current = null;
     setOverItemKey(null);
   }, []);
+
+  useEffect(() => {
+    draggedItemKeyRef.current = null;
+    draggedScopeKeyRef.current = null;
+    setOverItemKey(null);
+  }, [scopeKey]);
 
   // This diagnostic belongs only to the detached Memory List controller.
   useEffect(() => {

@@ -25,6 +25,12 @@ export const createPendingMemoryListRequest = (
   context: MemoryListRequestContext,
 ): PendingMemoryListRequest => ({ operation, requestId, ...context });
 
+export const createMemoryListRequestId = (
+  operation: MemoryListRequestOperation,
+  sequence: number,
+  now = Date.now(),
+): string => `memory-list-${now}-${sequence}-${operation.toLowerCase()}`;
+
 const responseObject = (body: unknown): Record<string, unknown> | null => (
   body && typeof body === 'object' ? body as Record<string, unknown> : null
 );
@@ -50,6 +56,22 @@ const sameContext = (
   && pending.workspaceEpoch === current.workspaceEpoch
   && pending.ownerEpoch === current.ownerEpoch;
 
+const optionalFailureFieldMatches = (
+  body: Record<string, unknown>,
+  field: 'homeBankingId' | 'botJobId' | 'workspaceEpoch' | 'ownerEpoch',
+  expected: string | number | null,
+): boolean => {
+  if (!(field in body)) return true;
+  if (field === 'ownerEpoch') {
+    return typeof expected === 'string'
+      && Boolean(expected)
+      && responseText(body, field) === expected;
+  }
+  return typeof expected === 'number'
+    && expected > 0
+    && responsePositiveInteger(body, field) === expected;
+};
+
 /**
  * Correlates one Memory List response without coupling UI state to transport parsing.
  * Exact-request failures settle immediately; only successful responses must prove the
@@ -72,7 +94,14 @@ export const classifyMemoryListResponse = (
     return 'IGNORE';
   }
 
-  if (body.ok === false) return 'FAILURE';
+  if (body.ok === false) {
+    return optionalFailureFieldMatches(body, 'homeBankingId', pending.homeBankingId)
+      && optionalFailureFieldMatches(body, 'botJobId', pending.botJobId)
+      && optionalFailureFieldMatches(body, 'workspaceEpoch', pending.workspaceEpoch)
+      && optionalFailureFieldMatches(body, 'ownerEpoch', pending.ownerEpoch)
+      ? 'FAILURE'
+      : 'IGNORE';
+  }
   if (body.ok !== true) return 'INVALID_SUCCESS';
 
   if (

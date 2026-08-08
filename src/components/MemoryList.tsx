@@ -17,6 +17,13 @@ import {
   type MemoryListItemIcon,
   type MemoryListSnapshot,
 } from './memoryList.contract';
+import {
+  classifyMemoryListCommandResponse,
+  createPendingMemoryListCommand,
+  memoryListCommandGeneration,
+  sameMemoryListCommandGeneration,
+  type PendingMemoryListCommand as CorrelatedPendingMemoryListCommand,
+} from './memoryList.commandCorrelation';
 import PagesOpenButton from './PagesOpenButton';
 import { useMemoryListDrag } from './useMemoryListDrag';
 import { useWebSocket } from './useWebSocket';
@@ -65,9 +72,7 @@ type OperationFeedback = {
   error: boolean;
 };
 
-type PendingMemoryListCommand = {
-  requestId: string;
-  action: MemoryListCommand['action'];
+type PendingMemoryListCommand = CorrelatedPendingMemoryListCommand<MemoryListCommand['action']> & {
   blockName?: string;
 };
 
@@ -205,6 +210,7 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose,
   const pendingCommandRef = useRef<PendingMemoryListCommand | null>(null);
   const commandTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [snapshot, setSnapshot] = useState<MemoryListSnapshot>(demoMode ? DEMO_SNAPSHOT : EMPTY_SNAPSHOT);
+  const snapshotRef = useRef(snapshot);
   const [createBlockOpen, setCreateBlockOpen] = useState(false);
   const [localStatus, setLocalStatus] = useState('');
   const [pendingAction, setPendingAction] = useState<MemoryListCommand['action'] | null>(null);
@@ -239,7 +245,8 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose,
   }, []);
 
   const sendCommand = useCallback((command: MemoryListCommand): boolean => {
-    if (!snapshot.ownerEpoch) {
+    const generation = memoryListCommandGeneration(snapshotRef.current);
+    if (!demoMode && !generation) {
       setLocalStatus('Memory List data is not ready.');
       return false;
     }
@@ -252,7 +259,7 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose,
     const sent = send('memoryList.command', {
       ...command,
       requestId,
-      ownerEpoch: snapshot.ownerEpoch,
+      ownerEpoch: generation?.ownerEpoch || snapshotRef.current.ownerEpoch,
     });
     if (!sent) return false;
 
@@ -262,8 +269,7 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose,
     }
 
     pendingCommandRef.current = {
-      requestId,
-      action: command.action,
+      ...createPendingMemoryListCommand(requestId, command.action, generation!),
       blockName: 'blockName' in command ? command.blockName : undefined,
     };
     setPendingAction(command.action);
@@ -281,7 +287,7 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose,
       );
     }, 15000);
     return true;
-  }, [demoMode, send, snapshot.ownerEpoch]);
+  }, [demoMode, send]);
 
   useEffect(() => {
     if (!demoMode && connected) send('memoryList.bootstrap');
@@ -298,18 +304,49 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose,
       try {
         const { operationId, body } = parseMessage(raw);
         if (operationId === 'memoryList.snapshot') {
-          setSnapshot({
+          const nextSnapshot: MemoryListSnapshot = {
             ...EMPTY_SNAPSHOT,
             ...body,
             items: Array.isArray(body?.items) ? body.items : [],
             blocks: Array.isArray(body?.blocks) ? body.blocks : [],
             targetBlockId: Number(body?.targetBlockId) > 0 ? Number(body.targetBlockId) : null,
-          });
-          if (!pendingCommandRef.current) setLocalStatus('');
+          };
+          const currentGeneration = memoryListCommandGeneration(snapshotRef.current);
+          const nextGeneration = memoryListCommandGeneration(nextSnapshot);
+          if (!demoMode && !nextGeneration) {
+            setLocalStatus('The Memory List owner response is invalid. Reopen this page.');
+            return;
+          }
+          const ownerChanged = Boolean(currentGeneration
+            && nextGeneration
+            && !sameMemoryListCommandGeneration(currentGeneration, nextGeneration));
+          const retiredPendingCommand = ownerChanged && Boolean(pendingCommandRef.current);
+          if (ownerChanged) {
+            clearPendingCommand();
+            setCreateBlockOpen(false);
+            setOperationFeedback(null);
+          }
+          snapshotRef.current = nextSnapshot;
+          setSnapshot(nextSnapshot);
+          if (retiredPendingCommand) {
+            setLocalStatus('Memory List switched workspaces. The previous action confirmation was retired.');
+          } else if (!pendingCommandRef.current) {
+            setLocalStatus('');
+          }
         } else if (operationId === 'memoryList.commandResponse') {
           const pending = pendingCommandRef.current;
-          if (!pending || String(body?.requestId || '') !== pending.requestId) return;
+          const disposition = classifyMemoryListCommandResponse(
+            body,
+            pending,
+            memoryListCommandGeneration(snapshotRef.current),
+          );
+          if (disposition === 'IGNORE') return;
           clearPendingCommand();
+          if (disposition === 'INVALID_SUCCESS') {
+            setLocalStatus('The Memory List confirmation did not match the active workspace. Refresh before retrying.');
+            return;
+          }
+          if (!pending) return;
           if (pending.action === 'CREATE_BLOCK_AND_APPLY') {
             const feedback = createAndApplyFeedback(body, pending);
             feedbackSequenceRef.current += 1;
@@ -339,7 +376,7 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose,
         setLocalStatus('The Memory List response could not be read.');
       }
     });
-  }, [clearPendingCommand, messages]);
+  }, [clearPendingCommand, demoMode, messages]);
 
   useEffect(() => {
     if (!error) return;
@@ -379,6 +416,7 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose,
     setSnapshot(current => ({ ...current, items: nextItems }));
     return true;
   }, [sendCommand]);
+  const dragScopeKey = `${snapshot.homeBankingId}:${snapshot.botJobId}:${snapshot.workspaceEpoch}:${snapshot.ownerEpoch}`;
   const {
     overItemKey,
     handleRowDragStart,
@@ -388,6 +426,7 @@ const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose,
   } = useMemoryListDrag({
     items: snapshot.items,
     busy: snapshot.busy || pendingAction !== null,
+    scopeKey: dragScopeKey,
     onReorder: commitMemoryReorder,
     onRefusal: setLocalStatus,
   });
