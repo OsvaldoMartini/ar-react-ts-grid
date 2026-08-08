@@ -49,15 +49,12 @@ interface CompForceProps {
 }
 
 const ENTRIES: Array<{ flag: ForceCoordFlag; label: string; title: string; alt: string }> = [
-  { flag: "S", label: "Scroll", title: "Scroll into view before type/click", alt: "scroll toggle" },
-  { flag: "N", label: "Next (mobile)", title: "Next field (mobile)", alt: "next toggle" },
   { flag: "T", label: "Tab", title: "Tab after input", alt: "tab toggle" },
   { flag: "E", label: "Enter", title: "Enter after input", alt: "enter toggle" },
-  { flag: "F", label: "Force Coordinates", title: "Force coordinates", alt: "force coord toggle" },
 ];
 
 /**
- * Compact horizontal strip of five on/off badges representing the
+ * Compact horizontal strip exposing only the Tab and Enter flags from the
  * {@code force_coordinates} bitstring on an instruction / scanned element.
  * Designed to sit inside the existing {@code .options-column} so the badges
  * render alongside the other row controls rather than on a second line.
