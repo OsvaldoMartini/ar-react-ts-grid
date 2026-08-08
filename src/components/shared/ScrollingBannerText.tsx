@@ -12,22 +12,21 @@ type Props = {
 const ScrollingBannerText: React.FC<Props> = ({ children, text, className, style }) => {
   const moving = text.trim().length > 24;
   const durationSeconds = Math.min(60, Math.max(12, text.trim().length * 0.22));
-  const bannerStyle = {
-    ...style,
+  const viewportStyle = {
     '--scroll-duration': `${durationSeconds}s`,
   } as React.CSSProperties;
   return (
-    <span
+    <div
       className={`${styles.viewport} ${moving ? styles.moving : ''} ${className ?? ''}`}
       title={text || undefined}
       aria-label={text || undefined}
-      style={bannerStyle}
+      style={viewportStyle}
     >
-      <span className={styles.track}>
+      <span className={styles.track} style={style}>
         <span className={styles.copy}>{children}</span>
         {moving && <span className={styles.copy} aria-hidden="true">{children}</span>}
       </span>
-    </span>
+    </div>
   );
 };
 
