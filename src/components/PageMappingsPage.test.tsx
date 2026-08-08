@@ -103,6 +103,71 @@ test('does not attach a blank detached-window capability', async () => {
     .toEqual({ requestId: expect.any(String) });
 });
 
+test('rejects an invalidation with a mismatched primary and partial alternate binding', async () => {
+  const view = render(<PageMappingsPage socketPort={5000} sessionId="pageMappingsManager" />);
+  await waitFor(() => expect(sent('pageMappings.bootstrap')).toHaveLength(1));
+  const bootstrapRequest = JSON.parse(sent('pageMappings.bootstrap')[0].body);
+  messages = [response('pageMappings.bootstrapResponse', {
+    ok: true,
+    requestId: bootstrapRequest.requestId,
+    bindingEpoch: 'binding-b',
+    workspaceEpoch: 2,
+    homeBankingId: 2,
+    botJobId: 20,
+    botJobName: 'B',
+    snapshots: [],
+  })];
+  view.rerender(<PageMappingsPage socketPort={5000} sessionId="pageMappingsManager" />);
+  expect(await screen.findByText(/Owner-scoped captures for Bot Job 20/)).toBeInTheDocument();
+
+  messages = [...messages, response('pageMappings.invalidated', {
+    bindingEpoch: 'binding-a',
+    workspaceEpoch: 1,
+    homeBankingId: 1,
+    botJobId: 10,
+    alternateBindingEpoch: 'binding-b',
+  })];
+  view.rerender(<PageMappingsPage socketPort={5000} sessionId="pageMappingsManager" />);
+
+  expect(screen.queryByText('Page Mappings is unavailable.')).not.toBeInTheDocument();
+  expect(screen.getByText(/Owner-scoped captures for Bot Job 20/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Reload' })).toBeEnabled();
+});
+
+test('accepts an invalidation whose complete alternate binding matches the active owner', async () => {
+  const view = render(<PageMappingsPage socketPort={5000} sessionId="pageMappingsManager" />);
+  await waitFor(() => expect(sent('pageMappings.bootstrap')).toHaveLength(1));
+  const bootstrapRequest = JSON.parse(sent('pageMappings.bootstrap')[0].body);
+  messages = [response('pageMappings.bootstrapResponse', {
+    ok: true,
+    requestId: bootstrapRequest.requestId,
+    bindingEpoch: 'binding-b',
+    workspaceEpoch: 2,
+    homeBankingId: 2,
+    botJobId: 20,
+    botJobName: 'B',
+    snapshots: [],
+  })];
+  view.rerender(<PageMappingsPage socketPort={5000} sessionId="pageMappingsManager" />);
+  expect(await screen.findByText(/Owner-scoped captures for Bot Job 20/)).toBeInTheDocument();
+
+  messages = [...messages, response('pageMappings.invalidated', {
+    bindingEpoch: 'binding-a',
+    workspaceEpoch: 1,
+    homeBankingId: 1,
+    botJobId: 10,
+    alternateBindingEpoch: 'binding-b',
+    alternateWorkspaceEpoch: 2,
+    alternateHomeBankingId: 2,
+    alternateBotJobId: 20,
+  })];
+  view.rerender(<PageMappingsPage socketPort={5000} sessionId="pageMappingsManager" />);
+
+  expect(await screen.findByRole('status')).toHaveTextContent('Page Mappings is unavailable.');
+  expect(screen.getByText(/Owner-scoped captures for Bot Job —/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Reload' })).toBeDisabled();
+});
+
 test('retargets atomically, ignores a late capture, and stages only authoritative registry identity', async () => {
   const view = render(<PageMappingsPage socketPort={5000} sessionId="pageMappingsManager" />);
   await waitFor(() => expect(sent('pageMappings.bootstrap')).toHaveLength(1));

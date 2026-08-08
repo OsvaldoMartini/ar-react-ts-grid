@@ -20,6 +20,11 @@ type PageMappingsBinding = {
   botJobName: string;
 };
 
+type PageMappingsBindingIdentity = Pick<
+  PageMappingsBinding,
+  'bindingEpoch' | 'workspaceEpoch' | 'homeBankingId' | 'botJobId'
+>;
+
 type Snapshot = {
   scanId: string;
   homeUrlId?: number;
@@ -96,6 +101,35 @@ const parseBinding = (body: Record<string, unknown>): PageMappingsBinding | null
     botJobName: text(body.botJobName),
   };
 };
+
+const invalidationIdentity = (
+  body: Record<string, unknown>,
+  alternate: boolean,
+): { present: boolean; identity: PageMappingsBindingIdentity | null } => {
+  const fields = alternate
+    ? ['alternateBindingEpoch', 'alternateWorkspaceEpoch', 'alternateHomeBankingId', 'alternateBotJobId'] as const
+    : ['bindingEpoch', 'workspaceEpoch', 'homeBankingId', 'botJobId'] as const;
+  const present = fields.some(field => Object.prototype.hasOwnProperty.call(body, field));
+  const bindingEpoch = text(body[fields[0]]);
+  const workspaceEpoch = positiveInteger(body[fields[1]]);
+  const homeBankingId = positiveInteger(body[fields[2]]);
+  const botJobId = positiveInteger(body[fields[3]]);
+  return {
+    present,
+    identity: bindingEpoch && workspaceEpoch && homeBankingId && botJobId
+      ? { bindingEpoch, workspaceEpoch, homeBankingId, botJobId }
+      : null,
+  };
+};
+
+const sameBindingIdentity = (
+  active: PageMappingsBinding,
+  candidate: PageMappingsBindingIdentity | null,
+): boolean => Boolean(candidate
+  && candidate.bindingEpoch === active.bindingEpoch
+  && candidate.workspaceEpoch === active.workspaceEpoch
+  && candidate.homeBankingId === active.homeBankingId
+  && candidate.botJobId === active.botJobId);
 
 const parseSnapshot = (value: unknown): Snapshot | null => {
   if (!value || typeof value !== 'object') return null;
@@ -245,12 +279,14 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
 
         if (operation === 'pageMappings.invalidated') {
           const activeBinding = bindingRef.current;
-          if ((activeBinding && (
-            text(body.bindingEpoch) !== activeBinding.bindingEpoch
-            || positiveInteger(body.workspaceEpoch) !== activeBinding.workspaceEpoch
-            || positiveInteger(body.homeBankingId) !== activeBinding.homeBankingId
-            || positiveInteger(body.botJobId) !== activeBinding.botJobId
-          )) || (!activeBinding && bindingEstablishedRef.current)) continue;
+          const primary = invalidationIdentity(body, false);
+          const alternate = invalidationIdentity(body, true);
+          const malformed = !primary.identity || (alternate.present && !alternate.identity);
+          if (malformed
+            || (activeBinding
+              && !sameBindingIdentity(activeBinding, primary.identity)
+              && !sameBindingIdentity(activeBinding, alternate.identity))
+            || (!activeBinding && bindingEstablishedRef.current)) continue;
           bindingRef.current = null;
           setBinding(null);
           resetOwnerState();
