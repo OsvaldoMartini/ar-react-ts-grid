@@ -33,6 +33,7 @@ import {
 import {
   buildInstructionRelationshipMutation,
 } from '../domain/instructionRelationshipMutation';
+import { botJobForceCoordinates } from '../domain/botJobForceCoordinates';
 import type {
   InstructionRelationshipEdge,
   RelationshipTarget,
@@ -3371,13 +3372,14 @@ export function useGridData(deps: UseGridDataDeps) {
     }
   };
 
-  // ── force_coordinates flag toggles (F / E / T / N / S) ─────────────────────
+  // Bot Job GridItem exposes and persists only Enter / Tab.
   // UI lives in CompForce. This handler persists the change: WebSocket push to
   // the backend (FORCE_COORDINATES_UPDATE) + local state update so the badge
   // flips immediately.
   const handleInstructionForceChange = (instructionId: number, nextForceCoordinates: string) => {
     const instruction = instructionsData.find(x => x.id === instructionId);
     if (!instruction) return;
+    const nextBotJobForceCoordinates = botJobForceCoordinates(nextForceCoordinates);
 
     if (webSocket && connected) {
       const message = {
@@ -3387,7 +3389,7 @@ export function useGridData(deps: UseGridDataDeps) {
         botJobName,
         instructionId,
         parentId: instruction.parentId,
-        forceCoordinates: nextForceCoordinates,
+        forceCoordinates: nextBotJobForceCoordinates,
         homeBankingId,
         sessionId: targetSessionId,
       };
@@ -3395,7 +3397,11 @@ export function useGridData(deps: UseGridDataDeps) {
     }
 
     setInstructionsData(prev =>
-      prev.map(x => (x.id === instructionId ? { ...x, forceCoordinates: nextForceCoordinates } : x))
+      prev.map(x => (
+        x.id === instructionId
+          ? { ...x, forceCoordinates: nextBotJobForceCoordinates }
+          : x
+      ))
     );
   };
 
