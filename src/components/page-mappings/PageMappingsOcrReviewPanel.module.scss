@@ -1,0 +1,22 @@
+.panel { border: 1px solid #bfd4e2; border-radius: 10px; background: #f9fcfe; padding: 13px; }
+.header { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.header p { margin: 0 0 3px; color: #567589; font-size: .64rem; font-weight: 900; letter-spacing: .1em; }
+.header h3 { margin: 0; color: #173f5d; font-size: 1.05rem; }
+.header span { display: block; margin-top: 4px; color: #587184; font-size: .78rem; }
+.header button,.footer button { min-height: 32px; border: 1px solid #3186a8; border-radius: 7px; padding: 0 11px; background: #e5f5fb; color: #135f7d; font-size: .72rem; font-weight: 850; cursor: pointer; white-space: nowrap; }
+.header button:disabled,.footer button:disabled { opacity: .52; cursor: not-allowed; }
+.status { margin: 11px 0; border-left: 4px solid #2c8fb6; background: #edf8fc; padding: 9px 10px; color: #355d73; font-size: .78rem; }
+.summary { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.summary span { border-radius: 12px; padding: 4px 8px; background: #e9eff4; color: #405d70; font-size: .68rem; font-weight: 800; }
+.summary span[data-quality='EXACT_CONTAIN'] { background: #d9f3e3; color: #17643b; }
+.summary span[data-quality='OVERLAP'] { background: #e1effb; color: #175c87; }
+.summary span[data-quality='PROXIMITY'] { background: #fff1cd; color: #795914; }
+.summary span[data-quality='NONE'] { background: #f5e1e3; color: #8d2932; }
+.imageStage { position: relative; display: inline-block; max-width: 100%; border: 1px solid #c4d6e2; border-radius: 8px; overflow: hidden; background: #eef3f6; line-height: 0; }
+.imageStage img { display: block; max-width: 100%; max-height: 420px; object-fit: contain; }
+.word { position: absolute; box-sizing: border-box; border: 1px solid #ef9c1b; background: #ffca5540; pointer-events: none; }
+.limitNotice { margin: 6px 0; color: #687b89; font-size: .7rem; }
+.footer { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; margin-top: 12px; }
+.footer span { color: #526d80; font-size: .75rem; text-align: right; }
+.footer .apply { border-color: #5aab79; background: #ddf5e6; color: #17623a; }
+@media (max-width: 760px) { .header { flex-direction: column; }.footer { grid-template-columns: 1fr; }.footer span { text-align: left; } }

@@ -1,0 +1,12 @@
+.grid { margin-top: 12px; }
+.checkbox { width: 15px; height: 15px; accent-color: #197c50; cursor: pointer; }
+.checkbox:disabled { cursor: not-allowed; }
+.ellipsis { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.draft { width: 100%; box-sizing: border-box; border: 1px solid #aebfcd; border-radius: 6px; padding: 6px 7px; color: #173a53; background: #fff; font: inherit; }
+.draft:focus { outline: 2px solid #90d2e7; outline-offset: 1px; border-color: #217fa2; }
+.draft:disabled { background: #edf1f4; color: #7d8992; }
+.quality { display: inline-flex; border-radius: 10px; padding: 3px 7px; background: #e9eef3; color: #465d70; font-size: .68rem; font-weight: 900; white-space: nowrap; }
+.quality[data-quality='EXACT_CONTAIN'] { background: #d9f3e3; color: #17643b; }
+.quality[data-quality='OVERLAP'] { background: #e1effb; color: #175c87; }
+.quality[data-quality='PROXIMITY'] { background: #fff1cd; color: #795914; }
+.quality[data-quality='NONE'] { background: #f5e1e3; color: #8d2932; }

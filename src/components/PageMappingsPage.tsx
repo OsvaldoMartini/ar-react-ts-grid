@@ -4,6 +4,19 @@ import PagesOpenButton from './PagesOpenButton';
 import PageMappingsCachePanel, {
   PageMappingsCacheState,
 } from './page-mappings/PageMappingsCachePanel';
+import PageMappingsOcrReviewPanel from './page-mappings/PageMappingsOcrReviewPanel';
+import type {
+  PageMappingsOcrAliasChange,
+  PageMappingsOcrCorrelation,
+  PageMappingsOcrReviewResult,
+} from './page-mappings/PageMappingsOcrReview.types';
+import {
+  PAGE_MAPPINGS_OCR_REVIEW_CONTRACT_VERSION,
+  pageMappingsOcrFailureMatches,
+  pageMappingsOcrMessage,
+  parsePageMappingsOcrApply,
+  parsePageMappingsOcrReview,
+} from './page-mappings/PageMappingsOcrReview.types';
 import { useWebSocket } from './useWebSocket';
 import type {
   MemoryListItem,
@@ -76,6 +89,7 @@ type LoadedCapture = {
 type MappingMemoryItem = MemoryListItem<PageMappingsMemoryListPayload>;
 type Props = { socketPort: number; sessionId: string; onClose?: () => void };
 const RESCAN_TIMEOUT_MS = 120_000;
+const OCR_REVIEW_TIMEOUT_MS = 120_000;
 
 const emptyCacheState: PageMappingsCacheState = {
   state: 'LOADING',
@@ -167,6 +181,51 @@ const parseSnapshot = (value: unknown): Snapshot | null => {
   };
 };
 
+const ocrCorrelation = (
+  active: PageMappingsBinding | null,
+  capture: LoadedCapture | null,
+  selectedScanId: string | null,
+  purpose: 'review' | 'apply',
+): PageMappingsOcrCorrelation | null => {
+  if (!active
+    || !capture
+    || capture.bindingEpoch !== active.bindingEpoch
+    || capture.scanId !== selectedScanId
+    || !capture.pageKey
+    || !capture.capturedAt
+    || !capture.manifestSha256) return null;
+  return {
+    contractVersion: PAGE_MAPPINGS_OCR_REVIEW_CONTRACT_VERSION,
+    requestId: requestId(`ocr-${purpose}`),
+    bindingEpoch: active.bindingEpoch,
+    workspaceEpoch: active.workspaceEpoch,
+    homeBankingId: active.homeBankingId,
+    botJobId: active.botJobId,
+    scanId: capture.scanId,
+    pageKey: capture.pageKey,
+    capturedAt: capture.capturedAt,
+    manifestSha256: capture.manifestSha256,
+  };
+};
+
+const currentOcrContextMatches = (
+  active: PageMappingsBinding | null,
+  capture: LoadedCapture | null,
+  selectedScanId: string | null,
+  expected: PageMappingsOcrCorrelation,
+): boolean => Boolean(active
+  && capture
+  && active.bindingEpoch === expected.bindingEpoch
+  && active.workspaceEpoch === expected.workspaceEpoch
+  && active.homeBankingId === expected.homeBankingId
+  && active.botJobId === expected.botJobId
+  && capture.bindingEpoch === expected.bindingEpoch
+  && capture.scanId === expected.scanId
+  && selectedScanId === expected.scanId
+  && capture.pageKey === expected.pageKey
+  && capture.capturedAt === expected.capturedAt
+  && capture.manifestSha256 === expected.manifestSha256);
+
 const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
   useEffect(() => { document.title = 'Page Mappings'; }, []);
   const windowCapability = useMemo(() => {
@@ -201,6 +260,11 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
   const [cacheState, setCacheState] = useState<PageMappingsCacheState>(emptyCacheState);
   const [cacheBusy, setCacheBusy] = useState(false);
   const [rescanBusy, setRescanBusy] = useState(false);
+  const [detailMode, setDetailMode] = useState<'explorer' | 'ocr-review'>('explorer');
+  const [ocrReview, setOcrReview] = useState<PageMappingsOcrReviewResult | null>(null);
+  const [ocrReviewBusy, setOcrReviewBusy] = useState(false);
+  const [ocrApplyBusy, setOcrApplyBusy] = useState(false);
+  const [ocrMessage, setOcrMessage] = useState('');
   const [invalidated, setInvalidated] = useState(false);
   const invalidatedRef = useRef(false);
   const bindingEstablishedRef = useRef(false);
@@ -215,6 +279,13 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
   const pendingRescan = useRef<{ requestId: string; bindingEpoch: string } | null>(null);
   const rescanTimer = useRef<number | null>(null);
   const pendingMemory = useRef<{ requestId: string; bindingEpoch: string } | null>(null);
+  const pendingOcrReview = useRef<PageMappingsOcrCorrelation | null>(null);
+  const pendingOcrApply = useRef<{
+    correlation: PageMappingsOcrCorrelation;
+    changes: PageMappingsOcrAliasChange[];
+  } | null>(null);
+  const ocrReviewTimer = useRef<number | null>(null);
+  const ocrApplyTimer = useRef<number | null>(null);
 
   const updateUrlHint = useCallback((botJobId: number) => {
     const url = new URL(window.location.href);
@@ -235,6 +306,34 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
     setRescanBusy(false);
   }, []);
 
+  const retireOcrReview = useCallback((expectedRequestId?: string) => {
+    if (expectedRequestId && pendingOcrReview.current?.requestId !== expectedRequestId) return;
+    if (ocrReviewTimer.current !== null) {
+      window.clearTimeout(ocrReviewTimer.current);
+      ocrReviewTimer.current = null;
+    }
+    pendingOcrReview.current = null;
+    setOcrReviewBusy(false);
+  }, []);
+
+  const retireOcrApply = useCallback((expectedRequestId?: string) => {
+    if (expectedRequestId
+      && pendingOcrApply.current?.correlation.requestId !== expectedRequestId) return;
+    if (ocrApplyTimer.current !== null) {
+      window.clearTimeout(ocrApplyTimer.current);
+      ocrApplyTimer.current = null;
+    }
+    pendingOcrApply.current = null;
+    setOcrApplyBusy(false);
+  }, []);
+
+  const clearOcrState = useCallback(() => {
+    retireOcrReview();
+    retireOcrApply();
+    setOcrReview(null);
+    setOcrMessage('');
+  }, [retireOcrApply, retireOcrReview]);
+
   const resetOwnerState = useCallback(() => {
     setSnapshots([]);
     setSelectedScanId(null);
@@ -253,11 +352,17 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
     pendingMemory.current = null;
     pendingCache.current = null;
     retireRescan();
+    clearOcrState();
+    setDetailMode('explorer');
     setCacheState(emptyCacheState);
     setCacheBusy(false);
-  }, [retireRescan]);
+  }, [clearOcrState, retireRescan]);
 
   const bootstrap = useCallback((expectedBindingEpoch?: string) => {
+    if (pendingOcrApply.current) {
+      setStatus('Wait for the OCR Review save to finish before reloading Page Mappings.');
+      return;
+    }
     if (invalidatedRef.current && !expectedBindingEpoch) {
       setStatus('Page Mappings is unavailable.');
       return;
@@ -280,6 +385,12 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
   }, [sessionId, webSocket]);
 
   const loadCapture = useCallback((scanId: string, expectedBindingEpoch?: string) => {
+    if (pendingOcrApply.current) {
+      const message = 'Wait for the OCR Review save to finish before changing captures.';
+      setOcrMessage(message);
+      setStatus(message);
+      return;
+    }
     const activeBindingEpoch = expectedBindingEpoch || bindingRef.current?.bindingEpoch || '';
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN || !activeBindingEpoch) {
       setStatus('Page Mappings ownership is not ready.');
@@ -288,6 +399,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
     const nextRequestId = requestId('capture');
     pendingCapture.current = { requestId: nextRequestId, scanId, bindingEpoch: activeBindingEpoch };
     setSelectedScanId(scanId);
+    clearOcrState();
     setLoadedCapture(null);
     setSelectedElementIndex(null);
     setCaptureImageSize({ width: 0, height: 0 });
@@ -297,9 +409,10 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
       sessionId,
       body: JSON.stringify({ requestId: nextRequestId, scanId, bindingEpoch: activeBindingEpoch }),
     }));
-  }, [sessionId, webSocket]);
+  }, [clearOcrState, sessionId, webSocket]);
 
   const requestCacheState = useCallback((expectedBinding?: PageMappingsBinding) => {
+    if (pendingOcrApply.current) return;
     const active = expectedBinding || bindingRef.current;
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN || !active) {
       setCacheState({
@@ -327,7 +440,11 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
 
   const rescan = useCallback(() => {
     const active = bindingRef.current;
-    if (!webSocket || webSocket.readyState !== WebSocket.OPEN || !active || rescanBusy) return;
+    if (!webSocket
+      || webSocket.readyState !== WebSocket.OPEN
+      || !active
+      || rescanBusy
+      || pendingOcrApply.current) return;
     const nextRequestId = requestId('rescan');
     pendingRescan.current = { requestId: nextRequestId, bindingEpoch: active.bindingEpoch };
     setRescanBusy(true);
@@ -355,6 +472,94 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
     }
   }, [rescanBusy, retireRescan, sessionId, webSocket]);
 
+  const runOcrReview = useCallback(() => {
+    const correlation = ocrCorrelation(
+      bindingRef.current,
+      loadedCapture,
+      selectedScanId,
+      'review',
+    );
+    if (!webSocket
+      || webSocket.readyState !== WebSocket.OPEN
+      || !correlation
+      || !loadedCapture?.screenshotBase64
+      || ocrReviewBusy
+      || ocrApplyBusy
+      || rescanBusy
+      || pendingOcrReview.current
+      || pendingOcrApply.current) {
+      setOcrMessage('Load one verified capture before running OCR Review.');
+      return;
+    }
+    pendingOcrReview.current = correlation;
+    setOcrReviewBusy(true);
+    setOcrMessage('Running OCR Review on the selected immutable capture...');
+    ocrReviewTimer.current = window.setTimeout(() => {
+      if (pendingOcrReview.current?.requestId !== correlation.requestId) return;
+      retireOcrReview(correlation.requestId);
+      setOcrMessage('OCR Review timed out. The capture was not changed; retry when OCR is available.');
+    }, OCR_REVIEW_TIMEOUT_MS);
+    try {
+      webSocket.send(JSON.stringify({
+        type: 'pageMappings.ocrReview',
+        sessionId,
+        body: JSON.stringify(correlation),
+      }));
+    } catch (_) {
+      retireOcrReview(correlation.requestId);
+      setOcrMessage('OCR Review could not be sent.');
+    }
+  }, [loadedCapture, ocrApplyBusy, ocrReviewBusy, rescanBusy, retireOcrReview, selectedScanId, sessionId, webSocket]);
+
+  const applyOcrNames = useCallback((changes: PageMappingsOcrAliasChange[]) => {
+    const correlation = ocrCorrelation(
+      bindingRef.current,
+      loadedCapture,
+      selectedScanId,
+      'apply',
+    );
+    if (!webSocket
+      || webSocket.readyState !== WebSocket.OPEN
+      || !correlation
+      || !changes.length
+      || changes.length > 1_000
+      || ocrReviewBusy
+      || ocrApplyBusy
+      || rescanBusy
+      || pendingOcrReview.current
+      || pendingOcrApply.current) {
+      setOcrMessage('Select valid OCR names from the current capture before saving.');
+      return;
+    }
+    const exactChanges = changes.map(change => ({
+      scannedElementId: change.scannedElementId,
+      elementHash: change.elementHash,
+      expectedLastScannedAt: change.expectedLastScannedAt,
+      expectedScanCount: change.expectedScanCount,
+      expectedClientNamed: change.expectedClientNamed ?? null,
+      clientNamed: change.clientNamed ?? null,
+    }));
+    pendingOcrApply.current = { correlation, changes: exactChanges };
+    setOcrApplyBusy(true);
+    setOcrMessage(`Saving ${exactChanges.length} reviewed name${exactChanges.length === 1 ? '' : 's'}...`);
+    ocrApplyTimer.current = window.setTimeout(() => {
+      if (pendingOcrApply.current?.correlation.requestId !== correlation.requestId) return;
+      retireOcrApply(correlation.requestId);
+      setOcrReview(null);
+      setOcrMessage('The save response timed out. Reload OCR Review before retrying because the commit outcome is unknown.');
+    }, OCR_REVIEW_TIMEOUT_MS);
+    try {
+      webSocket.send(JSON.stringify({
+        type: 'pageMappings.ocrReviewApply',
+        sessionId,
+        body: JSON.stringify({ ...correlation, changes: exactChanges }),
+      }));
+    } catch (_) {
+      retireOcrApply(correlation.requestId);
+      setOcrMessage('OCR Review names could not be sent.');
+    }
+  }, [loadedCapture, ocrApplyBusy, ocrReviewBusy, rescanBusy, retireOcrApply, selectedScanId, sessionId, webSocket]);
+
   useEffect(() => {
     if (connected) bootstrap();
   }, [bootstrap, connected]);
@@ -364,13 +569,16 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
     pendingCache.current = null;
     setCacheBusy(false);
     retireRescan();
-  }, [connected, retireRescan]);
+    clearOcrState();
+  }, [clearOcrState, connected, retireRescan]);
 
   useEffect(() => () => {
     if (rescanTimer.current !== null) {
       window.clearTimeout(rescanTimer.current);
       rescanTimer.current = null;
     }
+    if (ocrReviewTimer.current !== null) window.clearTimeout(ocrReviewTimer.current);
+    if (ocrApplyTimer.current !== null) window.clearTimeout(ocrApplyTimer.current);
   }, []);
 
   useEffect(() => {
@@ -564,12 +772,134 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
             screenshotMime: text(body.screenshotMime) || 'image/png',
           });
           setStatus('Immutable capture loaded.');
+          continue;
+        }
+
+        if (operation === 'pageMappings.ocrReviewResponse') {
+          const pending = pendingOcrReview.current;
+          if (!pending || text(body.requestId) !== pending.requestId) continue;
+          if (body.ok === false) {
+            if (!pageMappingsOcrFailureMatches(body, pending)) continue;
+            retireOcrReview(pending.requestId);
+            const failureMessage = pageMappingsOcrMessage(body, 'OCR Review could not be completed.');
+            setOcrMessage(failureMessage);
+            setStatus(failureMessage);
+            continue;
+          }
+          const parsed = parsePageMappingsOcrReview(body, pending);
+          retireOcrReview(pending.requestId);
+          if (!parsed || !currentOcrContextMatches(
+            bindingRef.current,
+            loadedCapture,
+            selectedScanId,
+            pending,
+          )) {
+            setOcrReview(null);
+            setOcrMessage('OCR Review returned an invalid or stale capture response.');
+            continue;
+          }
+          setOcrReview(parsed);
+          setOcrMessage(parsed.message);
+          setStatus(parsed.message);
+          continue;
+        }
+
+        if (operation === 'pageMappings.ocrReviewApplyResponse') {
+          const pending = pendingOcrApply.current;
+          if (!pending || text(body.requestId) !== pending.correlation.requestId) continue;
+          if (body.ok === false) {
+            if (!pageMappingsOcrFailureMatches(body, pending.correlation)) continue;
+            retireOcrApply(pending.correlation.requestId);
+            const failureMessage = pageMappingsOcrMessage(body, 'OCR Review names could not be saved.');
+            setOcrMessage(failureMessage);
+            setStatus(failureMessage);
+            continue;
+          }
+          const parsed = parsePageMappingsOcrApply(body, pending.correlation, pending.changes);
+          retireOcrApply(pending.correlation.requestId);
+          if (!parsed || !currentOcrContextMatches(
+            bindingRef.current,
+            loadedCapture,
+            selectedScanId,
+            pending.correlation,
+          )) {
+            setOcrReview(null);
+            setOcrMessage('OCR Review returned an invalid or stale save response. Reload the capture.');
+            continue;
+          }
+
+          const aliases = new Map(parsed.aliases.map(alias => [alias.scannedElementId, alias]));
+          const reviewRows = new Map((ocrReview?.rows || []).map(row => [row.scannedElementId, row]));
+          setOcrReview(current => current && current.scanId === parsed.scanId
+            ? {
+              ...current,
+              message: parsed.message,
+              rows: current.rows.map(row => {
+                const alias = aliases.get(row.scannedElementId);
+                return alias ? {
+                  ...row,
+                  clientNamed: alias.clientNamed,
+                  elementHash: alias.elementHash,
+                  expectedLastScannedAt: alias.lastScannedAt,
+                  expectedScanCount: alias.scanCount,
+                } : row;
+              }),
+            }
+            : current);
+          setLoadedCapture(current => current && current.scanId === parsed.scanId
+            ? {
+              ...current,
+              elements: current.elements.map(element => {
+                const alias = aliases.get(positiveInteger(element.scannedElementId));
+                return alias ? {
+                  ...element,
+                  clientNamed: alias.clientNamed,
+                  elementHash: alias.elementHash,
+                  lastScannedAt: alias.lastScannedAt,
+                  scanCount: alias.scanCount,
+                } : element;
+              }),
+            }
+            : current);
+          setMemoryItems(current => current.map(item => {
+            const payload = item.payload;
+            if (!payload) return item;
+            const alias = aliases.get(payload.scannedElementId);
+            if (!alias) return item;
+            const row = reviewRows.get(alias.scannedElementId);
+            return {
+              ...item,
+              label: alias.clientNamed || row?.definedName || row?.domText || row?.tag || item.label,
+              payload: {
+                ...payload,
+                elementHash: alias.elementHash,
+                expectedLastScannedAt: alias.lastScannedAt,
+                expectedScanCount: alias.scanCount,
+              },
+            };
+          }));
+          setOcrMessage(parsed.message);
+          setStatus(parsed.message);
+          continue;
         }
       } catch {
         setStatus('Page Mappings received an invalid response.');
       }
     }
-  }, [bootstrap, loadCapture, messages, requestCacheState, resetOwnerState, retireRescan, updateUrlHint]);
+  }, [
+    bootstrap,
+    loadCapture,
+    loadedCapture,
+    messages,
+    ocrReview,
+    requestCacheState,
+    resetOwnerState,
+    retireOcrApply,
+    retireOcrReview,
+    retireRescan,
+    selectedScanId,
+    updateUrlHint,
+  ]);
 
   const captureElements = loadedCapture?.scanId === selectedScanId
     ? loadedCapture.elements
@@ -746,6 +1076,16 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
     }
   }, [messages]);
 
+  const closePage = useCallback(() => {
+    if (pendingOcrApply.current) {
+      const message = 'Wait for the OCR Review save to finish before closing Page Mappings.';
+      setOcrMessage(message);
+      setStatus(message);
+      return;
+    }
+    onClose?.();
+  }, [onClose]);
+
   const captureImage = loadedCapture?.screenshotBase64
     ? `data:${loadedCapture.screenshotMime};base64,${loadedCapture.screenshotBase64}`
     : null;
@@ -753,9 +1093,20 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
     && loadedCapture
     && loadedCapture.scanId === selectedScanId
     && !captureLoading);
+  const canRunOcr = Boolean(connected
+    && !invalidated
+    && !captureLoading
+    && !rescanBusy
+    && selected?.status === 'READY'
+    && loadedCapture?.bindingEpoch === binding?.bindingEpoch
+    && loadedCapture?.scanId === selectedScanId
+    && loadedCapture?.pageKey === selected?.pageKey
+    && loadedCapture?.capturedAt === selected?.capturedAt
+    && loadedCapture?.manifestSha256 === selected?.manifestSha256
+    && captureImage);
 
   return (
-    <DetachedPageShell title="Page Mappings" testId="page-mappings-workspace" onClose={onClose}>
+    <DetachedPageShell title="Page Mappings" testId="page-mappings-workspace" onClose={closePage}>
       <main className={styles.page}>
         <header className={styles.header}>
           <div>
@@ -767,9 +1118,9 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
             </p>
           </div>
           <div className={styles.actions}>
-            <button type="button" onClick={() => bootstrap(binding?.bindingEpoch)} disabled={!connected || invalidated}>Reload</button>
+            <button type="button" onClick={() => bootstrap(binding?.bindingEpoch)} disabled={!connected || invalidated || ocrApplyBusy}>Reload</button>
             <PagesOpenButton webSocket={webSocket} connected={connected} messages={messages} sessionId={sessionId} />
-            <button type="button" className={styles.close} onClick={onClose}>Close</button>
+            <button type="button" className={styles.close} onClick={closePage} disabled={ocrApplyBusy}>Close</button>
           </div>
         </header>
         <div className={styles.status} role="status">{status}</div>
@@ -788,7 +1139,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
                       setSelectedElementIndex(null);
                       loadCapture(item.scanId);
                     }}
-                    disabled={item.status !== 'READY'}
+                    disabled={item.status !== 'READY' || ocrApplyBusy}
                   >
                     <strong>{new Date(item.capturedAt).toLocaleString()}</strong>
                     <span>{item.pageUrl || item.pageKey}</span>
@@ -801,8 +1152,8 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
           <section className={styles.details} aria-label="Selected scan capture">
             <PageMappingsCachePanel
               cache={cacheState}
-              busy={cacheBusy || rescanBusy}
-              disabled={!connected || invalidated}
+              busy={cacheBusy || rescanBusy || ocrApplyBusy}
+              disabled={!connected || invalidated || ocrApplyBusy}
               onRefresh={() => requestCacheState()}
               onUseExisting={useExisting}
               onRescan={rescan}
@@ -819,6 +1170,21 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
                   <div><dt>Page key</dt><dd>{selected.pageKey}</dd></div>
                   <div><dt>Manifest SHA-256</dt><dd className={styles.hash}>{selected.manifestSha256 || 'Unavailable'}</dd></div>
                 </dl>
+                <nav className={styles.modeTabs} aria-label="Page Mappings selected capture mode">
+                  <button
+                    type="button"
+                    className={detailMode === 'explorer' ? styles.modeActive : ''}
+                    aria-pressed={detailMode === 'explorer'}
+                    onClick={() => setDetailMode('explorer')}
+                  >Explorer</button>
+                  <button
+                    type="button"
+                    className={detailMode === 'ocr-review' ? styles.modeActive : ''}
+                    aria-pressed={detailMode === 'ocr-review'}
+                    onClick={() => setDetailMode('ocr-review')}
+                  >OCR Review</button>
+                </nav>
+                <div className={styles.modeContent} hidden={detailMode !== 'explorer'}>
                 <div className={styles.notice}>Capture artifacts are read-only. Select an element or drag it into Memory List to stage it for the active Bot Job.</div>
                 {captureLoading && <p className={styles.empty}>Loading immutable capture artifacts…</p>}
                 {captureImage && <div className={styles.imageStage}>
@@ -898,6 +1264,17 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
                     );
                   })}
                 </div>
+                </div>
+                {detailMode === 'ocr-review' && <PageMappingsOcrReviewPanel
+                  result={ocrReview}
+                  captureImage={captureImage}
+                  busy={ocrReviewBusy}
+                  applying={ocrApplyBusy}
+                  message={ocrMessage}
+                  canRun={canRunOcr}
+                  onRun={runOcrReview}
+                  onApply={applyOcrNames}
+                />}
               </>
             )}
           </section>

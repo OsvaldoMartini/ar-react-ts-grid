@@ -28,6 +28,11 @@
 .metadata div { border: 1px solid #e1ebf3; border-radius: 8px; padding: 10px; background: #fbfdff; }
 .metadata dt { font-size: .68rem; font-weight: 800; color: #637c90; text-transform: uppercase; }.metadata dd { margin: 5px 0 0; word-break: break-word; font-size: .85rem; }
 .hash { font-family: ui-monospace,SFMono-Regular,Consolas,monospace; font-size: .72rem !important; }
+.modeTabs { display: flex; gap: 7px; margin: 0 0 12px; border-bottom: 1px solid #dce8f0; padding-bottom: 9px; }
+.modeTabs button { min-height: 32px; border: 1px solid #a9c2d4; border-radius: 7px; padding: 0 14px; background: #f7fafc; color: #365d76; font-size: .75rem; font-weight: 850; cursor: pointer; }
+.modeTabs button:hover { border-color: #318cb1; }
+.modeTabs .modeActive { border-color: #1c82aa; background: #dff3fa; color: #0d607f; box-shadow: 0 0 0 1px #a9dcecb8; }
+.modeContent[hidden] { display: none; }
 .notice { border-left: 4px solid #2b91b9; background: #eef8fc; padding: 12px; color: #356079; font-size: .86rem; }
 .imageStage { position: relative; display: inline-block; max-width: 100%; margin: 14px 0; border: 1px solid #c7d9e8; border-radius: 8px; background: #f7fafc; line-height: 0; overflow: hidden; }
 .captureImage { display: block; max-width: 100%; max-height: 360px; object-fit: contain; }
