@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import DetachedPageShell from './DetachedPageShell';
 import PagesOpenButton from './PagesOpenButton';
+import PageMappingsCachePanel, {
+  PageMappingsCacheState,
+} from './page-mappings/PageMappingsCachePanel';
 import { useWebSocket } from './useWebSocket';
 import type {
   MemoryListItem,
@@ -72,6 +75,18 @@ type LoadedCapture = {
 
 type MappingMemoryItem = MemoryListItem<PageMappingsMemoryListPayload>;
 type Props = { socketPort: number; sessionId: string; onClose?: () => void };
+const RESCAN_TIMEOUT_MS = 120_000;
+
+const emptyCacheState: PageMappingsCacheState = {
+  state: 'LOADING',
+  message: 'Checking the active Playwright page…',
+  browserAvailable: false,
+  livePageKey: '',
+  livePageUrl: '',
+  liveNodeCount: 0,
+  reusableScanId: '',
+  comparedScanId: '',
+};
 
 const positiveInteger = (value: unknown): number => {
   const parsed = Number(value);
@@ -183,6 +198,9 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
   const [captureImageSize, setCaptureImageSize] = useState({ width: 0, height: 0 });
   const [memoryItems, setMemoryItems] = useState<MappingMemoryItem[]>([]);
   const [memoryOwnerEpoch, setMemoryOwnerEpoch] = useState('');
+  const [cacheState, setCacheState] = useState<PageMappingsCacheState>(emptyCacheState);
+  const [cacheBusy, setCacheBusy] = useState(false);
+  const [rescanBusy, setRescanBusy] = useState(false);
   const [invalidated, setInvalidated] = useState(false);
   const invalidatedRef = useRef(false);
   const bindingEstablishedRef = useRef(false);
@@ -193,6 +211,9 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
   const memoryCursor = useRef(0);
   const pendingBootstrap = useRef<string | null>(null);
   const pendingCapture = useRef<{ requestId: string; scanId: string; bindingEpoch: string } | null>(null);
+  const pendingCache = useRef<{ requestId: string; bindingEpoch: string } | null>(null);
+  const pendingRescan = useRef<{ requestId: string; bindingEpoch: string } | null>(null);
+  const rescanTimer = useRef<number | null>(null);
   const pendingMemory = useRef<{ requestId: string; bindingEpoch: string } | null>(null);
 
   const updateUrlHint = useCallback((botJobId: number) => {
@@ -202,6 +223,17 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
     if (windowCapability) url.searchParams.set('windowCapability', windowCapability);
     window.history.replaceState(window.history.state, '', url);
   }, [windowCapability]);
+
+  const retireRescan = useCallback((expectedRequestId?: string) => {
+    if (expectedRequestId
+      && pendingRescan.current?.requestId !== expectedRequestId) return;
+    if (rescanTimer.current !== null) {
+      window.clearTimeout(rescanTimer.current);
+      rescanTimer.current = null;
+    }
+    pendingRescan.current = null;
+    setRescanBusy(false);
+  }, []);
 
   const resetOwnerState = useCallback(() => {
     setSnapshots([]);
@@ -219,7 +251,11 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
     pendingBootstrap.current = null;
     pendingCapture.current = null;
     pendingMemory.current = null;
-  }, []);
+    pendingCache.current = null;
+    retireRescan();
+    setCacheState(emptyCacheState);
+    setCacheBusy(false);
+  }, [retireRescan]);
 
   const bootstrap = useCallback((expectedBindingEpoch?: string) => {
     if (invalidatedRef.current && !expectedBindingEpoch) {
@@ -263,9 +299,79 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
     }));
   }, [sessionId, webSocket]);
 
+  const requestCacheState = useCallback((expectedBinding?: PageMappingsBinding) => {
+    const active = expectedBinding || bindingRef.current;
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN || !active) {
+      setCacheState({
+        ...emptyCacheState,
+        state: 'UNAVAILABLE',
+        message: 'Page Mappings ownership is not ready.',
+      });
+      return;
+    }
+    const nextRequestId = requestId('cache');
+    pendingCache.current = { requestId: nextRequestId, bindingEpoch: active.bindingEpoch };
+    setCacheBusy(true);
+    webSocket.send(JSON.stringify({
+      type: 'pageMappings.cacheState',
+      sessionId,
+      body: JSON.stringify({
+        requestId: nextRequestId,
+        bindingEpoch: active.bindingEpoch,
+        workspaceEpoch: active.workspaceEpoch,
+        homeBankingId: active.homeBankingId,
+        botJobId: active.botJobId,
+      }),
+    }));
+  }, [sessionId, webSocket]);
+
+  const rescan = useCallback(() => {
+    const active = bindingRef.current;
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN || !active || rescanBusy) return;
+    const nextRequestId = requestId('rescan');
+    pendingRescan.current = { requestId: nextRequestId, bindingEpoch: active.bindingEpoch };
+    setRescanBusy(true);
+    setStatus('Starting Page Mappings rescan...');
+    rescanTimer.current = window.setTimeout(() => {
+      if (pendingRescan.current?.requestId !== nextRequestId) return;
+      retireRescan(nextRequestId);
+      setStatus('Page Mappings rescan timed out. Check the current history before retrying.');
+    }, RESCAN_TIMEOUT_MS);
+    try {
+      webSocket.send(JSON.stringify({
+        type: 'pageMappings.rescan',
+        sessionId,
+        body: JSON.stringify({
+          requestId: nextRequestId,
+          bindingEpoch: active.bindingEpoch,
+          workspaceEpoch: active.workspaceEpoch,
+          homeBankingId: active.homeBankingId,
+          botJobId: active.botJobId,
+        }),
+      }));
+    } catch (_) {
+      retireRescan(nextRequestId);
+      setStatus('Page Mappings rescan could not be sent.');
+    }
+  }, [rescanBusy, retireRescan, sessionId, webSocket]);
+
   useEffect(() => {
     if (connected) bootstrap();
   }, [bootstrap, connected]);
+
+  useEffect(() => {
+    if (connected) return;
+    pendingCache.current = null;
+    setCacheBusy(false);
+    retireRescan();
+  }, [connected, retireRescan]);
+
+  useEffect(() => () => {
+    if (rescanTimer.current !== null) {
+      window.clearTimeout(rescanTimer.current);
+      rescanTimer.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     for (const raw of messages.slice(workspaceCursor.current)) {
@@ -345,6 +451,71 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
             ? `${next.length} scan capture${next.length === 1 ? '' : 's'} available.`
             : 'No scan captures yet.');
           if (initial) loadCapture(initial.scanId, nextBinding.bindingEpoch);
+          requestCacheState(nextBinding);
+          continue;
+        }
+
+        if (operation === 'pageMappings.cacheStateResponse') {
+          const pending = pendingCache.current;
+          if (!pending
+            || text(body.requestId) !== pending.requestId
+            || text(body.bindingEpoch) !== pending.bindingEpoch
+            || bindingRef.current?.bindingEpoch !== pending.bindingEpoch) continue;
+          pendingCache.current = null;
+          setCacheBusy(false);
+          if (!body.ok) {
+            setCacheState({
+              ...emptyCacheState,
+              state: 'UNAVAILABLE',
+              message: text(body.message) || 'Live mapping comparison is unavailable.',
+            });
+            continue;
+          }
+          setCacheState({
+            state: text(body.cacheState) || 'UNAVAILABLE',
+            message: text(body.message) || 'Live mapping comparison completed.',
+            browserAvailable: body.browserAvailable === true,
+            livePageKey: text(body.livePageKey),
+            livePageUrl: text(body.livePageUrl),
+            liveNodeCount: positiveInteger(body.liveNodeCount),
+            reusableScanId: text(body.reusableScanId),
+            comparedScanId: text(body.comparedScanId),
+          });
+          continue;
+        }
+
+        if (operation === 'pageMappings.rescanResponse') {
+          const pending = pendingRescan.current;
+          if (!pending
+            || text(body.requestId) !== pending.requestId
+            || (body.bindingEpoch && text(body.bindingEpoch) !== pending.bindingEpoch)
+            || bindingRef.current?.bindingEpoch !== pending.bindingEpoch) continue;
+          if (!body.ok) {
+            retireRescan(pending.requestId);
+            setStatus(text(body.message) || 'Page Mappings rescan could not be started.');
+          }
+          continue;
+        }
+
+        if (operation === 'pageMappings.rescanStatus') {
+          const pending = pendingRescan.current;
+          const active = bindingRef.current;
+          if (!pending
+            || !active
+            || text(body.requestId) !== pending.requestId
+            || text(body.bindingEpoch) !== pending.bindingEpoch
+            || active.bindingEpoch !== pending.bindingEpoch
+            || positiveInteger(body.workspaceEpoch) !== active.workspaceEpoch
+            || positiveInteger(body.homeBankingId) !== active.homeBankingId
+            || positiveInteger(body.botJobId) !== active.botJobId) continue;
+          const scanStatus = text(body.status).toLowerCase();
+          setStatus(text(body.message) || 'Page Mappings rescan is running…');
+          if (scanStatus === 'done' || scanStatus === 'empty' || scanStatus === 'failed') {
+            retireRescan(pending.requestId);
+            if (scanStatus !== 'failed') {
+              bootstrap(active.bindingEpoch);
+            }
+          }
           continue;
         }
 
@@ -398,12 +569,22 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
         setStatus('Page Mappings received an invalid response.');
       }
     }
-  }, [bootstrap, loadCapture, messages, resetOwnerState, updateUrlHint]);
+  }, [bootstrap, loadCapture, messages, requestCacheState, resetOwnerState, retireRescan, updateUrlHint]);
 
   const captureElements = loadedCapture?.scanId === selectedScanId
     ? loadedCapture.elements
     : [];
   const selected = snapshots.find(item => item.scanId === selectedScanId) || null;
+
+  const useExisting = useCallback((scanId: string) => {
+    const candidate = snapshots.find(item => item.scanId === scanId && item.status === 'READY');
+    if (!candidate) {
+      setStatus('The reusable capture is no longer available. Reload Page Mappings.');
+      return;
+    }
+    loadCapture(candidate.scanId);
+    setStatus('Using the latest saved mapping for the active page.');
+  }, [loadCapture, snapshots]);
 
   const parseRectangle = useCallback((rectangle: CaptureRectangle) => {
     const dpr = loadedCapture?.viewport?.devicePixelRatio || 1;
@@ -618,6 +799,14 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
             )}
           </aside>
           <section className={styles.details} aria-label="Selected scan capture">
+            <PageMappingsCachePanel
+              cache={cacheState}
+              busy={cacheBusy || rescanBusy}
+              disabled={!connected || invalidated}
+              onRefresh={() => requestCacheState()}
+              onUseExisting={useExisting}
+              onRescan={rescan}
+            />
             {!selected ? <div className={styles.emptyDetail}>Select a capture to inspect its immutable metadata.</div> : (
               <>
                 <div className={styles.detailHeader}>
