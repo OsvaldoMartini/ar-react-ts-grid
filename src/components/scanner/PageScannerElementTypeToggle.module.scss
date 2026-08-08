@@ -1,0 +1,91 @@
+.toggle {
+  align-items: center;
+  background: linear-gradient(180deg, #ffffff 0%, #f3f8fc 100%);
+  border: 1px solid #8aa8bf;
+  border-radius: 999px;
+  box-shadow: 0 1px 3px rgba(15, 52, 77, 0.18);
+  box-sizing: border-box;
+  color: #17324d;
+  cursor: pointer;
+  display: grid;
+  gap: 2px;
+  grid-template-rows: auto 3px;
+  height: 30px;
+  justify-items: center;
+  min-width: 94px;
+  opacity: 1;
+  padding: 3px 9px 4px;
+  transition: box-shadow 120ms ease, filter 120ms ease, transform 120ms ease;
+  white-space: nowrap;
+}
+
+.toggle:hover:not(:disabled) {
+  box-shadow: 0 2px 7px rgba(15, 52, 77, 0.28);
+  filter: brightness(0.98);
+}
+
+.toggle:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.toggle:focus-visible {
+  outline: 2px solid #0b6ba8;
+  outline-offset: 2px;
+}
+
+.toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.68;
+}
+
+.currentType {
+  align-items: center;
+  display: inline-flex;
+  gap: 5px;
+  line-height: 1;
+}
+
+.currentType img {
+  height: 13px;
+  object-fit: contain;
+  width: 13px;
+}
+
+.currentType strong {
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.035em;
+}
+
+.positions {
+  align-items: center;
+  display: inline-flex;
+  gap: 3px;
+}
+
+.positions i {
+  background: #b7c6d1;
+  border-radius: 999px;
+  display: block;
+  height: 3px;
+  width: 9px;
+}
+
+.positions .selectedPosition {
+  background: currentColor;
+}
+
+.input {
+  border-color: #159b9b;
+  color: #087575;
+}
+
+.output {
+  border-color: #2879bd;
+  color: #155c96;
+}
+
+.click {
+  border-color: #d78722;
+  color: #a65308;
+}

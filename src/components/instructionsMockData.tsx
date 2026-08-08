@@ -1,4 +1,4 @@
-import type { WebElementExecutionType } from './webElementExecutionType';
+import type { PageScannerElementExecutionType } from './scanner/PageScannerElementExecutionType';
 
 // Sample data (mocketData)
 export interface BlockLoopInstructionLoadDTO {
@@ -62,7 +62,7 @@ export interface ElementDTO {
   active?: boolean | null;
   // Transient Page Scanner / Memory List execution override. It deliberately
   // leaves the scanner's raw tag, locator, and persisted classification intact.
-  executionTypeOverride?: WebElementExecutionType | null;
+  executionTypeOverride?: PageScannerElementExecutionType | null;
   // Bitstring of F/E/T/N/S toggled in GridItemScann before the element is
   // promoted to an instruction. Flows through to instruction.force_coordinates
   // on save (NEW_ELEMENT_DTO message).

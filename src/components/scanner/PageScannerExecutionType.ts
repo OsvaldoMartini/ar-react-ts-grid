@@ -1,9 +1,9 @@
 import type { ElementDTO } from '../instructionsMockData';
-import {
-  isWebElementExecutionType,
-  type WebElementExecutionType,
-} from '../webElementExecutionType';
 import { pageScannerLocatorElementKey } from './PageScannerLocator';
+import {
+  isPageScannerElementExecutionType,
+  type PageScannerElementExecutionType,
+} from './PageScannerElementExecutionType';
 
 export const inferredPageScannerGroupTagFor = (element: ElementDTO): string => {
   const decidedType = (element.typeElement ?? '').toLowerCase();
@@ -21,8 +21,8 @@ export const inferredPageScannerGroupTagFor = (element: ElementDTO): string => {
 
 export const pageScannerExecutionTypeFor = (
   element: ElementDTO,
-): WebElementExecutionType => {
-  if (isWebElementExecutionType(element.executionTypeOverride)) {
+): PageScannerElementExecutionType => {
+  if (isPageScannerElementExecutionType(element.executionTypeOverride)) {
     return element.executionTypeOverride;
   }
   const tag = inferredPageScannerGroupTagFor(element);
@@ -32,7 +32,7 @@ export const pageScannerExecutionTypeFor = (
 };
 
 export const pageScannerGroupTagFor = (element: ElementDTO): string => {
-  if (!isWebElementExecutionType(element.executionTypeOverride)) {
+  if (!isPageScannerElementExecutionType(element.executionTypeOverride)) {
     return inferredPageScannerGroupTagFor(element);
   }
   if (element.executionTypeOverride === 'INPUT') return 'input';
@@ -43,7 +43,7 @@ export const pageScannerGroupTagFor = (element: ElementDTO): string => {
 export const replacePageScannerExecutionTypeOverride = (
   elements: ElementDTO[],
   targetKey: string,
-  nextExecutionType: WebElementExecutionType,
+  nextExecutionType: PageScannerElementExecutionType,
 ): ElementDTO[] => elements.map((element) => (
   pageScannerLocatorElementKey(element) === targetKey
     ? { ...element, executionTypeOverride: nextExecutionType }

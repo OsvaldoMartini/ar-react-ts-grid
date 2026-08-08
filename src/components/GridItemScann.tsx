@@ -29,7 +29,7 @@ import { useBotJobDetailsController } from './bot-job-details/useBotJobDetailsCo
 import ScannerWorkspaceHeader from './scanner/ScannerWorkspaceHeader';
 import PageScannerWorkspaceHeader from './scanner/PageScannerWorkspaceHeader';
 import PageScannerExecutionControls from './scanner/PageScannerExecutionControls';
-import WebElementTypeToggle from './scanner/WebElementTypeToggle';
+import PageScannerElementTypeToggle from './scanner/PageScannerElementTypeToggle';
 import { pageScannerMemoryWorkspaceEpoch } from './scanner/PageScannerMemoryContract';
 import {
   matchesMemorySourceCommand,
@@ -42,12 +42,12 @@ import {
   type PendingMemoryListRequest,
 } from './memoryList.requestCorrelation';
 import ScrollingBannerText from './shared/ScrollingBannerText';
-import type { WebElementExecutionType } from './webElementExecutionType';
 import {
   pageScannerExecutionTypeFor,
   pageScannerGroupTagFor,
   replacePageScannerExecutionTypeOverride,
 } from './scanner/PageScannerExecutionType';
+import type { PageScannerElementExecutionType } from './scanner/PageScannerElementExecutionType';
 import PageScannerFocusProfileEditor, {
   type PageScannerFocusProfileDraft,
 } from './scanner/PageScannerFocusProfileEditor';
@@ -880,18 +880,22 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
 
   const handleElementExecutionTypeChange = (
     target: ElementDTO,
-    nextExecutionType: WebElementExecutionType,
+    nextExecutionType: PageScannerElementExecutionType,
   ) => {
     const targetKey = pageScannerLocatorElementKey(target);
     const updateElements = (current: ElementDTO[]) => (
       replacePageScannerExecutionTypeOverride(current, targetKey, nextExecutionType)
     );
 
+    // Scanner-only preview state. The explicit "+" action is the sole promotion
+    // boundary into Memory List; a toggle click must not broadcast to it.
     setElementDTO(updateElements);
-    setElementGrouped((current) => groupByTagName(
-      updateElements(Object.values(current).flatMap((group) => group.elements)),
+    setElementGrouped((current) => Object.fromEntries(
+      Object.entries(current).map(([groupName, group]) => [
+        groupName,
+        { ...group, elements: updateElements(group.elements) },
+      ]),
     ));
-    setMemoryElements(updateElements);
   };
 
   const startLocatorPanelDrag = (e: React.MouseEvent) => {
@@ -3780,7 +3784,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
                         {!isPreScanMode && (
                           <img src={saveImage} alt="" className={styles.saveButton} onClick={(event) => handleRowSelectedClick(event, elementDTO, "NEW_ELEMENT_DTO")} />
                         )}
-                        <WebElementTypeToggle
+                        <PageScannerElementTypeToggle
                           className={styles.executionTypeToggle}
                           value={pageScannerExecutionTypeFor(elementDTO)}
                           onChange={(nextExecutionType) => {
