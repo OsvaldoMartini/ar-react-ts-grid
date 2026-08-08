@@ -1,6 +1,5 @@
 import {
   isOcrConfigWorkspaceSession,
-  isOcrResultsWorkspaceSession,
   OCR_CONFIG_WORKSPACE_KIND,
   type OcrWorkspaceKind,
 } from '../scanner/Scanner.sessions';
@@ -20,8 +19,7 @@ export type OcrWorkspaceRetargetDisposition = 'FOCUS_ONLY' | 'SWITCH_SESSION';
 
 const isSessionForKind = (kind: OcrWorkspaceKind, sessionId: string): boolean =>
   kind === OCR_CONFIG_WORKSPACE_KIND
-    ? isOcrConfigWorkspaceSession(sessionId)
-    : isOcrResultsWorkspaceSession(sessionId);
+  && isOcrConfigWorkspaceSession(sessionId);
 
 const positiveSafeInteger = (value: unknown): number | null => {
   const parsed = Number(value);

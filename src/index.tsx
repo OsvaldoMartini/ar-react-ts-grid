@@ -33,7 +33,6 @@ import InfoPage, { INFO_PAGE_SESSION_ID } from './components/InfoPage';
 import LicensePage, { LICENSE_PAGE_SESSION_ID } from './components/LicensePage';
 import ActivationRequired from './components/ActivationRequired';
 import OCRConfigDetachedWorkspace from './components/ocr/OCRConfigDetachedWorkspace';
-import OCRResultsDetachedWorkspace from './components/ocr/OCRResultsDetachedWorkspace';
 import {
   ocrWorkspaceRetargetDisposition,
   ocrWorkspaceTargetUrl,
@@ -48,10 +47,8 @@ import {
 } from './components/bot-job-details/BotJobWindow.contract';
 import {
   isOcrConfigWorkspaceSession,
-  isOcrResultsWorkspaceSession,
   isPageScannerWorkspaceSession,
   OCR_CONFIG_WORKSPACE_KIND,
-  OCR_RESULTS_WORKSPACE_KIND,
   PAGE_SCANNER_WORKSPACE_KIND,
   PRE_SCANNER_GRID_SESSION_ID,
   SCANNER_GRID_SESSION_ID,
@@ -331,9 +328,7 @@ const App: React.FC = () => {
     if (openOcr || ocrSession) {
       const validConfig = openOcr === OCR_CONFIG_WORKSPACE_KIND
         && Boolean(ocrSession && isOcrConfigWorkspaceSession(ocrSession));
-      const validResults = openOcr === OCR_RESULTS_WORKSPACE_KIND
-        && Boolean(ocrSession && isOcrResultsWorkspaceSession(ocrSession));
-      if (!ocrSession || (!validConfig && !validResults)) {
+      if (!ocrSession || !validConfig) {
         console.error('Rejected invalid detached OCR workspace route.');
         return;
       }
@@ -616,16 +611,6 @@ const App: React.FC = () => {
       )}
       {isOcrConfigWorkspaceSession(sessionId) && (
         <OCRConfigDetachedWorkspace
-          key={sessionId}
-          socketPort={socketPort}
-          sessionId={sessionId}
-          onWorkspaceRetarget={onOcrWorkspaceRetarget}
-          onClose={closeDetachedWorkspace}
-          onWorkspaceNotice={showWorkspaceNotice}
-        />
-      )}
-      {isOcrResultsWorkspaceSession(sessionId) && (
-        <OCRResultsDetachedWorkspace
           key={sessionId}
           socketPort={socketPort}
           sessionId={sessionId}

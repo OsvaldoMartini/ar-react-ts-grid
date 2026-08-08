@@ -44,7 +44,7 @@ type Props = {
   }) => void;
   onDelete: (id: number) => void;
   onCleanup: () => void;
-  onTest: (parameters: OCRParameter[]) => void;
+  onTest?: (parameters: OCRParameter[]) => void;
   onClose: () => void;
   headerAction?: React.ReactNode;
 };
@@ -206,9 +206,11 @@ const OCRConfigPanel: React.FC<Props> = ({
         <button disabled={busy} onClick={onCleanup}>
           <Eraser size={15} aria-hidden="true" />Clean orphans
         </button>
-        <button disabled={busy} onClick={() => onTest(parameters)}>
-          <Play size={15} aria-hidden="true" />Test current page
-        </button>
+        {onTest && (
+          <button disabled={busy} onClick={() => onTest(parameters)}>
+            <Play size={15} aria-hidden="true" />Test current page
+          </button>
+        )}
         <span />
         <button disabled={busy} onClick={() => submit(true)}>Save as new</button>
         <button className={styles.primary} disabled={busy} onClick={() => submit(false)}>

@@ -7,8 +7,6 @@ const PAGE_SCANNER_SESSION = 'page-scanner-223e4567-e89b-42d3-a456-426614174000'
 const NEXT_PAGE_SCANNER_SESSION = 'page-scanner-323e4567-e89b-42d3-a456-426614174000';
 const OCR_CONFIG_SESSION = 'ocr-config-config-window-1';
 const NEXT_OCR_CONFIG_SESSION = 'ocr-config-config-window-2';
-const OCR_RESULTS_SESSION = 'ocr-results-results-window-1';
-const NEXT_OCR_RESULTS_SESSION = 'ocr-results-results-window-2';
 
 const installMockBackend = async (page: Page) => {
   await page.addInitScript(() => {
@@ -204,21 +202,15 @@ const installMockBackend = async (page: Page) => {
         }
 
         if (request.type === 'ocrWorkspace.bootstrap') {
-          const results = this.sessionId.startsWith('ocr-results-');
           const nextBinding = this.sessionId.endsWith('-2');
           this.reply('ocrWorkspace.bootstrapResponse', {
             ok: true,
-            kind: results ? 'results' : 'config',
+            kind: 'config',
             sessionId: this.sessionId,
             homeBankingId: 5,
             botJobId: nextBinding ? 84 : 42,
             homeUrlId: 8,
-            parameters: results ? [{
-              category: 'engine',
-              name: 'psm_mode',
-              valueType: 'integer',
-              value: '6',
-            }] : [],
+            parameters: [],
           });
           return;
         }
@@ -243,34 +235,6 @@ const installMockBackend = async (page: Page) => {
             }],
           });
           return;
-        }
-
-        if (request.type === 'ocrTest.run') {
-          this.reply('ocrTest.runResponse', {
-            ok: true,
-            source: 'elementDTO-PS.json',
-            wordCount: 4,
-            counts: { EXACT_CONTAIN: 1, OVERLAP: 0, PROXIMITY: 0, NONE: 1 },
-            rows: [{
-              definedName: 'login',
-              quality: 'EXACT_CONTAIN',
-              tag: 'button',
-              domText: 'Log in',
-              ocrText: 'Login now',
-              xPath: '/html/body/button',
-            }],
-          });
-          return;
-        }
-
-        if (request.type === 'ocrWorkspace.applySuggestions') {
-          const body = typeof request.body === 'string' ? JSON.parse(request.body) : {};
-          this.reply('ocrWorkspace.applySuggestionsResponse', {
-            ok: true,
-            published: true,
-            suggestionCount: Array.isArray(body.suggestions) ? body.suggestions.length : 0,
-            message: 'OCR suggestions sent to the scanner workspace.',
-          });
         }
       }
 
@@ -438,7 +402,8 @@ test('keeps Bot Job mounted while one detached Page Scanner retargets in place',
   await expect(scannerPage.getByRole('region', { name: 'Page Scanner' })).toHaveCount(1);
   await expect(scannerPage.getByRole('button', { name: 'Page Scanner', exact: true })).toBeEnabled();
   await expect(scannerPage.getByRole('button', { name: 'OCR Config' })).toBeEnabled();
-  await expect(scannerPage.getByRole('button', { name: 'OCR Results' })).toBeEnabled();
+  await expect(scannerPage.getByRole('button', { name: 'MAPPINGS' })).toBeEnabled();
+  await expect(scannerPage.getByRole('button', { name: 'OCR Results' })).toHaveCount(0);
   await expect(scannerPage.getByRole('button', { name: 'Refresh Web Page' })).toBeEnabled();
   await expect(scannerPage.getByText('Search Hidden Fields', { exact: true })).toBeVisible();
   await expect(scannerPage.getByPlaceholder('button, label, input, data-testid')).toBeVisible();
@@ -496,7 +461,7 @@ test('keeps Bot Job mounted while one detached Page Scanner retargets in place',
   await scannerPage.close();
 });
 
-test('keeps one independent OCR Config and one OCR Results window while both retarget in place', async ({ page }) => {
+test('keeps one independent OCR Config window while it retargets in place', async ({ page }) => {
   const pageErrors: string[] = [];
   page.on('pageerror', error => pageErrors.push(`bot-job: ${error.message}`));
   await page.setViewportSize({ width: 1240, height: 820 });
@@ -517,15 +482,13 @@ test('keeps one independent OCR Config and one OCR Results window while both ret
   await expect(scannerPage.getByTestId('detached-page-scanner-workspace')).toBeVisible();
 
   await scannerPage.getByRole('button', { name: 'OCR Config' }).click();
-  await scannerPage.getByRole('button', { name: 'OCR Results' }).click();
-  await expect.poll(async () => (await recordedRequests(scannerPage, 'ocrWorkspace.open')).length).toBe(2);
-  const parentOpenRequests = await recordedRequests(scannerPage, 'ocrWorkspace.open');
-  expect(parentOpenRequests.map(request => {
-    const body = typeof request.body === 'string' ? JSON.parse(request.body) : {};
-    return body.kind;
-  })).toEqual(['config', 'results']);
+  await expect.poll(async () => (await recordedRequests(scannerPage, 'ocrWorkspace.open')).length).toBe(1);
+  const [parentOpenRequest] = await recordedRequests(scannerPage, 'ocrWorkspace.open');
+  const parentOpenBody = typeof parentOpenRequest.body === 'string'
+    ? JSON.parse(parentOpenRequest.body)
+    : {};
+  expect(parentOpenBody.kind).toBe('config');
   await expect(scannerPage.getByTestId('ocr-config-workspace')).toHaveCount(0);
-  await expect(scannerPage.getByTestId('ocr-results-workspace')).toHaveCount(0);
 
   const configPage = await page.context().newPage();
   const configErrors: string[] = [];
@@ -544,31 +507,13 @@ test('keeps one independent OCR Config and one OCR Results window while both ret
   expect(await configPage.getByTestId('ocr-config-header').evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgb(11, 83, 148)');
   expect(await configPage.locator('[data-floating-workspace-drag-handle]').count()).toBe(0);
 
-  const resultsPage = await page.context().newPage();
-  const resultsErrors: string[] = [];
-  resultsPage.on('pageerror', error => resultsErrors.push(error.message));
-  await resultsPage.setViewportSize({ width: 1240, height: 820 });
-  await installMockBackend(resultsPage);
-  await resultsPage.goto(`/?desktopShell=1&openOcr=results&ocrSession=${OCR_RESULTS_SESSION}`);
-  const resultsWindow = resultsPage.getByTestId('ocr-results-window');
-  const resultsWorkspace = resultsPage.getByTestId('ocr-results-workspace');
-  await expect(resultsWindow).toBeVisible();
-  await expect(resultsWorkspace).toBeVisible();
-  await expect(resultsPage.getByText('Login now', { exact: true })).toBeVisible();
-  expect(await resultsWorkspace.evaluate(element => getComputedStyle(element).position)).toBe('static');
-  expect(await resultsPage.locator('[data-floating-workspace-drag-handle]').count()).toBe(0);
-
-  for (const [workspacePage, testId] of [
-    [configPage, 'ocr-config-window'],
-    [resultsPage, 'ocr-results-window'],
-  ] as const) {
-    const bounds = await workspacePage.getByTestId(testId).boundingBox();
-    expect(bounds).not.toBeNull();
-    expect(bounds!.x).toBeCloseTo(0, 0);
-    expect(bounds!.y).toBeCloseTo(0, 0);
-    expect(bounds!.width).toBeCloseTo(1240, 0);
-    expect(bounds!.height).toBeCloseTo(820, 0);
-  }
+  const bounds = await configWindow.boundingBox();
+  expect(bounds).not.toBeNull();
+  expect(bounds!.x).toBeCloseTo(0, 0);
+  expect(bounds!.y).toBeCloseTo(0, 0);
+  expect(bounds!.width).toBeCloseTo(1240, 0);
+  expect(bounds!.height).toBeCloseTo(820, 0);
+  await expect(configPage.getByRole('button', { name: 'Test current page' })).toHaveCount(0);
 
   const pageCountBeforeRetarget = page.context().pages().length;
   await sendServerMessage(configPage, OCR_CONFIG_SESSION, 'ocrWorkspace.windowRetarget', {
@@ -579,55 +524,24 @@ test('keeps one independent OCR Config and one OCR Results window while both ret
     botJobId: 84,
     homeUrlId: 8,
   });
-  await sendServerMessage(resultsPage, OCR_RESULTS_SESSION, 'ocrWorkspace.windowRetarget', {
-    kind: 'results',
-    previousSessionId: OCR_RESULTS_SESSION,
-    sessionId: NEXT_OCR_RESULTS_SESSION,
-    homeBankingId: 5,
-    botJobId: 84,
-    homeUrlId: 8,
-  });
   await expect.poll(() => new URL(configPage.url()).searchParams.get('ocrSession'))
     .toBe(NEXT_OCR_CONFIG_SESSION);
-  await expect.poll(() => new URL(resultsPage.url()).searchParams.get('ocrSession'))
-    .toBe(NEXT_OCR_RESULTS_SESSION);
   await expect(configPage.getByTestId('ocr-config-window')).toHaveCount(1);
-  await expect(resultsPage.getByTestId('ocr-results-window')).toHaveCount(1);
   await expect(configPage.getByLabel('Profile')).toHaveValue('7');
-  await expect(resultsPage.getByText('Login now', { exact: true })).toBeVisible();
   expect(page.context().pages().length).toBe(pageCountBeforeRetarget);
-
-  await configPage.getByRole('button', { name: 'Test current page' }).click();
-  await expect.poll(async () => (await recordedRequests(configPage, 'ocrWorkspace.open')).length).toBe(1);
-  const [configOpenResults] = await recordedRequests(configPage, 'ocrWorkspace.open');
-  expect(typeof configOpenResults.body === 'string' ? JSON.parse(configOpenResults.body).kind : '').toBe('results');
-
-  await resultsPage.getByLabel('Approve login').click();
-  await resultsPage.getByRole('button', { name: /Accept OCR names/ }).click();
-  await expect.poll(async () => resultsPage.evaluate(() => (
-    window as typeof window & { __AR_BOT_JOB_E2E__: { closeCalls: number } }
-  ).__AR_BOT_JOB_E2E__.closeCalls)).toBe(1);
 
   const configSessions = await configPage.evaluate(() => (
     window as typeof window & { __AR_BOT_JOB_E2E__: { socketSessions: string[] } }
   ).__AR_BOT_JOB_E2E__.socketSessions);
-  const resultsSessions = await resultsPage.evaluate(() => (
-    window as typeof window & { __AR_BOT_JOB_E2E__: { socketSessions: string[] } }
-  ).__AR_BOT_JOB_E2E__.socketSessions);
   expect(configSessions).toContain(OCR_CONFIG_SESSION);
   expect(configSessions).toContain(NEXT_OCR_CONFIG_SESSION);
-  expect(resultsSessions).toContain(OCR_RESULTS_SESSION);
-  expect(resultsSessions).toContain(NEXT_OCR_RESULTS_SESSION);
   expect(configSessions).not.toContain('mainDashboardBootstrap');
-  expect(resultsSessions).not.toContain('mainDashboardBootstrap');
 
   await configPage.close();
   expect(page.isClosed()).toBe(false);
   expect(scannerPage.isClosed()).toBe(false);
-  expect(resultsPage.isClosed()).toBe(false);
   await expect(page.getByTestId('bot-job-details-workspace')).toBeVisible();
   await expect(scannerPage.getByTestId('detached-page-scanner-workspace')).toBeVisible();
-  await expect(resultsWorkspace).toBeVisible();
 
   expect(await page.evaluate(() => (
     window as typeof window & { __AR_BOT_JOB_E2E__: { openCalls: string[] } }
@@ -635,7 +549,5 @@ test('keeps one independent OCR Config and one OCR Results window while both ret
   expect(pageErrors).toEqual([]);
   expect(scannerErrors).toEqual([]);
   expect(configErrors).toEqual([]);
-  expect(resultsErrors).toEqual([]);
-  await resultsPage.close();
   await scannerPage.close();
 });

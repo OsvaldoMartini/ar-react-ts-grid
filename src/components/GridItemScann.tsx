@@ -87,7 +87,6 @@ import {
 } from './scanner/PageScannerLocator';
 import {
   PAGE_SCANNER_ELEMENT_RENAME_RESPONSE,
-  applyPageScannerAliasesByXPath,
   normalizePageScannerClientNamed,
   pageScannerElementRenameMessage,
   replacePageScannerElementAlias,
@@ -119,7 +118,6 @@ import {
 } from './scanner/Scanner.operations';
 import {
   OCR_CONFIG_WORKSPACE_KIND,
-  OCR_RESULTS_WORKSPACE_KIND,
   isPageScannerWorkspaceSession,
   type OcrWorkspaceKind,
   SCANNER_ELEMENT_PANE_SESSION_ID,
@@ -1881,29 +1879,6 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
             break;
           }
 
-          // Roadmap 2 follow-on: AROcrTestResultsPane "Accept OCR Name" button delivers a list of
-          // {xPath, clientNamed} pairs derived from approved EXACT_CONTAIN rows. Apply each suggestion
-          // to the matching ElementDTO so the picker shows the OCR-derived label and the next big save
-          // (NEW_ELEMENT_DTO) carries it as instruction.client_named on the backend INSERT.
-          case "applyOcrSuggestions": {
-            const suggestions: Array<{ xPath: string; clientNamed: string }> = Array.isArray(bodyData?.suggestions)
-              ? bodyData.suggestions
-              : [];
-            if (suggestions.length === 0) break;
-            const byXPath = new Map<string, string>();
-            for (const s of suggestions) {
-              if (s && typeof s.xPath === 'string' && typeof s.clientNamed === 'string') {
-                byXPath.set(s.xPath, s.clientNamed);
-              }
-            }
-            setElementDTO((prev) => applyPageScannerAliasesByXPath(prev, byXPath));
-            setMemoryElements((prev) => applyPageScannerAliasesByXPath(prev, byXPath));
-            // Trigger a re-grouping so the row labels refresh from the new clientNamed values.
-            setIsElementGrouped(false);
-            console.log(`[applyOcrSuggestions] applied ${byXPath.size} OCR-derived clientNamed value(s).`);
-            break;
-          }
-
           case "ocrWorkspace.openResponse": {
             setOcrWorkspaceBusy(false);
             setOcrWorkspaceError(bodyData?.ok === false
@@ -2536,8 +2511,6 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
   };
   const openOcrConfig = (scope: Record<string, unknown> = {}) =>
     openOcrWorkspace(OCR_CONFIG_WORKSPACE_KIND, scope);
-  const openOcrResults = (scope: Record<string, unknown> = {}) =>
-    openOcrWorkspace(OCR_RESULTS_WORKSPACE_KIND, scope);
 
   const openPageMappings = () => {
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
@@ -3184,15 +3157,6 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
               title="OCR Configuration"
             >
               OCR Config
-            </button>
-            <button
-              type="button"
-              className={styles.preScanButton}
-              onClick={() => openOcrResults()}
-              disabled={preScanStatus.status === 'running' || preScanStatus.status === 'waiting' || ocrWorkspaceBusy}
-              title="Open highlighted OCR results for the newest page scan"
-            >
-              OCR Results
             </button>
             <button
               type="button"

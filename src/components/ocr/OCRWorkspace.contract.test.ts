@@ -1,8 +1,6 @@
 import {
   OCR_CONFIG_WORKSPACE_KIND,
-  OCR_RESULTS_WORKSPACE_KIND,
   isOcrConfigWorkspaceSession,
-  isOcrResultsWorkspaceSession,
   isOcrWorkspaceSession,
 } from '../scanner/Scanner.sessions';
 import {
@@ -13,19 +11,13 @@ import {
 
 const CURRENT_CONFIG = 'ocr-config-current-window';
 const NEXT_CONFIG = 'ocr-config-next-window';
-const CURRENT_RESULTS = 'ocr-results-current-window';
-const NEXT_RESULTS = 'ocr-results-next-window';
 
 test('validates OCR sessions with the exact backend kind and suffix grammar', () => {
   expect(isOcrConfigWorkspaceSession(CURRENT_CONFIG)).toBe(true);
-  expect(isOcrResultsWorkspaceSession(CURRENT_RESULTS)).toBe(true);
   expect(isOcrWorkspaceSession(NEXT_CONFIG)).toBe(true);
-  expect(isOcrWorkspaceSession(NEXT_RESULTS)).toBe(true);
-  expect(isOcrConfigWorkspaceSession(CURRENT_RESULTS)).toBe(false);
-  expect(isOcrResultsWorkspaceSession(CURRENT_CONFIG)).toBe(false);
+  expect(isOcrWorkspaceSession('ocr-results-current-window')).toBe(false);
   expect(isOcrWorkspaceSession('ocr-config-')).toBe(false);
   expect(isOcrWorkspaceSession('ocr-config-bad_value')).toBe(false);
-  expect(isOcrWorkspaceSession(`ocr-results-${'a'.repeat(81)}`)).toBe(false);
 });
 
 test('accepts a fresh same-kind OCR Config target only from the current binding', () => {
@@ -49,20 +41,7 @@ test('accepts a fresh same-kind OCR Config target only from the current binding'
   expect(ocrWorkspaceRetargetDisposition(retarget!, CURRENT_CONFIG)).toBe('SWITCH_SESSION');
 });
 
-test('treats the current OCR Results session as a focus-only target', () => {
-  const retarget = ocrWorkspaceRetarget({
-    kind: OCR_RESULTS_WORKSPACE_KIND,
-    previousSessionId: CURRENT_RESULTS,
-    sessionId: CURRENT_RESULTS,
-    homeBankingId: 7,
-    botJobId: 42,
-  }, CURRENT_RESULTS, OCR_RESULTS_WORKSPACE_KIND);
-
-  expect(retarget).not.toBeNull();
-  expect(ocrWorkspaceRetargetDisposition(retarget!, CURRENT_RESULTS)).toBe('FOCUS_ONLY');
-});
-
-test('rejects stale, cross-kind, and incomplete OCR retarget messages', () => {
+test('rejects stale and incomplete OCR Config retarget messages', () => {
   const valid = {
     kind: OCR_CONFIG_WORKSPACE_KIND,
     previousSessionId: CURRENT_CONFIG,
@@ -71,8 +50,7 @@ test('rejects stale, cross-kind, and incomplete OCR retarget messages', () => {
     botJobId: 42,
   };
   expect(ocrWorkspaceRetarget({ ...valid, previousSessionId: NEXT_CONFIG }, CURRENT_CONFIG, OCR_CONFIG_WORKSPACE_KIND)).toBeNull();
-  expect(ocrWorkspaceRetarget({ ...valid, sessionId: NEXT_RESULTS }, CURRENT_CONFIG, OCR_CONFIG_WORKSPACE_KIND)).toBeNull();
-  expect(ocrWorkspaceRetarget({ ...valid, kind: OCR_RESULTS_WORKSPACE_KIND }, CURRENT_CONFIG, OCR_CONFIG_WORKSPACE_KIND)).toBeNull();
+  expect(ocrWorkspaceRetarget({ ...valid, sessionId: 'ocr-results-next-window' }, CURRENT_CONFIG, OCR_CONFIG_WORKSPACE_KIND)).toBeNull();
   expect(ocrWorkspaceRetarget({ ...valid, botJobId: 0 }, CURRENT_CONFIG, OCR_CONFIG_WORKSPACE_KIND)).toBeNull();
   expect(ocrWorkspaceRetarget({ ...valid, homeUrlId: -1 }, CURRENT_CONFIG, OCR_CONFIG_WORKSPACE_KIND)).toBeNull();
 });
@@ -86,5 +64,5 @@ test('replaces the detached OCR URL without creating another browser window', ()
   expect(target.searchParams.get('desktopShell')).toBe('1');
   expect(target.searchParams.get('openOcr')).toBe(OCR_CONFIG_WORKSPACE_KIND);
   expect(target.searchParams.get('ocrSession')).toBe(NEXT_CONFIG);
-  expect(() => ocrWorkspaceTargetUrl(target.toString(), OCR_CONFIG_WORKSPACE_KIND, NEXT_RESULTS)).toThrow();
+  expect(() => ocrWorkspaceTargetUrl(target.toString(), OCR_CONFIG_WORKSPACE_KIND, 'ocr-results-next-window')).toThrow();
 });

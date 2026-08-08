@@ -4,10 +4,7 @@ import OCRConfigPanel, {
   type OCRParameter,
 } from '../OCRConfigPanel';
 import PagesOpenButton from '../PagesOpenButton';
-import {
-  OCR_CONFIG_WORKSPACE_KIND,
-  OCR_RESULTS_WORKSPACE_KIND,
-} from '../scanner/Scanner.sessions';
+import { OCR_CONFIG_WORKSPACE_KIND } from '../scanner/Scanner.sessions';
 import { useWebSocket } from '../useWebSocket';
 import {
   OCR_WORKSPACE_WINDOW_RETARGET_OPERATION,
@@ -226,24 +223,6 @@ const OCRConfigWorkspace: React.FC<Props> = ({
               : messageError(body, 'Cleanup failed.'));
             break;
 
-          case 'ocrWorkspace.openResponse':
-            setBusy(false);
-            if (body?.ok === false) {
-              setError(messageError(body, 'OCR Results could not be opened.'));
-            } else if (
-              body?.alreadyOpen === true
-              || body?.reused === true
-              || body?.focusOnly === true
-              || (typeof body?.message === 'string' && /already open/i.test(body.message))
-            ) {
-              const notice = String(body?.message || 'OCR Results workspace already open.');
-              setError(notice);
-              onWorkspaceNotice?.(notice);
-            } else {
-              setError('');
-            }
-            break;
-
           case 'license.requiredResponse':
             setBusy(false);
             setError(messageError(body, 'An active license is required.'));
@@ -284,18 +263,6 @@ const OCRConfigWorkspace: React.FC<Props> = ({
     sendCommand('ocrConfig.delete', { profileId, confirmed: true });
   };
 
-  const openResults = (parameters: OCRParameter[]) => {
-    if (!context) return;
-    setBusy(true);
-    setError('');
-    sendCommand('ocrWorkspace.open', {
-      kind: OCR_RESULTS_WORKSPACE_KIND,
-      homeBankingId: context.homeBankingId,
-      ...(context.homeUrlId ? { homeUrlId: context.homeUrlId } : {}),
-      parameters,
-    });
-  };
-
   return (
     <OCRConfigPanel
       data={config}
@@ -314,7 +281,6 @@ const OCRConfigWorkspace: React.FC<Props> = ({
         setError('');
         sendCommand('ocrConfig.cleanupPreview', { homeBankingId: context.homeBankingId });
       }}
-      onTest={openResults}
       onClose={onClose ?? (() => void 0)}
       headerAction={(
         <PagesOpenButton
