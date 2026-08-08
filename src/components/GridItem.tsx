@@ -187,6 +187,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
     activeDraggedInstructionId,
     moveGraphRevision,
     botJobGraphMutationCapability,
+    memoryWorkspaceEpoch,
     variableLinks,
     commandConfigurations,
     relationshipEdgesByInstruction,
@@ -249,6 +250,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
     botJobId: Number.isSafeInteger(Number(botJobId)) && Number(botJobId) > 0
       ? Number(botJobId)
       : null,
+    workspaceEpoch: memoryWorkspaceEpoch,
   });
   const gridInstructionMatchesFind = React.useCallback((
     instruction: BlockLoopInstructionLoadDTO,

@@ -73,6 +73,7 @@ type PendingMemoryListCommand = {
 
 const EMPTY_SNAPSHOT: MemoryListSnapshot = {
   ownerEpoch: '',
+  workspaceEpoch: 0,
   sourceKind: 'BOT_JOB',
   homeBankingId: -1,
   botJobId: -1,

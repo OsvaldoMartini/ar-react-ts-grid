@@ -280,6 +280,8 @@ test('Bot Job block plus stages its complete connected dependency union atomical
     sessionId: 'botJobTasks',
     botJobIdInitial: 5,
     botJobNameInitial: 'Drag regression',
+    // Dev takeover may start with a placeholder; the correlated server response below owns epoch 7.
+    workspaceEpochInitial: 1,
     onSessionOpen: jest.fn(),
   };
   const view = render(<GridItem {...props} />);
@@ -311,6 +313,7 @@ test('Bot Job block plus stages its complete connected dependency union atomical
       targetSessionId: 'botJobTasks',
       homeBankingId: 2,
       botJobId: 5,
+      workspaceEpoch: 7,
       graphRevision,
       capabilities: [101, 102, 103].map(instructionId => ({
         instructionId,
@@ -345,13 +348,79 @@ test('Bot Job block plus stages its complete connected dependency union atomical
     .reverse()
     .map(([payload]) => JSON.parse(payload))
     .find(message => message.type === 'memoryList.open');
-  const snapshot = JSON.parse(open.body).snapshot;
+  const openBody = JSON.parse(open.body);
+  const snapshot = openBody.snapshot;
+  expect(openBody.workspaceEpoch).toBe(7);
+  expect(snapshot.workspaceEpoch).toBe(7);
   expect(snapshot.items.map(
     (item: { payload: { instructionId: number } }) => item.payload.instructionId,
   )).toEqual([101, 102, 103]);
   expect(new Set(snapshot.items.map(
     (item: { dependencyGroupKey?: string }) => item.dependencyGroupKey,
   )).size).toBe(1);
+
+  mockMessages = [...mockMessages, JSON.stringify({
+    sessionId: 'botJobTasks',
+    homeBankingId: 2,
+    operationId: 'memoryList.openResponse',
+    body: JSON.stringify({
+      ok: true,
+      requestId: openBody.requestId,
+      botJobId: 5,
+      homeBankingId: 2,
+      workspaceEpoch: 7,
+      ownerEpoch: 'memory-owner-7',
+    }),
+  })];
+  view.rerender(<GridItem {...props} />);
+  await waitFor(() => expect(mockSend.mock.calls
+    .map(([payload]) => JSON.parse(payload))
+    .filter(message => message.type === 'memoryList.sync')
+    .some(message => JSON.parse(message.body).snapshot.items.length === 3))
+    .toBe(true));
+
+  const synchronizedBeforeStaleCommand = mockSend.mock.calls
+    .map(([payload]) => JSON.parse(payload))
+    .filter(message => message.type === 'memoryList.sync').length;
+  mockMessages = [...mockMessages, JSON.stringify({
+    sessionId: 'botJobTasks',
+    homeBankingId: 2,
+    operationId: 'memoryList.command',
+    body: JSON.stringify({
+      botJobId: 5,
+      workspaceEpoch: 6,
+      ownerEpoch: 'memory-owner-7',
+      command: 'CLEAR',
+      payload: {},
+    }),
+  })];
+  view.rerender(<GridItem {...props} />);
+  expect(mockSend.mock.calls
+    .map(([payload]) => JSON.parse(payload))
+    .filter(message => message.type === 'memoryList.sync')).toHaveLength(
+      synchronizedBeforeStaleCommand,
+    );
+
+  mockMessages = [...mockMessages, JSON.stringify({
+    sessionId: 'botJobTasks',
+    homeBankingId: 2,
+    operationId: 'memoryList.command',
+    body: JSON.stringify({
+      botJobId: 5,
+      workspaceEpoch: 7,
+      ownerEpoch: 'memory-owner-7',
+      command: 'CLEAR',
+      payload: {},
+    }),
+  })];
+  view.rerender(<GridItem {...props} />);
+  await waitFor(() => {
+    const syncMessages = mockSend.mock.calls
+      .map(([payload]) => JSON.parse(payload))
+      .filter(message => message.type === 'memoryList.sync');
+    expect(syncMessages.length).toBeGreaterThan(synchronizedBeforeStaleCommand);
+    expect(JSON.parse(syncMessages[syncMessages.length - 1].body).snapshot.items).toEqual([]);
+  });
 });
 
 test('an authoritative empty block never triggers the legacy automatic BLOCK_ORDER writer', async () => {
@@ -482,8 +551,7 @@ test('Memory Apply structured refresh keeps the source and renders its fresh cop
     .not.toContain('BLOCK_ORDER');
 });
 
-test('legacy producer Memory Apply cannot emit ROW_MOVE or remove its source row', async () => {
-  const warning = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+test('an uncorrelated producer Memory Apply cannot emit ROW_MOVE or remove its source row', async () => {
   const props = {
     homeBankingIdInitial: 2,
     data: [row],
@@ -526,14 +594,8 @@ test('legacy producer Memory Apply cannot emit ROW_MOVE or remove its source row
   })];
   view.rerender(<GridItem {...props} />);
 
-  await waitFor(() => {
-    expect(warning).toHaveBeenCalledWith(
-      'Ignored legacy producer-side Memory Apply; the backend owns this transaction.',
-    );
-  });
   expect(mockSend.mock.calls
     .map(([payload]) => JSON.parse(payload).type))
     .not.toContain('ROW_MOVE');
   expect(screen.getByText('(101)Continue')).toBeInTheDocument();
-  warning.mockRestore();
 });

@@ -94,6 +94,9 @@ const capabilityResponseForLastRequest = (
       targetSessionId: requestedBody.targetSessionId,
       homeBankingId: requestedBody.homeBankingId,
       botJobId: requestedBody.botJobId,
+      ...(requestedBody.workspaceEpoch > 0
+        ? { workspaceEpoch: requestedBody.workspaceEpoch }
+        : {}),
       graphRevision: computeInstructionGraphRevision(instructionRows, []),
       capabilities: instructionRows.map(instruction => ({
         instructionId: instruction.id,
@@ -152,13 +155,15 @@ beforeEach(() => {
 });
 
 test('row plus stages a typed COMPONENT instruction and exposes no component target blocks', async () => {
-  const view = render(<GridItemComp {...props} />);
-  await authorizeGrid(view);
+  const epochProps = { ...props, workspaceEpochInitial: 7 };
+  const view = render(<GridItemComp {...epochProps} />);
+  await authorizeGrid(view, epochProps);
   expect(screen.queryByAltText('Stage whole component block in memory')).not.toBeInTheDocument();
   fireEvent.click(screen.getAllByTitle('Add step to memory list')[0]);
 
   await waitFor(() => {
     expect(latestMemorySnapshot()).toEqual(expect.objectContaining({
+      workspaceEpoch: 7,
       sourceKind: 'COMPONENT',
       blocks: [],
       items: [expect.objectContaining({

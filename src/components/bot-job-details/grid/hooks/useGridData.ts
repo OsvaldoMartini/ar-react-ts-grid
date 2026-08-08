@@ -69,6 +69,10 @@ import constructionImage from '../../../../assets/construction.png';
 import forbiddenImage from '../../../../assets/forbidden.png';
 import warningRedImage from '../../../../assets/warning_red.png';
 import type { VariableCommandConfiguration } from '../../../variablesWorkspace.contract';
+import {
+  matchesMemorySourceCommand,
+  matchesMemoryWorkspaceEpoch,
+} from '../../../memoryList.sourceCorrelation';
 
 type BlockDeleteCapability = {
   canDelete: boolean;
@@ -280,6 +284,7 @@ export function useGridData(deps: UseGridDataDeps) {
     botJobGraphMutationCapability,
     setBotJobGraphMutationCapability,
   ] = useState<BotJobGraphMutationCapability | null>(null);
+  const [memoryWorkspaceEpoch, setMemoryWorkspaceEpoch] = useState(0);
   const [blockDeleteCapabilities, setBlockDeleteCapabilities] = useState<Map<number, BlockDeleteCapability>>(new Map());
   const [moveGraphRevision, setMoveGraphRevision] = useState('');
   const deleteContextRef = useRef({
@@ -288,6 +293,24 @@ export function useGridData(deps: UseGridDataDeps) {
     moveGraphRevision,
     memoryCapabilities,
   });
+
+  useEffect(() => {
+    setMemoryWorkspaceEpoch(0);
+    memoryListOpenRequestedRef.current = false;
+    memoryListOpenedRef.current = false;
+    memoryListOpenPendingRequestRef.current = null;
+    memoryListOwnerEpochRef.current = '';
+  }, [
+    botJobId,
+    homeBankingId,
+    memoryListOpenPendingRequestRef,
+    memoryListOpenRequestedRef,
+    memoryListOpenedRef,
+    memoryListOwnerEpochRef,
+    sessionId,
+    workspaceEpoch,
+    workspaceKind,
+  ]);
   deleteContextRef.current = {
     instructionsData,
     variableLinks,
@@ -733,11 +756,13 @@ export function useGridData(deps: UseGridDataDeps) {
   useEffect(() => {
     if (!memoryListOpenRequestedRef.current && !memoryListOpenedRef.current) return;
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN || !botJobId || botJobId <= 0) return;
+    if (memoryWorkspaceEpoch <= 0) return;
     if (memoryListOpenRequestedRef.current && memoryListOpenPendingRequestRef.current) return;
 
     const componentWorkspace = workspaceKind === 'COMPONENT';
     const snapshot: MemoryListSnapshot = {
       ownerEpoch: memoryListOwnerEpochRef.current,
+      workspaceEpoch: memoryWorkspaceEpoch,
       sourceKind: componentWorkspace ? 'COMPONENT' : 'BOT_JOB',
       homeBankingId,
       botJobId,
@@ -780,6 +805,7 @@ export function useGridData(deps: UseGridDataDeps) {
           requestId,
           homeBankingId,
           botJobId,
+          workspaceEpoch: memoryWorkspaceEpoch,
           ownerEpoch: memoryListOwnerEpochRef.current,
           snapshot,
         }),
@@ -807,6 +833,7 @@ export function useGridData(deps: UseGridDataDeps) {
     pendingMemoryMove,
     sessionId,
     webSocket,
+    memoryWorkspaceEpoch,
     workspaceKind,
   ]);
 
@@ -1272,6 +1299,7 @@ export function useGridData(deps: UseGridDataDeps) {
           const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
           if (String(bodyData?.requestId || '') !== memoryListOpenPendingRequestRef.current) return;
           memoryListOpenPendingRequestRef.current = null;
+          if (!matchesMemoryWorkspaceEpoch(bodyData, memoryWorkspaceEpoch)) return;
           const ownerEpoch = String(bodyData?.ownerEpoch || '');
           if (bodyData?.ok === false || !ownerEpoch) {
             memoryListOpenedRef.current = false;
@@ -1352,6 +1380,7 @@ export function useGridData(deps: UseGridDataDeps) {
           }
         } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "memoryList.syncResponse") {
           const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
+          if (!matchesMemoryWorkspaceEpoch(bodyData, memoryWorkspaceEpoch)) return;
           if (
             bodyData?.ok === false
             && String(bodyData?.ownerEpoch || '') === memoryListOwnerEpochRef.current
@@ -1366,6 +1395,11 @@ export function useGridData(deps: UseGridDataDeps) {
             ? bodyData.payload
             : bodyData;
           if (Number(bodyData?.botJobId) !== Number(botJobId)) return;
+          if (!matchesMemorySourceCommand(
+            bodyData,
+            memoryWorkspaceEpoch,
+            memoryListOwnerEpochRef.current,
+          )) return;
 
           if (command === 'REMOVE') {
             const sourceItemKey = String(
@@ -1566,6 +1600,7 @@ export function useGridData(deps: UseGridDataDeps) {
           }
           pendingCapabilityRequestRef.current = null;
           if (bodyData?.ok === false) {
+            setMemoryWorkspaceEpoch(0);
             setMoveGraphRevision('');
             setBotJobGraphMutationCapability(null);
             setMemoryCapabilities(new Map());
@@ -1643,6 +1678,11 @@ export function useGridData(deps: UseGridDataDeps) {
           }
           setCommandConfigurations(commandConfigurations);
           const responseWorkspaceEpoch = Number(bodyData?.workspaceEpoch);
+          setMemoryWorkspaceEpoch(
+            Number.isSafeInteger(responseWorkspaceEpoch) && responseWorkspaceEpoch > 0
+              ? responseWorkspaceEpoch
+              : 0,
+          );
           setRelationshipChipsV1(
             workspaceKind === 'BOT_JOB'
             && bodyData?.workspaceCapabilities?.relationshipChipsV1 === true
@@ -2038,6 +2078,7 @@ export function useGridData(deps: UseGridDataDeps) {
   }, [
     handleBotJobGraphMutationMessage, messages, onDetachedClose, onSessionOpen,
     pendingMemoryMove, sessionId, socketPort, updateOperation, workspaceKind,
+    memoryWorkspaceEpoch,
   ]);
 
   useEffect(() => {
@@ -3397,6 +3438,7 @@ export function useGridData(deps: UseGridDataDeps) {
     activeDraggedInstructionId,
     moveGraphRevision,
     botJobGraphMutationCapability,
+    memoryWorkspaceEpoch,
     variableLinks,
     commandConfigurations,
     relationshipChipsV1,

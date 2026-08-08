@@ -263,8 +263,10 @@ test('retargets atomically, ignores a late capture, and stages only authoritativ
   await waitFor(() => expect(sent('memoryList.open')).toHaveLength(1));
   const memoryBody = JSON.parse(sent('memoryList.open')[0].body);
   expect(memoryBody.sourceBindingEpoch).toBe('binding-b');
+  expect(memoryBody.workspaceEpoch).toBe(2);
   expect(memoryBody.snapshot.homeBankingId).toBe(2);
   expect(memoryBody.snapshot.botJobId).toBe(20);
+  expect(memoryBody.snapshot.workspaceEpoch).toBe(2);
   expect(memoryBody.snapshot.items[0].payload).toEqual({
     captureId: 'scan-b',
     pageKey: 'page-b',

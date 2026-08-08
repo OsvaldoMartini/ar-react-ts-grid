@@ -469,6 +469,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
 
   const memorySnapshot = useMemo<MemoryListSnapshot>(() => ({
     ownerEpoch: memoryOwnerEpoch,
+    workspaceEpoch: binding?.workspaceEpoch || 0,
     sourceKind: 'PAGE_MAPPINGS',
     homeBankingId: binding?.homeBankingId || 0,
     botJobId: binding?.botJobId || 0,
@@ -503,6 +504,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
         sourceBindingEpoch: binding.bindingEpoch,
         homeBankingId: binding.homeBankingId,
         botJobId: binding.botJobId,
+        workspaceEpoch: binding.workspaceEpoch,
         ownerEpoch: memoryOwnerEpoch,
         snapshot: memorySnapshot,
       }),

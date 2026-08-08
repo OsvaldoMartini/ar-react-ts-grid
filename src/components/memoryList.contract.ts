@@ -113,6 +113,7 @@ export interface MemoryListItem<
 
 export interface MemoryListSnapshot {
   ownerEpoch: string;
+  workspaceEpoch: number;
   sourceKind: MemoryListSourceKind;
   homeBankingId: number;
   botJobId: number;

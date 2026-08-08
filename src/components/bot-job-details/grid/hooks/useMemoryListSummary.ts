@@ -14,6 +14,7 @@ interface UseMemoryListSummaryOptions {
   sessionId: string;
   homeBankingId: number;
   botJobId: number | null;
+  workspaceEpoch: number | null;
 }
 
 const parseBody = (envelope: any): any => {
@@ -45,6 +46,7 @@ export const useMemoryListSummary = ({
   sessionId,
   homeBankingId,
   botJobId,
+  workspaceEpoch,
 }: UseMemoryListSummaryOptions): number => {
   const [itemCount, setItemCount] = useState(0);
   const processedMessageCountRef = useRef(0);
@@ -53,12 +55,14 @@ export const useMemoryListSummary = ({
   useEffect(() => {
     setItemCount(0);
     subscriptionKeyRef.current = '';
-  }, [botJobId, homeBankingId, sessionId, webSocket]);
+  }, [botJobId, homeBankingId, sessionId, webSocket, workspaceEpoch]);
 
   useEffect(() => {
     if (!connected || !webSocket || webSocket.readyState !== WebSocket.OPEN
-      || botJobId === null || botJobId <= 0 || homeBankingId <= 0) return;
-    const subscriptionKey = `${sessionId}:${homeBankingId}:${botJobId}`;
+      || botJobId === null || botJobId <= 0 || homeBankingId <= 0
+      || (workspaceEpoch !== null
+        && (!Number.isSafeInteger(workspaceEpoch) || workspaceEpoch <= 0))) return;
+    const subscriptionKey = `${sessionId}:${homeBankingId}:${botJobId}:${workspaceEpoch}`;
     if (subscriptionKeyRef.current === subscriptionKey) return;
     subscriptionKeyRef.current = subscriptionKey;
     try {
@@ -66,12 +70,16 @@ export const useMemoryListSummary = ({
         type: 'memoryList.summary',
         sessionId,
         homeBankingId,
-        body: JSON.stringify({ homeBankingId, botJobId }),
+        body: JSON.stringify({
+          homeBankingId,
+          botJobId,
+          ...(workspaceEpoch === null ? {} : { workspaceEpoch }),
+        }),
       }));
     } catch {
       subscriptionKeyRef.current = '';
     }
-  }, [botJobId, connected, homeBankingId, sessionId, webSocket]);
+  }, [botJobId, connected, homeBankingId, sessionId, webSocket, workspaceEpoch]);
 
   useEffect(() => {
     if (processedMessageCountRef.current > messages.length) {
@@ -96,13 +104,17 @@ export const useMemoryListSummary = ({
         if (Number.isSafeInteger(messageHomeBankingId)
           && messageHomeBankingId > 0
           && messageHomeBankingId !== homeBankingId) return;
+        const messageWorkspaceEpoch = Number(
+          body.workspaceEpoch ?? body.snapshot?.workspaceEpoch,
+        );
+        if (workspaceEpoch !== null && messageWorkspaceEpoch !== workspaceEpoch) return;
         const nextItemCount = bodyItemCount(body);
         if (nextItemCount !== null) setItemCount(nextItemCount);
       } catch {
         // Other workspace messages are intentionally ignored.
       }
     });
-  }, [botJobId, homeBankingId, messages, sessionId]);
+  }, [botJobId, homeBankingId, messages, sessionId, workspaceEpoch]);
 
   return itemCount;
 };

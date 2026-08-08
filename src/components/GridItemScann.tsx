@@ -30,6 +30,11 @@ import ScannerWorkspaceHeader from './scanner/ScannerWorkspaceHeader';
 import PageScannerWorkspaceHeader from './scanner/PageScannerWorkspaceHeader';
 import PageScannerExecutionControls from './scanner/PageScannerExecutionControls';
 import WebElementTypeToggle from './scanner/WebElementTypeToggle';
+import { pageScannerMemoryWorkspaceEpoch } from './scanner/PageScannerMemoryContract';
+import {
+  matchesMemorySourceCommand,
+  matchesMemoryWorkspaceEpoch,
+} from './memoryList.sourceCorrelation';
 import ScrollingBannerText from './shared/ScrollingBannerText';
 import type { WebElementExecutionType } from './webElementExecutionType';
 import {
@@ -125,6 +130,7 @@ export interface GridItemScannProps {
   homeBankingIdInitial: number;
   botJobIdInitial: number;
   botJobNameInitial: string;
+  workspaceEpochInitial?: number;
   dataDTO: ElementDTO[];
   socketPort: number;
   sessionId: string;
@@ -247,6 +253,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
   homeBankingIdInitial,
   botJobIdInitial,
   botJobNameInitial,
+  workspaceEpochInitial = 0,
   dataDTO,
   socketPort,
   sessionId,
@@ -261,6 +268,10 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
   const [homeBankingId, setHomeBankingId] = useState<number>(homeBankingIdInitial);
   const [botJobId, setBotJobId] = useState<number | null>(botJobIdInitial);
   const [botJobName, setBotJobName] = useState<string | null>(botJobNameInitial);
+  const memoryWorkspaceEpoch = pageScannerMemoryWorkspaceEpoch(
+    sessionId,
+    workspaceEpochInitial,
+  );
   const canonicalMemoryItemCount = useMemoryListSummary({
     webSocket,
     connected,
@@ -268,6 +279,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
     sessionId,
     homeBankingId,
     botJobId,
+    workspaceEpoch: memoryWorkspaceEpoch,
   });
 
   const [elementDTO, setElementDTO] = useState<ElementDTO[]>(dataDTO);
@@ -725,12 +737,14 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
   useEffect(() => {
     if (!memoryListOpenRequestedRef.current && !memoryListOpenedRef.current) return;
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN || !botJobId || botJobId <= 0) return;
+    if (memoryWorkspaceEpoch !== null && memoryWorkspaceEpoch <= 0) return;
     if (memoryListOpenRequestedRef.current && memoryListOpenPendingRequestRef.current) return;
 
     const activeItems = memoryElements.filter(isElementActive);
     const busy = memoryApplyBusy || createBlockBusy;
     const snapshot: MemoryListSnapshot = {
       ownerEpoch: memoryListOwnerEpochRef.current,
+      workspaceEpoch: memoryWorkspaceEpoch ?? 0,
       sourceKind: 'PAGE_SCANNER',
       homeBankingId,
       botJobId,
@@ -759,6 +773,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
           requestId,
           homeBankingId,
           botJobId,
+          ...(memoryWorkspaceEpoch === null ? {} : { workspaceEpoch: memoryWorkspaceEpoch }),
           ownerEpoch: memoryListOwnerEpochRef.current,
           snapshot,
         }),
@@ -781,6 +796,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
     memoryBlockOptions,
     memoryElements,
     memoryListOpenVersion,
+    memoryWorkspaceEpoch,
     memoryTargetBlockId,
     sessionId,
     webSocket,
@@ -1360,6 +1376,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
           case 'memoryList.openResponse': {
             if (String(bodyData?.requestId || '') !== memoryListOpenPendingRequestRef.current) break;
             memoryListOpenPendingRequestRef.current = null;
+            if (!matchesMemoryWorkspaceEpoch(bodyData, memoryWorkspaceEpoch ?? 0)) break;
             const ownerEpoch = String(bodyData?.ownerEpoch || '');
             if (bodyData?.ok === false || !ownerEpoch) {
               memoryListOpenedRef.current = false;
@@ -1378,6 +1395,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
             break;
           }
           case 'memoryList.syncResponse': {
+            if (!matchesMemoryWorkspaceEpoch(bodyData, memoryWorkspaceEpoch ?? 0)) break;
             if (
               bodyData?.ok === false
               && String(bodyData?.ownerEpoch || '') === memoryListOwnerEpochRef.current
@@ -1393,6 +1411,11 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
               ? bodyData.payload
               : bodyData;
             if (Number(bodyData?.botJobId) !== Number(botJobId)) break;
+            if (!matchesMemorySourceCommand(
+              bodyData,
+              memoryWorkspaceEpoch ?? 0,
+              memoryListOwnerEpochRef.current,
+            )) break;
 
             if (command === 'REMOVE') {
               const itemKey = String(
@@ -2002,7 +2025,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
 
     // ✅ mark all messages as processed
     lastProcessedIndexRef.current = messages.length;
-  }, [isDetachedPageScanner, messages, sessionId]);
+  }, [isDetachedPageScanner, memoryWorkspaceEpoch, messages, sessionId]);
 
   useEffect(() => {
     //console.log("UseEffect -> editingInstructionId");

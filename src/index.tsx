@@ -575,6 +575,7 @@ const App: React.FC = () => {
             sessionId={sessionId}
             botJobIdInitial={botJobId}
             botJobNameInitial={botJobName}
+            workspaceEpochInitial={botJobWorkspaceEpoch}
             onSessionOpen={onSessionOpen}
             onDetachedClose={closeDetachedWorkspace}
             onWorkspaceNotice={showWorkspaceNotice}
@@ -591,6 +592,7 @@ const App: React.FC = () => {
             sessionId={sessionId}
             botJobIdInitial={botJobId}
             botJobNameInitial={botJobName}
+            workspaceEpochInitial={botJobWorkspaceEpoch}
             onSessionOpen={onSessionOpen}
             onDetachedClose={closeDetachedWorkspace}
             onWorkspaceNotice={showWorkspaceNotice}
@@ -606,6 +608,7 @@ const App: React.FC = () => {
           sessionId={sessionId}
           botJobIdInitial={botJobId}
           botJobNameInitial={botJobName}
+          workspaceEpochInitial={botJobWorkspaceEpoch}
           onSessionOpen={onSessionOpen}
           onDetachedClose={closeDetachedWorkspace}
           onWorkspaceNotice={showWorkspaceNotice}
