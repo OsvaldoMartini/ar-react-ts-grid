@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import clickImage from '../assets/click.png';
 import excelImage from '../assets/excel.png';
 import inputImage from '../assets/input_field.png';
@@ -23,6 +23,15 @@ import { useWebSocket } from './useWebSocket';
 import styles from './MemoryList.module.scss';
 
 export const MEMORY_LIST_SESSION_ID = 'memoryListManager';
+
+export function memoryListConnectionQuery(
+  sessionId: string,
+  search: string,
+): Readonly<Record<string, string>> | undefined {
+  if (sessionId !== MEMORY_LIST_SESSION_ID) return undefined;
+  const windowCapability = new URLSearchParams(search).get('windowCapability')?.trim() || '';
+  return windowCapability ? { windowCapability } : undefined;
+}
 
 interface MemoryListProps {
   socketPort: number;
@@ -180,7 +189,15 @@ function createAndApplyFeedback(
 const MemoryList: React.FC<MemoryListProps> = ({ socketPort, sessionId, onClose, demoMode = false }) => {
   useEffect(() => { document.title = 'Memory List'; }, []);
 
-  const { webSocket, connected, messages, error } = useWebSocket(socketPort, sessionId);
+  const connectionQuery = useMemo(
+    () => memoryListConnectionQuery(sessionId, window.location.search),
+    [sessionId],
+  );
+  const { webSocket, connected, messages, error } = useWebSocket(
+    socketPort,
+    sessionId,
+    connectionQuery,
+  );
   const processedMessageCountRef = useRef(0);
   const commandSequenceRef = useRef(0);
   const feedbackSequenceRef = useRef(0);
