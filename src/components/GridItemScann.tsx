@@ -33,8 +33,13 @@ import WebElementTypeToggle from './scanner/WebElementTypeToggle';
 import { pageScannerMemoryWorkspaceEpoch } from './scanner/PageScannerMemoryContract';
 import {
   matchesMemorySourceCommand,
-  matchesMemoryWorkspaceEpoch,
 } from './memoryList.sourceCorrelation';
+import {
+  classifyMemoryListResponse,
+  createPendingMemoryListRequest,
+  type MemoryListRequestContext,
+  type PendingMemoryListRequest,
+} from './memoryList.requestCorrelation';
 import ScrollingBannerText from './shared/ScrollingBannerText';
 import type { WebElementExecutionType } from './webElementExecutionType';
 import {
@@ -446,9 +451,18 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
   const [memoryElements, setMemoryElements] = useState<ElementDTO[]>([]);
   const memoryListOpenRequestedRef = useRef(false);
   const memoryListOpenedRef = useRef(false);
-  const memoryListOpenPendingRequestRef = useRef<string | null>(null);
+  const memoryListOpenPendingRequestRef = useRef<PendingMemoryListRequest | null>(null);
+  const memoryListSyncPendingRequestRef = useRef<PendingMemoryListRequest | null>(null);
   const memoryListOwnerEpochRef = useRef('');
   const [memoryListOpenVersion, setMemoryListOpenVersion] = useState(0);
+
+  useEffect(() => {
+    memoryListOpenRequestedRef.current = false;
+    memoryListOpenedRef.current = false;
+    memoryListOpenPendingRequestRef.current = null;
+    memoryListSyncPendingRequestRef.current = null;
+    memoryListOwnerEpochRef.current = '';
+  }, [botJobId, homeBankingId, memoryWorkspaceEpoch, sessionId]);
 
   const [locatorPanelOpen, setLocatorPanelOpen] = useState<boolean>(false);
   const [locatorPanelPos, setLocatorPanelPos] = useState<{ x: number; y: number }>({ x: 120, y: 150 });
@@ -762,6 +776,23 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
     };
     const operation = memoryListOpenRequestedRef.current ? 'memoryList.open' : 'memoryList.sync';
     const requestId = `memory-list-${Date.now()}-${operation === 'memoryList.open' ? 'open' : 'sync'}`;
+    const requestContext: MemoryListRequestContext = {
+      sessionId,
+      homeBankingId,
+      botJobId,
+      workspaceEpoch: memoryWorkspaceEpoch,
+      ownerEpoch: memoryListOwnerEpochRef.current,
+    };
+    const pendingRequest = createPendingMemoryListRequest(
+      operation === 'memoryList.open' ? 'OPEN' : 'SYNC',
+      requestId,
+      requestContext,
+    );
+    if (operation === 'memoryList.open') {
+      memoryListOpenPendingRequestRef.current = pendingRequest;
+    } else {
+      memoryListSyncPendingRequestRef.current = pendingRequest;
+    }
 
     try {
       webSocket.send(JSON.stringify({
@@ -778,12 +809,13 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
           snapshot,
         }),
       }));
-      if (operation === 'memoryList.open') {
-        memoryListOpenPendingRequestRef.current = requestId;
-      }
     } catch (memoryListError) {
       if (operation === 'memoryList.open') {
-        memoryListOpenPendingRequestRef.current = null;
+        if (memoryListOpenPendingRequestRef.current?.requestId === requestId) {
+          memoryListOpenPendingRequestRef.current = null;
+        }
+      } else if (memoryListSyncPendingRequestRef.current?.requestId === requestId) {
+        memoryListSyncPendingRequestRef.current = null;
       }
       console.error('Could not synchronize Page Scanner Memory List:', memoryListError);
     }
@@ -1374,11 +1406,22 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
 
         switch (parsedMessage.operationId) {
           case 'memoryList.openResponse': {
-            if (String(bodyData?.requestId || '') !== memoryListOpenPendingRequestRef.current) break;
+            const disposition = classifyMemoryListResponse(
+              bodyData,
+              'OPEN',
+              memoryListOpenPendingRequestRef.current,
+              {
+                sessionId,
+                homeBankingId,
+                botJobId: botJobId ?? 0,
+                workspaceEpoch: memoryWorkspaceEpoch,
+                ownerEpoch: memoryListOwnerEpochRef.current,
+              },
+            );
+            if (disposition === 'IGNORE') break;
             memoryListOpenPendingRequestRef.current = null;
-            if (!matchesMemoryWorkspaceEpoch(bodyData, memoryWorkspaceEpoch ?? 0)) break;
             const ownerEpoch = String(bodyData?.ownerEpoch || '');
-            if (bodyData?.ok === false || !ownerEpoch) {
+            if (disposition !== 'SUCCESS') {
               memoryListOpenedRef.current = false;
               memoryListOpenRequestedRef.current = false;
               memoryListOwnerEpochRef.current = '';
@@ -1395,11 +1438,21 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
             break;
           }
           case 'memoryList.syncResponse': {
-            if (!matchesMemoryWorkspaceEpoch(bodyData, memoryWorkspaceEpoch ?? 0)) break;
-            if (
-              bodyData?.ok === false
-              && String(bodyData?.ownerEpoch || '') === memoryListOwnerEpochRef.current
-            ) {
+            const disposition = classifyMemoryListResponse(
+              bodyData,
+              'SYNC',
+              memoryListSyncPendingRequestRef.current,
+              {
+                sessionId,
+                homeBankingId,
+                botJobId: botJobId ?? 0,
+                workspaceEpoch: memoryWorkspaceEpoch,
+                ownerEpoch: memoryListOwnerEpochRef.current,
+              },
+            );
+            if (disposition === 'IGNORE') break;
+            memoryListSyncPendingRequestRef.current = null;
+            if (disposition !== 'SUCCESS') {
               memoryListOpenedRef.current = false;
               memoryListOwnerEpochRef.current = '';
             }
@@ -1644,7 +1697,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
               : '';
             if (
               responseRequestId
-              && responseRequestId === memoryListOpenPendingRequestRef.current
+              && responseRequestId === memoryListOpenPendingRequestRef.current?.requestId
             ) {
               memoryListOpenPendingRequestRef.current = null;
               memoryListOpenedRef.current = false;

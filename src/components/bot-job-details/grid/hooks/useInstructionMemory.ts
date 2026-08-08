@@ -19,6 +19,7 @@ import {
   BOT_JOB_INSTRUCTION_GRID_POLICY,
   type InstructionGridWorkspacePolicy,
 } from '../instructionGrid.policy';
+import type { PendingMemoryListRequest } from '../../../memoryList.requestCorrelation';
 
 /** Per-instruction Memory-List capability flags, keyed by instruction id. */
 export type MemoryCapability = {
@@ -86,7 +87,7 @@ export interface UseInstructionMemory {
   /** Refs coordinating the detached Memory-List open/sync handshake. */
   memoryListOpenRequestedRef: React.MutableRefObject<boolean>;
   memoryListOpenedRef: React.MutableRefObject<boolean>;
-  memoryListOpenPendingRequestRef: React.MutableRefObject<string | null>;
+  memoryListOpenPendingRequestRef: React.MutableRefObject<PendingMemoryListRequest | null>;
   memoryListOwnerEpochRef: React.MutableRefObject<string>;
   /** Ask the detached Memory List to (re)open; bumps the open version the sync effect watches. */
   requestMemoryListOpen: () => void;
@@ -163,7 +164,7 @@ export function useInstructionMemory(
   const [memoryMoveStatus, setMemoryMoveStatus] = useState('');
   const memoryListOpenRequestedRef = useRef(false);
   const memoryListOpenedRef = useRef(false);
-  const memoryListOpenPendingRequestRef = useRef<string | null>(null);
+  const memoryListOpenPendingRequestRef = useRef<PendingMemoryListRequest | null>(null);
   const memoryListOwnerEpochRef = useRef('');
   const [memoryListOpenVersion, setMemoryListOpenVersion] = useState(0);
 

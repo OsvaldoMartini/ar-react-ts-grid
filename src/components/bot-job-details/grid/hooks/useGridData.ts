@@ -71,8 +71,13 @@ import warningRedImage from '../../../../assets/warning_red.png';
 import type { VariableCommandConfiguration } from '../../../variablesWorkspace.contract';
 import {
   matchesMemorySourceCommand,
-  matchesMemoryWorkspaceEpoch,
 } from '../../../memoryList.sourceCorrelation';
+import {
+  classifyMemoryListResponse,
+  createPendingMemoryListRequest,
+  type MemoryListRequestContext,
+  type PendingMemoryListRequest,
+} from '../../../memoryList.requestCorrelation';
 
 type BlockDeleteCapability = {
   canDelete: boolean;
@@ -183,7 +188,7 @@ export interface UseGridDataDeps {
   handleRemoveComponentMemoryItem: (sourceItemKey: string) => void;
   memoryListOpenRequestedRef: React.MutableRefObject<boolean>;
   memoryListOpenedRef: React.MutableRefObject<boolean>;
-  memoryListOpenPendingRequestRef: React.MutableRefObject<string | null>;
+  memoryListOpenPendingRequestRef: React.MutableRefObject<PendingMemoryListRequest | null>;
   memoryListOwnerEpochRef: React.MutableRefObject<string>;
   // useExcelExport surface
   pendingExcelExportDirectoryRequestRef: React.MutableRefObject<string | null>;
@@ -285,6 +290,25 @@ export function useGridData(deps: UseGridDataDeps) {
     setBotJobGraphMutationCapability,
   ] = useState<BotJobGraphMutationCapability | null>(null);
   const [memoryWorkspaceEpoch, setMemoryWorkspaceEpoch] = useState(0);
+  const memoryWorkspaceEpochRef = useRef(0);
+  const memoryListSyncPendingRequestRef = useRef<PendingMemoryListRequest | null>(null);
+  const installMemoryWorkspaceEpoch = useCallback((nextEpoch: number) => {
+    if (memoryWorkspaceEpochRef.current === nextEpoch) return;
+    const reopenRequested = memoryListOpenRequestedRef.current
+      || memoryListOpenedRef.current;
+    memoryWorkspaceEpochRef.current = nextEpoch;
+    memoryListOpenPendingRequestRef.current = null;
+    memoryListSyncPendingRequestRef.current = null;
+    memoryListOpenedRef.current = false;
+    memoryListOwnerEpochRef.current = '';
+    memoryListOpenRequestedRef.current = reopenRequested;
+    setMemoryWorkspaceEpoch(nextEpoch);
+  }, [
+    memoryListOpenPendingRequestRef,
+    memoryListOpenRequestedRef,
+    memoryListOpenedRef,
+    memoryListOwnerEpochRef,
+  ]);
   const [blockDeleteCapabilities, setBlockDeleteCapabilities] = useState<Map<number, BlockDeleteCapability>>(new Map());
   const [moveGraphRevision, setMoveGraphRevision] = useState('');
   const deleteContextRef = useRef({
@@ -295,10 +319,12 @@ export function useGridData(deps: UseGridDataDeps) {
   });
 
   useEffect(() => {
+    memoryWorkspaceEpochRef.current = 0;
     setMemoryWorkspaceEpoch(0);
     memoryListOpenRequestedRef.current = false;
     memoryListOpenedRef.current = false;
     memoryListOpenPendingRequestRef.current = null;
+    memoryListSyncPendingRequestRef.current = null;
     memoryListOwnerEpochRef.current = '';
   }, [
     botJobId,
@@ -794,6 +820,23 @@ export function useGridData(deps: UseGridDataDeps) {
     };
     const operation = memoryListOpenRequestedRef.current ? 'memoryList.open' : 'memoryList.sync';
     const requestId = `memory-list-${Date.now()}-${operation === 'memoryList.open' ? 'open' : 'sync'}`;
+    const requestContext: MemoryListRequestContext = {
+      sessionId,
+      homeBankingId,
+      botJobId,
+      workspaceEpoch: memoryWorkspaceEpoch,
+      ownerEpoch: memoryListOwnerEpochRef.current,
+    };
+    const pendingRequest = createPendingMemoryListRequest(
+      operation === 'memoryList.open' ? 'OPEN' : 'SYNC',
+      requestId,
+      requestContext,
+    );
+    if (operation === 'memoryList.open') {
+      memoryListOpenPendingRequestRef.current = pendingRequest;
+    } else {
+      memoryListSyncPendingRequestRef.current = pendingRequest;
+    }
 
     try {
       webSocket.send(JSON.stringify({
@@ -810,12 +853,13 @@ export function useGridData(deps: UseGridDataDeps) {
           snapshot,
         }),
       }));
-      if (operation === 'memoryList.open') {
-        memoryListOpenPendingRequestRef.current = requestId;
-      }
     } catch (memoryListError) {
       if (operation === 'memoryList.open') {
-        memoryListOpenPendingRequestRef.current = null;
+        if (memoryListOpenPendingRequestRef.current?.requestId === requestId) {
+          memoryListOpenPendingRequestRef.current = null;
+        }
+      } else if (memoryListSyncPendingRequestRef.current?.requestId === requestId) {
+        memoryListSyncPendingRequestRef.current = null;
       }
       console.error('Could not synchronize detached Memory List:', memoryListError);
     }
@@ -1297,16 +1341,31 @@ export function useGridData(deps: UseGridDataDeps) {
         const parsedMessage = JSON.parse(message);
         if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "memoryList.openResponse") {
           const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
-          if (String(bodyData?.requestId || '') !== memoryListOpenPendingRequestRef.current) return;
+          const disposition = classifyMemoryListResponse(
+            bodyData,
+            'OPEN',
+            memoryListOpenPendingRequestRef.current,
+            {
+              sessionId,
+              homeBankingId,
+              botJobId: botJobId ?? 0,
+              workspaceEpoch: memoryWorkspaceEpochRef.current,
+              ownerEpoch: memoryListOwnerEpochRef.current,
+            },
+          );
+          if (disposition === 'IGNORE') return;
           memoryListOpenPendingRequestRef.current = null;
-          if (!matchesMemoryWorkspaceEpoch(bodyData, memoryWorkspaceEpoch)) return;
           const ownerEpoch = String(bodyData?.ownerEpoch || '');
-          if (bodyData?.ok === false || !ownerEpoch) {
+          if (disposition !== 'SUCCESS') {
             memoryListOpenedRef.current = false;
             memoryListOpenRequestedRef.current = false;
             memoryListOwnerEpochRef.current = '';
             setMemoryMoveStatus(String(
-              bodyData?.message || bodyData?.error || 'Memory List workspace could not be opened.',
+              bodyData?.message || bodyData?.error || (
+                disposition === 'INVALID_SUCCESS'
+                  ? 'Memory List returned a response for another workspace.'
+                  : 'Memory List workspace could not be opened.'
+              ),
             ));
           } else {
             memoryListOwnerEpochRef.current = ownerEpoch;
@@ -1380,13 +1439,26 @@ export function useGridData(deps: UseGridDataDeps) {
           }
         } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "memoryList.syncResponse") {
           const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
-          if (!matchesMemoryWorkspaceEpoch(bodyData, memoryWorkspaceEpoch)) return;
-          if (
-            bodyData?.ok === false
-            && String(bodyData?.ownerEpoch || '') === memoryListOwnerEpochRef.current
-          ) {
+          const disposition = classifyMemoryListResponse(
+            bodyData,
+            'SYNC',
+            memoryListSyncPendingRequestRef.current,
+            {
+              sessionId,
+              homeBankingId,
+              botJobId: botJobId ?? 0,
+              workspaceEpoch: memoryWorkspaceEpochRef.current,
+              ownerEpoch: memoryListOwnerEpochRef.current,
+            },
+          );
+          if (disposition === 'IGNORE') return;
+          memoryListSyncPendingRequestRef.current = null;
+          if (disposition !== 'SUCCESS') {
             memoryListOpenedRef.current = false;
             memoryListOwnerEpochRef.current = '';
+            setMemoryMoveStatus(String(
+              bodyData?.message || bodyData?.error || 'Memory List synchronization failed.',
+            ));
           }
         } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "memoryList.command") {
           const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
@@ -1397,7 +1469,7 @@ export function useGridData(deps: UseGridDataDeps) {
           if (Number(bodyData?.botJobId) !== Number(botJobId)) return;
           if (!matchesMemorySourceCommand(
             bodyData,
-            memoryWorkspaceEpoch,
+            memoryWorkspaceEpochRef.current,
             memoryListOwnerEpochRef.current,
           )) return;
 
@@ -1600,7 +1672,7 @@ export function useGridData(deps: UseGridDataDeps) {
           }
           pendingCapabilityRequestRef.current = null;
           if (bodyData?.ok === false) {
-            setMemoryWorkspaceEpoch(0);
+            installMemoryWorkspaceEpoch(0);
             setMoveGraphRevision('');
             setBotJobGraphMutationCapability(null);
             setMemoryCapabilities(new Map());
@@ -1678,7 +1750,7 @@ export function useGridData(deps: UseGridDataDeps) {
           }
           setCommandConfigurations(commandConfigurations);
           const responseWorkspaceEpoch = Number(bodyData?.workspaceEpoch);
-          setMemoryWorkspaceEpoch(
+          installMemoryWorkspaceEpoch(
             Number.isSafeInteger(responseWorkspaceEpoch) && responseWorkspaceEpoch > 0
               ? responseWorkspaceEpoch
               : 0,
@@ -2078,7 +2150,7 @@ export function useGridData(deps: UseGridDataDeps) {
   }, [
     handleBotJobGraphMutationMessage, messages, onDetachedClose, onSessionOpen,
     pendingMemoryMove, sessionId, socketPort, updateOperation, workspaceKind,
-    memoryWorkspaceEpoch,
+    botJobId, homeBankingId, installMemoryWorkspaceEpoch, memoryWorkspaceEpoch,
   ]);
 
   useEffect(() => {
