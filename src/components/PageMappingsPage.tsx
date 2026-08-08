@@ -27,7 +27,6 @@ type Snapshot = {
   pageUrl: string;
   capturedAt: string;
   elementCount: number;
-  artifactPath: string;
   manifestSha256: string;
   status: 'READY' | 'FAILED' | 'STAGED' | string;
   pinned: boolean;
@@ -98,9 +97,41 @@ const parseBinding = (body: Record<string, unknown>): PageMappingsBinding | null
   };
 };
 
+const parseSnapshot = (value: unknown): Snapshot | null => {
+  if (!value || typeof value !== 'object') return null;
+  const source = value as Record<string, unknown>;
+  const scanId = text(source.scanId);
+  const pageKey = text(source.pageKey);
+  const capturedAt = text(source.capturedAt);
+  if (!scanId || !pageKey || !capturedAt) return null;
+  const homeUrlId = positiveInteger(source.homeUrlId);
+  return {
+    scanId,
+    ...(homeUrlId ? { homeUrlId } : {}),
+    pageKey,
+    pageUrl: text(source.pageUrl),
+    capturedAt,
+    elementCount: positiveInteger(source.elementCount),
+    manifestSha256: text(source.manifestSha256),
+    status: text(source.status),
+    pinned: source.pinned === true,
+  };
+};
+
 const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
   useEffect(() => { document.title = 'Page Mappings'; }, []);
-  const { webSocket, connected, messages } = useWebSocket(socketPort, sessionId);
+  const windowCapability = useMemo(() => {
+    const value = new URLSearchParams(window.location.search).get('windowCapability');
+    return value && value.trim() ? value : '';
+  }, []);
+  const connectionQueryParameters = useMemo(() => windowCapability
+    ? { windowCapability }
+    : undefined, [windowCapability]);
+  const { webSocket, connected, messages } = useWebSocket(
+    socketPort,
+    sessionId,
+    connectionQueryParameters,
+  );
   const sourceBotJobHint = useMemo(() => {
     const value = Number(new URLSearchParams(window.location.search).get('sourceBotJobId'));
     return Number.isSafeInteger(value) && value > 0 ? value : 0;
@@ -118,19 +149,25 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
   const [captureImageSize, setCaptureImageSize] = useState({ width: 0, height: 0 });
   const [memoryItems, setMemoryItems] = useState<MappingMemoryItem[]>([]);
   const [memoryOwnerEpoch, setMemoryOwnerEpoch] = useState('');
+  const [invalidated, setInvalidated] = useState(false);
+  const invalidatedRef = useRef(false);
+  const bindingEstablishedRef = useRef(false);
+  const memoryOwnerEpochRef = useRef('');
   const memoryOpenRequested = useRef(false);
   const memoryOpened = useRef(false);
   const workspaceCursor = useRef(0);
   const memoryCursor = useRef(0);
   const pendingBootstrap = useRef<string | null>(null);
   const pendingCapture = useRef<{ requestId: string; scanId: string; bindingEpoch: string } | null>(null);
+  const pendingMemory = useRef<{ requestId: string; bindingEpoch: string } | null>(null);
 
   const updateUrlHint = useCallback((botJobId: number) => {
     const url = new URL(window.location.href);
     url.searchParams.set('sourceBotJobId', String(botJobId));
     url.searchParams.delete('homeBankingId');
+    if (windowCapability) url.searchParams.set('windowCapability', windowCapability);
     window.history.replaceState(window.history.state, '', url);
-  }, []);
+  }, [windowCapability]);
 
   const resetOwnerState = useCallback(() => {
     setSnapshots([]);
@@ -142,12 +179,19 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
     setCaptureImageSize({ width: 0, height: 0 });
     setMemoryItems([]);
     setMemoryOwnerEpoch('');
+    memoryOwnerEpochRef.current = '';
     memoryOpenRequested.current = false;
     memoryOpened.current = false;
+    pendingBootstrap.current = null;
     pendingCapture.current = null;
+    pendingMemory.current = null;
   }, []);
 
   const bootstrap = useCallback((expectedBindingEpoch?: string) => {
+    if (invalidatedRef.current && !expectedBindingEpoch) {
+      setStatus('Page Mappings is unavailable.');
+      return;
+    }
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
       setStatus('Page Mappings is disconnected.');
       return;
@@ -199,6 +243,23 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
           ? JSON.parse(envelope.body)
           : envelope.body || {}) as Record<string, unknown>;
 
+        if (operation === 'pageMappings.invalidated') {
+          const activeBinding = bindingRef.current;
+          if ((activeBinding && (
+            text(body.bindingEpoch) !== activeBinding.bindingEpoch
+            || positiveInteger(body.workspaceEpoch) !== activeBinding.workspaceEpoch
+            || positiveInteger(body.homeBankingId) !== activeBinding.homeBankingId
+            || positiveInteger(body.botJobId) !== activeBinding.botJobId
+          )) || (!activeBinding && bindingEstablishedRef.current)) continue;
+          bindingRef.current = null;
+          setBinding(null);
+          resetOwnerState();
+          invalidatedRef.current = true;
+          setInvalidated(true);
+          setStatus('Page Mappings is unavailable.');
+          continue;
+        }
+
         if (operation === 'pageMappings.retarget') {
           const nextBinding = parseBinding(body);
           if (!nextBinding) {
@@ -206,9 +267,12 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
             continue;
           }
           if (bindingRef.current?.bindingEpoch === nextBinding.bindingEpoch) continue;
+          bindingEstablishedRef.current = true;
           bindingRef.current = nextBinding;
           setBinding(nextBinding);
           resetOwnerState();
+          invalidatedRef.current = false;
+          setInvalidated(false);
           updateUrlHint(nextBinding.botJobId);
           setStatus(`Switching to Bot Job #${nextBinding.botJobId}…`);
           bootstrap(nextBinding.bindingEpoch);
@@ -229,10 +293,15 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
           }
           if (bindingRef.current && bindingRef.current.bindingEpoch !== nextBinding.bindingEpoch) continue;
           pendingBootstrap.current = null;
+          bindingEstablishedRef.current = true;
           bindingRef.current = nextBinding;
           setBinding(nextBinding);
+          invalidatedRef.current = false;
+          setInvalidated(false);
           updateUrlHint(nextBinding.botJobId);
-          const next = Array.isArray(body.snapshots) ? body.snapshots as Snapshot[] : [];
+          const next = Array.isArray(body.snapshots)
+            ? body.snapshots.map(parseSnapshot).filter((item): item is Snapshot => item !== null)
+            : [];
           setSnapshots(next);
           const initial = next.find(item => item.status === 'READY') || null;
           setSelectedScanId(initial?.scanId ?? null);
@@ -380,7 +449,12 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
   }), [binding, memoryItems, memoryOwnerEpoch]);
 
   useEffect(() => {
-    if (!webSocket || webSocket.readyState !== WebSocket.OPEN || !binding || !memoryItems.length) return;
+    if (!webSocket
+      || webSocket.readyState !== WebSocket.OPEN
+      || !binding
+      || !memoryItems.length
+      || invalidatedRef.current
+      || bindingRef.current?.bindingEpoch !== binding.bindingEpoch) return;
     const operation = memoryOpenRequested.current || !memoryOpened.current ? 'memoryList.open' : 'memoryList.sync';
     const nextRequestId = requestId('memory');
     webSocket.send(JSON.stringify({
@@ -397,6 +471,10 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
         snapshot: memorySnapshot,
       }),
     }));
+    pendingMemory.current = {
+      requestId: nextRequestId,
+      bindingEpoch: binding.bindingEpoch,
+    };
     memoryOpenRequested.current = false;
   }, [binding, memoryItems, memoryOwnerEpoch, memorySnapshot, sessionId, webSocket]);
 
@@ -408,14 +486,36 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
         const operation = envelope.operationId || envelope.type;
         const body = typeof envelope.body === 'string' ? JSON.parse(envelope.body) : envelope.body || {};
         if (operation === 'memoryList.openResponse' || operation === 'memoryList.syncResponse') {
+          const pending = pendingMemory.current;
+          if (!pending
+            || text(body.requestId) !== pending.requestId
+            || bindingRef.current?.bindingEpoch !== pending.bindingEpoch) continue;
           if (!body.ok) {
+            pendingMemory.current = null;
             setStatus(body.message || 'Memory List could not be updated.');
             continue;
           }
-          if (typeof body.ownerEpoch === 'string') setMemoryOwnerEpoch(body.ownerEpoch);
+          const activeBinding = bindingRef.current;
+          const nextOwnerEpoch = text(body.ownerEpoch);
+          if (!activeBinding
+            || positiveInteger(body.homeBankingId) !== activeBinding.homeBankingId
+            || positiveInteger(body.botJobId) !== activeBinding.botJobId
+            || !nextOwnerEpoch) continue;
+          pendingMemory.current = null;
+          memoryOwnerEpochRef.current = nextOwnerEpoch;
+          setMemoryOwnerEpoch(nextOwnerEpoch);
           memoryOpened.current = true;
           setStatus(body.message || 'Selected mapping added to Memory List.');
         } else if (operation === 'memoryList.command') {
+          const activeBinding = bindingRef.current;
+          const commandOwnerEpoch = text(body.ownerEpoch);
+          const commandBindingEpoch = text(body.sourceBindingEpoch) || text(body.bindingEpoch);
+          if (!activeBinding
+            || positiveInteger(body.homeBankingId) !== activeBinding.homeBankingId
+            || positiveInteger(body.botJobId) !== activeBinding.botJobId
+            || commandBindingEpoch !== activeBinding.bindingEpoch
+            || !memoryOwnerEpochRef.current
+            || commandOwnerEpoch !== memoryOwnerEpochRef.current) continue;
           const command = String(body.command || body.action || '').toUpperCase();
           const itemKey = String(body.payload?.sourceItemKey || body.payload?.itemKey || '');
           if (command === 'CLEAR') setMemoryItems([]);
@@ -430,7 +530,10 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
   const captureImage = loadedCapture?.screenshotBase64
     ? `data:${loadedCapture.screenshotMime};base64,${loadedCapture.screenshotBase64}`
     : null;
-  const canStage = Boolean(loadedCapture && loadedCapture.scanId === selectedScanId && !captureLoading);
+  const canStage = Boolean(!invalidated
+    && loadedCapture
+    && loadedCapture.scanId === selectedScanId
+    && !captureLoading);
 
   return (
     <DetachedPageShell title="Page Mappings" testId="page-mappings-workspace" onClose={onClose}>
@@ -440,12 +543,12 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
             <p className={styles.eyebrow}>PAGE SCAN HISTORY</p>
             <h1>Page Mappings</h1>
             <p className={styles.subtitle}>
-              Owner-scoped captures for Bot Job {binding?.botJobId || sourceBotJobHint || '—'}
+              Owner-scoped captures for Bot Job {binding?.botJobId || (!invalidated && sourceBotJobHint) || '—'}
               {binding?.botJobName ? ` · ${binding.botJobName}` : ''}
             </p>
           </div>
           <div className={styles.actions}>
-            <button type="button" onClick={() => bootstrap(binding?.bindingEpoch)} disabled={!connected}>Reload</button>
+            <button type="button" onClick={() => bootstrap(binding?.bindingEpoch)} disabled={!connected || invalidated}>Reload</button>
             <PagesOpenButton webSocket={webSocket} connected={connected} messages={messages} sessionId={sessionId} />
             <button type="button" className={styles.close} onClick={onClose}>Close</button>
           </div>
@@ -487,7 +590,6 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
                   <div><dt>Captured</dt><dd>{new Date(selected.capturedAt).toLocaleString()}</dd></div>
                   <div><dt>Elements</dt><dd>{selected.elementCount}</dd></div>
                   <div><dt>Page key</dt><dd>{selected.pageKey}</dd></div>
-                  <div><dt>Artifact folder</dt><dd>{selected.artifactPath || 'Unavailable'}</dd></div>
                   <div><dt>Manifest SHA-256</dt><dd className={styles.hash}>{selected.manifestSha256 || 'Unavailable'}</dd></div>
                 </dl>
                 <div className={styles.notice}>Capture artifacts are read-only. Select an element or drag it into Memory List to stage it for the active Bot Job.</div>

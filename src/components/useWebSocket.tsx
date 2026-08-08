@@ -5,6 +5,21 @@ const RECONNECT_DELAY_MS = 2000;
 const MAX_RECONNECT_DELAY_MS = 10000;
 const PING_INTERVAL_MS = 15000;
 
+export type WebSocketQueryParameters = Readonly<Record<
+  string,
+  string | number | boolean | null | undefined
+>>;
+
+const serializeQueryParameters = (parameters?: WebSocketQueryParameters): string => {
+  if (!parameters) return '';
+  const query = new URLSearchParams();
+  Object.entries(parameters)
+    .filter(([key, value]) => key !== 'sessionId' && key.trim() !== '' && value != null)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .forEach(([key, value]) => query.append(key, String(value)));
+  return query.toString();
+};
+
 type ApplicationControlOperation = 'application.shutdown' | 'application.workspaceClose';
 
 interface WorkspaceFocusRequest {
@@ -97,7 +112,12 @@ const applicationControlOperation = (
   }
 };
 
-export const useWebSocket = (socketPort: number, sessionId: string) => {
+export const useWebSocket = (
+  socketPort: number,
+  sessionId: string,
+  queryParameters?: WebSocketQueryParameters,
+) => {
+  const serializedQueryParameters = serializeQueryParameters(queryParameters);
   const [webSocket, setWebSocket] = useState<WebSocket | null>(null);
   const [connected, setConnected] = useState(false);
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
@@ -195,7 +215,13 @@ export const useWebSocket = (socketPort: number, sessionId: string) => {
 
       let socket: WebSocket;
       try {
-        socket = new WebSocket(`ws://localhost:${socketPort}/websocket?sessionId=${sessionId}`);
+        const connectionQuery = new URLSearchParams({ sessionId });
+        if (serializedQueryParameters) {
+          new URLSearchParams(serializedQueryParameters).forEach((value, key) => {
+            connectionQuery.append(key, value);
+          });
+        }
+        socket = new WebSocket(`ws://localhost:${socketPort}/websocket?${connectionQuery.toString()}`);
       } catch (connectionError) {
         setError(connectionError instanceof Error ? connectionError.message : 'WebSocket connection failed');
         scheduleReconnect(connectWebSocket);
@@ -335,7 +361,7 @@ export const useWebSocket = (socketPort: number, sessionId: string) => {
         }
       }
     };
-  }, [socketPort, sessionId]);
+  }, [serializedQueryParameters, socketPort, sessionId]);
 
   return { webSocket, connected, reconnectAttempts, messages, error };
 };

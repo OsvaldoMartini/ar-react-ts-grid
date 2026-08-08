@@ -53,6 +53,13 @@ const HookHarness: React.FC = () => {
   );
 };
 
+const CapabilityHookHarness: React.FC = () => {
+  const { reconnectAttempts } = useWebSocket(7357, 'pageMappingsManager', {
+    windowCapability: 'opaque +/?=& capability',
+  });
+  return <span data-testid="attempts">{reconnectAttempts}</span>;
+};
+
 beforeEach(() => {
   jest.useFakeTimers();
   MockWebSocket.instances = [];
@@ -125,6 +132,23 @@ test('bounds consecutive reconnects without creating parallel sockets', () => {
   expect(MockWebSocket.instances).toHaveLength(6);
   expect(screen.getByTestId('attempts')).toHaveTextContent('5');
   expect(screen.getByTestId('error')).toHaveTextContent('Max reconnect attempts reached');
+});
+
+test('encodes optional connection parameters and retains them on reconnect', () => {
+  render(<CapabilityHookHarness />);
+
+  expect(MockWebSocket.instances).toHaveLength(1);
+  expect(MockWebSocket.instances[0].url).toBe(
+    'ws://localhost:7357/websocket?sessionId=pageMappingsManager&windowCapability=opaque+%2B%2F%3F%3D%26+capability',
+  );
+
+  act(() => {
+    MockWebSocket.instances[0].failConnection();
+    jest.runOnlyPendingTimers();
+  });
+
+  expect(MockWebSocket.instances).toHaveLength(2);
+  expect(MockWebSocket.instances[1].url).toBe(MockWebSocket.instances[0].url);
 });
 
 test('closes the current ARWeb page and never reconnects after application shutdown', () => {
