@@ -14,12 +14,17 @@
 .sectionHeading h2,.detailHeader h2 { margin: 0; font-size: 1.05rem; }
 .sectionHeading span { background: #e5f3fa; color: #12658b; border-radius: 12px; padding: 2px 9px; font-weight: 800; }
 .captureList { display: grid; gap: 8px; margin-top: 12px; }
+.captureRow { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: stretch; gap: 6px; }
 .capture { text-align: left; border: 1px solid #d2e0ea; border-radius: 8px; background: #f9fbfd; padding: 10px; color: #18324a; cursor: pointer; }
+.pinButton { min-width: 58px; border: 1px solid #9db9ca; border-radius: 8px; padding: 0 7px; background: #f5f9fb; color: #3a5f76; font-size: .67rem; font-weight: 850; cursor: pointer; }
+.pinButton.pinned { border-color: #dfa447; background: #fff3d7; color: #8b4d12; box-shadow: inset 0 0 0 1px #f0cc8b; }
+.capture:disabled,.pinButton:disabled { opacity: .55; cursor: not-allowed; }
 .capture:hover,.capture.selected { border-color: #1986b6; background: #eef9fd; box-shadow: 0 0 0 2px #bfe8f5; }
 .capture strong,.capture span,.capture small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .capture span { margin-top: 3px; font-size: .8rem; }
 .capture small { margin-top: 7px; color: #587087; }
 .empty,.emptyDetail { color: #667b8d; font-size: .88rem; line-height: 1.45; }
+.storageMissing { border: 1px solid #dfa7ac; border-radius: 8px; margin: 12px 0 0; padding: 10px; background: #fff1f2; color: #8d2630; font-size: .76rem; line-height: 1.4; }
 .detailHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; border-bottom: 1px solid #e3edf5; padding-bottom: 12px; }
 .detailHeader h2 { margin-top: 5px; word-break: break-word; }
 .ready,.failed { border-radius: 12px; padding: 4px 10px; font-size: .72rem; font-weight: 800; }
@@ -30,6 +35,7 @@
 .hash { font-family: ui-monospace,SFMono-Regular,Consolas,monospace; font-size: .72rem !important; }
 .modeTabs { display: flex; gap: 7px; margin: 0 0 12px; border-bottom: 1px solid #dce8f0; padding-bottom: 9px; }
 .modeTabs button { min-height: 32px; border: 1px solid #a9c2d4; border-radius: 7px; padding: 0 14px; background: #f7fafc; color: #365d76; font-size: .75rem; font-weight: 850; cursor: pointer; }
+.modeTabs button:disabled { opacity: .55; cursor: not-allowed; }
 .modeTabs button:hover { border-color: #318cb1; }
 .modeTabs .modeActive { border-color: #1c82aa; background: #dff3fa; color: #0d607f; box-shadow: 0 0 0 1px #a9dcecb8; }
 .modeContent[hidden] { display: none; }

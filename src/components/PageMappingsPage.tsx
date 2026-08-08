@@ -5,6 +5,9 @@ import PageMappingsCachePanel, {
   PageMappingsCacheState,
 } from './page-mappings/PageMappingsCachePanel';
 import PageMappingsOcrReviewPanel from './page-mappings/PageMappingsOcrReviewPanel';
+import PageMappingsRetentionPanel, {
+  type PageMappingsRetentionState,
+} from './page-mappings/PageMappingsRetentionPanel';
 import type {
   PageMappingsOcrAliasChange,
   PageMappingsOcrCorrelation,
@@ -90,6 +93,17 @@ type MappingMemoryItem = MemoryListItem<PageMappingsMemoryListPayload>;
 type Props = { socketPort: number; sessionId: string; onClose?: () => void };
 const RESCAN_TIMEOUT_MS = 120_000;
 const OCR_REVIEW_TIMEOUT_MS = 120_000;
+const RETENTION_TIMEOUT_MS = 30_000;
+
+type RetentionCorrelation = PageMappingsBindingIdentity & {
+  requestId: string;
+};
+
+type PendingRetention = RetentionCorrelation & (
+  | { operation: 'pin'; scanId: string; pinned: boolean }
+  | { operation: 'save'; retentionDays: number; maxUnpinnedPerPage: number }
+  | { operation: 'purge' }
+);
 
 const emptyCacheState: PageMappingsCacheState = {
   state: 'LOADING',
@@ -108,6 +122,12 @@ const positiveInteger = (value: unknown): number => {
 };
 
 const text = (value: unknown): string => (typeof value === 'string' ? value : '');
+
+const boundedInteger = (value: unknown, maximum: number): number | null => {
+  if (value === null || value === undefined || value === '' || typeof value === 'boolean') return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= 0 && parsed <= maximum ? parsed : null;
+};
 
 const requestId = (purpose: string): string => {
   const random = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
@@ -179,6 +199,84 @@ const parseSnapshot = (value: unknown): Snapshot | null => {
     status: text(source.status),
     pinned: source.pinned === true,
   };
+};
+
+const parseRetention = (value: unknown): PageMappingsRetentionState | null => {
+  if (!value || typeof value !== 'object') return null;
+  const source = value as Record<string, unknown>;
+  const retentionDays = boundedInteger(source.retentionDays, 3650);
+  const maxUnpinnedPerPage = boundedInteger(source.maxUnpinnedPerPage, 1000);
+  const readyCount = boundedInteger(source.readyCount, Number.MAX_SAFE_INTEGER);
+  const pinnedCount = boundedInteger(source.pinnedCount, Number.MAX_SAFE_INTEGER);
+  const eligibleCount = boundedInteger(source.eligibleCount, Number.MAX_SAFE_INTEGER);
+  if (retentionDays === null
+    || maxUnpinnedPerPage === null
+    || readyCount === null
+    || pinnedCount === null
+    || eligibleCount === null
+    || typeof source.enabled !== 'boolean') return null;
+  return {
+    retentionDays,
+    maxUnpinnedPerPage,
+    enabled: source.enabled,
+    readyCount,
+    pinnedCount,
+    eligibleCount,
+  };
+};
+
+const retentionCorrelation = (
+  active: PageMappingsBinding | null,
+): RetentionCorrelation | null => active ? {
+  requestId: requestId('retention'),
+  bindingEpoch: active.bindingEpoch,
+  workspaceEpoch: active.workspaceEpoch,
+  homeBankingId: active.homeBankingId,
+  botJobId: active.botJobId,
+} : null;
+
+const retentionResponseMatches = (
+  body: Record<string, unknown>,
+  expected: RetentionCorrelation,
+  allowOmittedAssertions: boolean,
+): boolean => {
+  if (text(body.requestId) !== expected.requestId) return false;
+  const stringAssertionMatches = (field: 'bindingEpoch') => (
+    allowOmittedAssertions && !Object.prototype.hasOwnProperty.call(body, field)
+      ? true
+      : text(body[field]) === expected[field]
+  );
+  const numberAssertionMatches = (
+    field: 'workspaceEpoch' | 'homeBankingId' | 'botJobId',
+  ) => (
+    allowOmittedAssertions && !Object.prototype.hasOwnProperty.call(body, field)
+      ? true
+      : positiveInteger(body[field]) === expected[field]
+  );
+  return stringAssertionMatches('bindingEpoch')
+    && numberAssertionMatches('workspaceEpoch')
+    && numberAssertionMatches('homeBankingId')
+    && numberAssertionMatches('botJobId');
+};
+
+const retentionFailureMatches = (
+  body: Record<string, unknown>,
+  expected: PendingRetention,
+): boolean => {
+  if (!retentionResponseMatches(body, expected, true)) return false;
+  if (expected.operation === 'pin') {
+    if (Object.prototype.hasOwnProperty.call(body, 'scanId')
+      && text(body.scanId) !== expected.scanId) return false;
+    if (Object.prototype.hasOwnProperty.call(body, 'pinned')
+      && body.pinned !== expected.pinned) return false;
+  }
+  if (expected.operation === 'save') {
+    if (Object.prototype.hasOwnProperty.call(body, 'retentionDays')
+      && boundedInteger(body.retentionDays, 3650) !== expected.retentionDays) return false;
+    if (Object.prototype.hasOwnProperty.call(body, 'maxUnpinnedPerPage')
+      && boundedInteger(body.maxUnpinnedPerPage, 1000) !== expected.maxUnpinnedPerPage) return false;
+  }
+  return true;
 };
 
 const ocrCorrelation = (
@@ -260,6 +358,9 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
   const [cacheState, setCacheState] = useState<PageMappingsCacheState>(emptyCacheState);
   const [cacheBusy, setCacheBusy] = useState(false);
   const [rescanBusy, setRescanBusy] = useState(false);
+  const [storageReady, setStorageReady] = useState<boolean | null>(null);
+  const [retention, setRetention] = useState<PageMappingsRetentionState | null>(null);
+  const [retentionOperation, setRetentionOperation] = useState<PendingRetention['operation'] | null>(null);
   const [detailMode, setDetailMode] = useState<'explorer' | 'ocr-review'>('explorer');
   const [ocrReview, setOcrReview] = useState<PageMappingsOcrReviewResult | null>(null);
   const [ocrReviewBusy, setOcrReviewBusy] = useState(false);
@@ -286,6 +387,8 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
   } | null>(null);
   const ocrReviewTimer = useRef<number | null>(null);
   const ocrApplyTimer = useRef<number | null>(null);
+  const pendingRetention = useRef<PendingRetention | null>(null);
+  const retentionTimer = useRef<number | null>(null);
 
   const updateUrlHint = useCallback((botJobId: number) => {
     const url = new URL(window.location.href);
@@ -327,6 +430,16 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
     setOcrApplyBusy(false);
   }, []);
 
+  const retireRetention = useCallback((expectedRequestId?: string) => {
+    if (expectedRequestId && pendingRetention.current?.requestId !== expectedRequestId) return;
+    if (retentionTimer.current !== null) {
+      window.clearTimeout(retentionTimer.current);
+      retentionTimer.current = null;
+    }
+    pendingRetention.current = null;
+    setRetentionOperation(null);
+  }, []);
+
   const clearOcrState = useCallback(() => {
     retireOcrReview();
     retireOcrApply();
@@ -353,12 +466,19 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
     pendingCache.current = null;
     retireRescan();
     clearOcrState();
+    retireRetention();
     setDetailMode('explorer');
     setCacheState(emptyCacheState);
     setCacheBusy(false);
-  }, [clearOcrState, retireRescan]);
+    setStorageReady(null);
+    setRetention(null);
+  }, [clearOcrState, retireRescan, retireRetention]);
 
   const bootstrap = useCallback((expectedBindingEpoch?: string) => {
+    if (pendingRetention.current) {
+      setStatus('Wait for the snapshot retention action to finish before reloading Page Mappings.');
+      return;
+    }
     if (pendingOcrApply.current) {
       setStatus('Wait for the OCR Review save to finish before reloading Page Mappings.');
       return;
@@ -385,6 +505,10 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
   }, [sessionId, webSocket]);
 
   const loadCapture = useCallback((scanId: string, expectedBindingEpoch?: string) => {
+    if (pendingRetention.current) {
+      setStatus('Wait for the snapshot retention action to finish before changing captures.');
+      return;
+    }
     if (pendingOcrApply.current) {
       const message = 'Wait for the OCR Review save to finish before changing captures.';
       setOcrMessage(message);
@@ -412,7 +536,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
   }, [clearOcrState, sessionId, webSocket]);
 
   const requestCacheState = useCallback((expectedBinding?: PageMappingsBinding) => {
-    if (pendingOcrApply.current) return;
+    if (pendingOcrApply.current || pendingRetention.current) return;
     const active = expectedBinding || bindingRef.current;
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN || !active) {
       setCacheState({
@@ -444,7 +568,9 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
       || webSocket.readyState !== WebSocket.OPEN
       || !active
       || rescanBusy
-      || pendingOcrApply.current) return;
+      || !storageReady
+      || pendingOcrApply.current
+      || pendingRetention.current) return;
     const nextRequestId = requestId('rescan');
     pendingRescan.current = { requestId: nextRequestId, bindingEpoch: active.bindingEpoch };
     setRescanBusy(true);
@@ -470,7 +596,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
       retireRescan(nextRequestId);
       setStatus('Page Mappings rescan could not be sent.');
     }
-  }, [rescanBusy, retireRescan, sessionId, webSocket]);
+  }, [rescanBusy, retireRescan, sessionId, storageReady, webSocket]);
 
   const runOcrReview = useCallback(() => {
     const correlation = ocrCorrelation(
@@ -486,8 +612,10 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
       || ocrReviewBusy
       || ocrApplyBusy
       || rescanBusy
+      || !storageReady
       || pendingOcrReview.current
-      || pendingOcrApply.current) {
+      || pendingOcrApply.current
+      || pendingRetention.current) {
       setOcrMessage('Load one verified capture before running OCR Review.');
       return;
     }
@@ -509,7 +637,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
       retireOcrReview(correlation.requestId);
       setOcrMessage('OCR Review could not be sent.');
     }
-  }, [loadedCapture, ocrApplyBusy, ocrReviewBusy, rescanBusy, retireOcrReview, selectedScanId, sessionId, webSocket]);
+  }, [loadedCapture, ocrApplyBusy, ocrReviewBusy, rescanBusy, retireOcrReview, selectedScanId, sessionId, storageReady, webSocket]);
 
   const applyOcrNames = useCallback((changes: PageMappingsOcrAliasChange[]) => {
     const correlation = ocrCorrelation(
@@ -526,8 +654,10 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
       || ocrReviewBusy
       || ocrApplyBusy
       || rescanBusy
+      || !storageReady
       || pendingOcrReview.current
-      || pendingOcrApply.current) {
+      || pendingOcrApply.current
+      || pendingRetention.current) {
       setOcrMessage('Select valid OCR names from the current capture before saving.');
       return;
     }
@@ -558,7 +688,126 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
       retireOcrApply(correlation.requestId);
       setOcrMessage('OCR Review names could not be sent.');
     }
-  }, [loadedCapture, ocrApplyBusy, ocrReviewBusy, rescanBusy, retireOcrApply, selectedScanId, sessionId, webSocket]);
+  }, [loadedCapture, ocrApplyBusy, ocrReviewBusy, rescanBusy, retireOcrApply, selectedScanId, sessionId, storageReady, webSocket]);
+
+  const armRetentionTimeout = useCallback((pending: PendingRetention) => {
+    pendingRetention.current = pending;
+    setRetentionOperation(pending.operation);
+    retentionTimer.current = window.setTimeout(() => {
+      if (pendingRetention.current?.requestId !== pending.requestId) return;
+      retireRetention(pending.requestId);
+      setStatus('The retention response timed out. Reload Page Mappings before retrying because the outcome is unknown.');
+    }, RETENTION_TIMEOUT_MS);
+  }, [retireRetention]);
+
+  const pinSnapshot = useCallback((scanId: string, pinned: boolean) => {
+    const correlation = retentionCorrelation(bindingRef.current);
+    const candidate = snapshots.find(snapshot => snapshot.scanId === scanId);
+    if (!webSocket
+      || webSocket.readyState !== WebSocket.OPEN
+      || !correlation
+      || !storageReady
+      || candidate?.status !== 'READY'
+      || captureLoading
+      || cacheBusy
+      || rescanBusy
+      || ocrReviewBusy
+      || ocrApplyBusy
+      || pendingCapture.current
+      || pendingCache.current
+      || pendingRescan.current
+      || pendingOcrReview.current
+      || pendingOcrApply.current
+      || pendingMemory.current
+      || pendingRetention.current) return;
+    const pending: PendingRetention = { ...correlation, operation: 'pin', scanId, pinned };
+    armRetentionTimeout(pending);
+    setStatus(pinned ? 'Pinning capture...' : 'Unpinning capture...');
+    try {
+      webSocket.send(JSON.stringify({
+        type: 'pageMappings.pin',
+        sessionId,
+        body: JSON.stringify({ ...correlation, scanId, pinned }),
+      }));
+    } catch (_) {
+      retireRetention(correlation.requestId);
+      setStatus('The capture pin request could not be sent.');
+    }
+  }, [armRetentionTimeout, cacheBusy, captureLoading, ocrApplyBusy, ocrReviewBusy, rescanBusy, retireRetention, sessionId, snapshots, storageReady, webSocket]);
+
+  const saveRetention = useCallback((retentionDays: number, maxUnpinnedPerPage: number) => {
+    const correlation = retentionCorrelation(bindingRef.current);
+    if (!webSocket
+      || webSocket.readyState !== WebSocket.OPEN
+      || !correlation
+      || !storageReady
+      || boundedInteger(retentionDays, 3650) === null
+      || boundedInteger(maxUnpinnedPerPage, 1000) === null
+      || captureLoading
+      || cacheBusy
+      || rescanBusy
+      || ocrReviewBusy
+      || ocrApplyBusy
+      || pendingCapture.current
+      || pendingCache.current
+      || pendingRescan.current
+      || pendingOcrReview.current
+      || pendingOcrApply.current
+      || pendingMemory.current
+      || pendingRetention.current) return;
+    const pending: PendingRetention = {
+      ...correlation,
+      operation: 'save',
+      retentionDays,
+      maxUnpinnedPerPage,
+    };
+    armRetentionTimeout(pending);
+    setStatus('Saving snapshot retention policy...');
+    try {
+      webSocket.send(JSON.stringify({
+        type: 'pageMappings.retentionUpdate',
+        sessionId,
+        body: JSON.stringify({ ...correlation, retentionDays, maxUnpinnedPerPage }),
+      }));
+    } catch (_) {
+      retireRetention(correlation.requestId);
+      setStatus('The snapshot retention policy could not be sent.');
+    }
+  }, [armRetentionTimeout, cacheBusy, captureLoading, ocrApplyBusy, ocrReviewBusy, rescanBusy, retireRetention, sessionId, storageReady, webSocket]);
+
+  const purgeRetention = useCallback(() => {
+    const correlation = retentionCorrelation(bindingRef.current);
+    if (!webSocket
+      || webSocket.readyState !== WebSocket.OPEN
+      || !correlation
+      || !storageReady
+      || !retention?.eligibleCount
+      || captureLoading
+      || cacheBusy
+      || rescanBusy
+      || ocrReviewBusy
+      || ocrApplyBusy
+      || pendingCapture.current
+      || pendingCache.current
+      || pendingRescan.current
+      || pendingOcrReview.current
+      || pendingOcrApply.current
+      || pendingMemory.current
+      || pendingRetention.current) return;
+    const pending: PendingRetention = { ...correlation, operation: 'purge' };
+    armRetentionTimeout(pending);
+    setStatus('Purging eligible unpinned captures...');
+    try {
+      webSocket.send(JSON.stringify({
+        type: 'pageMappings.retentionPurge',
+        sessionId,
+        body: JSON.stringify(correlation),
+      }));
+    } catch (_) {
+      retireRetention(correlation.requestId);
+      setStatus('The snapshot purge request could not be sent.');
+    }
+  }, [armRetentionTimeout, cacheBusy, captureLoading, ocrApplyBusy, ocrReviewBusy, rescanBusy, retention?.eligibleCount, retireRetention, sessionId, storageReady, webSocket]);
 
   useEffect(() => {
     if (connected) bootstrap();
@@ -570,7 +819,10 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
     setCacheBusy(false);
     retireRescan();
     clearOcrState();
-  }, [clearOcrState, connected, retireRescan]);
+    retireRetention();
+    setStorageReady(null);
+    setRetention(null);
+  }, [clearOcrState, connected, retireRescan, retireRetention]);
 
   useEffect(() => () => {
     if (rescanTimer.current !== null) {
@@ -579,6 +831,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
     }
     if (ocrReviewTimer.current !== null) window.clearTimeout(ocrReviewTimer.current);
     if (ocrApplyTimer.current !== null) window.clearTimeout(ocrApplyTimer.current);
+    if (retentionTimer.current !== null) window.clearTimeout(retentionTimer.current);
   }, []);
 
   useEffect(() => {
@@ -632,12 +885,43 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
         if (operation === 'pageMappings.bootstrapResponse') {
           const responseRequestId = text(body.requestId);
           if (!responseRequestId || responseRequestId !== pendingBootstrap.current) continue;
+          const nextBinding = parseBinding(body);
+          const nextRetention = parseRetention(body.retention);
           if (!body.ok) {
-            setStatus(text(body.message) || 'Page Mappings history is unavailable.');
+            pendingBootstrap.current = null;
+            if (body.storageReady === false && nextBinding) {
+              if (bindingRef.current
+                && bindingRef.current.bindingEpoch !== nextBinding.bindingEpoch) continue;
+              bindingEstablishedRef.current = true;
+              bindingRef.current = nextBinding;
+              setBinding(nextBinding);
+              invalidatedRef.current = false;
+              setInvalidated(false);
+              updateUrlHint(nextBinding.botJobId);
+              setSnapshots([]);
+              setSelectedScanId(null);
+              setLoadedCapture(null);
+              clearOcrState();
+              setStorageReady(false);
+              setRetention(nextRetention);
+              setCacheState({
+                ...emptyCacheState,
+                state: 'MIGRATION_REQUIRED',
+                message: 'Page Mappings storage is not initialized. Apply the database migration, then Reload.',
+              });
+              setStatus(text(body.message)
+                || 'Page Mappings storage is not initialized. Apply the database migration, then Reload.');
+            } else {
+              setStorageReady(false);
+              setRetention(null);
+              setStatus(text(body.message) || 'Page Mappings history is unavailable.');
+            }
             continue;
           }
-          const nextBinding = parseBinding(body);
           if (!nextBinding) {
+            pendingBootstrap.current = null;
+            setStorageReady(false);
+            setRetention(null);
             setStatus('Page Mappings owner could not be verified.');
             continue;
           }
@@ -648,6 +932,9 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
           setBinding(nextBinding);
           invalidatedRef.current = false;
           setInvalidated(false);
+          const nextStorageReady = body.storageReady === true;
+          setStorageReady(nextStorageReady);
+          setRetention(nextRetention);
           updateUrlHint(nextBinding.botJobId);
           const next = Array.isArray(body.snapshots)
             ? body.snapshots.map(parseSnapshot).filter((item): item is Snapshot => item !== null)
@@ -655,11 +942,15 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
           setSnapshots(next);
           const initial = next.find(item => item.status === 'READY') || null;
           setSelectedScanId(initial?.scanId ?? null);
-          setStatus(next.length
-            ? `${next.length} scan capture${next.length === 1 ? '' : 's'} available.`
-            : 'No scan captures yet.');
-          if (initial) loadCapture(initial.scanId, nextBinding.bindingEpoch);
-          requestCacheState(nextBinding);
+          setStatus(!nextStorageReady
+            ? 'Page Mappings storage is not initialized. Apply the database migration, then Reload.'
+            : !nextRetention
+              ? 'Snapshot retention settings are unavailable. Reload Page Mappings.'
+              : next.length
+                ? `${next.length} scan capture${next.length === 1 ? '' : 's'} available.`
+                : 'No scan captures yet.');
+          if (nextStorageReady && initial) loadCapture(initial.scanId, nextBinding.bindingEpoch);
+          if (nextStorageReady) requestCacheState(nextBinding);
           continue;
         }
 
@@ -772,6 +1063,99 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
             screenshotMime: text(body.screenshotMime) || 'image/png',
           });
           setStatus('Immutable capture loaded.');
+          continue;
+        }
+
+        if (operation === 'pageMappings.pinResponse'
+          || operation === 'pageMappings.retentionUpdateResponse'
+          || operation === 'pageMappings.retentionPurgeResponse') {
+          const pending = pendingRetention.current;
+          const expectedOperation = operation === 'pageMappings.pinResponse'
+            ? 'pin'
+            : operation === 'pageMappings.retentionUpdateResponse'
+              ? 'save'
+              : 'purge';
+          if (!pending
+            || pending.operation !== expectedOperation
+            || text(body.requestId) !== pending.requestId) continue;
+          if (body.ok !== true) {
+            if (!retentionFailureMatches(body, pending)) continue;
+            retireRetention(pending.requestId);
+            if (body.reloadRequired === true) {
+              setStorageReady(null);
+              setRetention(null);
+            }
+            setStatus(text(body.error) || text(body.message) || 'The snapshot retention action failed.');
+            continue;
+          }
+          if (!retentionResponseMatches(body, pending, false)
+            || !bindingRef.current
+            || !sameBindingIdentity(bindingRef.current, pending)) continue;
+          const nextRetention = parseRetention(body.retention);
+          if (!nextRetention) {
+            retireRetention(pending.requestId);
+            setRetention(null);
+            setStatus('The snapshot retention response was invalid. Reload Page Mappings.');
+            continue;
+          }
+
+          if (pending.operation === 'pin') {
+            if (text(body.scanId) !== pending.scanId || body.pinned !== pending.pinned) {
+              retireRetention(pending.requestId);
+              setStatus('The capture pin response was stale. Reload Page Mappings.');
+              continue;
+            }
+            setSnapshots(current => current.map(snapshot => snapshot.scanId === pending.scanId
+              ? { ...snapshot, pinned: pending.pinned }
+              : snapshot));
+            setRetention(nextRetention);
+            retireRetention(pending.requestId);
+            setStatus(text(body.message) || (pending.pinned ? 'Capture pinned.' : 'Capture unpinned.'));
+            continue;
+          }
+
+          if (pending.operation === 'save') {
+            if (nextRetention.retentionDays !== pending.retentionDays
+              || nextRetention.maxUnpinnedPerPage !== pending.maxUnpinnedPerPage) {
+              retireRetention(pending.requestId);
+              setRetention(null);
+              setStatus('The saved retention policy response did not match the request. Reload Page Mappings.');
+              continue;
+            }
+            setRetention(nextRetention);
+            retireRetention(pending.requestId);
+            setStatus(text(body.message) || 'Snapshot retention policy saved.');
+            continue;
+          }
+
+          if (!Array.isArray(body.purgedScanIds)
+            || !body.purgedScanIds.every(scanId => typeof scanId === 'string' && scanId.trim())) {
+            retireRetention(pending.requestId);
+            setStatus('The snapshot purge response was invalid. Reload Page Mappings.');
+            continue;
+          }
+          const purgedScanIds = new Set(body.purgedScanIds as string[]);
+          setRetention(nextRetention);
+          setSnapshots(current => current.filter(snapshot => !purgedScanIds.has(snapshot.scanId)));
+          setMemoryItems(current => current.filter(item => (
+            !item.payload?.captureId || !purgedScanIds.has(item.payload.captureId)
+          )));
+          if (selectedScanId && purgedScanIds.has(selectedScanId)) {
+            pendingCapture.current = null;
+            setCaptureLoading(false);
+            setSelectedScanId(null);
+            setLoadedCapture(null);
+            setSelectedElementIndex(null);
+            setCaptureImageSize({ width: 0, height: 0 });
+            setElementSearch('');
+            clearOcrState();
+            setDetailMode('explorer');
+          }
+          retireRetention(pending.requestId);
+          bootstrap(pending.bindingEpoch);
+          setStatus(`${text(body.message) || 'Eligible captures purged.'}${body.cleanupPending === true
+            ? ' Artifact cleanup will finish during startup.'
+            : ''} Reloading scan history...`);
           continue;
         }
 
@@ -888,12 +1272,14 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
     }
   }, [
     bootstrap,
+    clearOcrState,
     loadCapture,
     loadedCapture,
     messages,
     ocrReview,
     requestCacheState,
     resetOwnerState,
+    retireRetention,
     retireOcrApply,
     retireOcrReview,
     retireRescan,
@@ -1000,7 +1386,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
     if (!webSocket
       || webSocket.readyState !== WebSocket.OPEN
       || !binding
-      || !memoryItems.length
+      || (!memoryItems.length && !memoryOpened.current)
       || invalidatedRef.current
       || bindingRef.current?.bindingEpoch !== binding.bindingEpoch) return;
     const operation = memoryOpenRequested.current || !memoryOpened.current ? 'memoryList.open' : 'memoryList.sync';
@@ -1077,6 +1463,10 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
   }, [messages]);
 
   const closePage = useCallback(() => {
+    if (pendingRetention.current) {
+      setStatus('Wait for the snapshot retention action to finish before closing Page Mappings.');
+      return;
+    }
     if (pendingOcrApply.current) {
       const message = 'Wait for the OCR Review save to finish before closing Page Mappings.';
       setOcrMessage(message);
@@ -1089,14 +1479,25 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
   const captureImage = loadedCapture?.screenshotBase64
     ? `data:${loadedCapture.screenshotMime};base64,${loadedCapture.screenshotBase64}`
     : null;
-  const canStage = Boolean(!invalidated
+  const retentionBusy = retentionOperation !== null;
+  const pageOperationBusy = captureLoading
+    || cacheBusy
+    || rescanBusy
+    || ocrReviewBusy
+    || ocrApplyBusy
+    || retentionBusy;
+  const canStage = Boolean(connected
+    && storageReady
+    && !invalidated
+    && !pageOperationBusy
     && loadedCapture
-    && loadedCapture.scanId === selectedScanId
-    && !captureLoading);
+    && loadedCapture.scanId === selectedScanId);
   const canRunOcr = Boolean(connected
+    && storageReady
     && !invalidated
     && !captureLoading
     && !rescanBusy
+    && !retentionBusy
     && selected?.status === 'READY'
     && loadedCapture?.bindingEpoch === binding?.bindingEpoch
     && loadedCapture?.scanId === selectedScanId
@@ -1118,33 +1519,53 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
             </p>
           </div>
           <div className={styles.actions}>
-            <button type="button" onClick={() => bootstrap(binding?.bindingEpoch)} disabled={!connected || invalidated || ocrApplyBusy}>Reload</button>
+            <button type="button" onClick={() => bootstrap(binding?.bindingEpoch)} disabled={!connected || invalidated || pageOperationBusy}>Reload</button>
             <PagesOpenButton webSocket={webSocket} connected={connected} messages={messages} sessionId={sessionId} />
-            <button type="button" className={styles.close} onClick={closePage} disabled={ocrApplyBusy}>Close</button>
+            <button type="button" className={styles.close} onClick={closePage} disabled={ocrApplyBusy || retentionBusy}>Close</button>
           </div>
         </header>
         <div className={styles.status} role="status">{status}</div>
         <section className={styles.workspace} aria-label="Page Mappings explorer">
           <aside className={styles.history}>
             <div className={styles.sectionHeading}><h2>Captures</h2><span>{snapshots.length}</span></div>
-            {snapshots.length === 0 ? <p className={styles.empty}>Run Page Scanner to create the first immutable capture.</p> : (
+            <PageMappingsRetentionPanel
+              retention={retention}
+              storageReady={storageReady}
+              busy={pageOperationBusy}
+              pendingOperation={retentionOperation}
+              disabled={!connected || invalidated}
+              onSave={saveRetention}
+              onPurge={purgeRetention}
+            />
+            {storageReady === false ? (
+              <p className={styles.storageMissing}>Page Mappings history storage is not initialized. The legacy Page Scanner remains available.</p>
+            ) : snapshots.length === 0 ? <p className={styles.empty}>Run Page Scanner to create the first immutable capture.</p> : (
               <div className={styles.captureList}>
                 {snapshots.map(item => (
-                  <button
-                    type="button"
-                    key={item.scanId}
-                    className={`${styles.capture} ${item.scanId === selectedScanId ? styles.selected : ''}`}
-                    onClick={() => {
-                      setElementSearch('');
-                      setSelectedElementIndex(null);
-                      loadCapture(item.scanId);
-                    }}
-                    disabled={item.status !== 'READY' || ocrApplyBusy}
-                  >
-                    <strong>{new Date(item.capturedAt).toLocaleString()}</strong>
-                    <span>{item.pageUrl || item.pageKey}</span>
-                    <small>{item.elementCount} elements · {item.status}</small>
-                  </button>
+                  <div className={styles.captureRow} key={item.scanId}>
+                    <button
+                      type="button"
+                      className={`${styles.capture} ${item.scanId === selectedScanId ? styles.selected : ''}`}
+                      onClick={() => {
+                        setElementSearch('');
+                        setSelectedElementIndex(null);
+                        loadCapture(item.scanId);
+                      }}
+                      disabled={item.status !== 'READY' || pageOperationBusy || storageReady !== true}
+                    >
+                      <strong>{new Date(item.capturedAt).toLocaleString()}</strong>
+                      <span>{item.pageUrl || item.pageKey}</span>
+                      <small>{item.elementCount} elements · {item.status}</small>
+                    </button>
+                    <button
+                      type="button"
+                      className={`${styles.pinButton} ${item.pinned ? styles.pinned : ''}`}
+                      aria-pressed={item.pinned}
+                      title={item.pinned ? 'Unpin this capture' : 'Pin this capture'}
+                      onClick={() => pinSnapshot(item.scanId, !item.pinned)}
+                      disabled={item.status !== 'READY' || pageOperationBusy || storageReady !== true}
+                    >{item.pinned ? 'Unpin' : 'Pin'}</button>
+                  </div>
                 ))}
               </div>
             )}
@@ -1152,8 +1573,8 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
           <section className={styles.details} aria-label="Selected scan capture">
             <PageMappingsCachePanel
               cache={cacheState}
-              busy={cacheBusy || rescanBusy || ocrApplyBusy}
-              disabled={!connected || invalidated || ocrApplyBusy}
+              busy={pageOperationBusy}
+              disabled={!connected || invalidated || storageReady !== true || pageOperationBusy}
               onRefresh={() => requestCacheState()}
               onUseExisting={useExisting}
               onRescan={rescan}
@@ -1175,12 +1596,14 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
                     type="button"
                     className={detailMode === 'explorer' ? styles.modeActive : ''}
                     aria-pressed={detailMode === 'explorer'}
+                    disabled={retentionBusy || ocrApplyBusy}
                     onClick={() => setDetailMode('explorer')}
                   >Explorer</button>
                   <button
                     type="button"
                     className={detailMode === 'ocr-review' ? styles.modeActive : ''}
                     aria-pressed={detailMode === 'ocr-review'}
+                    disabled={retentionBusy || ocrApplyBusy}
                     onClick={() => setDetailMode('ocr-review')}
                   >OCR Review</button>
                 </nav>
@@ -1240,7 +1663,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
                       <div
                         className={`${styles.elementRow} ${selectedElementIndex === index ? styles.elementRowSelected : ''}`}
                         key={`${selected.scanId}-${String(element.scannedElementId || index)}`}
-                        draggable={stageable}
+                        draggable={canStage && stageable}
                         onDragStart={event => {
                           if (!stageable) {
                             event.preventDefault();
@@ -1257,7 +1680,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
                         <button
                           type="button"
                           className={styles.addButton}
-                          disabled={!stageable}
+                          disabled={!canStage || !stageable}
                           onClick={event => { event.stopPropagation(); addToMemory(element, index); }}
                         >Add</button>
                       </div>
