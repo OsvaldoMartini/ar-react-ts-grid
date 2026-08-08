@@ -9,9 +9,14 @@
 
 .panel > header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 8px;
+}
+
+.panel > header > div {
+  min-width: 0;
 }
 
 .panel > header p {
@@ -28,12 +33,14 @@
 
 .panel > header > span {
   flex: 0 0 auto;
+  max-width: 100%;
   border-radius: 12px;
   padding: 3px 7px;
   background: #e4f2f8;
   color: #176482;
   font-size: .65rem;
   font-weight: 850;
+  text-align: right;
 }
 
 .counts {

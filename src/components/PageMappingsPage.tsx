@@ -102,7 +102,11 @@ type RetentionCorrelation = PageMappingsBindingIdentity & {
 type PendingRetention = RetentionCorrelation & (
   | { operation: 'pin'; scanId: string; pinned: boolean }
   | { operation: 'save'; retentionDays: number; maxUnpinnedPerPage: number }
-  | { operation: 'purge' }
+  | {
+    operation: 'purge';
+    expectedRetentionDays: number;
+    expectedMaxUnpinnedPerPage: number;
+  }
 );
 
 const emptyCacheState: PageMappingsCacheState = {
@@ -276,6 +280,13 @@ const retentionFailureMatches = (
     if (Object.prototype.hasOwnProperty.call(body, 'maxUnpinnedPerPage')
       && boundedInteger(body.maxUnpinnedPerPage, 1000) !== expected.maxUnpinnedPerPage) return false;
   }
+  if (expected.operation === 'purge') {
+    if (Object.prototype.hasOwnProperty.call(body, 'expectedRetentionDays')
+      && boundedInteger(body.expectedRetentionDays, 3650) !== expected.expectedRetentionDays) return false;
+    if (Object.prototype.hasOwnProperty.call(body, 'expectedMaxUnpinnedPerPage')
+      && boundedInteger(body.expectedMaxUnpinnedPerPage, 1000)
+        !== expected.expectedMaxUnpinnedPerPage) return false;
+  }
   return true;
 };
 
@@ -361,6 +372,8 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
   const [storageReady, setStorageReady] = useState<boolean | null>(null);
   const [retention, setRetention] = useState<PageMappingsRetentionState | null>(null);
   const [retentionOperation, setRetentionOperation] = useState<PendingRetention['operation'] | null>(null);
+  const [retentionReloadRequired, setRetentionReloadRequired] = useState(false);
+  const [retentionRevision, setRetentionRevision] = useState('');
   const [detailMode, setDetailMode] = useState<'explorer' | 'ocr-review'>('explorer');
   const [ocrReview, setOcrReview] = useState<PageMappingsOcrReviewResult | null>(null);
   const [ocrReviewBusy, setOcrReviewBusy] = useState(false);
@@ -389,6 +402,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
   const ocrApplyTimer = useRef<number | null>(null);
   const pendingRetention = useRef<PendingRetention | null>(null);
   const retentionTimer = useRef<number | null>(null);
+  const retentionReloadRequiredRef = useRef(false);
 
   const updateUrlHint = useCallback((botJobId: number) => {
     const url = new URL(window.location.href);
@@ -440,6 +454,18 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
     setRetentionOperation(null);
   }, []);
 
+  const markRetentionReloadRequired = useCallback(() => {
+    retentionReloadRequiredRef.current = true;
+    setRetentionReloadRequired(true);
+    setStorageReady(null);
+    setRetention(null);
+  }, []);
+
+  const clearRetentionReloadRequired = useCallback(() => {
+    retentionReloadRequiredRef.current = false;
+    setRetentionReloadRequired(false);
+  }, []);
+
   const clearOcrState = useCallback(() => {
     retireOcrReview();
     retireOcrApply();
@@ -472,6 +498,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
     setCacheBusy(false);
     setStorageReady(null);
     setRetention(null);
+    setRetentionRevision('');
   }, [clearOcrState, retireRescan, retireRetention]);
 
   const bootstrap = useCallback((expectedBindingEpoch?: string) => {
@@ -696,9 +723,10 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
     retentionTimer.current = window.setTimeout(() => {
       if (pendingRetention.current?.requestId !== pending.requestId) return;
       retireRetention(pending.requestId);
+      markRetentionReloadRequired();
       setStatus('The retention response timed out. Reload Page Mappings before retrying because the outcome is unknown.');
     }, RETENTION_TIMEOUT_MS);
-  }, [retireRetention]);
+  }, [markRetentionReloadRequired, retireRetention]);
 
   const pinSnapshot = useCallback((scanId: string, pinned: boolean) => {
     const correlation = retentionCorrelation(bindingRef.current);
@@ -707,6 +735,8 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
       || webSocket.readyState !== WebSocket.OPEN
       || !correlation
       || !storageReady
+      || !retention
+      || retentionReloadRequiredRef.current
       || candidate?.status !== 'READY'
       || captureLoading
       || cacheBusy
@@ -718,7 +748,6 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
       || pendingRescan.current
       || pendingOcrReview.current
       || pendingOcrApply.current
-      || pendingMemory.current
       || pendingRetention.current) return;
     const pending: PendingRetention = { ...correlation, operation: 'pin', scanId, pinned };
     armRetentionTimeout(pending);
@@ -733,7 +762,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
       retireRetention(correlation.requestId);
       setStatus('The capture pin request could not be sent.');
     }
-  }, [armRetentionTimeout, cacheBusy, captureLoading, ocrApplyBusy, ocrReviewBusy, rescanBusy, retireRetention, sessionId, snapshots, storageReady, webSocket]);
+  }, [armRetentionTimeout, cacheBusy, captureLoading, ocrApplyBusy, ocrReviewBusy, rescanBusy, retention, retireRetention, sessionId, snapshots, storageReady, webSocket]);
 
   const saveRetention = useCallback((retentionDays: number, maxUnpinnedPerPage: number) => {
     const correlation = retentionCorrelation(bindingRef.current);
@@ -741,6 +770,8 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
       || webSocket.readyState !== WebSocket.OPEN
       || !correlation
       || !storageReady
+      || !retention
+      || retentionReloadRequiredRef.current
       || boundedInteger(retentionDays, 3650) === null
       || boundedInteger(maxUnpinnedPerPage, 1000) === null
       || captureLoading
@@ -753,7 +784,6 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
       || pendingRescan.current
       || pendingOcrReview.current
       || pendingOcrApply.current
-      || pendingMemory.current
       || pendingRetention.current) return;
     const pending: PendingRetention = {
       ...correlation,
@@ -773,7 +803,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
       retireRetention(correlation.requestId);
       setStatus('The snapshot retention policy could not be sent.');
     }
-  }, [armRetentionTimeout, cacheBusy, captureLoading, ocrApplyBusy, ocrReviewBusy, rescanBusy, retireRetention, sessionId, storageReady, webSocket]);
+  }, [armRetentionTimeout, cacheBusy, captureLoading, ocrApplyBusy, ocrReviewBusy, rescanBusy, retention, retireRetention, sessionId, storageReady, webSocket]);
 
   const purgeRetention = useCallback(() => {
     const correlation = retentionCorrelation(bindingRef.current);
@@ -782,6 +812,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
       || !correlation
       || !storageReady
       || !retention?.eligibleCount
+      || retentionReloadRequiredRef.current
       || captureLoading
       || cacheBusy
       || rescanBusy
@@ -792,22 +823,37 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
       || pendingRescan.current
       || pendingOcrReview.current
       || pendingOcrApply.current
-      || pendingMemory.current
       || pendingRetention.current) return;
-    const pending: PendingRetention = { ...correlation, operation: 'purge' };
+    const confirmed = window.confirm(
+      `Permanently purge ${retention.eligibleCount} eligible unpinned capture${retention.eligibleCount === 1 ? '' : 's'} for this Bot Job?`,
+    );
+    if (!confirmed) {
+      setStatus('Snapshot purge cancelled.');
+      return;
+    }
+    const pending: PendingRetention = {
+      ...correlation,
+      operation: 'purge',
+      expectedRetentionDays: retention.retentionDays,
+      expectedMaxUnpinnedPerPage: retention.maxUnpinnedPerPage,
+    };
     armRetentionTimeout(pending);
     setStatus('Purging eligible unpinned captures...');
     try {
       webSocket.send(JSON.stringify({
         type: 'pageMappings.retentionPurge',
         sessionId,
-        body: JSON.stringify(correlation),
+        body: JSON.stringify({
+          ...correlation,
+          expectedRetentionDays: pending.expectedRetentionDays,
+          expectedMaxUnpinnedPerPage: pending.expectedMaxUnpinnedPerPage,
+        }),
       }));
     } catch (_) {
       retireRetention(correlation.requestId);
       setStatus('The snapshot purge request could not be sent.');
     }
-  }, [armRetentionTimeout, cacheBusy, captureLoading, ocrApplyBusy, ocrReviewBusy, rescanBusy, retention?.eligibleCount, retireRetention, sessionId, storageReady, webSocket]);
+  }, [armRetentionTimeout, cacheBusy, captureLoading, ocrApplyBusy, ocrReviewBusy, rescanBusy, retention, retireRetention, sessionId, storageReady, webSocket]);
 
   useEffect(() => {
     if (connected) bootstrap();
@@ -815,14 +861,20 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
 
   useEffect(() => {
     if (connected) return;
+    const retentionOutcomeUnknown = pendingRetention.current !== null;
     pendingCache.current = null;
     setCacheBusy(false);
     retireRescan();
     clearOcrState();
     retireRetention();
-    setStorageReady(null);
-    setRetention(null);
-  }, [clearOcrState, connected, retireRescan, retireRetention]);
+    if (retentionOutcomeUnknown) {
+      markRetentionReloadRequired();
+      setStatus('Connection lost during snapshot retention. Reconnect and reload before another retention action.');
+    } else {
+      setStorageReady(null);
+      setRetention(null);
+    }
+  }, [clearOcrState, connected, markRetentionReloadRequired, retireRescan, retireRetention]);
 
   useEffect(() => () => {
     if (rescanTimer.current !== null) {
@@ -897,6 +949,8 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
               setBinding(nextBinding);
               invalidatedRef.current = false;
               setInvalidated(false);
+              clearRetentionReloadRequired();
+              setRetentionRevision(`${nextBinding.bindingEpoch}:${responseRequestId}`);
               updateUrlHint(nextBinding.botJobId);
               setSnapshots([]);
               setSelectedScanId(null);
@@ -935,6 +989,14 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
           const nextStorageReady = body.storageReady === true;
           setStorageReady(nextStorageReady);
           setRetention(nextRetention);
+          setRetentionRevision(`${nextBinding.bindingEpoch}:${responseRequestId}`);
+          if (!nextStorageReady) {
+            clearRetentionReloadRequired();
+          } else if (nextRetention) {
+            clearRetentionReloadRequired();
+          } else {
+            markRetentionReloadRequired();
+          }
           updateUrlHint(nextBinding.botJobId);
           const next = Array.isArray(body.snapshots)
             ? body.snapshots.map(parseSnapshot).filter((item): item is Snapshot => item !== null)
@@ -949,8 +1011,10 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
               : next.length
                 ? `${next.length} scan capture${next.length === 1 ? '' : 's'} available.`
                 : 'No scan captures yet.');
-          if (nextStorageReady && initial) loadCapture(initial.scanId, nextBinding.bindingEpoch);
-          if (nextStorageReady) requestCacheState(nextBinding);
+          if (nextStorageReady && nextRetention && initial) {
+            loadCapture(initial.scanId, nextBinding.bindingEpoch);
+          }
+          if (nextStorageReady && nextRetention) requestCacheState(nextBinding);
           continue;
         }
 
@@ -1081,10 +1145,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
           if (body.ok !== true) {
             if (!retentionFailureMatches(body, pending)) continue;
             retireRetention(pending.requestId);
-            if (body.reloadRequired === true) {
-              setStorageReady(null);
-              setRetention(null);
-            }
+            if (body.reloadRequired === true) markRetentionReloadRequired();
             setStatus(text(body.error) || text(body.message) || 'The snapshot retention action failed.');
             continue;
           }
@@ -1094,7 +1155,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
           const nextRetention = parseRetention(body.retention);
           if (!nextRetention) {
             retireRetention(pending.requestId);
-            setRetention(null);
+            markRetentionReloadRequired();
             setStatus('The snapshot retention response was invalid. Reload Page Mappings.');
             continue;
           }
@@ -1102,6 +1163,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
           if (pending.operation === 'pin') {
             if (text(body.scanId) !== pending.scanId || body.pinned !== pending.pinned) {
               retireRetention(pending.requestId);
+              markRetentionReloadRequired();
               setStatus('The capture pin response was stale. Reload Page Mappings.');
               continue;
             }
@@ -1118,7 +1180,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
             if (nextRetention.retentionDays !== pending.retentionDays
               || nextRetention.maxUnpinnedPerPage !== pending.maxUnpinnedPerPage) {
               retireRetention(pending.requestId);
-              setRetention(null);
+              markRetentionReloadRequired();
               setStatus('The saved retention policy response did not match the request. Reload Page Mappings.');
               continue;
             }
@@ -1128,9 +1190,17 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
             continue;
           }
 
+          if (nextRetention.retentionDays !== pending.expectedRetentionDays
+            || nextRetention.maxUnpinnedPerPage !== pending.expectedMaxUnpinnedPerPage) {
+            retireRetention(pending.requestId);
+            markRetentionReloadRequired();
+            setStatus('The purge policy changed while the request was running. Reload Page Mappings.');
+            continue;
+          }
           if (!Array.isArray(body.purgedScanIds)
             || !body.purgedScanIds.every(scanId => typeof scanId === 'string' && scanId.trim())) {
             retireRetention(pending.requestId);
+            markRetentionReloadRequired();
             setStatus('The snapshot purge response was invalid. Reload Page Mappings.');
             continue;
           }
@@ -1272,10 +1342,12 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
     }
   }, [
     bootstrap,
+    clearRetentionReloadRequired,
     clearOcrState,
     loadCapture,
     loadedCapture,
     messages,
+    markRetentionReloadRequired,
     ocrReview,
     requestCacheState,
     resetOwnerState,
@@ -1531,9 +1603,11 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
             <PageMappingsRetentionPanel
               retention={retention}
               storageReady={storageReady}
+              authoritativeRevision={retentionRevision}
+              reloadRequired={retentionReloadRequired}
               busy={pageOperationBusy}
               pendingOperation={retentionOperation}
-              disabled={!connected || invalidated}
+              disabled={!connected || invalidated || retentionReloadRequired}
               onSave={saveRetention}
               onPurge={purgeRetention}
             />
@@ -1563,7 +1637,11 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
                       aria-pressed={item.pinned}
                       title={item.pinned ? 'Unpin this capture' : 'Pin this capture'}
                       onClick={() => pinSnapshot(item.scanId, !item.pinned)}
-                      disabled={item.status !== 'READY' || pageOperationBusy || storageReady !== true}
+                      disabled={item.status !== 'READY'
+                        || pageOperationBusy
+                        || storageReady !== true
+                        || retentionReloadRequired
+                        || !retention}
                     >{item.pinned ? 'Unpin' : 'Pin'}</button>
                   </div>
                 ))}

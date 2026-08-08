@@ -13,6 +13,8 @@ export type PageMappingsRetentionState = {
 type Props = {
   retention: PageMappingsRetentionState | null;
   storageReady: boolean | null;
+  authoritativeRevision: string;
+  reloadRequired: boolean;
   busy: boolean;
   pendingOperation: 'pin' | 'save' | 'purge' | null;
   disabled?: boolean;
@@ -29,6 +31,8 @@ const boundedInteger = (value: string, maximum: number): number | null => {
 const PageMappingsRetentionPanel: React.FC<Props> = ({
   retention,
   storageReady,
+  authoritativeRevision,
+  reloadRequired,
   busy,
   pendingOperation,
   disabled = false,
@@ -42,7 +46,7 @@ const PageMappingsRetentionPanel: React.FC<Props> = ({
     if (!retention) return;
     setDays(String(retention.retentionDays));
     setMaximum(String(retention.maxUnpinnedPerPage));
-  }, [retention?.maxUnpinnedPerPage, retention?.retentionDays]);
+  }, [authoritativeRevision, retention?.maxUnpinnedPerPage, retention?.retentionDays]);
 
   const parsedDays = useMemo(() => boundedInteger(days, 3650), [days]);
   const parsedMaximum = useMemo(() => boundedInteger(maximum, 1000), [maximum]);
@@ -51,6 +55,19 @@ const PageMappingsRetentionPanel: React.FC<Props> = ({
     && (parsedDays !== retention.retentionDays
       || parsedMaximum !== retention.maxUnpinnedPerPage));
   const unavailable = disabled || busy || storageReady !== true || !retention;
+
+  if (reloadRequired) {
+    return (
+      <section
+        className={`${styles.panel} ${styles.unavailable}`}
+        aria-label="Snapshot retention"
+        role="alert"
+      >
+        <strong>Snapshot retention reload required</strong>
+        <p>The previous action has an unknown or stale outcome. Use Reload before pinning, saving, or purging again.</p>
+      </section>
+    );
+  }
 
   if (storageReady === null) {
     return (
@@ -82,10 +99,10 @@ const PageMappingsRetentionPanel: React.FC<Props> = ({
     <section className={styles.panel} aria-label="Snapshot retention">
       <header>
         <div>
-          <p>SNAPSHOT RETENTION</p>
-          <strong>{retention.enabled ? 'After-scan cleanup enabled' : 'After-scan cleanup disabled'}</strong>
+          <p>SYSTEM-WIDE SNAPSHOT RETENTION</p>
+          <strong>{retention.enabled ? 'System-wide after-scan cleanup enabled' : 'System-wide after-scan cleanup disabled'}</strong>
         </div>
-        <span>{retention.eligibleCount} eligible</span>
+        <span>{retention.eligibleCount} eligible for this Bot Job</span>
       </header>
 
       <div className={styles.counts}>
@@ -125,7 +142,7 @@ const PageMappingsRetentionPanel: React.FC<Props> = ({
       </div>
 
       {!valid && <p className={styles.validation}>Use whole numbers: days 0–3650 and captures 0–1000.</p>}
-      <p className={styles.hint}>Cleanup is evaluated after successful scans or by Purge Eligible. Zero disables a limit; pinned captures are never eligible. Counts apply to this Bot Job.</p>
+      <p className={styles.hint}>The policy applies system-wide. Counts and Purge Eligible apply only to this Bot Job. Cleanup is evaluated after successful scans or by Purge Eligible. Zero disables a limit; pinned captures are never eligible.</p>
 
       <div className={styles.actions}>
         <button
