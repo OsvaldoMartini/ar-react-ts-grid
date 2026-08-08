@@ -25,10 +25,12 @@ export interface PageScannerMemoryListPayload {
 }
 
 export interface PageMappingsMemoryListPayload {
-  elementDTO: ElementDTO;
   captureId: string;
   pageKey: string;
-  expectedLastScannedAt?: string;
+  scannedElementId: number;
+  elementHash: string;
+  expectedLastScannedAt: string;
+  expectedScanCount: number;
 }
 
 export interface ComponentInstructionMemoryListPayload {
