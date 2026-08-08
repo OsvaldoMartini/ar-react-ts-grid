@@ -46,7 +46,7 @@ const PageMappingsRetentionPanel: React.FC<Props> = ({
     if (!retention) return;
     setDays(String(retention.retentionDays));
     setMaximum(String(retention.maxUnpinnedPerPage));
-  }, [authoritativeRevision, retention?.maxUnpinnedPerPage, retention?.retentionDays]);
+  }, [authoritativeRevision, retention]);
 
   const parsedDays = useMemo(() => boundedInteger(days, 3650), [days]);
   const parsedMaximum = useMemo(() => boundedInteger(maximum, 1000), [maximum]);
