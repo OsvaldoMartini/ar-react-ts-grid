@@ -611,8 +611,6 @@
 .pickButton,
 .warningButton,
 .testButton,
-.activeButton,
-.inactiveButton,
 .arrowLeftButton,
 .brickButton {
   // width: 22px;
@@ -683,13 +681,6 @@
   display: block;
   flex: 0 0 14px;
 }
-
-
-// .activeButton{
-//   width: 20px;
-//   height: 20px;
-// }
-
 .editContainer {
   display: inline-flex;  /* Make input and image inline */
   align-items: center;   /* Vertically center the items */
@@ -996,15 +987,6 @@
       z-index: 100;
     }
 
-}
-
-.instructionItemInactive {
-  opacity: 0.55;
-  filter: grayscale(0.25);
-}
-
-.instructionItemInactive:hover {
-  opacity: 0.7;
 }
 
 /* Change background to white when dropdown is open */

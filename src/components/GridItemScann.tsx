@@ -13,8 +13,6 @@ import outPutImage from "../assets/output1.png";
 import testInputImage from "../assets/testInput.png";
 import clickTestImage from "../assets/clickTest2.png";
 import warningRedImage from '../assets/warning_red.png';
-import activeImage from '../assets/active3.png';
-import inactiveImage from '../assets/inactive2.png';
 import CompForce from './CompForce';
 import AlertModal from './AlertModal';
 import DomReviewModal, { type DomReviewData, type DomReviewAction } from './DomReviewModal';
@@ -167,8 +165,6 @@ const groupByTagName = (data: ElementDTO[]) => {
   }, {} as Record<string, { tagName: string; elements: ElementDTO[] }>);
 };
 
-const isElementActive = (element: ElementDTO): boolean => element.active !== false;
-
 const scannerMemoryElementKey = (element: ElementDTO): string =>
   `${element.xPath || ''}||${element.tagName || ''}||${element.typeElement || ''}||${element.attributeType || ''}||${element.someText || ''}`;
 
@@ -196,7 +192,7 @@ const scannerMemoryItem = (element: ElementDTO): MemoryListItem => {
     label,
     detail: element.xPath || `${element.tagName || 'element'} #${element.id}`,
     icon: scannerMemoryIcon(element),
-    active: isElementActive(element),
+    active: true,
     payload: { elementDTO: element },
   };
 };
@@ -756,7 +752,6 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
     if (memoryWorkspaceEpoch !== null && memoryWorkspaceEpoch <= 0) return;
     if (memoryListOpenRequestedRef.current && memoryListOpenPendingRequestRef.current) return;
 
-    const activeItems = memoryElements.filter(isElementActive);
     const busy = memoryApplyBusy || createBlockBusy;
     const snapshot: MemoryListSnapshot = {
       ownerEpoch: memoryListOwnerEpochRef.current,
@@ -772,7 +767,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
       status: busy ? 'Applying Memory List changes...' : 'Memory List ready',
       busy,
       canApply: memoryTargetBlockId !== null
-        && activeItems.length > 0
+        && memoryElements.length > 0
         && !busy
         && memoryBlockOptions.some(block => block.blockId === memoryTargetBlockId),
     };
@@ -853,29 +848,6 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
       setLocatorTargetKey(pageScannerLocatorElementKey(merged.accepted[0]));
     }
     return merged.accepted;
-  };
-
-  const handleElementActiveToggle = (target: ElementDTO) => {
-    const nextActive = !isElementActive(target);
-    const updateElement = (element: ElementDTO): ElementDTO =>
-      element.id === target.id ? { ...element, active: nextActive } : element;
-
-    setElementDTO((prev) => prev.map(updateElement));
-    setElementGrouped((prevGrouped) => {
-      const updated = { ...prevGrouped };
-      for (const tagName of Object.keys(updated)) {
-        updated[tagName] = {
-          ...updated[tagName],
-          elements: updated[tagName].elements.map(updateElement),
-        };
-      }
-      return updated;
-    });
-    setMemoryElements((prev) => prev.map((element) =>
-      element.id === target.id || memoryElementKey(element) === memoryElementKey(target)
-        ? { ...element, active: nextActive }
-        : element
-    ));
   };
 
   const handleElementExecutionTypeChange = (
@@ -1133,11 +1105,10 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
           return memoryElementBySourceKey.get(rawKey);
         })
         .filter((element): element is ElementDTO => Boolean(element));
-    const activeMemoryElements = requestedElements.filter(isElementActive);
     const targetBlockId = targetBlockIdOverride === undefined
       ? memoryTargetBlockId
       : targetBlockIdOverride;
-    if (targetBlockId === null || activeMemoryElements.length === 0 || memoryApplyBusy) return;
+    if (targetBlockId === null || requestedElements.length === 0 || memoryApplyBusy) return;
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
       console.warn('WebSocket is not connected. Cannot apply scanner memory list.');
       return;
@@ -1146,7 +1117,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
     const targetBlock = memoryBlockOptions.find((block) => block.blockId === targetBlockId);
     if (!targetBlock) return;
 
-    const elementKeys = activeMemoryElements.map(memoryElementKey);
+    const elementKeys = requestedElements.map(memoryElementKey);
     const previousApply = pendingPageScannerApplyRef.current;
     const repeatsUnacknowledgedApply = Boolean(
       previousApply
@@ -1162,7 +1133,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
       blockId: targetBlock.blockId,
       blockName: targetBlock.blockName,
       blockOrderNumber: targetBlock.blockOrderNumber,
-      elementDetails: activeMemoryElements,
+      elementDetails: requestedElements,
     };
     const message = isDetachedPageScanner
       ? {
@@ -2196,11 +2167,10 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
 
     // Flatten the elementGrouped object to get all ElementDTOs
     const allElements = Object.values(elementGrouped)
-      .flatMap(group => group.elements)
-      .filter(isElementActive);
+      .flatMap(group => group.elements);
     if (allElements.length === 0) {
-      setAlertMessageHeader('No active elements to insert');
-      setAlertMessageBody('Activate at least one scanned element before inserting all elements.');
+      setAlertMessageHeader('No elements to insert');
+      setAlertMessageBody('Scan at least one element before inserting all elements.');
       setIsSendingAll(false);
       return;
     }
@@ -2235,11 +2205,10 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
 
     // Flatten the elementGrouped object to get all ElementDTOs
     const allElements = Object.values(elementGrouped)
-      .flatMap(group => group.elements)
-      .filter(isElementActive);
+      .flatMap(group => group.elements);
     if (allElements.length === 0) {
-      setAlertMessageHeader('No active elements to update');
-      setAlertMessageBody('Activate at least one scanned element before updating all elements.');
+      setAlertMessageHeader('No elements to update');
+      setAlertMessageBody('Scan at least one element before updating all elements.');
       setIsUpdatingAll(false);
       return;
     }
@@ -2278,13 +2247,6 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
       console.warn("🚨 WebSocket is not connected. Cannot send message.");
       return;
     }
-    const actionAllowedWhenInactive = action === "HOVERED_ROW" || action === "DETAILS_ELEMENT_DTO";
-    if (!isElementActive(elementDTO) && !actionAllowedWhenInactive) {
-      setAlertMessageHeader('Element is inactive');
-      setAlertMessageBody('Activate this scanned element before saving or testing it.');
-      return;
-    }
-
     const sessionDestine = action === "HOVERED_ROW"
       ? SCANNER_TOOL_SESSION_ID
       : SCANNER_ELEMENT_PANE_SESSION_ID;
@@ -2382,13 +2344,12 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
     elements: ElementDTO[]
   ) => {
     event.stopPropagation();
-    const activeElements = elements.filter(isElementActive);
-    if (activeElements.length === 0) {
-      setAlertMessageHeader('No active inputs to test');
-      setAlertMessageBody('Activate at least one input in this block before running the block input test.');
+    if (elements.length === 0) {
+      setAlertMessageHeader('No inputs to test');
+      setAlertMessageBody('This block does not contain inputs to test.');
       return;
     }
-    activeElements.forEach((element) => {
+    elements.forEach((element) => {
       sendWebSocketMessage(withScannerTestInputValue(element), "TEST_INPUT_DTO");
     });
   };
@@ -3685,7 +3646,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
                   {paginatedElements.map((elementDTO, i) => (
                     <div
                       key={i}
-                      className={`${styles.instructionItem} ${!isElementActive(elementDTO) ? styles.instructionItemInactive : ''}`}
+                      className={styles.instructionItem}
                       onMouseEnter={() => handleRowHover(elementDTO)}
                       onMouseLeave={handleRowLeave}
                     // onDoubleClick={(event) => handleRowSelectedClick(event, elementDTO, "NEW_ELEMENT_DTO")}
@@ -3750,16 +3711,6 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
                         <span className="attr-slot">{"\u00A0".repeat(20)}</span>
                       )} */}
                       <div className={styles.optionsColumn}>
-                        <img
-                          src={isElementActive(elementDTO) ? activeImage : inactiveImage}
-                          alt={isElementActive(elementDTO) ? 'Active' : 'Inactive'}
-                          title={isElementActive(elementDTO) ? 'Deactivate element' : 'Activate element'}
-                          className={isElementActive(elementDTO) ? styles.activeButton : styles.inactiveButton}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handleElementActiveToggle(elementDTO);
-                          }}
-                        />
                         <CompForce item={elementDTO} onChange={handleElementForceChange} />
                         {/* Hidden — MultiPlugins support disabled
                         <img
