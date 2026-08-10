@@ -5,6 +5,7 @@ import PageMappingsCachePanel, {
   PageMappingsCacheState,
 } from './page-mappings/PageMappingsCachePanel';
 import PageMappingsOcrReviewPanel from './page-mappings/PageMappingsOcrReviewPanel';
+import PageMappingsHelpModal from './page-mappings/PageMappingsHelpModal';
 import PageMappingsRetentionPanel, {
   type PageMappingsRetentionState,
 } from './page-mappings/PageMappingsRetentionPanel';
@@ -401,6 +402,8 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
   const [ocrApplyReloadRequired, setOcrApplyReloadRequired] = useState(false);
   const [ocrMessage, setOcrMessage] = useState('');
   const [invalidated, setInvalidated] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const helpButtonRef = useRef<HTMLButtonElement>(null);
   const invalidatedRef = useRef(false);
   const bindingEstablishedRef = useRef(false);
   const memoryOwnerEpochRef = useRef('');
@@ -1740,6 +1743,12 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
   const captureImage = loadedCapture?.screenshotBase64
     ? `data:${loadedCapture.screenshotMime};base64,${loadedCapture.screenshotBase64}`
     : null;
+  const captureCanvasWidth = (() => {
+    const cssWidth = loadedCapture?.viewport?.cssWidth || 0;
+    if (Number.isFinite(cssWidth) && cssWidth > 0) return cssWidth;
+    const dpr = loadedCapture?.viewport?.devicePixelRatio || 1;
+    return captureImageSize.width > 0 ? captureImageSize.width / dpr : 0;
+  })();
   const retentionBusy = retentionOperation !== null;
   const pageOperationBusy = captureLoading
     || cacheBusy
@@ -1883,32 +1892,42 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
                 <div className={styles.modeContent} hidden={detailMode !== 'explorer'}>
                 <div className={styles.notice}>Capture artifacts are read-only. Select an element or drag it into Memory List to stage it for the active Bot Job.</div>
                 {captureLoading && <p className={styles.empty}>Loading immutable capture artifacts…</p>}
-                {captureImage && <div className={styles.imageStage}>
-                  <img
-                    className={styles.captureImage}
-                    src={captureImage}
-                    alt="Selected scanned page capture"
-                    onLoad={event => setCaptureImageSize({
-                      width: event.currentTarget.naturalWidth,
-                      height: event.currentTarget.naturalHeight,
+                {captureImage && <div
+                  className={styles.imageViewport}
+                  role="region"
+                  aria-label="Scrollable selected page capture"
+                  tabIndex={0}
+                >
+                  <div
+                    className={styles.imageStage}
+                    style={captureCanvasWidth > 0 ? { width: `${captureCanvasWidth}px` } : undefined}
+                  >
+                    <img
+                      className={styles.captureImage}
+                      src={captureImage}
+                      alt="Selected scanned page capture"
+                      onLoad={event => setCaptureImageSize({
+                        width: event.currentTarget.naturalWidth,
+                        height: event.currentTarget.naturalHeight,
+                      })}
+                    />
+                    {loadedCapture?.rectangles.map((rectangle, rectangleIndex) => {
+                      const placement = parseRectangle(rectangle);
+                      if (!placement) return null;
+                      const elementIndex = Number.isInteger(rectangle.elementIndex)
+                        ? rectangle.elementIndex
+                        : rectangleIndex;
+                      return <button
+                        type="button"
+                        key={`overlay-${rectangle.elementHash || rectangle.scannedElementId || rectangleIndex}`}
+                        className={`${styles.overlay} ${selectedElementIndex === elementIndex ? styles.overlaySelected : ''}`}
+                        style={placement}
+                        aria-label={`Select scanned element ${elementIndex + 1}`}
+                        title={`Element ${elementIndex + 1}`}
+                        onClick={() => setSelectedElementIndex(elementIndex)}
+                      />;
                     })}
-                  />
-                  {loadedCapture?.rectangles.map((rectangle, rectangleIndex) => {
-                    const placement = parseRectangle(rectangle);
-                    if (!placement) return null;
-                    const elementIndex = Number.isInteger(rectangle.elementIndex)
-                      ? rectangle.elementIndex
-                      : rectangleIndex;
-                    return <button
-                      type="button"
-                      key={`overlay-${rectangle.elementHash || rectangle.scannedElementId || rectangleIndex}`}
-                      className={`${styles.overlay} ${selectedElementIndex === elementIndex ? styles.overlaySelected : ''}`}
-                      style={placement}
-                      aria-label={`Select scanned element ${elementIndex + 1}`}
-                      title={`Element ${elementIndex + 1}`}
-                      onClick={() => setSelectedElementIndex(elementIndex)}
-                    />;
-                  })}
+                  </div>
                 </div>}
                 <div className={styles.searchField}>
                   <label htmlFor="page-mappings-element-search">Search captured elements</label>
@@ -1991,6 +2010,18 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
             )}
           </section>
         </section>
+        <button
+          ref={helpButtonRef}
+          type="button"
+          className={styles.helpButton}
+          aria-label="Open Page Mappings rules"
+          title="Page Mappings rules"
+          onClick={() => setHelpOpen(true)}
+        >?</button>
+        {helpOpen && <PageMappingsHelpModal onClose={() => {
+          setHelpOpen(false);
+          window.requestAnimationFrame(() => helpButtonRef.current?.focus());
+        }} />}
       </main>
     </DetachedPageShell>
   );
