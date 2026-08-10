@@ -54,7 +54,14 @@ const PageMappingsHelpModal: React.FC<Props> = ({ onClose }) => {
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
 
-  useEffect(() => closeRef.current?.focus(), []);
+  useEffect(() => {
+    closeRef.current?.focus();
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [onClose]);
 
   return (
     <div
@@ -66,7 +73,11 @@ const PageMappingsHelpModal: React.FC<Props> = ({ onClose }) => {
         aria-modal="true"
         aria-labelledby={titleId}
         className={styles.dialog}
-        onKeyDown={event => { if (event.key === 'Escape') onClose(); }}
+        onKeyDown={event => {
+          if (event.key !== 'Tab') return;
+          event.preventDefault();
+          closeRef.current?.focus();
+        }}
       >
         <header>
           <span className={styles.icon}><Map size={20} aria-hidden="true" /></span>
