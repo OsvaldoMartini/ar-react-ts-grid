@@ -390,6 +390,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
   const [cacheState, setCacheState] = useState<PageMappingsCacheState>(emptyCacheState);
   const [cacheBusy, setCacheBusy] = useState(false);
   const [rescanBusy, setRescanBusy] = useState(false);
+  const [scrollPage, setScrollPage] = useState(false);
   const [storageReady, setStorageReady] = useState<boolean | null>(null);
   const [retention, setRetention] = useState<PageMappingsRetentionState | null>(null);
   const [retentionOperation, setRetentionOperation] = useState<PendingRetention['operation'] | null>(null);
@@ -415,7 +416,11 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
   const pendingBootstrap = useRef<string | null>(null);
   const pendingCapture = useRef<{ requestId: string; scanId: string; bindingEpoch: string } | null>(null);
   const pendingCache = useRef<{ requestId: string; bindingEpoch: string } | null>(null);
-  const pendingRescan = useRef<{ requestId: string; bindingEpoch: string } | null>(null);
+  const pendingRescan = useRef<{
+    requestId: string;
+    bindingEpoch: string;
+    scrollPage: boolean;
+  } | null>(null);
   const rescanTimer = useRef<number | null>(null);
   const pendingMemory = useRef<{ requestId: string; bindingEpoch: string } | null>(null);
   const pendingOcrReview = useRef<PageMappingsOcrCorrelation | null>(null);
@@ -543,6 +548,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
     setDetailMode('explorer');
     setCacheState(emptyCacheState);
     setCacheBusy(false);
+    setScrollPage(false);
     setStorageReady(null);
     setRetention(null);
     setRetentionRevision('');
@@ -660,9 +666,15 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
       || pendingOcrApply.current
       || pendingRetention.current) return;
     const nextRequestId = requestId('rescan');
-    pendingRescan.current = { requestId: nextRequestId, bindingEpoch: active.bindingEpoch };
+    pendingRescan.current = {
+      requestId: nextRequestId,
+      bindingEpoch: active.bindingEpoch,
+      scrollPage,
+    };
     setRescanBusy(true);
-    setStatus('Starting Page Mappings rescan...');
+    setStatus(scrollPage
+      ? 'Starting bounded full-page Page Mappings rescan...'
+      : 'Starting Page Mappings rescan...');
     rescanTimer.current = window.setTimeout(() => {
       if (pendingRescan.current?.requestId !== nextRequestId) return;
       retireRescan(nextRequestId);
@@ -678,13 +690,14 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
           workspaceEpoch: active.workspaceEpoch,
           homeBankingId: active.homeBankingId,
           botJobId: active.botJobId,
+          scrollPage,
         }),
       }));
     } catch (_) {
       retireRescan(nextRequestId);
       setStatus('Page Mappings rescan could not be sent.');
     }
-  }, [rescanBusy, retireRescan, sessionId, storageReady, webSocket]);
+  }, [rescanBusy, retireRescan, scrollPage, sessionId, storageReady, webSocket]);
 
   const runOcrReview = useCallback(() => {
     const correlation = ocrCorrelation(
@@ -1224,6 +1237,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
           if (!pending
             || text(body.requestId) !== pending.requestId
             || (body.bindingEpoch && text(body.bindingEpoch) !== pending.bindingEpoch)
+            || (body.scrollPage === true) !== pending.scrollPage
             || bindingRef.current?.bindingEpoch !== pending.bindingEpoch) continue;
           if (!body.ok) {
             retireRescan(pending.requestId);
@@ -1242,7 +1256,8 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
             || active.bindingEpoch !== pending.bindingEpoch
             || positiveInteger(body.workspaceEpoch) !== active.workspaceEpoch
             || positiveInteger(body.homeBankingId) !== active.homeBankingId
-            || positiveInteger(body.botJobId) !== active.botJobId) continue;
+            || positiveInteger(body.botJobId) !== active.botJobId
+            || (body.scrollPage === true) !== pending.scrollPage) continue;
           const scanStatus = text(body.status).toLowerCase();
           setStatus(text(body.message) || 'Page Mappings rescan is running…');
           if (scanStatus === 'done' || scanStatus === 'empty' || scanStatus === 'failed') {
@@ -1857,9 +1872,11 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
               cache={cacheState}
               busy={pageOperationBusy}
               disabled={!connected || invalidated || storageReady !== true || pageOperationBusy}
+              scrollPage={scrollPage}
               onRefresh={() => requestCacheState()}
               onUseExisting={useExisting}
               onRescan={rescan}
+              onScrollPageChange={setScrollPage}
             />
             {!selected ? <div className={styles.emptyDetail}>Select a capture to inspect its immutable metadata.</div> : (
               <>

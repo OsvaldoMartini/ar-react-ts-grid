@@ -18,18 +18,22 @@ type Props = {
   cache: PageMappingsCacheState;
   busy: boolean;
   disabled?: boolean;
+  scrollPage: boolean;
   onRefresh: () => void;
   onUseExisting: (scanId: string) => void;
   onRescan: () => void;
+  onScrollPageChange: (enabled: boolean) => void;
 };
 
 const PageMappingsCachePanel: React.FC<Props> = ({
   cache,
   busy,
   disabled = false,
+  scrollPage,
   onRefresh,
   onUseExisting,
   onRescan,
+  onScrollPageChange,
 }) => {
   const current = cache.state === 'CURRENT';
   const changed = cache.state === 'CHANGED' || cache.state === 'PAGE_CHANGED' || cache.state === 'STALE';
@@ -52,6 +56,16 @@ const PageMappingsCachePanel: React.FC<Props> = ({
         </dl>
       )}
       <div className={styles.actions}>
+        <button
+          type="button"
+          className={`${styles.scrollToggle} ${scrollPage ? styles.scrollOn : styles.scrollOff}`}
+          aria-pressed={scrollPage}
+          title={scrollPage
+            ? 'Automatic bounded page scrolling and full-page capture enabled for Rescan'
+            : 'Automatic page scrolling disabled'}
+          onClick={() => onScrollPageChange(!scrollPage)}
+          disabled={disabled || busy}
+        ><span>SCROLL PAGE</span><strong>{scrollPage ? 'ON' : 'OFF'}</strong></button>
         <button type="button" onClick={onRefresh} disabled={disabled || busy}>Check page</button>
         <button
           type="button"
