@@ -1708,7 +1708,12 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
     && captureImage);
 
   return (
-    <DetachedPageShell title="Page Mappings" testId="page-mappings-workspace" onClose={closePage}>
+    <DetachedPageShell
+      title="Page Mappings"
+      testId="page-mappings-workspace"
+      onClose={closePage}
+      showCloseButton={false}
+    >
       <main className={styles.page}>
         <header className={styles.header}>
           <div>
