@@ -1786,9 +1786,9 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
             </p>
           </div>
           <div className={styles.actions}>
-            <button type="button" onClick={() => bootstrap(binding?.bindingEpoch)} disabled={!connected || invalidated || pageOperationBusy}>Reload</button>
+            <button type="button" className={styles.actionButton} onClick={() => bootstrap(binding?.bindingEpoch)} disabled={!connected || invalidated || pageOperationBusy}>Reload</button>
             <PagesOpenButton webSocket={webSocket} connected={connected} messages={messages} sessionId={sessionId} />
-            <button type="button" className={styles.close} onClick={closePage} disabled={ocrApplyBusy || retentionBusy}>Close</button>
+            <button type="button" className={`${styles.actionButton} ${styles.close}`} onClick={closePage} disabled={ocrApplyBusy || retentionBusy}>Close</button>
           </div>
         </header>
         <div className={styles.status} role="status">{status}</div>
@@ -1910,10 +1910,26 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
                     />;
                   })}
                 </div>}
-                <label className={styles.searchLabel}>
-                  Search captured elements
-                  <input value={elementSearch} onChange={event => setElementSearch(event.target.value)} placeholder="name, text, XPath, CSS…" />
-                </label>
+                <div className={styles.searchField}>
+                  <label htmlFor="page-mappings-element-search">Search captured elements</label>
+                  <div className={styles.searchControl}>
+                    <input
+                      id="page-mappings-element-search"
+                      value={elementSearch}
+                      onChange={event => setElementSearch(event.target.value)}
+                      placeholder="name, text, XPath, CSS…"
+                    />
+                    {elementSearch && (
+                      <button
+                        type="button"
+                        className={styles.clearSearch}
+                        aria-label="Clear captured element search"
+                        title="Clear search"
+                        onClick={() => setElementSearch('')}
+                      >×</button>
+                    )}
+                  </div>
+                </div>
                 <section
                   className={styles.memoryDropZone}
                   aria-label="Selected elements for Memory List"

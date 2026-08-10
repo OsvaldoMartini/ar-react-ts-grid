@@ -4,8 +4,8 @@
 .eyebrow { margin: 0; font-size: .68rem; font-weight: 800; letter-spacing: .12em; opacity: .8; }
 .subtitle { margin: 0; opacity: .86; }
 .actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.actions button { min-height: 34px; border: 1px solid #b6d1e7; border-radius: 7px; padding: 0 13px; background: #fff; color: #174d77; font-weight: 700; cursor: pointer; }
-.actions button:disabled { opacity: .55; cursor: not-allowed; }
+.actions .actionButton { min-height: 34px; border: 1px solid #b6d1e7; border-radius: 7px; padding: 0 13px; background: #fff; color: #174d77; font-weight: 700; cursor: pointer; }
+.actions .actionButton:disabled { opacity: .55; cursor: not-allowed; }
 .actions .close { color: #a31e28; border-color: #e5a2aa; }
 .status { margin: 12px 0; border: 1px solid #c6d9e9; border-radius: 8px; background: #fff; padding: 9px 12px; font-size: .86rem; }
 .header,.status { flex: 0 0 auto; }
@@ -47,8 +47,12 @@
 .captureImage { display: block; width: 100%; height: auto; }
 .overlay { position: absolute; box-sizing: border-box; padding: 0; border: 2px solid #1496c7; background: #1496c733; cursor: pointer; }
 .overlay:hover,.overlaySelected { border-color: #e18b15; background: #f6bd3947; z-index: 1; }
-.searchLabel { display: grid; gap: 6px; margin-top: 14px; font-size: .76rem; font-weight: 800; color: #4b687d; }
-.searchLabel input { border: 1px solid #b9cfdf; border-radius: 7px; padding: 9px 10px; color: #18324a; font: inherit; font-weight: 500; }
+.searchField { display: grid; gap: 6px; margin-top: 14px; font-size: .76rem; font-weight: 800; color: #4b687d; }
+.searchControl { position: relative; }
+.searchControl input { width: 100%; border: 1px solid #b9cfdf; border-radius: 7px; padding: 9px 38px 9px 10px; color: #18324a; font: inherit; font-weight: 500; }
+.clearSearch { position: absolute; top: 50%; right: 6px; display: inline-flex; align-items: center; justify-content: center; width: 27px; height: 27px; padding: 0; transform: translateY(-50%); border: 0; border-radius: 50%; background: transparent; color: #587087; font-size: 1.15rem; font-weight: 800; line-height: 1; cursor: pointer; }
+.clearSearch:hover { background: #e5f3fa; color: #12658b; }
+.clearSearch:focus-visible { outline: 2px solid #1986b6; outline-offset: 1px; }
 .memoryDropZone { margin-top: 12px; border: 1px dashed #2b91b9; border-radius: 8px; padding: 10px; background: #f1fbfe; color: #356079; }
 .memoryHeader { display: flex; justify-content: space-between; align-items: center; color: #174d77; }.memoryHeader span { font-size: .72rem; font-weight: 800; }
 .memoryDropZone p { margin: 5px 0 0; font-size: .76rem; }.memoryChips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }.memoryChips span { padding: 3px 7px; border-radius: 10px; background: #d9f2fa; color: #12658b; font-size: .7rem; font-weight: 700; }
