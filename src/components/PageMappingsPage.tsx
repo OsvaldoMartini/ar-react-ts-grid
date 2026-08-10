@@ -109,6 +109,20 @@ type PendingRetention = RetentionCorrelation & (
   }
 );
 
+type PendingOcrApply = {
+  correlation: PageMappingsOcrCorrelation;
+  changes: PageMappingsOcrAliasChange[];
+  requestBody: string;
+  resendRequired: boolean;
+  reloadAfterSettle: boolean;
+};
+
+type OcrApplyReloadGate = {
+  bootstrapRequestId: string | null;
+  bindingEpoch: string | null;
+  captureRequestId: string | null;
+};
+
 const emptyCacheState: PageMappingsCacheState = {
   state: 'LOADING',
   message: 'Checking the active Playwright page…',
@@ -378,6 +392,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
   const [ocrReview, setOcrReview] = useState<PageMappingsOcrReviewResult | null>(null);
   const [ocrReviewBusy, setOcrReviewBusy] = useState(false);
   const [ocrApplyBusy, setOcrApplyBusy] = useState(false);
+  const [ocrApplyReloadRequired, setOcrApplyReloadRequired] = useState(false);
   const [ocrMessage, setOcrMessage] = useState('');
   const [invalidated, setInvalidated] = useState(false);
   const invalidatedRef = useRef(false);
@@ -394,12 +409,11 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
   const rescanTimer = useRef<number | null>(null);
   const pendingMemory = useRef<{ requestId: string; bindingEpoch: string } | null>(null);
   const pendingOcrReview = useRef<PageMappingsOcrCorrelation | null>(null);
-  const pendingOcrApply = useRef<{
-    correlation: PageMappingsOcrCorrelation;
-    changes: PageMappingsOcrAliasChange[];
-  } | null>(null);
+  const pendingOcrApply = useRef<PendingOcrApply | null>(null);
   const ocrReviewTimer = useRef<number | null>(null);
   const ocrApplyTimer = useRef<number | null>(null);
+  const ocrApplyReloadRequiredRef = useRef(false);
+  const ocrApplyReloadGate = useRef<OcrApplyReloadGate | null>(null);
   const pendingRetention = useRef<PendingRetention | null>(null);
   const retentionTimer = useRef<number | null>(null);
   const retentionReloadRequiredRef = useRef(false);
@@ -452,6 +466,22 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
     }
     pendingRetention.current = null;
     setRetentionOperation(null);
+  }, []);
+
+  const markOcrApplyReloadRequired = useCallback(() => {
+    ocrApplyReloadRequiredRef.current = true;
+    ocrApplyReloadGate.current = {
+      bootstrapRequestId: null,
+      bindingEpoch: null,
+      captureRequestId: null,
+    };
+    setOcrApplyReloadRequired(true);
+  }, []);
+
+  const clearOcrApplyReloadRequired = useCallback(() => {
+    ocrApplyReloadRequiredRef.current = false;
+    ocrApplyReloadGate.current = null;
+    setOcrApplyReloadRequired(false);
   }, []);
 
   const markRetentionReloadRequired = useCallback(() => {
@@ -520,6 +550,13 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
     }
     const nextRequestId = requestId('bootstrap');
     pendingBootstrap.current = nextRequestId;
+    if (ocrApplyReloadRequiredRef.current) {
+      ocrApplyReloadGate.current = {
+        bootstrapRequestId: nextRequestId,
+        bindingEpoch: null,
+        captureRequestId: null,
+      };
+    }
     setStatus('Loading scan history…');
     webSocket.send(JSON.stringify({
       type: 'pageMappings.bootstrap',
@@ -549,6 +586,13 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
     }
     const nextRequestId = requestId('capture');
     pendingCapture.current = { requestId: nextRequestId, scanId, bindingEpoch: activeBindingEpoch };
+    const reloadGate = ocrApplyReloadGate.current;
+    if (ocrApplyReloadRequiredRef.current
+      && reloadGate
+      && reloadGate.bootstrapRequestId === null
+      && reloadGate.bindingEpoch === activeBindingEpoch) {
+      reloadGate.captureRequestId = nextRequestId;
+    }
     setSelectedScanId(scanId);
     clearOcrState();
     setLoadedCapture(null);
@@ -640,6 +684,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
       || ocrApplyBusy
       || rescanBusy
       || !storageReady
+      || ocrApplyReloadRequiredRef.current
       || pendingOcrReview.current
       || pendingOcrApply.current
       || pendingRetention.current) {
@@ -667,6 +712,10 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
   }, [loadedCapture, ocrApplyBusy, ocrReviewBusy, rescanBusy, retireOcrReview, selectedScanId, sessionId, storageReady, webSocket]);
 
   const applyOcrNames = useCallback((changes: PageMappingsOcrAliasChange[]) => {
+    if (ocrApplyReloadRequiredRef.current) {
+      setOcrMessage('Reload Page Mappings and its capture before saving more OCR Review names.');
+      return;
+    }
     const correlation = ocrCorrelation(
       bindingRef.current,
       loadedCapture,
@@ -696,26 +745,40 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
       expectedClientNamed: change.expectedClientNamed ?? null,
       clientNamed: change.clientNamed ?? null,
     }));
-    pendingOcrApply.current = { correlation, changes: exactChanges };
+    const requestBody = JSON.stringify({ ...correlation, changes: exactChanges });
+    const pending: PendingOcrApply = {
+      correlation,
+      changes: exactChanges,
+      requestBody,
+      resendRequired: false,
+      reloadAfterSettle: false,
+    };
+    pendingOcrApply.current = pending;
     setOcrApplyBusy(true);
     setOcrMessage(`Saving ${exactChanges.length} reviewed name${exactChanges.length === 1 ? '' : 's'}...`);
     ocrApplyTimer.current = window.setTimeout(() => {
-      if (pendingOcrApply.current?.correlation.requestId !== correlation.requestId) return;
+      const activePending = pendingOcrApply.current;
+      if (activePending?.correlation.requestId !== correlation.requestId) return;
+      const reloadAfterSettle = activePending.reloadAfterSettle;
       retireOcrApply(correlation.requestId);
+      markOcrApplyReloadRequired();
       setOcrReview(null);
-      setOcrMessage('The save response timed out. Reload OCR Review before retrying because the commit outcome is unknown.');
+      const message = 'The save response timed out. Reload Page Mappings before retrying because the commit outcome is unknown.';
+      setOcrMessage(message);
+      setStatus(message);
+      if (reloadAfterSettle) bootstrap(correlation.bindingEpoch);
     }, OCR_REVIEW_TIMEOUT_MS);
     try {
       webSocket.send(JSON.stringify({
         type: 'pageMappings.ocrReviewApply',
         sessionId,
-        body: JSON.stringify({ ...correlation, changes: exactChanges }),
+        body: requestBody,
       }));
     } catch (_) {
       retireOcrApply(correlation.requestId);
       setOcrMessage('OCR Review names could not be sent.');
     }
-  }, [loadedCapture, ocrApplyBusy, ocrReviewBusy, rescanBusy, retireOcrApply, selectedScanId, sessionId, storageReady, webSocket]);
+  }, [bootstrap, loadedCapture, markOcrApplyReloadRequired, ocrApplyBusy, ocrReviewBusy, rescanBusy, retireOcrApply, selectedScanId, sessionId, storageReady, webSocket]);
 
   const armRetentionTimeout = useCallback((pending: PendingRetention) => {
     pendingRetention.current = pending;
@@ -856,16 +919,50 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
   }, [armRetentionTimeout, cacheBusy, captureLoading, ocrApplyBusy, ocrReviewBusy, rescanBusy, retention, retireRetention, sessionId, storageReady, webSocket]);
 
   useEffect(() => {
-    if (connected) bootstrap();
-  }, [bootstrap, connected]);
+    if (!connected) return;
+    const pending = pendingOcrApply.current;
+    if (pending) {
+      if (!pending.resendRequired
+        || !webSocket
+        || webSocket.readyState !== WebSocket.OPEN) return;
+      try {
+        webSocket.send(JSON.stringify({
+          type: 'pageMappings.ocrReviewApply',
+          sessionId,
+          body: pending.requestBody,
+        }));
+        pending.resendRequired = false;
+        const message = 'Reconfirming the exact OCR Review save after reconnecting...';
+        setOcrMessage(message);
+        setStatus(message);
+      } catch (_) {
+        const message = 'The OCR Review save could not be resent. Waiting for recovery before allowing another save.';
+        setOcrMessage(message);
+        setStatus(message);
+      }
+      return;
+    }
+    bootstrap();
+  }, [bootstrap, connected, sessionId, webSocket]);
 
   useEffect(() => {
     if (connected) return;
     const retentionOutcomeUnknown = pendingRetention.current !== null;
+    const pendingApply = pendingOcrApply.current;
     pendingCache.current = null;
     setCacheBusy(false);
     retireRescan();
-    clearOcrState();
+    retireOcrReview();
+    setOcrReview(null);
+    if (pendingApply) {
+      pendingApply.resendRequired = true;
+      pendingApply.reloadAfterSettle = true;
+      const message = 'Connection lost while saving OCR Review names. The exact request will be reconfirmed after reconnecting.';
+      setOcrMessage(message);
+      setStatus(message);
+    } else {
+      setOcrMessage('');
+    }
     retireRetention();
     if (retentionOutcomeUnknown) {
       markRetentionReloadRequired();
@@ -874,7 +971,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
       setStorageReady(null);
       setRetention(null);
     }
-  }, [clearOcrState, connected, markRetentionReloadRequired, retireRescan, retireRetention]);
+  }, [connected, markRetentionReloadRequired, retireOcrReview, retireRescan, retireRetention]);
 
   useEffect(() => () => {
     if (rescanTimer.current !== null) {
@@ -906,6 +1003,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
               && !sameBindingIdentity(activeBinding, primary.identity)
               && !sameBindingIdentity(activeBinding, alternate.identity))
             || (!activeBinding && bindingEstablishedRef.current)) continue;
+          if (pendingOcrApply.current) markOcrApplyReloadRequired();
           bindingRef.current = null;
           setBinding(null);
           resetOwnerState();
@@ -922,6 +1020,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
             continue;
           }
           if (bindingRef.current?.bindingEpoch === nextBinding.bindingEpoch) continue;
+          if (pendingOcrApply.current) markOcrApplyReloadRequired();
           bindingEstablishedRef.current = true;
           bindingRef.current = nextBinding;
           setBinding(nextBinding);
@@ -996,6 +1095,15 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
             clearRetentionReloadRequired();
           } else {
             markRetentionReloadRequired();
+          }
+          const ocrReloadGate = ocrApplyReloadGate.current;
+          if (ocrApplyReloadRequiredRef.current
+            && ocrReloadGate?.bootstrapRequestId === responseRequestId
+            && nextStorageReady
+            && nextRetention) {
+            ocrReloadGate.bootstrapRequestId = null;
+            ocrReloadGate.bindingEpoch = nextBinding.bindingEpoch;
+            ocrReloadGate.captureRequestId = null;
           }
           updateUrlHint(nextBinding.botJobId);
           const next = Array.isArray(body.snapshots)
@@ -1126,6 +1234,13 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
             screenshotBase64: text(body.screenshotBase64) || null,
             screenshotMime: text(body.screenshotMime) || 'image/png',
           });
+          const ocrReloadGate = ocrApplyReloadGate.current;
+          if (ocrApplyReloadRequiredRef.current
+            && ocrReloadGate?.bootstrapRequestId === null
+            && ocrReloadGate?.bindingEpoch === pending.bindingEpoch
+            && ocrReloadGate?.captureRequestId === pending.requestId) {
+            clearOcrApplyReloadRequired();
+          }
           setStatus('Immutable capture loaded.');
           continue;
         }
@@ -1261,12 +1376,18 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
         if (operation === 'pageMappings.ocrReviewApplyResponse') {
           const pending = pendingOcrApply.current;
           if (!pending || text(body.requestId) !== pending.correlation.requestId) continue;
+          const reloadAfterSettle = pending.reloadAfterSettle;
           if (body.ok === false) {
             if (!pageMappingsOcrFailureMatches(body, pending.correlation)) continue;
             retireOcrApply(pending.correlation.requestId);
             const failureMessage = pageMappingsOcrMessage(body, 'OCR Review names could not be saved.');
+            if (body.reloadRequired === true) {
+              markOcrApplyReloadRequired();
+              setOcrReview(null);
+            }
             setOcrMessage(failureMessage);
             setStatus(failureMessage);
+            if (reloadAfterSettle) bootstrap(pending.correlation.bindingEpoch);
             continue;
           }
           const parsed = parsePageMappingsOcrApply(body, pending.correlation, pending.changes);
@@ -1277,8 +1398,12 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
             selectedScanId,
             pending.correlation,
           )) {
+            markOcrApplyReloadRequired();
             setOcrReview(null);
-            setOcrMessage('OCR Review returned an invalid or stale save response. Reload the capture.');
+            const message = 'OCR Review returned an invalid or stale save response. Reload Page Mappings.';
+            setOcrMessage(message);
+            setStatus(message);
+            if (reloadAfterSettle) bootstrap(pending.correlation.bindingEpoch);
             continue;
           }
 
@@ -1334,6 +1459,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
           }));
           setOcrMessage(parsed.message);
           setStatus(parsed.message);
+          if (reloadAfterSettle) bootstrap(pending.correlation.bindingEpoch);
           continue;
         }
       } catch {
@@ -1342,11 +1468,13 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
     }
   }, [
     bootstrap,
+    clearOcrApplyReloadRequired,
     clearRetentionReloadRequired,
     clearOcrState,
     loadCapture,
     loadedCapture,
     messages,
+    markOcrApplyReloadRequired,
     markRetentionReloadRequired,
     ocrReview,
     requestCacheState,
@@ -1567,6 +1695,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
   const canRunOcr = Boolean(connected
     && storageReady
     && !invalidated
+    && !ocrApplyReloadRequired
     && !captureLoading
     && !rescanBusy
     && !retentionBusy
