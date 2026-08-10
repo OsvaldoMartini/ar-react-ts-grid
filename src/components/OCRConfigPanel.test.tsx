@@ -29,7 +29,7 @@ test('requires a profile name',()=>{
   expect(onSave).not.toHaveBeenCalled();
 });
 
-test('renders as a non-modal full-window page without a DOM drag surface',()=>{
+test('renders as a non-modal page with a handle for its containing workspace frame',()=>{
   const owner=document.createElement('div');
   document.body.appendChild(owner);
   const onClose=jest.fn();
@@ -39,7 +39,7 @@ test('renders as a non-modal full-window page without a DOM drag surface',()=>{
   expect(workspace.parentElement).toBe(owner);
   expect(workspace).toHaveAttribute('aria-label','OCR configuration');
   expect(workspace).not.toHaveAttribute('aria-modal');
-  expect(screen.getByTestId('ocr-config-header')).not.toHaveAttribute('data-floating-workspace-drag-handle');
+  expect(screen.getByTestId('ocr-config-header')).toHaveAttribute('data-floating-workspace-drag-handle');
   fireEvent.click(screen.getByRole('button',{name:'Close OCR configuration'}));
   expect(onClose).toHaveBeenCalledTimes(1);
   view.unmount();
