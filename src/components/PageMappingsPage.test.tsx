@@ -1,7 +1,8 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { useWebSocket } from './useWebSocket';
 import PageMappingsPage from './PageMappingsPage';
+import type { PageMappingsRetentionState } from './page-mappings/PageMappingsRetentionPanel';
 
 jest.mock('./useWebSocket', () => ({ useWebSocket: jest.fn() }));
 jest.mock('./PagesOpenButton', () => () => <button type="button">Pages</button>);
@@ -13,6 +14,24 @@ const socket = {
   send: jest.fn(),
 } as unknown as WebSocket;
 let messages: string[] = [];
+let connected = true;
+
+const retentionState = (
+  overrides: Partial<PageMappingsRetentionState> = {},
+): PageMappingsRetentionState => ({
+  retentionDays: 14,
+  maxUnpinnedPerPage: 4,
+  enabled: true,
+  readyCount: 1,
+  pinnedCount: 0,
+  eligibleCount: 2,
+  ...overrides,
+});
+
+const readyStorage = (overrides: Partial<PageMappingsRetentionState> = {}) => ({
+  storageReady: true,
+  retention: retentionState(overrides),
+});
 
 const response = (operationId: string, body: Record<string, unknown>) => JSON.stringify({
   operationId,
@@ -24,8 +43,57 @@ const sent = (operation: string) => (socket.send as jest.Mock).mock.calls
   .map(([value]) => JSON.parse(String(value)))
   .filter(envelope => envelope.type === operation);
 
+const latestSentBody = (operation: string): Record<string, unknown> => {
+  const envelopes = sent(operation);
+  return JSON.parse(envelopes[envelopes.length - 1].body) as Record<string, unknown>;
+};
+
+const page = () => (
+  <PageMappingsPage socketPort={5000} sessionId="pageMappingsManager" />
+);
+
+const appendResponse = (
+  view: ReturnType<typeof render>,
+  operationId: string,
+  body: Record<string, unknown>,
+) => {
+  messages = [...messages, response(operationId, body)];
+  view.rerender(page());
+};
+
+const hydrateReadyRetention = async (
+  view: ReturnType<typeof render>,
+  overrides: Partial<PageMappingsRetentionState> = {},
+) => {
+  await waitFor(() => expect(sent('pageMappings.bootstrap')).toHaveLength(1));
+  const bootstrap = latestSentBody('pageMappings.bootstrap');
+  appendResponse(view, 'pageMappings.bootstrapResponse', {
+    ok: true,
+    requestId: bootstrap.requestId,
+    bindingEpoch: 'binding-retention',
+    workspaceEpoch: 7,
+    homeBankingId: 2,
+    botJobId: 32,
+    botJobName: 'Retention Job',
+    ...readyStorage(overrides),
+    snapshots: [],
+  });
+
+  await waitFor(() => expect(sent('pageMappings.cacheState')).toHaveLength(1));
+  const cache = latestSentBody('pageMappings.cacheState');
+  appendResponse(view, 'pageMappings.cacheStateResponse', {
+    ok: false,
+    requestId: cache.requestId,
+    bindingEpoch: cache.bindingEpoch,
+    message: 'Live comparison is not required by this test.',
+  });
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Reload' })).toBeEnabled());
+  return { bootstrap, retention: retentionState(overrides) };
+};
+
 beforeEach(() => {
   messages = [];
+  connected = true;
   jest.clearAllMocks();
   window.history.replaceState(
     {},
@@ -34,11 +102,16 @@ beforeEach(() => {
   );
   mockedUseWebSocket.mockImplementation(() => ({
     webSocket: socket,
-    connected: true,
+    connected,
     reconnectAttempts: 0,
     messages,
     error: null,
   }));
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
+  jest.useRealTimers();
 });
 
 test('uses the server-owned binding and sends correlated capture requests without owner authority', async () => {
@@ -62,6 +135,7 @@ test('uses the server-owned binding and sends correlated capture requests withou
     homeBankingId: 2,
     botJobId: 32,
     botJobName: 'Authoritative Bot Job',
+    ...readyStorage(),
     snapshots: [{
       scanId: 'scan-a',
       pageKey: 'page-a',
@@ -181,6 +255,7 @@ test('retargets atomically, ignores a late capture, and stages only authoritativ
     homeBankingId: 1,
     botJobId: 10,
     botJobName: 'A',
+    ...readyStorage(),
     snapshots: [{
       scanId: 'scan-a', pageKey: 'page-a', pageUrl: 'https://a.example/',
       capturedAt: '2026-08-07T10:00:00Z', elementCount: 1, artifactPath: 'a',
@@ -212,6 +287,7 @@ test('retargets atomically, ignores a late capture, and stages only authoritativ
     homeBankingId: 2,
     botJobId: 20,
     botJobName: 'B',
+    ...readyStorage(),
     snapshots: [{
       scanId: 'scan-b', pageKey: 'page-b', pageUrl: 'https://b.example/',
       capturedAt: '2026-08-07T11:00:00Z', elementCount: 1, artifactPath: 'b',
@@ -220,7 +296,9 @@ test('retargets atomically, ignores a late capture, and stages only authoritativ
   })];
   view.rerender(<PageMappingsPage socketPort={5000} sessionId="pageMappingsManager" />);
   await waitFor(() => expect(sent('pageMappings.capture')).toHaveLength(2));
+  await waitFor(() => expect(sent('pageMappings.cacheState')).toHaveLength(2));
   const captureB = JSON.parse(sent('pageMappings.capture')[1].body);
+  const cacheB = JSON.parse(sent('pageMappings.cacheState')[1].body);
 
   messages = [...messages,
     response('pageMappings.captureResponse', {
@@ -253,6 +331,12 @@ test('retargets atomically, ignores a late capture, and stages only authoritativ
       manifestSha256: 'a'.repeat(64),
       elements: [{ clientNamed: 'STALE A element' }],
       rectangles: [],
+    }),
+    response('pageMappings.cacheStateResponse', {
+      ok: false,
+      requestId: cacheB.requestId,
+      bindingEpoch: cacheB.bindingEpoch,
+      message: 'Live comparison unavailable in this test.',
     })];
   view.rerender(<PageMappingsPage socketPort={5000} sessionId="pageMappingsManager" />);
 
@@ -291,6 +375,7 @@ test('clears every owner-scoped surface and staged mapping when the workspace is
     homeBankingId: 2,
     botJobId: 32,
     botJobName: 'Active owner',
+    ...readyStorage(),
     snapshots: [{
       scanId: 'scan-active', pageKey: 'page-active', pageUrl: 'https://bank.example/',
       capturedAt: '2026-08-07T12:00:00Z', elementCount: 1,
@@ -300,28 +385,37 @@ test('clears every owner-scoped surface and staged mapping when the workspace is
   })];
   view.rerender(<PageMappingsPage socketPort={5000} sessionId="pageMappingsManager" />);
   await waitFor(() => expect(sent('pageMappings.capture')).toHaveLength(1));
+  await waitFor(() => expect(sent('pageMappings.cacheState')).toHaveLength(1));
   const captureRequest = JSON.parse(sent('pageMappings.capture')[0].body);
+  const cacheRequest = JSON.parse(sent('pageMappings.cacheState')[0].body);
 
-  messages = [...messages, response('pageMappings.captureResponse', {
-    ok: true,
-    requestId: captureRequest.requestId,
-    bindingEpoch: 'binding-active',
-    scanId: 'scan-active',
-    pageKey: 'page-active',
-    capturedAt: '2026-08-07T12:00:00Z',
-    manifestSha256: 'c'.repeat(64),
-    elements: [{
-      scannedElementId: 101,
-      elementHash: 'hash-active',
-      lastScannedAt: '2026-08-07T12:00:00Z',
-      scanCount: 1,
-      clientNamed: 'Staged active element',
-      tagName: 'input',
-      typeElement: 'INPUT',
-      xPath: '//input',
-    }],
-    rectangles: [],
-  })];
+  messages = [...messages,
+    response('pageMappings.captureResponse', {
+      ok: true,
+      requestId: captureRequest.requestId,
+      bindingEpoch: 'binding-active',
+      scanId: 'scan-active',
+      pageKey: 'page-active',
+      capturedAt: '2026-08-07T12:00:00Z',
+      manifestSha256: 'c'.repeat(64),
+      elements: [{
+        scannedElementId: 101,
+        elementHash: 'hash-active',
+        lastScannedAt: '2026-08-07T12:00:00Z',
+        scanCount: 1,
+        clientNamed: 'Staged active element',
+        tagName: 'input',
+        typeElement: 'INPUT',
+        xPath: '//input',
+      }],
+      rectangles: [],
+    }),
+    response('pageMappings.cacheStateResponse', {
+      ok: false,
+      requestId: cacheRequest.requestId,
+      bindingEpoch: cacheRequest.bindingEpoch,
+      message: 'Live comparison unavailable in this test.',
+    })];
   view.rerender(<PageMappingsPage socketPort={5000} sessionId="pageMappingsManager" />);
 
   expect(await screen.findByText('Staged active element')).toBeInTheDocument();
@@ -363,6 +457,7 @@ test('rejects late Memory List responses and commands after an owner retarget', 
     homeBankingId: 1,
     botJobId: 10,
     botJobName: 'A',
+    ...readyStorage(),
     snapshots: [{
       scanId: 'scan-a', pageKey: 'page-a', pageUrl: 'https://a.example/',
       capturedAt: '2026-08-07T10:00:00Z', elementCount: 1,
@@ -371,22 +466,31 @@ test('rejects late Memory List responses and commands after an owner retarget', 
   })];
   view.rerender(<PageMappingsPage socketPort={5000} sessionId="pageMappingsManager" />);
   await waitFor(() => expect(sent('pageMappings.capture')).toHaveLength(1));
+  await waitFor(() => expect(sent('pageMappings.cacheState')).toHaveLength(1));
   const captureA = JSON.parse(sent('pageMappings.capture')[0].body);
-  messages = [...messages, response('pageMappings.captureResponse', {
-    ok: true,
-    requestId: captureA.requestId,
-    bindingEpoch: 'binding-a',
-    scanId: 'scan-a',
-    pageKey: 'page-a',
-    capturedAt: '2026-08-07T10:00:00Z',
-    manifestSha256: 'a'.repeat(64),
-    elements: [{
-      scannedElementId: 11, elementHash: 'hash-a',
-      lastScannedAt: '2026-08-07T10:00:00Z', scanCount: 1,
-      clientNamed: 'Owner A element', typeElement: 'INPUT', tagName: 'input', xPath: '//a',
-    }],
-    rectangles: [],
-  })];
+  const cacheA = JSON.parse(sent('pageMappings.cacheState')[0].body);
+  messages = [...messages,
+    response('pageMappings.captureResponse', {
+      ok: true,
+      requestId: captureA.requestId,
+      bindingEpoch: 'binding-a',
+      scanId: 'scan-a',
+      pageKey: 'page-a',
+      capturedAt: '2026-08-07T10:00:00Z',
+      manifestSha256: 'a'.repeat(64),
+      elements: [{
+        scannedElementId: 11, elementHash: 'hash-a',
+        lastScannedAt: '2026-08-07T10:00:00Z', scanCount: 1,
+        clientNamed: 'Owner A element', typeElement: 'INPUT', tagName: 'input', xPath: '//a',
+      }],
+      rectangles: [],
+    }),
+    response('pageMappings.cacheStateResponse', {
+      ok: false,
+      requestId: cacheA.requestId,
+      bindingEpoch: cacheA.bindingEpoch,
+      message: 'Live comparison unavailable in this test.',
+    })];
   view.rerender(<PageMappingsPage socketPort={5000} sessionId="pageMappingsManager" />);
   expect(await screen.findByText('Owner A element')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Add' }));
@@ -420,6 +524,7 @@ test('rejects late Memory List responses and commands after an owner retarget', 
     homeBankingId: 2,
     botJobId: 20,
     botJobName: 'B',
+    ...readyStorage(),
     snapshots: [{
       scanId: 'scan-b', pageKey: 'page-b', pageUrl: 'https://b.example/',
       capturedAt: '2026-08-07T11:00:00Z', elementCount: 1,
@@ -428,22 +533,31 @@ test('rejects late Memory List responses and commands after an owner retarget', 
   })];
   view.rerender(<PageMappingsPage socketPort={5000} sessionId="pageMappingsManager" />);
   await waitFor(() => expect(sent('pageMappings.capture')).toHaveLength(2));
+  await waitFor(() => expect(sent('pageMappings.cacheState')).toHaveLength(2));
   const captureB = JSON.parse(sent('pageMappings.capture')[1].body);
-  messages = [...messages, response('pageMappings.captureResponse', {
-    ok: true,
-    requestId: captureB.requestId,
-    bindingEpoch: 'binding-b',
-    scanId: 'scan-b',
-    pageKey: 'page-b',
-    capturedAt: '2026-08-07T11:00:00Z',
-    manifestSha256: 'b'.repeat(64),
-    elements: [{
-      scannedElementId: 22, elementHash: 'hash-b',
-      lastScannedAt: '2026-08-07T11:00:00Z', scanCount: 2,
-      clientNamed: 'Owner B element', typeElement: 'INPUT', tagName: 'input', xPath: '//b',
-    }],
-    rectangles: [],
-  })];
+  const cacheB = JSON.parse(sent('pageMappings.cacheState')[1].body);
+  messages = [...messages,
+    response('pageMappings.captureResponse', {
+      ok: true,
+      requestId: captureB.requestId,
+      bindingEpoch: 'binding-b',
+      scanId: 'scan-b',
+      pageKey: 'page-b',
+      capturedAt: '2026-08-07T11:00:00Z',
+      manifestSha256: 'b'.repeat(64),
+      elements: [{
+        scannedElementId: 22, elementHash: 'hash-b',
+        lastScannedAt: '2026-08-07T11:00:00Z', scanCount: 2,
+        clientNamed: 'Owner B element', typeElement: 'INPUT', tagName: 'input', xPath: '//b',
+      }],
+      rectangles: [],
+    }),
+    response('pageMappings.cacheStateResponse', {
+      ok: false,
+      requestId: cacheB.requestId,
+      bindingEpoch: cacheB.bindingEpoch,
+      message: 'Live comparison unavailable in this test.',
+    })];
   view.rerender(<PageMappingsPage socketPort={5000} sessionId="pageMappingsManager" />);
   expect(await screen.findByText('Owner B element')).toBeInTheDocument();
   messages = [...messages, response('pageMappings.invalidated', {
@@ -508,6 +622,7 @@ test('rejects late Memory List responses and commands after an owner retarget', 
     homeBankingId: 1,
     botJobId: 10,
     botJobName: 'A reopened',
+    ...readyStorage(),
     snapshots: [{
       scanId: 'scan-a2', pageKey: 'page-a', pageUrl: 'https://a.example/',
       capturedAt: '2026-08-07T12:00:00Z', elementCount: 1,
@@ -516,22 +631,31 @@ test('rejects late Memory List responses and commands after an owner retarget', 
   })];
   view.rerender(<PageMappingsPage socketPort={5000} sessionId="pageMappingsManager" />);
   await waitFor(() => expect(sent('pageMappings.capture')).toHaveLength(3));
+  await waitFor(() => expect(sent('pageMappings.cacheState')).toHaveLength(3));
   const captureA2 = JSON.parse(sent('pageMappings.capture')[2].body);
-  messages = [...messages, response('pageMappings.captureResponse', {
-    ok: true,
-    requestId: captureA2.requestId,
-    bindingEpoch: 'binding-a2',
-    scanId: 'scan-a2',
-    pageKey: 'page-a',
-    capturedAt: '2026-08-07T12:00:00Z',
-    manifestSha256: 'c'.repeat(64),
-    elements: [{
-      scannedElementId: 33, elementHash: 'hash-a2',
-      lastScannedAt: '2026-08-07T12:00:00Z', scanCount: 3,
-      clientNamed: 'Owner A reopened element', typeElement: 'INPUT', tagName: 'input', xPath: '//a2',
-    }],
-    rectangles: [],
-  })];
+  const cacheA2 = JSON.parse(sent('pageMappings.cacheState')[2].body);
+  messages = [...messages,
+    response('pageMappings.captureResponse', {
+      ok: true,
+      requestId: captureA2.requestId,
+      bindingEpoch: 'binding-a2',
+      scanId: 'scan-a2',
+      pageKey: 'page-a',
+      capturedAt: '2026-08-07T12:00:00Z',
+      manifestSha256: 'c'.repeat(64),
+      elements: [{
+        scannedElementId: 33, elementHash: 'hash-a2',
+        lastScannedAt: '2026-08-07T12:00:00Z', scanCount: 3,
+        clientNamed: 'Owner A reopened element', typeElement: 'INPUT', tagName: 'input', xPath: '//a2',
+      }],
+      rectangles: [],
+    }),
+    response('pageMappings.cacheStateResponse', {
+      ok: false,
+      requestId: cacheA2.requestId,
+      bindingEpoch: cacheA2.bindingEpoch,
+      message: 'Live comparison unavailable in this test.',
+    })];
   view.rerender(<PageMappingsPage socketPort={5000} sessionId="pageMappingsManager" />);
   expect(await screen.findByText('Owner A reopened element')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Add' }));
@@ -545,7 +669,7 @@ test('rejects late Memory List responses and commands after an owner retarget', 
     ownerEpoch: 'owner-a',
   })];
   view.rerender(<PageMappingsPage socketPort={5000} sessionId="pageMappingsManager" />);
-  await waitFor(() => expect(sent('memoryList.sync')).toHaveLength(2));
+  await waitFor(() => expect(sent('memoryList.sync')).toHaveLength(3));
 
   const reopenedDropZone = screen.getByLabelText('Selected elements for Memory List');
   messages = [...messages, response('memoryList.command', {
@@ -570,4 +694,189 @@ test('rejects late Memory List responses and commands after an owner retarget', 
   view.rerender(<PageMappingsPage socketPort={5000} sessionId="pageMappingsManager" />);
   await waitFor(() => expect(within(reopenedDropZone)
     .queryByText('Owner A reopened element')).not.toBeInTheDocument());
+});
+
+test('requires confirmation and sends the authoritative expected policy when purging', async () => {
+  const view = render(page());
+  await hydrateReadyRetention(view, {
+    retentionDays: 21,
+    maxUnpinnedPerPage: 6,
+    eligibleCount: 2,
+  });
+  const confirm = jest.spyOn(window, 'confirm')
+    .mockReturnValueOnce(false)
+    .mockReturnValueOnce(true);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Purge Eligible' }));
+
+  expect(confirm).toHaveBeenLastCalledWith(
+    'Permanently purge 2 eligible unpinned captures for this Bot Job?',
+  );
+  expect(sent('pageMappings.retentionPurge')).toHaveLength(0);
+  expect(screen.getByRole('status')).toHaveTextContent('Snapshot purge cancelled.');
+
+  fireEvent.click(screen.getByRole('button', { name: 'Purge Eligible' }));
+
+  await waitFor(() => expect(sent('pageMappings.retentionPurge')).toHaveLength(1));
+  expect(confirm).toHaveBeenCalledTimes(2);
+  expect(latestSentBody('pageMappings.retentionPurge')).toEqual({
+    requestId: expect.any(String),
+    bindingEpoch: 'binding-retention',
+    workspaceEpoch: 7,
+    homeBankingId: 2,
+    botJobId: 32,
+    expectedRetentionDays: 21,
+    expectedMaxUnpinnedPerPage: 6,
+  });
+  expect(screen.getByRole('button', { name: 'Purging...' })).toBeDisabled();
+});
+
+test('requires reload after a correlated retention failure reports an unknown outcome', async () => {
+  const view = render(page());
+  await hydrateReadyRetention(view);
+  fireEvent.change(screen.getByLabelText('Retain days'), { target: { value: '15' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  await waitFor(() => expect(sent('pageMappings.retentionUpdate')).toHaveLength(1));
+  const update = latestSentBody('pageMappings.retentionUpdate');
+
+  appendResponse(view, 'pageMappings.retentionUpdateResponse', {
+    ok: false,
+    requestId: update.requestId,
+    reloadRequired: true,
+    error: 'Retention outcome is unknown.',
+  });
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('Snapshot retention reload required');
+  expect(screen.getByRole('status')).toHaveTextContent('Retention outcome is unknown.');
+  expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Purge Eligible' })).not.toBeInTheDocument();
+
+  appendResponse(view, 'pageMappings.retentionUpdateResponse', {
+    ...update,
+    ok: true,
+    retention: retentionState({ retentionDays: 15 }),
+  });
+  expect(screen.getByRole('alert')).toHaveTextContent('Snapshot retention reload required');
+});
+
+test('requires reload after a correlated retention success contains malformed state', async () => {
+  const view = render(page());
+  await hydrateReadyRetention(view);
+  fireEvent.change(screen.getByLabelText('Retain days'), { target: { value: '15' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  await waitFor(() => expect(sent('pageMappings.retentionUpdate')).toHaveLength(1));
+  const update = latestSentBody('pageMappings.retentionUpdate');
+
+  appendResponse(view, 'pageMappings.retentionUpdateResponse', {
+    ...update,
+    ok: true,
+    retention: retentionState({ retentionDays: 15, eligibleCount: -1 }),
+  });
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('Snapshot retention reload required');
+  expect(screen.getByRole('status')).toHaveTextContent(
+    'The snapshot retention response was invalid. Reload Page Mappings.',
+  );
+});
+
+test('requires reload when a purge response returns a different retention policy', async () => {
+  const view = render(page());
+  await hydrateReadyRetention(view, { retentionDays: 21, maxUnpinnedPerPage: 6 });
+  jest.spyOn(window, 'confirm').mockReturnValue(true);
+  fireEvent.click(screen.getByRole('button', { name: 'Purge Eligible' }));
+  await waitFor(() => expect(sent('pageMappings.retentionPurge')).toHaveLength(1));
+  const purge = latestSentBody('pageMappings.retentionPurge');
+
+  appendResponse(view, 'pageMappings.retentionPurgeResponse', {
+    ...purge,
+    ok: true,
+    retention: retentionState({ retentionDays: 22, maxUnpinnedPerPage: 6 }),
+    purgedScanIds: [],
+  });
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('Snapshot retention reload required');
+  expect(screen.getByRole('status')).toHaveTextContent(
+    'The purge policy changed while the request was running. Reload Page Mappings.',
+  );
+});
+
+test('keeps the reload latch after a retention timeout until its correlated bootstrap completes', async () => {
+  const view = render(page());
+  await hydrateReadyRetention(view);
+  fireEvent.change(screen.getByLabelText('Retain days'), { target: { value: '15' } });
+  jest.useFakeTimers();
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  expect(sent('pageMappings.retentionUpdate')).toHaveLength(1);
+
+  act(() => { jest.advanceTimersByTime(30_000); });
+  jest.useRealTimers();
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('Snapshot retention reload required');
+  expect(screen.getByRole('status')).toHaveTextContent(
+    'The retention response timed out. Reload Page Mappings before retrying because the outcome is unknown.',
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Reload' }));
+  await waitFor(() => expect(sent('pageMappings.bootstrap')).toHaveLength(2));
+  const reload = latestSentBody('pageMappings.bootstrap');
+
+  appendResponse(view, 'pageMappings.bootstrapResponse', {
+    ok: true,
+    requestId: 'mismatched-bootstrap-request',
+    bindingEpoch: 'binding-retention',
+    workspaceEpoch: 7,
+    homeBankingId: 2,
+    botJobId: 32,
+    ...readyStorage(),
+    snapshots: [],
+  });
+  expect(screen.getByRole('alert')).toHaveTextContent('Snapshot retention reload required');
+
+  appendResponse(view, 'pageMappings.bootstrapResponse', {
+    ok: true,
+    requestId: reload.requestId,
+    bindingEpoch: 'binding-retention',
+    workspaceEpoch: 7,
+    homeBankingId: 2,
+    botJobId: 32,
+    ...readyStorage(),
+    snapshots: [],
+  });
+  await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+  expect(screen.getByText('SYSTEM-WIDE SNAPSHOT RETENTION')).toBeInTheDocument();
+});
+
+test('keeps the reload latch across reconnect after disconnecting during retention', async () => {
+  const view = render(page());
+  await hydrateReadyRetention(view);
+  fireEvent.change(screen.getByLabelText('Retain days'), { target: { value: '15' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  await waitFor(() => expect(sent('pageMappings.retentionUpdate')).toHaveLength(1));
+
+  connected = false;
+  view.rerender(page());
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('Snapshot retention reload required');
+  expect(screen.getByRole('status')).toHaveTextContent(
+    'Connection lost during snapshot retention. Reconnect and reload before another retention action.',
+  );
+
+  connected = true;
+  view.rerender(page());
+  await waitFor(() => expect(sent('pageMappings.bootstrap')).toHaveLength(2));
+  expect(screen.getByRole('alert')).toHaveTextContent('Snapshot retention reload required');
+  const reconnect = latestSentBody('pageMappings.bootstrap');
+
+  appendResponse(view, 'pageMappings.bootstrapResponse', {
+    ok: true,
+    requestId: reconnect.requestId,
+    bindingEpoch: 'binding-retention',
+    workspaceEpoch: 7,
+    homeBankingId: 2,
+    botJobId: 32,
+    ...readyStorage(),
+    snapshots: [],
+  });
+
+  await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+  expect(screen.getByText('SYSTEM-WIDE SNAPSHOT RETENTION')).toBeInTheDocument();
 });
