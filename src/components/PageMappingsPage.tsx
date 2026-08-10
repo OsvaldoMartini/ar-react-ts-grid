@@ -358,7 +358,13 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
   const connectionQueryParameters = useMemo(() => windowCapability
     ? { windowCapability }
     : undefined, [windowCapability]);
-  const { webSocket, connected, messages } = useWebSocket(
+  const {
+    webSocket,
+    connected,
+    messages,
+    error,
+    messageGeneration = 0,
+  } = useWebSocket(
     socketPort,
     sessionId,
     connectionQueryParameters,
@@ -402,6 +408,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
   const memoryOpened = useRef(false);
   const workspaceCursor = useRef(0);
   const memoryCursor = useRef(0);
+  const processedMessageGeneration = useRef(messageGeneration);
   const pendingBootstrap = useRef<string | null>(null);
   const pendingCapture = useRef<{ requestId: string; scanId: string; bindingEpoch: string } | null>(null);
   const pendingCache = useRef<{ requestId: string; bindingEpoch: string } | null>(null);
@@ -417,6 +424,13 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
   const pendingRetention = useRef<PendingRetention | null>(null);
   const retentionTimer = useRef<number | null>(null);
   const retentionReloadRequiredRef = useRef(false);
+
+  useEffect(() => {
+    if (messageGeneration === processedMessageGeneration.current) return;
+    workspaceCursor.current = 0;
+    memoryCursor.current = 0;
+    processedMessageGeneration.current = messageGeneration;
+  }, [messageGeneration]);
 
   const updateUrlHint = useCallback((botJobId: number) => {
     const url = new URL(window.location.href);
@@ -973,6 +987,33 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
     }
   }, [connected, markRetentionReloadRequired, retireOcrReview, retireRescan, retireRetention]);
 
+  useEffect(() => {
+    if (error !== 'This workspace was replaced by a newer tab.') return;
+
+    const ocrOutcomeUnknown = pendingOcrApply.current !== null
+      || ocrApplyReloadRequiredRef.current;
+    const retentionOutcomeUnknown = pendingRetention.current !== null
+      || retentionReloadRequiredRef.current;
+    if (pendingOcrApply.current) markOcrApplyReloadRequired();
+    if (pendingRetention.current) markRetentionReloadRequired();
+
+    bindingRef.current = null;
+    setBinding(null);
+    resetOwnerState();
+    invalidatedRef.current = true;
+    setInvalidated(true);
+    const unknownOutcomeWarning = ocrOutcomeUnknown || retentionOutcomeUnknown
+      ? ' An in-flight save may have completed; reload the active Page Mappings window before retrying it.'
+      : '';
+    setStatus(`This Page Mappings window was replaced by a newer tab. Its previous Bot Job data has been cleared. Close this stale window if it remains open.${unknownOutcomeWarning}`);
+
+    try {
+      window.close();
+    } catch (closeError) {
+      console.error('Could not close the superseded Page Mappings window:', closeError);
+    }
+  }, [error, markOcrApplyReloadRequired, markRetentionReloadRequired, resetOwnerState]);
+
   useEffect(() => () => {
     if (rescanTimer.current !== null) {
       window.clearTimeout(rescanTimer.current);
@@ -1040,7 +1081,27 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
           const nextRetention = parseRetention(body.retention);
           if (!body.ok) {
             pendingBootstrap.current = null;
-            if (body.storageReady === false && nextBinding) {
+            if (body.reloadRequired === true && nextBinding) {
+              if (bindingRef.current
+                && bindingRef.current.bindingEpoch !== nextBinding.bindingEpoch) continue;
+              bindingEstablishedRef.current = true;
+              bindingRef.current = nextBinding;
+              setBinding(nextBinding);
+              resetOwnerState();
+              invalidatedRef.current = false;
+              setInvalidated(false);
+              updateUrlHint(nextBinding.botJobId);
+              setStorageReady(null);
+              setRetention(null);
+              setCacheState({
+                ...emptyCacheState,
+                state: 'UNAVAILABLE',
+                message: text(body.message)
+                  || 'A Page Mappings change overlapped this reload. Reload again before continuing.',
+              });
+              setStatus(text(body.message)
+                || 'A Page Mappings change overlapped this reload. Reload again before continuing.');
+            } else if (body.storageReady === false && nextBinding) {
               if (bindingRef.current
                 && bindingRef.current.bindingEpoch !== nextBinding.bindingEpoch) continue;
               bindingEstablishedRef.current = true;

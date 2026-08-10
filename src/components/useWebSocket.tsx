@@ -116,12 +116,23 @@ export const useWebSocket = (
   socketPort: number,
   sessionId: string,
   queryParameters?: WebSocketQueryParameters,
-) => {
+): {
+  webSocket: WebSocket | null;
+  connected: boolean;
+  reconnectAttempts: number;
+  messages: string[];
+  error: string | null;
+  messageGeneration?: number;
+} => {
   const serializedQueryParameters = serializeQueryParameters(queryParameters);
   const [webSocket, setWebSocket] = useState<WebSocket | null>(null);
   const [connected, setConnected] = useState(false);
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
-  const [messages, setMessages] = useState<string[]>([]);
+  const [messageBuffer, setMessageBuffer] = useState<{
+    generation: number;
+    messages: string[];
+  }>({ generation: 0, messages: [] });
+  const { generation: messageGeneration, messages } = messageBuffer;
   const [error, setError] = useState<string | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectAttemptsRef = useRef(0);
@@ -135,7 +146,10 @@ export const useWebSocket = (
     setReconnectAttempts(0);
     setConnected(false);
     setWebSocket(null);
-    setMessages([]);
+    setMessageBuffer((previous) => ({
+      generation: previous.generation + 1,
+      messages: [],
+    }));
     setError(null);
 
     if (socketPort <= 0 || !sessionId) {
@@ -305,7 +319,10 @@ export const useWebSocket = (
           }
           return;
         }
-        setMessages((previous) => [...previous, event.data]);
+        setMessageBuffer((previous) => ({
+          ...previous,
+          messages: [...previous.messages, event.data],
+        }));
       };
 
       socket.onerror = () => {
@@ -363,5 +380,12 @@ export const useWebSocket = (
     };
   }, [serializedQueryParameters, socketPort, sessionId]);
 
-  return { webSocket, connected, reconnectAttempts, messages, error };
+  return {
+    webSocket,
+    connected,
+    reconnectAttempts,
+    messages,
+    error,
+    messageGeneration,
+  };
 };
