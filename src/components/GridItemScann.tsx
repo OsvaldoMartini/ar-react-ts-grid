@@ -5,6 +5,7 @@ import crossImage from '../assets/cross.png';
 import pickItemImage from '../assets/pick-item5.png';
 import saveImage from "../assets/save.png";
 import editImage from '../assets/edit.png';
+import rollbackNameImage from '../assets/rollback.png';
 import constructionImage from '../assets/construction.png';
 import clickImage from "../assets/click.png";
 import linkImage from "../assets/links-icon.png";
@@ -2961,6 +2962,35 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
   };
 
 
+  // Resets clientNamed to null (the "no override" value - see
+  // normalizePageScannerClientNamed) so the display chain falls back to the
+  // original scanned name (definedName > someText > tagName). This action is
+  // intentionally local to the current scan and its staged Memory List copy;
+  // it does not mutate the scanned_element registry. Memory List Apply carries
+  // this null override into the new Bot Job instruction.
+  const handleRollbackClientNamed = (target: ElementDTO) => {
+    const elementKey = pageScannerLocatorElementKey(target);
+    setElementDTO(current => replacePageScannerElementAlias(
+      current,
+      elementKey,
+      null,
+    ).elements);
+    setElementGrouped(current => replacePageScannerGroupedElementAlias(
+      current,
+      elementKey,
+      null,
+    ));
+    setMemoryElements(current => replacePageScannerElementAlias(
+      current,
+      elementKey,
+      null,
+    ).elements);
+    if (editingElementId === target.xPath && editingElementTagName === target.tagName) {
+      setEditingElementId(null);
+      setEditingElementTagName(null);
+    }
+  };
+
   const handleRowHover = (elementDTO: ElementDTO) => {
     console.clear(); // Clear previous logs to only show the current hovered row
     console.log('Hovered Row:', elementDTO);
@@ -3693,6 +3723,15 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
                         {renderEditButton(
                           elementDTO,
                           editImage
+                        )}
+                        {Boolean(elementDTO.clientNamed?.trim()) && (
+                          <img
+                            src={rollbackNameImage}
+                            alt="Rollback name"
+                            title="Rollback to the original scanned name"
+                            className={styles.rollbackButton}
+                            onClick={() => handleRollbackClientNamed(elementDTO)}
+                          />
                         )}
                         {/* Row save removed in preScan mode: the Memory List "+" → Apply is the
                             single insert path for this version. */}

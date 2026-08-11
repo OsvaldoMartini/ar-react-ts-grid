@@ -48,6 +48,7 @@ export interface InstructionRowProps {
   operations: React.ReactNode;
   deviceOptionsRow: React.ReactNode;
   editButton: React.ReactNode;
+  rollbackNameButton: React.ReactNode;
   commandEditButton: React.ReactNode;
   moveButtons: React.ReactNode;
   testClick: React.ReactNode;
@@ -89,6 +90,7 @@ const InstructionRow: React.FC<InstructionRowProps> = ({
   operations,
   deviceOptionsRow,
   editButton,
+  rollbackNameButton,
   commandEditButton,
   moveButtons,
   testClick,
@@ -162,6 +164,7 @@ const InstructionRow: React.FC<InstructionRowProps> = ({
       <div className={styles.optionsColumn}>
         {deviceOptionsRow}
         {editButton}
+        {rollbackNameButton}
         {moveButtons}
         {executionTypeControl}
         {testClick}

@@ -3,6 +3,7 @@ import { SquarePen } from 'lucide-react';
 import { BlockLoopInstructionLoadDTO } from './instructionsMockData';
 
 import editImage from '../assets/edit.png';
+import rollbackNameImage from '../assets/rollback.png';
 import edit2Image from '../assets/edit2.png';
 import upImage from '../assets/up.png';
 import downImage from '../assets/down.png';
@@ -211,6 +212,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
     handleInstructionForceChange,
     handleEditInstruction,
     handleSaveInstruction,
+    handleRollbackInstructionName,
     submitInstructionRelationshipMutation,
     submitCheckOperand,
     submitCheckOperatorUpdate,
@@ -420,6 +422,20 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
         alt="edit"
         className={styles.editButton}
         onClick={() => handleEditInstruction(instruction)}  // Trigger edit mode
+      />
+    );
+  };
+
+  const renderRollbackNameButton = (instruction: BlockLoopInstructionLoadDTO) => {
+    if (allSpecialOperations(instruction.actions) || !instruction.clientNamed?.trim()) return null;
+
+    return (
+      <img
+        src={rollbackNameImage}
+        alt="Rollback name"
+        title={`Rollback to the canonical name: ${instruction.name}`}
+        className={styles.rollbackButton}
+        onClick={() => handleRollbackInstructionName(instruction.id)}
       />
     );
   };
@@ -996,6 +1012,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                             )}
                             deviceOptionsRow={renderDeviceOptionsRow(instruction)}
                             editButton={renderEditButton(instruction.actions, editImage, instruction)}
+                            rollbackNameButton={renderRollbackNameButton(instruction)}
                             commandEditButton={
                               !componentWorkspace ? (
                                 <span className={styles.commandEditRuleCard}>

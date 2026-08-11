@@ -3416,7 +3416,10 @@ export function useGridData(deps: UseGridDataDeps) {
     );
   };
 
-  const handleSaveInstruction = (instructionId: number) => {
+  const persistInstructionClientNamed = (
+    instructionId: number,
+    requestedClientNamed: string | null,
+  ) => {
     // Find the instruction to get blockId and botJobId
     const instructionToUpdate = instructionsData.find(instruction => instruction.id === instructionId);
 
@@ -3432,54 +3435,67 @@ export function useGridData(deps: UseGridDataDeps) {
     }
 
     const { blockId, blockName, blockOrderNumber, botJobId, instructionOrderNumber } = instructionToUpdate;
+    const typed = (requestedClientNamed ?? '').trim();
+    const nextClientNamed = (typed.length === 0 || typed === instructionToUpdate.name) ? null : typed;
+
+    if (!webSocket || !connected) {
+      setAlertImage(warningRedImage);
+      setAlertClass('construction-image');
+      setAlertMessageHeader('Instruction name not saved');
+      setErrorFlag(true);
+      setAlertMessageBody('The instruction workspace is disconnected. Reconnect and try again.');
+      return;
+    }
 
     // Roadmap 3 Phase 3d: write the user's edit to clientNamed only; never mutate `name`.
     // If the typed value matches the canonical name, clear clientNamed (null = no override).
-    const updatedInstructions = instructionsData.map((instruction) => {
-      if (instruction.id !== instructionId) return instruction;
+    const message = {
+      type: 'ROW_UPDATE',
+      botJobId,
+      blockId,
+      blockName,
+      homeBankingId,
+      sessionId: targetSessionId,
+      instructionId,
+      instructionOrderNumber,
+      blockOrderNumber,
+      // Roadmap 3 Phase 3d: instructionName always carries the canonical (immutable) name;
+      // clientNamed carries the display-only override (null = clear).
+      instructionName: instructionToUpdate.name,
+      clientNamed: nextClientNamed,
+      actions: instructionToUpdate.actions,
+    };
 
-      const typed = (instructionName ?? "").trim();
-      const nextClientNamed = (typed.length === 0 || typed === instruction.name) ? null : typed;
-
-      // updateInputActionName previously rebuilt the I:<name> action token from the typed value.
-      // With Phase 3d the canonical name does not change, so action tokens stay locked to it.
-      return { ...instruction, clientNamed: nextClientNamed };
-    });
-
-    setInstructionsData(updatedInstructions);
-    setIsDataReordered(false); // Set this to false to trigger the reassignment logic again
-    setEditingInstructionId(null); // Exit edit mode
-
-    const updatedInstruction = updatedInstructions.find(instruction => instruction.id === instructionId);
-
-    // Send WebSocket message with the updated instruction
-    if (webSocket && connected && updatedInstruction) {
-      const message = {
-        type: 'ROW_UPDATE',
-        botJobId,
-        blockId,
-        blockName,
-        homeBankingId,
-        sessionId: targetSessionId,
-        instructionId,
-        instructionOrderNumber,
-        blockOrderNumber,
-        // Roadmap 3 Phase 3d: instructionName always carries the canonical (immutable) name;
-        // clientNamed carries the display-only override (null = clear).
-        instructionName: instructionToUpdate.name,
-        clientNamed: updatedInstruction.clientNamed ?? null,
-        actions: updatedInstruction.actions,
-      };
-
-      try {
-        webSocket.send(
-          JSON.stringify(message));
-
-        console.log('Sent instruction update message:', message);
-      } catch (error) {
-        console.log('Error sending WebSocket message:', error);
-      }
+    try {
+      webSocket.send(JSON.stringify(message));
+    } catch (error) {
+      setAlertImage(warningRedImage);
+      setAlertClass('construction-image');
+      setAlertMessageHeader('Instruction name not saved');
+      setErrorFlag(true);
+      setAlertMessageBody(error instanceof Error
+        ? error.message
+        : 'The instruction name update could not be sent.');
+      return;
     }
+
+    // updateInputActionName previously rebuilt the I:<name> action token from the typed value.
+    // The canonical name/actions stay locked; only the display override changes.
+    setInstructionsData(current => current.map(instruction => (
+      instruction.id === instructionId
+        ? { ...instruction, clientNamed: nextClientNamed }
+        : instruction
+    )));
+    setIsDataReordered(false);
+    setEditingInstructionId(null);
+  };
+
+  const handleSaveInstruction = (instructionId: number) => {
+    persistInstructionClientNamed(instructionId, instructionName);
+  };
+
+  const handleRollbackInstructionName = (instructionId: number) => {
+    persistInstructionClientNamed(instructionId, null);
   };
 
   const submitSaveComponent = (name: string, description: string) => {
@@ -3548,6 +3564,7 @@ export function useGridData(deps: UseGridDataDeps) {
     handleInstructionForceChange,
     handleEditInstruction,
     handleSaveInstruction,
+    handleRollbackInstructionName,
     submitInstructionRelationshipMutation,
     submitCheckOperand,
     submitCheckOperatorUpdate,
