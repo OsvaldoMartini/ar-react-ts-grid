@@ -499,6 +499,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
   const [captureImageSize, setCaptureImageSize] = useState({ width: 0, height: 0 });
   const [memoryItems, setMemoryItems] = useState<MappingMemoryItem[]>([]);
   const [memoryOwnerEpoch, setMemoryOwnerEpoch] = useState('');
+  const [memoryOpenVersion, setMemoryOpenVersion] = useState(0);
   const [cacheState, setCacheState] = useState<PageMappingsCacheState>(emptyCacheState);
   const [cacheBusy, setCacheBusy] = useState(false);
   const [rescanBusy, setRescanBusy] = useState(false);
@@ -1823,6 +1824,24 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
     memoryOpenRequested.current = true;
   }, [memoryItemFor]);
 
+  const requestMemoryListOpen = useCallback(() => {
+    if (!connected || !webSocket || webSocket.readyState !== WebSocket.OPEN) {
+      setStatus('Connect Page Mappings before opening Memory List.');
+      return;
+    }
+    if (!bindingRef.current || invalidatedRef.current) {
+      setStatus('Reload Page Mappings before opening Memory List.');
+      return;
+    }
+    if (pendingMemory.current) {
+      setStatus('Memory List is already opening or synchronizing.');
+      return;
+    }
+    memoryOpenRequested.current = true;
+    setMemoryOpenVersion(current => current + 1);
+    setStatus('Opening or focusing Memory List…');
+  }, [connected, webSocket]);
+
   const memorySnapshot = useMemo<MemoryListSnapshot>(() => ({
     ownerEpoch: memoryOwnerEpoch,
     workspaceEpoch: binding?.workspaceEpoch || 0,
@@ -1845,7 +1864,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
     if (!webSocket
       || webSocket.readyState !== WebSocket.OPEN
       || !binding
-      || (!memoryItems.length && !memoryOpened.current)
+      || (!memoryOpenRequested.current && !memoryItems.length && !memoryOpened.current)
       || invalidatedRef.current
       || bindingRef.current?.bindingEpoch !== binding.bindingEpoch) return;
     const operation = memoryOpenRequested.current || !memoryOpened.current ? 'memoryList.open' : 'memoryList.sync';
@@ -1870,7 +1889,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
       bindingEpoch: binding.bindingEpoch,
     };
     memoryOpenRequested.current = false;
-  }, [binding, memoryItems, memoryOwnerEpoch, memorySnapshot, sessionId, webSocket]);
+  }, [binding, memoryItems, memoryOpenVersion, memoryOwnerEpoch, memorySnapshot, sessionId, webSocket]);
 
   useEffect(() => {
     for (const raw of messages.slice(memoryCursor.current)) {
@@ -2167,6 +2186,16 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
                 <section
                   className={styles.memoryDropZone}
                   aria-label="Selected elements for Memory List"
+                  aria-disabled={!connected || !binding || invalidated}
+                  role="button"
+                  tabIndex={0}
+                  title="Open or focus Memory List"
+                  onClick={requestMemoryListOpen}
+                  onKeyDown={event => {
+                    if (event.key !== 'Enter' && event.key !== ' ') return;
+                    event.preventDefault();
+                    requestMemoryListOpen();
+                  }}
                   onDragOver={event => { if (canStage) event.preventDefault(); }}
                   onDrop={event => {
                     event.preventDefault();
@@ -2176,7 +2205,10 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
                   }}
                 >
                   <div className={styles.memoryHeader}><strong>Memory List</strong><span>{memoryItems.length} selected</span></div>
-                  <p>Drop captured elements here, or use Add. The existing Memory List window opens automatically.</p>
+                  <div className={styles.memoryGuidance}>
+                    <span className={styles.memoryHint}>Drop captured elements here, or use Add.</span>
+                    <span className={styles.memoryOpenText}>Click anywhere to open or focus the Memory List window.</span>
+                  </div>
                   {memoryItems.length > 0 && <div className={styles.memoryChips}>{memoryItems.map(item => <span key={item.sourceItemKey}>{item.label}</span>)}</div>}
                 </section>
                 <div className={styles.elementResults}>
