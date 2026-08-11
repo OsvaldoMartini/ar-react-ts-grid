@@ -15,7 +15,13 @@ const plan: VariablesSmokeTestPlan = {
   runtimeMemoryRevision: 7,
   selectedBlockIds: [223],
   scopeLabel: 'Block #1',
-  blocks: [],
+  blocks: [{
+    blockId: 223,
+    blockName: 'Login',
+    blockOrder: 1,
+    active: true,
+    steps: [],
+  }],
   steps: [],
   variableFlows: [],
 };
@@ -180,6 +186,61 @@ test('keeps the active run when Finish is refused and permits Stop cleanup retry
   await act(async () => {
     await stop;
   });
+
+  expect(result.current.phase).toBe('IDLE');
+  expect(result.current.activeRun).toBeNull();
+  expect(result.current.error).toBeNull();
+});
+
+test('keeps Stop single-flight when it cancels an in-flight step', async () => {
+  const send = jest.fn();
+  const { result, rerender } = renderIntegrationHook(send);
+  const messages: string[] = [];
+
+  let start!: ReturnType<typeof result.current.start>;
+  act(() => {
+    start = result.current.start(plan, 'REAL', false);
+  });
+  const startRequest = requestBody(send, 0);
+  messages.push(responseMessage(
+    'smokeTest.integration.startResponse',
+    startResponse(startRequest.requestId),
+  ));
+  act(() => rerender({ messages: [...messages] }));
+  await act(async () => { await start; });
+
+  let step!: ReturnType<typeof result.current.executeStep>;
+  let firstStop!: ReturnType<typeof result.current.stop>;
+  let duplicateStop!: ReturnType<typeof result.current.stop>;
+  act(() => {
+    step = result.current.executeStep(1735, 0);
+    firstStop = result.current.stop('USER_REQUEST');
+    duplicateStop = result.current.stop('STEP_REQUEST_FAILED');
+  });
+
+  await act(async () => {
+    await expect(step).rejects.toThrow('cancelled the pending step');
+    await duplicateStop;
+  });
+  expect(send).toHaveBeenCalledTimes(3);
+
+  const stopRequest = requestBody(send, 2);
+  messages.push(responseMessage('smokeTest.integration.stopResponse', {
+    ok: true,
+    contractVersion: 1,
+    requestId: stopRequest.requestId,
+    runId: 'server-run-1',
+    integrationEpoch: 4,
+    status: 'STOPPED',
+    lastSequence: 0,
+    passed: 0,
+    warnings: 0,
+    failed: 0,
+    skipped: 0,
+    message: 'Integration stopped.',
+  }));
+  act(() => rerender({ messages: [...messages] }));
+  await act(async () => { await firstStop; });
 
   expect(result.current.phase).toBe('IDLE');
   expect(result.current.activeRun).toBeNull();

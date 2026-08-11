@@ -65,6 +65,7 @@ type Arguments = {
   webSocket: WebSocket | null;
   connected: boolean;
   messages: readonly unknown[];
+  messageGeneration?: number;
   sessionId: string;
   snapshot: VariableWorkspaceSnapshot | null;
 };
@@ -78,6 +79,7 @@ export const useSmokeTestIntegrationRun = ({
   webSocket,
   connected,
   messages,
+  messageGeneration = 0,
   sessionId,
   snapshot,
 }: Arguments): SmokeTestIntegrationController => {
@@ -87,9 +89,11 @@ export const useSmokeTestIntegrationRun = ({
   const activeRunRef = useRef<SmokeTestIntegrationRun | null>(null);
   const pendingRef = useRef<PendingRequest | null>(null);
   const processedMessagesRef = useRef(0);
+  const processedMessageGenerationRef = useRef(messageGeneration);
   const requestSequenceRef = useRef(0);
   const stepSequenceRef = useRef(0);
   const generationRef = useRef(0);
+  const terminalInFlightRef = useRef(false);
 
   const replaceRun = useCallback((run: SmokeTestIntegrationRun | null) => {
     activeRunRef.current = run;
@@ -180,6 +184,10 @@ export const useSmokeTestIntegrationRun = ({
   }, [connected, replaceRun, sessionId, snapshot?.botJob.homeBankingId, webSocket]);
 
   useEffect(() => {
+    if (processedMessageGenerationRef.current !== messageGeneration) {
+      processedMessageGenerationRef.current = messageGeneration;
+      processedMessagesRef.current = 0;
+    }
     if (processedMessagesRef.current > messages.length) processedMessagesRef.current = 0;
     const unread = messages.slice(processedMessagesRef.current);
     processedMessagesRef.current = messages.length;
@@ -198,11 +206,12 @@ export const useSmokeTestIntegrationRun = ({
       clearTimeout(pending.timeout);
       pending.resolve(envelope.body);
     });
-  }, [messages]);
+  }, [messageGeneration, messages]);
 
   useEffect(() => {
     if (connected) return;
     generationRef.current += 1;
+    terminalInFlightRef.current = false;
     clearPending(new Error('Smoke Test Integration disconnected.'));
     replaceRun(null);
     setPhase('IDLE');
@@ -210,6 +219,7 @@ export const useSmokeTestIntegrationRun = ({
 
   useEffect(() => {
     generationRef.current += 1;
+    terminalInFlightRef.current = false;
     clearPending(new Error('The Smoke Test Bot Job changed.'));
     replaceRun(null);
     setPhase('IDLE');
@@ -339,19 +349,21 @@ export const useSmokeTestIntegrationRun = ({
           integrationEpoch: run.integrationEpoch,
         }),
       );
-      setPhase('READY');
+      if (!terminalInFlightRef.current) setPhase('READY');
       return result;
     } catch (failure) {
       const nextError = failure instanceof Error ? failure : new Error('Integration step failed.');
       setError(nextError.message);
-      setPhase('READY');
+      if (!terminalInFlightRef.current) setPhase('READY');
       throw nextError;
     }
   }, [nextRequestId, request]);
 
   const terminal = useCallback(async (operation: 'stop' | 'finish', _reason?: string) => {
+    if (terminalInFlightRef.current) return;
     const run = activeRunRef.current;
     if (run === null) return;
+    terminalInFlightRef.current = true;
     generationRef.current += 1;
     clearPending(new Error(`Integration ${operation} cancelled the pending step.`));
     setPhase(operation === 'stop' ? 'STOPPING' : 'FINISHING');
@@ -386,6 +398,8 @@ export const useSmokeTestIntegrationRun = ({
       setError(nextError.message);
       setPhase('CLEANUP_REQUIRED');
       throw nextError;
+    } finally {
+      terminalInFlightRef.current = false;
     }
   }, [clearPending, nextRequestId, replaceRun, request]);
 

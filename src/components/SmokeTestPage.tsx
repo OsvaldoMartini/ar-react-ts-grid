@@ -86,6 +86,7 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     connected,
     reconnectAttempts,
     messages,
+    messageGeneration,
   } = useWebSocket(socketPort, sessionId);
   const processedMessagesRef = useRef(0);
   const requestSequenceRef = useRef(0);
@@ -156,6 +157,7 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     webSocket,
     connected,
     messages,
+    messageGeneration,
     sessionId,
     snapshot,
   });

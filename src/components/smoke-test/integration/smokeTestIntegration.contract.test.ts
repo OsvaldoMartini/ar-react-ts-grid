@@ -16,7 +16,13 @@ const plan: VariablesSmokeTestPlan = {
   runtimeMemoryRevision: 7,
   selectedBlockIds: [223],
   scopeLabel: 'Block #1',
-  blocks: [],
+  blocks: [{
+    blockId: 223,
+    blockName: 'Login',
+    blockOrder: 1,
+    active: true,
+    steps: [],
+  }],
   steps: [],
   variableFlows: [],
 };
