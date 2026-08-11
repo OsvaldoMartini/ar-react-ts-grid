@@ -53,7 +53,6 @@ import type {
   SmokeTestIntegrationStepResult,
 } from '../smoke-test/integration/smokeTestIntegration.contract';
 import SmokeTestWebPageRefreshButton from '../smoke-test/integration/SmokeTestWebPageRefreshButton';
-import SmokeTestRuntimeModeToggle from '../smoke-test/integration/SmokeTestRuntimeModeToggle';
 
 export interface VariablesSmokeTestPanelProps {
   review: VariablesExecutionFlowReview;
@@ -68,7 +67,6 @@ export interface VariablesSmokeTestPanelProps {
   onExcelDataModeChange?: (mode: ExcelDataMode) => void;
   executionMode?: SmokeTestExecutionMode;
   integrationRuntimeMode?: SmokeTestIntegrationRuntimeMode;
-  onIntegrationRuntimeModeChange?: (mode: SmokeTestIntegrationRuntimeMode) => void;
   integration?: SmokeTestIntegrationController;
   onStatusChange?: (status: VariablesSmokeTestStatus) => void;
 }
@@ -178,7 +176,6 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   onExcelDataModeChange,
   executionMode = 'SMOKE',
   integrationRuntimeMode = 'JAVA_V1',
-  onIntegrationRuntimeModeChange,
   integration,
   onStatusChange,
 }) => {
@@ -649,15 +646,6 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
         <ExcelDataModeToggle mode={excelDataMode}
           disabled={!onExcelDataModeChange || executionActive}
           onChange={mode => onExcelDataModeChange?.(mode)} />
-        {executionMode === 'INTEGRATION' && (
-          <SmokeTestRuntimeModeToggle
-            mode={integrationRuntimeMode}
-            disabled={executionActive
-              || integration?.phase !== 'IDLE'
-              || !onIntegrationRuntimeModeChange}
-            onChange={mode => onIntegrationRuntimeModeChange?.(mode)}
-          />
-        )}
         <label className={styles.speedSelector}>
           <span>Speed</span>
           <select

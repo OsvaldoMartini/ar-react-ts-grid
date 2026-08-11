@@ -27,7 +27,6 @@ type Props = {
   onExcelDataModeChange: (mode: ExcelDataMode) => void;
   executionMode: SmokeTestExecutionMode;
   integrationRuntimeMode: SmokeTestIntegrationRuntimeMode;
-  onIntegrationRuntimeModeChange: (mode: SmokeTestIntegrationRuntimeMode) => void;
   integration: SmokeTestIntegrationController;
   onStatusChange: (status: VariablesSmokeTestStatus) => void;
 };
@@ -45,7 +44,6 @@ const SmokeTestSimulationWorkspace: React.FC<Props> = ({
   onExcelDataModeChange,
   executionMode,
   integrationRuntimeMode,
-  onIntegrationRuntimeModeChange,
   integration,
   onStatusChange,
 }) => (
@@ -63,7 +61,6 @@ const SmokeTestSimulationWorkspace: React.FC<Props> = ({
       onExcelDataModeChange={onExcelDataModeChange}
       executionMode={executionMode}
       integrationRuntimeMode={integrationRuntimeMode}
-      onIntegrationRuntimeModeChange={onIntegrationRuntimeModeChange}
       integration={integration}
       onStatusChange={onStatusChange}
     />

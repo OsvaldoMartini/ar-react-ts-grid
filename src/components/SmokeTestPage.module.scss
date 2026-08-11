@@ -80,6 +80,36 @@
   gap: 8px;
 }
 
+.statusStack {
+  align-items: flex-end;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.runtimeStatus {
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  border-radius: 999px;
+  color: #eaf3ff;
+  font-size: 0.55rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.runtimeStatus[data-mode='TYPESCRIPT_PLAYWRIGHT_V2'] {
+  background: #0891b2;
+  border-color: #67e8f9;
+  box-shadow: 0 0 10px rgba(34, 211, 238, 0.48);
+}
+
+.runtimeStatus[data-mode='JAVA_V1'] {
+  background: rgba(15, 23, 42, 0.32);
+}
+
 .status {
   max-width: min(38vw, 470px);
   overflow: hidden;
@@ -1266,6 +1296,7 @@
   }
 
   .toolbarActions {
+    overflow-x: auto;
     width: 100%;
   }
 
@@ -1289,9 +1320,14 @@
     width: 100%;
   }
 
-  .status {
-    max-width: none;
+  .statusStack {
+    align-items: flex-start;
     flex: 1;
+  }
+
+  .status {
+    max-width: 100%;
+    width: 100%;
   }
 
   .filterButtons,

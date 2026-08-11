@@ -6,6 +6,7 @@ import SmokeTestConnectionReview from './smoke-test/SmokeTestConnectionReview';
 import SmokeTestSimulationWorkspace from './smoke-test/SmokeTestSimulationWorkspace';
 import type { ExcelDataMode } from './excel-data/ExcelDataModeToggle';
 import SmokeTestExecutionModeToggle from './smoke-test/integration/SmokeTestExecutionModeToggle';
+import SmokeTestRuntimeModeToggle from './smoke-test/integration/SmokeTestRuntimeModeToggle';
 import { useSmokeTestIntegrationRun } from './smoke-test/integration/useSmokeTestIntegrationRun';
 import type {
   SmokeTestExecutionMode,
@@ -506,10 +507,19 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
               <p className={styles.subtitle} title={subtitle}>{subtitle}</p>
             </div>
             <div className={styles.topBarRight} data-floating-drag-ignore="true">
-              <div className={`${styles.status} ${statusClass}`} role="status">
-                {connected
-                  ? status.text
-                  : `Reconnecting${reconnectAttempts ? ` (${reconnectAttempts})` : ''}`}
+              <div className={styles.statusStack}>
+                {executionMode === 'INTEGRATION' && (
+                  <span className={styles.runtimeStatus} data-mode={integrationRuntimeMode}>
+                    Runtime: {integrationRuntimeMode === 'TYPESCRIPT_PLAYWRIGHT_V2'
+                      ? 'V2 Isolated'
+                      : 'Java V1 Shared'}
+                  </span>
+                )}
+                <div className={`${styles.status} ${statusClass}`} role="status">
+                  {connected
+                    ? status.text
+                    : `Reconnecting${reconnectAttempts ? ` (${reconnectAttempts})` : ''}`}
+                </div>
               </div>
               <PagesOpenButton
                 webSocket={webSocket}
@@ -541,6 +551,13 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
                 disabled={smokeRunActive || integration.phase !== 'IDLE'}
                 onChange={setExecutionMode}
               />
+              {executionMode === 'INTEGRATION' && (
+                <SmokeTestRuntimeModeToggle
+                  mode={integrationRuntimeMode}
+                  disabled={smokeRunActive || integration.phase !== 'IDLE'}
+                  onChange={setIntegrationRuntimeMode}
+                />
+              )}
               <button
                 type="button"
                 className={styles.refreshButton}
@@ -593,7 +610,6 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
                 onExcelDataModeChange={updateExcelDataMode}
                 executionMode={executionMode}
                 integrationRuntimeMode={integrationRuntimeMode}
-                onIntegrationRuntimeModeChange={setIntegrationRuntimeMode}
                 integration={integration}
                 onStatusChange={setSmokeRunStatus}
               />
