@@ -35,7 +35,15 @@ const ruleGroups = [
   {
     title: 'OCR Review and safe recovery',
     rules: [
-      ['OCR REVIEW', 'Reads the selected immutable screenshot, proposes client names, and changes nothing until Apply names is used. Apply is correlation and revision checked.'],
+      ['OCR REVIEW', 'Runs OCR against the selected immutable screenshot, not the live browser page. Review is read-only: it compares OCR text with the captured DOM text and current client name, then proposes editable names without changing the database.'],
+      ['QUALITY', 'EXACT CONTAIN, OVERLAP, PROXIMITY, and NONE describe how confidently a captured element matches nearby OCR words. Inspect the highlighted word boxes, DOM text, and proposed name before selecting a change.'],
+      ['SAFE TEST', 'After Run OCR Review, choose Clear selected, select one strong row, enter a distinctive proposed name, and use Apply names (1). Changed, persistable proposals may be selected automatically, so always review the Use column first.'],
+      ['APPLY NAMES', 'Saves the selected client names as one all-or-nothing, owner-scoped change for the exact Bot Job, page, capture, element revision, and current alias. A stale or conflicting row makes the whole Apply fail safely.'],
+      ['WHAT APPLY CHANGES', 'Only the mutable scanned-element client name changes. The immutable canonical name, locators, screenshot, capture history, and existing Bot Job instructions do not change, and Apply creates no new capture or Rescan.'],
+      ['MEMORY LIST', 'After a successful Apply, the loaded capture and matching staged Memory List labels are refreshed. Creating or changing Bot Job instructions still requires the separate Memory List Apply action.'],
+      ['RESTORE A NAME', 'Run OCR Review again, select the same element, replace the proposal with its previous client name or clear it to remove the alias, then Apply that one selected row.'],
+      ['LIMITS', 'One Apply accepts at most 1,000 visible changes and each client name is limited to 255 characters. The screenshot may show up to 2,000 OCR word boxes.'],
+      ['UNKNOWN OUTCOME', 'If Apply times out, disconnects, or reports a stale, malformed, or unknown result, do not submit another Apply. Reload Page Mappings and the verified capture first; reconnect recovery reconfirms the exact original request.'],
       ['RELOAD', 'Reload refreshes authoritative owner history, policy, and live-page state. After a timeout, disconnect, stale response, or unknown mutation outcome, editing stays blocked until recovery completes.'],
     ],
   },
