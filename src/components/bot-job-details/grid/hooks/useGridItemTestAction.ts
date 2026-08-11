@@ -64,6 +64,7 @@ type UseGridItemTestActionOptions = {
   botJobId: number | null;
   capability: BotJobGraphMutationCapability | null;
   onResult: (result: GridItemTestActionResult) => void;
+  transportSessionId?: string;
   timeoutMs?: number;
 };
 
@@ -74,6 +75,7 @@ type PendingTestAction = {
   instructionId: number;
   action: GridItemTestAction;
   workspaceEpoch: number | null;
+  transportSessionId: string;
   webSocket: WebSocket;
   timeoutId: ReturnType<typeof setTimeout>;
 };
@@ -184,6 +186,7 @@ export const useGridItemTestAction = ({
   botJobId,
   capability,
   onResult,
+  transportSessionId = BOT_JOB_SESSION_ID,
   timeoutMs = GRID_ITEM_TEST_ACTION_TIMEOUT_MS,
 }: UseGridItemTestActionOptions) => {
   const pendingRef = useRef<PendingTestAction | null>(null);
@@ -220,7 +223,7 @@ export const useGridItemTestAction = ({
       || !webSocket
       || webSocket.readyState !== WebSocket.OPEN
       || webSocket !== pending.webSocket
-      || sessionId !== BOT_JOB_SESSION_ID
+      || sessionId !== pending.transportSessionId
       || workspaceChanged
     ) {
       const cancelled = clearPending();
@@ -232,8 +235,8 @@ export const useGridItemTestAction = ({
         action: cancelled.action,
         message: '',
         error: workspaceChanged
-          ? 'The Bot Job workspace changed before the test completed.'
-          : 'The Bot Job connection closed before the test completed.',
+          ? 'The instruction workspace changed before the test completed.'
+          : 'The instruction-test connection closed before the test completed.',
         code: workspaceChanged ? 'WORKSPACE_CHANGED' : 'DISCONNECTED',
         valueSource: '',
         datasetMode: '',
@@ -249,6 +252,7 @@ export const useGridItemTestAction = ({
     homeBankingId,
     onResult,
     sessionId,
+    transportSessionId,
     webSocket,
   ]);
 
@@ -269,7 +273,7 @@ export const useGridItemTestAction = ({
     const activeInstructionId = positiveInteger(instructionId);
     const activeExcelRowIndex = nonNegativeInteger(excelRowIndex);
     if (
-      sessionId !== BOT_JOB_SESSION_ID
+      sessionId !== transportSessionId
       || !connected
       || !webSocket
       || webSocket.readyState !== WebSocket.OPEN
@@ -313,7 +317,7 @@ export const useGridItemTestAction = ({
         instructionId: activeInstructionId,
         action,
         message: '',
-        error: 'The GridItem test timed out before the backend responded.',
+        error: 'The instruction test timed out before the backend responded.',
         code: 'TIMEOUT',
         valueSource: '',
         datasetMode: '',
@@ -328,6 +332,7 @@ export const useGridItemTestAction = ({
       instructionId: activeInstructionId,
       action,
       workspaceEpoch: authority?.workspaceEpoch ?? null,
+      transportSessionId,
       webSocket,
       timeoutId,
     };
@@ -338,7 +343,7 @@ export const useGridItemTestAction = ({
     try {
       webSocket.send(JSON.stringify({
         type: GRID_ITEM_TEST_ACTION_OPERATION,
-        sessionId: BOT_JOB_SESSION_ID,
+        sessionId: transportSessionId,
         homeBankingId: activeHomeBankingId,
         body: JSON.stringify(request),
       }));
@@ -351,7 +356,7 @@ export const useGridItemTestAction = ({
         instructionId: activeInstructionId,
         action,
         message: '',
-        error: 'The GridItem test request could not be sent.',
+        error: 'The instruction-test request could not be sent.',
         code: 'SEND_FAILED',
         valueSource: '',
         datasetMode: '',
@@ -369,6 +374,7 @@ export const useGridItemTestAction = ({
     onResult,
     sessionId,
     timeoutMs,
+    transportSessionId,
     webSocket,
   ]);
 
@@ -380,7 +386,7 @@ export const useGridItemTestAction = ({
     const operation = textValue(envelope.operationId) || textValue(envelope.type);
     if (
       operation !== GRID_ITEM_TEST_ACTION_RESPONSE
-      || textValue(envelope.sessionId) !== BOT_JOB_SESSION_ID
+      || textValue(envelope.sessionId) !== pending.transportSessionId
     ) {
       return false;
     }

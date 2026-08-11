@@ -34,6 +34,11 @@ import InstructionIntrinsicValues, {
 import styles from './SmokeTestConnectionReview.module.scss';
 import { hidesLegacyVariableOperation } from '../variables/domain/legacyVariableOperation';
 import type { CommandRemainingByInstructionId } from '../variables/Engine/controlFlowCommand.types';
+import SmokeTestInstructionActions from './SmokeTestInstructionActions';
+import {
+  gridItemTestActionsForInstruction,
+  type GridItemTestAction,
+} from '../bot-job-details/grid/hooks/useGridItemTestAction';
 
 const VariablesSmokeTestFlowModal = lazy(
   () => import('../variables/VariablesSmokeTestFlowModal'),
@@ -47,6 +52,15 @@ export interface SmokeTestConnectionReviewProps {
   activeSmokePosition: VariablesSmokeTestPosition | null;
   smokeExecutionTrace: readonly VariablesSmokeTestPosition[];
   commandRemainingByInstructionId: CommandRemainingByInstructionId;
+  actionsDisabled?: boolean;
+  pendingTestInstructionId?: number | null;
+  pendingTestAction?: GridItemTestAction | null;
+  pendingStatusInstructionId?: number | null;
+  onTestInstruction?: (instructionId: number, action: GridItemTestAction) => void;
+  onToggleInstructionStatus?: (
+    instructionId: number,
+    currentActive: boolean,
+  ) => void;
   returnFocusElement?: HTMLElement | null;
   embedded?: boolean;
   onClose: () => void;
@@ -80,6 +94,12 @@ const SmokeTestConnectionReview: React.FC<
   activeSmokePosition,
   smokeExecutionTrace,
   commandRemainingByInstructionId,
+  actionsDisabled = false,
+  pendingTestInstructionId = null,
+  pendingTestAction = null,
+  pendingStatusInstructionId = null,
+  onTestInstruction,
+  onToggleInstructionStatus,
   returnFocusElement = null,
   embedded = false,
   onClose,
@@ -351,7 +371,7 @@ const SmokeTestConnectionReview: React.FC<
               <h2 id={titleId}>Review All Connections</h2>
             </div>
             <p id={descriptionId}>
-              Complete read-only Bot Job execution sequence and relationship graph.
+              Complete Bot Job execution sequence with synchronized command and Playwright controls.
             </p>
           </div>
           <button
@@ -377,7 +397,7 @@ const SmokeTestConnectionReview: React.FC<
               <span>Review scope</span>
               <strong>{visibleScopeLabel}</strong>
             </div>
-            <b>READ ONLY</b>
+            <b>LIVE CONTROLS</b>
           </section>
 
           <div className={styles.summaryRow}>
@@ -429,7 +449,7 @@ const SmokeTestConnectionReview: React.FC<
                 <strong>Relationship graph unavailable</strong>
                 <span>
                   Blocks, commands, runtime values, and diagnostics remain available
-                  for read-only review. Refresh when graph authority reconnects.
+                  for review. Refresh when graph authority reconnects.
                 </span>
               </div>
             </div>
@@ -616,6 +636,29 @@ const SmokeTestConnectionReview: React.FC<
                             </span>
                           )}
                         </div>
+                        <SmokeTestInstructionActions
+                          instructionName={step.instructionName}
+                          active={step.active}
+                          testable={gridItemTestActionsForInstruction(step.action).length > 0}
+                          disabled={actionsDisabled || step.instructionId === null}
+                          pendingAction={pendingTestInstructionId === step.instructionId
+                            ? pendingTestAction
+                            : null}
+                          statusPending={pendingStatusInstructionId === step.instructionId}
+                          onTest={(action) => {
+                            if (step.instructionId !== null) {
+                              onTestInstruction?.(step.instructionId, action);
+                            }
+                          }}
+                          onToggleStatus={() => {
+                            if (step.instructionId !== null) {
+                              onToggleInstructionStatus?.(
+                                step.instructionId,
+                                step.active,
+                              );
+                            }
+                          }}
+                        />
                       </article>
                     ))}
                     {block.steps.length === 0 && (
@@ -693,7 +736,8 @@ const SmokeTestConnectionReview: React.FC<
             {visibleDiagnostics.length === 0
               ? <CheckCircle2 size={16} aria-hidden="true" />
               : <AlertTriangle size={16} aria-hidden="true" />}
-            No database change is made by this review.
+            Test controls act only on the open Playwright page. Active status is saved and
+            synchronized with Bot Job Details.
           </span>
           <button type="button" onClick={onClose}>Close</button>
         </footer>}

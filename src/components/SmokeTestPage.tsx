@@ -17,6 +17,16 @@ import type {
 import type { CommandRemainingByInstructionId } from './variables/Engine/controlFlowCommand.types';
 import { useVariablesRuntimeMemory } from './variables/useVariablesRuntimeMemory';
 import {
+  useVariablesInstructionStatus,
+  type VariablesInstructionStatusResult,
+} from './variables/useVariablesInstructionStatus';
+import {
+  useGridItemTestAction,
+  type GridItemTestAction,
+  type GridItemTestActionResult,
+} from './bot-job-details/grid/hooks/useGridItemTestAction';
+import type { BotJobGraphMutationCapability } from './bot-job-details/grid/hooks/useBotJobInstructionGraphMutation';
+import {
   normalizeVariablesWorkspaceSnapshot,
   parseVariablesWorkspaceMessage,
   type VariableWorkspaceSnapshot,
@@ -144,6 +154,63 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     sessionId,
     snapshot,
   });
+  const instructionTestCapability = useMemo<BotJobGraphMutationCapability | null>(() => {
+    const capability = snapshot?.mutationCapability;
+    if (!snapshot || !capability?.enabled) return null;
+    return {
+      enabled: true,
+      contractVersion: capability.contractVersion,
+      workspaceEpoch: snapshot.workspaceEpoch,
+      graphVersion: capability.graphVersion,
+      graphRevision: capability.graphRevision,
+      ownerAssertion: capability.ownerAssertion,
+    };
+  }, [snapshot]);
+  const handleInstructionTestResult = useCallback((result: GridItemTestActionResult) => {
+    setStatus({
+      level: result.ok ? 'ok' : 'error',
+      text: result.message || result.error || (result.ok
+        ? `Test ${result.action.toLowerCase()} completed.`
+        : `Test ${result.action.toLowerCase()} was refused${result.code ? ` (${result.code})` : ''}.`),
+    });
+  }, []);
+  const {
+    pendingRequestId: pendingInstructionTestRequestId,
+    pendingInstructionId: pendingInstructionTestId,
+    pendingAction: pendingInstructionTestAction,
+    submit: submitInstructionTest,
+  } = useGridItemTestAction({
+    webSocket,
+    connected,
+    messages,
+    sessionId,
+    transportSessionId: sessionId,
+    homeBankingId: snapshot?.botJob.homeBankingId ?? 0,
+    botJobId: snapshot?.botJob.id ?? null,
+    capability: instructionTestCapability,
+    onResult: handleInstructionTestResult,
+  });
+  const handleInstructionStatusResult = useCallback((
+    result: VariablesInstructionStatusResult,
+  ) => {
+    setStatus({
+      level: result.ok ? 'ok' : 'error',
+      text: result.message || (result.ok
+        ? `Command ${result.active ? 'activated' : 'deactivated'}.`
+        : 'The command status was not changed.'),
+    });
+  }, []);
+  const {
+    pendingInstructionId: pendingStatusInstructionId,
+    submit: submitInstructionStatus,
+    handleMessage: handleInstructionStatusMessage,
+  } = useVariablesInstructionStatus({
+    webSocket,
+    connected,
+    sessionId,
+    snapshot,
+    onResult: handleInstructionStatusResult,
+  });
 
   useEffect(() => {
     resetRuntimeMemory();
@@ -212,6 +279,7 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     processedMessagesRef.current = messages.length;
     unread.forEach((raw) => {
       if (handleRuntimeMemoryMessage(raw)) return;
+      if (handleInstructionStatusMessage(raw)) return;
       let envelope;
       try {
         envelope = parseVariablesWorkspaceMessage(String(raw));
@@ -269,6 +337,7 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
   }, [
     clearPending,
     handleRuntimeMemoryMessage,
+    handleInstructionStatusMessage,
     messages,
     replaceSnapshot,
     sourceBotJobId,
@@ -333,6 +402,32 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
   const smokeRunActive = smokeRunStatus === 'STARTING'
     || smokeRunStatus === 'RUNNING'
     || smokeRunStatus === 'STOPPING';
+  const instructionActionsDisabled = !connected
+    || pending !== null
+    || instructionTestCapability === null
+    || smokeRunActive
+    || integration.phase !== 'IDLE'
+    || pendingInstructionTestRequestId !== null
+    || pendingStatusInstructionId !== null;
+  const testInstruction = useCallback((
+    instructionId: number,
+    action: GridItemTestAction,
+  ) => {
+    if (instructionActionsDisabled) return;
+    submitInstructionTest(instructionId, action, 0);
+  }, [instructionActionsDisabled, submitInstructionTest]);
+  const toggleInstructionStatus = useCallback((
+    instructionId: number,
+    currentActive: boolean,
+  ) => {
+    if (instructionActionsDisabled || !snapshot) return;
+    const instruction = snapshot.commands.find(command => command.id === instructionId);
+    if (!instruction) {
+      setStatus({ level: 'error', text: 'The selected command is no longer available.' });
+      return;
+    }
+    submitInstructionStatus(instruction, !currentActive);
+  }, [instructionActionsDisabled, snapshot, submitInstructionStatus]);
   const statusClass = status.level === 'error'
     ? styles.statusError
     : status.level === 'ok'
@@ -460,6 +555,12 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
                 activeSmokePosition={activeSmokePosition}
                 smokeExecutionTrace={smokeExecutionTrace}
                 commandRemainingByInstructionId={commandRemainingByInstructionId}
+                actionsDisabled={instructionActionsDisabled}
+                pendingTestInstructionId={pendingInstructionTestId}
+                pendingTestAction={pendingInstructionTestAction}
+                pendingStatusInstructionId={pendingStatusInstructionId}
+                onTestInstruction={testInstruction}
+                onToggleInstructionStatus={toggleInstructionStatus}
                 embedded
                 onClose={() => undefined}
               />

@@ -1,0 +1,121 @@
+.actions {
+  align-self: stretch;
+  border-left: 1px solid #d9e2ec;
+  display: grid;
+  gap: 6px;
+  min-width: 158px;
+  padding-left: 8px;
+}
+
+.statusButton,
+.testButton {
+  align-items: center;
+  appearance: none;
+  border: 1px solid;
+  border-radius: 7px;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: inline-flex;
+  font-family: inherit;
+  gap: 6px;
+  justify-content: center;
+  min-height: 34px;
+  padding: 5px 8px;
+  transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease,
+    transform 120ms ease;
+
+  span {
+    display: grid;
+    line-height: 1;
+    text-align: left;
+  }
+
+  strong {
+    font-size: 0.64rem;
+    font-weight: 900;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  small {
+    font-size: 0.54rem;
+    font-weight: 800;
+    margin-top: 2px;
+    text-transform: uppercase;
+  }
+
+  &:hover:not(:disabled) {
+    box-shadow: 0 3px 9px rgba(30, 55, 80, 0.16);
+    transform: translateY(-1px);
+  }
+
+  &:focus-visible {
+    outline: 3px solid rgba(46, 117, 182, 0.27);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+}
+
+.active {
+  background: #e7f7ed;
+  border-color: #3a9a5b;
+  color: #1d6d38;
+}
+
+.inactive {
+  background: #fff0f0;
+  border-color: #d45a5a;
+  color: #a61b1b;
+}
+
+.testActions {
+  display: grid;
+  gap: 5px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.testButton {
+  min-width: 0;
+  padding-inline: 5px;
+}
+
+.inputButton {
+  background: #eef4ff;
+  border-color: #668ac7;
+  color: #214f98;
+}
+
+.clickButton {
+  background: #fff4e6;
+  border-color: #db8b2d;
+  color: #9a4c00;
+}
+
+.spin {
+  animation: spin 850ms linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 900px) {
+  .actions {
+    border-left: 0;
+    border-top: 1px solid #d9e2ec;
+    grid-column: 1 / -1;
+    grid-template-columns: minmax(110px, 0.8fr) minmax(190px, 1.2fr);
+    padding-left: 0;
+    padding-top: 8px;
+  }
+}
+
+@media (max-width: 520px) {
+  .actions {
+    grid-template-columns: 1fr;
+  }
+}
