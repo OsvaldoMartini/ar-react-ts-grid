@@ -49,6 +49,7 @@ import ExcelDataModeToggle, { type ExcelDataMode } from '../excel-data/ExcelData
 import type { SmokeTestIntegrationController } from '../smoke-test/integration/useSmokeTestIntegrationRun';
 import type {
   SmokeTestExecutionMode,
+  SmokeTestIntegrationPagePolicy,
   SmokeTestIntegrationRuntimeMode,
   SmokeTestIntegrationStepResult,
 } from '../smoke-test/integration/smokeTestIntegration.contract';
@@ -67,6 +68,7 @@ export interface VariablesSmokeTestPanelProps {
   onExcelDataModeChange?: (mode: ExcelDataMode) => void;
   executionMode?: SmokeTestExecutionMode;
   integrationRuntimeMode?: SmokeTestIntegrationRuntimeMode;
+  integrationPagePolicy?: SmokeTestIntegrationPagePolicy;
   integration?: SmokeTestIntegrationController;
   onStatusChange?: (status: VariablesSmokeTestStatus) => void;
 }
@@ -176,6 +178,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   onExcelDataModeChange,
   executionMode = 'SMOKE',
   integrationRuntimeMode = 'JAVA_V1',
+  integrationPagePolicy = 'PRESERVE_ACTIVE',
   integration,
   onStatusChange,
 }) => {
@@ -284,6 +287,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
           excelDataMode,
           integrationRuntimeMode,
           writeRuntimeValues,
+          integrationPagePolicy,
         );
         runtimeValuesRef.current = new Map<number, VariablesSmokeTestRuntimeValue>(
           startedRun.runtimeSnapshot.values.map(value => [value.variableId, {

@@ -6,6 +6,7 @@ export const SMOKE_TEST_INTEGRATION_CONTRACT_VERSION = 1 as const;
 
 export type SmokeTestExecutionMode = 'SMOKE' | 'INTEGRATION';
 export type SmokeTestIntegrationRuntimeMode = 'JAVA_V1' | 'TYPESCRIPT_PLAYWRIGHT_V2';
+export type SmokeTestIntegrationPagePolicy = 'PRESERVE_ACTIVE' | 'RELOAD_SELECTED';
 
 export type SmokeTestIntegrationStartRequest = {
   contractVersion: typeof SMOKE_TEST_INTEGRATION_CONTRACT_VERSION;
@@ -21,7 +22,7 @@ export type SmokeTestIntegrationStartRequest = {
   };
   excelMode: ExcelDataMode;
   runtimeMode: SmokeTestIntegrationRuntimeMode;
-  pagePolicy: 'PRESERVE_ACTIVE';
+  pagePolicy: SmokeTestIntegrationPagePolicy;
   durableRuntimeWrites: boolean;
 };
 
@@ -36,6 +37,7 @@ export type SmokeTestIntegrationRun = {
   planRevision: string;
   datasetMode: ExcelDataMode;
   runtimeMode: SmokeTestIntegrationRuntimeMode;
+  pagePolicy: SmokeTestIntegrationPagePolicy;
   datasetEpoch: number;
   datasetRevision: number;
   datasetContentRevision: string;
@@ -159,6 +161,7 @@ export const buildSmokeTestIntegrationStartRequest = (
   excelMode: ExcelDataMode,
   runtimeMode: SmokeTestIntegrationRuntimeMode,
   runtimeWrites: boolean,
+  pagePolicy: SmokeTestIntegrationPagePolicy = 'PRESERVE_ACTIVE',
 ): SmokeTestIntegrationStartRequest => {
   const activeBlockIds = plan.blocks.flatMap(block => (
     block.active && block.blockId !== null ? [block.blockId] : []
@@ -180,7 +183,7 @@ export const buildSmokeTestIntegrationStartRequest = (
     },
     excelMode,
     runtimeMode,
-    pagePolicy: 'PRESERVE_ACTIVE',
+    pagePolicy,
     durableRuntimeWrites: runtimeWrites,
   };
 };
@@ -237,6 +240,12 @@ export const parseSmokeTestIntegrationStartResponse = (
   const runtimeMode = stringValue(body.runtimeMode, 'Integration runtime mode');
   if (runtimeMode !== 'JAVA_V1' && runtimeMode !== 'TYPESCRIPT_PLAYWRIGHT_V2') {
     throw new Error('Integration start returned an invalid runtime mode.');
+  }
+  const pagePolicy = body.pagePolicy === undefined
+    ? 'PRESERVE_ACTIVE'
+    : stringValue(body.pagePolicy, 'Integration page policy');
+  if (pagePolicy !== 'PRESERVE_ACTIVE' && pagePolicy !== 'RELOAD_SELECTED') {
+    throw new Error('Integration start returned an invalid page policy.');
   }
   const runtimeSnapshot = objectValue(
     body.runtimeSnapshot,
@@ -304,6 +313,7 @@ export const parseSmokeTestIntegrationStartResponse = (
     planRevision: revisionValue(body.planRevision, 'Integration plan revision'),
     datasetMode,
     runtimeMode,
+    pagePolicy,
     datasetEpoch: integerValue(body.datasetEpoch, 'Integration dataset epoch', 1),
     datasetRevision: integerValue(body.datasetRevision, 'Integration dataset revision'),
     datasetContentRevision: revisionValue(

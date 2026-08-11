@@ -7,9 +7,11 @@ import SmokeTestSimulationWorkspace from './smoke-test/SmokeTestSimulationWorksp
 import type { ExcelDataMode } from './excel-data/ExcelDataModeToggle';
 import SmokeTestExecutionModeToggle from './smoke-test/integration/SmokeTestExecutionModeToggle';
 import SmokeTestRuntimeModeToggle from './smoke-test/integration/SmokeTestRuntimeModeToggle';
+import SmokeTestPagePolicyToggle from './smoke-test/integration/SmokeTestPagePolicyToggle';
 import { useSmokeTestIntegrationRun } from './smoke-test/integration/useSmokeTestIntegrationRun';
 import type {
   SmokeTestExecutionMode,
+  SmokeTestIntegrationPagePolicy,
   SmokeTestIntegrationRuntimeMode,
 } from './smoke-test/integration/smokeTestIntegration.contract';
 import { useWebSocket } from './useWebSocket';
@@ -110,6 +112,8 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
   const [executionMode, setExecutionMode] = useState<SmokeTestExecutionMode>('SMOKE');
   const [integrationRuntimeMode, setIntegrationRuntimeMode] =
     useState<SmokeTestIntegrationRuntimeMode>('JAVA_V1');
+  const [integrationPagePolicy, setIntegrationPagePolicy] =
+    useState<SmokeTestIntegrationPagePolicy>('PRESERVE_ACTIVE');
   const [smokeRunStatus, setSmokeRunStatus] = useState<VariablesSmokeTestStatus>('IDLE');
   const [status, setStatus] = useState<Status>({
     level: 'warn',
@@ -555,7 +559,21 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
                 <SmokeTestRuntimeModeToggle
                   mode={integrationRuntimeMode}
                   disabled={smokeRunActive || integration.phase !== 'IDLE'}
-                  onChange={setIntegrationRuntimeMode}
+                  onChange={(mode) => {
+                    setIntegrationRuntimeMode(mode);
+                    if (mode === 'TYPESCRIPT_PLAYWRIGHT_V2') {
+                      setIntegrationPagePolicy('RELOAD_SELECTED');
+                    }
+                  }}
+                />
+              )}
+              {executionMode === 'INTEGRATION' && (
+                <SmokeTestPagePolicyToggle
+                  policy={integrationPagePolicy}
+                  disabled={integrationRuntimeMode === 'TYPESCRIPT_PLAYWRIGHT_V2'
+                    || smokeRunActive
+                    || integration.phase !== 'IDLE'}
+                  onChange={setIntegrationPagePolicy}
                 />
               )}
               <button
@@ -610,6 +628,7 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
                 onExcelDataModeChange={updateExcelDataMode}
                 executionMode={executionMode}
                 integrationRuntimeMode={integrationRuntimeMode}
+                integrationPagePolicy={integrationPagePolicy}
                 integration={integration}
                 onStatusChange={setSmokeRunStatus}
               />

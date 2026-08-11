@@ -16,6 +16,7 @@ import {
   parseSmokeTestIntegrationTerminalResponse,
   SMOKE_TEST_INTEGRATION_CONTRACT_VERSION,
   type SmokeTestIntegrationRun,
+  type SmokeTestIntegrationPagePolicy,
   type SmokeTestIntegrationRuntimeMode,
   type SmokeTestIntegrationStepRequest,
   type SmokeTestIntegrationStepResult,
@@ -55,6 +56,7 @@ export type SmokeTestIntegrationController = {
     excelMode: ExcelDataMode,
     runtimeMode: SmokeTestIntegrationRuntimeMode,
     runtimeWrites: boolean,
+    pagePolicy?: SmokeTestIntegrationPagePolicy,
   ) => Promise<SmokeTestIntegrationRun>;
   executeStep: (
     instructionId: number,
@@ -239,6 +241,7 @@ export const useSmokeTestIntegrationRun = ({
     excelMode: ExcelDataMode,
     runtimeMode: SmokeTestIntegrationRuntimeMode,
     runtimeWrites: boolean,
+    pagePolicy: SmokeTestIntegrationPagePolicy = 'PRESERVE_ACTIVE',
   ) => {
     if (!snapshot) throw new Error('Smoke Test Integration has no authoritative workspace snapshot.');
     if (activeRunRef.current !== null) {
@@ -265,6 +268,7 @@ export const useSmokeTestIntegrationRun = ({
         excelMode,
         runtimeMode,
         runtimeWrites,
+        pagePolicy,
       );
       const run = await request(
         'start',
@@ -280,6 +284,7 @@ export const useSmokeTestIntegrationRun = ({
           || run.graphRevision !== plan.graphRevision
           || run.datasetMode !== excelMode
           || run.runtimeMode !== runtimeMode
+          || run.pagePolicy !== pagePolicy
           || run.durableRuntimeWrites !== runtimeWrites) {
         throw new Error('Integration start response does not match the frozen Smoke Test request.');
       }
