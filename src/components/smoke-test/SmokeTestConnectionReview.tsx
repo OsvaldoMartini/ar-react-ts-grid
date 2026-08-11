@@ -39,6 +39,8 @@ import {
   gridItemTestActionsForInstruction,
   type GridItemTestAction,
 } from '../bot-job-details/grid/hooks/useGridItemTestAction';
+import { gridItemWebElementTypeForAction } from '../bot-job-details/grid/hooks/useGridItemWebElementType';
+import type { WebElementExecutionType } from '../webElementExecutionType';
 
 const VariablesSmokeTestFlowModal = lazy(
   () => import('../variables/VariablesSmokeTestFlowModal'),
@@ -55,8 +57,14 @@ export interface SmokeTestConnectionReviewProps {
   actionsDisabled?: boolean;
   pendingTestInstructionId?: number | null;
   pendingTestAction?: GridItemTestAction | null;
+  pendingWebElementTypeInstructionId?: number | null;
   pendingStatusInstructionId?: number | null;
   onTestInstruction?: (instructionId: number, action: GridItemTestAction) => void;
+  onChangeInstructionType?: (
+    instructionId: number,
+    currentType: WebElementExecutionType,
+    replacementType: WebElementExecutionType,
+  ) => void;
   onToggleInstructionStatus?: (
     instructionId: number,
     currentActive: boolean,
@@ -97,8 +105,10 @@ const SmokeTestConnectionReview: React.FC<
   actionsDisabled = false,
   pendingTestInstructionId = null,
   pendingTestAction = null,
+  pendingWebElementTypeInstructionId = null,
   pendingStatusInstructionId = null,
   onTestInstruction,
+  onChangeInstructionType,
   onToggleInstructionStatus,
   returnFocusElement = null,
   embedded = false,
@@ -640,14 +650,25 @@ const SmokeTestConnectionReview: React.FC<
                           instructionName={step.instructionName}
                           active={step.active}
                           testable={gridItemTestActionsForInstruction(step.action).length > 0}
+                          executionType={gridItemWebElementTypeForAction(step.action)}
                           disabled={actionsDisabled || step.instructionId === null}
                           pendingAction={pendingTestInstructionId === step.instructionId
                             ? pendingTestAction
                             : null}
                           statusPending={pendingStatusInstructionId === step.instructionId}
+                          typePending={pendingWebElementTypeInstructionId === step.instructionId}
                           onTest={(action) => {
                             if (step.instructionId !== null) {
                               onTestInstruction?.(step.instructionId, action);
+                            }
+                          }}
+                          onExecutionTypeChange={(currentType, replacementType) => {
+                            if (step.instructionId !== null) {
+                              onChangeInstructionType?.(
+                                step.instructionId,
+                                currentType,
+                                replacementType,
+                              );
                             }
                           }}
                           onToggleStatus={() => {

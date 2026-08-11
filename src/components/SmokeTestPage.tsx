@@ -25,7 +25,12 @@ import {
   type GridItemTestAction,
   type GridItemTestActionResult,
 } from './bot-job-details/grid/hooks/useGridItemTestAction';
+import {
+  useGridItemWebElementType,
+  type GridItemWebElementTypeResult,
+} from './bot-job-details/grid/hooks/useGridItemWebElementType';
 import type { BotJobGraphMutationCapability } from './bot-job-details/grid/hooks/useBotJobInstructionGraphMutation';
+import type { WebElementExecutionType } from './webElementExecutionType';
 import {
   normalizeVariablesWorkspaceSnapshot,
   parseVariablesWorkspaceMessage,
@@ -185,10 +190,37 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     messages,
     sessionId,
     transportSessionId: sessionId,
+    bindingEpoch: snapshot?.bindingEpoch ?? '',
     homeBankingId: snapshot?.botJob.homeBankingId ?? 0,
     botJobId: snapshot?.botJob.id ?? null,
     capability: instructionTestCapability,
     onResult: handleInstructionTestResult,
+  });
+  const handleWebElementTypeResult = useCallback((
+    result: GridItemWebElementTypeResult,
+  ) => {
+    setStatus({
+      level: result.ok ? 'ok' : 'error',
+      text: result.message || (result.ok
+        ? `Execution type changed to ${result.committedType}.`
+        : `Execution type was not changed${result.code ? ` (${result.code})` : ''}.`),
+    });
+  }, []);
+  const {
+    pendingRequestId: pendingWebElementTypeRequestId,
+    pendingInstructionId: pendingWebElementTypeInstructionId,
+    submit: submitWebElementType,
+  } = useGridItemWebElementType({
+    webSocket,
+    connected,
+    messages,
+    sessionId,
+    transportSessionId: sessionId,
+    bindingEpoch: snapshot?.bindingEpoch ?? '',
+    homeBankingId: snapshot?.botJob.homeBankingId ?? 0,
+    botJobId: snapshot?.botJob.id ?? null,
+    capability: instructionTestCapability,
+    onResult: handleWebElementTypeResult,
   });
   const handleInstructionStatusResult = useCallback((
     result: VariablesInstructionStatusResult,
@@ -408,6 +440,7 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     || smokeRunActive
     || integration.phase !== 'IDLE'
     || pendingInstructionTestRequestId !== null
+    || pendingWebElementTypeRequestId !== null
     || pendingStatusInstructionId !== null;
   const testInstruction = useCallback((
     instructionId: number,
@@ -428,6 +461,14 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     }
     submitInstructionStatus(instruction, !currentActive);
   }, [instructionActionsDisabled, snapshot, submitInstructionStatus]);
+  const changeInstructionType = useCallback((
+    instructionId: number,
+    currentType: WebElementExecutionType,
+    replacementType: WebElementExecutionType,
+  ) => {
+    if (instructionActionsDisabled) return;
+    submitWebElementType(instructionId, currentType, replacementType);
+  }, [instructionActionsDisabled, submitWebElementType]);
   const statusClass = status.level === 'error'
     ? styles.statusError
     : status.level === 'ok'
@@ -558,8 +599,10 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
                 actionsDisabled={instructionActionsDisabled}
                 pendingTestInstructionId={pendingInstructionTestId}
                 pendingTestAction={pendingInstructionTestAction}
+                pendingWebElementTypeInstructionId={pendingWebElementTypeInstructionId}
                 pendingStatusInstructionId={pendingStatusInstructionId}
                 onTestInstruction={testInstruction}
+                onChangeInstructionType={changeInstructionType}
                 onToggleInstructionStatus={toggleInstructionStatus}
                 embedded
                 onClose={() => undefined}

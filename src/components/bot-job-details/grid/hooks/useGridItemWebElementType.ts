@@ -14,6 +14,7 @@ export const GRID_ITEM_WEB_ELEMENT_TYPE_CONTRACT_VERSION = 1 as const;
 export const GRID_ITEM_WEB_ELEMENT_TYPE_TIMEOUT_MS = 25_000;
 
 const BOT_JOB_SESSION_ID = 'botJobTasks';
+const SMOKE_TEST_SESSION_ID = 'smokeTestManager';
 const WEB_ELEMENT_TYPES = new Set<WebElementExecutionType>([
   'INPUT',
   'OUTPUT',
@@ -59,6 +60,8 @@ type UseGridItemWebElementTypeOptions = {
   botJobId: number | null;
   capability: BotJobGraphMutationCapability | null;
   onResult: (result: GridItemWebElementTypeResult) => void;
+  transportSessionId?: string;
+  bindingEpoch?: string;
   timeoutMs?: number;
 };
 
@@ -72,6 +75,8 @@ type PendingMutation = {
   workspaceEpoch: number;
   graphVersion: number;
   graphRevision: string;
+  transportSessionId: string;
+  bindingEpoch: string;
   webSocket: WebSocket;
   timeoutId: ReturnType<typeof setTimeout>;
 };
@@ -87,6 +92,7 @@ type MutationRequest = {
   graphRevision: string;
   expectedType: WebElementExecutionType;
   replacementType: WebElementExecutionType;
+  bindingEpoch?: string;
 };
 
 let requestSequence = 0;
@@ -186,6 +192,8 @@ export const useGridItemWebElementType = ({
   botJobId,
   capability,
   onResult,
+  transportSessionId = BOT_JOB_SESSION_ID,
+  bindingEpoch = '',
   timeoutMs = GRID_ITEM_WEB_ELEMENT_TYPE_TIMEOUT_MS,
 }: UseGridItemWebElementTypeOptions) => {
   const pendingRef = useRef<PendingMutation | null>(null);
@@ -222,7 +230,9 @@ export const useGridItemWebElementType = ({
       || !webSocket
       || webSocket.readyState !== WebSocket.OPEN
       || webSocket !== pending.webSocket
-      || sessionId !== BOT_JOB_SESSION_ID
+      || sessionId !== pending.transportSessionId
+      || (pending.transportSessionId === SMOKE_TEST_SESSION_ID
+        && bindingEpoch !== pending.bindingEpoch)
       || workspaceChanged
     ) {
       const cancelled = clearPending();
@@ -237,12 +247,14 @@ export const useGridItemWebElementType = ({
     }
   }, [
     botJobId,
+    bindingEpoch,
     capability,
     clearPending,
     connected,
     homeBankingId,
     onResult,
     sessionId,
+    transportSessionId,
     webSocket,
   ]);
 
@@ -261,11 +273,15 @@ export const useGridItemWebElementType = ({
     const activeBotJobId = positiveInteger(botJobId);
     const activeHomeBankingId = positiveInteger(homeBankingId);
     const activeInstructionId = positiveInteger(instructionId);
+    const activeBindingEpoch = textValue(bindingEpoch);
     const authority = activeBotJobId === null || activeHomeBankingId === null
       ? null
       : matchingCapability(capability, activeHomeBankingId, activeBotJobId);
     if (
-      sessionId !== BOT_JOB_SESSION_ID
+      sessionId !== transportSessionId
+      || (transportSessionId !== BOT_JOB_SESSION_ID
+        && transportSessionId !== SMOKE_TEST_SESSION_ID)
+      || (transportSessionId === SMOKE_TEST_SESSION_ID && !activeBindingEpoch)
       || !connected
       || !webSocket
       || webSocket.readyState !== WebSocket.OPEN
@@ -293,6 +309,9 @@ export const useGridItemWebElementType = ({
       graphRevision: authority.graphRevision,
       expectedType,
       replacementType,
+      ...(transportSessionId === SMOKE_TEST_SESSION_ID
+        ? { bindingEpoch: activeBindingEpoch }
+        : {}),
     };
     const timeoutId = setTimeout(() => {
       if (pendingRef.current?.requestId !== requestId) return;
@@ -314,6 +333,8 @@ export const useGridItemWebElementType = ({
       workspaceEpoch: authority.workspaceEpoch,
       graphVersion: authority.graphVersion,
       graphRevision: authority.graphRevision,
+      transportSessionId,
+      bindingEpoch: activeBindingEpoch,
       webSocket,
       timeoutId,
     };
@@ -324,7 +345,7 @@ export const useGridItemWebElementType = ({
     try {
       webSocket.send(JSON.stringify({
         type: GRID_ITEM_WEB_ELEMENT_TYPE_OPERATION,
-        sessionId: BOT_JOB_SESSION_ID,
+        sessionId: transportSessionId,
         homeBankingId: activeHomeBankingId,
         body: JSON.stringify(request),
       }));
@@ -342,6 +363,7 @@ export const useGridItemWebElementType = ({
     }
   }, [
     botJobId,
+    bindingEpoch,
     capability,
     clearPending,
     connected,
@@ -349,6 +371,7 @@ export const useGridItemWebElementType = ({
     onResult,
     sessionId,
     timeoutMs,
+    transportSessionId,
     webSocket,
   ]);
 
@@ -360,7 +383,7 @@ export const useGridItemWebElementType = ({
     const operation = textValue(envelope.operationId) || textValue(envelope.type);
     if (
       operation !== GRID_ITEM_WEB_ELEMENT_TYPE_RESPONSE
-      || textValue(envelope.sessionId) !== BOT_JOB_SESSION_ID
+      || textValue(envelope.sessionId) !== pending.transportSessionId
     ) {
       return false;
     }

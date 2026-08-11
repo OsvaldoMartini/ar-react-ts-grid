@@ -65,6 +65,7 @@ type UseGridItemTestActionOptions = {
   capability: BotJobGraphMutationCapability | null;
   onResult: (result: GridItemTestActionResult) => void;
   transportSessionId?: string;
+  bindingEpoch?: string;
   timeoutMs?: number;
 };
 
@@ -76,6 +77,7 @@ type PendingTestAction = {
   action: GridItemTestAction;
   workspaceEpoch: number | null;
   transportSessionId: string;
+  bindingEpoch: string;
   webSocket: WebSocket;
   timeoutId: ReturnType<typeof setTimeout>;
 };
@@ -91,9 +93,11 @@ type TestActionRequest = {
   workspaceEpoch?: number;
   baseGraphVersion?: number;
   graphRevision?: string;
+  bindingEpoch?: string;
 };
 
 const BOT_JOB_SESSION_ID = 'botJobTasks';
+const SMOKE_TEST_SESSION_ID = 'smokeTestManager';
 let requestSequence = 0;
 
 const nextRequestId = (instructionId: number, action: GridItemTestAction): string => {
@@ -187,6 +191,7 @@ export const useGridItemTestAction = ({
   capability,
   onResult,
   transportSessionId = BOT_JOB_SESSION_ID,
+  bindingEpoch = '',
   timeoutMs = GRID_ITEM_TEST_ACTION_TIMEOUT_MS,
 }: UseGridItemTestActionOptions) => {
   const pendingRef = useRef<PendingTestAction | null>(null);
@@ -224,6 +229,8 @@ export const useGridItemTestAction = ({
       || webSocket.readyState !== WebSocket.OPEN
       || webSocket !== pending.webSocket
       || sessionId !== pending.transportSessionId
+      || (pending.transportSessionId === SMOKE_TEST_SESSION_ID
+        && bindingEpoch !== pending.bindingEpoch)
       || workspaceChanged
     ) {
       const cancelled = clearPending();
@@ -246,6 +253,7 @@ export const useGridItemTestAction = ({
     }
   }, [
     botJobId,
+    bindingEpoch,
     capability,
     clearPending,
     connected,
@@ -272,8 +280,12 @@ export const useGridItemTestAction = ({
     const activeHomeBankingId = positiveInteger(homeBankingId);
     const activeInstructionId = positiveInteger(instructionId);
     const activeExcelRowIndex = nonNegativeInteger(excelRowIndex);
+    const activeBindingEpoch = textValue(bindingEpoch);
     if (
       sessionId !== transportSessionId
+      || (transportSessionId !== BOT_JOB_SESSION_ID
+        && transportSessionId !== SMOKE_TEST_SESSION_ID)
+      || (transportSessionId === SMOKE_TEST_SESSION_ID && !activeBindingEpoch)
       || !connected
       || !webSocket
       || webSocket.readyState !== WebSocket.OPEN
@@ -306,6 +318,9 @@ export const useGridItemTestAction = ({
         baseGraphVersion: authority.graphVersion,
         graphRevision: authority.graphRevision,
       } : {}),
+      ...(transportSessionId === SMOKE_TEST_SESSION_ID
+        ? { bindingEpoch: activeBindingEpoch }
+        : {}),
     };
     const timeoutId = setTimeout(() => {
       if (pendingRef.current?.requestId !== requestId) return;
@@ -333,6 +348,7 @@ export const useGridItemTestAction = ({
       action,
       workspaceEpoch: authority?.workspaceEpoch ?? null,
       transportSessionId,
+      bindingEpoch: activeBindingEpoch,
       webSocket,
       timeoutId,
     };
@@ -367,6 +383,7 @@ export const useGridItemTestAction = ({
     }
   }, [
     botJobId,
+    bindingEpoch,
     capability,
     clearPending,
     connected,
