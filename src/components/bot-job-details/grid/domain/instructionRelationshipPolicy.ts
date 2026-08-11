@@ -79,7 +79,7 @@ const POLICIES: Record<string, InstructionActionPolicy> = {
   E: policy('E', {
     role: 'VARIABLE_COMMAND',
     variableSemantics: 'READ_EXPORT',
-    requirements: ['ELEMENT_TARGET', 'VARIABLE_BINDING', 'VARIABLE_ORDER'],
+    requirements: ['VARIABLE_BINDING', 'VARIABLE_ORDER'],
     allowedVariableTypes: VARIABLE_TYPES,
   }),
   CK: policy('CK', {

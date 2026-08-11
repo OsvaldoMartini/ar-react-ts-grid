@@ -4,7 +4,6 @@ import upImage from '../../../assets/up.png';
 import downImage from '../../../assets/down.png';
 import rollBackImage from '../../../assets/rollback4.png';
 import saveImage from '../../../assets/save.png';
-import excelImage from '../../../assets/excel.png';
 // Shares GridItem's block-header styling, including the descendant selectors
 // `.blockHeader .blockName` / `.blockHeader .blockCount` / `.blockHeader .moveButtons`,
 // so the design is preserved exactly with no duplication.
@@ -35,7 +34,8 @@ export interface BlockHeaderProps {
   blockDeleteDimmed?: boolean;
   selectedInstructionCount?: number;
   renderHighlighted: (text: string, query: string) => React.ReactNode;
-  exportFileNode: React.ReactNode;
+  /** @deprecated Legacy Block-level ExcelWrite display; intentionally no longer rendered. */
+  exportFileNode?: React.ReactNode;
   /** The Excel-GOTO badge cluster, built by GridItem when this block owns it. */
   excelGotoNode?: React.ReactNode;
   onToggleStatus: () => void;
@@ -48,7 +48,8 @@ export interface BlockHeaderProps {
   onMoveUp: () => void;
   onMoveDown: () => void;
   onEditName: () => void;
-  onExcelFile: () => void;
+  /** @deprecated ExcelWrite files are configured on each E instruction in Command Editor. */
+  onExcelFile?: () => void;
   onCreateComponent: () => void;
   onBlockSelectionChange?: (checked: boolean) => void;
   onDeleteBlock: () => void;
@@ -56,10 +57,8 @@ export interface BlockHeaderProps {
 
 /**
  * The header row of one Bot Job Details block: status/collapse toggles, order
- * number, name (view/edit), step count, add-to-memory, export file, and the
- * move/edit/excel/save/delete controls. Extracted verbatim from GridItem; the
- * Excel-GOTO cluster and export-file label are passed in as nodes so their
- * GridItem-owned logic stays put.
+ * number, name (view/edit), step count, add-to-memory, and the move/edit/save/delete
+ * controls. ExcelWrite file ownership moved to each E instruction in Command Editor.
  */
 const BlockHeader: React.FC<BlockHeaderProps> = ({
   blockActive,
@@ -80,7 +79,6 @@ const BlockHeader: React.FC<BlockHeaderProps> = ({
   blockDeleteDimmed,
   selectedInstructionCount = 0,
   renderHighlighted,
-  exportFileNode,
   excelGotoNode,
   onToggleStatus,
   onToggleCollapse,
@@ -92,7 +90,6 @@ const BlockHeader: React.FC<BlockHeaderProps> = ({
   onMoveUp,
   onMoveDown,
   onEditName,
-  onExcelFile,
   onCreateComponent,
   onBlockSelectionChange,
   onDeleteBlock,
@@ -123,7 +120,6 @@ const BlockHeader: React.FC<BlockHeaderProps> = ({
       title={memoryAddTitle || 'Add this complete connected block to Memory List'}
       onClick={onAddToMemory}
     />
-    <span className={styles.blockExportFile}>{exportFileNode}</span>
     <div className={styles.moveButtons}>
       {isFirstBlock && (
         <img
@@ -138,7 +134,6 @@ const BlockHeader: React.FC<BlockHeaderProps> = ({
       <img src={upImage} alt="" className={styles.moveButton} onClick={onMoveUp} />
       <img src={downImage} alt="" className={styles.moveButton} onClick={onMoveDown} />
       <img src={editImage} alt="edit" className={styles.editButton} onClick={onEditName} />
-      <img src={excelImage} alt="excel" className={styles.excelButton} onClick={onExcelFile} />
       {showCreateComponent && (
         <img src={saveImage} alt="save" className={styles.saveButton} onClick={onCreateComponent} />
       )}

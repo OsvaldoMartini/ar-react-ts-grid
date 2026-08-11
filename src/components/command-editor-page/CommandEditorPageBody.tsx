@@ -50,6 +50,8 @@ import {
   type CommandEditorRelationshipImpact,
 } from '../command-editor/commandEditorRelationshipImpact';
 import type { CommandEditorPageSnapshot } from './commandEditorPageSnapshot';
+import ExcelWriteFileModal from './excel-write/ExcelWriteFileModal';
+import type { ExcelWriteWorkspaceClient } from './excel-write/ExcelWriteWorkspace.contract';
 import styles from './CommandEditorPageBody.module.scss';
 
 export interface CommandEditorPageBodyStatus {
@@ -66,6 +68,7 @@ interface Props {
   pending: boolean;
   mode?: 'EDIT' | 'CREATE';
   createTargetBlockId?: number | null;
+  excelWriteWorkspace?: ExcelWriteWorkspaceClient;
   onSubmit?: (intent: CommandEditorMutationIntent) => void;
   onCancel: () => void;
 }
@@ -79,6 +82,7 @@ const CommandEditorPageBody: React.FC<Props> = ({
   pending,
   mode = 'EDIT',
   createTargetBlockId = null,
+  excelWriteWorkspace,
   onSubmit,
   onCancel,
 }) => {
@@ -141,6 +145,7 @@ const CommandEditorPageBody: React.FC<Props> = ({
     impact: CommandEditorConditionalFamilyImpact;
     intent: CommandEditorMutationIntent;
   } | null>(null);
+  const [excelWriteFileOpen, setExcelWriteFileOpen] = useState(false);
 
   const commandChanged = selectedCommandCode !== originalCommandCode;
   const lockCommandSelection = mode === 'EDIT' && command
@@ -368,6 +373,9 @@ const CommandEditorPageBody: React.FC<Props> = ({
                   <ExcelWriteCommandEditor
                     value={draft.configuration}
                     disabled={pending}
+                    onConfigureFile={excelWriteWorkspace
+                      ? () => setExcelWriteFileOpen(true)
+                      : undefined}
                     onChange={configuration => setDraft(current => current
                       ? { ...current, configuration }
                       : current)}
@@ -681,6 +689,19 @@ const CommandEditorPageBody: React.FC<Props> = ({
             onSubmit?.(intent);
           }}
         />
+      )}
+      {excelWriteFileOpen
+        && excelWriteWorkspace
+        && draft.configuration.kind === 'EXCEL_WRITE' && (
+          <ExcelWriteFileModal
+            instructionId={command.instructionId}
+            value={draft.configuration}
+            client={excelWriteWorkspace}
+            onApply={configuration => setDraft(current => current
+              ? { ...current, configuration }
+              : current)}
+            onClose={() => setExcelWriteFileOpen(false)}
+          />
       )}
     </section>
   );

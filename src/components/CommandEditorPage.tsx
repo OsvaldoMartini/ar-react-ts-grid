@@ -15,6 +15,11 @@ import {
 import PagesOpenButton from './PagesOpenButton';
 import { useWebSocket } from './useWebSocket';
 import { validateIfFamilyCreateRows } from './variables/domain/ifFamilyRules';
+import type {
+  ExcelWriteWorkspaceClient,
+  ExcelWriteWorkspaceOperation,
+  ExcelWriteWorkspaceResponse,
+} from './command-editor-page/excel-write/ExcelWriteWorkspace.contract';
 import styles from './CommandEditorPage.module.scss';
 
 export const COMMAND_EDITOR_SESSION_ID = 'commandEditorManager';
@@ -57,6 +62,16 @@ type PendingSelection = {
   requestId: string;
   webSocket: WebSocket;
   timeoutId: ReturnType<typeof setTimeout>;
+};
+
+type PendingExcelWriteRequest = {
+  requestId: string;
+  responseType: `${ExcelWriteWorkspaceOperation}Response`;
+  bindingEpoch: string;
+  webSocket: WebSocket;
+  timeoutId: ReturnType<typeof setTimeout>;
+  resolve: (response: ExcelWriteWorkspaceResponse) => void;
+  reject: (reason: Error) => void;
 };
 
 type Status = {
@@ -160,6 +175,7 @@ const CommandEditorPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) 
   const pendingBootstrapRequestRef = useRef<string | null>(null);
   const pendingSelectionRequestRef = useRef<PendingSelection | null>(null);
   const pendingMutationRef = useRef<PendingMutation | null>(null);
+  const pendingExcelWriteRef = useRef<PendingExcelWriteRequest | null>(null);
   const targetRef = useRef<CommandEditorTarget | null>(null);
   const [target, setTarget] = useState<CommandEditorTarget | null>(null);
   const [snapshot, setSnapshot] = useState<CommandEditorPageSnapshot | null>(null);
@@ -185,6 +201,15 @@ const CommandEditorPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) 
     if (!pending) return null;
     clearTimeout(pending.timeoutId);
     pendingSelectionRequestRef.current = null;
+    return pending;
+  }, []);
+
+  const clearPendingExcelWrite = useCallback((reason?: string) => {
+    const pending = pendingExcelWriteRef.current;
+    if (!pending) return null;
+    clearTimeout(pending.timeoutId);
+    pendingExcelWriteRef.current = null;
+    if (reason) pending.reject(new Error(reason));
     return pending;
   }, []);
 
@@ -229,6 +254,55 @@ const CommandEditorPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) 
       setWorkspaceState('error');
     }
   }, [send]);
+
+  const requestExcelWrite = useCallback((
+    operation: ExcelWriteWorkspaceOperation,
+    body: Record<string, unknown>,
+  ): Promise<ExcelWriteWorkspaceResponse> => {
+    const current = targetRef.current;
+    if (!current || !webSocket || webSocket.readyState !== WebSocket.OPEN) {
+      return Promise.reject(new Error('Command Editor is not connected to an authoritative Bot Job.'));
+    }
+    if (pendingExcelWriteRef.current) {
+      return Promise.reject(new Error('Another ExcelWrite file request is still pending.'));
+    }
+    const requestId = `${Date.now()}-${operation.replace(/[^A-Za-z0-9]/g, '-')}`;
+    return new Promise<ExcelWriteWorkspaceResponse>((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        if (pendingExcelWriteRef.current?.requestId !== requestId) return;
+        pendingExcelWriteRef.current = null;
+        reject(new Error('ExcelWrite file request timed out. Reload Command Editor before retrying.'));
+      }, COMMAND_MUTATION_TIMEOUT_MS);
+      pendingExcelWriteRef.current = {
+        requestId,
+        responseType: `${operation}Response`,
+        bindingEpoch: current.bindingEpoch,
+        webSocket,
+        timeoutId,
+        resolve,
+        reject,
+      };
+      const sent = send(operation, {
+        ...body,
+        requestId,
+        bindingEpoch: current.bindingEpoch,
+        selectionRevision: current.selectionRevision,
+        targetSessionId: current.targetSessionId,
+        homeBankingId: current.homeBankingId,
+        botJobId: current.botJobId,
+        workspaceEpoch: current.workspaceEpoch,
+      }, current.homeBankingId);
+      if (!sent) {
+        clearPendingExcelWrite();
+        reject(new Error('ExcelWrite file request could not be sent.'));
+      }
+    });
+  }, [clearPendingExcelWrite, send, webSocket]);
+
+  const excelWriteWorkspace = useMemo<ExcelWriteWorkspaceClient>(() => ({
+    connected,
+    request: requestExcelWrite,
+  }), [connected, requestExcelWrite]);
 
   const variableSaveAuthority = useMemo(() => {
     const capability = snapshot?.graphCapability;
@@ -318,6 +392,7 @@ const CommandEditorPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) 
     ) {
       clearPendingMutation();
       clearPendingSelection();
+      clearPendingExcelWrite('The Command Editor selection changed. Reopen ExcelWrite configuration.');
     }
     targetRef.current = nextTarget;
     setTarget(nextTarget);
@@ -338,7 +413,7 @@ const CommandEditorPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) 
       text: String(body?.message || 'Command Editor loaded'),
     });
     return true;
-  }, [clearPendingMutation, clearPendingSelection]);
+  }, [clearPendingExcelWrite, clearPendingMutation, clearPendingSelection]);
 
   useEffect(() => {
     if (processedMessagesRef.current > messages.length) {
@@ -350,6 +425,24 @@ const CommandEditorPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) 
     pendingMessages.forEach((raw) => {
       try {
         const { operationId, body } = parseEnvelope(raw);
+        if (
+          operationId === 'excelWrite.bootstrapResponse'
+          || operationId === 'excelWrite.chooseDirectoryResponse'
+          || operationId === 'excelWrite.validateTargetResponse'
+        ) {
+          const pending = pendingExcelWriteRef.current;
+          if (
+            !pending
+            || operationId !== pending.responseType
+            || String(body?.requestId || '') !== pending.requestId
+            || String(body?.bindingEpoch || '') !== pending.bindingEpoch
+            || pending.webSocket !== webSocket
+          ) return;
+          clearTimeout(pending.timeoutId);
+          pendingExcelWriteRef.current = null;
+          pending.resolve(body as ExcelWriteWorkspaceResponse);
+          return;
+        }
         if ([
           'commandEditor.workspaceBootstrapResponse',
           'commandEditor.workspaceTarget',
@@ -393,6 +486,7 @@ const CommandEditorPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) 
             pendingBootstrapRequestRef.current = null;
             clearPendingSelection();
             clearPendingMutation();
+            clearPendingExcelWrite('The Command Editor target became unavailable.');
             targetRef.current = null;
             setTarget(null);
             setSnapshot(null);
@@ -561,6 +655,7 @@ const CommandEditorPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) 
           pendingBootstrapRequestRef.current = null;
           clearPendingSelection();
           clearPendingMutation();
+          clearPendingExcelWrite('The ExcelWrite file request was refused.');
           setStatus({
             level: 'error',
             text: String(
@@ -583,6 +678,7 @@ const CommandEditorPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) 
     });
   }, [
     acceptWorkspaceSnapshot,
+    clearPendingExcelWrite,
     clearPendingMutation,
     clearPendingSelection,
     handleVariableSaveMessage,
@@ -590,6 +686,7 @@ const CommandEditorPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) 
     requestWorkspaceBootstrap,
     send,
     snapshot,
+    webSocket,
   ]);
 
   useEffect(() => {
@@ -626,7 +723,16 @@ const CommandEditorPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) 
         text: 'The Command Editor connection changed before the new command loaded.',
       });
     }
-  }, [clearPendingMutation, clearPendingSelection, connected, webSocket]);
+    const pendingExcelWrite = pendingExcelWriteRef.current;
+    if (pendingExcelWrite && (
+      !connected
+      || !webSocket
+      || webSocket.readyState !== WebSocket.OPEN
+      || pendingExcelWrite.webSocket !== webSocket
+    )) {
+      clearPendingExcelWrite('Command Editor disconnected during the ExcelWrite file request.');
+    }
+  }, [clearPendingExcelWrite, clearPendingMutation, clearPendingSelection, connected, webSocket]);
 
   useEffect(() => () => {
     const pending = pendingMutationRef.current;
@@ -638,6 +744,12 @@ const CommandEditorPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) 
     if (pendingSelection) {
       clearTimeout(pendingSelection.timeoutId);
       pendingSelectionRequestRef.current = null;
+    }
+    const pendingExcelWrite = pendingExcelWriteRef.current;
+    if (pendingExcelWrite) {
+      clearTimeout(pendingExcelWrite.timeoutId);
+      pendingExcelWriteRef.current = null;
+      pendingExcelWrite.reject(new Error('Command Editor closed during the ExcelWrite file request.'));
     }
   }, []);
 
@@ -903,6 +1015,7 @@ const CommandEditorPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) 
                 snapshot={snapshot}
                 status={status}
                 pending={mutationPending || pendingVariableSaveRequestId !== null}
+                excelWriteWorkspace={excelWriteWorkspace}
                 mode={target.editorMode}
                 createTargetBlockId={target.targetBlockId}
                 onSubmit={snapshot.graphCapability ? submitCommandMutation : undefined}
