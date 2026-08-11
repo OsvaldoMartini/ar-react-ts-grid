@@ -155,22 +155,30 @@ export const buildSmokeTestIntegrationStartRequest = (
   workspaceEpoch: number,
   excelMode: ExcelDataMode,
   runtimeWrites: boolean,
-): SmokeTestIntegrationStartRequest => ({
-  contractVersion: SMOKE_TEST_INTEGRATION_CONTRACT_VERSION,
-  requestId,
-  bindingEpoch,
-  workspaceEpoch,
-  homeBankingId: plan.homeBankingId,
-  botJobId: plan.botJobId,
-  graphRevision: plan.graphRevision,
-  scope: {
-    kind: 'BLOCKS',
-    blockIds: [...plan.selectedBlockIds],
-  },
-  excelMode,
-  pagePolicy: 'PRESERVE_ACTIVE',
-  durableRuntimeWrites: runtimeWrites,
-});
+): SmokeTestIntegrationStartRequest => {
+  const activeBlockIds = plan.blocks.flatMap(block => (
+    block.active && block.blockId !== null ? [block.blockId] : []
+  ));
+  if (activeBlockIds.length === 0) {
+    throw new Error('Select at least one active Block before starting Integration.');
+  }
+  return {
+    contractVersion: SMOKE_TEST_INTEGRATION_CONTRACT_VERSION,
+    requestId,
+    bindingEpoch,
+    workspaceEpoch,
+    homeBankingId: plan.homeBankingId,
+    botJobId: plan.botJobId,
+    graphRevision: plan.graphRevision,
+    scope: {
+      kind: 'BLOCKS',
+      blockIds: activeBlockIds,
+    },
+    excelMode,
+    pagePolicy: 'PRESERVE_ACTIVE',
+    durableRuntimeWrites: runtimeWrites,
+  };
+};
 
 export const buildSmokeTestIntegrationRefreshRequest = (
   requestId: string,

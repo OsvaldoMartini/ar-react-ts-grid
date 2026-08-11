@@ -242,15 +242,15 @@ export const useSmokeTestIntegrationRun = ({
     setPhase('STARTING');
     stepSequenceRef.current = 0;
     const requestId = nextRequestId('start');
-    const body = buildSmokeTestIntegrationStartRequest(
-      requestId,
-      plan,
-      snapshot.bindingEpoch,
-      snapshot.workspaceEpoch,
-      excelMode,
-      runtimeWrites,
-    );
     try {
+      const body = buildSmokeTestIntegrationStartRequest(
+        requestId,
+        plan,
+        snapshot.bindingEpoch,
+        snapshot.workspaceEpoch,
+        excelMode,
+        runtimeWrites,
+      );
       const run = await request(
         'start',
         'smokeTest.integration.startResponse',
