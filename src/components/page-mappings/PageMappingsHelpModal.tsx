@@ -19,7 +19,8 @@ const ruleGroups = [
       ['CHECK PAGE', 'Compares the current shared browser page with the latest matching reusable capture. It does not scan, save, or create history.'],
       ['USE EXISTING', 'Available only when the live page fingerprint is CURRENT. It loads the newest matching verified capture and creates no new capture.'],
       ['RESCAN', 'Runs the normal Page Scanner pipeline for the active Bot Job against the current shared Playwright page and requires a new READY immutable capture.'],
-      ['SCROLL PAGE', 'Red keeps normal capture behavior. Green performs a bounded page scroll before Rescan and requests one full-page screenshot; unsafe or unbounded pages fail instead of claiming a complete capture.'],
+      ['SCROLL PAGE', 'Red keeps normal capture behavior. Green moves downward by up to the saved SCROLL PAGES value, stopping early when the document bottom is stable. Each movement waits for visible rendering before Rescan captures the full current document.'],
+      ['SCROLL PAGES', 'A browser preference saved separately for each Home Banking and Bot Job, from 1 to 40 with default 5. N means at most N downward viewport movements, not N different websites. Virtualized lists, nested scroll areas, canvas/video, CSS backgrounds, and unbounded content remain outside the top-document guarantee.'],
     ],
   },
   {

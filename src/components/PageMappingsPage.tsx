@@ -2,6 +2,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import DetachedPageShell from './DetachedPageShell';
 import PagesOpenButton from './PagesOpenButton';
 import PageMappingsCachePanel, {
+  PAGE_MAPPINGS_DEFAULT_SCROLL_PAGES,
+  PAGE_MAPPINGS_MAX_SCROLL_PAGES,
+  PAGE_MAPPINGS_MIN_SCROLL_PAGES,
   PageMappingsCacheState,
 } from './page-mappings/PageMappingsCachePanel';
 import PageMappingsOcrReviewPanel from './page-mappings/PageMappingsOcrReviewPanel';
@@ -100,6 +103,12 @@ type RetentionCorrelation = PageMappingsBindingIdentity & {
   requestId: string;
 };
 
+type PendingRescan = PageMappingsBindingIdentity & {
+  requestId: string;
+  scrollPage: boolean;
+  scrollPages: number;
+};
+
 type PendingRetention = RetentionCorrelation & (
   | { operation: 'pin'; scanId: string; pinned: boolean }
   | { operation: 'save'; retentionDays: number; maxUnpinnedPerPage: number }
@@ -146,6 +155,27 @@ const boundedInteger = (value: unknown, maximum: number): number | null => {
   if (value === null || value === undefined || value === '' || typeof value === 'boolean') return null;
   const parsed = Number(value);
   return Number.isSafeInteger(parsed) && parsed >= 0 && parsed <= maximum ? parsed : null;
+};
+
+const scrollPagesInteger = (value: unknown): number | null => {
+  const parsed = boundedInteger(value, PAGE_MAPPINGS_MAX_SCROLL_PAGES);
+  return parsed !== null && parsed >= PAGE_MAPPINGS_MIN_SCROLL_PAGES ? parsed : null;
+};
+
+const scrollPagesPreferenceKey = (owner: PageMappingsBindingIdentity): string => (
+  `arweb.page-mappings.scroll-pages.${owner.homeBankingId}.${owner.botJobId}`
+);
+
+const loadScrollPagesPreference = (owner: PageMappingsBindingIdentity): number => {
+  try {
+    const stored = window.localStorage.getItem(scrollPagesPreferenceKey(owner));
+    if (stored === null || !/^(?:[1-9]|[1-3][0-9]|40)$/.test(stored)) {
+      return PAGE_MAPPINGS_DEFAULT_SCROLL_PAGES;
+    }
+    return scrollPagesInteger(stored) ?? PAGE_MAPPINGS_DEFAULT_SCROLL_PAGES;
+  } catch (_) {
+    return PAGE_MAPPINGS_DEFAULT_SCROLL_PAGES;
+  }
 };
 
 const requestId = (purpose: string): string => {
@@ -198,6 +228,29 @@ const sameBindingIdentity = (
   && candidate.workspaceEpoch === active.workspaceEpoch
   && candidate.homeBankingId === active.homeBankingId
   && candidate.botJobId === active.botJobId);
+
+const bindingAssertionsMatch = (
+  body: Record<string, unknown>,
+  expected: PageMappingsBindingIdentity,
+  allowOmittedAssertions: boolean,
+): boolean => {
+  const stringMatches = (field: 'bindingEpoch') => (
+    allowOmittedAssertions && !Object.prototype.hasOwnProperty.call(body, field)
+      ? true
+      : text(body[field]) === expected[field]
+  );
+  const numberMatches = (
+    field: 'workspaceEpoch' | 'homeBankingId' | 'botJobId',
+  ) => (
+    allowOmittedAssertions && !Object.prototype.hasOwnProperty.call(body, field)
+      ? true
+      : positiveInteger(body[field]) === expected[field]
+  );
+  return stringMatches('bindingEpoch')
+    && numberMatches('workspaceEpoch')
+    && numberMatches('homeBankingId')
+    && numberMatches('botJobId');
+};
 
 const parseSnapshot = (value: unknown): Snapshot | null => {
   if (!value || typeof value !== 'object') return null;
@@ -391,6 +444,8 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
   const [cacheBusy, setCacheBusy] = useState(false);
   const [rescanBusy, setRescanBusy] = useState(false);
   const [scrollPage, setScrollPage] = useState(false);
+  const [scrollPages, setScrollPages] = useState(PAGE_MAPPINGS_DEFAULT_SCROLL_PAGES);
+  const [scrollPagesEditing, setScrollPagesEditing] = useState(false);
   const [storageReady, setStorageReady] = useState<boolean | null>(null);
   const [retention, setRetention] = useState<PageMappingsRetentionState | null>(null);
   const [retentionOperation, setRetentionOperation] = useState<PendingRetention['operation'] | null>(null);
@@ -416,11 +471,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
   const pendingBootstrap = useRef<string | null>(null);
   const pendingCapture = useRef<{ requestId: string; scanId: string; bindingEpoch: string } | null>(null);
   const pendingCache = useRef<{ requestId: string; bindingEpoch: string } | null>(null);
-  const pendingRescan = useRef<{
-    requestId: string;
-    bindingEpoch: string;
-    scrollPage: boolean;
-  } | null>(null);
+  const pendingRescan = useRef<PendingRescan | null>(null);
   const rescanTimer = useRef<number | null>(null);
   const pendingMemory = useRef<{ requestId: string; bindingEpoch: string } | null>(null);
   const pendingOcrReview = useRef<PageMappingsOcrCorrelation | null>(null);
@@ -549,6 +600,8 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
     setCacheState(emptyCacheState);
     setCacheBusy(false);
     setScrollPage(false);
+    setScrollPages(PAGE_MAPPINGS_DEFAULT_SCROLL_PAGES);
+    setScrollPagesEditing(false);
     setStorageReady(null);
     setRetention(null);
     setRetentionRevision('');
@@ -656,6 +709,43 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
     }));
   }, [sessionId, webSocket]);
 
+  const saveScrollPages = useCallback((nextScrollPages: number) => {
+    const active = bindingRef.current;
+    if (!active
+      || !storageReady
+      || scrollPagesInteger(nextScrollPages) !== nextScrollPages
+      || nextScrollPages === scrollPages
+      || captureLoading
+      || cacheBusy
+      || rescanBusy
+      || ocrReviewBusy
+      || ocrApplyBusy
+      || pendingCapture.current
+      || pendingCache.current
+      || pendingRescan.current
+      || pendingOcrReview.current
+      || pendingOcrApply.current
+      || pendingRetention.current) return;
+    setScrollPages(nextScrollPages);
+    try {
+      window.localStorage.setItem(
+        scrollPagesPreferenceKey(active),
+        String(nextScrollPages),
+      );
+      setStatus(`Scroll Pages saved as ${nextScrollPages} for Bot Job #${active.botJobId}.`);
+    } catch (_) {
+      setStatus(`Browser preference storage is unavailable. Using ${nextScrollPages} for this window.`);
+    }
+  }, [
+    cacheBusy,
+    captureLoading,
+    ocrApplyBusy,
+    ocrReviewBusy,
+    rescanBusy,
+    scrollPages,
+    storageReady,
+  ]);
+
   const rescan = useCallback(() => {
     const active = bindingRef.current;
     if (!webSocket
@@ -663,17 +753,22 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
       || !active
       || rescanBusy
       || !storageReady
+      || scrollPagesEditing
       || pendingOcrApply.current
       || pendingRetention.current) return;
     const nextRequestId = requestId('rescan');
     pendingRescan.current = {
       requestId: nextRequestId,
       bindingEpoch: active.bindingEpoch,
+      workspaceEpoch: active.workspaceEpoch,
+      homeBankingId: active.homeBankingId,
+      botJobId: active.botJobId,
       scrollPage,
+      scrollPages,
     };
     setRescanBusy(true);
     setStatus(scrollPage
-      ? 'Starting bounded full-page Page Mappings rescan...'
+      ? `Starting bounded Page Mappings rescan with up to ${scrollPages} downward viewport movements...`
       : 'Starting Page Mappings rescan...');
     rescanTimer.current = window.setTimeout(() => {
       if (pendingRescan.current?.requestId !== nextRequestId) return;
@@ -691,13 +786,23 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
           homeBankingId: active.homeBankingId,
           botJobId: active.botJobId,
           scrollPage,
+          scrollPages,
         }),
       }));
     } catch (_) {
       retireRescan(nextRequestId);
       setStatus('Page Mappings rescan could not be sent.');
     }
-  }, [rescanBusy, retireRescan, scrollPage, sessionId, storageReady, webSocket]);
+  }, [
+    rescanBusy,
+    retireRescan,
+    scrollPage,
+    scrollPages,
+    scrollPagesEditing,
+    sessionId,
+    storageReady,
+    webSocket,
+  ]);
 
   const runOcrReview = useCallback(() => {
     const correlation = ocrCorrelation(
@@ -1160,6 +1265,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
           bindingEstablishedRef.current = true;
           bindingRef.current = nextBinding;
           setBinding(nextBinding);
+          setScrollPages(loadScrollPagesPreference(nextBinding));
           invalidatedRef.current = false;
           setInvalidated(false);
           const nextStorageReady = body.storageReady === true;
@@ -1234,15 +1340,20 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
 
         if (operation === 'pageMappings.rescanResponse') {
           const pending = pendingRescan.current;
+          const active = bindingRef.current;
           if (!pending
+            || !active
             || text(body.requestId) !== pending.requestId
-            || (body.bindingEpoch && text(body.bindingEpoch) !== pending.bindingEpoch)
-            || (body.scrollPage === true) !== pending.scrollPage
-            || bindingRef.current?.bindingEpoch !== pending.bindingEpoch) continue;
+            || !sameBindingIdentity(active, pending)) continue;
           if (!body.ok) {
+            if (!bindingAssertionsMatch(body, pending, true)) continue;
             retireRescan(pending.requestId);
             setStatus(text(body.message) || 'Page Mappings rescan could not be started.');
+            continue;
           }
+          if (!bindingAssertionsMatch(body, pending, false)
+            || body.scrollPage !== pending.scrollPage
+            || scrollPagesInteger(body.scrollPages) !== pending.scrollPages) continue;
           continue;
         }
 
@@ -1252,12 +1363,10 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
           if (!pending
             || !active
             || text(body.requestId) !== pending.requestId
-            || text(body.bindingEpoch) !== pending.bindingEpoch
-            || active.bindingEpoch !== pending.bindingEpoch
-            || positiveInteger(body.workspaceEpoch) !== active.workspaceEpoch
-            || positiveInteger(body.homeBankingId) !== active.homeBankingId
-            || positiveInteger(body.botJobId) !== active.botJobId
-            || (body.scrollPage === true) !== pending.scrollPage) continue;
+            || !sameBindingIdentity(active, pending)
+            || !bindingAssertionsMatch(body, pending, false)
+            || body.scrollPage !== pending.scrollPage
+            || scrollPagesInteger(body.scrollPages) !== pending.scrollPages) continue;
           const scanStatus = text(body.status).toLowerCase();
           setStatus(text(body.message) || 'Page Mappings rescan is running…');
           if (scanStatus === 'done' || scanStatus === 'empty' || scanStatus === 'failed') {
@@ -1872,11 +1981,15 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
               cache={cacheState}
               busy={pageOperationBusy}
               disabled={!connected || invalidated || storageReady !== true || pageOperationBusy}
+              actionsDisabled={scrollPagesEditing}
               scrollPage={scrollPage}
+              scrollPages={scrollPages}
               onRefresh={() => requestCacheState()}
               onUseExisting={useExisting}
               onRescan={rescan}
               onScrollPageChange={setScrollPage}
+              onScrollPagesCommit={saveScrollPages}
+              onScrollPagesEditingChange={setScrollPagesEditing}
             />
             {!selected ? <div className={styles.emptyDetail}>Select a capture to inspect its immutable metadata.</div> : (
               <>
