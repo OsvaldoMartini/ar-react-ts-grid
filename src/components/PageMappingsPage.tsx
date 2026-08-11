@@ -1909,16 +1909,15 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
       showCloseButton={false}
     >
       <main className={styles.page}>
-        <header className={styles.header}>
+        <header className={styles.header} data-floating-workspace-drag-handle>
           <div>
-            <p className={styles.eyebrow}>PAGE SCAN HISTORY</p>
             <h1>Page Mappings</h1>
             <p className={styles.subtitle}>
               Owner-scoped captures for Bot Job {binding?.botJobId || (!invalidated && sourceBotJobHint) || '—'}
               {binding?.botJobName ? ` · ${binding.botJobName}` : ''}
             </p>
           </div>
-          <div className={styles.actions}>
+          <div className={styles.actions} data-floating-drag-ignore>
             <button type="button" className={styles.actionButton} onClick={() => bootstrap(binding?.bindingEpoch)} disabled={!connected || invalidated || pageOperationBusy}>Reload</button>
             <PagesOpenButton webSocket={webSocket} connected={connected} messages={messages} sessionId={sessionId} />
             <button type="button" className={`${styles.actionButton} ${styles.close}`} onClick={closePage} disabled={ocrApplyBusy || retentionBusy}>Close</button>
@@ -2060,7 +2059,10 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
                   </div>
                 </div>}
                 <div className={styles.searchField}>
-                  <label htmlFor="page-mappings-element-search">Search captured elements</label>
+                  <div className={styles.searchHeader}>
+                    <label htmlFor="page-mappings-element-search">Search captured elements</label>
+                    <span className={styles.elementTotal}>Total Web Elements: {selected.elementCount}</span>
+                  </div>
                   <div className={styles.searchControl}>
                     <input
                       id="page-mappings-element-search"

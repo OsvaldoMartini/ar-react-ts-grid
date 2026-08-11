@@ -1,15 +1,13 @@
-.page { position: relative; height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; background: #f4f8fc; color: #18324a; padding: 18px; box-sizing: border-box; }
-.header { display: flex; align-items: center; justify-content: space-between; gap: 18px; background: linear-gradient(120deg,#124d84,#0d6e96); color: #fff; border-radius: 12px; padding: 18px 22px; }
-.header h1 { margin: 2px 0 4px; font-size: 1.55rem; }
-.eyebrow { margin: 0; font-size: .68rem; font-weight: 800; letter-spacing: .12em; opacity: .8; }
-.subtitle { margin: 0; opacity: .86; }
+.page { position: relative; width: 100%; height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; background: #eef3f8; color: #1f2933; padding: 0; box-sizing: border-box; font-family: Arial,Helvetica,sans-serif; }
+.header { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 8px 12px; background: #0b5394; color: #fff; flex: 0 0 auto; cursor: move; touch-action: none; user-select: none; }
+.header h1 { margin: 0; font-size: .95rem; font-weight: bold; }
+.subtitle { margin: 2px 0 0; color: #dcecf5; font-size: .76rem; }
 .actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .actions .actionButton { min-height: 34px; border: 1px solid #b6d1e7; border-radius: 7px; padding: 0 13px; background: #fff; color: #174d77; font-weight: 700; cursor: pointer; }
 .actions .actionButton:disabled { opacity: .55; cursor: not-allowed; }
 .actions .close { color: #a31e28; border-color: #e5a2aa; }
-.status { margin: 12px 0; border: 1px solid #c6d9e9; border-radius: 8px; background: #fff; padding: 9px 12px; font-size: .86rem; }
-.header,.status { flex: 0 0 auto; }
-.workspace { display: grid; grid-template-columns: minmax(270px,.36fr) minmax(0,1fr); gap: 14px; flex: 1 1 auto; min-height: 0; overflow: hidden; }
+.status { flex: 0 0 auto; margin: 12px; border: 1px solid #c6d9e9; border-radius: 8px; background: #fff; padding: 9px 12px; font-size: .86rem; }
+.workspace { display: grid; grid-template-columns: minmax(270px,.36fr) minmax(0,1fr); gap: 14px; flex: 1 1 auto; min-height: 0; margin: 0 12px 12px; overflow: hidden; }
 .history,.details { background: #fff; border: 1px solid #c7d9e8; border-radius: 11px; padding: 15px; min-width: 0; min-height: 0; }
 .history { display: flex; flex-direction: column; overflow: hidden; }
 .details { overflow-x: hidden; overflow-y: auto; overscroll-behavior-y: contain; scrollbar-gutter: stable; padding-bottom: 72px; }
@@ -50,6 +48,8 @@
 .overlay { position: absolute; box-sizing: border-box; padding: 0; border: 2px solid #1496c7; background: #1496c733; cursor: pointer; }
 .overlay:hover,.overlaySelected { border-color: #e18b15; background: #f6bd3947; z-index: 1; }
 .searchField { display: grid; gap: 6px; margin-top: 14px; font-size: .76rem; font-weight: 800; color: #4b687d; }
+.searchHeader { display: flex; align-items: center; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; }
+.elementTotal { margin-left: auto; color: #174d77; text-align: right; white-space: nowrap; }
 .searchControl { position: relative; }
 .searchControl input { width: 100%; border: 1px solid #b9cfdf; border-radius: 7px; padding: 9px 38px 9px 10px; color: #18324a; font: inherit; font-weight: 500; }
 .clearSearch { position: absolute; top: 50%; right: 6px; display: inline-flex; align-items: center; justify-content: center; width: 27px; height: 27px; padding: 0; transform: translateY(-50%); border: 0; border-radius: 50%; background: transparent; color: #587087; font-size: 1.15rem; font-weight: 800; line-height: 1; cursor: pointer; }
