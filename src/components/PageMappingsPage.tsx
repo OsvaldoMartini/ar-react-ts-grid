@@ -9,6 +9,11 @@ import PageMappingsCachePanel, {
 } from './page-mappings/PageMappingsCachePanel';
 import PageMappingsOcrReviewPanel from './page-mappings/PageMappingsOcrReviewPanel';
 import PageMappingsHelpModal from './page-mappings/PageMappingsHelpModal';
+import PageMappingsScanInventoryModal, {
+  type PageMappingsScanInventory,
+  type PageMappingsScanInventoryJob,
+  type PageMappingsScanInventoryPage,
+} from './page-mappings/PageMappingsScanInventoryModal';
 import PageMappingsRetentionPanel, {
   type PageMappingsRetentionState,
 } from './page-mappings/PageMappingsRetentionPanel';
@@ -160,6 +165,58 @@ const boundedInteger = (value: unknown, maximum: number): number | null => {
 const scrollPagesInteger = (value: unknown): number | null => {
   const parsed = boundedInteger(value, PAGE_MAPPINGS_MAX_SCROLL_PAGES);
   return parsed !== null && parsed >= PAGE_MAPPINGS_MIN_SCROLL_PAGES ? parsed : null;
+};
+
+const nonNegativeInteger = (value: unknown): number | null => {
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : null;
+};
+
+const parseScanInventoryPage = (value: unknown): PageMappingsScanInventoryPage | null => {
+  if (!value || typeof value !== 'object') return null;
+  const page = value as Record<string, unknown>;
+  const pageKey = text(page.pageKey);
+  const elementCount = nonNegativeInteger(page.elementCount);
+  if (!pageKey || elementCount === null) return null;
+  return {
+    pageKey,
+    pageUrl: text(page.pageUrl),
+    elementCount,
+    lastScannedAt: text(page.lastScannedAt),
+  };
+};
+
+const parseScanInventoryJob = (value: unknown): PageMappingsScanInventoryJob | null => {
+  if (!value || typeof value !== 'object') return null;
+  const job = value as Record<string, unknown>;
+  const botJobId = positiveInteger(job.botJobId);
+  const botJobName = text(job.botJobName);
+  const elementCount = nonNegativeInteger(job.elementCount);
+  const pages = Array.isArray(job.pages)
+    ? job.pages.map(parseScanInventoryPage).filter((page): page is PageMappingsScanInventoryPage => page !== null)
+    : [];
+  if (!botJobId || !botJobName || elementCount === null
+    || nonNegativeInteger(job.pageCount) !== pages.length
+    || pages.reduce((sum, page) => sum + page.elementCount, 0) !== elementCount) return null;
+  return { botJobId, botJobName, elementCount, pageCount: pages.length, pages };
+};
+
+const parseScanInventory = (value: unknown): PageMappingsScanInventory | null => {
+  if (!value || typeof value !== 'object') return null;
+  const inventory = value as Record<string, unknown>;
+  if (inventory.ready !== true) return null;
+  const homeBankingId = positiveInteger(inventory.homeBankingId);
+  const organizationName = text(inventory.organizationName);
+  const totalElements = nonNegativeInteger(inventory.totalElements);
+  const jobs = Array.isArray(inventory.jobs)
+    ? inventory.jobs.map(parseScanInventoryJob).filter((job): job is PageMappingsScanInventoryJob => job !== null)
+    : [];
+  const totalPages = jobs.reduce((sum, job) => sum + job.pages.length, 0);
+  if (!homeBankingId || !organizationName || totalElements === null
+    || nonNegativeInteger(inventory.totalBotJobs) !== jobs.length
+    || nonNegativeInteger(inventory.totalPages) !== totalPages
+    || jobs.reduce((sum, job) => sum + job.elementCount, 0) !== totalElements) return null;
+  return { homeBankingId, organizationName, totalElements, totalBotJobs: jobs.length, totalPages, jobs };
 };
 
 const scrollPagesPreferenceKey = (owner: PageMappingsBindingIdentity): string => (
@@ -435,6 +492,8 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
   const [status, setStatus] = useState('Connecting to Page Mappings…');
   const [loadedCapture, setLoadedCapture] = useState<LoadedCapture | null>(null);
   const [elementSearch, setElementSearch] = useState('');
+  const [scanInventory, setScanInventory] = useState<PageMappingsScanInventory | null>(null);
+  const [scanInventoryOpen, setScanInventoryOpen] = useState(false);
   const [captureLoading, setCaptureLoading] = useState(false);
   const [selectedElementIndex, setSelectedElementIndex] = useState<number | null>(null);
   const [captureImageSize, setCaptureImageSize] = useState({ width: 0, height: 0 });
@@ -460,6 +519,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
   const [invalidated, setInvalidated] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const helpButtonRef = useRef<HTMLButtonElement>(null);
+  const scanInventoryButtonRef = useRef<HTMLButtonElement>(null);
   const invalidatedRef = useRef(false);
   const bindingEstablishedRef = useRef(false);
   const memoryOwnerEpochRef = useRef('');
@@ -581,6 +641,8 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
     setSelectedScanId(null);
     setLoadedCapture(null);
     setElementSearch('');
+    setScanInventory(null);
+    setScanInventoryOpen(false);
     setCaptureLoading(false);
     setSelectedElementIndex(null);
     setCaptureImageSize({ width: 0, height: 0 });
@@ -1269,6 +1331,10 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
           invalidatedRef.current = false;
           setInvalidated(false);
           const nextStorageReady = body.storageReady === true;
+          const nextScanInventory = parseScanInventory(body.scanInventory);
+          setScanInventory(nextScanInventory?.homeBankingId === nextBinding.homeBankingId
+            ? nextScanInventory
+            : null);
           setStorageReady(nextStorageReady);
           setRetention(nextRetention);
           setRetentionRevision(`${nextBinding.bindingEpoch}:${responseRequestId}`);
@@ -1675,9 +1741,9 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
     updateUrlHint,
   ]);
 
-  const captureElements = loadedCapture?.scanId === selectedScanId
+  const captureElements = useMemo(() => loadedCapture?.scanId === selectedScanId
     ? loadedCapture.elements
-    : [];
+    : [], [loadedCapture, selectedScanId]);
   const selected = snapshots.find(item => item.scanId === selectedScanId) || null;
 
   const useExisting = useCallback((scanId: string) => {
@@ -1706,10 +1772,15 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
     };
   }, [captureImageSize, loadedCapture]);
 
-  const filteredElements = useMemo(() => captureElements
+  const matchingElements = useMemo(() => captureElements
     .map((element, index) => ({ element, index }))
-    .filter(({ element }) => JSON.stringify(element).toLowerCase().includes(elementSearch.toLowerCase()))
-    .slice(0, 200), [captureElements, elementSearch]);
+    .filter(({ element }) => JSON.stringify(element).toLowerCase().includes(elementSearch.trim().toLowerCase())),
+  [captureElements, elementSearch]);
+  const filteredElements = useMemo(() => matchingElements.slice(0, 200), [matchingElements]);
+  const matchingElementIndices = useMemo(
+    () => new Set(matchingElements.map(({ index }) => index)),
+    [matchingElements],
+  );
 
   const memoryItemFor = useCallback((element: CaptureElement, index: number): MappingMemoryItem | null => {
     if (!loadedCapture || loadedCapture.scanId !== selectedScanId) return null;
@@ -1919,6 +1990,14 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
           </div>
           <div className={styles.actions} data-floating-drag-ignore>
             <button type="button" className={styles.actionButton} onClick={() => bootstrap(binding?.bindingEpoch)} disabled={!connected || invalidated || pageOperationBusy}>Reload</button>
+            <button
+              ref={scanInventoryButtonRef}
+              type="button"
+              className={styles.actionButton}
+              disabled={!scanInventory || invalidated}
+              title="View the organization, Bot Job, and scanned-page database tree"
+              onClick={() => setScanInventoryOpen(true)}
+            >Scan Flow{scanInventory ? ` - ${scanInventory.totalElements}` : ''}</button>
             <PagesOpenButton webSocket={webSocket} connected={connected} messages={messages} sessionId={sessionId} />
             <button type="button" className={`${styles.actionButton} ${styles.close}`} onClick={closePage} disabled={ocrApplyBusy || retentionBusy}>Close</button>
           </div>
@@ -2046,6 +2125,7 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
                       const elementIndex = Number.isInteger(rectangle.elementIndex)
                         ? rectangle.elementIndex
                         : rectangleIndex;
+                      if (elementSearch.trim() && !matchingElementIndices.has(elementIndex)) return null;
                       return <button
                         type="button"
                         key={`overlay-${rectangle.elementHash || rectangle.scannedElementId || rectangleIndex}`}
@@ -2061,7 +2141,10 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
                 <div className={styles.searchField}>
                   <div className={styles.searchHeader}>
                     <label htmlFor="page-mappings-element-search">Search captured elements</label>
-                    <span className={styles.elementTotal}>Total Web Elements: {selected.elementCount}</span>
+                    <span className={styles.elementTotal}>
+                      {elementSearch.trim() && `Showing ${matchingElements.length} · `}
+                      Total Web Elements: {selected.elementCount}
+                    </span>
                   </div>
                   <div className={styles.searchControl}>
                     <input
@@ -2154,6 +2237,15 @@ const PageMappingsPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) =
           setHelpOpen(false);
           window.requestAnimationFrame(() => helpButtonRef.current?.focus());
         }} />}
+        {scanInventoryOpen && scanInventory && (
+          <PageMappingsScanInventoryModal
+            inventory={scanInventory}
+            onClose={() => {
+              setScanInventoryOpen(false);
+              window.requestAnimationFrame(() => scanInventoryButtonRef.current?.focus());
+            }}
+          />
+        )}
       </main>
     </DetachedPageShell>
   );
