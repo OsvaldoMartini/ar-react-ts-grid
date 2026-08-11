@@ -49,9 +49,11 @@ import ExcelDataModeToggle, { type ExcelDataMode } from '../excel-data/ExcelData
 import type { SmokeTestIntegrationController } from '../smoke-test/integration/useSmokeTestIntegrationRun';
 import type {
   SmokeTestExecutionMode,
+  SmokeTestIntegrationRuntimeMode,
   SmokeTestIntegrationStepResult,
 } from '../smoke-test/integration/smokeTestIntegration.contract';
 import SmokeTestWebPageRefreshButton from '../smoke-test/integration/SmokeTestWebPageRefreshButton';
+import SmokeTestRuntimeModeToggle from '../smoke-test/integration/SmokeTestRuntimeModeToggle';
 
 export interface VariablesSmokeTestPanelProps {
   review: VariablesExecutionFlowReview;
@@ -65,6 +67,8 @@ export interface VariablesSmokeTestPanelProps {
   excelDataMode?: ExcelDataMode;
   onExcelDataModeChange?: (mode: ExcelDataMode) => void;
   executionMode?: SmokeTestExecutionMode;
+  integrationRuntimeMode?: SmokeTestIntegrationRuntimeMode;
+  onIntegrationRuntimeModeChange?: (mode: SmokeTestIntegrationRuntimeMode) => void;
   integration?: SmokeTestIntegrationController;
   onStatusChange?: (status: VariablesSmokeTestStatus) => void;
 }
@@ -173,6 +177,8 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   excelDataMode = 'REAL',
   onExcelDataModeChange,
   executionMode = 'SMOKE',
+  integrationRuntimeMode = 'JAVA_V1',
+  onIntegrationRuntimeModeChange,
   integration,
   onStatusChange,
 }) => {
@@ -279,6 +285,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
         const startedRun = await integration.start(
           nextPlan,
           excelDataMode,
+          integrationRuntimeMode,
           writeRuntimeValues,
         );
         runtimeValuesRef.current = new Map<number, VariablesSmokeTestRuntimeValue>(
@@ -642,6 +649,15 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
         <ExcelDataModeToggle mode={excelDataMode}
           disabled={!onExcelDataModeChange || executionActive}
           onChange={mode => onExcelDataModeChange?.(mode)} />
+        {executionMode === 'INTEGRATION' && (
+          <SmokeTestRuntimeModeToggle
+            mode={integrationRuntimeMode}
+            disabled={executionActive
+              || integration?.phase !== 'IDLE'
+              || !onIntegrationRuntimeModeChange}
+            onChange={mode => onIntegrationRuntimeModeChange?.(mode)}
+          />
+        )}
         <label className={styles.speedSelector}>
           <span>Speed</span>
           <select
@@ -739,7 +755,9 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
       <footer className={styles.safety}>
         <ShieldCheck size={15} aria-hidden="true" />
         <span>{executionMode === 'INTEGRATION'
-          ? 'Each active instruction uses a correlated WebSocket/Playwright step. Java executeJob() is not used.'
+          ? integrationRuntimeMode === 'TYPESCRIPT_PLAYWRIGHT_V2'
+            ? 'Each physical step uses this run\'s isolated Node/Playwright session. Java V1 fallback is disabled.'
+            : 'Each active instruction uses the established Java Playwright path. Java executeJob() is not used.'
           : 'No Playwright, Web page, or production execution is called.'}</span>
       </footer>
 

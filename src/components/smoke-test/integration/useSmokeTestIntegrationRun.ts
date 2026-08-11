@@ -16,11 +16,13 @@ import {
   parseSmokeTestIntegrationTerminalResponse,
   SMOKE_TEST_INTEGRATION_CONTRACT_VERSION,
   type SmokeTestIntegrationRun,
+  type SmokeTestIntegrationRuntimeMode,
   type SmokeTestIntegrationStepRequest,
   type SmokeTestIntegrationStepResult,
 } from './smokeTestIntegration.contract';
 
 const START_TIMEOUT_MS = 30_000;
+const V2_START_TIMEOUT_MS = 75_000;
 const STEP_TIMEOUT_MS = 90_000;
 const TERMINAL_TIMEOUT_MS = 15_000;
 
@@ -51,6 +53,7 @@ export type SmokeTestIntegrationController = {
   start: (
     plan: VariablesSmokeTestPlan,
     excelMode: ExcelDataMode,
+    runtimeMode: SmokeTestIntegrationRuntimeMode,
     runtimeWrites: boolean,
   ) => Promise<SmokeTestIntegrationRun>;
   executeStep: (
@@ -234,6 +237,7 @@ export const useSmokeTestIntegrationRun = ({
   const start = useCallback(async (
     plan: VariablesSmokeTestPlan,
     excelMode: ExcelDataMode,
+    runtimeMode: SmokeTestIntegrationRuntimeMode,
     runtimeWrites: boolean,
   ) => {
     if (!snapshot) throw new Error('Smoke Test Integration has no authoritative workspace snapshot.');
@@ -259,13 +263,14 @@ export const useSmokeTestIntegrationRun = ({
         snapshot.bindingEpoch,
         snapshot.workspaceEpoch,
         excelMode,
+        runtimeMode,
         runtimeWrites,
       );
       const run = await request(
         'start',
         'smokeTest.integration.startResponse',
         body,
-        START_TIMEOUT_MS,
+        runtimeMode === 'TYPESCRIPT_PLAYWRIGHT_V2' ? V2_START_TIMEOUT_MS : START_TIMEOUT_MS,
         payload => parseSmokeTestIntegrationStartResponse(payload, requestId),
       );
       if (run.bindingEpoch !== snapshot.bindingEpoch
@@ -274,6 +279,7 @@ export const useSmokeTestIntegrationRun = ({
           || run.botJobId !== plan.botJobId
           || run.graphRevision !== plan.graphRevision
           || run.datasetMode !== excelMode
+          || run.runtimeMode !== runtimeMode
           || run.durableRuntimeWrites !== runtimeWrites) {
         throw new Error('Integration start response does not match the frozen Smoke Test request.');
       }

@@ -7,7 +7,10 @@ import SmokeTestSimulationWorkspace from './smoke-test/SmokeTestSimulationWorksp
 import type { ExcelDataMode } from './excel-data/ExcelDataModeToggle';
 import SmokeTestExecutionModeToggle from './smoke-test/integration/SmokeTestExecutionModeToggle';
 import { useSmokeTestIntegrationRun } from './smoke-test/integration/useSmokeTestIntegrationRun';
-import type { SmokeTestExecutionMode } from './smoke-test/integration/smokeTestIntegration.contract';
+import type {
+  SmokeTestExecutionMode,
+  SmokeTestIntegrationRuntimeMode,
+} from './smoke-test/integration/smokeTestIntegration.contract';
 import { useWebSocket } from './useWebSocket';
 import { buildVariablesExecutionFlowReview } from './variables/domain/variablesExecutionFlowReview';
 import type {
@@ -104,6 +107,8 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     useState<CommandRemainingByInstructionId>({});
   const [excelDataMode, setExcelDataMode] = useState<ExcelDataMode>('REAL');
   const [executionMode, setExecutionMode] = useState<SmokeTestExecutionMode>('SMOKE');
+  const [integrationRuntimeMode, setIntegrationRuntimeMode] =
+    useState<SmokeTestIntegrationRuntimeMode>('JAVA_V1');
   const [smokeRunStatus, setSmokeRunStatus] = useState<VariablesSmokeTestStatus>('IDLE');
   const [status, setStatus] = useState<Status>({
     level: 'warn',
@@ -587,6 +592,8 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
                 excelDataMode={excelDataMode}
                 onExcelDataModeChange={updateExcelDataMode}
                 executionMode={executionMode}
+                integrationRuntimeMode={integrationRuntimeMode}
+                onIntegrationRuntimeModeChange={setIntegrationRuntimeMode}
                 integration={integration}
                 onStatusChange={setSmokeRunStatus}
               />

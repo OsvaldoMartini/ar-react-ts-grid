@@ -5,6 +5,7 @@ import type { VariableWorkspaceSnapshot } from '../../variablesWorkspace.contrac
 export const SMOKE_TEST_INTEGRATION_CONTRACT_VERSION = 1 as const;
 
 export type SmokeTestExecutionMode = 'SMOKE' | 'INTEGRATION';
+export type SmokeTestIntegrationRuntimeMode = 'JAVA_V1' | 'TYPESCRIPT_PLAYWRIGHT_V2';
 
 export type SmokeTestIntegrationStartRequest = {
   contractVersion: typeof SMOKE_TEST_INTEGRATION_CONTRACT_VERSION;
@@ -19,6 +20,7 @@ export type SmokeTestIntegrationStartRequest = {
     blockIds: readonly number[];
   };
   excelMode: ExcelDataMode;
+  runtimeMode: SmokeTestIntegrationRuntimeMode;
   pagePolicy: 'PRESERVE_ACTIVE';
   durableRuntimeWrites: boolean;
 };
@@ -33,6 +35,7 @@ export type SmokeTestIntegrationRun = {
   graphRevision: string;
   planRevision: string;
   datasetMode: ExcelDataMode;
+  runtimeMode: SmokeTestIntegrationRuntimeMode;
   datasetEpoch: number;
   datasetRevision: number;
   datasetContentRevision: string;
@@ -154,6 +157,7 @@ export const buildSmokeTestIntegrationStartRequest = (
   bindingEpoch: string,
   workspaceEpoch: number,
   excelMode: ExcelDataMode,
+  runtimeMode: SmokeTestIntegrationRuntimeMode,
   runtimeWrites: boolean,
 ): SmokeTestIntegrationStartRequest => {
   const activeBlockIds = plan.blocks.flatMap(block => (
@@ -175,6 +179,7 @@ export const buildSmokeTestIntegrationStartRequest = (
       blockIds: activeBlockIds,
     },
     excelMode,
+    runtimeMode,
     pagePolicy: 'PRESERVE_ACTIVE',
     durableRuntimeWrites: runtimeWrites,
   };
@@ -228,6 +233,10 @@ export const parseSmokeTestIntegrationStartResponse = (
   const datasetMode = stringValue(body.datasetMode, 'Integration Excel mode');
   if (datasetMode !== 'REAL' && datasetMode !== 'SYNTHETIC') {
     throw new Error('Integration start returned an invalid Excel mode.');
+  }
+  const runtimeMode = stringValue(body.runtimeMode, 'Integration runtime mode');
+  if (runtimeMode !== 'JAVA_V1' && runtimeMode !== 'TYPESCRIPT_PLAYWRIGHT_V2') {
+    throw new Error('Integration start returned an invalid runtime mode.');
   }
   const runtimeSnapshot = objectValue(
     body.runtimeSnapshot,
@@ -294,6 +303,7 @@ export const parseSmokeTestIntegrationStartResponse = (
     graphRevision: revisionValue(body.graphRevision, 'Integration graph revision'),
     planRevision: revisionValue(body.planRevision, 'Integration plan revision'),
     datasetMode,
+    runtimeMode,
     datasetEpoch: integerValue(body.datasetEpoch, 'Integration dataset epoch', 1),
     datasetRevision: integerValue(body.datasetRevision, 'Integration dataset revision'),
     datasetContentRevision: revisionValue(

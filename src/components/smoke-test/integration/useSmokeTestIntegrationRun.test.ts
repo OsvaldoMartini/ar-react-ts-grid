@@ -54,6 +54,7 @@ const startResponse = (requestId: unknown) => ({
   graphRevision: REVISION,
   planRevision: 'b'.repeat(64),
   datasetMode: 'REAL',
+  runtimeMode: 'JAVA_V1',
   datasetEpoch: 3,
   datasetRevision: 0,
   datasetContentRevision: 'c'.repeat(64),
@@ -90,7 +91,7 @@ test('releases the pending request immediately when WebSocket.send throws', asyn
   const { result, rerender } = renderIntegrationHook(send);
 
   await act(async () => {
-    await expect(result.current.start(plan, 'REAL', false))
+    await expect(result.current.start(plan, 'REAL', 'JAVA_V1', false))
       .rejects.toThrow('socket closed during send');
   });
   expect(result.current.phase).toBe('IDLE');
@@ -98,7 +99,7 @@ test('releases the pending request immediately when WebSocket.send throws', asyn
 
   let retry!: ReturnType<typeof result.current.start>;
   act(() => {
-    retry = result.current.start(plan, 'REAL', false);
+    retry = result.current.start(plan, 'REAL', 'JAVA_V1', false);
   });
   const retryRequest = requestBody(send, 1);
   act(() => {
@@ -124,7 +125,7 @@ test('keeps the active run when Finish is refused and permits Stop cleanup retry
 
   let start!: ReturnType<typeof result.current.start>;
   act(() => {
-    start = result.current.start(plan, 'REAL', false);
+    start = result.current.start(plan, 'REAL', 'JAVA_V1', false);
   });
   const startRequest = requestBody(send, 0);
   messages.push(responseMessage(
@@ -199,7 +200,7 @@ test('keeps Stop single-flight when it cancels an in-flight step', async () => {
 
   let start!: ReturnType<typeof result.current.start>;
   act(() => {
-    start = result.current.start(plan, 'REAL', false);
+    start = result.current.start(plan, 'REAL', 'JAVA_V1', false);
   });
   const startRequest = requestBody(send, 0);
   messages.push(responseMessage(
