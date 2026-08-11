@@ -2,9 +2,14 @@
 .checkbox { width: 15px; height: 15px; accent-color: #197c50; cursor: pointer; }
 .checkbox:disabled { cursor: not-allowed; }
 .ellipsis { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.draft { width: 100%; box-sizing: border-box; border: 1px solid #aebfcd; border-radius: 6px; padding: 6px 7px; color: #173a53; background: #fff; font: inherit; }
+.draftControl { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; }
+.draft { flex: 1 1 auto; min-width: 0; width: 100%; box-sizing: border-box; border: 1px solid #aebfcd; border-radius: 6px; padding: 6px 7px; color: #173a53; background: #fff; font: inherit; }
 .draft:focus { outline: 2px solid #90d2e7; outline-offset: 1px; border-color: #217fa2; }
 .draft:disabled { background: #edf1f4; color: #7d8992; }
+.rollback { flex: 0 0 28px; width: 28px; height: 28px; display: inline-grid; place-items: center; padding: 0; border: 1px solid #f0b7a8; border-radius: 7px; background: #fff4ef; color: #a43b24; cursor: pointer; }
+.rollback:hover:not(:disabled) { border-color: #dc765d; background: #ffe5dc; color: #7e2715; }
+.rollback:focus-visible { outline: 2px solid #dc765d; outline-offset: 2px; }
+.rollback:disabled { cursor: not-allowed; opacity: .55; }
 .quality { display: inline-flex; border-radius: 10px; padding: 3px 7px; background: #e9eef3; color: #465d70; font-size: .68rem; font-weight: 900; white-space: nowrap; }
 .quality[data-quality='EXACT_CONTAIN'] { background: #d9f3e3; color: #17643b; }
 .quality[data-quality='OVERLAP'] { background: #e1effb; color: #175c87; }

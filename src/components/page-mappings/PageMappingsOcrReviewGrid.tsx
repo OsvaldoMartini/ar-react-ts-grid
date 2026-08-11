@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { RotateCcw } from 'lucide-react';
 import GridTempA, { type GridTempAColumn } from '../GridTemp_A';
 import type { PageMappingsOcrReviewRow } from './PageMappingsOcrReview.types';
 import {
@@ -15,6 +16,7 @@ type Props = {
   disabled?: boolean;
   onToggle: (row: PageMappingsOcrReviewRow) => void;
   onDraft: (row: PageMappingsOcrReviewRow, value: string) => void;
+  onRollback: (row: PageMappingsOcrReviewRow) => void;
 };
 
 const qualityLabel = (value: string): string => value.replaceAll('_', ' ');
@@ -27,6 +29,7 @@ const PageMappingsOcrReviewGrid: React.FC<Props> = ({
   disabled = false,
   onToggle,
   onDraft,
+  onRollback,
 }) => {
   const columns = useMemo<readonly GridTempAColumn<PageMappingsOcrReviewRow>[]>(() => [
     {
@@ -105,23 +108,36 @@ const PageMappingsOcrReviewGrid: React.FC<Props> = ({
       width: 220,
       renderCell: row => {
         const key = pageMappingsOcrRowKey(row);
-        return <input
-          type="text"
-          className={styles.draft}
-          value={drafts[key] ?? ''}
-          maxLength={255}
-          disabled={disabled || !pageMappingsOcrRowPersistable(row)}
-          aria-label={`Proposed name for ${row.definedName || `element ${row.elementIndex + 1}`}`}
-          onClick={event => event.stopPropagation()}
-          onChange={event => onDraft(row, event.target.value)}
-        />;
+        return <div className={styles.draftControl}>
+          <input
+            type="text"
+            className={styles.draft}
+            value={drafts[key] ?? ''}
+            maxLength={255}
+            disabled={disabled || !pageMappingsOcrRowPersistable(row)}
+            aria-label={`Proposed name for ${row.definedName || `element ${row.elementIndex + 1}`}`}
+            onClick={event => event.stopPropagation()}
+            onChange={event => onDraft(row, event.target.value)}
+          />
+          {Boolean(row.clientNamed?.trim()) && <button
+            type="button"
+            className={styles.rollback}
+            disabled={disabled || !pageMappingsOcrRowPersistable(row)}
+            aria-label={`Restore canonical name ${row.definedName || `for element ${row.elementIndex + 1}`}`}
+            title={`Restore canonical name: ${row.definedName || 'Unnamed'}`}
+            onClick={event => {
+              event.stopPropagation();
+              onRollback(row);
+            }}
+          ><RotateCcw size={14} aria-hidden="true" /></button>}
+        </div>;
       },
       sortValue: row => drafts[pageMappingsOcrRowKey(row)] || '',
       searchValue: row => drafts[pageMappingsOcrRowKey(row)] || '',
       title: row => drafts[pageMappingsOcrRowKey(row)] || '',
       headerTitle: 'Click to sort',
     },
-  ], [disabled, drafts, onDraft, onToggle, selected]);
+  ], [disabled, drafts, onDraft, onRollback, onToggle, selected]);
 
   return <GridTempA
     title="OCR comparison"

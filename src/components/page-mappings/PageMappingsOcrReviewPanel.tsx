@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PageMappingsOcrReviewGrid from './PageMappingsOcrReviewGrid';
 import type {
   PageMappingsOcrAliasChange,
@@ -69,15 +69,39 @@ const PageMappingsOcrReviewPanel: React.FC<Props> = ({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
+  const initializedReviewRef = useRef<string | null>(null);
   const reviewableRows = useMemo(
     () => result?.rows.slice(0, MAX_REVIEWABLE_ROWS) || [],
     [result],
   );
 
   useEffect(() => {
-    setSelected(defaultSelection(reviewableRows));
-    setDrafts(defaultDrafts(reviewableRows));
-  }, [reviewableRows]);
+    const reviewIdentity = result
+      ? `${result.requestId}:${result.scanId}:${result.manifestSha256}`
+      : null;
+    if (!reviewIdentity) {
+      if (initializedReviewRef.current === null) return;
+      initializedReviewRef.current = null;
+      setSelected(new Set());
+      setDrafts({});
+      return;
+    }
+    if (initializedReviewRef.current !== reviewIdentity) {
+      initializedReviewRef.current = reviewIdentity;
+      setSelected(defaultSelection(reviewableRows));
+      setDrafts(defaultDrafts(reviewableRows));
+      return;
+    }
+    setSelected(current => {
+      const next = new Set(current);
+      for (const row of reviewableRows) {
+        const key = pageMappingsOcrRowKey(row);
+        if (!changedFromCurrent(row, drafts[key] || '')) next.delete(key);
+      }
+      if (next.size === current.size && [...next].every(key => current.has(key))) return current;
+      return next;
+    });
+  }, [drafts, result, reviewableRows]);
 
   useEffect(() => {
     setImageSize({ width: 0, height: 0 });
@@ -99,7 +123,35 @@ const PageMappingsOcrReviewPanel: React.FC<Props> = ({
   const updateDraft = useCallback((row: PageMappingsOcrReviewRow, value: string) => {
     const key = pageMappingsOcrRowKey(row);
     setDrafts(current => ({ ...current, [key]: value }));
+    setSelected(current => {
+      const next = new Set(current);
+      if (pageMappingsOcrRowPersistable(row) && changedFromCurrent(row, value)) {
+        if (next.size < MAX_APPLY_CHANGES || next.has(key)) next.add(key);
+      } else {
+        next.delete(key);
+      }
+      return next;
+    });
   }, []);
+
+  const rollbackName = useCallback((row: PageMappingsOcrReviewRow) => {
+    if (!pageMappingsOcrRowPersistable(row) || !row.clientNamed?.trim()) return;
+    const key = pageMappingsOcrRowKey(row);
+    setDrafts(current => ({ ...current, [key]: '' }));
+    setSelected(current => {
+      const next = new Set(current);
+      next.delete(key);
+      return next;
+    });
+    onApply([{
+      scannedElementId: row.scannedElementId,
+      elementHash: row.elementHash,
+      expectedLastScannedAt: row.expectedLastScannedAt,
+      expectedScanCount: row.expectedScanCount,
+      expectedClientNamed: row.clientNamed,
+      clientNamed: null,
+    }]);
+  }, [onApply]);
 
   const changes = useMemo<PageMappingsOcrAliasChange[]>(() => {
     if (!result) return [];
@@ -136,6 +188,7 @@ const PageMappingsOcrReviewPanel: React.FC<Props> = ({
   }, [drafts, result, reviewableRows]);
 
   const operationBusy = busy || applying;
+  const reviewActionsDisabled = operationBusy || !canRun;
   const overlayWords = result?.words.slice(0, MAX_VISIBLE_WORDS) || [];
 
   return <section className={styles.panel} aria-label="OCR Review">
@@ -193,20 +246,21 @@ const PageMappingsOcrReviewPanel: React.FC<Props> = ({
         totalCount={result.rows.length}
         selected={selected}
         drafts={drafts}
-        disabled={operationBusy}
+        disabled={reviewActionsDisabled}
         onToggle={toggle}
         onDraft={updateDraft}
+        onRollback={rollbackName}
       />
 
       <footer className={styles.footer}>
-        <button type="button" onClick={selectAll} disabled={operationBusy || !reviewableRows.length}>
+        <button type="button" onClick={selectAll} disabled={reviewActionsDisabled || !reviewableRows.length}>
           {selected.size ? 'Clear selected' : 'Select changed names'}
         </button>
         <span>{selected.size} selected · {changes.length} changes</span>
         <button
           type="button"
           className={styles.apply}
-          disabled={operationBusy || !changes.length}
+          disabled={reviewActionsDisabled || !changes.length}
           onClick={() => onApply(changes)}
         >{applying ? 'Saving...' : `Apply names (${changes.length})`}</button>
       </footer>
