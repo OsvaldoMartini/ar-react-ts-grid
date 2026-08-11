@@ -8,7 +8,9 @@ import {
   type VariableWorkspaceSnapshot,
 } from '../../variablesWorkspace.contract';
 import {
+  buildSmokeTestIntegrationRefreshRequest,
   buildSmokeTestIntegrationStartRequest,
+  parseSmokeTestIntegrationRefreshResponse,
   parseSmokeTestIntegrationStartResponse,
   parseSmokeTestIntegrationStepResponse,
   parseSmokeTestIntegrationTerminalResponse,
@@ -24,6 +26,7 @@ const TERMINAL_TIMEOUT_MS = 15_000;
 
 type Phase =
   | 'IDLE'
+  | 'REFRESHING'
   | 'STARTING'
   | 'READY'
   | 'EXECUTING'
@@ -32,7 +35,7 @@ type Phase =
   | 'CLEANUP_REQUIRED';
 
 type PendingRequest = {
-  operation: 'start' | 'step' | 'stop' | 'finish';
+  operation: 'start' | 'refresh' | 'step' | 'stop' | 'finish';
   requestId: string;
   responseOperation: string;
   resolve: (body: unknown) => void;
@@ -44,6 +47,7 @@ export type SmokeTestIntegrationController = {
   phase: Phase;
   activeRun: SmokeTestIntegrationRun | null;
   error: string | null;
+  refreshPage: () => Promise<string>;
   start: (
     plan: VariablesSmokeTestPlan,
     excelMode: ExcelDataMode,
@@ -275,6 +279,37 @@ export const useSmokeTestIntegrationRun = ({
     }
   }, [clearPending, nextRequestId, replaceRun, request, snapshot]);
 
+  const refreshPage = useCallback(async () => {
+    if (!snapshot) {
+      throw new Error('Smoke Test has no authoritative workspace snapshot.');
+    }
+    if (activeRunRef.current !== null) {
+      throw new Error('Stop or finish the Integration run before refreshing the web page.');
+    }
+    const requestId = nextRequestId('refresh');
+    const body = buildSmokeTestIntegrationRefreshRequest(requestId, snapshot);
+    setError(null);
+    setPhase('REFRESHING');
+    try {
+      const message = await request(
+        'refresh',
+        'smokeTest.integration.refreshResponse',
+        body,
+        START_TIMEOUT_MS,
+        payload => parseSmokeTestIntegrationRefreshResponse(payload, body),
+      );
+      setPhase('IDLE');
+      return message;
+    } catch (failure) {
+      const nextError = failure instanceof Error
+        ? failure
+        : new Error('The Playwright web page could not be refreshed.');
+      setError(nextError.message);
+      setPhase('IDLE');
+      throw nextError;
+    }
+  }, [nextRequestId, request, snapshot]);
+
   const executeStep = useCallback(async (
     instructionId: number,
     excelRowIndex = 0,
@@ -357,5 +392,5 @@ export const useSmokeTestIntegrationRun = ({
   const stop = useCallback((reason?: string) => terminal('stop', reason), [terminal]);
   const finish = useCallback(() => terminal('finish'), [terminal]);
 
-  return { phase, activeRun, error, start, executeStep, stop, finish };
+  return { phase, activeRun, error, refreshPage, start, executeStep, stop, finish };
 };

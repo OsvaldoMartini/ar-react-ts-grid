@@ -51,6 +51,7 @@ import type {
   SmokeTestExecutionMode,
   SmokeTestIntegrationStepResult,
 } from '../smoke-test/integration/smokeTestIntegration.contract';
+import SmokeTestWebPageRefreshButton from '../smoke-test/integration/SmokeTestWebPageRefreshButton';
 
 export interface VariablesSmokeTestPanelProps {
   review: VariablesExecutionFlowReview;
@@ -670,6 +671,15 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
           <b>{writeRuntimeValues ? 'ON' : 'OFF'}</b>
           <small>Variables</small>
         </label>
+        <SmokeTestWebPageRefreshButton
+          refreshing={integration?.phase === 'REFRESHING'}
+          disabled={executionMode !== 'INTEGRATION'
+            || !runtimeWriteAvailable
+            || !integration
+            || integration.phase !== 'IDLE'
+            || executionActive}
+          onRefresh={() => { void integration?.refreshPage().catch(() => undefined); }}
+        />
         <button
           type="button"
           className={styles.stopButton}

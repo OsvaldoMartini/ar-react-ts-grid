@@ -1,5 +1,6 @@
 import type { ExcelDataMode } from '../../excel-data/ExcelDataModeToggle';
 import type { VariablesSmokeTestPlan } from '../../variables/domain/variablesSmokeTestTypes';
+import type { VariableWorkspaceSnapshot } from '../../variablesWorkspace.contract';
 
 export const SMOKE_TEST_INTEGRATION_CONTRACT_VERSION = 1 as const;
 
@@ -62,6 +63,16 @@ export type SmokeTestIntegrationStepRequest = {
   sequence: number;
   instructionId: number;
   excelRowIndex: number;
+};
+
+export type SmokeTestIntegrationRefreshRequest = {
+  contractVersion: typeof SMOKE_TEST_INTEGRATION_CONTRACT_VERSION;
+  requestId: string;
+  bindingEpoch: string;
+  workspaceEpoch: number;
+  homeBankingId: number;
+  botJobId: number;
+  graphRevision: string;
 };
 
 export type SmokeTestIntegrationRuntimeWrite = {
@@ -160,6 +171,42 @@ export const buildSmokeTestIntegrationStartRequest = (
   pagePolicy: 'PRESERVE_ACTIVE',
   durableRuntimeWrites: runtimeWrites,
 });
+
+export const buildSmokeTestIntegrationRefreshRequest = (
+  requestId: string,
+  snapshot: VariableWorkspaceSnapshot,
+): SmokeTestIntegrationRefreshRequest => ({
+  contractVersion: SMOKE_TEST_INTEGRATION_CONTRACT_VERSION,
+  requestId,
+  bindingEpoch: snapshot.bindingEpoch,
+  workspaceEpoch: snapshot.workspaceEpoch,
+  homeBankingId: snapshot.botJob.homeBankingId,
+  botJobId: snapshot.botJob.id,
+  graphRevision: snapshot.graphRevision,
+});
+
+export const parseSmokeTestIntegrationRefreshResponse = (
+  payload: unknown,
+  expected: SmokeTestIntegrationRefreshRequest,
+): string => {
+  const body = contractBody(payload, 'Playwright page refresh');
+  if (stringValue(body.requestId, 'Playwright refresh request ID') !== expected.requestId
+      || stringValue(body.bindingEpoch, 'Playwright refresh binding epoch') !== expected.bindingEpoch
+      || integerValue(body.workspaceEpoch, 'Playwright refresh workspace epoch', 1)
+        !== expected.workspaceEpoch
+      || integerValue(body.homeBankingId, 'Playwright refresh organization ID', 1)
+        !== expected.homeBankingId
+      || integerValue(body.botJobId, 'Playwright refresh Bot Job ID', 1)
+        !== expected.botJobId
+      || revisionValue(body.graphRevision, 'Playwright refresh graph revision')
+        !== expected.graphRevision.toLocaleLowerCase()) {
+    throw new Error('Playwright page refresh response does not match this Smoke Test workspace.');
+  }
+  if (body.status !== 'REFRESHED') {
+    throw new Error('Playwright page refresh returned an invalid state.');
+  }
+  return stringValue(body.message, 'Playwright refresh message');
+};
 
 export const parseSmokeTestIntegrationStartResponse = (
   payload: unknown,
