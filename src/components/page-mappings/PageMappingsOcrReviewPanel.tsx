@@ -28,7 +28,7 @@ type Props = {
 };
 
 const proposedName = (row: PageMappingsOcrReviewRow): string =>
-  row.ocrText.trim() || row.clientNamed || '';
+  row.clientNamed?.trim() || row.ocrText.trim() || '';
 
 const normalizedAlias = (value: string): string | null => {
   const trimmed = value.trim();
@@ -36,7 +36,7 @@ const normalizedAlias = (value: string): string | null => {
 };
 
 const changedFromCurrent = (row: PageMappingsOcrReviewRow, draft: string): boolean =>
-  normalizedAlias(draft) !== (row.clientNamed || null);
+  normalizedAlias(draft) !== normalizedAlias(row.clientNamed || '');
 
 const defaultSelection = (rows: readonly PageMappingsOcrReviewRow[]): Set<string> => {
   const selected = new Set<string>();
@@ -167,7 +167,8 @@ const PageMappingsOcrReviewPanel: React.FC<Props> = ({
       }))
       .filter((change, index) => {
         const row = reviewableRows.find(candidate => candidate.scannedElementId === change.scannedElementId);
-        return index < MAX_APPLY_CHANGES && Boolean(row && change.clientNamed !== (row.clientNamed || null));
+        return index < MAX_APPLY_CHANGES
+          && Boolean(row && change.clientNamed !== normalizedAlias(row.clientNamed || ''));
       });
   }, [drafts, result, reviewableRows, selected]);
 

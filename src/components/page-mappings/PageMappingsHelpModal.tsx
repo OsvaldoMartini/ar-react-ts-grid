@@ -1,10 +1,11 @@
-import React, { useEffect, useId, useRef } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { Map, ShieldCheck, X } from 'lucide-react';
 import styles from './PageMappingsHelpModal.module.scss';
 
 type Props = { onClose: () => void };
+type HelpTab = 'workspace' | 'client-instructions';
 
-const ruleGroups = [
+const workspaceRuleGroups = [
   {
     title: 'Ownership and history',
     rules: [
@@ -59,9 +60,40 @@ const ruleGroups = [
   },
 ] as const;
 
+const instructionRuleGroups = [
+  {
+    title: 'Canonical and client names',
+    rules: [
+      ['CANONICAL NAME', 'defined_name is the scanner-owned machine name. It remains the canonical identity even when a client alias is present, and Rescan may refresh scanner-owned evidence without replacing the client alias.'],
+      ['CLIENT NAMED', 'client_named is the client-authored display and migration reference. Once saved, Rescan and OCR Review must preserve it until the client explicitly changes or restores it.'],
+      ['PROPOSAL PRIORITY', 'When client_named exists, Proposed name starts with that saved alias and Use stays unselected. OCR text remains visible as evidence but Run again cannot silently prepare an overwrite.'],
+      ['CHANGE A NAME', 'Type a different Proposed name to select Use, review the selected and changes counts, then choose Apply names. Only that explicit Apply may replace a saved client alias.'],
+      ['RESTORE', 'The restore icon explicitly clears client_named and returns display to the canonical name. It is an intentional alias rollback, not a Rescan.'],
+    ],
+  },
+  {
+    title: 'From a capture to Bot Job instructions',
+    rules: [
+      ['ADD OR DRAG', 'Add or drag stages the exact owner, capture, scanned-element identity, revision, locators, canonical name, and saved client alias in Memory List. The immutable capture is not edited.'],
+      ['MEMORY LIST', 'Memory List is a staging area. Opening it, focusing it, reordering items, or changing the staged selection does not create or update a Bot Job instruction.'],
+      ['APPLY INSTRUCTIONS', 'The separate Memory List Apply action creates or updates Bot Job instructions. It carries the canonical name and client alias into their separate instruction fields and validates the authoritative element data.'],
+      ['MIGRATION REFERENCE', 'Use client_named as the stable human-readable reference when recognizing equivalent business fields across scanned pages. Exact page, element IDs, revisions, hashes, and locators remain the authoritative technical identity.'],
+      ['NO SILENT MATCHING', 'A shared alias does not automatically join unrelated elements or choose the first duplicate. Cross-page execution still requires the correct active Bot Job/page and one unique compatible target.'],
+      ['CONFLICT SAFETY', 'If the capture revision or current alias changed, Apply fails as one transaction and requires Reload. A stale window must never overwrite a newer client name.'],
+    ],
+  },
+] as const;
+
 const PageMappingsHelpModal: React.FC<Props> = ({ onClose }) => {
   const titleId = useId();
+  const dialogRef = useRef<HTMLElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const [activeTab, setActiveTab] = useState<HelpTab>('workspace');
+  const workspaceTabId = `${titleId}-workspace-tab`;
+  const instructionsTabId = `${titleId}-instructions-tab`;
+  const workspacePanelId = `${titleId}-workspace-panel`;
+  const instructionsPanelId = `${titleId}-instructions-panel`;
+  const activeGroups = activeTab === 'workspace' ? workspaceRuleGroups : instructionRuleGroups;
 
   useEffect(() => {
     closeRef.current?.focus();
@@ -78,14 +110,26 @@ const PageMappingsHelpModal: React.FC<Props> = ({ onClose }) => {
       onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}
     >
       <section
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         className={styles.dialog}
         onKeyDown={event => {
           if (event.key !== 'Tab') return;
-          event.preventDefault();
-          closeRef.current?.focus();
+          const focusable = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+          ) || []);
+          if (!focusable.length) return;
+          const first = focusable[0];
+          const last = focusable[focusable.length - 1];
+          if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+          }
         }}
       >
         <header>
@@ -101,25 +145,56 @@ const PageMappingsHelpModal: React.FC<Props> = ({ onClose }) => {
             onClick={onClose}
           ><X size={18} aria-hidden="true" /></button>
         </header>
+        <div className={styles.tabs} role="tablist" aria-label="Page Mappings help sections">
+          <button
+            id={workspaceTabId}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'workspace'}
+            aria-controls={workspacePanelId}
+            className={activeTab === 'workspace' ? styles.activeTab : undefined}
+            onClick={() => setActiveTab('workspace')}
+          >Workspace Rules</button>
+          <button
+            id={instructionsTabId}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'client-instructions'}
+            aria-controls={instructionsPanelId}
+            className={activeTab === 'client-instructions' ? styles.activeTab : undefined}
+            onClick={() => setActiveTab('client-instructions')}
+          >Client Names &amp; Instructions</button>
+        </div>
         <div className={styles.body}>
-          <p>Use these rules to understand what reads the live page, what creates history, and what can delete stored captures.</p>
-          {ruleGroups.map((group, groupIndex) => (
-            <section className={styles.group} key={group.title}>
-              <h3>{group.title}</h3>
-              <div className={styles.grid}>
-                {group.rules.map(([label, description], index) => (
-                  <article key={label} data-tone={(groupIndex + index) % 3}>
-                    <strong>{label}</strong>
-                    <span>{description}</span>
-                  </article>
-                ))}
-              </div>
-            </section>
-          ))}
-          <aside>
-            <ShieldCheck size={19} aria-hidden="true" />
-            <span><strong>Fail-closed ownership</strong> Page Mappings mutations are bound to the active Bot Job, workspace generation, and exact window transport. When authority is stale or an outcome is unknown, Reload is required.</span>
-          </aside>
+          <div
+            id={activeTab === 'workspace' ? workspacePanelId : instructionsPanelId}
+            role="tabpanel"
+            aria-labelledby={activeTab === 'workspace' ? workspaceTabId : instructionsTabId}
+            className={styles.tabPanel}
+          >
+            <p>{activeTab === 'workspace'
+              ? 'Use these rules to understand what reads the live page, what creates history, and what can delete stored captures.'
+              : 'Use these rules to preserve client-authored names as durable migration references and to understand when a staged element becomes a Bot Job instruction.'}</p>
+            {activeGroups.map((group, groupIndex) => (
+              <section className={styles.group} key={group.title}>
+                <h3>{group.title}</h3>
+                <div className={styles.grid}>
+                  {group.rules.map(([label, description], index) => (
+                    <article key={label} data-tone={(groupIndex + index) % 3}>
+                      <strong>{label}</strong>
+                      <span>{description}</span>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            ))}
+            <aside>
+              <ShieldCheck size={19} aria-hidden="true" />
+              {activeTab === 'workspace'
+                ? <span><strong>Fail-closed ownership</strong> Page Mappings mutations are bound to the active Bot Job, workspace generation, and exact window transport. When authority is stale or an outcome is unknown, Reload is required.</span>
+                : <span><strong>Names stay separate</strong> Canonical names, client aliases, and locator identity have different jobs. Preserving the alias never weakens exact owner, revision, page, and unique-target validation.</span>}
+            </aside>
+          </div>
         </div>
       </section>
     </div>

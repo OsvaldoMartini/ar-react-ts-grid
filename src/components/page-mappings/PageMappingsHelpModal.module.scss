@@ -7,8 +7,13 @@
 .icon { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 11px; background: #2e75b6; color: #fff; box-shadow: 0 5px 14px #0b53943d; }
 .dialog header button { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid #c5d5e5; border-radius: 9px; background: #fff; color: #48647f; cursor: pointer; }
 .dialog header button:focus-visible { outline: 2px solid #0b5394; outline-offset: 2px; }
-.body { max-height: calc(100vh - 135px); overflow: auto; padding: 19px; background: #f7fafc; }
-.body > p { margin: 0 0 14px; color: #60758a; font-size: .74rem; }
+.tabs { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; padding: 9px 19px; border-bottom: 1px solid #d7e4f0; background: #f4f8fc; }
+.tabs button { min-height: 36px; padding: 7px 12px; border: 1px solid #bfd0e0; border-radius: 9px; background: #fff; color: #496985; cursor: pointer; font-size: .69rem; font-weight: 800; }
+.tabs button:hover { border-color: #6f9bc2; color: #174f84; }
+.tabs button:focus-visible { outline: 2px solid #0b5394; outline-offset: 2px; }
+.tabs .activeTab { border-color: #2e75b6; background: linear-gradient(135deg,#2e75b6,#0b5394); color: #fff; box-shadow: 0 5px 14px #0b539433; }
+.body { max-height: calc(100vh - 190px); overflow: auto; padding: 19px; background: #f7fafc; }
+.tabPanel > p { margin: 0 0 14px; color: #60758a; font-size: .74rem; }
 .group + .group { margin-top: 16px; }
 .group h3 { margin: 0 0 8px; color: #244f72; font-size: .78rem; }
 .grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; }
@@ -20,4 +25,4 @@
 .body aside { display: flex; gap: 10px; margin-top: 15px; padding: 12px 13px; border: 1px solid #b9d2ea; border-radius: 9px; background: #eaf4ff; color: #496985; font-size: .67rem; line-height: 1.45; }
 .body aside svg { flex: none; color: #1d5f9b; }
 .body aside strong { display: block; color: #123e75; }
-@media(max-width:640px){.grid{grid-template-columns:1fr}.backdrop{padding:10px}.dialog{max-height:calc(100vh - 20px)}.body{max-height:calc(100vh - 115px)}}
+@media(max-width:640px){.grid{grid-template-columns:1fr}.tabs{grid-template-columns:1fr;padding:8px 10px}.backdrop{padding:10px}.dialog{max-height:calc(100vh - 20px)}.body{max-height:calc(100vh - 176px)}}
