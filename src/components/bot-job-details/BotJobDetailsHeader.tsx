@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Beaker, Clock, Database, Map, Play, RefreshCw, Rocket, Square } from 'lucide-react';
+import { Beaker, Clock, Database, LocateFixed, Map, Play, RefreshCw, Rocket, Square } from 'lucide-react';
 import QuestionsCard from '../QuestionsCard';
 import WorkspaceHeader, { type WorkspaceHeaderAction } from '../workspace/WorkspaceHeader';
 import BotJobDataActions from './BotJobDataActions';
@@ -141,6 +141,13 @@ const BotJobDetailsHeader: React.FC<BotJobDetailsHeaderProps> = ({
     });
   };
 
+  const runPreflight = () => {
+    onToolbarAction?.('PREFLIGHT', {
+      executionMode: mode,
+      blockId: selectedBlockId === 'all' ? 0 : selectedBlockId,
+    });
+  };
+
   return (
     <div className={styles.wrapper}>
       <WorkspaceHeader
@@ -244,6 +251,16 @@ const BotJobDetailsHeader: React.FC<BotJobDetailsHeaderProps> = ({
               >
                 <Play size={17} fill="currentColor" aria-hidden="true" />
                 Test run
+              </button>
+              <button
+                type="button"
+                className={execStyles.preflightButton}
+                disabled={!canExecute || executionBusy || executionActive || !hasBlocks}
+                onClick={runPreflight}
+                title="Validate the selected Test Run without starting it"
+              >
+                <LocateFixed size={15} aria-hidden="true" />
+                Pre Flight
               </button>
               <button
                 type="button"

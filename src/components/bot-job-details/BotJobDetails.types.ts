@@ -21,6 +21,7 @@ export type BotJobToolbarAction =
   | 'SET_NAVIGATION_TIME'
   | 'LAUNCH'
   | 'REFRESH_BLOCKS'
+  | 'PREFLIGHT'
   | 'TEST_RUN'
   | 'STOP_TEST_RUN'
   | 'EXPORT_JOB'
@@ -85,9 +86,9 @@ export interface ExecutionPreflightIssue {
 /**
  * Authoritative backend observation captured immediately before execution.
  *
- * WARN is intentionally observational: it reports what a future hard gate
- * would refuse, while the current TEST RUN or LAUNCH still starts exactly
- * once.
+ * The legacy `WARN` enforcement field remains transport-compatible. Consumers
+ * use the semantic outcome: Bot Job Test Run now refuses structural blockers
+ * and unavailable validation, while variable diagnostics remain warnings.
  */
 export interface ExecutionPreflightReport {
   enforcement: ExecutionPreflightEnforcement;

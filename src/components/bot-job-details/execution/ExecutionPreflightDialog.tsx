@@ -27,7 +27,7 @@ const focusableSelector = [
 ].join(',');
 
 export interface ExecutionPreflightDialogProps {
-  action: Extract<BotJobToolbarAction, 'TEST_RUN' | 'LAUNCH'>;
+  action: Extract<BotJobToolbarAction, 'PREFLIGHT' | 'TEST_RUN' | 'LAUNCH'>;
   report: ExecutionPreflightReport;
   onClose: () => void;
   onFocusIssue?: (issue: ExecutionPreflightIssue) => void;
@@ -35,7 +35,7 @@ export interface ExecutionPreflightDialogProps {
 
 const actionLabel = (
   action: ExecutionPreflightDialogProps['action'],
-): string => action === 'TEST_RUN' ? 'Test Run' : 'Launch';
+): string => action === 'LAUNCH' ? 'Launch' : 'Test Run';
 
 const ExecutionPreflightDialog: React.FC<ExecutionPreflightDialogProps> = ({
   action,

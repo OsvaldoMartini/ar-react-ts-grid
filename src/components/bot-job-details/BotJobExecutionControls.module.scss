@@ -171,6 +171,15 @@
 .actionRow .modeOne { border-color: #db6b16; background: #e8791b; }
 .actionRow .launchButton { border-color: #176b3a; background: #176b3a; color: #fff; }
 .actionRow .testButton { border-color: #dc6b18; background: #e8791b; color: #fff; }
+.actionRow .preflightButton {
+  border-color: #b97a2e;
+  background: #fff;
+  color: #8a4b00;
+}
+.actionRow .preflightButton:hover:not(:disabled) { background: #fff1da; }
+.actionRow .preflightButton:focus-visible {
+  outline-color: rgb(255 136 0 / 30%);
+}
 .actionRow .stopButton { border-color: #b42318; background: #b42318; color: #fff; }
 .scopeHint { min-height: 1em; color: #6e6e6e; font-size: 0.66rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 

@@ -42,7 +42,7 @@ export interface BotJobDetailsControllerState {
   reportStatus: (message: string, tone: BotJobWorkspaceStatusTone) => void;
   executionPause: BotJobExecutionPauseRequest | null;
   executionPreflight: {
-    action: Extract<BotJobToolbarAction, 'TEST_RUN' | 'LAUNCH'>;
+    action: Extract<BotJobToolbarAction, 'PREFLIGHT' | 'TEST_RUN' | 'LAUNCH'>;
     report: ExecutionPreflightReport;
   } | null;
   resolveExecutionPause: (decision: BotJobExecutionPauseDecision) => void;
@@ -65,6 +65,7 @@ const TOOLBAR_TIMEOUT_MS: Partial<Record<BotJobToolbarAction, number>> = {
   EXPORT_JOB: 120000,
   IMPORT_JOB: 120000,
   LAUNCH: 30000,
+  PREFLIGHT: 30000,
   TEST_RUN: 30000,
   STOP_TEST_RUN: 30000,
 };
@@ -398,16 +399,17 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
           && body.selectedPath.trim()) {
           setTransferPath(body.selectedPath);
         }
-        const executionAction = body.action === 'TEST_RUN' || body.action === 'LAUNCH'
+        const executionAction = body.action === 'PREFLIGHT'
+          || body.action === 'TEST_RUN'
+          || body.action === 'LAUNCH'
           ? body.action
           : null;
         const preflightOutcome = body.executionPreflight?.enforcement === 'WARN'
           ? executionPreflightOutcome(body.executionPreflight)
           : null;
-        const preflightNotice = body.ok !== false
-          && executionAction !== null
+        const preflightNotice = executionAction !== null
           && preflightOutcome !== null
-          && preflightOutcome !== 'READY';
+          && (executionAction === 'PREFLIGHT' || preflightOutcome !== 'READY');
         if (preflightNotice && executionAction) {
           setExecutionPreflight({
             action: executionAction,
@@ -605,7 +607,7 @@ export function useBotJobDetailsController(options: ControllerOptions): BotJobDe
     clearTimer(toolbarTimeoutRef);
     clearTimer(statusResetRef);
     pendingToolbarActionRef.current = { requestId: toolbarRequestId, action };
-    if (action === 'TEST_RUN' || action === 'LAUNCH') {
+    if (action === 'PREFLIGHT' || action === 'TEST_RUN' || action === 'LAUNCH') {
       setExecutionPreflight(null);
     }
     setPendingToolbarAction(action);
