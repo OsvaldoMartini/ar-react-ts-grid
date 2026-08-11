@@ -161,17 +161,15 @@ const InstructionRow: React.FC<InstructionRowProps> = ({
       {operations}
       <div className={styles.optionsColumn}>
         {deviceOptionsRow}
-        <div className={styles.moveButtons}>
-          {editButton}
-          {moveButtons}
-          {executionTypeControl}
-          {testClick}
-          {commandEditButton}
-          <DeleteButton
-            title="Delete instruction"
-            onClick={onRemove}
-          />
-        </div>
+        {editButton}
+        {moveButtons}
+        {executionTypeControl}
+        {testClick}
+        {commandEditButton}
+        <DeleteButton
+          title="Delete instruction"
+          onClick={onRemove}
+        />
       </div>
     </div>
   );
