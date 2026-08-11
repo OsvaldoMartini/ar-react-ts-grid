@@ -19,16 +19,29 @@ type Props = {
   detached?: boolean;
 };
 
+type Notice = {
+  level: 'ok' | 'warn' | 'error';
+  text: string;
+};
+
 const LicenseManager: React.FC<Props> = ({ socketPort, sessionId, onClose, onActivated, detached = false }) => {
-  const { webSocket, connected, messages } = useWebSocket(socketPort, sessionId);
+  const { webSocket, connected, messages, error } = useWebSocket(socketPort, sessionId);
   const processedMessageCountRef = useRef(0);
   const [state, setState] = useState<LicenseState | null>(null);
   const [mode, setMode] = useState<'request' | 'activate' | 'existing'>('request');
   const [form, setForm] = useState({ organization: '', owner: '', email: '', file: '', agreementAccepted: false });
   const [pending, setPending] = useState(false);
-  const [feedback, setFeedback] = useState('');
+  const [notice, setNotice] = useState<Notice>({ level: 'warn', text: 'Connecting to License Request...' });
 
-  const refresh = useCallback(() => webSocket?.send(JSON.stringify({ type: 'license.bootstrap', sessionId })), [webSocket, sessionId]);
+  const requestBootstrap = useCallback((announce: boolean) => {
+    if (!connected || !webSocket) {
+      setNotice({ level: 'error', text: 'License Request is not connected.' });
+      return;
+    }
+    if (announce) setNotice({ level: 'warn', text: 'Checking license status...' });
+    webSocket.send(JSON.stringify({ type: 'license.bootstrap', sessionId }));
+  }, [connected, sessionId, webSocket]);
+  const refresh = useCallback(() => requestBootstrap(true), [requestBootstrap]);
   useEffect(() => { if (connected) refresh(); }, [connected, refresh]);
   useEffect(() => {
     if (processedMessageCountRef.current > messages.length) {
@@ -54,18 +67,26 @@ const LicenseManager: React.FC<Props> = ({ socketPort, sessionId, onClose, onAct
         setPending(false);
         if (body?.ok) {
           setState(body);
-          setFeedback(body.message || 'License status refreshed.');
+          setNotice({
+            level: body.active ? 'ok' : body.requiresActivation ? 'warn' : 'ok',
+            text: body.message || body.status || 'License status refreshed.',
+          });
           if (!['license.bootstrapResponse', 'license.statusResponse', 'license.statusChanged'].includes(operationId)) {
-            refresh();
+            requestBootstrap(false);
           }
         } else {
-          setFeedback(body?.error || 'License operation failed.');
+          setNotice({ level: 'error', text: body?.error || 'License operation failed.' });
         }
       } catch {
-        // Ignore unrelated or malformed messages and preserve the current license state.
+        setPending(false);
+        setNotice({ level: 'error', text: 'The License response could not be read.' });
       }
     });
-  }, [messages, refresh, sessionId]);
+  }, [messages, requestBootstrap, sessionId]);
+
+  useEffect(() => {
+    if (error) setNotice({ level: 'error', text: error });
+  }, [error]);
 
   const modes = useMemo(() => [
     { id: 'request' as const, label: 'Request', enabled: state?.capabilities?.request !== false },
@@ -74,25 +95,69 @@ const LicenseManager: React.FC<Props> = ({ socketPort, sessionId, onClose, onAct
   ], [state]);
   useEffect(() => { if (state?.active) onActivated?.(); }, [state?.active, onActivated]);
 
+  const selectMode = (nextMode: 'request' | 'activate' | 'existing') => {
+    setMode(nextMode);
+    setNotice({ level: 'ok', text: 'Ready' });
+  };
+
   const submit = () => {
-    if (!webSocket || pending) return;
-    setPending(true); setFeedback('');
+    if (pending) return;
+    const organization = form.organization.trim();
+    const owner = form.owner.trim();
+    const email = form.email.trim();
+    const file = form.file.trim();
+    let validationError = '';
+    if (mode === 'request') {
+      if (!organization) validationError = 'Organization is required.';
+      else if (!owner) validationError = 'Owner is required.';
+      else if (!email) validationError = 'Email is required.';
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) validationError = 'Enter a valid email address.';
+    } else if (!file) {
+      validationError = mode === 'activate' ? 'Response file is required.' : 'License file is required.';
+    }
+    if (!validationError && mode !== 'existing' && !form.agreementAccepted) {
+      validationError = 'Accept the software license agreement to continue.';
+    }
+    if (validationError) {
+      setNotice({ level: 'error', text: validationError });
+      return;
+    }
+    if (!connected || !webSocket) {
+      setNotice({ level: 'error', text: 'License Request is not connected.' });
+      return;
+    }
+    setPending(true);
+    setNotice({ level: 'warn', text: mode === 'request' ? 'Generating license request...' : mode === 'activate' ? 'Activating license...' : 'Validating existing license...' });
     const type = mode === 'request' ? 'license.request' : mode === 'activate' ? 'license.activate' : 'license.useExisting';
     webSocket.send(JSON.stringify({ type, sessionId, body: JSON.stringify({
-      requestId: `${Date.now()}-${type}`, organization: form.organization, owner: form.owner, email: form.email,
+      requestId: `${Date.now()}-${type}`, organization, owner, email,
       agreementAccepted: form.agreementAccepted,
-      responseFile: mode === 'activate' ? form.file : undefined,
-      licenseFile: mode === 'existing' ? form.file : undefined,
+      responseFile: mode === 'activate' ? file : undefined,
+      licenseFile: mode === 'existing' ? file : undefined,
     }) }));
   };
+
+  const noticeClass = notice.level === 'error'
+    ? styles.statusError
+    : notice.level === 'warn'
+      ? styles.statusWarn
+      : styles.statusOk;
 
   return <section className={`${styles.panel} ${detached ? styles.detached : ''}`} aria-label="License manager">
     <header
       className={styles.header}
       data-floating-workspace-drag-handle={detached ? true : undefined}
     >
-      <div><FileKey2 size={18}/><span><strong>License</strong><small>AR Web authorization</small></span></div>
+      <div><FileKey2 size={18}/><span><strong>License Request</strong><small>Request, activate, or select an AR Web license</small></span></div>
       <div className={styles.headerActions} data-floating-drag-ignore="true">
+        <div
+          className={`${styles.headerStatus} ${noticeClass}`}
+          role={notice.level === 'error' ? 'alert' : 'status'}
+          aria-live={notice.level === 'error' ? 'assertive' : 'polite'}
+          title={notice.text}
+        >
+          {notice.text}
+        </div>
         <button title="Refresh license status" onClick={refresh} disabled={!connected}><RefreshCw size={16}/></button>
         {detached && (
           <div className={styles.pagesControl}>
@@ -115,7 +180,7 @@ const LicenseManager: React.FC<Props> = ({ socketPort, sessionId, onClose, onAct
         )}
       </div>
     </header>
-    <div className={`${styles.status} ${state?.active ? styles.active : styles.required}`}>
+    <div className={`${styles.licenseStatus} ${state?.active ? styles.active : styles.required}`}>
       {state?.active ? <CheckCircle2 size={20}/> : <ShieldAlert size={20}/>}<span>
         <strong>{state?.status || (connected ? 'Checking license...' : 'Connecting...')}</strong>
         <small>{state?.statusCode || 'UNKNOWN'}</small>
@@ -128,23 +193,23 @@ const LicenseManager: React.FC<Props> = ({ socketPort, sessionId, onClose, onAct
       <div><dt>License path</dt><dd>{state?.path || 'Application directory'}</dd></div>
     </dl>
     <nav className={styles.segmented} aria-label="License action">
-      {modes.map(item => <button key={item.id} disabled={!item.enabled} className={mode === item.id ? styles.selected : ''} onClick={() => setMode(item.id)}>{item.label}</button>)}
+      {modes.map(item => <button key={item.id} disabled={!item.enabled} className={mode === item.id ? styles.selected : ''} onClick={() => selectMode(item.id)}>{item.label}</button>)}
     </nav>
     <div className={styles.form}>
+      <p className={styles.requiredHint}>Required fields are marked below.</p>
       {mode === 'request' ? <>
-        <label>Organization<input value={form.organization} onChange={e => setForm({...form,organization:e.target.value})}/></label>
-        <label>Owner<input value={form.owner} onChange={e => setForm({...form,owner:e.target.value})}/></label>
-        <label>Email<input type="email" value={form.email} onChange={e => setForm({...form,email:e.target.value})}/></label>
-      </> : <label>{mode === 'activate' ? 'Response file' : 'License file'}<span className={styles.pathInput}><FolderOpen size={17}/><input value={form.file} onChange={e => setForm({...form,file:e.target.value})} placeholder={mode === 'activate' ? 'Configured directory/response file' : 'Configured directory/ARWeb.lic'}/></span></label>}
+        <label><span className={styles.fieldLabel}>Organization <em>Required</em></span><input aria-label="Organization" required value={form.organization} onChange={e => setForm({...form,organization:e.target.value})}/></label>
+        <label><span className={styles.fieldLabel}>Owner <em>Required</em></span><input aria-label="Owner" required value={form.owner} onChange={e => setForm({...form,owner:e.target.value})}/></label>
+        <label><span className={styles.fieldLabel}>Email <em>Required</em></span><input aria-label="Email" required type="email" value={form.email} onChange={e => setForm({...form,email:e.target.value})}/></label>
+      </> : <label><span className={styles.fieldLabel}>{mode === 'activate' ? 'Response file' : 'License file'} <em>Required</em></span><span className={styles.pathInput}><FolderOpen size={17}/><input aria-label={mode === 'activate' ? 'Response file' : 'License file'} required value={form.file} onChange={e => setForm({...form,file:e.target.value})} placeholder={mode === 'activate' ? 'Configured directory/response file' : 'Configured directory/ARWeb.lic'}/></span></label>}
       {mode !== 'existing' && <>
         <section className={styles.agreementText} aria-labelledby="license-agreement-title" tabIndex={0}>
           <h2 id="license-agreement-title">Software License Agreement <small>v{LICENSE_AGREEMENT_VERSION}</small></h2>
           <p>{LICENSE_AGREEMENT_V1}</p>
         </section>
-        <label className={styles.agreement}><input type="checkbox" checked={form.agreementAccepted} onChange={e => setForm({...form,agreementAccepted:e.target.checked})}/><span>I accept the software license agreement.</span></label>
+        <label className={styles.agreement}><input type="checkbox" required checked={form.agreementAccepted} onChange={e => setForm({...form,agreementAccepted:e.target.checked})}/><span>I accept the software license agreement. <em>Required</em></span></label>
       </>}
-      {feedback && <p className={styles.feedback}>{feedback}</p>}
-      <button className={styles.submit} onClick={submit} disabled={pending || (mode !== 'existing' && !form.agreementAccepted)}>{pending ? 'Processing...' : mode === 'request' ? 'Generate request' : mode === 'activate' ? 'Activate license' : 'Use existing license'}</button>
+      <button className={styles.submit} onClick={submit} disabled={pending}>{pending ? 'Processing...' : mode === 'request' ? 'Generate request' : mode === 'activate' ? 'Activate license' : 'Use existing license'}</button>
     </div>
   </section>;
 };

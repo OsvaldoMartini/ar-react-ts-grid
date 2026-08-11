@@ -149,7 +149,7 @@ const InfoPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
 
   return (
     <DetachedPageShell
-      title="Info"
+      title="About this Software"
       testId="info-page"
       onClose={undefined}
       showCloseButton={false}
@@ -158,7 +158,7 @@ const InfoPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
         <section className={styles.window}>
           <header className={styles.topBar} data-floating-workspace-drag-handle>
             <div className={styles.titleBlock}>
-              <h1 className={styles.title}>AR Web</h1>
+              <h1 className={styles.title}>About this Software</h1>
               <p className={styles.subtitle}>Software and license information</p>
             </div>
             <div className={styles.topBarRight} data-floating-drag-ignore="true">
@@ -174,7 +174,7 @@ const InfoPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
               <button
                 type="button"
                 className={styles.closeButton}
-                title="Close only this Info window"
+                title="Close only this About this Software window"
                 onClick={onClose}
               >
                 Close

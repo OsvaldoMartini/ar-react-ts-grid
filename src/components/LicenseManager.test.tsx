@@ -3,8 +3,9 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import LicenseManager from './LicenseManager';
 
 const mockSend = jest.fn();
+const mockWebSocket = { send: mockSend };
 let mockMessages: string[] = [];
-jest.mock('./useWebSocket', () => ({ useWebSocket: () => ({ webSocket: { send: mockSend }, connected: true, messages: mockMessages }) }));
+jest.mock('./useWebSocket', () => ({ useWebSocket: () => ({ webSocket: mockWebSocket, connected: true, messages: mockMessages }) }));
 
 const response = JSON.stringify({
   sessionId: 'licenseManager-test', operationId: 'license.bootstrapResponse',
@@ -23,15 +24,23 @@ const sentOperation = (type: string) => mockSend.mock.calls
   .map(([message]) => JSON.parse(message))
   .find((message) => message.type === type);
 
-test('renders status and sends an agreement-gated license request', () => {
-  render(<LicenseManager socketPort={59772} sessionId="licenseManager-test"/>);
-  expect(screen.getByText('Missing license')).toBeInTheDocument();
-  expect(screen.getByRole('region', { name: /Software License Agreement v1.0/ })).toBeInTheDocument();
-  expect(screen.getByText(/7\. Miscellaneous/)).toBeInTheDocument();
+const fillRequestForm = () => {
   fireEvent.change(screen.getByLabelText('Organization'), { target: { value: 'Client Org' } });
   fireEvent.change(screen.getByLabelText('Owner'), { target: { value: 'Client Owner' } });
   fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'client@example.com' } });
-  expect(screen.getByRole('button', { name: 'Generate request' })).toBeDisabled();
+};
+
+test('renders status and sends an agreement-gated license request', () => {
+  render(<LicenseManager socketPort={59772} sessionId="licenseManager-test"/>);
+  expect(screen.getByRole('status')).toHaveTextContent('Missing license');
+  expect(screen.getByText('License Request')).toBeInTheDocument();
+  expect(screen.getByRole('region', { name: /Software License Agreement v1.0/ })).toBeInTheDocument();
+  expect(screen.getByText(/7\. Miscellaneous/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Generate request' }));
+  expect(screen.getByRole('alert')).toHaveTextContent('Organization is required.');
+  fillRequestForm();
+  fireEvent.click(screen.getByRole('button', { name: 'Generate request' }));
+  expect(screen.getByRole('alert')).toHaveTextContent('Accept the software license agreement to continue.');
   fireEvent.click(screen.getByText('I accept the software license agreement.'));
   fireEvent.click(screen.getByRole('button', { name: 'Generate request' }));
   const request = sentOperation('license.request');
@@ -55,6 +64,8 @@ test('sends the existing-license path', () => {
   render(<LicenseManager socketPort={59772} sessionId="licenseManager-test"/>);
   fireEvent.click(screen.getByRole('button', { name: 'Use existing' }));
   expect(screen.queryByRole('region', { name: /Software License Agreement/ })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Use existing license' }));
+  expect(screen.getByRole('alert')).toHaveTextContent('License file is required.');
   fireEvent.change(screen.getByLabelText('License file'), { target: { value: '/licenses/ARWeb.lic' } });
   fireEvent.click(screen.getByRole('button', { name: 'Use existing license' }));
   expect(sentOperation('license.useExisting')).toBeDefined();
@@ -73,6 +84,7 @@ test('disables license modes excluded by backend capabilities', () => {
 
 test('prevents repeated submission while a request is pending', () => {
   render(<LicenseManager socketPort={59772} sessionId="licenseManager-test"/>);
+  fillRequestForm();
   fireEvent.click(screen.getByText('I accept the software license agreement.'));
   const submit = screen.getByRole('button', { name: 'Generate request' });
   fireEvent.click(submit);
@@ -84,6 +96,7 @@ test('prevents repeated submission while a request is pending', () => {
 
 test('shows a structured backend error and clears pending state', () => {
   const { rerender } = render(<LicenseManager socketPort={59772} sessionId="licenseManager-test"/>);
+  fillRequestForm();
   fireEvent.click(screen.getByText('I accept the software license agreement.'));
   fireEvent.click(screen.getByRole('button', { name: 'Generate request' }));
   mockMessages = [response, licenseResponse('license.requestResponse', {

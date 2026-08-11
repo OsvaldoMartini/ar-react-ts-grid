@@ -12,7 +12,7 @@ type Props = {
 
 const LicensePage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => (
   <DetachedPageShell
-    title="License Manager"
+    title="License Request"
     testId="license-manager-workspace"
     onClose={undefined}
     showCloseButton={false}

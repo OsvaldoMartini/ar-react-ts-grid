@@ -22,6 +22,7 @@ describe('InfoPage', () => {
     const onClose = jest.fn();
     render(<InfoPage socketPort={59772} sessionId="aboutPanel" onClose={onClose} />);
 
+    expect(screen.getByRole('heading', { name: 'About this Software' })).toBeInTheDocument();
     expect(screen.getByText('Software Information')).toBeInTheDocument();
     expect(screen.getByText('License Information')).toBeInTheDocument();
     expect(screen.getByTestId('desktop-workspace-shell')).toBeInTheDocument();
