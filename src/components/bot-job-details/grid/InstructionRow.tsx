@@ -48,7 +48,7 @@ export interface InstructionRowProps {
   operations: React.ReactNode;
   deviceOptionsRow: React.ReactNode;
   editButton: React.ReactNode;
-  rollbackNameButton: React.ReactNode;
+  rollbackNameButton?: React.ReactNode;
   commandEditButton: React.ReactNode;
   moveButtons: React.ReactNode;
   testClick: React.ReactNode;
