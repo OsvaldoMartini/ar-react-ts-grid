@@ -8,7 +8,6 @@ import { useInstructionFocus } from './useInstructionFocus';
 import { useGridAlerts } from './useGridAlerts';
 import { useExecutionState } from './useExecutionState';
 import { useInstructionMemory } from './useInstructionMemory';
-import { useExcelExport } from './useExcelExport';
 import { useBlockReorder } from './useBlockReorder';
 import { useGridData } from './useGridData';
 import {
@@ -128,19 +127,6 @@ export function useInstructionGrid({
     expandBlock,
     clearFind: () => setFindText(''),
   });
-  const {
-    excelExportContext, setExcelExportContext,
-    excelExportDirectory, setExcelExportDirectory,
-    choosingExcelExportDirectory, setChoosingExcelExportDirectory,
-    pendingExcelExportDirectoryRequestRef,
-    handleExcelFileBlockName, submitExcelExport, chooseExcelExportDirectory, closeExcelExport,
-  } = useExcelExport({
-    webSocket, connected, sessionId, homeBankingId, botJobId, botJobName,
-    alerts: {
-      setAlertImage, setAlertClass, setErrorFlag,
-      setAlertMessageHeader, setAlertMessageBody, setAlertMessageFooter,
-    },
-  });
   const [saveComponentContext, setSaveComponentContext] = useState<SaveComponentContext | null>(null);
 
   // Memory list: steps hand-picked via the row "+" button, kept in insertion order.
@@ -237,7 +223,6 @@ export function useInstructionGrid({
     setPendingMemoryMove, setMemoryMoveStatus, setMemoryListOpenVersion, setCreateBlockOpen,
     handleRemoveFromMemory, handleRemoveComponentMemoryItem,
     memoryListOpenRequestedRef, memoryListOpenedRef, memoryListOpenPendingRequestRef, memoryListOwnerEpochRef,
-    pendingExcelExportDirectoryRequestRef, setChoosingExcelExportDirectory, setExcelExportDirectory,
   });
 
   const handleGridItemTestActionResult = useCallback((
@@ -1128,9 +1113,6 @@ export function useInstructionGrid({
     findText, setFindText, renderHighlighted,
     // useBlockCollapse
     collapsedBlocks, expandBlock, toggleBlockCollapsed, focusInstructionTarget,
-    // useExcelExport
-    excelExportContext, excelExportDirectory, choosingExcelExportDirectory,
-    handleExcelFileBlockName, submitExcelExport, chooseExcelExportDirectory, closeExcelExport,
     // useInstructionMemory
     memorySteps, memoryItemCount, memoryBlockOptions, createBlockOpen, setCreateBlockOpen,
     memoryCapabilities, requestMemoryListOpen,

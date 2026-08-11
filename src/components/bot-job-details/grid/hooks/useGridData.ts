@@ -203,10 +203,6 @@ export interface UseGridDataDeps {
   memoryListOpenedRef: React.MutableRefObject<boolean>;
   memoryListOpenPendingRequestRef: React.MutableRefObject<PendingMemoryListRequest | null>;
   memoryListOwnerEpochRef: React.MutableRefObject<string>;
-  // useExcelExport surface
-  pendingExcelExportDirectoryRequestRef: React.MutableRefObject<string | null>;
-  setChoosingExcelExportDirectory: React.Dispatch<React.SetStateAction<boolean>>;
-  setExcelExportDirectory: React.Dispatch<React.SetStateAction<string | undefined>>;
 }
 
 /**
@@ -242,7 +238,6 @@ export function useGridData(deps: UseGridDataDeps) {
     setPendingMemoryMove, setMemoryMoveStatus, setMemoryListOpenVersion, setCreateBlockOpen,
     handleRemoveFromMemory, handleRemoveComponentMemoryItem,
     memoryListOpenRequestedRef, memoryListOpenedRef, memoryListOpenPendingRequestRef, memoryListOwnerEpochRef,
-    pendingExcelExportDirectoryRequestRef, setChoosingExcelExportDirectory, setExcelExportDirectory,
   } = deps;
   const {
     kind: workspaceKind,
@@ -1539,30 +1534,6 @@ export function useGridData(deps: UseGridDataDeps) {
           setAlertMessageHeader(bodyData?.ok === false ? 'Component Not Saved' : 'Component Saved');
           setAlertMessageBody(bodyData?.error || bodyData?.message || 'Component saved successfully.');
           setAlertMessageFooter(bodyData?.ok === false ? 'Review the component name and try again.' : 'The component grid was refreshed.');
-        } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "excelExport.chooseDirectoryResponse") {
-          const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
-          if (!pendingExcelExportDirectoryRequestRef.current
-              || bodyData?.requestId !== pendingExcelExportDirectoryRequestRef.current) {
-            return;
-          }
-          pendingExcelExportDirectoryRequestRef.current = null;
-          setChoosingExcelExportDirectory(false);
-          if (bodyData?.ok === false) {
-            setAlertImage(warningRedImage); setAlertClass('construction-image'); setErrorFlag(true);
-            setAlertMessageHeader('Excel Export Folder Not Selected');
-            setAlertMessageBody(bodyData?.error || 'The destination folder could not be selected.');
-            setAlertMessageFooter('Keep the Excel Export page open and try Browse again.');
-          } else if (bodyData?.cancelled !== true && typeof bodyData?.directory === 'string') {
-            setExcelExportDirectory(bodyData.directory);
-          }
-        } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "excelExport.saveResponse") {
-          const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
-          if (bodyData?.ok === false) {
-            setAlertImage(warningRedImage); setAlertClass('construction-image'); setErrorFlag(true);
-            setAlertMessageHeader('Excel Export Not Saved');
-            setAlertMessageBody(bodyData?.error || 'The export configuration could not be saved.');
-            setAlertMessageFooter('Review the path and filename, then try again.');
-          }
         } else if (sessionId === parsedMessage.sessionId && parsedMessage.operationId === "commandEditor.workspaceOpenResponse") {
           const bodyData = typeof parsedMessage.body === "string" ? JSON.parse(parsedMessage.body) : parsedMessage.body;
           const responseRequestId = String(bodyData?.requestId || '');

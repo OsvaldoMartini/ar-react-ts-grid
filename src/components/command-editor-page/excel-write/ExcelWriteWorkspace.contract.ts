@@ -20,6 +20,8 @@ export interface ExcelWriteWorkspaceResponse {
   cancelled?: boolean;
   directory?: string;
   outputFile?: string;
+  suggestedOutputKey?: string;
+  suggestedOutputColumn?: string;
   current?: ExcelWriteFileTarget;
   targets?: ExcelWriteFileTarget[];
 }

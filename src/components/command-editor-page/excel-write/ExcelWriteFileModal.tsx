@@ -60,6 +60,8 @@ const ExcelWriteFileModal: React.FC<Props> = ({
     client.request('excelWrite.bootstrap', {
       instructionId,
       outputFile: value.outputFile,
+      outputKey: value.outputKey,
+      outputColumn: value.outputColumn,
     }).then((response) => {
       if (!active) return;
       if (!response.ok) {
@@ -76,6 +78,15 @@ const ExcelWriteFileModal: React.FC<Props> = ({
           delimiter: response.current?.delimiter || ',',
         }));
       }
+      setDraft(current => ({
+        ...current,
+        outputKey: current.outputKey.trim()
+          ? current.outputKey
+          : response.suggestedOutputKey || '',
+        outputColumn: current.outputColumn.trim()
+          ? current.outputColumn
+          : response.suggestedOutputColumn || '',
+      }));
       setStatus(response.message || 'ExcelWrite file configuration loaded.');
     }).catch((reason) => {
       if (active) setError(String(reason?.message || reason || 'ExcelWrite configuration could not load.'));
@@ -83,7 +94,7 @@ const ExcelWriteFileModal: React.FC<Props> = ({
       if (active) setPending(null);
     });
     return () => { active = false; };
-  }, [client, instructionId, value.outputFile]);
+  }, [client, instructionId, value.outputColumn, value.outputFile, value.outputKey]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

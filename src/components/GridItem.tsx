@@ -15,7 +15,6 @@ import testInputImage from "../assets/testInput.png";
 import AlertModal from './AlertModal';
 import CompForce from './CompForce';
 import CreateNewBlock from './CreateNewBlock';
-import ExcelExportPanel from './ExcelExportPanel';
 import SaveComponentPanel from './SaveComponentPanel';
 import BotJobDetailsChrome from './bot-job-details/BotJobDetailsChrome';
 import ComponentWorkspaceHeader from './bot-job-details/ComponentWorkspaceHeader';
@@ -172,8 +171,6 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
     executionId, executionState,
     findText, setFindText, renderHighlighted,
     collapsedBlocks, toggleBlockCollapsed, focusInstructionTarget,
-    excelExportContext, excelExportDirectory, choosingExcelExportDirectory,
-    handleExcelFileBlockName, submitExcelExport, chooseExcelExportDirectory, closeExcelExport,
     memoryBlockOptions, createBlockOpen, setCreateBlockOpen,
     memoryCapabilities, requestMemoryListOpen,
     handleAddConnectedGroupToMemory,
@@ -566,42 +563,6 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
   };
 
 
-  // Same rule everywhere: match the label the grid displays (clientNamed wins
-  // over the canonical backend name), but keep matching `name` too so searching
-  // by the backend key still works.
-  const renderExportFile = (input: string) => {
-    const lastChar = input.slice(-1);
-    const path = input.slice(0, -2); // remove ":," or ":|" from the end
-
-    // If path is "No Excel Export File", render only the path
-    if (path.includes("No Excel Export")) {
-      return (
-        <span className={styles.instructionDetails}>
-          <span style={{ color: "#FFA500" }}>No Excel Export File</span>
-        </span>
-      );
-    }
-
-    let delimiterName = '';
-    switch (lastChar) {
-      case ',':
-        delimiterName = 'Comma';
-        break;
-      case '|':
-        delimiterName = 'Pipe';
-        break;
-      default:
-        delimiterName = 'Comma';
-    }
-
-    return (
-      <span className={styles.instructionDetails}>
-        <span style={{ color: "#FFA500" }}>{path}</span>{'  '}
-        <span style={{ color: "#FFA500" }}>({delimiterName})</span>
-      </span>
-    );
-  };
-
   return (
     <div className={styles.gridContainer}>
       {componentWorkspace ? (
@@ -646,14 +607,6 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
         }}
         />
       )}
-      {excelExportContext && <ExcelExportPanel
-        context={excelExportContext}
-        onSubmit={submitExcelExport}
-        onClose={closeExcelExport}
-        onChooseDirectory={chooseExcelExportDirectory}
-        selectedDirectory={excelExportDirectory}
-        choosingDirectory={choosingExcelExportDirectory}
-      />}
       {!componentWorkspace && saveComponentContext && (
         <SaveComponentPanel
           context={saveComponentContext}
@@ -919,7 +872,6 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                         blockDeleteDimmed={false}
                         selectedInstructionCount={selectedInstructionCount}
                         renderHighlighted={renderHighlighted}
-                        exportFileNode={renderExportFile(String(blockData.exportFile))}
                         excelGotoNode={excelGotoInstruction &&
                           blockData.instructions[0].blockOrderNumber === excelGotoInstruction.blockOrderNumber ? (
                           <div className={styles.excelGotoContainer}>
@@ -963,7 +915,6 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                         onMoveUp={() => handleMoveBlockUp(Number(blockData.instructions[0].blockId))}
                         onMoveDown={() => handleMoveBlockDown(Number(blockData.instructions[0].blockId))}
                         onEditName={() => handleEditBlock(Number(blockData.instructions[0].blockId), blockData.blockName)}
-                        onExcelFile={() => handleExcelFileBlockName(Number(blockData.instructions[0].blockId), blockData.blockName, Number(blockData.instructions[0].blockOrderNumber), blockData.exportFile)}
                         onCreateComponent={() => handleCreateComponent(Number(blockData.instructions[0].blockId))}
                         onBlockSelectionChange={(checked) =>
                           handleBlockSelectionChange(blockId, checked)}
@@ -1103,7 +1054,6 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                           : 'Delete block'}
                         blockDeleteDimmed={false}
                         renderHighlighted={renderHighlighted}
-                        exportFileNode={renderExportFile(block.exportFile || 'No Excel Export File')}
                         onToggleStatus={() => handleBlockStatus(block.blockId)}
                         onToggleCollapse={() => toggleBlockCollapsed(block.blockId)}
                         onChangeName={setBlockName}
@@ -1113,12 +1063,6 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                         onMoveUp={() => handleMoveBlockUp(block.blockId)}
                         onMoveDown={() => handleMoveBlockDown(block.blockId)}
                         onEditName={() => handleEditBlock(block.blockId, block.blockName)}
-                        onExcelFile={() => handleExcelFileBlockName(
-                          block.blockId,
-                          block.blockName,
-                          block.blockOrderNumber,
-                          block.exportFile,
-                        )}
                         onCreateComponent={() => handleCreateComponent(block.blockId)}
                         onBlockSelectionChange={(checked) =>
                           handleBlockSelectionChange(block.blockId, checked)}
