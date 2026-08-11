@@ -1,16 +1,20 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppWindow, ChevronDown, FlaskConical, GripHorizontal, ShieldCheck, Trash2, User } from 'lucide-react';
+import { AppWindow, ChevronDown, FlaskConical, GripHorizontal, Layers3, ShieldCheck, Trash2, User } from 'lucide-react';
 import AutoTestWorkspace, { AutomationTestCatalog } from './auto-test/AutoTestWorkspace';
 import ConfirmationDialog from './ConfirmationDialog';
 import FloatingWorkspaceFrame from './workspace/FloatingWorkspaceFrame';
 import GridTempA, { GridTempAColumn } from './GridTemp_A';
 import PagesOpenButton from './PagesOpenButton';
 import { RulesCard } from './RulesCard';
+import MultiBotJobExecutionWorkspace, {
+  type MultiExecutionBotJob,
+} from './multi-execution/MultiBotJobExecutionWorkspace';
 import styles from './MainDashboard.module.scss';
 import { useWebSocket } from './useWebSocket';
 
 type StatusLevel = 'ok' | 'warn' | 'error';
 const AUTO_TEST_INLINE_PAGE_ID = 'autoTest';
+const MULTI_EXECUTION_INLINE_PAGE_ID = 'multiBotJobExecutionManager';
 
 interface MainDashboardProps {
   socketPort: number;
@@ -170,6 +174,7 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, on
   const processedMessageCountRef = useRef(0);
   const shutdownRequestedRef = useRef(false);
   const reportedAutoTestStateRef = useRef<boolean | null>(null);
+  const reportedMultiExecutionStateRef = useRef<boolean | null>(null);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
   const selectAllCheckboxRef = useRef<HTMLInputElement | null>(null);
   const pendingBulkDeleteRequestRef = useRef<string | null>(null);
@@ -183,6 +188,9 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, on
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [licenseProfile, setLicenseProfile] = useState<LicenseProfile | null>(null);
   const [autoTestOpen, setAutoTestOpen] = useState(false);
+  const [multiExecutionOpen, setMultiExecutionOpen] = useState(false);
+  const [multiExecutionDraft, setMultiExecutionDraft] = useState<readonly MultiExecutionBotJob[]>([]);
+  const [multiExecutionVersion, setMultiExecutionVersion] = useState(0);
   const [testCatalog, setTestCatalog] = useState<AutomationTestCatalog | null>(null);
   const [testCatalogLoading, setTestCatalogLoading] = useState(false);
   const [testCatalogError, setTestCatalogError] = useState('');
@@ -382,6 +390,24 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, on
   }, [autoTestOpen, connected, send]);
 
   useEffect(() => {
+    if (!connected) {
+      reportedMultiExecutionStateRef.current = null;
+      return;
+    }
+    if (reportedMultiExecutionStateRef.current === multiExecutionOpen) return;
+
+    reportedMultiExecutionStateRef.current = multiExecutionOpen;
+    send('pagesOpen.inlineState', {
+      pageId: MULTI_EXECUTION_INLINE_PAGE_ID,
+      pageKey: MULTI_EXECUTION_INLINE_PAGE_ID,
+      title: 'Multi-Bot-Job Execution Manager',
+      kind: 'MULTI_BOT_JOB_EXECUTION',
+      open: multiExecutionOpen,
+      isOpen: multiExecutionOpen,
+    });
+  }, [connected, multiExecutionOpen, send]);
+
+  useEffect(() => {
     if (!userMenuOpen) return;
     const closeOutside = (event: MouseEvent) => {
       if (!userMenuRef.current?.contains(event.target as Node)) setUserMenuOpen(false);
@@ -491,8 +517,13 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, on
             text: responseMessage(body, 'Pages Open workspace opened'),
           });
         } else if (operationId === 'pagesOpen.inlineClose') {
+          const pageKey = String(body?.pageKey || body?.kind || '');
           const targetSessionId = String(body?.sessionId || body?.targetSessionId || '');
-          if (!targetSessionId || targetSessionId === sessionId) {
+          if (pageKey === 'inline:multi-bot-job-execution'
+            || pageKey === 'MULTI_BOT_JOB_EXECUTION') {
+            setMultiExecutionOpen(false);
+            setMultiExecutionDraft([]);
+          } else if (!targetSessionId || targetSessionId === sessionId) {
             setAutoTestOpen(false);
           }
         } else if (operationId === 'react.session.open') {
@@ -513,6 +544,38 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, on
   const openPagesOpen = () => {
     setUserMenuOpen(false);
     send('pagesOpen.open');
+  };
+
+  const openMultiExecutionManager = () => {
+    const exactSelection = Object.freeze(botJobs
+      .filter(row => loadedSelectedBotJobIds.has(row.id))
+      .map(row => Object.freeze({
+        id: row.id,
+        name: row.name,
+        homeBankingId: row.homeBankingId,
+        homeUrlId: row.homeUrlId,
+        organizationName: row.organizationName,
+        environmentName: row.environmentName,
+        environmentUrl: row.environmentUrl,
+        active: row.active,
+        launchable: row.launchable,
+      })));
+    if (exactSelection.length === 0) {
+      setStatus({ level: 'warn', text: 'Check one or more Bot Jobs before Run Multiple Jobs' });
+      return;
+    }
+    setMultiExecutionDraft(exactSelection);
+    setMultiExecutionVersion(version => version + 1);
+    setMultiExecutionOpen(true);
+    setStatus({
+      level: 'ok',
+      text: `${exactSelection.length} Bot Job${exactSelection.length === 1 ? '' : 's'} ready for execution review`,
+    });
+  };
+
+  const closeMultiExecutionManager = () => {
+    setMultiExecutionOpen(false);
+    setMultiExecutionDraft([]);
   };
 
   const licensedUser = licenseProfile?.owner || licenseProfile?.licensedUser || 'Licensed user';
@@ -719,6 +782,26 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, on
           <button type="button" className={styles.commandBtn} disabled={!selectedJob} onClick={openSelectedBotJob}>
             Open Job
           </button>
+          <button
+            type="button"
+            className={[
+              styles.commandBtn,
+              styles.multiRunButton,
+              selectedBotJobCount > 0 ? styles.multiRunButtonActive : '',
+            ].filter(Boolean).join(' ')}
+            aria-label={`Run ${selectedBotJobCount} selected Bot Job${selectedBotJobCount === 1 ? '' : 's'}`}
+            title={selectedBotJobCount > 0
+              ? `Review ${selectedBotJobCount} selected Bot Job${selectedBotJobCount === 1 ? '' : 's'} for execution`
+              : 'Check one or more Bot Jobs to run'}
+            disabled={!connected || selectedBotJobCount === 0 || bulkDeletePending}
+            onClick={openMultiExecutionManager}
+          >
+            <Layers3 size={15} aria-hidden="true" />
+            <span>
+              <strong>Run ({selectedBotJobCount})</strong>
+              <small>Multiple Jobs</small>
+            </span>
+          </button>
           <button type="button" className={styles.commandBtn} onClick={refresh}>
             Refresh
           </button>
@@ -808,6 +891,13 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, on
             error={testCatalogError}
             onRefresh={loadTestCatalog}
             onClose={() => setAutoTestOpen(false)}
+          />
+        )}
+        {multiExecutionOpen && (
+          <MultiBotJobExecutionWorkspace
+            key={multiExecutionVersion}
+            selectedJobs={multiExecutionDraft}
+            onClose={closeMultiExecutionManager}
           />
         )}
       </FloatingWorkspaceFrame>
