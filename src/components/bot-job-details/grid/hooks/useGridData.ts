@@ -41,7 +41,9 @@ import type {
 import { computeInstructionGraphRevision } from '../domain/instructionGraphRevision';
 import {
   planInstructionDeletion,
+  planInstructionSelectionDeletion,
   type InstructionDeletePlan,
+  type InstructionSelectionDeletePlan,
 } from '../domain/instructionDelete';
 import {
   groupByBlock,
@@ -121,6 +123,15 @@ type SuccessfulInstructionDeletePlan = Extract<
   InstructionDeletePlan,
   { ok: true }
 >;
+
+type SuccessfulInstructionSelectionDeletePlan = Extract<
+  InstructionSelectionDeletePlan,
+  { ok: true }
+>;
+
+type ConfirmedInstructionDeletePlan =
+  | SuccessfulInstructionDeletePlan
+  | SuccessfulInstructionSelectionDeletePlan;
 
 export interface UseGridDataDeps {
   // Props
@@ -3067,13 +3078,32 @@ export function useGridData(deps: UseGridDataDeps) {
   const executeRemoveInstruction = (
     confirmedPlan: SuccessfulInstructionDeletePlan,
   ) => {
-    handleClose();
     const latest = deleteContextRef.current;
     const latestPlan = planInstructionDeletion(
       latest.instructionsData,
       latest.variableLinks,
       confirmedPlan.selectedInstruction.id,
     );
+    executeConfirmedInstructionDelete(confirmedPlan, latestPlan);
+  };
+
+  const executeInstructionSelectionDelete = (
+    confirmedPlan: SuccessfulInstructionSelectionDeletePlan,
+  ) => {
+    const latest = deleteContextRef.current;
+    const latestPlan = planInstructionSelectionDeletion(
+      latest.instructionsData,
+      confirmedPlan.selectedInstructionIds,
+      confirmedPlan.mode,
+    );
+    executeConfirmedInstructionDelete(confirmedPlan, latestPlan);
+  };
+
+  const executeConfirmedInstructionDelete = (
+    confirmedPlan: ConfirmedInstructionDeletePlan,
+    latestPlan: InstructionDeletePlan | InstructionSelectionDeletePlan,
+  ) => {
+    handleClose();
     const confirmedParentRepairs = confirmedPlan.survivingParentReferences.map(
       reference => ({
         instructionId: reference.instructionId,
@@ -3560,6 +3590,7 @@ export function useGridData(deps: UseGridDataDeps) {
     handleOpenCommandEditor,
     handleOpenCommandEditorCreate,
     handleRemoveInstruction,
+    executeInstructionSelectionDelete,
     handleInstructionStatus,
     handleInstructionForceChange,
     handleEditInstruction,

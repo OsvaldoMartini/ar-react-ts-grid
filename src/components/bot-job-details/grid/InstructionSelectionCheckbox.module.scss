@@ -1,0 +1,18 @@
+.checkbox {
+  width: 17px;
+  height: 17px;
+  margin: 0 4px;
+  flex: 0 0 17px;
+  accent-color: #0b5394;
+  cursor: pointer;
+  filter: drop-shadow(0 1px 1px rgba(11, 83, 148, 0.22));
+}
+
+.checkbox:checked {
+  filter: drop-shadow(0 0 4px rgba(11, 83, 148, 0.7));
+}
+
+.checkbox:focus-visible {
+  outline: 2px solid #0b5394;
+  outline-offset: 2px;
+}

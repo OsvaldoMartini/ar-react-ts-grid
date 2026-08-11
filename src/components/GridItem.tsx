@@ -160,7 +160,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
     workspacePolicy,
     homeBankingId, botJobId, botJobName,
     gridScrollRef, instructionRef, blockRef, dropdownRef,
-    openDropdown, selectedBlockIds,
+    openDropdown, selectedBlockIds, selectedInstructionIds,
     saveComponentContext, setSaveComponentContext,
     botJobHeader,
     errorFlag,
@@ -205,6 +205,8 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
     handleCreateComponent,
     handleBlockSelectionChange,
     handleBlockDelete,
+    handleInstructionSelectionChange,
+    handleDeleteSelectedInstructions,
     handleOpenCommandEditor,
     handleOpenCommandEditorCreate,
     handleRemoveInstruction,
@@ -877,6 +879,12 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                     const displayOrder = authoritativeIndex + 1;
                     const blockCapability = blockDeleteCapabilities.get(blockId);
                     const isFirstBlock = authoritativeIndex === 0;
+                    const selectedInstructionCount = componentWorkspace
+                      ? 0
+                      : blockData.instructions.filter(instruction => (
+                          instruction.actions !== 'EXCEL GOTO'
+                          && selectedInstructionIds.has(instruction.id)
+                        )).length;
                     return (
                     <BlockCard
                       key={blockGroupIndex}
@@ -909,6 +917,7 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                             : 'Delete checked blocks'
                           : 'Delete block'}
                         blockDeleteDimmed={false}
+                        selectedInstructionCount={selectedInstructionCount}
                         renderHighlighted={renderHighlighted}
                         exportFileNode={renderExportFile(String(blockData.exportFile))}
                         excelGotoNode={excelGotoInstruction &&
@@ -936,6 +945,9 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                         ) : null}
                         onToggleStatus={() => handleBlockStatus(blockData.instructions[0].blockId)}
                         onToggleCollapse={() => toggleBlockCollapsed(Number(blockData.instructions[0].blockId))}
+                        onDeleteSelectedInstructions={componentWorkspace
+                          ? undefined
+                          : () => handleDeleteSelectedInstructions(blockId)}
                         onChangeName={setBlockName}
                         onSaveName={() => handleSaveBlockName(Number(blockData.instructions[0].blockId))}
                         onAddToMemory={(e) => {
@@ -978,6 +990,8 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                             dropdownOpen={openDropdown === instruction.id}
                             isExecuting={instruction.id === executionId}
                             executionState={executionState}
+                            selectable={!componentWorkspace}
+                            selected={selectedInstructionIds.has(instruction.id)}
                             isEditing={editingInstructionId === instruction.id}
                             instructionName={instructionName}
                             nameInputRef={instructionRef}
@@ -1039,6 +1053,8 @@ const GridItem: React.FC<UseInstructionGridProps> = ({
                             onMoveUp={() => handleMoveRowUp(instruction.id)}
                             onMoveDown={() => handleMoveRowDown(instruction.id)}
                             onToggleStatus={() => handleInstructionStatus(instruction.id, blockData.instructions)}
+                            onSelectionChange={(checked) =>
+                              handleInstructionSelectionChange(blockId, instruction.id, checked)}
                             onAddToMemory={(e) => {
                               e.stopPropagation();
                               handleAddConnectedGroupToMemory(instruction);

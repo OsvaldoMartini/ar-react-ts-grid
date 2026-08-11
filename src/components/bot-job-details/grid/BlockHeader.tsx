@@ -14,6 +14,7 @@ import BlockCollapseToggle from './BlockCollapseToggle';
 import InlineNameEditor from './InlineNameEditor';
 import MemoryAddButton from './MemoryAddButton';
 import DeleteButton from './DeleteButton';
+import SelectedInstructionDeleteButton from './SelectedInstructionDeleteButton';
 
 export interface BlockHeaderProps {
   blockActive: boolean;
@@ -32,12 +33,14 @@ export interface BlockHeaderProps {
   blockSelected?: boolean;
   blockDeleteTitle?: string;
   blockDeleteDimmed?: boolean;
+  selectedInstructionCount?: number;
   renderHighlighted: (text: string, query: string) => React.ReactNode;
   exportFileNode: React.ReactNode;
   /** The Excel-GOTO badge cluster, built by GridItem when this block owns it. */
   excelGotoNode?: React.ReactNode;
   onToggleStatus: () => void;
   onToggleCollapse: () => void;
+  onDeleteSelectedInstructions?: () => void;
   onChangeName: (value: string) => void;
   onSaveName: () => void;
   onAddToMemory: (event: React.MouseEvent<HTMLButtonElement>) => void;
@@ -75,11 +78,13 @@ const BlockHeader: React.FC<BlockHeaderProps> = ({
   blockSelected = false,
   blockDeleteTitle,
   blockDeleteDimmed,
+  selectedInstructionCount = 0,
   renderHighlighted,
   exportFileNode,
   excelGotoNode,
   onToggleStatus,
   onToggleCollapse,
+  onDeleteSelectedInstructions,
   onChangeName,
   onSaveName,
   onAddToMemory,
@@ -95,6 +100,12 @@ const BlockHeader: React.FC<BlockHeaderProps> = ({
   <div className={styles.blockHeader}>
     <BlockStatusToggle active={blockActive} onToggle={onToggleStatus} />
     <BlockCollapseToggle collapsed={collapsed} onToggle={onToggleCollapse} />
+    {onDeleteSelectedInstructions && (
+      <SelectedInstructionDeleteButton
+        count={selectedInstructionCount}
+        onDelete={onDeleteSelectedInstructions}
+      />
+    )}
     <span className={styles.blockOrderNumber}>#{blockOrderNumber}</span>
     {isEditing ? (
       <InlineNameEditor

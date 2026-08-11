@@ -39,6 +39,18 @@ export type InstructionDeletePlan =
       reason: string;
     };
 
+export type InstructionSelectionDeleteMode =
+  | 'SELECTED_ONLY'
+  | 'INCLUDE_CONNECTED';
+
+export type InstructionSelectionDeletePlan =
+  | ({
+      ok: true;
+      selectedInstructionIds: number[];
+      mode: InstructionSelectionDeleteMode;
+    } & Extract<InstructionDeletePlan, { ok: true }>)
+  | Extract<InstructionDeletePlan, { ok: false }>;
+
 const isPositiveId = (value: unknown): value is number =>
   typeof value === 'number'
   && Number.isSafeInteger(value)
@@ -262,6 +274,97 @@ export const planInstructionDeletion = (
   return {
     ok: true,
     selectedInstruction: selected,
+    instructions,
+    deleteInstructionIds,
+    survivingParentReferences,
+  };
+};
+
+/**
+ * Plan deletion for checked Bot Job rows without treating variables as ownership edges.
+ *
+ * SELECTED_ONLY deletes exactly the checked rows. INCLUDE_CONNECTED expands only the
+ * structural parent/conditional/loop families already owned by planInstructionDeletion;
+ * passing an empty variable-link set is intentional because variable definitions are
+ * independent records and must survive instruction deletion.
+ */
+export const planInstructionSelectionDeletion = (
+  renderedInstructions: readonly BlockLoopInstructionLoadDTO[],
+  selectedInstructionIds: readonly number[],
+  mode: InstructionSelectionDeleteMode,
+): InstructionSelectionDeletePlan => {
+  const selectedIds = new Set<number>();
+  for (const instructionId of selectedInstructionIds) {
+    if (!isPositiveId(instructionId) || selectedIds.has(instructionId)) {
+      return {
+        ok: false,
+        reason: 'Every selected instruction ID must be unique and positive.',
+      };
+    }
+    selectedIds.add(instructionId);
+  }
+  if (selectedIds.size === 0) {
+    return { ok: false, reason: 'Select at least one instruction row.' };
+  }
+
+  const selectedRows = renderedInstructions
+    .filter(instruction => selectedIds.has(instruction.id))
+    .sort(compareRenderedOrder);
+  if (selectedRows.length !== selectedIds.size) {
+    return {
+      ok: false,
+      reason: 'One or more selected instructions are no longer present. Refresh the grid.',
+    };
+  }
+  const selectedInstruction = selectedRows[0];
+  if (selectedRows.some(instruction => !(
+    instruction.homeBankingId === selectedInstruction.homeBankingId
+    && instruction.botJobId === selectedInstruction.botJobId
+  ))) {
+    return {
+      ok: false,
+      reason: 'Selected instructions must belong to one Bot Job owner.',
+    };
+  }
+
+  const deleteIds = new Set<number>(selectedIds);
+  if (mode === 'INCLUDE_CONNECTED') {
+    for (const instructionId of selectedIds) {
+      const connected = planInstructionDeletion(
+        renderedInstructions,
+        [],
+        instructionId,
+      );
+      if (!connected.ok) return connected;
+      connected.deleteInstructionIds.forEach(id => deleteIds.add(id));
+    }
+  }
+
+  const ownerRows = renderedInstructions.filter(instruction => (
+    instruction.homeBankingId === selectedInstruction.homeBankingId
+    && instruction.botJobId === selectedInstruction.botJobId
+  ));
+  const instructions = ownerRows
+    .filter(instruction => deleteIds.has(instruction.id))
+    .sort(compareRenderedOrder);
+  const deleteInstructionIds = instructions.map(instruction => instruction.id);
+  const survivingParentReferences = ownerRows
+    .filter(instruction => (
+      !deleteIds.has(instruction.id)
+      && isPositiveId(instruction.parentId)
+      && deleteIds.has(instruction.parentId)
+    ))
+    .sort(compareRenderedOrder)
+    .map(instruction => ({
+      instructionId: instruction.id,
+      deletedParentId: instruction.parentId as number,
+    }));
+
+  return {
+    ok: true,
+    selectedInstructionIds: selectedRows.map(instruction => instruction.id),
+    mode,
+    selectedInstruction,
     instructions,
     deleteInstructionIds,
     survivingParentReferences,

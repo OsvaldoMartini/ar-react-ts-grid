@@ -15,6 +15,7 @@ import BlockStatusToggle from './BlockStatusToggle';
 import InstructionTypeBadge from './InstructionTypeBadge';
 import MemoryAddButton from './MemoryAddButton';
 import DeleteButton from './DeleteButton';
+import InstructionSelectionCheckbox from './InstructionSelectionCheckbox';
 
 export interface InstructionRowCapability {
   canMove?: boolean;
@@ -39,6 +40,8 @@ export interface InstructionRowProps {
   dropdownOpen: boolean;
   isExecuting: boolean;
   executionState?: string;
+  selectable?: boolean;
+  selected?: boolean;
   isEditing: boolean;
   instructionName: string;
   nameInputRef: React.RefObject<HTMLInputElement>;
@@ -57,6 +60,7 @@ export interface InstructionRowProps {
   onMoveUp: () => void;
   onMoveDown: () => void;
   onToggleStatus: () => void;
+  onSelectionChange?: (checked: boolean) => void;
   onAddToMemory: (event: React.MouseEvent<HTMLButtonElement>) => void;
   onRemove: () => void;
 }
@@ -82,6 +86,8 @@ const InstructionRow: React.FC<InstructionRowProps> = ({
   dropdownOpen,
   isExecuting,
   executionState,
+  selectable = false,
+  selected = false,
   isEditing,
   instructionName,
   nameInputRef,
@@ -99,6 +105,7 @@ const InstructionRow: React.FC<InstructionRowProps> = ({
   onMoveUp,
   onMoveDown,
   onToggleStatus,
+  onSelectionChange,
   onAddToMemory,
   onRemove,
 }) => {
@@ -142,6 +149,14 @@ const InstructionRow: React.FC<InstructionRowProps> = ({
       ) : (
         <span className={styles.instructionLine}>
           <BlockStatusToggle active={instruction.instructionActive} onToggle={onToggleStatus} />
+          {selectable && (
+            <InstructionSelectionCheckbox
+              instructionId={instruction.id}
+              instructionName={instruction.name}
+              checked={selected}
+              onChange={(checked) => onSelectionChange?.(checked)}
+            />
+          )}
           <InstructionTypeBadge
             instruction={instruction}
             findText={findText}

@@ -1,0 +1,52 @@
+@keyframes selectedRowsGlow {
+  0%, 100% {
+    box-shadow: 0 0 4px rgba(239, 68, 68, 0.55);
+  }
+  50% {
+    box-shadow: 0 0 10px rgba(248, 113, 113, 0.95);
+  }
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: 22px;
+  min-width: 38px;
+  margin: 0 4px 0 0;
+  padding: 0 6px;
+  flex: 0 0 auto;
+  border: 1px solid #fca5a5;
+  border-radius: 8px;
+  background: #fff1f2;
+  color: #b91c1c;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  animation: selectedRowsGlow 1.65s ease-in-out infinite;
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+.button:hover {
+  background: #fee2e2;
+  transform: scale(1.05);
+}
+
+.button:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.button svg {
+  display: block;
+  flex: 0 0 auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button {
+    animation: none;
+  }
+}

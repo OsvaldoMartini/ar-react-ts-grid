@@ -32,6 +32,10 @@ import { buildInstructionRelationshipGraph } from '../domain/instructionRelation
 import type { InstructionRelationshipEdge } from '../domain/instructionRelationshipGraph';
 import { buildBotJobRelationshipFacts } from '../domain/instructionRelationshipFacts';
 import { gridItemTestActionFeedback } from '../domain/gridItemTestActionFeedback';
+import {
+  planInstructionSelectionDeletion,
+  type InstructionSelectionDeleteMode,
+} from '../domain/instructionDelete';
 import constructionImage from '../../../../assets/construction.png';
 import warningRedImage from '../../../../assets/warning_red.png';
 
@@ -96,6 +100,9 @@ export function useInstructionGrid({
   const [openDropdown, setOpenDropdown] = useState<number | null>(null);
   const [mockData, setMockData] = useState<boolean>(false);
   const [selectedBlockIds, setSelectedBlockIds] = useState<Set<number>>(
+    () => new Set<number>(),
+  );
+  const [selectedInstructionIds, setSelectedInstructionIds] = useState<Set<number>>(
     () => new Set<number>(),
   );
 
@@ -193,6 +200,7 @@ export function useInstructionGrid({
     handleOpenCommandEditor,
     handleOpenCommandEditorCreate,
     handleRemoveInstruction,
+    executeInstructionSelectionDelete,
     handleInstructionStatus,
     handleInstructionForceChange,
     handleEditInstruction,
@@ -337,6 +345,7 @@ export function useInstructionGrid({
 
   useEffect(() => {
     setSelectedBlockIds(new Set<number>());
+    setSelectedInstructionIds(new Set<number>());
   }, [workspacePolicy.kind, homeBankingId, botJobId, workspaceEpochInitial]);
 
   useEffect(() => {
@@ -347,6 +356,198 @@ export function useInstructionGrid({
       return new Set(retained);
     });
   }, [orderedWorkspaceBlockIdsSignature]);
+
+  const selectableInstructionIdsSignature = instructionsData
+    .filter(instruction => instruction.actions !== 'EXCEL GOTO')
+    .map(instruction => instruction.id)
+    .join(',');
+  useEffect(() => {
+    const currentIds = new Set(
+      instructionsData
+        .filter(instruction => instruction.actions !== 'EXCEL GOTO')
+        .map(instruction => instruction.id),
+    );
+    setSelectedInstructionIds((current) => {
+      const retained = [...current].filter(instructionId => currentIds.has(instructionId));
+      if (retained.length === current.size) return current;
+      return new Set(retained);
+    });
+  }, [selectableInstructionIdsSignature, instructionsData]);
+
+  const instructionSelectionContextRef = useRef({
+    instructionsData,
+    selectedInstructionIds,
+  });
+  instructionSelectionContextRef.current = {
+    instructionsData,
+    selectedInstructionIds,
+  };
+
+  const orderedSelectableRows = (
+    rows: typeof instructionsData,
+    ownerBlockId: number,
+  ) => rows
+    .filter(instruction => (
+      instruction.blockId === ownerBlockId
+      && instruction.actions !== 'EXCEL GOTO'
+    ))
+    .sort((left, right) => (
+      left.instructionOrderNumber - right.instructionOrderNumber
+      || left.id - right.id
+    ));
+
+  const handleInstructionSelectionChange = (
+    ownerBlockId: number,
+    instructionId: number,
+    checked: boolean,
+  ) => {
+    if (workspacePolicy.kind !== 'BOT_JOB') return;
+    const selectionContext = instructionSelectionContextRef.current;
+    const blockRows = orderedSelectableRows(
+      selectionContext.instructionsData,
+      ownerBlockId,
+    );
+    const firstInstructionId = blockRows[0]?.id;
+    if (instructionId !== firstInstructionId) {
+      setSelectedInstructionIds((current) => {
+        const next = new Set(current);
+        if (checked) next.add(instructionId); else next.delete(instructionId);
+        return next;
+      });
+      return;
+    }
+
+    const blockInstructionIds = blockRows.map(instruction => instruction.id);
+    if (!checked) {
+      setSelectedInstructionIds((current) => {
+        const next = new Set(current);
+        blockInstructionIds.forEach(id => next.delete(id));
+        return next;
+      });
+      return;
+    }
+
+    const applyScope = (scope: 'FIRST' | 'ALL') => {
+      handleClose();
+      const latestRows = orderedSelectableRows(
+        instructionSelectionContextRef.current.instructionsData,
+        ownerBlockId,
+      );
+      const latestIds = latestRows.map(instruction => instruction.id);
+      setSelectedInstructionIds((current) => {
+        const next = new Set(current);
+        latestIds.forEach(id => next.delete(id));
+        if (scope === 'ALL') latestIds.forEach(id => next.add(id));
+        else if (latestIds[0] != null) next.add(latestIds[0]);
+        return next;
+      });
+    };
+
+    setAlertImage(constructionImage);
+    setAlertClass('construction-image');
+    setAlertMessageHeader('Select Rows');
+    setAlertMessageBody(
+      `Choose the first row only or all ${blockRows.length} current rows in this block.`,
+    );
+    setAlertMessageFooter(
+      'You can adjust the other row checkboxes individually after this choice.',
+    );
+    setErrorFlag(false);
+    setAlertOnConfirm(() => () => applyScope('ALL'));
+    setAlertAlternateAction({
+      label: 'First row only',
+      onAction: () => applyScope('FIRST'),
+      title: 'Check only the first row in this block',
+      confirmLabel: 'All rows',
+      confirmTitle: 'Check every current row in this block',
+    });
+  };
+
+  const handleDeleteSelectedInstructions = (ownerBlockId: number) => {
+    if (workspacePolicy.kind !== 'BOT_JOB') return;
+    const selectionContext = instructionSelectionContextRef.current;
+    const selectedRows = orderedSelectableRows(
+      selectionContext.instructionsData,
+      ownerBlockId,
+    ).filter(instruction => selectionContext.selectedInstructionIds.has(instruction.id));
+    if (selectedRows.length === 0) return;
+    const selectedIds = selectedRows.map(instruction => instruction.id);
+    const directPlan = planInstructionSelectionDeletion(
+      selectionContext.instructionsData,
+      selectedIds,
+      'SELECTED_ONLY',
+    );
+    const connectedPlan = planInstructionSelectionDeletion(
+      selectionContext.instructionsData,
+      selectedIds,
+      'INCLUDE_CONNECTED',
+    );
+    if (!directPlan.ok || !connectedPlan.ok) {
+      const planningReason = !directPlan.ok
+        ? directPlan.reason
+        : !connectedPlan.ok
+          ? connectedPlan.reason
+          : 'The selected rows could not be planned for deletion.';
+      setAlertImage(warningRedImage);
+      setAlertClass('construction-image');
+      setAlertMessageHeader('Delete Selected Rows');
+      setAlertMessageBody(planningReason);
+      setAlertMessageFooter('No instruction was deleted. Refresh the grid and retry.');
+      setErrorFlag(true);
+      setAlertAlternateAction(undefined);
+      return;
+    }
+
+    const executeScope = (mode: InstructionSelectionDeleteMode) => {
+      const latest = instructionSelectionContextRef.current;
+      const latestSelectedIds = orderedSelectableRows(
+        latest.instructionsData,
+        ownerBlockId,
+      )
+        .filter(instruction => latest.selectedInstructionIds.has(instruction.id))
+        .map(instruction => instruction.id);
+      const latestPlan = planInstructionSelectionDeletion(
+        latest.instructionsData,
+        latestSelectedIds,
+        mode,
+      );
+      if (!latestPlan.ok) {
+        handleClose();
+        setAlertImage(warningRedImage);
+        setAlertClass('construction-image');
+        setAlertMessageHeader('Delete Selected Rows');
+        setAlertMessageBody(latestPlan.reason);
+        setAlertMessageFooter('No instruction was deleted. Refresh the grid and retry.');
+        setErrorFlag(true);
+        setAlertAlternateAction(undefined);
+        return;
+      }
+      executeInstructionSelectionDelete(latestPlan);
+    };
+
+    const connectedExtraCount = Math.max(
+      0,
+      connectedPlan.deleteInstructionIds.length - directPlan.deleteInstructionIds.length,
+    );
+    setAlertImage(warningRedImage);
+    setAlertClass('construction-image');
+    setAlertMessageHeader(`Delete ${selectedRows.length} Selected Row${selectedRows.length === 1 ? '' : 's'}?`);
+    setAlertMessageBody(
+      `Choose only the checked row${selectedRows.length === 1 ? '' : 's'}, or include ${connectedExtraCount} structurally connected parent/conditional/loop row${connectedExtraCount === 1 ? '' : 's'}.`,
+    );
+    setAlertMessageFooter(
+      'Blocks and variable definitions are always preserved. Surviving parent and variable-owner links are disconnected. This action cannot be undone.',
+    );
+    setErrorFlag(true);
+    setAlertOnConfirm(() => () => executeScope('INCLUDE_CONNECTED'));
+    setAlertAlternateAction({
+      label: 'Selected only',
+      onAction: () => executeScope('SELECTED_ONLY'),
+      title: 'Delete exactly the checked rows and preserve their blocks and variables',
+      confirmLabel: 'Selected + connected',
+      confirmTitle: 'Also delete structurally connected parent, conditional, and loop rows',
+    });
+  };
 
   const blockSelectionContextRef = useRef({
     orderedBlocks: orderedWorkspaceBlocks,
@@ -910,6 +1111,7 @@ export function useInstructionGrid({
     // UI state
     openDropdown,
     selectedBlockIds,
+    selectedInstructionIds,
     saveComponentContext, setSaveComponentContext,
     // bot job header controller
     botJobHeader,
@@ -963,6 +1165,8 @@ export function useInstructionGrid({
     handleCreateComponent,
     handleBlockSelectionChange,
     handleBlockDelete,
+    handleInstructionSelectionChange,
+    handleDeleteSelectedInstructions,
     handleRemoveBlock,
     handleOpenCommandEditor,
     handleOpenCommandEditorCreate,

@@ -1,6 +1,9 @@
 import type { BlockLoopInstructionLoadDTO } from '../../../instructionsMockData';
 import type { InstructionVariableLink } from './instructionDependency';
-import { planInstructionDeletion } from './instructionDelete';
+import {
+  planInstructionDeletion,
+  planInstructionSelectionDeletion,
+} from './instructionDelete';
 
 const row = (
   id: number,
@@ -134,5 +137,41 @@ describe('React-owned instruction deletion planning', () => {
     expect(result.survivingParentReferences).toEqual([
       { instructionId: 71, deletedParentId: 70 },
     ]);
+  });
+
+  it('deletes exactly the checked rows and repairs surviving parent references', () => {
+    const rows = [
+      row(80, 1, 'O'),
+      row(81, 2, 'GET', { parentId: 80 }),
+      row(82, 3, 'C', { parentId: 81 }),
+    ];
+
+    const result = planInstructionSelectionDeletion(rows, [80, 82], 'SELECTED_ONLY');
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.deleteInstructionIds).toEqual([80, 82]);
+    expect(result.survivingParentReferences).toEqual([
+      { instructionId: 81, deletedParentId: 80 },
+    ]);
+  });
+
+  it('expands structural connections without cascading through variables', () => {
+    const rows = [
+      row(90, 1, 'O'),
+      row(91, 2, 'GET', { parentId: 90, variableId: 700 }),
+      row(92, 3, 'CK', {
+        variableId: 700,
+        blockId: 20,
+        blockOrderNumber: 2,
+      }),
+    ];
+
+    const result = planInstructionSelectionDeletion(rows, [90], 'INCLUDE_CONNECTED');
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.deleteInstructionIds).toEqual([90, 91]);
+    expect(result.deleteInstructionIds).not.toContain(92);
   });
 });
