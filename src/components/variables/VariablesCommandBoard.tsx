@@ -47,6 +47,10 @@ import {
 } from './domain/variableSlotRequirements';
 import styles from './VariablesCommandBoard.module.scss';
 
+// The Review Connections implementation remains available for a future
+// re-enable; only its Variables-page launcher is intentionally hidden.
+const SHOW_REVIEW_CONNECTIONS_ACTION = false;
+
 export type VariablesCommandDropTarget = {
   blockId: number;
   index: number;
@@ -530,7 +534,7 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
           </div>
           {(
             onResolveVisibleConnections
-            || onReviewVisibleConnections
+            || (SHOW_REVIEW_CONNECTIONS_ACTION && onReviewVisibleConnections)
             || onReleaseVisibleConnections
             || onAddCommand
           ) && (
@@ -541,16 +545,18 @@ const VariablesCommandBoard: React.FC<VariablesCommandBoardProps> = ({
               {onResolveVisibleConnections && (
                 <RulesCard
                   event={resolveConnectionsEvent}
+                  className={styles.resolveConnectionsAction}
                   animate={false}
-                  pulse={false}
-                  glow={false}
+                  pulse
+                  glow
+                  border
                   onClick={() =>
                     onResolveVisibleConnections(visibleConnectionScope)}
                   disabled={false}
                   title={`Resolve connections for ${visibleConnectionScope.label}`}
                 />
               )}
-              {onReviewVisibleConnections && (
+              {SHOW_REVIEW_CONNECTIONS_ACTION && onReviewVisibleConnections && (
                 <VariablesConnectionsPrimaryAction
                   scopeLabel={visibleConnectionScope.label}
                   onReview={() =>

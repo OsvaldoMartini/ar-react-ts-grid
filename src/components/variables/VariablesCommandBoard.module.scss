@@ -62,6 +62,18 @@
   min-height: 30px;
 }
 
+.resolveConnectionsAction {
+  border-color: #00a6c8;
+  background: linear-gradient(135deg, #e6fbff, #c8f4ff);
+  color: #006b86;
+  font-weight: 900;
+  text-shadow: none;
+  box-shadow:
+    0 0 0 1px rgba(0, 166, 200, 0.18),
+    0 0 12px rgba(0, 196, 224, 0.48),
+    0 0 24px rgba(0, 196, 224, 0.24);
+}
+
 .commandSearch {
   min-width: 0;
   display: flex;
