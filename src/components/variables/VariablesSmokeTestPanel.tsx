@@ -66,6 +66,10 @@ import {
   type ExcelWriteFlushPolicy,
   type ExcelWriteManagerState,
 } from '../excel-write-manager/domain/excelWriteManager';
+import {
+  excelWriteCommandFlushBoundary,
+  settleExcelWriteStopBoundary,
+} from '../excel-write-manager/domain/excelWriteFlushBoundary';
 
 export interface VariablesSmokeTestPanelProps {
   review: VariablesExecutionFlowReview;
@@ -208,6 +212,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   const [excelWriteManagerOpen, setExcelWriteManagerOpen] = useState(false);
   const [excelWriteSaving, setExcelWriteSaving] = useState(false);
   const excelWriteManagerRef = useRef<ExcelWriteManagerState>(EMPTY_EXCEL_WRITE_MANAGER);
+  const excelWriteFlushQueueRef = useRef<Promise<void>>(Promise.resolve());
   const runtimeValuesRef = useRef<Map<number, VariablesSmokeTestRuntimeValue>>(new Map());
   const commandRemainingRef = useRef<CommandRemainingByInstructionId>({});
   const conditionalStateRef = useRef<ConditionalExecutionState>(
@@ -268,16 +273,17 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     setExcelWriteManager(next);
   }, []);
 
-  const flushExcelWriteFiles = useCallback(async (blockId?: number) => {
-    const candidates = excelWriteManagerRef.current.files.filter(file =>
-      file.dirty && (blockId === undefined || file.touchedBlockIds.includes(blockId)));
-    if (candidates.length === 0) return;
-    if (executionMode !== 'INTEGRATION' || !integrationRef.current?.activeRun) {
-      throw new Error('ExcelWrite files can be saved only by an active Integration run.');
-    }
-    setExcelWriteSaving(true);
-    try {
-      for (const file of candidates) {
+  const flushExcelWriteFiles = useCallback((blockId?: number): Promise<void> => {
+    const execute = async () => {
+      const candidates = excelWriteManagerRef.current.files.filter(file =>
+        file.dirty && (blockId === undefined || file.touchedBlockIds.includes(blockId)));
+      if (candidates.length === 0) return;
+      if (executionMode !== 'INTEGRATION' || !integrationRef.current?.activeRun) {
+        throw new Error('ExcelWrite files can be saved only by an active Integration run.');
+      }
+      setExcelWriteSaving(true);
+      try {
+        for (const file of candidates) {
         replaceExcelWriteManager(markExcelWriteFile(
           excelWriteManagerRef.current, file.fileId, 'UPLOADING', 'Sending finalized DTO to Java…'));
         try {
@@ -301,10 +307,14 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
             failure instanceof Error ? failure.message : 'ExcelWrite save failed.'));
           throw failure;
         }
+        }
+      } finally {
+        setExcelWriteSaving(false);
       }
-    } finally {
-      setExcelWriteSaving(false);
-    }
+    };
+    const queued = excelWriteFlushQueueRef.current.catch(() => undefined).then(execute);
+    excelWriteFlushQueueRef.current = queued;
+    return queued;
   }, [executionMode, replaceExcelWriteManager]);
 
   useEffect(() => () => {
@@ -425,12 +435,15 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     setStatus('STOPPING');
     onActivePositionChange?.(null);
     if (executionMode === 'INTEGRATION') {
-      try {
-        await integrationRef.current?.stop('USER_REQUEST');
-      } catch (failure) {
-        const message = failure instanceof Error ? failure.message : 'Integration stop was not acknowledged.';
-        setEntries(current => [...current, logEntry(processedCommands + 1, 'ERROR', message, 'failed')]);
-      }
+      const result = await settleExcelWriteStopBoundary(
+        () => flushExcelWriteFiles(),
+        async () => { await integrationRef.current?.stop('USER_REQUEST'); },
+      );
+      [result.flushFailure, result.stopFailure].filter((failure): failure is Error => failure !== null)
+        .forEach(failure => setEntries(current => [
+          ...current,
+          logEntry(processedCommands + 1, 'ERROR', failure.message, 'failed'),
+        ]));
     }
     setStatus('STOPPED');
   };
@@ -704,6 +717,9 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     const scheduleCurrentItem = async () => {
       try {
         if (executionMode === 'INTEGRATION' && activeStep && item.kind === 'STEP') {
+          if (excelWriteCommandFlushBoundary(activeAction) !== null) {
+            await flushExcelWriteFiles();
+          }
           if (item.step.instructionId === null) {
             throw new Error('Integration cannot execute an instruction without a database ID.');
           }
@@ -741,17 +757,15 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
             setStatus('STOPPING');
             onActivePositionChange?.(null);
             if (executionMode === 'INTEGRATION') {
-              try {
-                await integrationRef.current?.stop('PAUSE_STOP');
-              } catch (failure) {
-                const message = failure instanceof Error
-                  ? failure.message
-                  : 'Integration PAUSE stop was not acknowledged.';
-                setEntries(current => [
+              const result = await settleExcelWriteStopBoundary(
+                () => flushExcelWriteFiles(),
+                async () => { await integrationRef.current?.stop('PAUSE_STOP'); },
+              );
+              [result.flushFailure, result.stopFailure].filter((failure): failure is Error => failure !== null)
+                .forEach(failure => setEntries(current => [
                   ...current,
-                  logEntry(processedCommands + 1, 'ERROR', message, 'failed'),
-                ]);
-              }
+                  logEntry(processedCommands + 1, 'ERROR', failure.message, 'failed'),
+                ]));
             }
             setStatus('STOPPED');
             return;

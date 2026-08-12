@@ -45,3 +45,11 @@ test('refuses incomplete target and VOID variables', () => {
   expect(() => arriveExcelWrite(EMPTY_EXCEL_WRITE_MANAGER, { ...step(1, 'User'), excelWrite: null }, 0, new Map())).toThrow(/file target/);
   expect(() => arriveExcelWrite(EMPTY_EXCEL_WRITE_MANAGER, step(1, 'User'), 0, new Map([[1, { state: 'VOID' as const, value: '' }]]))).toThrow(/VOID/);
 });
+test('creates output for produced empty and whitespace values without treating them as VOID', () => {
+  const empty = arriveExcelWrite(EMPTY_EXCEL_WRITE_MANAGER, step(1, 'Empty'), 0,
+    new Map([[1, { state: 'VALUE' as const, value: '' }]]));
+  const whitespace = arriveExcelWrite(empty, step(2, 'Spaces'), 0,
+    new Map([[2, { state: 'VALUE' as const, value: '   ' }]]));
+  expect(whitespace.files[0].rows[0]).toEqual({ Empty: '', Spaces: '   ' });
+  expect(encodeExcelWriteCsv(whitespace.files[0])).toBe('Empty,Spaces\r\n,   \r\n');
+});
