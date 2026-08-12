@@ -8,6 +8,7 @@ import type {
 import type { CommandRemainingByInstructionId } from '../variables/Engine/controlFlowCommand.types';
 import styles from './SmokeTestSimulationWorkspace.module.scss';
 import type { ExcelDataMode } from '../excel-data/ExcelDataModeToggle';
+import type { ExcelWriteManagerState } from '../excel-write-manager/domain/excelWriteManager';
 import type { SmokeTestIntegrationController } from './integration/useSmokeTestIntegrationRun';
 import type {
   SmokeTestExecutionMode,
@@ -23,8 +24,15 @@ type Props = {
   onActivePositionChange: (position: VariablesSmokeTestPosition | null) => void;
   onExecutionTraceChange: (positions: readonly VariablesSmokeTestPosition[]) => void;
   onCommandRemainingChange: (remaining: CommandRemainingByInstructionId) => void;
-  onRunStart: () => void;
+  onRunStart: () => void | Promise<void>;
   onOpenExcelWriterManager: () => void;
+  excelWriterMessages: readonly string[];
+  excelWriterMessageGeneration: number;
+  onPublishExcelWriterState: (
+    state: ExcelWriteManagerState,
+    busy: boolean,
+    policyLocked: boolean,
+  ) => boolean;
   excelDataMode: ExcelDataMode;
   onExcelDataModeChange: (mode: ExcelDataMode) => void;
   executionMode: SmokeTestExecutionMode;
@@ -44,6 +52,9 @@ const SmokeTestSimulationWorkspace: React.FC<Props> = ({
   onCommandRemainingChange,
   onRunStart,
   onOpenExcelWriterManager,
+  excelWriterMessages,
+  excelWriterMessageGeneration,
+  onPublishExcelWriterState,
   excelDataMode,
   onExcelDataModeChange,
   executionMode,
@@ -63,6 +74,9 @@ const SmokeTestSimulationWorkspace: React.FC<Props> = ({
       onCommandRemainingChange={onCommandRemainingChange}
       onRunStart={onRunStart}
       onOpenExcelWriterManager={onOpenExcelWriterManager}
+      excelWriterMessages={excelWriterMessages}
+      excelWriterMessageGeneration={excelWriterMessageGeneration}
+      onPublishExcelWriterState={onPublishExcelWriterState}
       excelDataMode={excelDataMode}
       onExcelDataModeChange={onExcelDataModeChange}
       executionMode={executionMode}

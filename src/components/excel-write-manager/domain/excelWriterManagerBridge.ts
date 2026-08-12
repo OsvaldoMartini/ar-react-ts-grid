@@ -1,37 +1,32 @@
-import type {
-  ExcelWriteFlushPolicy,
-  ExcelWriteManagerState,
-} from './excelWriteManager';
+import type { ExcelWriteManagerState } from './excelWriteManager';
 
 export const EXCEL_WRITER_MANAGER_SESSION_ID = 'excelWriterManager';
 
-export type ExcelWriterManagerSnapshot = {
-  type: 'STATE';
+export type ExcelWriterAuthority = {
+  bindingEpoch: string;
+  workspaceEpoch: number;
   homeBankingId: number;
   botJobId: number;
+};
+
+export type ExcelWriterManagerSnapshot = ExcelWriterAuthority & {
   state: ExcelWriteManagerState;
   busy: boolean;
   policyLocked: boolean;
 };
 
-export type ExcelWriterManagerCommand =
-  | { type: 'REQUEST_STATE'; botJobId: number }
-  | { type: 'POLICY_CHANGE'; botJobId: number; policy: ExcelWriteFlushPolicy }
-  | { type: 'CELL_CHANGE'; botJobId: number; fileId: string; rowIndex: number; column: string; value: string }
-  | { type: 'SAVE'; botJobId: number };
-
-export type ExcelWriterManagerBridgeMessage =
-  | ExcelWriterManagerSnapshot
-  | ExcelWriterManagerCommand;
-
-export const excelWriterManagerChannelName = (botJobId: number): string =>
-  `arweb.excel-writer-manager.${botJobId}`;
-
-export const isExcelWriterManagerMessage = (
+export const isExcelWriterManagerSnapshot = (
   value: unknown,
-  botJobId: number,
-): value is ExcelWriterManagerBridgeMessage => {
+  authority: ExcelWriterAuthority,
+): value is ExcelWriterManagerSnapshot => {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as Record<string, unknown>;
-  return candidate.botJobId === botJobId && typeof candidate.type === 'string';
+  return candidate.bindingEpoch === authority.bindingEpoch
+    && candidate.workspaceEpoch === authority.workspaceEpoch
+    && candidate.homeBankingId === authority.homeBankingId
+    && candidate.botJobId === authority.botJobId
+    && candidate.state !== null
+    && typeof candidate.state === 'object'
+    && typeof candidate.busy === 'boolean'
+    && typeof candidate.policyLocked === 'boolean';
 };

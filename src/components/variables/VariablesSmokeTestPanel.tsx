@@ -68,11 +68,6 @@ import {
   excelWriteCommandFlushBoundary,
   settleExcelWriteStopBoundary,
 } from '../excel-write-manager/domain/excelWriteFlushBoundary';
-import {
-  excelWriterManagerChannelName,
-  isExcelWriterManagerMessage,
-  type ExcelWriterManagerSnapshot,
-} from '../excel-write-manager/domain/excelWriterManagerBridge';
 
 export interface VariablesSmokeTestPanelProps {
   review: VariablesExecutionFlowReview;
@@ -82,8 +77,15 @@ export interface VariablesSmokeTestPanelProps {
   onActivePositionChange?: (position: VariablesSmokeTestPosition | null) => void;
   onExecutionTraceChange?: (positions: readonly VariablesSmokeTestPosition[]) => void;
   onCommandRemainingChange?: (remaining: CommandRemainingByInstructionId) => void;
-  onRunStart?: () => void;
+  onRunStart?: () => void | Promise<void>;
   onOpenExcelWriterManager?: () => void;
+  excelWriterMessages?: readonly string[];
+  excelWriterMessageGeneration?: number;
+  onPublishExcelWriterState?: (
+    state: ExcelWriteManagerState,
+    busy: boolean,
+    policyLocked: boolean,
+  ) => boolean;
   excelDataMode?: ExcelDataMode;
   onExcelDataModeChange?: (mode: ExcelDataMode) => void;
   executionMode?: SmokeTestExecutionMode;
@@ -195,6 +197,9 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   onCommandRemainingChange,
   onRunStart,
   onOpenExcelWriterManager,
+  excelWriterMessages = [],
+  excelWriterMessageGeneration = 0,
+  onPublishExcelWriterState,
   excelDataMode = 'REAL',
   onExcelDataModeChange,
   executionMode = 'SMOKE',
@@ -224,7 +229,8 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   );
   const executionTraceRef = useRef<readonly VariablesSmokeTestPosition[]>([]);
   const integrationRef = useRef(integration);
-  const excelWriterChannelRef = useRef<BroadcastChannel | null>(null);
+  const excelWriterMessagesCursorRef = useRef(0);
+  const excelWriterMessageGenerationRef = useRef(excelWriterMessageGeneration);
   const excelWriterOpenRequestedRef = useRef(false);
   const excelWriteSavingRef = useRef(false);
   const executionActiveRef = useRef(false);
@@ -281,17 +287,11 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     setExcelWriteManager(next);
   }, []);
 
-  const publishExcelWriterManager = useCallback(() => {
-    const message: ExcelWriterManagerSnapshot = {
-      type: 'STATE',
-      homeBankingId: review.homeBankingId,
-      botJobId: review.botJobId,
-      state: excelWriteManagerRef.current,
-      busy: excelWriteSavingRef.current,
-      policyLocked: executionActiveRef.current,
-    };
-    excelWriterChannelRef.current?.postMessage(message);
-  }, [review.botJobId, review.homeBankingId]);
+  const publishExcelWriterManager = useCallback(() => onPublishExcelWriterState?.(
+    excelWriteManagerRef.current,
+    excelWriteSavingRef.current,
+    executionActiveRef.current,
+  ), [onPublishExcelWriterState]);
 
   const flushExcelWriteFiles = useCallback((blockId?: number): Promise<void> => {
     const execute = async () => {
@@ -338,30 +338,39 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   }, [executionMode, replaceExcelWriteManager]);
 
   useEffect(() => {
-    if (typeof BroadcastChannel === 'undefined') return undefined;
-    const channel = new BroadcastChannel(excelWriterManagerChannelName(review.botJobId));
-    excelWriterChannelRef.current = channel;
-    channel.onmessage = event => {
-      if (!isExcelWriterManagerMessage(event.data, review.botJobId)) return;
-      const message = event.data;
-      if (message.type === 'REQUEST_STATE') {
-        publishExcelWriterManager();
-      } else if (message.type === 'POLICY_CHANGE' && !executionActiveRef.current) {
-        replaceExcelWriteManager(Object.freeze({ ...excelWriteManagerRef.current, policy: message.policy }));
-      } else if (message.type === 'CELL_CHANGE' && !excelWriteSavingRef.current) {
-        replaceExcelWriteManager(editExcelWriteCell(
-          excelWriteManagerRef.current, message.fileId, message.rowIndex, message.column, message.value,
-        ));
-      } else if (message.type === 'SAVE' && !excelWriteSavingRef.current) {
-        void flushExcelWriteFiles().catch(() => undefined);
+    if (excelWriterMessageGenerationRef.current !== excelWriterMessageGeneration) {
+      excelWriterMessageGenerationRef.current = excelWriterMessageGeneration;
+      excelWriterMessagesCursorRef.current = 0;
+    } else if (excelWriterMessagesCursorRef.current > excelWriterMessages.length) {
+      excelWriterMessagesCursorRef.current = 0;
+    }
+    const unread = excelWriterMessages.slice(excelWriterMessagesCursorRef.current);
+    excelWriterMessagesCursorRef.current = excelWriterMessages.length;
+    unread.forEach(raw => {
+      try {
+        const envelope = JSON.parse(String(raw));
+        if ((envelope.operationId || envelope.type) !== 'excelWriterWorkspace.command') return;
+        const message = typeof envelope.body === 'string' ? JSON.parse(envelope.body) : envelope.body;
+        if (Number(message?.botJobId) !== review.botJobId) return;
+        if (message.command === 'REQUEST_STATE') publishExcelWriterManager();
+        else if (message.command === 'POLICY_CHANGE' && !executionActiveRef.current) {
+          replaceExcelWriteManager(Object.freeze({ ...excelWriteManagerRef.current, policy: message.policy }));
+        } else if (message.command === 'CELL_CHANGE' && !excelWriteSavingRef.current) {
+          replaceExcelWriteManager(editExcelWriteCell(
+            excelWriteManagerRef.current,
+            String(message.fileId || ''),
+            Number(message.rowIndex),
+            String(message.column || ''),
+            String(message.value ?? ''),
+          ));
+        } else if (message.command === 'SAVE' && !excelWriteSavingRef.current) {
+          void flushExcelWriteFiles().catch(() => undefined);
+        }
+      } catch (_) {
+        // Other workspace messages do not belong to the ExcelWriter projection.
       }
-    };
-    publishExcelWriterManager();
-    return () => {
-      excelWriterChannelRef.current = null;
-      channel.close();
-    };
-  }, [flushExcelWriteFiles, publishExcelWriterManager, replaceExcelWriteManager, review.botJobId]);
+    });
+  }, [excelWriterMessageGeneration, excelWriterMessages, flushExcelWriteFiles, publishExcelWriterManager, replaceExcelWriteManager, review.botJobId]);
 
   useEffect(() => () => {
     const resolve = pauseResolverRef.current;
@@ -379,7 +388,17 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
       policy: excelWriteManagerRef.current.policy,
     }));
     excelWriterOpenRequestedRef.current = false;
-    onRunStart?.();
+    try {
+      await onRunStart?.();
+    } catch (failure) {
+      const message = failure instanceof Error
+        ? failure.message
+        : 'Smoke Test supporting pages are not ready.';
+      setStatus('STOPPED');
+      setCounters({ ...EMPTY_COUNTERS, failed: 1 });
+      setEntries([logEntry(1, 'FAIL', message, 'failed')]);
+      return;
+    }
     const nextPlan = buildVariablesSmokeTestPlan(review, selectedBlockIds);
     const nextProgram = buildSmokeExecutionProgram(nextPlan);
     const nextCommandRemaining = Object.freeze({

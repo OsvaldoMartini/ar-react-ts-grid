@@ -22,6 +22,7 @@ type ExcelSnapshot = {
   ok: boolean;
   error?: string;
   botJobId: number;
+  homeBankingId: number;
   botJobName: string;
   fileName: string;
   filePath: string;
@@ -30,6 +31,7 @@ type ExcelSnapshot = {
   blocks: ExcelBlock[];
   selectedRowIndex: number | null;
   datasetRevision?: number;
+  datasetEpoch: number;
   dirty?: boolean;
   mode: 'REAL' | 'SYNTHETIC';
   syntheticContext?: string;
@@ -49,8 +51,9 @@ const parse = (raw: string) => {
 
 const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
   useEffect(() => { document.title = 'Excel DATA'; }, []);
-  const { webSocket, connected, messages, error } = useWebSocket(socketPort, sessionId);
+  const { webSocket, connected, messages, messageGeneration = 0, error } = useWebSocket(socketPort, sessionId);
   const cursor = useRef(0);
+  const messageGenerationRef = useRef(messageGeneration);
   const [snapshot, setSnapshot] = useState<ExcelSnapshot | null>(null);
   const [status, setStatus] = useState('Connecting to Excel dataset…');
   const [pendingAction, setPendingAction] = useState<'STANDARD' | 'SYNTHETIC' | 'SAVE' | 'CLEAR' | null>(null);
@@ -234,6 +237,18 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
   }, [sessionId, webSocket]);
 
   useEffect(() => { if (connected) bootstrap(); }, [bootstrap, connected]);
+  useEffect(() => {
+    if (!snapshot || !connected || !webSocket || webSocket.readyState !== WebSocket.OPEN) return;
+    webSocket.send(JSON.stringify({
+      type: 'excelData.ready',
+      sessionId,
+      body: JSON.stringify({
+        botJobId: snapshot.botJobId,
+        homeBankingId: snapshot.homeBankingId,
+        datasetEpoch: snapshot.datasetEpoch,
+      }),
+    }));
+  }, [connected, sessionId, snapshot, webSocket]);
   useEffect(() => { if (error) setStatus(error); }, [error]);
   useEffect(() => {
     if (!connected) resetRowInteraction();
@@ -245,7 +260,10 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
   }, [snapshot?.botJobId, snapshot?.mode]);
 
   useEffect(() => {
-    if (cursor.current > messages.length) cursor.current = 0;
+    if (messageGenerationRef.current !== messageGeneration) {
+      messageGenerationRef.current = messageGeneration;
+      cursor.current = 0;
+    } else if (cursor.current > messages.length) cursor.current = 0;
     const pending = messages.slice(cursor.current);
     cursor.current = messages.length;
     pending.forEach(raw => {
@@ -327,7 +345,7 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
         setStatus('The Excel Data response could not be read.');
       }
     });
-  }, [messages, onClose, resetRowInteraction, showExcelError]);
+  }, [messageGeneration, messages, onClose, resetRowInteraction, showExcelError]);
 
   return (
     <DetachedPageShell title="Excel Data" testId="excel-data-page" showCloseButton={false}>
@@ -338,7 +356,9 @@ const ExcelDataPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
             <p>{snapshot ? `${snapshot.botJobName} · ${snapshot.fileName}` : 'Bot Job execution dataset'}</p>
           </div>
           <div className={styles.actions} data-floating-drag-ignore="true">
-            <span className={`${styles.status} ${snapshot?.mode === 'SYNTHETIC' ? styles.syntheticStatus : styles.realStatus}`}>{status}</span>
+            <span className={`${styles.status} ${!connected || error || /failed|unavailable|not connected|could not/i.test(status)
+              ? styles.errorStatus
+              : snapshot?.mode === 'SYNTHETIC' ? styles.syntheticStatus : styles.realStatus}`} role="status">{status}</span>
             <ExcelDataModeToggle mode={snapshot?.mode ?? 'REAL'}
               onChange={selectMode} disabled={!connected || generating || selectingRowIndex !== null || movingRow !== null} />
             <button type="button" className={styles.actionButton} onClick={() => setPendingAction('STANDARD')} disabled={!connected || generating || selectingRowIndex !== null || movingRow !== null || snapshot?.mode !== 'REAL'}><FilePlus2 size={14} />Recreate Columns</button>

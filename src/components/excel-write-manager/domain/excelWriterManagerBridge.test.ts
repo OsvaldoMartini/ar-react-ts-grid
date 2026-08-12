@@ -1,11 +1,14 @@
-import {
-  excelWriterManagerChannelName,
-  isExcelWriterManagerMessage,
-} from './excelWriterManagerBridge';
+import { isExcelWriterManagerSnapshot } from './excelWriterManagerBridge';
 
-test('isolates ExcelWriter messages by Bot Job owner', () => {
-  expect(excelWriterManagerChannelName(5)).toBe('arweb.excel-writer-manager.5');
-  expect(isExcelWriterManagerMessage({ type: 'SAVE', botJobId: 5 }, 5)).toBe(true);
-  expect(isExcelWriterManagerMessage({ type: 'SAVE', botJobId: 32 }, 5)).toBe(false);
-  expect(isExcelWriterManagerMessage(null, 5)).toBe(false);
+const authority = { bindingEpoch: 'binding-1', workspaceEpoch: 4, homeBankingId: 2, botJobId: 5 };
+
+test('accepts ExcelWriter state only for the exact workspace owner', () => {
+  const snapshot = {
+    ...authority,
+    state: { files: [], policy: 'END_EXECUTION' },
+    busy: false,
+    policyLocked: false,
+  };
+  expect(isExcelWriterManagerSnapshot(snapshot, authority)).toBe(true);
+  expect(isExcelWriterManagerSnapshot({ ...snapshot, botJobId: 32 }, authority)).toBe(false);
 });

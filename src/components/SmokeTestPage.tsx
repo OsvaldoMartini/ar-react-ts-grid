@@ -22,6 +22,7 @@ import type {
 } from './variables/domain/variablesSmokeTestTypes';
 import type { CommandRemainingByInstructionId } from './variables/Engine/controlFlowCommand.types';
 import { useVariablesRuntimeMemory } from './variables/useVariablesRuntimeMemory';
+import type { ExcelWriteManagerState } from './excel-write-manager/domain/excelWriteManager';
 import {
   useVariablesInstructionStatus,
   type VariablesInstructionStatusResult,
@@ -60,7 +61,15 @@ type PendingRequest = {
   operation: 'variablesWorkspace.bootstrap' | 'variablesWorkspace.refresh';
 };
 
+type SupportingWorkspacesPending = {
+  requestId: string;
+  resolve: () => void;
+  reject: (failure: Error) => void;
+  timeout: ReturnType<typeof setTimeout>;
+};
+
 const REQUEST_TIMEOUT_MS = 12_000;
+const SUPPORTING_WORKSPACES_TIMEOUT_MS = 45_000;
 
 const bodyObject = (value: unknown): Record<string, any> | null =>
   value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -95,9 +104,11 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     messageGeneration,
   } = useWebSocket(socketPort, sessionId);
   const processedMessagesRef = useRef(0);
+  const processedMessageGenerationRef = useRef(messageGeneration ?? 0);
   const requestSequenceRef = useRef(0);
   const pendingRef = useRef<PendingRequest | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const supportingWorkspacesPendingRef = useRef<SupportingWorkspacesPending | null>(null);
   const snapshotRef = useRef<VariableWorkspaceSnapshot | null>(null);
   const [snapshot, setSnapshot] = useState<VariableWorkspaceSnapshot | null>(null);
   const [pending, setPending] = useState<PendingRequest | null>(null);
@@ -125,6 +136,14 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     timeoutRef.current = null;
     pendingRef.current = null;
     setPending(null);
+  }, []);
+
+  const rejectSupportingWorkspaces = useCallback((message: string) => {
+    const current = supportingWorkspacesPendingRef.current;
+    if (current === null) return;
+    supportingWorkspacesPendingRef.current = null;
+    clearTimeout(current.timeout);
+    current.reject(new Error(message));
   }, []);
 
   const replaceSnapshot = useCallback((next: VariableWorkspaceSnapshot) => {
@@ -307,16 +326,23 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
   useEffect(() => {
     if (!connected) {
       clearPending();
+      rejectSupportingWorkspaces('Smoke Test disconnected while preparing its supporting pages.');
       resetRuntimeMemory();
       return;
     }
     sendSnapshotRequest('variablesWorkspace.bootstrap');
-  }, [clearPending, connected, resetRuntimeMemory, sendSnapshotRequest]);
+  }, [clearPending, connected, rejectSupportingWorkspaces, resetRuntimeMemory, sendSnapshotRequest]);
 
-  useEffect(() => () => clearPending(), [clearPending]);
+  useEffect(() => () => {
+    clearPending();
+    rejectSupportingWorkspaces('Smoke Test closed while preparing its supporting pages.');
+  }, [clearPending, rejectSupportingWorkspaces]);
 
   useEffect(() => {
-    if (processedMessagesRef.current > messages.length) {
+    if (processedMessageGenerationRef.current !== (messageGeneration ?? 0)) {
+      processedMessageGenerationRef.current = messageGeneration ?? 0;
+      processedMessagesRef.current = 0;
+    } else if (processedMessagesRef.current > messages.length) {
       processedMessagesRef.current = 0;
     }
     const unread = messages.slice(processedMessagesRef.current);
@@ -331,6 +357,33 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
         return;
       }
       const body = bodyObject(envelope.body);
+      if (envelope.operationId === 'smokeTest.supportingWorkspaces.prepareResponse') {
+        const current = supportingWorkspacesPendingRef.current;
+        if (current === null || body?.requestId !== current.requestId) return;
+        supportingWorkspacesPendingRef.current = null;
+        clearTimeout(current.timeout);
+        if (body?.ok === false) {
+          const message = statusText(body, 'Smoke Test supporting pages are not ready.');
+          setStatus({ level: 'error', text: message });
+          current.reject(new Error(message));
+        } else {
+          setStatus({
+            level: 'ok',
+            text: 'Runtime Variables, Excel Data, and ExcelWriter Manager are ready.',
+          });
+          current.resolve();
+        }
+        return;
+      }
+      if (envelope.operationId === 'excelWriterWorkspace.stateResponse') {
+        if (body?.ok === false) {
+          setStatus({
+            level: 'error',
+            text: statusText(body, 'ExcelWriter Manager state could not be synchronized.'),
+          });
+        }
+        return;
+      }
       if ([
         'excelDataWorkspace.openResponse',
         'excelDataWorkspace.mode.readResponse',
@@ -391,6 +444,7 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     clearPending,
     handleRuntimeMemoryMessage,
     handleInstructionStatusMessage,
+    messageGeneration,
     messages,
     replaceSnapshot,
     sourceBotJobId,
@@ -400,23 +454,54 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     () => snapshot ? buildVariablesExecutionFlowReview(snapshot) : null,
     [snapshot],
   );
-  const openSupportingWorkspaces = useCallback(() => {
-    if (!webSocket || webSocket.readyState !== WebSocket.OPEN || !snapshotRef.current) {
-      setStatus({
-        level: 'error',
-        text: 'Excel Data could not be opened because Smoke Test is disconnected.',
-      });
-      return;
+  const openSupportingWorkspaces = useCallback((): Promise<void> => {
+    const current = snapshotRef.current;
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN || !current) {
+      const message = 'Supporting pages could not be prepared because Smoke Test is disconnected.';
+      setStatus({ level: 'error', text: message });
+      return Promise.reject(new Error(message));
     }
-    webSocket.send(JSON.stringify({
-      type: 'excelDataWorkspace.open',
-      sessionId,
-      body: JSON.stringify({
-        requestId: `${Date.now()}-smoke-excel-data-open`,
-        bindingEpoch: snapshotRef.current.bindingEpoch,
-        workspaceEpoch: snapshotRef.current.workspaceEpoch,
-      }),
-    }));
+    if (supportingWorkspacesPendingRef.current !== null) {
+      return Promise.reject(new Error('Supporting pages are already being prepared.'));
+    }
+    requestSequenceRef.current += 1;
+    const requestId = `${Date.now()}-smoke-supporting-${requestSequenceRef.current}`;
+    setStatus({
+      level: 'warn',
+      text: 'Opening Runtime Variables, Excel Data, and ExcelWriter Manager...',
+    });
+    return new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        if (supportingWorkspacesPendingRef.current?.requestId !== requestId) return;
+        supportingWorkspacesPendingRef.current = null;
+        const message = 'Supporting pages did not become ready before the timeout.';
+        setStatus({ level: 'error', text: message });
+        reject(new Error(message));
+      }, SUPPORTING_WORKSPACES_TIMEOUT_MS);
+      supportingWorkspacesPendingRef.current = { requestId, resolve, reject, timeout };
+      try {
+        webSocket.send(JSON.stringify({
+          type: 'smokeTest.supportingWorkspaces.prepare',
+          sessionId,
+          body: JSON.stringify({
+            requestId,
+            bindingEpoch: current.bindingEpoch,
+            workspaceEpoch: current.workspaceEpoch,
+            homeBankingId: current.botJob.homeBankingId,
+            botJobId: current.botJob.id,
+            graphRevision: current.graphRevision,
+          }),
+        }));
+      } catch (failure) {
+        supportingWorkspacesPendingRef.current = null;
+        clearTimeout(timeout);
+        const message = failure instanceof Error
+          ? failure.message
+          : 'Supporting pages request could not be sent.';
+        setStatus({ level: 'error', text: message });
+        reject(new Error(message));
+      }
+    });
   }, [sessionId, webSocket]);
   const openExcelWriterManager = useCallback(() => {
     const current = snapshotRef.current;
@@ -435,6 +520,38 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
         botJobId: current.botJob.id,
       }),
     }));
+  }, [sessionId, webSocket]);
+  const publishExcelWriterState = useCallback((
+    state: ExcelWriteManagerState,
+    busy: boolean,
+    policyLocked: boolean,
+  ): boolean => {
+    const current = snapshotRef.current;
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN || !current) return false;
+    try {
+      webSocket.send(JSON.stringify({
+        type: 'excelWriterWorkspace.state',
+        sessionId,
+        body: JSON.stringify({
+          bindingEpoch: current.bindingEpoch,
+          workspaceEpoch: current.workspaceEpoch,
+          homeBankingId: current.botJob.homeBankingId,
+          botJobId: current.botJob.id,
+          state,
+          busy,
+          policyLocked,
+        }),
+      }));
+      return true;
+    } catch (failure) {
+      setStatus({
+        level: 'error',
+        text: failure instanceof Error
+          ? failure.message
+          : 'ExcelWriter Manager state could not be synchronized.',
+      });
+      return false;
+    }
   }, [sessionId, webSocket]);
   const updateExcelDataMode = useCallback((mode: ExcelDataMode) => {
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN) return;
@@ -643,6 +760,9 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
                 onCommandRemainingChange={setCommandRemainingByInstructionId}
                 onRunStart={openSupportingWorkspaces}
                 onOpenExcelWriterManager={openExcelWriterManager}
+                excelWriterMessages={messages}
+                excelWriterMessageGeneration={messageGeneration ?? 0}
+                onPublishExcelWriterState={publishExcelWriterState}
                 excelDataMode={excelDataMode}
                 onExcelDataModeChange={updateExcelDataMode}
                 executionMode={executionMode}
