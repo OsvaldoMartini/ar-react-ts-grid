@@ -395,19 +395,10 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     if (!webSocket || webSocket.readyState !== WebSocket.OPEN || !snapshotRef.current) {
       setStatus({
         level: 'error',
-        text: 'Runtime Variables could not be opened because Smoke Test is disconnected.',
+        text: 'Excel Data could not be opened because Smoke Test is disconnected.',
       });
       return;
     }
-    webSocket.send(JSON.stringify({
-      type: 'runtimeVariablesWorkspace.open',
-      sessionId,
-      body: JSON.stringify({
-        requestId: `${Date.now()}-smoke-runtime-open`,
-        bindingEpoch: snapshotRef.current.bindingEpoch,
-        workspaceEpoch: snapshotRef.current.workspaceEpoch,
-      }),
-    }));
     webSocket.send(JSON.stringify({
       type: 'excelDataWorkspace.open',
       sessionId,

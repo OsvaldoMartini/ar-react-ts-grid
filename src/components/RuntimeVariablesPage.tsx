@@ -265,6 +265,22 @@ const RuntimeVariablesPage: React.FC<RuntimeVariablesPageProps> = ({
   useEffect(() => () => clearPending(), [clearPending]);
 
   useEffect(() => {
+    if (!snapshot || !connected || !webSocket
+      || webSocket.readyState !== WebSocket.OPEN) return;
+    webSocket.send(JSON.stringify({
+      type: 'runtimeVariablesWorkspace.ready',
+      sessionId,
+      body: JSON.stringify({
+        requestId: `${Date.now()}-runtime-variables-ready`,
+        bindingEpoch: snapshot.bindingEpoch,
+        workspaceEpoch: snapshot.workspaceEpoch,
+        homeBankingId: snapshot.botJob.homeBankingId,
+        botJobId: snapshot.botJob.id,
+      }),
+    }));
+  }, [connected, sessionId, snapshot, webSocket]);
+
+  useEffect(() => {
     if (processedMessagesRef.current > messages.length) processedMessagesRef.current = 0;
     const unread = messages.slice(processedMessagesRef.current);
     processedMessagesRef.current = messages.length;
