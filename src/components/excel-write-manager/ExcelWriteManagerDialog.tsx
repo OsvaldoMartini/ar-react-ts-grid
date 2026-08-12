@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { FileSpreadsheet, X } from 'lucide-react';
+import FloatingWorkspaceFrame from '../workspace/FloatingWorkspaceFrame';
 import type {
   ExcelWriteFileState,
   ExcelWriteFlushPolicy,
@@ -27,9 +28,7 @@ const ExcelWriteManagerDialog: React.FC<Props> = ({
   onClose,
 }) => {
   const [selectedId, setSelectedId] = useState(state.files[0]?.fileId ?? '');
-  const closeRef = useRef<HTMLButtonElement>(null);
 
-  useEffect(() => { closeRef.current?.focus(); }, []);
   useEffect(() => {
     if (!state.files.some(file => file.fileId === selectedId)) {
       setSelectedId(state.files[0]?.fileId ?? '');
@@ -38,14 +37,20 @@ const ExcelWriteManagerDialog: React.FC<Props> = ({
 
   const selected: ExcelWriteFileState | undefined = state.files.find(file => file.fileId === selectedId);
   return (
-    <div className={styles.backdrop} role="presentation"
-      onMouseDown={event => { if (event.target === event.currentTarget && !busy) onClose(); }}>
-      <section className={styles.dialog} role="dialog" aria-modal="true"
-        aria-labelledby="excel-writer-manager-title">
-        <header>
+    <FloatingWorkspaceFrame
+      className={styles.pane}
+      role="region"
+      aria-labelledby="excel-writer-manager-title"
+      initialPosition={() => ({
+        x: Math.max(16, window.innerWidth - Math.min(1080, window.innerWidth - 32) - 24),
+        y: 72,
+      })}
+    >
+        <header data-floating-workspace-drag-handle>
           <div><FileSpreadsheet size={21} /><span><small>React execution memory</small>
             <h2 id="excel-writer-manager-title">ExcelWriter Manager</h2></span></div>
-          <button ref={closeRef} type="button" aria-label="Close ExcelWriter Manager"
+          <button type="button" aria-label="Close ExcelWriter Manager"
+            data-floating-drag-ignore="true"
             disabled={busy} onClick={onClose}><X size={18} /></button>
         </header>
         <div className={styles.toolbar}>
@@ -83,8 +88,7 @@ const ExcelWriteManagerDialog: React.FC<Props> = ({
             </tbody></table></div>
           </> : <p>No ExcelWrite command has arrived in this run.</p>}
         </main>
-      </section>
-    </div>
+    </FloatingWorkspaceFrame>
   );
 };
 
