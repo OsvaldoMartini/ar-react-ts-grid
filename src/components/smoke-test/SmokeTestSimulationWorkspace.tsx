@@ -24,6 +24,7 @@ type Props = {
   onExecutionTraceChange: (positions: readonly VariablesSmokeTestPosition[]) => void;
   onCommandRemainingChange: (remaining: CommandRemainingByInstructionId) => void;
   onRunStart: () => void;
+  onOpenExcelWriterManager: () => void;
   excelDataMode: ExcelDataMode;
   onExcelDataModeChange: (mode: ExcelDataMode) => void;
   executionMode: SmokeTestExecutionMode;
@@ -42,6 +43,7 @@ const SmokeTestSimulationWorkspace: React.FC<Props> = ({
   onExecutionTraceChange,
   onCommandRemainingChange,
   onRunStart,
+  onOpenExcelWriterManager,
   excelDataMode,
   onExcelDataModeChange,
   executionMode,
@@ -60,6 +62,7 @@ const SmokeTestSimulationWorkspace: React.FC<Props> = ({
       onExecutionTraceChange={onExecutionTraceChange}
       onCommandRemainingChange={onCommandRemainingChange}
       onRunStart={onRunStart}
+      onOpenExcelWriterManager={onOpenExcelWriterManager}
       excelDataMode={excelDataMode}
       onExcelDataModeChange={onExcelDataModeChange}
       executionMode={executionMode}

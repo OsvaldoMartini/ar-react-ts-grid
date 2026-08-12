@@ -1,0 +1,15 @@
+.shell { height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; background: #eef3f8; color: #18324a; }
+.topBar { align-items: center; background: #0b5394; color: #fff; cursor: move; display: flex; flex: 0 0 auto; gap: 14px; justify-content: space-between; padding: 8px 12px; touch-action: none; user-select: none; }
+.titleBlock { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.titleBlock h1 { font-size: 18px; line-height: 1.1; margin: 0; }
+.titleBlock small { display: block; opacity: .85; margin-bottom: 2px; }
+.actions { display: flex; align-items: center; gap: 8px; cursor: default; }
+.status { border: 1px solid rgba(255, 255, 255, .36); border-radius: 999px; padding: 6px 10px; font-size: 12px; font-weight: 800; white-space: nowrap; }
+.statusReady { background: rgba(8, 166, 190, .25); box-shadow: 0 0 14px rgba(34, 211, 238, .42); }
+.statusWaiting { background: rgba(213, 137, 16, .28); }
+.actions > button { min-height: 34px; border: 1px solid rgba(255, 255, 255, .55); border-radius: 7px; background: rgba(255, 255, 255, .12); color: #fff; font-weight: 800; padding: 6px 10px; cursor: pointer; }
+.body { display: flex; flex: 1 1 auto; min-height: 0; overflow: hidden; padding: 12px; }
+.manager { display: flex; flex: 1 1 auto; min-height: 0; overflow: hidden; border: 1px solid #70d7ef; border-radius: 12px; box-shadow: 0 8px 28px rgba(33, 92, 128, .18), 0 0 24px rgba(34, 211, 238, .3); }
+.empty { margin: auto; display: grid; gap: 8px; max-width: 520px; text-align: center; color: #45647c; }
+.empty strong { color: #18324a; font-size: 18px; }
+@media (max-width: 720px) { .topBar { align-items: flex-start; flex-direction: column; } .actions { width: 100%; overflow-x: auto; } .body { padding: 8px; } }

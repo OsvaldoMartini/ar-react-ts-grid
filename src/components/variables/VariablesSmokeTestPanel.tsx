@@ -56,20 +56,23 @@ import type {
 } from '../smoke-test/integration/smokeTestIntegration.contract';
 import SmokeTestWebPageRefreshButton from '../smoke-test/integration/SmokeTestWebPageRefreshButton';
 import ConfirmationDialog from '../ConfirmationDialog';
-import ExcelWriteManagerDialog from '../excel-write-manager/ExcelWriteManagerDialog';
 import {
   EMPTY_EXCEL_WRITE_MANAGER,
   arriveExcelWrite,
   buildExcelWriteArtifacts,
   editExcelWriteCell,
   markExcelWriteFile,
-  type ExcelWriteFlushPolicy,
   type ExcelWriteManagerState,
 } from '../excel-write-manager/domain/excelWriteManager';
 import {
   excelWriteCommandFlushBoundary,
   settleExcelWriteStopBoundary,
 } from '../excel-write-manager/domain/excelWriteFlushBoundary';
+import {
+  excelWriterManagerChannelName,
+  isExcelWriterManagerMessage,
+  type ExcelWriterManagerSnapshot,
+} from '../excel-write-manager/domain/excelWriterManagerBridge';
 
 export interface VariablesSmokeTestPanelProps {
   review: VariablesExecutionFlowReview;
@@ -80,6 +83,7 @@ export interface VariablesSmokeTestPanelProps {
   onExecutionTraceChange?: (positions: readonly VariablesSmokeTestPosition[]) => void;
   onCommandRemainingChange?: (remaining: CommandRemainingByInstructionId) => void;
   onRunStart?: () => void;
+  onOpenExcelWriterManager?: () => void;
   excelDataMode?: ExcelDataMode;
   onExcelDataModeChange?: (mode: ExcelDataMode) => void;
   executionMode?: SmokeTestExecutionMode;
@@ -190,6 +194,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   onExecutionTraceChange,
   onCommandRemainingChange,
   onRunStart,
+  onOpenExcelWriterManager,
   excelDataMode = 'REAL',
   onExcelDataModeChange,
   executionMode = 'SMOKE',
@@ -209,7 +214,6 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   const [reportCounter, setReportCounter] = useState<keyof VariablesSmokeTestCounters | null>(null);
   const [pausedStep, setPausedStep] = useState<VariablesSmokeTestStep | null>(null);
   const [excelWriteManager, setExcelWriteManager] = useState<ExcelWriteManagerState>(EMPTY_EXCEL_WRITE_MANAGER);
-  const [excelWriteManagerOpen, setExcelWriteManagerOpen] = useState(false);
   const [excelWriteSaving, setExcelWriteSaving] = useState(false);
   const excelWriteManagerRef = useRef<ExcelWriteManagerState>(EMPTY_EXCEL_WRITE_MANAGER);
   const excelWriteFlushQueueRef = useRef<Promise<void>>(Promise.resolve());
@@ -220,6 +224,10 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   );
   const executionTraceRef = useRef<readonly VariablesSmokeTestPosition[]>([]);
   const integrationRef = useRef(integration);
+  const excelWriterChannelRef = useRef<BroadcastChannel | null>(null);
+  const excelWriterOpenRequestedRef = useRef(false);
+  const excelWriteSavingRef = useRef(false);
+  const executionActiveRef = useRef(false);
   const pauseResolverRef = useRef<((decision: 'CONTINUE' | 'STOP') => void) | null>(null);
   const stopRequestedRef = useRef(false);
   const excelRowIndexRef = useRef(0);
@@ -273,6 +281,18 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     setExcelWriteManager(next);
   }, []);
 
+  const publishExcelWriterManager = useCallback(() => {
+    const message: ExcelWriterManagerSnapshot = {
+      type: 'STATE',
+      homeBankingId: review.homeBankingId,
+      botJobId: review.botJobId,
+      state: excelWriteManagerRef.current,
+      busy: excelWriteSavingRef.current,
+      policyLocked: executionActiveRef.current,
+    };
+    excelWriterChannelRef.current?.postMessage(message);
+  }, [review.botJobId, review.homeBankingId]);
+
   const flushExcelWriteFiles = useCallback((blockId?: number): Promise<void> => {
     const execute = async () => {
       const candidates = excelWriteManagerRef.current.files.filter(file =>
@@ -317,6 +337,32 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     return queued;
   }, [executionMode, replaceExcelWriteManager]);
 
+  useEffect(() => {
+    if (typeof BroadcastChannel === 'undefined') return undefined;
+    const channel = new BroadcastChannel(excelWriterManagerChannelName(review.botJobId));
+    excelWriterChannelRef.current = channel;
+    channel.onmessage = event => {
+      if (!isExcelWriterManagerMessage(event.data, review.botJobId)) return;
+      const message = event.data;
+      if (message.type === 'REQUEST_STATE') {
+        publishExcelWriterManager();
+      } else if (message.type === 'POLICY_CHANGE' && !executionActiveRef.current) {
+        replaceExcelWriteManager(Object.freeze({ ...excelWriteManagerRef.current, policy: message.policy }));
+      } else if (message.type === 'CELL_CHANGE' && !excelWriteSavingRef.current) {
+        replaceExcelWriteManager(editExcelWriteCell(
+          excelWriteManagerRef.current, message.fileId, message.rowIndex, message.column, message.value,
+        ));
+      } else if (message.type === 'SAVE' && !excelWriteSavingRef.current) {
+        void flushExcelWriteFiles().catch(() => undefined);
+      }
+    };
+    publishExcelWriterManager();
+    return () => {
+      excelWriterChannelRef.current = null;
+      channel.close();
+    };
+  }, [flushExcelWriteFiles, publishExcelWriterManager, replaceExcelWriteManager, review.botJobId]);
+
   useEffect(() => () => {
     const resolve = pauseResolverRef.current;
     pauseResolverRef.current = null;
@@ -332,7 +378,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
       files: Object.freeze([]),
       policy: excelWriteManagerRef.current.policy,
     }));
-    setExcelWriteManagerOpen(false);
+    excelWriterOpenRequestedRef.current = false;
     onRunStart?.();
     const nextPlan = buildVariablesSmokeTestPlan(review, selectedBlockIds);
     const nextProgram = buildSmokeExecutionProgram(nextPlan);
@@ -578,7 +624,10 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
               runtimeValuesRef.current,
             );
             replaceExcelWriteManager(nextManager);
-            setExcelWriteManagerOpen(true);
+            if (!excelWriterOpenRequestedRef.current) {
+              excelWriterOpenRequestedRef.current = true;
+              onOpenExcelWriterManager?.();
+            }
             simulatedResult = {
               ...simulatedResult,
               tone: 'SUCCESS',
@@ -820,6 +869,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     onExecutionTraceChange,
     onCommitRuntimeValue,
     onCommandRemainingChange,
+    onOpenExcelWriterManager,
     pauseAt,
     flushExcelWriteFiles,
     replaceExcelWriteManager,
@@ -849,6 +899,12 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   const executionActive = status === 'STARTING'
     || status === 'RUNNING'
     || status === 'STOPPING';
+
+  useEffect(() => {
+    excelWriteSavingRef.current = excelWriteSaving;
+    executionActiveRef.current = executionActive;
+    publishExcelWriterManager();
+  }, [excelWriteManager, excelWriteSaving, executionActive, publishExcelWriterManager]);
   const integrationUnavailable = executionMode === 'INTEGRATION'
     && (!runtimeWriteAvailable || !integration || integration.phase !== 'IDLE');
 
@@ -913,7 +969,10 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
           onRefresh={() => { void integration?.refreshPage().catch(() => undefined); }}
         />
         <button type="button" className={styles.runButton} disabled={excelWriteManager.files.length === 0}
-          title="Open ExcelWriter Manager" onClick={() => setExcelWriteManagerOpen(true)}>
+          title="Open ExcelWriter Manager" onClick={() => {
+            excelWriterOpenRequestedRef.current = true;
+            onOpenExcelWriterManager?.();
+          }}>
           <FileSpreadsheet size={14} aria-hidden="true" /> FILES ({excelWriteManager.files.length})
         </button>
         <button
@@ -999,21 +1058,6 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
           initialFocus="confirm"
           onConfirm={() => resolvePause('CONTINUE')}
           onCancel={() => resolvePause('STOP')}
-        />
-      )}
-      {excelWriteManagerOpen && (
-        <ExcelWriteManagerDialog
-          state={excelWriteManager}
-          busy={excelWriteSaving}
-          policyLocked={executionActive}
-          onPolicyChange={(policy: ExcelWriteFlushPolicy) => replaceExcelWriteManager(Object.freeze({
-            ...excelWriteManagerRef.current,
-            policy,
-          }))}
-          onCellChange={(fileId, rowIndex, column, value) => replaceExcelWriteManager(
-            editExcelWriteCell(excelWriteManagerRef.current, fileId, rowIndex, column, value))}
-          onSave={() => { void flushExcelWriteFiles().catch(() => undefined); }}
-          onClose={() => setExcelWriteManagerOpen(false)}
         />
       )}
     </aside>

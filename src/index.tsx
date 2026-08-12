@@ -27,6 +27,7 @@ import PagesOpen, { PAGES_OPEN_SESSION_ID } from './components/PagesOpen';
 import CommandEditorPage, { COMMAND_EDITOR_SESSION_ID } from './components/CommandEditorPage';
 import VariablesPage, { VARIABLES_MANAGER_SESSION_ID } from './components/VariablesPage';
 import ExcelDataPage, { EXCEL_DATA_SESSION_ID } from './components/ExcelDataPage';
+import ExcelWriterManagerPage, { EXCEL_WRITER_MANAGER_SESSION_ID } from './components/ExcelWriterManagerPage';
 import SmokeTestPage from './components/SmokeTestPage';
 import PageMappingsPage, { PAGE_MAPPINGS_SESSION_ID } from './components/PageMappingsPage';
 import InfoPage, { INFO_PAGE_SESSION_ID } from './components/InfoPage';
@@ -719,6 +720,15 @@ const App: React.FC = () => {
           key={sessionId}
           socketPort={socketPort}
           sessionId={sessionId}
+          onClose={closeDetachedWorkspace}
+        />
+      )}
+      {sessionId === EXCEL_WRITER_MANAGER_SESSION_ID && (
+        <ExcelWriterManagerPage
+          key={sessionId}
+          socketPort={socketPort}
+          sessionId={sessionId}
+          sourceBotJobId={botJobId}
           onClose={closeDetachedWorkspace}
         />
       )}

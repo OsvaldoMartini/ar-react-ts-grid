@@ -343,6 +343,15 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
         }
         return;
       }
+      if (envelope.operationId === 'excelWriterWorkspace.openResponse') {
+        setStatus({
+          level: body?.ok === false ? 'error' : 'ok',
+          text: statusText(body, body?.ok === false
+            ? 'ExcelWriter Manager could not be opened.'
+            : 'ExcelWriter Manager opened for this Bot Job.'),
+        });
+        return;
+      }
       if (
         envelope.operationId !== 'variablesWorkspace.bootstrapResponse'
         && envelope.operationId !== 'variablesWorkspace.refreshResponse'
@@ -406,6 +415,24 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
         requestId: `${Date.now()}-smoke-excel-data-open`,
         bindingEpoch: snapshotRef.current.bindingEpoch,
         workspaceEpoch: snapshotRef.current.workspaceEpoch,
+      }),
+    }));
+  }, [sessionId, webSocket]);
+  const openExcelWriterManager = useCallback(() => {
+    const current = snapshotRef.current;
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN || !current) {
+      setStatus({ level: 'error', text: 'ExcelWriter Manager could not be opened because Smoke Test is disconnected.' });
+      return;
+    }
+    webSocket.send(JSON.stringify({
+      type: 'excelWriterWorkspace.open',
+      sessionId,
+      body: JSON.stringify({
+        requestId: `${Date.now()}-smoke-excel-writer-open`,
+        bindingEpoch: current.bindingEpoch,
+        workspaceEpoch: current.workspaceEpoch,
+        homeBankingId: current.botJob.homeBankingId,
+        botJobId: current.botJob.id,
       }),
     }));
   }, [sessionId, webSocket]);
@@ -615,6 +642,7 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
                 onExecutionTraceChange={setSmokeExecutionTrace}
                 onCommandRemainingChange={setCommandRemainingByInstructionId}
                 onRunStart={openSupportingWorkspaces}
+                onOpenExcelWriterManager={openExcelWriterManager}
                 excelDataMode={excelDataMode}
                 onExcelDataModeChange={updateExcelDataMode}
                 executionMode={executionMode}
