@@ -39,7 +39,8 @@ type DeleteConfirmation = {
   body: string;
 };
 
-const REQUEST_TIMEOUT_MS = 12_000;
+const REQUEST_SLOW_NOTICE_MS = 12_000;
+const REQUEST_TIMEOUT_MS = 90_000;
 
 const bodyObject = (value: unknown): Record<string, any> | null =>
   value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -77,6 +78,7 @@ const RuntimeVariablesPage: React.FC<RuntimeVariablesPageProps> = ({
   const processedMessagesRef = useRef(0);
   const requestSequenceRef = useRef(0);
   const pendingRef = useRef<PendingRequest | null>(null);
+  const slowNoticeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const snapshotRef = useRef<VariableWorkspaceSnapshot | null>(null);
   const createSubmitRef = useRef<(draft: { name: string }) => string | null>(() => null);
@@ -96,7 +98,9 @@ const RuntimeVariablesPage: React.FC<RuntimeVariablesPageProps> = ({
   });
 
   const clearPending = useCallback(() => {
+    if (slowNoticeRef.current !== null) clearTimeout(slowNoticeRef.current);
     if (timeoutRef.current !== null) clearTimeout(timeoutRef.current);
+    slowNoticeRef.current = null;
     timeoutRef.current = null;
     pendingRef.current = null;
     setPending(null);
@@ -164,6 +168,15 @@ const RuntimeVariablesPage: React.FC<RuntimeVariablesPageProps> = ({
           : '',
       }),
     }));
+    slowNoticeRef.current = setTimeout(() => {
+      if (pendingRef.current?.requestId !== requestId) return;
+      setStatus({
+        level: 'warn',
+        text: operation.endsWith('refresh')
+          ? 'Runtime Variables is still refreshing...'
+          : 'Runtime Variables is still loading while Integration prepares the Playwright page...',
+      });
+    }, REQUEST_SLOW_NOTICE_MS);
     timeoutRef.current = setTimeout(() => {
       if (pendingRef.current?.requestId !== requestId) return;
       clearPending();
