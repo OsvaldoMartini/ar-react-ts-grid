@@ -15,7 +15,6 @@ interface PageScannerWorkspaceHeaderProps {
   messages?: readonly string[];
   sessionId?: string;
   onClose: () => void;
-  onOpenPageMappings?: () => void;
 }
 
 const PageScannerWorkspaceHeader: React.FC<PageScannerWorkspaceHeaderProps> = ({
@@ -31,7 +30,6 @@ const PageScannerWorkspaceHeader: React.FC<PageScannerWorkspaceHeaderProps> = ({
   messages = [],
   sessionId = '',
   onClose,
-  onOpenPageMappings,
 }) => {
   const resolvedStatus = error
     || status
@@ -64,17 +62,6 @@ const PageScannerWorkspaceHeader: React.FC<PageScannerWorkspaceHeaderProps> = ({
             messages={messages}
             sessionId={sessionId}
           />
-        )}
-        {onOpenPageMappings && (
-          <button
-            type="button"
-            className={styles.closeButton}
-            title="Open Page Mappings history"
-            disabled={!connected || !botJobId || botJobId <= 0}
-            onClick={onOpenPageMappings}
-          >
-            Mappings
-          </button>
         )}
         <button
           type="button"

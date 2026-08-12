@@ -3114,7 +3114,6 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
           messages={messages}
           sessionId={sessionId}
           onClose={closeDetachedPageScanner}
-          onOpenPageMappings={openPageMappings}
         />
       ) : isPreScanMode ? (
         <BotJobDetailsChrome
@@ -3190,7 +3189,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
             </button>
             <button
               type="button"
-              className={styles.preScanButton}
+              className={`${styles.preScanButton} ${styles.preScanMappingsButton}`}
               onClick={openPageMappings}
               disabled={!botJobId || botJobId <= 0}
               title="Open historical Page Mappings captures"
