@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlaskConical, Octagon, Play, ShieldCheck } from 'lucide-react';
 import type { VariablesExecutionFlowReview } from './domain/variablesExecutionFlowReview';
 import { buildVariablesSmokeTestPlan } from './domain/variablesSmokeTestPlan';
@@ -54,6 +54,7 @@ import type {
   SmokeTestIntegrationStepResult,
 } from '../smoke-test/integration/smokeTestIntegration.contract';
 import SmokeTestWebPageRefreshButton from '../smoke-test/integration/SmokeTestWebPageRefreshButton';
+import ConfirmationDialog from '../ConfirmationDialog';
 
 export interface VariablesSmokeTestPanelProps {
   review: VariablesExecutionFlowReview;
@@ -191,6 +192,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   const [stepIntervalMs, setStepIntervalMs] = useState(100);
   const [writeRuntimeValues, setWriteRuntimeValues] = useState(false);
   const [reportCounter, setReportCounter] = useState<keyof VariablesSmokeTestCounters | null>(null);
+  const [pausedStep, setPausedStep] = useState<VariablesSmokeTestStep | null>(null);
   const runtimeValuesRef = useRef<Map<number, VariablesSmokeTestRuntimeValue>>(new Map());
   const commandRemainingRef = useRef<CommandRemainingByInstructionId>({});
   const conditionalStateRef = useRef<ConditionalExecutionState>(
@@ -198,6 +200,8 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   );
   const executionTraceRef = useRef<readonly VariablesSmokeTestPosition[]>([]);
   const integrationRef = useRef(integration);
+  const pauseResolverRef = useRef<((decision: 'CONTINUE' | 'STOP') => void) | null>(null);
+  const stopRequestedRef = useRef(false);
   const previewPlan = useMemo(
     () => buildVariablesSmokeTestPlan(review, selectedBlockIds),
     [review, selectedBlockIds],
@@ -225,7 +229,32 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     integrationRef.current = integration;
   }, [integration]);
 
+  const resolvePause = useCallback((decision: 'CONTINUE' | 'STOP') => {
+    const resolve = pauseResolverRef.current;
+    if (resolve === null) return;
+    pauseResolverRef.current = null;
+    setPausedStep(null);
+    resolve(decision);
+  }, []);
+
+  const pauseAt = useCallback((step: VariablesSmokeTestStep) => {
+    const previous = pauseResolverRef.current;
+    if (previous !== null) previous('STOP');
+    setPausedStep(step);
+    return new Promise<'CONTINUE' | 'STOP'>((resolve) => {
+      pauseResolverRef.current = resolve;
+    });
+  }, []);
+
+  useEffect(() => () => {
+    const resolve = pauseResolverRef.current;
+    pauseResolverRef.current = null;
+    if (resolve !== null) resolve('STOP');
+  }, []);
+
   const run = async () => {
+    resolvePause('STOP');
+    stopRequestedRef.current = false;
     onRunStart?.();
     const nextPlan = buildVariablesSmokeTestPlan(review, selectedBlockIds);
     const nextProgram = buildSmokeExecutionProgram(nextPlan);
@@ -322,6 +351,8 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     const integrationCleanupPending = executionMode === 'INTEGRATION'
       && Boolean(integrationRef.current?.activeRun);
     if (status !== 'RUNNING' && !integrationCleanupPending) return;
+    stopRequestedRef.current = true;
+    resolvePause('STOP');
     setStatus('STOPPING');
     onActivePositionChange?.(null);
     if (executionMode === 'INTEGRATION') {
@@ -562,6 +593,34 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
             controlTransition.playwrightCommand,
           );
         }
+        if (
+          activeStep
+          && item.kind === 'STEP'
+          && item.step.action.trim().toLocaleUpperCase() === 'PAUSE'
+        ) {
+          const decision = await pauseAt(item.step);
+          if (cancelled || stopRequestedRef.current) return;
+          if (decision === 'STOP') {
+            stopRequestedRef.current = true;
+            setStatus('STOPPING');
+            onActivePositionChange?.(null);
+            if (executionMode === 'INTEGRATION') {
+              try {
+                await integrationRef.current?.stop('PAUSE_STOP');
+              } catch (failure) {
+                const message = failure instanceof Error
+                  ? failure.message
+                  : 'Integration PAUSE stop was not acknowledged.';
+                setEntries(current => [
+                  ...current,
+                  logEntry(processedCommands + 1, 'ERROR', message, 'failed'),
+                ]);
+              }
+            }
+            setStatus('STOPPED');
+            return;
+          }
+        }
       } catch (failure) {
         if (cancelled) return;
         const message = failure instanceof Error
@@ -599,6 +658,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     onExecutionTraceChange,
     onCommitRuntimeValue,
     onCommandRemainingChange,
+    pauseAt,
     plan,
     processedCommands,
     runtimeWriteAvailable,
@@ -759,6 +819,18 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
           count={counters[reportCounter]}
           entries={entries}
           onClose={() => setReportCounter(null)}
+        />
+      )}
+      {pausedStep !== null && (
+        <ConfirmationDialog
+          title={executionMode === 'INTEGRATION' ? 'PAUSE INTEGRATION' : 'PAUSE SMOKE TEST'}
+          message={`Paused at Block #${pausedStep.blockOrder ?? pausedStep.blockId ?? '?'} ${pausedStep.blockName}.`}
+          detail={`${pausedStep.instructionName || 'PAUSE'} is waiting. The current Playwright page remains open.`}
+          confirmLabel="Continue"
+          cancelLabel="Stop Run"
+          initialFocus="confirm"
+          onConfirm={() => resolvePause('CONTINUE')}
+          onCancel={() => resolvePause('STOP')}
         />
       )}
     </aside>
