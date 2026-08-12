@@ -23,10 +23,23 @@ const step = (
   comparisonFormatPolicy: 'STRICT',
   variables: [],
   connections: targetBlockId === undefined ? [] : [{
+    id: `block-target-${instructionId}`,
     kind: 'BLOCK_TARGET',
     required: true,
     state: 'CONNECTED',
-    target: { entity: 'BLOCK', id: targetBlockId, label: `Block ${targetBlockId}` },
+    code: null,
+    source: {
+      entity: 'INSTRUCTION',
+      owner: { workspaceKind: 'BOT_JOB', homeBankingId: 1, botJobId: 29 },
+      id: instructionId,
+    },
+    target: {
+      entity: 'BLOCK',
+      owner: { workspaceKind: 'BOT_JOB', homeBankingId: 1, botJobId: 29 },
+      id: targetBlockId,
+    },
+    sourceLabel: action,
+    targetLabel: `Block ${targetBlockId}`,
   }],
 });
 

@@ -417,6 +417,9 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     executionTraceRef.current = [...executionTraceRef.current, activePosition];
     onExecutionTraceChange?.(executionTraceRef.current);
     const activeStep = item.kind === 'STEP' && item.step.active;
+    const activeAction = item.kind === 'STEP'
+      ? item.step.action.trim().toLocaleUpperCase()
+      : '';
     const loopTransition = activeStep
       ? resolveLoopCommandTransition(
           executionProgram,
@@ -462,7 +465,9 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
       let nextCursor = conditionalBoundaryTransition?.nextCursor
         ?? excelGotoTransition?.nextCursor
         ?? controlTransition?.nextCursor
-        ?? itemCursor + 1;
+        ?? (activeAction === 'Q' || activeAction === 'QUIT'
+          ? executionItems.length
+          : itemCursor + 1);
       if (item.kind === 'INACTIVE_BLOCK') {
         const skipped = item.block.steps.length;
         setEntries(current => [
@@ -620,7 +625,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
         if (
           activeStep
           && item.kind === 'STEP'
-          && item.step.action.trim().toLocaleUpperCase() === 'PAUSE'
+          && activeAction === 'PAUSE'
         ) {
           const decision = await pauseAt(item.step);
           if (cancelled || stopRequestedRef.current) return;
