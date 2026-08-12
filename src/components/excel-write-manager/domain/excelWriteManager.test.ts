@@ -34,6 +34,12 @@ test('builds CSV first and a finalized XLSX in React memory', async () => {
   expect(atob(artifacts[0].contentBase64)).toBe('User\r\nAlice\r\n');
   expect(atob(artifacts[1].contentBase64).slice(0, 2)).toBe('PK');
   expect(artifacts.every(artifact => artifact.sha256.length === 64)).toBe(true);
+  const ExcelJS = await import('exceljs');
+  const workbook = new ExcelJS.Workbook();
+  const workbookBytes = Uint8Array.from(atob(artifacts[1].contentBase64), character => character.charCodeAt(0));
+  await workbook.xlsx.load(workbookBytes);
+  expect(workbook.getWorksheet('ExcelWrite')?.getCell('A1').value).toBe('User');
+  expect(workbook.getWorksheet('ExcelWrite')?.getCell('A2').value).toBe('Alice');
 });
 test('refuses incomplete target and VOID variables', () => {
   expect(() => arriveExcelWrite(EMPTY_EXCEL_WRITE_MANAGER, { ...step(1, 'User'), excelWrite: null }, 0, new Map())).toThrow(/file target/);
