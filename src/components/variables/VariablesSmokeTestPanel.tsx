@@ -60,9 +60,8 @@ import ExcelWriteManagerDialog from '../excel-write-manager/ExcelWriteManagerDia
 import {
   EMPTY_EXCEL_WRITE_MANAGER,
   arriveExcelWrite,
+  buildExcelWriteArtifacts,
   editExcelWriteCell,
-  encodeExcelWriteCsv,
-  excelWriteSha256,
   markExcelWriteFile,
   type ExcelWriteFlushPolicy,
   type ExcelWriteManagerState,
@@ -281,18 +280,19 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
       for (const file of candidates) {
         replaceExcelWriteManager(markExcelWriteFile(
           excelWriteManagerRef.current, file.fileId, 'UPLOADING', 'Sending finalized DTO to Java…'));
-        const csvContent = encodeExcelWriteCsv(file);
-        const sha256 = await excelWriteSha256(csvContent);
         try {
-          const message = await integrationRef.current.saveExcelWrite({
-            outputFile: file.outputFile,
-            delimiter: file.delimiter,
-            columns: file.columns,
-            instructionIds: file.instructionIds,
-            csvContent,
-            sha256,
-            revision: file.revision,
-          });
+          const artifacts = await buildExcelWriteArtifacts(file);
+          let message = '';
+          for (const artifact of artifacts) {
+            message = await integrationRef.current.saveExcelWrite({
+              outputFile: file.outputFile,
+              delimiter: file.delimiter,
+              columns: file.columns,
+              instructionIds: file.instructionIds,
+              ...artifact,
+              revision: file.revision,
+            });
+          }
           replaceExcelWriteManager(markExcelWriteFile(
             excelWriteManagerRef.current, file.fileId, 'SAVED', message));
         } catch (failure) {

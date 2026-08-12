@@ -8,6 +8,12 @@ export type ExcelWriteFileState = Readonly<{
   flushState: 'MEMORY' | 'UPLOADING' | 'SAVED' | 'FAILED'; message: string;
 }>;
 export type ExcelWriteManagerState = Readonly<{ files: readonly ExcelWriteFileState[]; policy: ExcelWriteFlushPolicy }>;
+export type ExcelWriteFinalizedArtifact = Readonly<{
+  artifactKind: 'CSV' | 'XLSX';
+  contentBase64: string;
+  byteLength: number;
+  sha256: string;
+}>;
 export const EMPTY_EXCEL_WRITE_MANAGER: ExcelWriteManagerState = Object.freeze({ files: Object.freeze([]), policy: 'END_EXECUTION' });
 
 const parsedTarget = (encoded: string) => {
@@ -62,7 +68,38 @@ export const encodeExcelWriteCsv = (file: ExcelWriteFileState): string => `${[
   file.columns.map(column => escaped(column, file.delimiter)).join(file.delimiter),
   ...file.rows.map(row => file.columns.map(column => escaped(row[column] ?? '', file.delimiter)).join(file.delimiter)),
 ].join('\r\n')}\r\n`;
-export const excelWriteSha256 = async (content: string): Promise<string> => {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(content));
+const bytesSha256 = async (bytes: Uint8Array): Promise<string> => {
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
   return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+};
+const bytesBase64 = (bytes: Uint8Array): string => {
+  let encoded = '';
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+    encoded += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + 0x8000, bytes.length)));
+  }
+  return btoa(encoded);
+};
+const finalized = async (artifactKind: 'CSV' | 'XLSX', bytes: Uint8Array): Promise<ExcelWriteFinalizedArtifact> => Object.freeze({
+  artifactKind,
+  contentBase64: bytesBase64(bytes),
+  byteLength: bytes.byteLength,
+  sha256: await bytesSha256(bytes),
+});
+
+export const buildExcelWriteArtifacts = async (file: ExcelWriteFileState): Promise<readonly ExcelWriteFinalizedArtifact[]> => {
+  const csv = new TextEncoder().encode(encodeExcelWriteCsv(file));
+  const csvArtifact = await finalized('CSV', csv);
+  if (file.finalFormat === 'CSV') return Object.freeze([csvArtifact]);
+
+  const ExcelJS = await import('exceljs');
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('ExcelWrite');
+  sheet.addRow([...file.columns]);
+  file.rows.forEach(row => sheet.addRow(file.columns.map(column => row[column] ?? '')));
+  file.columns.forEach((column, index) => {
+    const maxValueLength = file.rows.reduce((length, row) => Math.max(length, (row[column] ?? '').length), column.length);
+    sheet.getColumn(index + 1).width = Math.min(80, Math.max(10, maxValueLength + 2));
+  });
+  const workbookBuffer = await workbook.xlsx.writeBuffer();
+  return Object.freeze([csvArtifact, await finalized('XLSX', new Uint8Array(workbookBuffer))]);
 };

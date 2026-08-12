@@ -104,7 +104,9 @@ export type SmokeTestIntegrationExcelWriteArtifact = {
   delimiter: ',' | '|';
   columns: readonly string[];
   instructionIds: readonly number[];
-  csvContent: string;
+  artifactKind: 'CSV' | 'XLSX';
+  contentBase64: string;
+  byteLength: number;
   sha256: string;
   revision: number;
 };

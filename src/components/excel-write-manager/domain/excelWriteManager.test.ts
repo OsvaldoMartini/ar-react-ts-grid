@@ -1,4 +1,6 @@
-import { EMPTY_EXCEL_WRITE_MANAGER, arriveExcelWrite, editExcelWriteCell, encodeExcelWriteCsv } from './excelWriteManager';
+import { webcrypto } from 'crypto';
+import { TextEncoder } from 'util';
+import { EMPTY_EXCEL_WRITE_MANAGER, arriveExcelWrite, buildExcelWriteArtifacts, editExcelWriteCell, encodeExcelWriteCsv } from './excelWriteManager';
 import type { VariablesSmokeTestStep } from '../../variables/domain/variablesSmokeTestTypes';
 const step = (instructionId: number, column: string, outputFile = 'C:/exports/report.xlsx:,'): VariablesSmokeTestStep => ({
   key: String(instructionId), instructionId, instructionName: 'ExcelWrite', action: 'E', operation: '', onHoldSeconds: null,
@@ -21,6 +23,17 @@ test('neutralizes spreadsheet formulas in generated CSV cells', () => {
   const arrived = arriveExcelWrite(EMPTY_EXCEL_WRITE_MANAGER, step(1, 'Value'), 0,
     new Map([[1, { state: 'VALUE' as const, value: '=HYPERLINK("https://example.invalid")' }]]));
   expect(encodeExcelWriteCsv(arrived.files[0])).toBe('Value\r\n"\'=HYPERLINK(""https://example.invalid"")"\r\n');
+});
+test('builds CSV first and a finalized XLSX in React memory', async () => {
+  Object.defineProperty(globalThis, 'crypto', { configurable: true, value: webcrypto });
+  Object.defineProperty(globalThis, 'TextEncoder', { configurable: true, value: TextEncoder });
+  const arrived = arriveExcelWrite(EMPTY_EXCEL_WRITE_MANAGER, step(1, 'User'), 0,
+    new Map([[1, { state: 'VALUE' as const, value: 'Alice' }]]));
+  const artifacts = await buildExcelWriteArtifacts(arrived.files[0]);
+  expect(artifacts.map(artifact => artifact.artifactKind)).toEqual(['CSV', 'XLSX']);
+  expect(atob(artifacts[0].contentBase64)).toBe('User\r\nAlice\r\n');
+  expect(atob(artifacts[1].contentBase64).slice(0, 2)).toBe('PK');
+  expect(artifacts.every(artifact => artifact.sha256.length === 64)).toBe(true);
 });
 test('refuses incomplete target and VOID variables', () => {
   expect(() => arriveExcelWrite(EMPTY_EXCEL_WRITE_MANAGER, { ...step(1, 'User'), excelWrite: null }, 0, new Map())).toThrow(/file target/);
