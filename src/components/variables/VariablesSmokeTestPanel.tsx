@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlaskConical, Octagon, Play, ShieldCheck } from 'lucide-react';
+import { FileSpreadsheet, FlaskConical, Octagon, Play, ShieldCheck } from 'lucide-react';
 import type { VariablesExecutionFlowReview } from './domain/variablesExecutionFlowReview';
 import { buildVariablesSmokeTestPlan } from './domain/variablesSmokeTestPlan';
 import {
@@ -56,6 +56,17 @@ import type {
 } from '../smoke-test/integration/smokeTestIntegration.contract';
 import SmokeTestWebPageRefreshButton from '../smoke-test/integration/SmokeTestWebPageRefreshButton';
 import ConfirmationDialog from '../ConfirmationDialog';
+import ExcelWriteManagerDialog from '../excel-write-manager/ExcelWriteManagerDialog';
+import {
+  EMPTY_EXCEL_WRITE_MANAGER,
+  arriveExcelWrite,
+  editExcelWriteCell,
+  encodeExcelWriteCsv,
+  excelWriteSha256,
+  markExcelWriteFile,
+  type ExcelWriteFlushPolicy,
+  type ExcelWriteManagerState,
+} from '../excel-write-manager/domain/excelWriteManager';
 
 export interface VariablesSmokeTestPanelProps {
   review: VariablesExecutionFlowReview;
@@ -194,6 +205,10 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   const [writeRuntimeValues, setWriteRuntimeValues] = useState(false);
   const [reportCounter, setReportCounter] = useState<keyof VariablesSmokeTestCounters | null>(null);
   const [pausedStep, setPausedStep] = useState<VariablesSmokeTestStep | null>(null);
+  const [excelWriteManager, setExcelWriteManager] = useState<ExcelWriteManagerState>(EMPTY_EXCEL_WRITE_MANAGER);
+  const [excelWriteManagerOpen, setExcelWriteManagerOpen] = useState(false);
+  const [excelWriteSaving, setExcelWriteSaving] = useState(false);
+  const excelWriteManagerRef = useRef<ExcelWriteManagerState>(EMPTY_EXCEL_WRITE_MANAGER);
   const runtimeValuesRef = useRef<Map<number, VariablesSmokeTestRuntimeValue>>(new Map());
   const commandRemainingRef = useRef<CommandRemainingByInstructionId>({});
   const conditionalStateRef = useRef<ConditionalExecutionState>(
@@ -249,6 +264,49 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     });
   }, []);
 
+  const replaceExcelWriteManager = useCallback((next: ExcelWriteManagerState) => {
+    excelWriteManagerRef.current = next;
+    setExcelWriteManager(next);
+  }, []);
+
+  const flushExcelWriteFiles = useCallback(async (blockId?: number) => {
+    const candidates = excelWriteManagerRef.current.files.filter(file =>
+      file.dirty && (blockId === undefined || file.touchedBlockIds.includes(blockId)));
+    if (candidates.length === 0) return;
+    if (executionMode !== 'INTEGRATION' || !integrationRef.current?.activeRun) {
+      throw new Error('ExcelWrite files can be saved only by an active Integration run.');
+    }
+    setExcelWriteSaving(true);
+    try {
+      for (const file of candidates) {
+        replaceExcelWriteManager(markExcelWriteFile(
+          excelWriteManagerRef.current, file.fileId, 'UPLOADING', 'Sending finalized DTO to Java…'));
+        const csvContent = encodeExcelWriteCsv(file);
+        const sha256 = await excelWriteSha256(csvContent);
+        try {
+          const message = await integrationRef.current.saveExcelWrite({
+            outputFile: file.outputFile,
+            delimiter: file.delimiter,
+            columns: file.columns,
+            instructionIds: file.instructionIds,
+            csvContent,
+            sha256,
+            revision: file.revision,
+          });
+          replaceExcelWriteManager(markExcelWriteFile(
+            excelWriteManagerRef.current, file.fileId, 'SAVED', message));
+        } catch (failure) {
+          replaceExcelWriteManager(markExcelWriteFile(
+            excelWriteManagerRef.current, file.fileId, 'FAILED',
+            failure instanceof Error ? failure.message : 'ExcelWrite save failed.'));
+          throw failure;
+        }
+      }
+    } finally {
+      setExcelWriteSaving(false);
+    }
+  }, [executionMode, replaceExcelWriteManager]);
+
   useEffect(() => () => {
     const resolve = pauseResolverRef.current;
     pauseResolverRef.current = null;
@@ -260,6 +318,11 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     stopRequestedRef.current = false;
     excelRowIndexRef.current = 0;
     datasetRowCountRef.current = 0;
+    replaceExcelWriteManager(Object.freeze({
+      files: Object.freeze([]),
+      policy: excelWriteManagerRef.current.policy,
+    }));
+    setExcelWriteManagerOpen(false);
     onRunStart?.();
     const nextPlan = buildVariablesSmokeTestPlan(review, selectedBlockIds);
     const nextProgram = buildSmokeExecutionProgram(nextPlan);
@@ -378,8 +441,8 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
       onActivePositionChange?.(null);
       if (executionMode === 'INTEGRATION') {
         setStatus('STOPPING');
-        const finishRequest = integrationRef.current?.finish();
-        if (!finishRequest) {
+        const integrationController = integrationRef.current;
+        if (!integrationController) {
           setEntries(current => [
             ...current,
             logEntry(processedCommands + 1, 'ERROR', 'Integration finish is unavailable.', 'failed'),
@@ -388,9 +451,10 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
           setStatus('STOPPED');
           return undefined;
         }
-        void finishRequest
+        void flushExcelWriteFiles()
+          .then(() => integrationController.finish())
           .then(() => setStatus('COMPLETED'))
-          .catch((failure) => {
+          .catch(async (failure) => {
             const message = failure instanceof Error
               ? failure.message
               : 'Integration finish was not acknowledged.';
@@ -399,6 +463,11 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
               logEntry(processedCommands + 1, 'ERROR', message, 'failed'),
             ]);
             setCounters(current => ({ ...current, failed: current.failed + 1 }));
+            try {
+              await integrationController.stop('EXCEL_WRITE_FLUSH_FAILED');
+            } catch (_) {
+              // The original flush failure remains the user-facing cause.
+            }
             setStatus('STOPPED');
           });
       } else {
@@ -461,7 +530,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     let playwrightResult: PlaywrightCommandResult | null = null;
     let integrationStepResult: SmokeTestIntegrationStepResult | null = null;
 
-    const completeCurrentItem = () => {
+    const completeCurrentItem = async () => {
       let nextCursor = conditionalBoundaryTransition?.nextCursor
         ?? excelGotoTransition?.nextCursor
         ?? controlTransition?.nextCursor
@@ -482,11 +551,42 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
         setCounters(current => ({ ...current, bypassed: current.bypassed + skipped }));
         setProcessedCommands(current => current + skipped);
       } else {
-        const simulatedResult = simulateVariablesSmokeTestStep(
+        let simulatedResult = simulateVariablesSmokeTestStep(
           item.step,
           processedCommands + 1,
           runtimeValuesRef.current,
         );
+        if (activeStep && ['E', 'EXCELWRITE'].includes(activeAction)) {
+          try {
+            const nextManager = arriveExcelWrite(
+              excelWriteManagerRef.current,
+              item.step,
+              excelRowIndexRef.current,
+              runtimeValuesRef.current,
+            );
+            replaceExcelWriteManager(nextManager);
+            setExcelWriteManagerOpen(true);
+            simulatedResult = {
+              ...simulatedResult,
+              tone: 'SUCCESS',
+              counter: 'passed',
+              message: replaceSmokeStepDetail(
+                simulatedResult.message,
+                'captured the configured variable in ExcelWriter Manager memory',
+              ),
+            };
+          } catch (failure) {
+            simulatedResult = {
+              ...simulatedResult,
+              tone: 'FAIL',
+              counter: 'failed',
+              message: replaceSmokeStepDetail(
+                simulatedResult.message,
+                failure instanceof Error ? failure.message : 'ExcelWrite memory capture failed.',
+              ),
+            };
+          }
+        }
         const result = integrationStepResult !== null
           && (!localControlAction(item.step.action)
             || integrationStepResult.outcome === 'FAILED'
@@ -591,6 +691,13 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
           nextCursor = conditionalTransition.nextCursor;
         }
       }
+      if (
+        excelWriteManagerRef.current.policy === 'END_BLOCK'
+        && item.block.blockId !== null
+        && executionItems[nextCursor]?.block.blockId !== item.block.blockId
+      ) {
+        await flushExcelWriteFiles(item.block.blockId);
+      }
       setItemCursor(nextCursor);
     };
 
@@ -669,7 +776,19 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
         return;
       }
       if (cancelled) return;
-      timer = window.setTimeout(completeCurrentItem, executionDelayMs);
+      timer = window.setTimeout(() => {
+        void completeCurrentItem().catch((failure) => {
+          if (cancelled) return;
+          const message = failure instanceof Error ? failure.message : 'ExcelWrite end-of-Block save failed.';
+          setEntries(current => [...current, logEntry(processedCommands + 1, 'ERROR', message, 'failed')]);
+          setCounters(current => ({ ...current, failed: current.failed + 1 }));
+          onActivePositionChange?.(null);
+          setStatus('STOPPING');
+          void integrationRef.current?.stop('EXCEL_WRITE_FLUSH_FAILED')
+            .catch(() => undefined)
+            .finally(() => setStatus('STOPPED'));
+        });
+      }, executionDelayMs);
     };
     void scheduleCurrentItem();
 
@@ -688,6 +807,8 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     onCommitRuntimeValue,
     onCommandRemainingChange,
     pauseAt,
+    flushExcelWriteFiles,
+    replaceExcelWriteManager,
     plan,
     processedCommands,
     runtimeWriteAvailable,
@@ -777,6 +898,10 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
             || executionActive}
           onRefresh={() => { void integration?.refreshPage().catch(() => undefined); }}
         />
+        <button type="button" className={styles.runButton} disabled={excelWriteManager.files.length === 0}
+          title="Open ExcelWriter Manager" onClick={() => setExcelWriteManagerOpen(true)}>
+          <FileSpreadsheet size={14} aria-hidden="true" /> FILES ({excelWriteManager.files.length})
+        </button>
         <button
           type="button"
           className={styles.stopButton}
@@ -860,6 +985,21 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
           initialFocus="confirm"
           onConfirm={() => resolvePause('CONTINUE')}
           onCancel={() => resolvePause('STOP')}
+        />
+      )}
+      {excelWriteManagerOpen && (
+        <ExcelWriteManagerDialog
+          state={excelWriteManager}
+          busy={excelWriteSaving}
+          policyLocked={executionActive}
+          onPolicyChange={(policy: ExcelWriteFlushPolicy) => replaceExcelWriteManager(Object.freeze({
+            ...excelWriteManagerRef.current,
+            policy,
+          }))}
+          onCellChange={(fileId, rowIndex, column, value) => replaceExcelWriteManager(
+            editExcelWriteCell(excelWriteManagerRef.current, fileId, rowIndex, column, value))}
+          onSave={() => { void flushExcelWriteFiles().catch(() => undefined); }}
+          onClose={() => setExcelWriteManagerOpen(false)}
         />
       )}
     </aside>

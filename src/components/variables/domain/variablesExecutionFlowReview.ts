@@ -371,6 +371,13 @@ export const buildVariablesExecutionFlowReview = (
         command.commandConfiguration?.formatPolicy?.trim() || 'EXACT_TEXT',
       variables: Object.freeze(variableIds.map(stepVariable)),
       connections: Object.freeze(presentationConnections),
+      excelWrite: action === 'E'
+        ? Object.freeze({
+            outputKey: command.commandConfiguration?.outputKey?.trim() || '',
+            outputColumn: command.commandConfiguration?.outputColumn?.trim() || '',
+            outputFile: command.commandConfiguration?.outputFile?.trim() || '',
+          })
+        : null,
     });
   }).sort(compareSteps);
 

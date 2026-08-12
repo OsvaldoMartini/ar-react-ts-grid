@@ -33,6 +33,11 @@ export type VariablesSmokeTestStep = {
   comparisonFormatPolicy: string;
   variables: readonly VariablesExecutionStepVariable[];
   connections: readonly VariablesExecutionFlowConnection[];
+  excelWrite?: Readonly<{
+    outputKey: string;
+    outputColumn: string;
+    outputFile: string;
+  }> | null;
 };
 
 export type VariablesSmokeTestBlock = {

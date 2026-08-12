@@ -99,6 +99,16 @@ export type SmokeTestIntegrationStepResult = {
   runtimeWrites: readonly SmokeTestIntegrationRuntimeWrite[];
 };
 
+export type SmokeTestIntegrationExcelWriteArtifact = {
+  outputFile: string;
+  delimiter: ',' | '|';
+  columns: readonly string[];
+  instructionIds: readonly number[];
+  csvContent: string;
+  sha256: string;
+  revision: number;
+};
+
 export type SmokeTestIntegrationTerminalResult = {
   status: 'STOPPED' | 'FINISHED' | 'FAILED';
   lastSequence: number;
@@ -379,6 +389,21 @@ export const parseSmokeTestIntegrationStepResponse = (
     replayed: body.replayed === true,
     runtimeWrites,
   };
+};
+
+export const parseSmokeTestIntegrationExcelWriteResponse = (
+  payload: unknown,
+  expectedRequestId: string,
+  expectedRunId: string,
+  expectedSha256: string,
+): string => {
+  const body = contractBody(payload, 'Integration ExcelWrite save');
+  if (stringValue(body.requestId, 'ExcelWrite request ID') !== expectedRequestId
+      || stringValue(body.runId, 'ExcelWrite run ID') !== expectedRunId
+      || revisionValue(body.sha256, 'ExcelWrite checksum') !== expectedSha256) {
+    throw new Error('ExcelWrite save response does not match this file revision.');
+  }
+  return stringValue(body.message, 'ExcelWrite save message');
 };
 
 export const parseSmokeTestIntegrationTerminalResponse = (

@@ -13,6 +13,7 @@ import {
   parseSmokeTestIntegrationRefreshResponse,
   parseSmokeTestIntegrationStartResponse,
   parseSmokeTestIntegrationStepResponse,
+  parseSmokeTestIntegrationExcelWriteResponse,
   parseSmokeTestIntegrationTerminalResponse,
   SMOKE_TEST_INTEGRATION_CONTRACT_VERSION,
   type SmokeTestIntegrationRun,
@@ -20,6 +21,7 @@ import {
   type SmokeTestIntegrationRuntimeMode,
   type SmokeTestIntegrationStepRequest,
   type SmokeTestIntegrationStepResult,
+  type SmokeTestIntegrationExcelWriteArtifact,
 } from './smokeTestIntegration.contract';
 
 const START_TIMEOUT_MS = 30_000;
@@ -38,7 +40,7 @@ type Phase =
   | 'CLEANUP_REQUIRED';
 
 type PendingRequest = {
-  operation: 'start' | 'refresh' | 'step' | 'stop' | 'finish';
+  operation: 'start' | 'refresh' | 'step' | 'excelWrite' | 'stop' | 'finish';
   requestId: string;
   responseOperation: string;
   resolve: (body: unknown) => void;
@@ -62,6 +64,7 @@ export type SmokeTestIntegrationController = {
     instructionId: number,
     excelRowIndex?: number,
   ) => Promise<SmokeTestIntegrationStepResult>;
+  saveExcelWrite: (artifact: SmokeTestIntegrationExcelWriteArtifact) => Promise<string>;
   stop: (reason?: string) => Promise<void>;
   finish: () => Promise<void>;
 };
@@ -118,10 +121,10 @@ export const useSmokeTestIntegrationRun = ({
     if (reason) pending.reject(reason);
   }, []);
 
-  const request = useCallback(<T,>(
+  const request = useCallback(<T, B extends { requestId: string }>(
     operation: PendingRequest['operation'],
     responseOperation: string,
-    body: { requestId: string },
+    body: B,
     timeoutMs: number,
     parse: (payload: unknown) => T,
   ): Promise<T> => {
@@ -370,6 +373,19 @@ export const useSmokeTestIntegrationRun = ({
     }
   }, [nextRequestId, request]);
 
+  const saveExcelWrite = useCallback(async (artifact: SmokeTestIntegrationExcelWriteArtifact) => {
+    const run = activeRunRef.current;
+    if (run === null) throw new Error('Smoke Test Integration has not started.');
+    const requestId = nextRequestId('excel-write');
+    return request(
+      'excelWrite',
+      'smokeTest.integration.excelWriteResponse',
+      { contractVersion: SMOKE_TEST_INTEGRATION_CONTRACT_VERSION, requestId, runId: run.runId, ...artifact },
+      STEP_TIMEOUT_MS,
+      payload => parseSmokeTestIntegrationExcelWriteResponse(payload, requestId, run.runId, artifact.sha256),
+    );
+  }, [nextRequestId, request]);
+
   const terminal = useCallback(async (operation: 'stop' | 'finish', _reason?: string) => {
     if (terminalInFlightRef.current) return;
     const run = activeRunRef.current;
@@ -417,5 +433,5 @@ export const useSmokeTestIntegrationRun = ({
   const stop = useCallback((reason?: string) => terminal('stop', reason), [terminal]);
   const finish = useCallback(() => terminal('finish'), [terminal]);
 
-  return { phase, activeRun, error, refreshPage, start, executeStep, stop, finish };
+  return { phase, activeRun, error, refreshPage, start, executeStep, saveExcelWrite, stop, finish };
 };
