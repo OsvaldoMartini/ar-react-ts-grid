@@ -41,6 +41,7 @@ export type SmokeTestIntegrationRun = {
   datasetEpoch: number;
   datasetRevision: number;
   datasetContentRevision: string;
+  datasetRowCount: number;
   durableRuntimeWrites: boolean;
   blockCount: number;
   instructionCount: number;
@@ -320,6 +321,7 @@ export const parseSmokeTestIntegrationStartResponse = (
       body.datasetContentRevision,
       'Integration dataset content revision',
     ),
+    datasetRowCount: integerValue(body.datasetRowCount, 'Integration dataset row count'),
     durableRuntimeWrites: body.durableRuntimeWrites === true,
     blockCount: integerValue(body.blockCount, 'Integration block count'),
     instructionCount: integerValue(body.instructionCount, 'Integration instruction count'),

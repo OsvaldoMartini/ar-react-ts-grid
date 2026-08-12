@@ -58,6 +58,7 @@ const startResponse = (requestId: unknown) => ({
   datasetEpoch: 3,
   datasetRevision: 0,
   datasetContentRevision: 'c'.repeat(64),
+  datasetRowCount: 2,
   durableRuntimeWrites: false,
   blockCount: 1,
   instructionCount: 0,

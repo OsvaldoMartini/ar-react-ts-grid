@@ -33,6 +33,7 @@ import type {
   CommandRemainingByInstructionId,
 } from './Engine/controlFlowCommand.types';
 import { resolveWaitCommandExecution } from './Engine/waitCommandEngine';
+import { resolveExcelGotoTransition } from './Engine/excelGotoCommandEngine';
 import {
   smokePlaywrightCommandBridge,
   type PlaywrightCommandResult,
@@ -202,6 +203,8 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   const integrationRef = useRef(integration);
   const pauseResolverRef = useRef<((decision: 'CONTINUE' | 'STOP') => void) | null>(null);
   const stopRequestedRef = useRef(false);
+  const excelRowIndexRef = useRef(0);
+  const datasetRowCountRef = useRef(0);
   const previewPlan = useMemo(
     () => buildVariablesSmokeTestPlan(review, selectedBlockIds),
     [review, selectedBlockIds],
@@ -255,6 +258,8 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   const run = async () => {
     resolvePause('STOP');
     stopRequestedRef.current = false;
+    excelRowIndexRef.current = 0;
+    datasetRowCountRef.current = 0;
     onRunStart?.();
     const nextPlan = buildVariablesSmokeTestPlan(review, selectedBlockIds);
     const nextProgram = buildSmokeExecutionProgram(nextPlan);
@@ -324,6 +329,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
             value: value.value,
           }]),
         );
+        datasetRowCountRef.current = startedRun.datasetRowCount;
       } catch (failure) {
         const message = failure instanceof Error ? failure.message : 'Smoke Test Integration could not start.';
         setStatus('STOPPED');
@@ -426,6 +432,14 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
         )
       : null;
     const controlTransition = loopTransition ?? gotoTransition;
+    const excelGotoTransition = activeStep && executionProgram !== null
+      ? resolveExcelGotoTransition(
+          executionProgram,
+          itemCursor,
+          excelRowIndexRef.current,
+          datasetRowCountRef.current,
+        )
+      : null;
     const conditionalBoundaryTransition = activeStep && conditionalIndex !== null
       ? resolveConditionalBoundaryTransition(
           conditionalIndex,
@@ -446,6 +460,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
 
     const completeCurrentItem = () => {
       let nextCursor = conditionalBoundaryTransition?.nextCursor
+        ?? excelGotoTransition?.nextCursor
         ?? controlTransition?.nextCursor
         ?? itemCursor + 1;
       if (item.kind === 'INACTIVE_BLOCK') {
@@ -473,9 +488,15 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
             || integrationStepResult.disposition === 'UNSUPPORTED')
           ? integrationResultForStep(item.step, integrationStepResult)
           : simulatedResult;
-        const engineWarning = controlTransition?.warning ?? waitExecution?.warning ?? null;
+        const engineWarning = controlTransition?.warning
+          ?? excelGotoTransition?.warning
+          ?? waitExecution?.warning
+          ?? null;
         const engineMessage = controlTransition === null
-          ? conditionalBoundaryTransition?.message ?? waitExecution?.message ?? null
+          ? conditionalBoundaryTransition?.message
+            ?? excelGotoTransition?.message
+            ?? waitExecution?.message
+            ?? null
           : [
               playwrightResult?.message,
               controlTransition.message,
@@ -555,6 +576,9 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
           commandRemainingRef.current = nextRemaining;
           onCommandRemainingChange?.(nextRemaining);
         }
+        if (excelGotoTransition !== null) {
+          excelRowIndexRef.current = excelGotoTransition.nextRowIndex;
+        }
         const conditionalTransition = conditionalCheckTransition
           ?? conditionalBoundaryTransition;
         if (conditionalTransition !== null) {
@@ -576,7 +600,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
           }
           integrationStepResult = await integrationRef.current.executeStep(
             item.step.instructionId,
-            0,
+            excelRowIndexRef.current,
           );
           integrationStepResult.runtimeWrites.forEach((write) => {
             runtimeValuesRef.current.set(write.variableId, {
