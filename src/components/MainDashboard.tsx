@@ -170,7 +170,7 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, on
     document.title = 'Main Bot Jobs';
   }, []);
   const desktopShell = new URLSearchParams(window.location.search).get('desktopShell') === '1';
-  const { webSocket, connected, messages, error } = useWebSocket(socketPort, sessionId);
+  const { webSocket, connected, messages, messageGeneration = 0, error } = useWebSocket(socketPort, sessionId);
   const processedMessageCountRef = useRef(0);
   const shutdownRequestedRef = useRef(false);
   const reportedAutoTestStateRef = useRef<boolean | null>(null);
@@ -897,6 +897,10 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ socketPort, sessionId, on
           <MultiBotJobExecutionWorkspace
             key={multiExecutionVersion}
             selectedJobs={multiExecutionDraft}
+            webSocket={webSocket}
+            connected={connected}
+            messages={messages}
+            messageGeneration={messageGeneration}
             onClose={closeMultiExecutionManager}
           />
         )}
