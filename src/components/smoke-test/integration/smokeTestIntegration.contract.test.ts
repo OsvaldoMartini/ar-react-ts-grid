@@ -221,3 +221,65 @@ test('rejects a response for another instruction and a refused terminal operatio
     message: 'The Integration run is no longer active.',
   }, 'finish', 'finish-1', 'server-run-1', 1)).toThrow('no longer active');
 });
+
+test('parses an owner-correlated locator recovery comparison without treating it as an action', () => {
+  const result = parseSmokeTestIntegrationStepResponse({
+    ok: true,
+    contractVersion: 1,
+    requestId: 'step-recovery-1',
+    runId: 'run-recovery-1',
+    integrationEpoch: 4,
+    sequence: 3,
+    instructionId: 1735,
+    status: 'FAILED',
+    disposition: 'PHYSICAL',
+    code: 'TARGET_NOT_FOUND',
+    message: 'The physical action is waiting for locator recovery.',
+    replayed: false,
+    recovery: {
+      state: 'AWAITING_USER',
+      candidates: [{
+        recoveryCandidateId: 'a'.repeat(64),
+        registryCandidateId: 91,
+        savedCanonicalName: 'login',
+        savedClientName: 'Banca Stato Login',
+        ocrMappedName: 'Sign in',
+        previousXPath: '/html/body/button[1]',
+        previousCustomXPath: '//*[@id="old-login"]',
+        previousCss: '#old-login',
+        previousStableAttributes: { 'data-testid': 'old-login' },
+        newXPath: '/html/body/button[2]',
+        newCss: '#new-login',
+        newStableAttributes: { 'data-testid': 'new-login' },
+        previousPageIdentity: `url-v1:${'b'.repeat(64)}`,
+        currentPageIdentity: `url-v1:${'c'.repeat(64)}`,
+        tag: 'button',
+        type: '',
+        role: 'button',
+        expectedAction: 'CLICK',
+        confidence: 0.85,
+        reasons: ['Exact saved/OCR name match'],
+        ambiguityWarnings: ['XPath changed'],
+        matches: {
+          xpath: false,
+          customXPath: false,
+          css: false,
+          stableAttributes: false,
+          frame: null,
+          shadow: null,
+        },
+      }],
+    },
+  }, {
+    requestId: 'step-recovery-1',
+    runId: 'run-recovery-1',
+    integrationEpoch: 4,
+    sequence: 3,
+    instructionId: 1735,
+  });
+
+  expect(result.code).toBe('TARGET_NOT_FOUND');
+  expect(result.recovery?.state).toBe('AWAITING_USER');
+  expect(result.recovery?.candidates[0]?.matches.xpath).toBe(false);
+  expect(result.recovery?.candidates[0]?.matches.frame).toBeNull();
+});

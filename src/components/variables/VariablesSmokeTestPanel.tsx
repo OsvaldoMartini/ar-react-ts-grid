@@ -53,8 +53,10 @@ import type {
   SmokeTestIntegrationPagePolicy,
   SmokeTestIntegrationRuntimeMode,
   SmokeTestIntegrationStepResult,
+  SmokeTestLocatorRecoveryCandidate,
 } from '../smoke-test/integration/smokeTestIntegration.contract';
 import SmokeTestWebPageRefreshButton from '../smoke-test/integration/SmokeTestWebPageRefreshButton';
+import SmokeTestLocatorRecoveryModal from '../smoke-test/integration/SmokeTestLocatorRecoveryModal';
 import ConfirmationDialog from '../ConfirmationDialog';
 import {
   EMPTY_EXCEL_WRITE_MANAGER,
@@ -113,6 +115,16 @@ const EMPTY_COUNTERS: VariablesSmokeTestCounters = Object.freeze({
   warning: 0,
   failed: 0,
 });
+
+type LocatorRecoveryDecisionResult = Readonly<{
+  kind: 'COMPLETED' | 'WARNING' | 'CANCELLED' | 'STOPPED';
+  message: string;
+}>;
+
+type PendingLocatorRecovery = Readonly<{
+  step: VariablesSmokeTestStep;
+  result: SmokeTestIntegrationStepResult;
+}>;
 
 const logEntry = (
   sequence: number,
@@ -228,6 +240,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   const [writeRuntimeValues, setWriteRuntimeValues] = useState(false);
   const [reportCounter, setReportCounter] = useState<keyof VariablesSmokeTestCounters | null>(null);
   const [pausedStep, setPausedStep] = useState<VariablesSmokeTestStep | null>(null);
+  const [pendingLocatorRecovery, setPendingLocatorRecovery] = useState<PendingLocatorRecovery | null>(null);
   const [excelWriteManager, setExcelWriteManager] = useState<ExcelWriteManagerState>(EMPTY_EXCEL_WRITE_MANAGER);
   const [excelWriteSaving, setExcelWriteSaving] = useState(false);
   const excelWriteManagerRef = useRef<ExcelWriteManagerState>(EMPTY_EXCEL_WRITE_MANAGER);
@@ -245,6 +258,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   const excelWriteSavingRef = useRef(false);
   const executionActiveRef = useRef(false);
   const pauseResolverRef = useRef<((decision: 'CONTINUE' | 'STOP') => void) | null>(null);
+  const locatorRecoveryResolverRef = useRef<((result: LocatorRecoveryDecisionResult) => void) | null>(null);
   const stopRequestedRef = useRef(false);
   const autoStartTokenRef = useRef(0);
   const autoStopTokenRef = useRef(0);
@@ -295,6 +309,59 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
       pauseResolverRef.current = resolve;
     });
   }, []);
+
+  const waitForLocatorRecovery = useCallback((
+    step: VariablesSmokeTestStep,
+    result: SmokeTestIntegrationStepResult,
+  ) => {
+    const previous = locatorRecoveryResolverRef.current;
+    if (previous !== null) previous({ kind: 'CANCELLED', message: 'Locator recovery was replaced.' });
+    setPendingLocatorRecovery({ step, result });
+    return new Promise<LocatorRecoveryDecisionResult>((resolve) => {
+      locatorRecoveryResolverRef.current = resolve;
+    });
+  }, []);
+
+  const settleLocatorRecovery = useCallback((result: LocatorRecoveryDecisionResult) => {
+    const resolve = locatorRecoveryResolverRef.current;
+    if (resolve === null) return;
+    locatorRecoveryResolverRef.current = null;
+    setPendingLocatorRecovery(null);
+    resolve(result);
+  }, []);
+
+  const decideLocatorRecovery = useCallback(async (
+    candidate: SmokeTestLocatorRecoveryCandidate | null,
+    decision: 'USE_ONCE' | 'USE_AND_SAVE' | 'CANCEL' | 'STOP',
+  ) => {
+    const pending = pendingLocatorRecovery;
+    const controller = integrationRef.current;
+    if (pending === null || controller === undefined) return;
+    if (decision === 'STOP') {
+      stopRequestedRef.current = true;
+      setStatus('STOPPING');
+      onActivePositionChange?.(null);
+      settleLocatorRecovery({ kind: 'STOPPED', message: 'Execution stop was requested.' });
+      try {
+        await controller.stop('LOCATOR_RECOVERY_STOP');
+      } finally {
+        setStatus('STOPPED');
+      }
+      return;
+    }
+    const response = await controller.recoverStep(
+      pending.result.sequence,
+      pending.result.instructionId,
+      candidate?.recoveryCandidateId ?? '',
+      decision,
+    );
+    settleLocatorRecovery({
+      kind: response.status === 'COMPLETED'
+        ? decision === 'USE_AND_SAVE' && !response.locatorSaved ? 'WARNING' : 'COMPLETED'
+        : 'CANCELLED',
+      message: response.message,
+    });
+  }, [onActivePositionChange, pendingLocatorRecovery, settleLocatorRecovery]);
 
   const replaceExcelWriteManager = useCallback((next: ExcelWriteManagerState) => {
     excelWriteManagerRef.current = next;
@@ -390,6 +457,9 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     const resolve = pauseResolverRef.current;
     pauseResolverRef.current = null;
     if (resolve !== null) resolve('STOP');
+    const recovery = locatorRecoveryResolverRef.current;
+    locatorRecoveryResolverRef.current = null;
+    if (recovery !== null) recovery({ kind: 'STOPPED', message: 'Smoke Test closed.' });
   }, []);
 
   const run = async () => {
@@ -516,6 +586,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     if (status !== 'STARTING' && status !== 'RUNNING' && !integrationCleanupPending) return;
     stopRequestedRef.current = true;
     resolvePause('STOP');
+    settleLocatorRecovery({ kind: 'STOPPED', message: 'Execution stop was requested.' });
     setStatus('STOPPING');
     onActivePositionChange?.(null);
     if (status === 'STARTING' && !integrationCleanupPending) return;
@@ -837,6 +908,27 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
             item.step.instructionId,
             excelRowIndexRef.current,
           );
+          if (integrationStepResult.recovery !== null) {
+            const recoveryDecision = await waitForLocatorRecovery(item.step, integrationStepResult);
+            if (cancelled || stopRequestedRef.current || recoveryDecision.kind === 'STOPPED') return;
+            if (recoveryDecision.kind === 'COMPLETED' || recoveryDecision.kind === 'WARNING') {
+              integrationStepResult = {
+                ...integrationStepResult,
+                outcome: recoveryDecision.kind === 'WARNING' ? 'WARNING' : 'PASSED',
+                code: recoveryDecision.kind === 'WARNING'
+                  ? 'RECOVERY_ACTION_COMPLETED_SAVE_FAILED'
+                  : 'RECOVERY_COMPLETED',
+                message: recoveryDecision.message,
+                recovery: null,
+              };
+            } else {
+              integrationStepResult = {
+                ...integrationStepResult,
+                message: recoveryDecision.message,
+                recovery: null,
+              };
+            }
+          }
           integrationStepResult.runtimeWrites.forEach((write) => {
             runtimeValuesRef.current.set(write.variableId, {
               state: 'VALUE',
@@ -929,6 +1021,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     onCommandRemainingChange,
     onOpenExcelWriterManager,
     pauseAt,
+    waitForLocatorRecovery,
     flushExcelWriteFiles,
     replaceExcelWriteManager,
     plan,
@@ -1116,6 +1209,14 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
           initialFocus="confirm"
           onConfirm={() => resolvePause('CONTINUE')}
           onCancel={() => resolvePause('STOP')}
+        />
+      )}
+      {pendingLocatorRecovery?.result.recovery !== null
+        && pendingLocatorRecovery?.result.recovery !== undefined && (
+        <SmokeTestLocatorRecoveryModal
+          instructionName={pendingLocatorRecovery.step.instructionName || `Instruction #${pendingLocatorRecovery.result.instructionId}`}
+          recovery={pendingLocatorRecovery.result.recovery}
+          onDecision={decideLocatorRecovery}
         />
       )}
     </aside>

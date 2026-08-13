@@ -13,6 +13,7 @@ import {
   parseSmokeTestIntegrationRefreshResponse,
   parseSmokeTestIntegrationStartResponse,
   parseSmokeTestIntegrationStepResponse,
+  parseSmokeTestLocatorRecoveryResponse,
   parseSmokeTestIntegrationExcelWriteResponse,
   parseSmokeTestIntegrationTerminalResponse,
   SMOKE_TEST_INTEGRATION_CONTRACT_VERSION,
@@ -22,6 +23,8 @@ import {
   type SmokeTestIntegrationStepRequest,
   type SmokeTestIntegrationStepResult,
   type SmokeTestIntegrationExcelWriteArtifact,
+  type SmokeTestLocatorRecoveryDecision,
+  type SmokeTestLocatorRecoveryResult,
 } from './smokeTestIntegration.contract';
 
 const START_TIMEOUT_MS = 30_000;
@@ -40,7 +43,7 @@ type Phase =
   | 'CLEANUP_REQUIRED';
 
 type PendingRequest = {
-  operation: 'start' | 'refresh' | 'step' | 'excelWrite' | 'stop' | 'finish';
+  operation: 'start' | 'refresh' | 'step' | 'recover' | 'excelWrite' | 'stop' | 'finish';
   requestId: string;
   responseOperation: string;
   resolve: (body: unknown) => void;
@@ -64,6 +67,12 @@ export type SmokeTestIntegrationController = {
     instructionId: number,
     excelRowIndex?: number,
   ) => Promise<SmokeTestIntegrationStepResult>;
+  recoverStep: (
+    sequence: number,
+    instructionId: number,
+    recoveryCandidateId: string,
+    decision: SmokeTestLocatorRecoveryDecision,
+  ) => Promise<SmokeTestLocatorRecoveryResult>;
   saveExcelWrite: (artifact: SmokeTestIntegrationExcelWriteArtifact) => Promise<string>;
   stop: (reason?: string) => Promise<void>;
   finish: () => Promise<void>;
@@ -391,6 +400,48 @@ export const useSmokeTestIntegrationRun = ({
     );
   }, [nextRequestId, request]);
 
+  const recoverStep = useCallback(async (
+    sequence: number,
+    instructionId: number,
+    recoveryCandidateId: string,
+    decision: SmokeTestLocatorRecoveryDecision,
+  ) => {
+    const run = activeRunRef.current;
+    if (run === null) throw new Error('Smoke Test Integration has not started.');
+    const requestId = nextRequestId('recover');
+    setPhase('EXECUTING');
+    try {
+      const result = await request(
+        'recover',
+        'smokeTest.integration.recoverResponse',
+        {
+          contractVersion: SMOKE_TEST_INTEGRATION_CONTRACT_VERSION,
+          requestId,
+          runId: run.runId,
+          sequence,
+          instructionId,
+          recoveryCandidateId,
+          decision,
+        },
+        STEP_TIMEOUT_MS,
+        payload => parseSmokeTestLocatorRecoveryResponse(payload, {
+          requestId,
+          runId: run.runId,
+          integrationEpoch: run.integrationEpoch,
+          sequence,
+          instructionId,
+        }),
+      );
+      if (!terminalInFlightRef.current) setPhase('READY');
+      return result;
+    } catch (failure) {
+      const nextError = failure instanceof Error ? failure : new Error('Locator recovery failed.');
+      setError(nextError.message);
+      if (!terminalInFlightRef.current) setPhase('READY');
+      throw nextError;
+    }
+  }, [nextRequestId, request]);
+
   const terminal = useCallback(async (operation: 'stop' | 'finish', _reason?: string) => {
     if (terminalInFlightRef.current) return;
     const run = activeRunRef.current;
@@ -438,5 +489,16 @@ export const useSmokeTestIntegrationRun = ({
   const stop = useCallback((reason?: string) => terminal('stop', reason), [terminal]);
   const finish = useCallback(() => terminal('finish'), [terminal]);
 
-  return { phase, activeRun, error, refreshPage, start, executeStep, saveExcelWrite, stop, finish };
+  return {
+    phase,
+    activeRun,
+    error,
+    refreshPage,
+    start,
+    executeStep,
+    recoverStep,
+    saveExcelWrite,
+    stop,
+    finish,
+  };
 };

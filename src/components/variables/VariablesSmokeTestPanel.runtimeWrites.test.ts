@@ -35,9 +35,11 @@ test('preserves authoritative Integration GET writes for runtime publication', (
     instructionId: 20,
     outcome: 'PASSED',
     disposition: 'PHYSICAL',
+    code: 'GET_VALUE_WRITTEN',
     message: 'GET captured the live value.',
     replayed: false,
     runtimeWrites: [{ variableId: 30, value: '125.00' }],
+    recovery: null,
   } satisfies SmokeTestIntegrationStepResult;
 
   expect(integrationResultForStep(step, result).runtimeWrites).toEqual([

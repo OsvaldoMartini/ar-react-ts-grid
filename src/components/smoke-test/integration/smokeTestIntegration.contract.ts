@@ -95,8 +95,57 @@ export type SmokeTestIntegrationStepResult = {
   outcome: 'PASSED' | 'FAILED' | 'WARNING' | 'BYPASSED';
   disposition: 'PHYSICAL' | 'LOGICAL_ONLY' | 'INACTIVE' | 'UNSUPPORTED';
   message: string;
+  code: string;
   replayed: boolean;
   runtimeWrites: readonly SmokeTestIntegrationRuntimeWrite[];
+  recovery: SmokeTestLocatorRecovery | null;
+};
+
+export type LocatorMatchValue = boolean | null;
+
+export type SmokeTestLocatorRecoveryCandidate = {
+  recoveryCandidateId: string;
+  registryCandidateId: number;
+  savedCanonicalName: string;
+  savedClientName: string;
+  ocrMappedName: string;
+  previousXPath: string;
+  previousCustomXPath: string;
+  previousCss: string;
+  previousStableAttributes: Readonly<Record<string, string>>;
+  newXPath: string;
+  newCss: string;
+  newStableAttributes: Readonly<Record<string, string>>;
+  previousPageIdentity: string;
+  currentPageIdentity: string;
+  tag: string;
+  type: string;
+  role: string;
+  expectedAction: 'CLICK' | 'INPUT' | 'OUTPUT';
+  confidence: number;
+  reasons: readonly string[];
+  ambiguityWarnings: readonly string[];
+  matches: Readonly<{
+    xpath: LocatorMatchValue;
+    customXPath: LocatorMatchValue;
+    css: LocatorMatchValue;
+    stableAttributes: LocatorMatchValue;
+    frame: LocatorMatchValue;
+    shadow: LocatorMatchValue;
+  }>;
+};
+
+export type SmokeTestLocatorRecovery = {
+  state: 'AWAITING_USER';
+  candidates: readonly SmokeTestLocatorRecoveryCandidate[];
+};
+
+export type SmokeTestLocatorRecoveryDecision = 'USE_ONCE' | 'USE_AND_SAVE' | 'CANCEL';
+
+export type SmokeTestLocatorRecoveryResult = {
+  status: 'COMPLETED' | 'CANCELLED';
+  message: string;
+  locatorSaved: boolean;
 };
 
 export type SmokeTestIntegrationExcelWriteArtifact = {
@@ -148,6 +197,79 @@ const revisionValue = (value: unknown, name: string): string => {
   const revision = stringValue(value, name);
   if (!/^[0-9a-f]{64}$/i.test(revision)) throw new Error(`${name} is invalid.`);
   return revision.toLocaleLowerCase();
+};
+
+const textRecord = (value: unknown, name: string): Readonly<Record<string, string>> => {
+  const source = objectValue(value, name);
+  const result: Record<string, string> = {};
+  Object.entries(source).forEach(([key, candidate]) => {
+    result[key] = stringValue(candidate, `${name}.${key}`, true);
+  });
+  return Object.freeze(result);
+};
+
+const matchValue = (value: unknown, name: string): LocatorMatchValue => {
+  if (value === null) return null;
+  if (typeof value !== 'boolean') throw new Error(`${name} is invalid.`);
+  return value;
+};
+
+const stringList = (value: unknown, name: string): readonly string[] => {
+  if (!Array.isArray(value)) throw new Error(`${name} is invalid.`);
+  return Object.freeze(value.map((candidate, index) =>
+    stringValue(candidate, `${name} ${index + 1}`, true)));
+};
+
+const parseRecovery = (value: unknown): SmokeTestLocatorRecovery | null => {
+  if (value == null) return null;
+  const recovery = objectValue(value, 'Integration locator recovery');
+  if (recovery.state !== 'AWAITING_USER' || !Array.isArray(recovery.candidates)) {
+    throw new Error('Integration locator recovery is invalid.');
+  }
+  const candidates = recovery.candidates.map((raw, index) => {
+    const candidate = objectValue(raw, `Recovery candidate ${index + 1}`);
+    const expectedAction = stringValue(candidate.expectedAction, 'Recovery expected action');
+    if (!['CLICK', 'INPUT', 'OUTPUT'].includes(expectedAction)) {
+      throw new Error('Recovery expected action is invalid.');
+    }
+    const confidence = Number(candidate.confidence);
+    if (!Number.isFinite(confidence) || confidence < 0 || confidence > 1) {
+      throw new Error('Recovery confidence is invalid.');
+    }
+    const matches = objectValue(candidate.matches, 'Recovery locator matches');
+    return Object.freeze({
+      recoveryCandidateId: revisionValue(candidate.recoveryCandidateId, 'Recovery candidate ID'),
+      registryCandidateId: integerValue(candidate.registryCandidateId, 'Registry candidate ID', 1),
+      savedCanonicalName: stringValue(candidate.savedCanonicalName, 'Saved canonical name', true),
+      savedClientName: stringValue(candidate.savedClientName, 'Saved client name', true),
+      ocrMappedName: stringValue(candidate.ocrMappedName, 'OCR mapped name', true),
+      previousXPath: stringValue(candidate.previousXPath, 'Previous XPath', true),
+      previousCustomXPath: stringValue(candidate.previousCustomXPath, 'Previous custom XPath', true),
+      previousCss: stringValue(candidate.previousCss, 'Previous CSS', true),
+      previousStableAttributes: textRecord(candidate.previousStableAttributes, 'Previous stable attributes'),
+      newXPath: stringValue(candidate.newXPath, 'New XPath', true),
+      newCss: stringValue(candidate.newCss, 'New CSS', true),
+      newStableAttributes: textRecord(candidate.newStableAttributes, 'New stable attributes'),
+      previousPageIdentity: stringValue(candidate.previousPageIdentity, 'Previous page identity'),
+      currentPageIdentity: stringValue(candidate.currentPageIdentity, 'Current page identity'),
+      tag: stringValue(candidate.tag, 'Recovery tag', true),
+      type: stringValue(candidate.type, 'Recovery type', true),
+      role: stringValue(candidate.role, 'Recovery role', true),
+      expectedAction: expectedAction as SmokeTestLocatorRecoveryCandidate['expectedAction'],
+      confidence,
+      reasons: stringList(candidate.reasons, 'Recovery reasons'),
+      ambiguityWarnings: stringList(candidate.ambiguityWarnings, 'Recovery warnings'),
+      matches: Object.freeze({
+        xpath: matchValue(matches.xpath, 'XPath match'),
+        customXPath: matchValue(matches.customXPath, 'Custom XPath match'),
+        css: matchValue(matches.css, 'CSS match'),
+        stableAttributes: matchValue(matches.stableAttributes, 'Stable attributes match'),
+        frame: matchValue(matches.frame, 'Frame match'),
+        shadow: matchValue(matches.shadow, 'Shadow match'),
+      }),
+    });
+  });
+  return Object.freeze({ state: 'AWAITING_USER' as const, candidates: Object.freeze(candidates) });
 };
 
 const contractBody = (payload: unknown, operation: string): JsonObject => {
@@ -388,8 +510,40 @@ export const parseSmokeTestIntegrationStepResponse = (
       : status as SmokeTestIntegrationStepResult['outcome'],
     disposition: disposition as SmokeTestIntegrationStepResult['disposition'],
     message: stringValue(body.message, 'Integration step message'),
+    code: stringValue(body.code, 'Integration step code', true),
     replayed: body.replayed === true,
     runtimeWrites,
+    recovery: parseRecovery(body.recovery),
+  };
+};
+
+export const parseSmokeTestLocatorRecoveryResponse = (
+  payload: unknown,
+  expected: Readonly<{
+    requestId: string;
+    runId: string;
+    integrationEpoch: number;
+    sequence: number;
+    instructionId: number;
+  }>,
+): SmokeTestLocatorRecoveryResult => {
+  const body = contractBody(payload, 'Locator recovery');
+  if (stringValue(body.requestId, 'Recovery request ID') !== expected.requestId
+      || stringValue(body.runId, 'Recovery run ID') !== expected.runId
+      || integerValue(body.integrationEpoch, 'Recovery Integration epoch', 1)
+        !== expected.integrationEpoch
+      || integerValue(body.sequence, 'Recovery sequence', 1) !== expected.sequence
+      || integerValue(body.instructionId, 'Recovery instruction ID', 1)
+        !== expected.instructionId) {
+    throw new Error('Locator recovery response does not match the paused instruction.');
+  }
+  if (body.status !== 'COMPLETED' && body.status !== 'CANCELLED') {
+    throw new Error(stringValue(body.message, 'Locator recovery message'));
+  }
+  return {
+    status: body.status,
+    message: stringValue(body.message, 'Locator recovery message'),
+    locatorSaved: body.locatorSaved === true,
   };
 };
 
