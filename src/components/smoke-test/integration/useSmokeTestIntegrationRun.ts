@@ -76,6 +76,7 @@ type Arguments = {
   messageGeneration?: number;
   sessionId: string;
   snapshot: VariableWorkspaceSnapshot | null;
+  startContext?: Readonly<{ multiBatchId: string }>;
 };
 
 const bodyObject = (value: unknown): Record<string, unknown> | null =>
@@ -90,6 +91,7 @@ export const useSmokeTestIntegrationRun = ({
   messageGeneration = 0,
   sessionId,
   snapshot,
+  startContext,
 }: Arguments): SmokeTestIntegrationController => {
   const [phase, setPhase] = useState<Phase>('IDLE');
   const [activeRun, setActiveRun] = useState<SmokeTestIntegrationRun | null>(null);
@@ -263,7 +265,7 @@ export const useSmokeTestIntegrationRun = ({
     stepSequenceRef.current = 0;
     const requestId = nextRequestId('start');
     try {
-      const body = buildSmokeTestIntegrationStartRequest(
+      const baseBody = buildSmokeTestIntegrationStartRequest(
         requestId,
         plan,
         snapshot.bindingEpoch,
@@ -273,6 +275,9 @@ export const useSmokeTestIntegrationRun = ({
         runtimeWrites,
         pagePolicy,
       );
+      const body = startContext === undefined
+        ? baseBody
+        : { ...baseBody, multiBatchId: startContext.multiBatchId };
       const run = await request(
         'start',
         'smokeTest.integration.startResponse',
@@ -301,7 +306,7 @@ export const useSmokeTestIntegrationRun = ({
       setPhase('IDLE');
       throw nextError;
     }
-  }, [clearPending, nextRequestId, replaceRun, request, snapshot]);
+  }, [clearPending, nextRequestId, replaceRun, request, snapshot, startContext]);
 
   const refreshPage = useCallback(async () => {
     if (!snapshot) {

@@ -94,6 +94,8 @@ export interface VariablesSmokeTestPanelProps {
   integrationPagePolicy?: SmokeTestIntegrationPagePolicy;
   integration?: SmokeTestIntegrationController;
   onStatusChange?: (status: VariablesSmokeTestStatus) => void;
+  autoStartToken?: number;
+  autoStopToken?: number;
 }
 
 const SPEED_OPTIONS = [
@@ -213,6 +215,8 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   integrationPagePolicy = 'PRESERVE_ACTIVE',
   integration,
   onStatusChange,
+  autoStartToken = 0,
+  autoStopToken = 0,
 }) => {
   const [status, setStatus] = useState<VariablesSmokeTestStatus>('IDLE');
   const [plan, setPlan] = useState<VariablesSmokeTestPlan | null>(null);
@@ -242,6 +246,10 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   const executionActiveRef = useRef(false);
   const pauseResolverRef = useRef<((decision: 'CONTINUE' | 'STOP') => void) | null>(null);
   const stopRequestedRef = useRef(false);
+  const autoStartTokenRef = useRef(0);
+  const autoStopTokenRef = useRef(0);
+  const autoRunRef = useRef<() => Promise<void>>(async () => undefined);
+  const autoStopRef = useRef<() => Promise<void>>(async () => undefined);
   const excelRowIndexRef = useRef(0);
   const datasetRowCountRef = useRef(0);
   const previewPlan = useMemo(
@@ -474,6 +482,11 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
           }]),
         );
         datasetRowCountRef.current = startedRun.datasetRowCount;
+        if (stopRequestedRef.current) {
+          await integration.stop('USER_REQUEST');
+          setStatus('STOPPED');
+          return;
+        }
       } catch (failure) {
         const message = failure instanceof Error ? failure.message : 'Smoke Test Integration could not start.';
         setStatus('STOPPED');
@@ -500,11 +513,12 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   const stop = async () => {
     const integrationCleanupPending = executionMode === 'INTEGRATION'
       && Boolean(integrationRef.current?.activeRun);
-    if (status !== 'RUNNING' && !integrationCleanupPending) return;
+    if (status !== 'STARTING' && status !== 'RUNNING' && !integrationCleanupPending) return;
     stopRequestedRef.current = true;
     resolvePause('STOP');
     setStatus('STOPPING');
     onActivePositionChange?.(null);
+    if (status === 'STARTING' && !integrationCleanupPending) return;
     if (executionMode === 'INTEGRATION') {
       const result = await settleExcelWriteStopBoundary(
         () => flushExcelWriteFiles(),
@@ -518,6 +532,23 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     }
     setStatus('STOPPED');
   };
+
+  autoRunRef.current = run;
+  autoStopRef.current = stop;
+
+  useEffect(() => {
+    if (autoStartToken <= 0 || autoStartTokenRef.current === autoStartToken) return;
+    autoStartTokenRef.current = autoStartToken;
+    if (status === 'STARTING' || status === 'RUNNING' || status === 'STOPPING') return;
+    void autoRunRef.current();
+  }, [autoStartToken, status]);
+
+  useEffect(() => {
+    if (autoStopToken <= 0 || autoStopTokenRef.current === autoStopToken) return;
+    autoStopTokenRef.current = autoStopToken;
+    if (status !== 'STARTING' && status !== 'RUNNING' && status !== 'STOPPING') return;
+    void autoStopRef.current();
+  }, [autoStopToken, status]);
 
   useEffect(() => {
     if (status !== 'RUNNING' || plan === null || executionProgram === null) return undefined;

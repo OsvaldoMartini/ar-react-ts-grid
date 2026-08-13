@@ -49,6 +49,7 @@
 }
 
 .closeButton:hover { background: rgb(255 255 255 / 24%); }
+.closeButton:disabled { opacity: 0.45; cursor: not-allowed; }
 .closeButton:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 
 .notice {
@@ -71,6 +72,38 @@
   flex: 1 1 auto;
   overflow: auto;
   background: #fff;
+}
+
+.runs {
+  min-width: 0;
+  min-height: 0;
+  flex: 2 1 0;
+  padding: 10px;
+  overflow: auto;
+  background: #eef4f8;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 390px), 1fr));
+  align-items: start;
+}
+
+.runCard {
+  min-width: 0;
+  border: 1px solid #b9ceda;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 4px 14px rgb(17 61 89 / 10%);
+  overflow: hidden;
+}
+
+.runCardError {
+  padding: 12px;
+  border: 1px solid #d98b8b;
+  border-radius: 6px;
+  background: #fff1f1;
+  color: #8b1f1f;
+  font-size: 0.74rem;
+  font-weight: 700;
 }
 
 .table {
@@ -159,6 +192,7 @@
 
 .footerActions { display: flex; align-items: center; gap: 8px; }
 .footer .preflightButton { border-color: #0b78a5; background: #0b78a5; }
+.footer .stopButton { border-color: #b42318; background: #b42318; }
 .spinner { animation: multiExecutionSpin 0.9s linear infinite; }
 
 @keyframes multiExecutionSpin { to { transform: rotate(360deg); } }

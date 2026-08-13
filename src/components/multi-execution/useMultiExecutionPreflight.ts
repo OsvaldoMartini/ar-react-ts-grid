@@ -1,4 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  normalizeVariablesWorkspaceSnapshot,
+  type VariableWorkspaceSnapshot,
+} from '../variablesWorkspace.contract';
 
 export type MultiExecutionDataMode = 'REAL' | 'SYNTHETIC';
 
@@ -17,6 +21,17 @@ export type MultiExecutionPreflightJob = {
   runtimeConfigured: boolean;
   unsupportedActions: readonly string[];
   message: string;
+  workspaceSnapshot: VariableWorkspaceSnapshot | null;
+  datasetSnapshot: MultiExecutionDatasetSnapshot | null;
+};
+
+export type MultiExecutionDatasetSnapshot = {
+  mode: MultiExecutionDataMode;
+  datasetEpoch: number;
+  datasetRevision: number;
+  contentRevision: string;
+  rowCount: number;
+  blocks: readonly unknown[];
 };
 
 export type MultiExecutionPreflightState = {
@@ -25,6 +40,7 @@ export type MultiExecutionPreflightState = {
   runtimeConfigured: boolean;
   maxParallelism: number;
   jobs: ReadonlyMap<number, MultiExecutionPreflightJob>;
+  batchId: string;
 };
 
 type Draft = {
@@ -47,6 +63,7 @@ const initialState: MultiExecutionPreflightState = {
   runtimeConfigured: false,
   maxParallelism: 5,
   jobs: new Map(),
+  batchId: '',
 };
 
 const parsedBody = (raw: string): { operation: string; body: any } => {
@@ -68,6 +85,28 @@ const parsedJob = (value: any): MultiExecutionPreflightJob | null => {
   const unsupportedActions = Array.isArray(value?.unsupportedActions)
     ? value.unsupportedActions.map(String).filter(Boolean)
     : [];
+  const workspaceSnapshot = normalizeVariablesWorkspaceSnapshot(value?.workspaceSnapshot);
+  const dataset = value?.datasetSnapshot;
+  const contentRevision = String(dataset?.contentRevision || '');
+  const datasetSnapshot: MultiExecutionDatasetSnapshot | null = dataset
+    && (dataset.mode === 'REAL' || dataset.mode === 'SYNTHETIC')
+    && Number.isSafeInteger(Number(dataset.datasetEpoch))
+    && Number(dataset.datasetEpoch) > 0
+    && Number.isSafeInteger(Number(dataset.datasetRevision))
+    && Number(dataset.datasetRevision) > 0
+    && /^[a-f0-9]{64}$/i.test(contentRevision)
+    && Number.isSafeInteger(Number(dataset.rowCount))
+    && Number(dataset.rowCount) >= 0
+    && Array.isArray(dataset.blocks)
+    ? Object.freeze({
+        mode: dataset.mode as MultiExecutionDataMode,
+        datasetEpoch: Number(dataset.datasetEpoch),
+        datasetRevision: Number(dataset.datasetRevision),
+        contentRevision: contentRevision.toLocaleLowerCase(),
+        rowCount: Number(dataset.rowCount),
+        blocks: Object.freeze([...dataset.blocks]),
+      })
+    : null;
   return Object.freeze({
     botJobId,
     homeBankingId,
@@ -83,6 +122,8 @@ const parsedJob = (value: any): MultiExecutionPreflightJob | null => {
     runtimeConfigured: value?.runtimeConfigured === true,
     unsupportedActions: Object.freeze(unsupportedActions),
     message: String(value?.message || 'Preflight did not return a diagnostic.'),
+    workspaceSnapshot,
+    datasetSnapshot,
   });
 };
 
@@ -175,7 +216,12 @@ export const useMultiExecutionPreflight = ({
         );
         const complete = parsedJobs.length === selectedJobs.length
           && selectedJobs.every(job => jobsById.has(job.id));
-        const ready = body?.ok === true && body?.ready === true && complete;
+        const batchId = String(body?.batchId || '');
+        const prepared = complete && parsedJobs.every(job => job.workspaceSnapshot !== null
+          && job.datasetSnapshot !== null
+          && job.datasetSnapshot.mode === job.excelMode);
+        const ready = body?.ok === true && body?.ready === true && prepared
+          && /^[a-f0-9-]{36}$/i.test(batchId);
         setState({
           status: ready ? 'READY' : body?.ok === true ? 'BLOCKED' : 'FAILED',
           message: complete
@@ -184,6 +230,7 @@ export const useMultiExecutionPreflight = ({
           runtimeConfigured: body?.runtimeConfigured === true,
           maxParallelism: Math.max(1, Math.min(5, finiteInteger(body?.maxParallelism, 5))),
           jobs: jobsById,
+          batchId: ready ? batchId : '',
         });
       } catch (_) {
         // Unrelated or malformed workspace messages cannot settle this correlated request.
