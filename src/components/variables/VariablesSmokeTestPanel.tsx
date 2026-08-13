@@ -160,7 +160,7 @@ const localControlAction = (action: string): boolean => [
   'PAUSE',
 ].includes(action.trim().toLocaleUpperCase());
 
-const integrationResultForStep = (
+export const integrationResultForStep = (
   step: VariablesSmokeTestStep,
   result: SmokeTestIntegrationStepResult,
 ): VariablesSmokeTestStepResult => {
@@ -183,7 +183,11 @@ const integrationResultForStep = (
     tone,
     counter,
     message: `${position}: ${result.message}`,
-    runtimeWrites: [],
+    runtimeWrites: result.runtimeWrites.map(write => ({
+      ...write,
+      variableName: step.variables.find(variable => variable.variableId === write.variableId)?.variableName
+        ?? `Variable #${write.variableId}`,
+    })),
   };
 };
 
@@ -728,8 +732,10 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
             state: 'VALUE',
             value: write.value,
           });
+          const authoritativeIntegrationWrite = integrationStepResult?.runtimeWrites
+            .some(candidate => candidate.variableId === write.variableId) === true;
           if (
-            writeRuntimeValues
+            (authoritativeIntegrationWrite || writeRuntimeValues)
             && (!runtimeWriteAvailable
               || !onCommitRuntimeValue
               || !onCommitRuntimeValue(write.variableId, write.value))
