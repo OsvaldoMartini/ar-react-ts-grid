@@ -68,6 +68,12 @@ type SupportingWorkspacesPending = {
   timeout: ReturnType<typeof setTimeout>;
 };
 
+type ExcelDataModePending = {
+  requestId: string;
+  mode: ExcelDataMode;
+  timeout: ReturnType<typeof setTimeout>;
+};
+
 const REQUEST_TIMEOUT_MS = 12_000;
 const SUPPORTING_WORKSPACES_TIMEOUT_MS = 45_000;
 
@@ -109,6 +115,7 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
   const pendingRef = useRef<PendingRequest | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const supportingWorkspacesPendingRef = useRef<SupportingWorkspacesPending | null>(null);
+  const excelDataModePendingRef = useRef<ExcelDataModePending | null>(null);
   const snapshotRef = useRef<VariableWorkspaceSnapshot | null>(null);
   const [snapshot, setSnapshot] = useState<VariableWorkspaceSnapshot | null>(null);
   const [pending, setPending] = useState<PendingRequest | null>(null);
@@ -120,6 +127,7 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
   const [commandRemainingByInstructionId, setCommandRemainingByInstructionId] =
     useState<CommandRemainingByInstructionId>({});
   const [excelDataMode, setExcelDataMode] = useState<ExcelDataMode>('REAL');
+  const [excelDataModePending, setExcelDataModePending] = useState(false);
   const [executionMode, setExecutionMode] = useState<SmokeTestExecutionMode>('SMOKE');
   const [integrationRuntimeMode, setIntegrationRuntimeMode] =
     useState<SmokeTestIntegrationRuntimeMode>('JAVA_V1');
@@ -146,6 +154,13 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     current.reject(new Error(message));
   }, []);
 
+  const clearExcelDataModePending = useCallback(() => {
+    const current = excelDataModePendingRef.current;
+    if (current !== null) clearTimeout(current.timeout);
+    excelDataModePendingRef.current = null;
+    setExcelDataModePending(false);
+  }, []);
+
   const replaceSnapshot = useCallback((next: VariableWorkspaceSnapshot) => {
     const previous = snapshotRef.current;
     const botJobChanged = previous !== null && previous.botJob.id !== next.botJob.id;
@@ -156,11 +171,12 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
       : current.filter(blockId => next.blocks.some(block => block.id === blockId)));
     if (botJobChanged) {
       clearPending();
+      clearExcelDataModePending();
       setActiveSmokePosition(null);
       setSmokeExecutionTrace([]);
       setCommandRemainingByInstructionId({});
     }
-  }, [clearPending]);
+  }, [clearExcelDataModePending, clearPending]);
 
   const replaceRuntimeMemory = useCallback((
     runtimeMemory: VariableWorkspaceSnapshot['runtimeMemory'],
@@ -326,17 +342,19 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
   useEffect(() => {
     if (!connected) {
       clearPending();
+      clearExcelDataModePending();
       rejectSupportingWorkspaces('Smoke Test disconnected while preparing its supporting pages.');
       resetRuntimeMemory();
       return;
     }
     sendSnapshotRequest('variablesWorkspace.bootstrap');
-  }, [clearPending, connected, rejectSupportingWorkspaces, resetRuntimeMemory, sendSnapshotRequest]);
+  }, [clearExcelDataModePending, clearPending, connected, rejectSupportingWorkspaces, resetRuntimeMemory, sendSnapshotRequest]);
 
   useEffect(() => () => {
     clearPending();
+    clearExcelDataModePending();
     rejectSupportingWorkspaces('Smoke Test closed while preparing its supporting pages.');
-  }, [clearPending, rejectSupportingWorkspaces]);
+  }, [clearExcelDataModePending, clearPending, rejectSupportingWorkspaces]);
 
   useEffect(() => {
     if (processedMessageGenerationRef.current !== (messageGeneration ?? 0)) {
@@ -384,15 +402,43 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
         }
         return;
       }
+      if (envelope.operationId === 'excelDataWorkspace.mode.updateResponse') {
+        const current = excelDataModePendingRef.current;
+        if (current === null || body?.requestId !== current.requestId) return;
+        clearExcelDataModePending();
+        if (body?.ok === false
+          || body?.botJobId !== sourceBotJobId
+          || body?.mode !== current.mode) {
+          setStatus({
+            level: 'error',
+            text: statusText(body, 'The Excel Data mode change was not confirmed.'),
+          });
+          return;
+        }
+        setExcelDataMode(current.mode);
+        setStatus({
+          level: 'ok',
+          text: `${current.mode === 'REAL' ? 'Real' : 'Synthetic'} Excel Data memory selected.`,
+        });
+        return;
+      }
       if ([
         'excelDataWorkspace.openResponse',
         'excelDataWorkspace.mode.readResponse',
-        'excelDataWorkspace.mode.updateResponse',
         'excelData.mode.changed',
       ].includes(envelope.operationId ?? '')) {
         if (body?.ok !== false && body?.botJobId === sourceBotJobId
           && (body?.mode === 'REAL' || body?.mode === 'SYNTHETIC')) {
           setExcelDataMode(body.mode);
+          const current = excelDataModePendingRef.current;
+          if (envelope.operationId === 'excelData.mode.changed'
+            && current?.mode === body.mode) {
+            clearExcelDataModePending();
+            setStatus({
+              level: 'ok',
+              text: `${body.mode === 'REAL' ? 'Real' : 'Synthetic'} Excel Data memory selected.`,
+            });
+          }
         }
         return;
       }
@@ -442,6 +488,7 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     });
   }, [
     clearPending,
+    clearExcelDataModePending,
     handleRuntimeMemoryMessage,
     handleInstructionStatusMessage,
     messageGeneration,
@@ -554,13 +601,36 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     }
   }, [sessionId, webSocket]);
   const updateExcelDataMode = useCallback((mode: ExcelDataMode) => {
-    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) return;
-    webSocket.send(JSON.stringify({
-      type: 'excelDataWorkspace.mode.update',
-      sessionId,
-      body: JSON.stringify({ requestId: `${Date.now()}-smoke-excel-mode`, mode }),
-    }));
-  }, [sessionId, webSocket]);
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN
+      || excelDataModePendingRef.current !== null) return;
+    requestSequenceRef.current += 1;
+    const requestId = `${Date.now()}-smoke-excel-mode-${requestSequenceRef.current}`;
+    const timeout = setTimeout(() => {
+      if (excelDataModePendingRef.current?.requestId !== requestId) return;
+      setStatus({
+        level: 'error',
+        text: 'The Excel Data mode change timed out. Test Input remains unavailable; Reload Smoke Test before retrying.',
+      });
+    }, REQUEST_TIMEOUT_MS);
+    excelDataModePendingRef.current = { requestId, mode, timeout };
+    setExcelDataModePending(true);
+    setStatus({ level: 'warn', text: 'Confirming the Excel Data memory mode...' });
+    try {
+      webSocket.send(JSON.stringify({
+        type: 'excelDataWorkspace.mode.update',
+        sessionId,
+        body: JSON.stringify({ requestId, mode }),
+      }));
+    } catch (failure) {
+      clearExcelDataModePending();
+      setStatus({
+        level: 'error',
+        text: failure instanceof Error
+          ? failure.message
+          : 'The Excel Data mode change could not be sent.',
+      });
+    }
+  }, [clearExcelDataModePending, sessionId, webSocket]);
   useEffect(() => {
     if (!connected || !webSocket || webSocket.readyState !== WebSocket.OPEN || !snapshot?.botJob.id) return;
     webSocket.send(JSON.stringify({
@@ -593,9 +663,9 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     instructionId: number,
     action: GridItemTestAction,
   ) => {
-    if (instructionActionsDisabled) return;
+    if (instructionActionsDisabled || (action === 'INPUT' && excelDataModePending)) return;
     submitInstructionTest(instructionId, action, 0);
-  }, [instructionActionsDisabled, submitInstructionTest]);
+  }, [excelDataModePending, instructionActionsDisabled, submitInstructionTest]);
   const toggleInstructionStatus = useCallback((
     instructionId: number,
     currentActive: boolean,
@@ -764,6 +834,7 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
                 excelWriterMessageGeneration={messageGeneration ?? 0}
                 onPublishExcelWriterState={publishExcelWriterState}
                 excelDataMode={excelDataMode}
+                excelDataModePending={excelDataModePending}
                 onExcelDataModeChange={updateExcelDataMode}
                 executionMode={executionMode}
                 integrationRuntimeMode={integrationRuntimeMode}
@@ -780,6 +851,7 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
                 smokeExecutionTrace={smokeExecutionTrace}
                 commandRemainingByInstructionId={commandRemainingByInstructionId}
                 actionsDisabled={instructionActionsDisabled}
+                inputTestDisabled={excelDataModePending}
                 pendingTestInstructionId={pendingInstructionTestId}
                 pendingTestAction={pendingInstructionTestAction}
                 pendingWebElementTypeInstructionId={pendingWebElementTypeInstructionId}

@@ -15,6 +15,7 @@ type Props = {
   testable: boolean;
   executionType: WebElementExecutionType | null;
   disabled: boolean;
+  inputDisabled: boolean;
   pendingAction: GridItemTestAction | null;
   statusPending: boolean;
   typePending: boolean;
@@ -32,6 +33,7 @@ const SmokeTestInstructionActions: React.FC<Props> = ({
   testable,
   executionType,
   disabled,
+  inputDisabled,
   pendingAction,
   statusPending,
   typePending,
@@ -80,7 +82,7 @@ const SmokeTestInstructionActions: React.FC<Props> = ({
           <button
             type="button"
             className={`${styles.testButton} ${styles.inputButton}`}
-            disabled={controlsBusy}
+            disabled={controlsBusy || inputDisabled}
             title={pendingAction === 'INPUT'
               ? 'Testing input...'
               : `Test Input on ${instructionName}`}

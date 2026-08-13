@@ -34,6 +34,7 @@ type Props = {
     policyLocked: boolean,
   ) => boolean;
   excelDataMode: ExcelDataMode;
+  excelDataModePending: boolean;
   onExcelDataModeChange: (mode: ExcelDataMode) => void;
   executionMode: SmokeTestExecutionMode;
   integrationRuntimeMode: SmokeTestIntegrationRuntimeMode;
@@ -56,6 +57,7 @@ const SmokeTestSimulationWorkspace: React.FC<Props> = ({
   excelWriterMessageGeneration,
   onPublishExcelWriterState,
   excelDataMode,
+  excelDataModePending,
   onExcelDataModeChange,
   executionMode,
   integrationRuntimeMode,
@@ -78,6 +80,7 @@ const SmokeTestSimulationWorkspace: React.FC<Props> = ({
       excelWriterMessageGeneration={excelWriterMessageGeneration}
       onPublishExcelWriterState={onPublishExcelWriterState}
       excelDataMode={excelDataMode}
+      excelDataModePending={excelDataModePending}
       onExcelDataModeChange={onExcelDataModeChange}
       executionMode={executionMode}
       integrationRuntimeMode={integrationRuntimeMode}

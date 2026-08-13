@@ -87,6 +87,7 @@ export interface VariablesSmokeTestPanelProps {
     policyLocked: boolean,
   ) => boolean;
   excelDataMode?: ExcelDataMode;
+  excelDataModePending?: boolean;
   onExcelDataModeChange?: (mode: ExcelDataMode) => void;
   executionMode?: SmokeTestExecutionMode;
   integrationRuntimeMode?: SmokeTestIntegrationRuntimeMode;
@@ -205,6 +206,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   excelWriterMessageGeneration = 0,
   onPublishExcelWriterState,
   excelDataMode = 'REAL',
+  excelDataModePending = false,
   onExcelDataModeChange,
   executionMode = 'SMOKE',
   integrationRuntimeMode = 'JAVA_V1',
@@ -953,7 +955,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
           <Play size={14} aria-hidden="true" /> RUN
         </button>
         <ExcelDataModeToggle mode={excelDataMode}
-          disabled={!onExcelDataModeChange || executionActive}
+          disabled={!onExcelDataModeChange || executionActive || excelDataModePending}
           onChange={mode => onExcelDataModeChange?.(mode)} />
         <label className={styles.speedSelector}>
           <span>Speed</span>

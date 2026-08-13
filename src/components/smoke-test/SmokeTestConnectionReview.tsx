@@ -55,6 +55,7 @@ export interface SmokeTestConnectionReviewProps {
   smokeExecutionTrace: readonly VariablesSmokeTestPosition[];
   commandRemainingByInstructionId: CommandRemainingByInstructionId;
   actionsDisabled?: boolean;
+  inputTestDisabled?: boolean;
   pendingTestInstructionId?: number | null;
   pendingTestAction?: GridItemTestAction | null;
   pendingWebElementTypeInstructionId?: number | null;
@@ -103,6 +104,7 @@ const SmokeTestConnectionReview: React.FC<
   smokeExecutionTrace,
   commandRemainingByInstructionId,
   actionsDisabled = false,
+  inputTestDisabled = false,
   pendingTestInstructionId = null,
   pendingTestAction = null,
   pendingWebElementTypeInstructionId = null,
@@ -652,6 +654,7 @@ const SmokeTestConnectionReview: React.FC<
                           testable={gridItemTestActionsForInstruction(step.action).length > 0}
                           executionType={gridItemWebElementTypeForAction(step.action)}
                           disabled={actionsDisabled || step.instructionId === null}
+                          inputDisabled={inputTestDisabled}
                           pendingAction={pendingTestInstructionId === step.instructionId
                             ? pendingTestAction
                             : null}
