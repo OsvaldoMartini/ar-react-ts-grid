@@ -4,6 +4,7 @@ import type { VariablesSmokeTestStep } from './domain/variablesSmokeTestTypes';
 
 test('preserves authoritative Integration GET writes for runtime publication', () => {
   const step = {
+    key: 'step-20',
     blockId: 1,
     blockOrder: 1,
     blockName: 'Login',
@@ -11,14 +12,33 @@ test('preserves authoritative Integration GET writes for runtime publication', (
     instructionOrder: 2,
     instructionName: 'Read balance',
     action: 'GET',
-    variables: [{ variableId: 30, variableName: 'balance' }],
-  } as VariablesSmokeTestStep;
+    operation: '',
+    onHoldSeconds: null,
+    active: true,
+    comparisonOperator: null,
+    comparisonFormatPolicy: '',
+    variables: [{
+      slot: 'PRIMARY',
+      variableId: 30,
+      variableName: 'balance',
+      runtimeState: 'VOID',
+      runtimeRawValue: '',
+      displayValue: 'VOID',
+    }],
+    connections: [],
+  } satisfies VariablesSmokeTestStep;
   const result = {
+    requestId: 'step-request-1',
+    runId: 'run-1',
+    integrationEpoch: 1,
+    sequence: 1,
+    instructionId: 20,
     outcome: 'PASSED',
     disposition: 'PHYSICAL',
     message: 'GET captured the live value.',
+    replayed: false,
     runtimeWrites: [{ variableId: 30, value: '125.00' }],
-  } as SmokeTestIntegrationStepResult;
+  } satisfies SmokeTestIntegrationStepResult;
 
   expect(integrationResultForStep(step, result).runtimeWrites).toEqual([
     { variableId: 30, variableName: 'balance', value: '125.00' },
