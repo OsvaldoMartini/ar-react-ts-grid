@@ -84,6 +84,54 @@ test('sends only one synchronous update for the same variable before rerender', 
   unmount();
 });
 
+test('keeps update identity stable while using the latest runtime snapshot revision', () => {
+  const send = jest.fn();
+  const webSocket = {
+    readyState: WebSocket.OPEN,
+    send,
+  } as unknown as WebSocket;
+  const onMemory = jest.fn();
+  const onStatus = jest.fn();
+  const { result, rerender, unmount } = renderHook(
+    ({ currentSnapshot }: { currentSnapshot: VariableWorkspaceSnapshot }) =>
+      useVariablesRuntimeMemory({
+        webSocket,
+        connected: true,
+        sessionId: 'variablesManager',
+        snapshot: currentSnapshot,
+        onMemory,
+        onStatus,
+      }),
+    { initialProps: { currentSnapshot: snapshot } },
+  );
+  const initialUpdateValue = result.current.updateValue;
+  const revisedSnapshot = {
+    ...snapshot,
+    runtimeMemory: {
+      ...snapshot.runtimeMemory,
+      revision: 19,
+      variables: snapshot.runtimeMemory.variables.map(entry => ({
+        ...entry,
+        entryRevision: 8,
+      })),
+    },
+  } as VariableWorkspaceSnapshot;
+
+  rerender({ currentSnapshot: revisedSnapshot });
+
+  expect(result.current.updateValue).toBe(initialUpdateValue);
+  act(() => {
+    expect(result.current.updateValue(12, 'latest')).toBe(true);
+  });
+  const envelope = JSON.parse(send.mock.calls[0][0]);
+  expect(JSON.parse(envelope.body)).toMatchObject({
+    baseRuntimeRevision: 19,
+    expectedEntryRevision: 8,
+    value: 'latest',
+  });
+  unmount();
+});
+
 test('requests one atomic clear-all against the authoritative revision', () => {
   const send = jest.fn();
   const { result, unmount } = renderHook(() => useVariablesRuntimeMemory({

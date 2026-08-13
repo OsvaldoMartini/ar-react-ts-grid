@@ -72,6 +72,7 @@ export const useVariablesRuntimeMemory = ({
   onStatus,
   timeoutMs = DEFAULT_TIMEOUT_MS,
 }: Context) => {
+  const snapshotRef = useRef(snapshot);
   const pendingRef = useRef<Map<string, PendingEdit>>(new Map());
   const pendingClearAllRef = useRef<{
     requestId: string;
@@ -80,6 +81,8 @@ export const useVariablesRuntimeMemory = ({
   const [pendingVariableIds, setPendingVariableIds] =
     useState<ReadonlySet<number>>(() => new Set());
   const [pendingClearAll, setPendingClearAll] = useState(false);
+
+  snapshotRef.current = snapshot;
 
   const syncPendingIds = useCallback(() => {
     setPendingVariableIds(new Set(
@@ -122,8 +125,9 @@ export const useVariablesRuntimeMemory = ({
   }, [connected, resetPending, webSocket]);
 
   const updateValue = useCallback((variableId: number, value: string): boolean => {
+    const currentSnapshot = snapshotRef.current;
     if (
-      !snapshot
+      !currentSnapshot
       || !connected
       || !webSocket
       || webSocket.readyState !== WebSocket.OPEN
@@ -145,7 +149,7 @@ export const useVariablesRuntimeMemory = ({
     pendingRef.current.set(requestId, { requestId, variableId, timeoutId });
     syncPendingIds();
     try {
-      const entryRevision = snapshot.runtimeMemory.variables.find(
+      const entryRevision = currentSnapshot.runtimeMemory.variables.find(
         entry => entry.variableId === variableId,
       )?.entryRevision ?? 0;
       webSocket.send(JSON.stringify({
@@ -153,10 +157,10 @@ export const useVariablesRuntimeMemory = ({
         sessionId,
         body: JSON.stringify({
           requestId,
-          bindingEpoch: snapshot.bindingEpoch,
-          workspaceEpoch: snapshot.workspaceEpoch,
+          bindingEpoch: currentSnapshot.bindingEpoch,
+          workspaceEpoch: currentSnapshot.workspaceEpoch,
           contractVersion: RUNTIME_MEMORY_CONTRACT_VERSION,
-          baseRuntimeRevision: snapshot.runtimeMemory.revision,
+          baseRuntimeRevision: currentSnapshot.runtimeMemory.revision,
           variableId,
           operation: 'SET',
           expectedEntryRevision: entryRevision,
@@ -181,7 +185,6 @@ export const useVariablesRuntimeMemory = ({
     connected,
     onStatus,
     sessionId,
-    snapshot,
     syncPendingIds,
     timeoutMs,
     webSocket,
