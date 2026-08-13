@@ -286,6 +286,7 @@ const App: React.FC = () => {
           VARIABLES_MANAGER_SESSION_ID,
           RUNTIME_VARIABLES_SESSION_ID,
           EXCEL_DATA_SESSION_ID,
+          EXCEL_WRITER_MANAGER_SESSION_ID,
           'smokeTestManager',
           PAGE_MAPPINGS_SESSION_ID,
           INFO_PAGE_SESSION_ID,
