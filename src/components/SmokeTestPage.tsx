@@ -8,6 +8,9 @@ import type { ExcelDataMode } from './excel-data/ExcelDataModeToggle';
 import SmokeTestExecutionModeToggle from './smoke-test/integration/SmokeTestExecutionModeToggle';
 import SmokeTestRuntimeModeToggle from './smoke-test/integration/SmokeTestRuntimeModeToggle';
 import SmokeTestPagePolicyToggle from './smoke-test/integration/SmokeTestPagePolicyToggle';
+import SmokeTestV2RuntimeToggle, {
+  type V2RuntimeState,
+} from './smoke-test/integration/SmokeTestV2RuntimeToggle';
 import { useSmokeTestIntegrationRun } from './smoke-test/integration/useSmokeTestIntegrationRun';
 import type {
   SmokeTestExecutionMode,
@@ -74,6 +77,12 @@ type ExcelDataModePending = {
   timeout: ReturnType<typeof setTimeout>;
 };
 
+type V2RuntimePending = {
+  requestId: string;
+  action: 'STATUS' | 'START' | 'STOP';
+  timeout: ReturnType<typeof setTimeout>;
+};
+
 const REQUEST_TIMEOUT_MS = 12_000;
 const SUPPORTING_WORKSPACES_TIMEOUT_MS = 45_000;
 
@@ -116,6 +125,7 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const supportingWorkspacesPendingRef = useRef<SupportingWorkspacesPending | null>(null);
   const excelDataModePendingRef = useRef<ExcelDataModePending | null>(null);
+  const v2RuntimePendingRef = useRef<V2RuntimePending | null>(null);
   const snapshotRef = useRef<VariableWorkspaceSnapshot | null>(null);
   const [snapshot, setSnapshot] = useState<VariableWorkspaceSnapshot | null>(null);
   const [pending, setPending] = useState<PendingRequest | null>(null);
@@ -135,6 +145,8 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     useState<SmokeTestIntegrationPagePolicy>('PRESERVE_ACTIVE');
   const [smokeRunStatus, setSmokeRunStatus] = useState<VariablesSmokeTestStatus>('IDLE');
   const [locatorRecoveryVerificationEnabled, setLocatorRecoveryVerificationEnabled] = useState(true);
+  const [v2RuntimeState, setV2RuntimeState] = useState<V2RuntimeState>('UNKNOWN');
+  const [v2RuntimePending, setV2RuntimePending] = useState(false);
   const [status, setStatus] = useState<Status>({
     level: 'warn',
     text: 'Waiting for Smoke Test workspace',
@@ -162,6 +174,13 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     setExcelDataModePending(false);
   }, []);
 
+  const clearV2RuntimePending = useCallback(() => {
+    const current = v2RuntimePendingRef.current;
+    if (current !== null) clearTimeout(current.timeout);
+    v2RuntimePendingRef.current = null;
+    setV2RuntimePending(false);
+  }, []);
+
   const replaceSnapshot = useCallback((next: VariableWorkspaceSnapshot) => {
     const previous = snapshotRef.current;
     const botJobChanged = previous !== null && previous.botJob.id !== next.botJob.id;
@@ -173,11 +192,13 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     if (botJobChanged) {
       clearPending();
       clearExcelDataModePending();
+      clearV2RuntimePending();
+      setV2RuntimeState('UNKNOWN');
       setActiveSmokePosition(null);
       setSmokeExecutionTrace([]);
       setCommandRemainingByInstructionId({});
     }
-  }, [clearExcelDataModePending, clearPending]);
+  }, [clearExcelDataModePending, clearPending, clearV2RuntimePending]);
 
   const replaceRuntimeMemory = useCallback((
     runtimeMemory: VariableWorkspaceSnapshot['runtimeMemory'],
@@ -340,22 +361,61 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     return true;
   }, [clearPending, sessionId, sourceBotJobId, webSocket]);
 
+  const requestV2Runtime = useCallback((action: 'STATUS' | 'START' | 'STOP') => {
+    const current = snapshotRef.current;
+    if (!connected || !webSocket || webSocket.readyState !== WebSocket.OPEN
+      || !current || v2RuntimePendingRef.current !== null) return false;
+    requestSequenceRef.current += 1;
+    const requestId = `${Date.now()}-smoke-v2-runtime-${requestSequenceRef.current}`;
+    const timeout = setTimeout(() => {
+      if (v2RuntimePendingRef.current?.requestId !== requestId) return;
+      v2RuntimePendingRef.current = null;
+      setV2RuntimePending(false);
+      setV2RuntimeState('ERROR');
+      setStatus({ level: 'error', text: 'Execution V2 runtime control timed out.' });
+    }, 25_000);
+    v2RuntimePendingRef.current = { requestId, action, timeout };
+    setV2RuntimePending(true);
+    webSocket.send(JSON.stringify({
+      type: action === 'STATUS'
+        ? 'smokeTest.integration.runtimeStatus'
+        : 'smokeTest.integration.runtimeControl',
+      sessionId,
+      body: JSON.stringify({
+        requestId,
+        action,
+        bindingEpoch: current.bindingEpoch,
+        workspaceEpoch: current.workspaceEpoch,
+        homeBankingId: current.botJob.homeBankingId,
+        botJobId: current.botJob.id,
+        graphRevision: current.graphRevision,
+      }),
+    }));
+    return true;
+  }, [connected, sessionId, webSocket]);
+
+  useEffect(() => {
+    if (connected && snapshot) requestV2Runtime('STATUS');
+  }, [connected, requestV2Runtime, snapshot]);
+
   useEffect(() => {
     if (!connected) {
       clearPending();
       clearExcelDataModePending();
+      clearV2RuntimePending();
       rejectSupportingWorkspaces('Smoke Test disconnected while preparing its supporting pages.');
       resetRuntimeMemory();
       return;
     }
     sendSnapshotRequest('variablesWorkspace.bootstrap');
-  }, [clearExcelDataModePending, clearPending, connected, rejectSupportingWorkspaces, resetRuntimeMemory, sendSnapshotRequest]);
+  }, [clearExcelDataModePending, clearPending, clearV2RuntimePending, connected, rejectSupportingWorkspaces, resetRuntimeMemory, sendSnapshotRequest]);
 
   useEffect(() => () => {
     clearPending();
     clearExcelDataModePending();
+    clearV2RuntimePending();
     rejectSupportingWorkspaces('Smoke Test closed while preparing its supporting pages.');
-  }, [clearExcelDataModePending, clearPending, rejectSupportingWorkspaces]);
+  }, [clearExcelDataModePending, clearPending, clearV2RuntimePending, rejectSupportingWorkspaces]);
 
   useEffect(() => {
     if (processedMessageGenerationRef.current !== (messageGeneration ?? 0)) {
@@ -376,6 +436,43 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
         return;
       }
       const body = bodyObject(envelope.body);
+      if (envelope.operationId === 'smokeTest.integration.runtimeStatusResponse'
+        || envelope.operationId === 'smokeTest.integration.runtimeControlResponse') {
+        const current = v2RuntimePendingRef.current;
+        if (current === null || body?.requestId !== current.requestId) return;
+        if (body?.ok === false && body?.state === undefined) {
+          clearTimeout(current.timeout);
+          v2RuntimePendingRef.current = null;
+          setV2RuntimePending(false);
+          setV2RuntimeState('ERROR');
+          setStatus({
+            level: 'error',
+            text: statusText(body, 'Execution V2 runtime control was refused.'),
+          });
+          return;
+        }
+        const owner = snapshotRef.current;
+        if (!owner
+          || body?.bindingEpoch !== owner.bindingEpoch
+          || body?.workspaceEpoch !== owner.workspaceEpoch
+          || body?.homeBankingId !== owner.botJob.homeBankingId
+          || body?.botJobId !== owner.botJob.id
+          || body?.graphRevision !== owner.graphRevision) return;
+        clearTimeout(current.timeout);
+        v2RuntimePendingRef.current = null;
+        setV2RuntimePending(false);
+        const nextState = typeof body?.state === 'string' ? body.state : 'ERROR';
+        if (['STOPPED', 'STARTING', 'READY', 'READY_EXTERNAL'].includes(nextState)) {
+          setV2RuntimeState(nextState as V2RuntimeState);
+        } else {
+          setV2RuntimeState('ERROR');
+        }
+        setStatus({
+          level: body?.ok === false ? 'error' : nextState.startsWith('READY') ? 'ok' : 'warn',
+          text: statusText(body, `Execution V2 runtime is ${nextState.toLowerCase()}.`),
+        });
+        return;
+      }
       if (envelope.operationId === 'smokeTest.supportingWorkspaces.prepareResponse') {
         const current = supportingWorkspacesPendingRef.current;
         if (current === null || body?.requestId !== current.requestId) return;
@@ -780,6 +877,20 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
                     || smokeRunActive
                     || integration.phase !== 'IDLE'}
                   onChange={setIntegrationPagePolicy}
+                />
+              )}
+              {executionMode === 'INTEGRATION' && (
+                <SmokeTestV2RuntimeToggle
+                  state={v2RuntimeState}
+                  pending={v2RuntimePending}
+                  disabled={!connected
+                    || snapshot === null
+                    || smokeRunActive
+                    || integration.phase !== 'IDLE'
+                    || v2RuntimeState === 'READY_EXTERNAL'}
+                  onToggle={() => requestV2Runtime(
+                    v2RuntimeState === 'READY' ? 'STOP' : 'START',
+                  )}
                 />
               )}
               <button
