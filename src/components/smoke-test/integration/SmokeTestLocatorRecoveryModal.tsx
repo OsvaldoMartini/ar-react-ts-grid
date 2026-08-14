@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, Minus, Octagon, Save, ShieldAlert, X } from 'lucide-react';
+import { Check, Minus, Octagon, Save, ShieldAlert, SkipForward, X } from 'lucide-react';
 import type {
   LocatorMatchValue,
   SmokeTestLocatorRecovery,
@@ -118,6 +118,14 @@ const SmokeTestLocatorRecoveryModal: React.FC<Props> = ({ instructionName, recov
               </tr>
             </thead>
             <tbody>
+              {recovery.candidates.length === 0 && (
+                <tr>
+                  <td colSpan={21} className={styles.empty}>
+                    No safe recovery candidates were found on the current page. Bypass can skip
+                    this instruction and continue the evaluation without performing an action.
+                  </td>
+                </tr>
+              )}
               {recovery.candidates.map(candidate => (
                 <tr key={candidate.recoveryCandidateId} data-selected={candidate.recoveryCandidateId === selectedId}>
                   <td><input type="radio" name="locator-recovery" checked={candidate.recoveryCandidateId === selectedId} onChange={() => setSelectedId(candidate.recoveryCandidateId)} /></td>
@@ -152,6 +160,7 @@ const SmokeTestLocatorRecoveryModal: React.FC<Props> = ({ instructionName, recov
         <footer>
           <button type="button" disabled={busy} onClick={() => void decide(null, 'CANCEL')}>Cancel Recovery</button>
           <button type="button" className={styles.stop} disabled={busy} onClick={() => void decide(null, 'STOP')}><Octagon size={15} /> Stop Execution</button>
+          <button type="button" className={styles.bypass} disabled={busy} onClick={() => void decide(null, 'BYPASS')}><SkipForward size={15} /> Bypass &amp; Continue</button>
           <button type="button" className={styles.once} disabled={busy || selected === null} onClick={() => void decide(selected, 'USE_ONCE')}>Use Once</button>
           <button type="button" className={styles.save} disabled={busy || selected === null} onClick={() => void decide(selected, 'USE_AND_SAVE')}><Save size={15} /> Use and Save Locator</button>
         </footer>

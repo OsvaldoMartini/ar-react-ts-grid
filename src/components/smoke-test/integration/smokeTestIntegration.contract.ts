@@ -140,10 +140,10 @@ export type SmokeTestLocatorRecovery = {
   candidates: readonly SmokeTestLocatorRecoveryCandidate[];
 };
 
-export type SmokeTestLocatorRecoveryDecision = 'USE_ONCE' | 'USE_AND_SAVE' | 'CANCEL';
+export type SmokeTestLocatorRecoveryDecision = 'USE_ONCE' | 'USE_AND_SAVE' | 'BYPASS' | 'CANCEL';
 
 export type SmokeTestLocatorRecoveryResult = {
-  status: 'COMPLETED' | 'CANCELLED';
+  status: 'COMPLETED' | 'BYPASSED' | 'CANCELLED';
   message: string;
   locatorSaved: boolean;
 };
@@ -537,7 +537,9 @@ export const parseSmokeTestLocatorRecoveryResponse = (
         !== expected.instructionId) {
     throw new Error('Locator recovery response does not match the paused instruction.');
   }
-  if (body.status !== 'COMPLETED' && body.status !== 'CANCELLED') {
+  if (body.status !== 'COMPLETED'
+      && body.status !== 'BYPASSED'
+      && body.status !== 'CANCELLED') {
     throw new Error(stringValue(body.message, 'Locator recovery message'));
   }
   return {

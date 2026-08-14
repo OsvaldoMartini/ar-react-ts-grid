@@ -117,7 +117,7 @@ const EMPTY_COUNTERS: VariablesSmokeTestCounters = Object.freeze({
 });
 
 type LocatorRecoveryDecisionResult = Readonly<{
-  kind: 'COMPLETED' | 'WARNING' | 'CANCELLED' | 'STOPPED';
+  kind: 'COMPLETED' | 'WARNING' | 'BYPASSED' | 'CANCELLED' | 'STOPPED';
   message: string;
 }>;
 
@@ -332,7 +332,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
 
   const decideLocatorRecovery = useCallback(async (
     candidate: SmokeTestLocatorRecoveryCandidate | null,
-    decision: 'USE_ONCE' | 'USE_AND_SAVE' | 'CANCEL' | 'STOP',
+    decision: 'USE_ONCE' | 'USE_AND_SAVE' | 'BYPASS' | 'CANCEL' | 'STOP',
   ) => {
     const pending = pendingLocatorRecovery;
     const controller = integrationRef.current;
@@ -356,9 +356,11 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
       decision,
     );
     settleLocatorRecovery({
-      kind: response.status === 'COMPLETED'
-        ? decision === 'USE_AND_SAVE' && !response.locatorSaved ? 'WARNING' : 'COMPLETED'
-        : 'CANCELLED',
+      kind: response.status === 'BYPASSED'
+        ? 'BYPASSED'
+        : response.status === 'COMPLETED'
+          ? decision === 'USE_AND_SAVE' && !response.locatorSaved ? 'WARNING' : 'COMPLETED'
+          : 'CANCELLED',
       message: response.message,
     });
   }, [onActivePositionChange, pendingLocatorRecovery, settleLocatorRecovery]);
@@ -911,7 +913,15 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
           if (integrationStepResult.recovery !== null) {
             const recoveryDecision = await waitForLocatorRecovery(item.step, integrationStepResult);
             if (cancelled || stopRequestedRef.current || recoveryDecision.kind === 'STOPPED') return;
-            if (recoveryDecision.kind === 'COMPLETED' || recoveryDecision.kind === 'WARNING') {
+            if (recoveryDecision.kind === 'BYPASSED') {
+              integrationStepResult = {
+                ...integrationStepResult,
+                outcome: 'BYPASSED',
+                code: 'RECOVERY_BYPASSED',
+                message: recoveryDecision.message,
+                recovery: null,
+              };
+            } else if (recoveryDecision.kind === 'COMPLETED' || recoveryDecision.kind === 'WARNING') {
               integrationStepResult = {
                 ...integrationStepResult,
                 outcome: recoveryDecision.kind === 'WARNING' ? 'WARNING' : 'PASSED',

@@ -87,6 +87,7 @@ test('submits Use and Save only for the selected server candidate', async () => 
 
 test.each([
   ['Cancel Recovery', 'CANCEL'],
+  ['Bypass & Continue', 'BYPASS'],
   ['Stop Execution', 'STOP'],
 ] as const)('%s submits a terminal decision without a candidate', async (button, decision) => {
   const onDecision = jest.fn().mockResolvedValue(undefined);
@@ -105,7 +106,7 @@ test.each([
   await waitFor(() => expect(onDecision).toHaveBeenCalledWith(null, decision));
 });
 
-test('keeps an empty recovery fail-closed and contains keyboard focus', () => {
+test('allows an empty recovery to be explicitly bypassed and contains keyboard focus', async () => {
   const onDecision = jest.fn().mockResolvedValue(undefined);
   render(
     <SmokeTestLocatorRecoveryModal
@@ -116,11 +117,16 @@ test('keeps an empty recovery fail-closed and contains keyboard focus', () => {
   );
 
   expect(screen.getByText('0 candidates')).toBeVisible();
+  expect(screen.getByText(/No safe recovery candidates were found/)).toBeVisible();
   expect(screen.getByRole('button', { name: 'Use Once' })).toBeDisabled();
   expect(screen.getByRole('button', { name: 'Use and Save Locator' })).toBeDisabled();
-  const stop = screen.getByRole('button', { name: 'Stop Execution' });
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Bypass & Continue' }));
+  });
+  await waitFor(() => expect(onDecision).toHaveBeenCalledWith(null, 'BYPASS'));
+  const bypass = screen.getByRole('button', { name: 'Bypass & Continue' });
   const cancel = screen.getByRole('button', { name: 'Cancel Recovery' });
-  stop.focus();
+  bypass.focus();
   fireEvent.keyDown(document, { key: 'Tab' });
   expect(cancel).toHaveFocus();
 });

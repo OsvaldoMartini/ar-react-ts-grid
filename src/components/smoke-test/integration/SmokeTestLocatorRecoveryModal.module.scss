@@ -11,6 +11,7 @@
 .tableViewport th, .tableViewport td { max-width: 250px; padding: 7px 8px; border-right: 1px solid #d8e3eb; border-bottom: 1px solid #d8e3eb; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tableViewport thead th { position: sticky; top: 0; z-index: 2; text-align: left; color: #17324d; background: #dcecf7; }
 .tableViewport tbody tr[data-selected=true] { background: #e7faff; box-shadow: inset 3px 0 #08a5be; }
+.tableViewport td.empty { padding: 28px; text-align: center; color: #526f83; white-space: normal; background: #f7fbfe; }
 .tableViewport td small { display: block; margin-top: 3px; font-weight: 400; color: #58748a; }
 .match, .mismatch, .unavailable { display: inline-grid; place-items: center; width: 25px; height: 25px; border-radius: 50%; }
 .match { color: #fff; background: #16834a; box-shadow: 0 0 9px rgba(22,131,74,.4); }
@@ -20,6 +21,7 @@
 .dialog footer button { min-height: 36px; display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border: 1px solid #8bb8d7; border-radius: 8px; color: #24445e; background: #fff; font-weight: 800; cursor: pointer; }
 .dialog footer button:disabled { cursor: wait; opacity: .55; }
 .dialog footer .stop { color: #fff; border-color: #a51d25; background: #bd2933; }
+.dialog footer .bypass { color: #fff; border-color: #b56b08; background: #d17a08; box-shadow: 0 0 13px rgba(245, 158, 11, .38); }
 .dialog footer .once { color: #fff; border-color: #087f94; background: #07869d; }
 .dialog footer .save { color: #fff; border-color: #057f72; background: #078c7d; box-shadow: 0 0 13px rgba(34,211,238,.42); }
 @media (max-width: 680px) { .backdrop { padding: 8px; } .dialog { width: calc(100vw - 16px); height: calc(100vh - 16px); } .dialog > header { align-items: flex-start; } .dialog footer { justify-content: stretch; } .dialog footer button { flex: 1 1 145px; justify-content: center; } }
