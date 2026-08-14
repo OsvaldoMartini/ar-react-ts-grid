@@ -69,6 +69,7 @@ export type SmokeTestIntegrationStepRequest = {
   sequence: number;
   instructionId: number;
   excelRowIndex: number;
+  recoveryVerificationEnabled: boolean;
 };
 
 export type SmokeTestIntegrationRefreshRequest = {
@@ -92,6 +93,7 @@ export type SmokeTestIntegrationStepResult = {
   integrationEpoch: number;
   sequence: number;
   instructionId: number;
+  recoveryVerificationEnabled: boolean;
   outcome: 'PASSED' | 'FAILED' | 'WARNING' | 'BYPASSED';
   disposition: 'PHYSICAL' | 'LOGICAL_ONLY' | 'INACTIVE' | 'UNSUPPORTED';
   message: string;
@@ -470,14 +472,16 @@ export const parseSmokeTestIntegrationStartResponse = (
 export const parseSmokeTestIntegrationStepResponse = (
   payload: unknown,
   expected: Pick<SmokeTestIntegrationStepRequest,
-    'requestId' | 'runId' | 'sequence' | 'instructionId'> & { integrationEpoch: number },
+    'requestId' | 'runId' | 'sequence' | 'instructionId' | 'recoveryVerificationEnabled'>
+    & { integrationEpoch: number },
 ): SmokeTestIntegrationStepResult => {
   const body = contractBody(payload, 'Integration step');
   if (stringValue(body.requestId, 'Integration step request ID') !== expected.requestId
       || stringValue(body.runId, 'Integration run ID') !== expected.runId
       || integerValue(body.integrationEpoch, 'Integration epoch', 1) !== expected.integrationEpoch
       || integerValue(body.sequence, 'Integration sequence', 1) !== expected.sequence
-      || integerValue(body.instructionId, 'Integration instruction ID', 1) !== expected.instructionId) {
+      || integerValue(body.instructionId, 'Integration instruction ID', 1) !== expected.instructionId
+      || body.recoveryVerificationEnabled !== expected.recoveryVerificationEnabled) {
     throw new Error('Integration step response does not match the pending instruction.');
   }
   const status = stringValue(body.status, 'Integration status');
@@ -505,6 +509,7 @@ export const parseSmokeTestIntegrationStepResponse = (
     integrationEpoch: expected.integrationEpoch,
     sequence: expected.sequence,
     instructionId: expected.instructionId,
+    recoveryVerificationEnabled: expected.recoveryVerificationEnabled,
     outcome: status === 'SKIPPED'
       ? 'BYPASSED'
       : status as SmokeTestIntegrationStepResult['outcome'],

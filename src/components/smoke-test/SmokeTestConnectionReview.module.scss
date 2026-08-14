@@ -321,6 +321,37 @@
   }
 }
 
+.recoveryPower {
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 32px;
+  justify-content: center;
+  margin-left: auto;
+  transition: box-shadow 140ms ease, transform 140ms ease;
+  width: 36px;
+
+  &:hover { transform: translateY(-1px); }
+  &:focus-visible { outline: 2px solid #0b5394; outline-offset: 2px; }
+}
+
+.recoveryOn {
+  background: #16834a;
+  border-color: #0f6f3c;
+  box-shadow: 0 0 12px rgba(22, 131, 74, 0.48);
+  color: #fff;
+}
+
+.recoveryOff {
+  background: #bd2933;
+  border-color: #9f2029;
+  box-shadow: 0 0 10px rgba(189, 41, 51, 0.35);
+  color: #fff;
+}
+
 .variableList,
 .blockList,
 .stepList {

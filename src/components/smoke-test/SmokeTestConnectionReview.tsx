@@ -15,6 +15,7 @@ import {
   Link2,
   Variable,
   Workflow,
+  Power,
   X,
 } from 'lucide-react';
 import type {
@@ -70,6 +71,8 @@ export interface SmokeTestConnectionReviewProps {
     instructionId: number,
     currentActive: boolean,
   ) => void;
+  locatorRecoveryVerificationEnabled?: boolean;
+  onLocatorRecoveryVerificationChange?: (enabled: boolean) => void;
   returnFocusElement?: HTMLElement | null;
   embedded?: boolean;
   onClose: () => void;
@@ -112,6 +115,8 @@ const SmokeTestConnectionReview: React.FC<
   onTestInstruction,
   onChangeInstructionType,
   onToggleInstructionStatus,
+  locatorRecoveryVerificationEnabled = true,
+  onLocatorRecoveryVerificationChange,
   returnFocusElement = null,
   embedded = false,
   onClose,
@@ -566,6 +571,16 @@ const SmokeTestConnectionReview: React.FC<
                 <h3>Bot Job execution flow</h3>
                 <p>Block order first, then instruction order. Every command is shown.</p>
               </div>
+              <button
+                type="button"
+                className={`${styles.recoveryPower} ${locatorRecoveryVerificationEnabled ? styles.recoveryOn : styles.recoveryOff}`}
+                aria-pressed={locatorRecoveryVerificationEnabled}
+                aria-label={`${locatorRecoveryVerificationEnabled ? 'Disable' : 'Enable'} locator recovery verification`}
+                title={`${locatorRecoveryVerificationEnabled ? 'Disable' : 'Enable'} Page Scanner verification for unresolved Web Elements`}
+                onClick={() => onLocatorRecoveryVerificationChange?.(!locatorRecoveryVerificationEnabled)}
+              >
+                <Power size={15} aria-hidden="true" />
+              </button>
             </header>
             <div className={styles.blockList}>
               {visibleBlocks.map(block => {

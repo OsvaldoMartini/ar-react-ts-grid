@@ -40,6 +40,8 @@ type Props = {
   integrationRuntimeMode: SmokeTestIntegrationRuntimeMode;
   integrationPagePolicy: SmokeTestIntegrationPagePolicy;
   integration: SmokeTestIntegrationController;
+  locatorRecoveryVerificationEnabled: boolean;
+  onLocatorRecoveryVerificationChange: (enabled: boolean) => void;
   onStatusChange: (status: VariablesSmokeTestStatus) => void;
 };
 
@@ -63,6 +65,8 @@ const SmokeTestSimulationWorkspace: React.FC<Props> = ({
   integrationRuntimeMode,
   integrationPagePolicy,
   integration,
+  locatorRecoveryVerificationEnabled,
+  onLocatorRecoveryVerificationChange,
   onStatusChange,
 }) => (
   <section className={styles.workspace} aria-label="Simulation workspace Smoke Tests">
@@ -86,6 +90,8 @@ const SmokeTestSimulationWorkspace: React.FC<Props> = ({
       integrationRuntimeMode={integrationRuntimeMode}
       integrationPagePolicy={integrationPagePolicy}
       integration={integration}
+      locatorRecoveryVerificationEnabled={locatorRecoveryVerificationEnabled}
+      onLocatorRecoveryVerificationChange={onLocatorRecoveryVerificationChange}
       onStatusChange={onStatusChange}
     />
   </section>

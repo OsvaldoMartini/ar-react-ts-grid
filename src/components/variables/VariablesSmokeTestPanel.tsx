@@ -95,6 +95,8 @@ export interface VariablesSmokeTestPanelProps {
   integrationRuntimeMode?: SmokeTestIntegrationRuntimeMode;
   integrationPagePolicy?: SmokeTestIntegrationPagePolicy;
   integration?: SmokeTestIntegrationController;
+  locatorRecoveryVerificationEnabled?: boolean;
+  onLocatorRecoveryVerificationChange?: (enabled: boolean) => void;
   onStatusChange?: (status: VariablesSmokeTestStatus) => void;
   autoStartToken?: number;
   autoStopToken?: number;
@@ -226,6 +228,8 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   integrationRuntimeMode = 'JAVA_V1',
   integrationPagePolicy = 'PRESERVE_ACTIVE',
   integration,
+  locatorRecoveryVerificationEnabled = true,
+  onLocatorRecoveryVerificationChange,
   onStatusChange,
   autoStartToken = 0,
   autoStopToken = 0,
@@ -364,6 +368,11 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
       message: response.message,
     });
   }, [onActivePositionChange, pendingLocatorRecovery, settleLocatorRecovery]);
+
+  useEffect(() => {
+    if (locatorRecoveryVerificationEnabled || pendingLocatorRecovery === null) return;
+    void decideLocatorRecovery(null, 'BYPASS');
+  }, [decideLocatorRecovery, locatorRecoveryVerificationEnabled, pendingLocatorRecovery]);
 
   const replaceExcelWriteManager = useCallback((next: ExcelWriteManagerState) => {
     excelWriteManagerRef.current = next;
@@ -909,9 +918,20 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
           integrationStepResult = await integrationRef.current.executeStep(
             item.step.instructionId,
             excelRowIndexRef.current,
+            locatorRecoveryVerificationEnabled,
           );
           if (integrationStepResult.recovery !== null) {
-            const recoveryDecision = await waitForLocatorRecovery(item.step, integrationStepResult);
+            const recoveryDecision = locatorRecoveryVerificationEnabled
+              ? await waitForLocatorRecovery(item.step, integrationStepResult)
+              : await integrationRef.current.recoverStep(
+                integrationStepResult.sequence,
+                integrationStepResult.instructionId,
+                '',
+                'BYPASS',
+              ).then(response => ({
+                kind: 'BYPASSED' as const,
+                message: response.message,
+              }));
             if (cancelled || stopRequestedRef.current || recoveryDecision.kind === 'STOPPED') return;
             if (recoveryDecision.kind === 'BYPASSED') {
               integrationStepResult = {
@@ -1031,6 +1051,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     onCommandRemainingChange,
     onOpenExcelWriterManager,
     pauseAt,
+    locatorRecoveryVerificationEnabled,
     waitForLocatorRecovery,
     flushExcelWriteFiles,
     replaceExcelWriteManager,
@@ -1226,6 +1247,8 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
         <SmokeTestLocatorRecoveryModal
           instructionName={pendingLocatorRecovery.step.instructionName || `Instruction #${pendingLocatorRecovery.result.instructionId}`}
           recovery={pendingLocatorRecovery.result.recovery}
+          verificationEnabled={locatorRecoveryVerificationEnabled}
+          onVerificationChange={(enabled) => onLocatorRecoveryVerificationChange?.(enabled)}
           onDecision={decideLocatorRecovery}
         />
       )}

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, Minus, Octagon, Save, ShieldAlert, SkipForward, X } from 'lucide-react';
+import { Check, Minus, Octagon, Power, Save, ShieldAlert, SkipForward, X } from 'lucide-react';
 import type {
   LocatorMatchValue,
   SmokeTestLocatorRecovery,
@@ -11,6 +11,8 @@ import styles from './SmokeTestLocatorRecoveryModal.module.scss';
 type Props = {
   instructionName: string;
   recovery: SmokeTestLocatorRecovery;
+  verificationEnabled: boolean;
+  onVerificationChange: (enabled: boolean) => void;
   onDecision: (
     candidate: SmokeTestLocatorRecoveryCandidate | null,
     decision: SmokeTestLocatorRecoveryDecision | 'STOP',
@@ -30,7 +32,13 @@ const Match: React.FC<{ value: LocatorMatchValue; label: string }> = ({ value, l
 const attributes = (value: Readonly<Record<string, string>>): string =>
   Object.entries(value).map(([key, item]) => `${key}=${item}`).join('\n') || '—';
 
-const SmokeTestLocatorRecoveryModal: React.FC<Props> = ({ instructionName, recovery, onDecision }) => {
+const SmokeTestLocatorRecoveryModal: React.FC<Props> = ({
+  instructionName,
+  recovery,
+  verificationEnabled,
+  onVerificationChange,
+  onDecision,
+}) => {
   const [selectedId, setSelectedId] = useState(recovery.candidates[0]?.recoveryCandidateId ?? '');
   const [busy, setBusy] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -96,7 +104,20 @@ const SmokeTestLocatorRecoveryModal: React.FC<Props> = ({ instructionName, recov
               <h2 id="locator-recovery-title">Locator Recovery · {instructionName}</h2>
             </div>
           </div>
-          <span>{recovery.candidates.length} candidate{recovery.candidates.length === 1 ? '' : 's'}</span>
+          <div className={styles.headerActions}>
+            <button
+              type="button"
+              className={`${styles.verificationPower} ${verificationEnabled ? styles.verificationOn : styles.verificationOff}`}
+              aria-pressed={verificationEnabled}
+              aria-label={`${verificationEnabled ? 'Disable' : 'Enable'} locator recovery verification`}
+              title="Turn off to bypass this recovery and future unresolved elements"
+              disabled={busy}
+              onClick={() => onVerificationChange(!verificationEnabled)}
+            >
+              <Power size={15} aria-hidden="true" />
+            </button>
+            <span>{recovery.candidates.length} candidate{recovery.candidates.length === 1 ? '' : 's'}</span>
+          </div>
         </header>
 
         <section className={styles.summary}>

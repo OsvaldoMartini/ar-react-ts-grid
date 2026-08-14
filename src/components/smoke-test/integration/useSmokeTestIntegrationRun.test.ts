@@ -215,10 +215,12 @@ test('keeps Stop single-flight when it cancels an in-flight step', async () => {
   let firstStop!: ReturnType<typeof result.current.stop>;
   let duplicateStop!: ReturnType<typeof result.current.stop>;
   act(() => {
-    step = result.current.executeStep(1735, 0);
+    step = result.current.executeStep(1735, 0, false);
     firstStop = result.current.stop('USER_REQUEST');
     duplicateStop = result.current.stop('STEP_REQUEST_FAILED');
   });
+
+  expect(requestBody(send, 1).recoveryVerificationEnabled).toBe(false);
 
   await act(async () => {
     await expect(step).rejects.toThrow('cancelled the pending step');

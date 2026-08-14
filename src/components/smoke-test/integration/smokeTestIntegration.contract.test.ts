@@ -137,6 +137,7 @@ test('keeps an empty GET result distinct from VOID', () => {
     integrationEpoch: 1,
     sequence: 1,
     instructionId: 1727,
+    recoveryVerificationEnabled: true,
     status: 'PASSED',
     disposition: 'PHYSICAL',
     code: 'GET_APPLIED',
@@ -149,6 +150,7 @@ test('keeps an empty GET result distinct from VOID', () => {
     integrationEpoch: 1,
     sequence: 1,
     instructionId: 1727,
+    recoveryVerificationEnabled: true,
   });
 
   expect(result.runtimeWrites).toEqual([{ variableId: 30, value: '' }]);
@@ -200,6 +202,7 @@ test('rejects a response for another instruction and a refused terminal operatio
     integrationEpoch: 1,
     sequence: 1,
     instructionId: 99,
+    recoveryVerificationEnabled: true,
     status: 'PASSED',
     disposition: 'LOGICAL_ONLY',
     message: 'Acknowledged.',
@@ -209,6 +212,7 @@ test('rejects a response for another instruction and a refused terminal operatio
     integrationEpoch: 1,
     sequence: 1,
     instructionId: 1727,
+    recoveryVerificationEnabled: true,
   })).toThrow('does not match');
 
   expect(() => parseSmokeTestIntegrationTerminalResponse({
@@ -231,6 +235,7 @@ test('parses an owner-correlated locator recovery comparison without treating it
     integrationEpoch: 4,
     sequence: 3,
     instructionId: 1735,
+    recoveryVerificationEnabled: true,
     status: 'FAILED',
     disposition: 'PHYSICAL',
     code: 'TARGET_NOT_FOUND',
@@ -276,6 +281,7 @@ test('parses an owner-correlated locator recovery comparison without treating it
     integrationEpoch: 4,
     sequence: 3,
     instructionId: 1735,
+    recoveryVerificationEnabled: true,
   });
 
   expect(result.code).toBe('TARGET_NOT_FOUND');

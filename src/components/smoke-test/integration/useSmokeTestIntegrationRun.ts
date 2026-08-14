@@ -66,6 +66,7 @@ export type SmokeTestIntegrationController = {
   executeStep: (
     instructionId: number,
     excelRowIndex?: number,
+    recoveryVerificationEnabled?: boolean,
   ) => Promise<SmokeTestIntegrationStepResult>;
   recoverStep: (
     sequence: number,
@@ -351,6 +352,7 @@ export const useSmokeTestIntegrationRun = ({
   const executeStep = useCallback(async (
     instructionId: number,
     excelRowIndex = 0,
+    recoveryVerificationEnabled = true,
   ) => {
     const run = activeRunRef.current;
     if (run === null) throw new Error('Smoke Test Integration has not started.');
@@ -364,6 +366,7 @@ export const useSmokeTestIntegrationRun = ({
       sequence,
       instructionId,
       excelRowIndex,
+      recoveryVerificationEnabled,
     };
     setPhase('EXECUTING');
     try {

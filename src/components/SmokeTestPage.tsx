@@ -134,6 +134,7 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
   const [integrationPagePolicy, setIntegrationPagePolicy] =
     useState<SmokeTestIntegrationPagePolicy>('PRESERVE_ACTIVE');
   const [smokeRunStatus, setSmokeRunStatus] = useState<VariablesSmokeTestStatus>('IDLE');
+  const [locatorRecoveryVerificationEnabled, setLocatorRecoveryVerificationEnabled] = useState(true);
   const [status, setStatus] = useState<Status>({
     level: 'warn',
     text: 'Waiting for Smoke Test workspace',
@@ -840,6 +841,8 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
                 integrationRuntimeMode={integrationRuntimeMode}
                 integrationPagePolicy={integrationPagePolicy}
                 integration={integration}
+                locatorRecoveryVerificationEnabled={locatorRecoveryVerificationEnabled}
+                onLocatorRecoveryVerificationChange={setLocatorRecoveryVerificationEnabled}
                 onStatusChange={setSmokeRunStatus}
               />
               <SmokeTestConnectionReview
@@ -859,6 +862,8 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
                 onTestInstruction={testInstruction}
                 onChangeInstructionType={changeInstructionType}
                 onToggleInstructionStatus={toggleInstructionStatus}
+                locatorRecoveryVerificationEnabled={locatorRecoveryVerificationEnabled}
+                onLocatorRecoveryVerificationChange={setLocatorRecoveryVerificationEnabled}
                 embedded
                 onClose={() => undefined}
               />

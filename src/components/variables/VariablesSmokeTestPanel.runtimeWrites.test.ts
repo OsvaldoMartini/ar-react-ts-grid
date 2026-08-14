@@ -33,6 +33,7 @@ test('preserves authoritative Integration GET writes for runtime publication', (
     integrationEpoch: 1,
     sequence: 1,
     instructionId: 20,
+    recoveryVerificationEnabled: true,
     outcome: 'PASSED',
     disposition: 'PHYSICAL',
     code: 'GET_VALUE_WRITTEN',

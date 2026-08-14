@@ -51,6 +51,8 @@ test('shows comparison evidence and submits the explicitly selected candidate on
     <SmokeTestLocatorRecoveryModal
       instructionName="log_in"
       recovery={recovery(first, second)}
+      verificationEnabled
+      onVerificationChange={jest.fn()}
       onDecision={onDecision}
     />,
   );
@@ -74,6 +76,8 @@ test('submits Use and Save only for the selected server candidate', async () => 
     <SmokeTestLocatorRecoveryModal
       instructionName="log_in"
       recovery={recovery(selected)}
+      verificationEnabled
+      onVerificationChange={jest.fn()}
       onDecision={onDecision}
     />,
   );
@@ -95,6 +99,8 @@ test.each([
     <SmokeTestLocatorRecoveryModal
       instructionName="log_in"
       recovery={recovery(candidate('a', 'Login'))}
+      verificationEnabled
+      onVerificationChange={jest.fn()}
       onDecision={onDecision}
     />,
   );
@@ -112,6 +118,8 @@ test('allows an empty recovery to be explicitly bypassed and contains keyboard f
     <SmokeTestLocatorRecoveryModal
       instructionName="missing_element"
       recovery={recovery()}
+      verificationEnabled
+      onVerificationChange={jest.fn()}
       onDecision={onDecision}
     />,
   );

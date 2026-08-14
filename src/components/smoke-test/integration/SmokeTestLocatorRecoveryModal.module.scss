@@ -4,7 +4,14 @@
 .dialog > header > div { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .dialog h2 { margin: 0; font-size: 18px; }
 .dialog header small { display: block; opacity: .86; }
-.dialog header > span { flex: 0 0 auto; padding: 6px 10px; font-size: 12px; font-weight: 900; border: 1px solid rgba(255,255,255,.4); border-radius: 999px; background: rgba(8,166,190,.3); box-shadow: 0 0 14px rgba(34,211,238,.45); }
+.headerActions { display: flex; align-items: center; gap: 9px; flex: 0 0 auto; }
+.headerActions > span { padding: 6px 10px; font-size: 12px; font-weight: 900; border: 1px solid rgba(255,255,255,.4); border-radius: 999px; background: rgba(8,166,190,.3); box-shadow: 0 0 14px rgba(34,211,238,.45); }
+.verificationPower { display: inline-grid; place-items: center; width: 34px; height: 32px; border: 1px solid transparent; border-radius: 8px; color: #fff; cursor: pointer; transition: transform 140ms ease, box-shadow 140ms ease; }
+.verificationPower:hover:not(:disabled) { transform: translateY(-1px); }
+.verificationPower:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.verificationPower:disabled { cursor: wait; opacity: .58; }
+.verificationOn { background: #16834a; border-color: #0f6f3c; box-shadow: 0 0 12px rgba(56, 239, 133, .52); }
+.verificationOff { background: #bd2933; border-color: #9f2029; box-shadow: 0 0 11px rgba(255, 89, 99, .48); }
 .summary { flex: 0 0 auto; margin: 12px 14px 0; padding: 10px 12px; border: 1px solid #8fc9dc; border-radius: 9px; color: #254a64; background: #f8fcff; }
 .tableViewport { flex: 1 1 auto; min-height: 0; margin: 12px 14px; overflow: auto; border: 1px solid #bdd1df; background: #fff; }
 .tableViewport table { border-collapse: separate; border-spacing: 0; min-width: 2500px; width: 100%; font-size: 12px; }
