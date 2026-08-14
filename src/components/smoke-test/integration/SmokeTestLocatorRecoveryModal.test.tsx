@@ -136,5 +136,6 @@ test('allows an empty recovery to be explicitly bypassed and contains keyboard f
   const cancel = screen.getByRole('button', { name: 'Cancel Recovery' });
   bypass.focus();
   fireEvent.keyDown(document, { key: 'Tab' });
-  expect(cancel).toHaveFocus();
+  expect(screen.getByRole('button', { name: 'Disable locator recovery verification' }))
+    .toHaveFocus();
 });
