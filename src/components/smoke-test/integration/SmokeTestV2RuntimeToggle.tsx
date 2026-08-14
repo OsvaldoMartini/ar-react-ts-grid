@@ -35,7 +35,7 @@ const SmokeTestV2RuntimeToggle: React.FC<Props> = ({
       onClick={onToggle}
     >
       <ServerCog size={14} aria-hidden="true" />
-      <span><strong>{label}</strong><small>V2 Runtime</small></span>
+      <span><strong>{label}</strong><small>SERVER</small></span>
     </button>
   );
 };
