@@ -516,7 +516,7 @@ const selectReviewTarget = (
     return { selectedTarget: compatibleTargets[0], resolution: 'AUTO' };
   }
   return {
-    selectedTarget: compatibleTargets[0],
+    selectedTarget: null,
     resolution: 'REVIEW_REQUIRED',
   };
 };
@@ -549,6 +549,7 @@ const deriveResolveReview = (
     [...basis.factsById].map(([id, fact]) => [id, cloneFact(fact)]),
   );
   const items: VariablesBatchResolveReviewItem[] = [];
+  const unresolvedParentReviewByInstruction = new Map<number, string>();
   const parentEdges = editableIssueEdges(baseGraph, visibleSet, PARENT_KINDS);
 
   for (const edge of parentEdges) {
@@ -560,7 +561,7 @@ const deriveResolveReview = (
       reviewId,
       compatibleTargets,
       indexed.choices,
-      true,
+      false,
     );
     if ('ok' in selection) return selection;
     remainingChoiceIds.delete(reviewId);
@@ -577,6 +578,9 @@ const deriveResolveReview = (
       blockedByReviewId: null,
     };
     items.push(Object.freeze(item));
+    if (selection.resolution === 'REVIEW_REQUIRED') {
+      unresolvedParentReviewByInstruction.set(sourceInstructionId, reviewId);
+    }
     if (selection.selectedTarget === null) {
       continue;
     }
@@ -622,6 +626,8 @@ const deriveResolveReview = (
   for (const edge of variableEdges) {
     const sourceInstructionId = edge.source.id;
     const reviewId = reviewIdFor(sourceInstructionId, 'VARIABLE_BINDING');
+    const blockedByReviewId = unresolvedParentReviewByInstruction
+      .get(sourceInstructionId) ?? null;
     remainingChoiceIds.delete(reviewId);
     items.push(Object.freeze({
       reviewId,
@@ -632,8 +638,8 @@ const deriveResolveReview = (
       currentTarget: edge.target,
       compatibleTargets: [],
       selectedTarget: null,
-      resolution: 'UNAVAILABLE',
-      blockedByReviewId: null,
+      resolution: blockedByReviewId === null ? 'UNAVAILABLE' : 'BLOCKED',
+      blockedByReviewId,
     }));
   }
 

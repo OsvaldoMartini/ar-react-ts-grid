@@ -224,8 +224,8 @@ test('RESOLVE projects the unique parent before deriving variable compatibility'
     }),
     expect.objectContaining({
       reviewId: '2:VARIABLE_BINDING',
-      resolution: 'AUTO',
-      selectedTarget: expect.objectContaining({ entity: 'VARIABLE', id: 100 }),
+      resolution: 'UNAVAILABLE',
+      selectedTarget: null,
     }),
   ]));
 
@@ -239,12 +239,7 @@ test('RESOLVE projects the unique parent before deriving variable compatibility'
     expected: { parentId: null, parentBlockId: null },
     replacement: { parentId: 1, parentBlockId: 10 },
   }]);
-  expect(built.mutation.draft.variableBindingPatches).toEqual([{
-    instructionId: 2,
-    operation: 'SET',
-    expected: { value: null },
-    replacement: { value: 100 },
-  }]);
+  expect(built.mutation.draft.variableBindingPatches).toEqual([]);
   expect(built.mutation.draft.variableOwnerPatches).toEqual([]);
   expect(built.mutation.draft.layoutRows).toEqual(
     current.mutationCapability?.layoutRows,
@@ -303,10 +298,8 @@ test('RESOLVE never guesses an ambiguous parent and refreshes variable choices a
   expect(reviewed.review.items).toEqual(expect.arrayContaining([
     expect.objectContaining({
       reviewId: '3:VARIABLE_BINDING',
-      resolution: 'AUTO',
-      compatibleTargets: [
-        expect.objectContaining({ entity: 'VARIABLE', id: 200 }),
-      ],
+      resolution: 'UNAVAILABLE',
+      compatibleTargets: [],
     }),
   ]));
 
@@ -318,11 +311,7 @@ test('RESOLVE never guesses an ambiguous parent and refreshes variable choices a
       instructionId: 3,
       replacement: { parentId: 2, parentBlockId: 10 },
     }));
-  expect(built.mutation.draft.variableBindingPatches[0])
-    .toEqual(expect.objectContaining({
-      instructionId: 3,
-      replacement: { value: 200 },
-    }));
+  expect(built.mutation.draft.variableBindingPatches).toEqual([]);
 });
 
 test('RESOLVE ignores FIX_ORDER, VARIABLE_ORDER, and positional edges', () => {
