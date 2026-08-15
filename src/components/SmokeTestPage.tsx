@@ -11,6 +11,9 @@ import SmokeTestPagePolicyToggle from './smoke-test/integration/SmokeTestPagePol
 import SmokeTestV2RuntimeToggle, {
   type V2RuntimeState,
 } from './smoke-test/integration/SmokeTestV2RuntimeToggle';
+import SmokeTestRuntimeInstancesModal, {
+  type SmokeTestRuntimeInstance,
+} from './smoke-test/integration/SmokeTestRuntimeInstancesModal';
 import { useSmokeTestIntegrationRun } from './smoke-test/integration/useSmokeTestIntegrationRun';
 import type {
   SmokeTestExecutionMode,
@@ -83,6 +86,13 @@ type V2RuntimePending = {
   timeout: ReturnType<typeof setTimeout>;
 };
 
+type RuntimeInstancesPending = {
+  requestId: string;
+  kind: 'LIST' | 'CONTROL';
+  runId: string | null;
+  timeout: ReturnType<typeof setTimeout>;
+};
+
 const REQUEST_TIMEOUT_MS = 12_000;
 const SUPPORTING_WORKSPACES_TIMEOUT_MS = 45_000;
 
@@ -126,6 +136,7 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
   const supportingWorkspacesPendingRef = useRef<SupportingWorkspacesPending | null>(null);
   const excelDataModePendingRef = useRef<ExcelDataModePending | null>(null);
   const v2RuntimePendingRef = useRef<V2RuntimePending | null>(null);
+  const runtimeInstancesPendingRef = useRef<RuntimeInstancesPending | null>(null);
   const snapshotRef = useRef<VariableWorkspaceSnapshot | null>(null);
   const [snapshot, setSnapshot] = useState<VariableWorkspaceSnapshot | null>(null);
   const [pending, setPending] = useState<PendingRequest | null>(null);
@@ -147,6 +158,10 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
   const [locatorRecoveryVerificationEnabled, setLocatorRecoveryVerificationEnabled] = useState(true);
   const [v2RuntimeState, setV2RuntimeState] = useState<V2RuntimeState>('UNKNOWN');
   const [v2RuntimePending, setV2RuntimePending] = useState(false);
+  const [runtimeInstancesOpen, setRuntimeInstancesOpen] = useState(false);
+  const [runtimeInstances, setRuntimeInstances] = useState<readonly SmokeTestRuntimeInstance[]>([]);
+  const [runtimeInstancesLoading, setRuntimeInstancesLoading] = useState(false);
+  const [runtimeInstancePendingRunId, setRuntimeInstancePendingRunId] = useState<string | null>(null);
   const [status, setStatus] = useState<Status>({
     level: 'warn',
     text: 'Waiting for Smoke Test workspace',
@@ -181,6 +196,14 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     setV2RuntimePending(false);
   }, []);
 
+  const clearRuntimeInstancesPending = useCallback(() => {
+    const current = runtimeInstancesPendingRef.current;
+    if (current !== null) clearTimeout(current.timeout);
+    runtimeInstancesPendingRef.current = null;
+    setRuntimeInstancesLoading(false);
+    setRuntimeInstancePendingRunId(null);
+  }, []);
+
   const replaceSnapshot = useCallback((next: VariableWorkspaceSnapshot) => {
     const previous = snapshotRef.current;
     const botJobChanged = previous !== null && previous.botJob.id !== next.botJob.id;
@@ -193,6 +216,7 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
       clearPending();
       clearExcelDataModePending();
       clearV2RuntimePending();
+      clearRuntimeInstancesPending();
       setV2RuntimeState('UNKNOWN');
       setActiveSmokePosition(null);
       setSmokeExecutionTrace([]);
@@ -394,6 +418,45 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     return true;
   }, [connected, sessionId, webSocket]);
 
+  const requestRuntimeInstances = useCallback((control?: { runId: string; action: 'STOP' | 'KILL' }) => {
+    const current = snapshotRef.current;
+    if (!connected || !webSocket || webSocket.readyState !== WebSocket.OPEN
+      || !current || runtimeInstancesPendingRef.current !== null) return false;
+    requestSequenceRef.current += 1;
+    const requestId = `${Date.now()}-smoke-runtime-instances-${requestSequenceRef.current}`;
+    const kind = control ? 'CONTROL' : 'LIST';
+    const timeout = setTimeout(() => {
+      if (runtimeInstancesPendingRef.current?.requestId !== requestId) return;
+      clearRuntimeInstancesPending();
+      setStatus({ level: 'error', text: 'Runtime instance request timed out.' });
+    }, 15_000);
+    runtimeInstancesPendingRef.current = { requestId, kind, runId: control?.runId ?? null, timeout };
+    setRuntimeInstancesLoading(kind === 'LIST');
+    setRuntimeInstancePendingRunId(control?.runId ?? null);
+    webSocket.send(JSON.stringify({
+      type: control
+        ? 'smokeTest.integration.runtimeInstanceControl'
+        : 'smokeTest.integration.runtimeInstances',
+      sessionId,
+      body: JSON.stringify({
+        requestId,
+        ...(control ?? {}),
+        bindingEpoch: current.bindingEpoch,
+        workspaceEpoch: current.workspaceEpoch,
+        homeBankingId: current.botJob.homeBankingId,
+        botJobId: current.botJob.id,
+        graphRevision: current.graphRevision,
+      }),
+    }));
+    return true;
+  }, [clearRuntimeInstancesPending, connected, sessionId, webSocket]);
+
+  useEffect(() => {
+    if (!runtimeInstancesOpen) return undefined;
+    const interval = window.setInterval(() => requestRuntimeInstances(), 2_000);
+    return () => window.clearInterval(interval);
+  }, [requestRuntimeInstances, runtimeInstancesOpen]);
+
   useEffect(() => {
     if (connected && snapshot) requestV2Runtime('STATUS');
   }, [connected, requestV2Runtime, snapshot]);
@@ -408,14 +471,15 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
       return;
     }
     sendSnapshotRequest('variablesWorkspace.bootstrap');
-  }, [clearExcelDataModePending, clearPending, clearV2RuntimePending, connected, rejectSupportingWorkspaces, resetRuntimeMemory, sendSnapshotRequest]);
+  }, [clearExcelDataModePending, clearPending, clearRuntimeInstancesPending, clearV2RuntimePending, connected, rejectSupportingWorkspaces, resetRuntimeMemory, sendSnapshotRequest]);
 
   useEffect(() => () => {
     clearPending();
     clearExcelDataModePending();
     clearV2RuntimePending();
+    clearRuntimeInstancesPending();
     rejectSupportingWorkspaces('Smoke Test closed while preparing its supporting pages.');
-  }, [clearExcelDataModePending, clearPending, clearV2RuntimePending, rejectSupportingWorkspaces]);
+  }, [clearExcelDataModePending, clearPending, clearRuntimeInstancesPending, clearV2RuntimePending, rejectSupportingWorkspaces]);
 
   useEffect(() => {
     if (processedMessageGenerationRef.current !== (messageGeneration ?? 0)) {
@@ -436,6 +500,27 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
         return;
       }
       const body = bodyObject(envelope.body);
+      if (envelope.operationId === 'smokeTest.integration.runtimeInstancesResponse'
+        || envelope.operationId === 'smokeTest.integration.runtimeInstanceControlResponse') {
+        const current = runtimeInstancesPendingRef.current;
+        if (current === null || body?.requestId !== current.requestId) return;
+        if (current.kind === 'CONTROL' && body?.runId !== current.runId) return;
+        clearTimeout(current.timeout);
+        runtimeInstancesPendingRef.current = null;
+        setRuntimeInstancesLoading(false);
+        setRuntimeInstancePendingRunId(null);
+        if (body?.ok === false) {
+          setStatus({ level: 'error', text: statusText(body, 'Runtime instance control was refused.') });
+          return;
+        }
+        if (current.kind === 'LIST') {
+          setRuntimeInstances(Array.isArray(body?.instances) ? body.instances as SmokeTestRuntimeInstance[] : []);
+        } else {
+          setStatus({ level: 'ok', text: statusText(body, 'Runtime instance stopped.') });
+          setTimeout(() => requestRuntimeInstances(), 0);
+        }
+        return;
+      }
       if (envelope.operationId === 'smokeTest.integration.runtimeStatusResponse'
         || envelope.operationId === 'smokeTest.integration.runtimeControlResponse') {
         const current = v2RuntimePendingRef.current;
@@ -592,6 +677,7 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     messageGeneration,
     messages,
     replaceSnapshot,
+    requestRuntimeInstances,
     sourceBotJobId,
   ]);
 
@@ -884,13 +970,11 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
                   state={v2RuntimeState}
                   pending={v2RuntimePending}
                   disabled={!connected
-                    || snapshot === null
-                    || smokeRunActive
-                    || integration.phase !== 'IDLE'
-                    || v2RuntimeState === 'READY_EXTERNAL'}
-                  onToggle={() => requestV2Runtime(
-                    v2RuntimeState === 'READY' ? 'STOP' : 'START',
-                  )}
+                    || snapshot === null}
+                  onToggle={() => {
+                    setRuntimeInstancesOpen(true);
+                    requestRuntimeInstances();
+                  }}
                 />
               )}
               <button
@@ -979,6 +1063,19 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
                 onClose={() => undefined}
               />
             </section>
+          )}
+          {runtimeInstancesOpen && (
+            <SmokeTestRuntimeInstancesModal
+              instances={runtimeInstances}
+              loading={runtimeInstancesLoading}
+              pendingRunId={runtimeInstancePendingRunId}
+              serverState={v2RuntimeState}
+              serverPending={v2RuntimePending}
+              onServerToggle={() => requestV2Runtime(v2RuntimeState === 'READY' ? 'STOP' : 'START')}
+              onRefresh={() => requestRuntimeInstances()}
+              onControl={(runId, action) => requestRuntimeInstances({ runId, action })}
+              onClose={() => setRuntimeInstancesOpen(false)}
+            />
           )}
         </section>
       </main>

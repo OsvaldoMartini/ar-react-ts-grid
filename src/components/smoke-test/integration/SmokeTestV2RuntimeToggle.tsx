@@ -26,12 +26,8 @@ const SmokeTestV2RuntimeToggle: React.FC<Props> = ({
       data-ready={ready}
       disabled={disabled || pending}
       aria-pressed={ready}
-      aria-label={`${ready ? 'Stop' : 'Start'} TypeScript Playwright V2 runtime`}
-      title={ready
-        ? state === 'READY_EXTERNAL'
-          ? 'The V2 runtime is externally managed and cannot be stopped here.'
-          : 'Stop the local Node V2 runtime. Active V2 runs must finish first.'
-        : 'Start the local Node V2 runtime and wait until it is ready.'}
+      aria-label="Open live runtime instances"
+      title="Open live Java V1 and TypeScript V2 runtime instances"
       onClick={onToggle}
     >
       <ServerCog size={14} aria-hidden="true" />
