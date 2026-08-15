@@ -12,7 +12,7 @@ type Props = {
 
 const DetachedPageShell: React.FC<Props> = ({ title, testId, onClose, showCloseButton = true, children }) => (
   <DesktopWorkspaceShell ariaLabel={title} testId={testId}>
-    <section className={styles.page} aria-label={title}>
+    <section className={styles.page}>
       {showCloseButton && onClose && (
         <button
           type="button"
