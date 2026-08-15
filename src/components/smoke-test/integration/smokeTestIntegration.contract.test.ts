@@ -267,7 +267,6 @@ test('parses an owner-correlated locator recovery comparison without treating it
         ambiguityWarnings: ['XPath changed'],
         matches: {
           xpath: false,
-          customXPath: false,
           css: false,
           stableAttributes: false,
           frame: null,
@@ -287,5 +286,6 @@ test('parses an owner-correlated locator recovery comparison without treating it
   expect(result.code).toBe('TARGET_NOT_FOUND');
   expect(result.recovery?.state).toBe('AWAITING_USER');
   expect(result.recovery?.candidates[0]?.matches.xpath).toBe(false);
+  expect(result.recovery?.candidates[0]?.matches.customXPath).toBeNull();
   expect(result.recovery?.candidates[0]?.matches.frame).toBeNull();
 });

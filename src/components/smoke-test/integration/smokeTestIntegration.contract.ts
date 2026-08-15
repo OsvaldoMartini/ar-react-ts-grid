@@ -211,7 +211,7 @@ const textRecord = (value: unknown, name: string): Readonly<Record<string, strin
 };
 
 const matchValue = (value: unknown, name: string): LocatorMatchValue => {
-  if (value === null) return null;
+  if (value == null) return null;
   if (typeof value !== 'boolean') throw new Error(`${name} is invalid.`);
   return value;
 };

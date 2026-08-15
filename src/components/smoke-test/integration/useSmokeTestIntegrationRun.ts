@@ -27,7 +27,7 @@ import {
   type SmokeTestLocatorRecoveryResult,
 } from './smokeTestIntegration.contract';
 
-const START_TIMEOUT_MS = 30_000;
+const START_TIMEOUT_MS = 75_000;
 const V2_START_TIMEOUT_MS = 75_000;
 const STEP_TIMEOUT_MS = 90_000;
 const TERMINAL_TIMEOUT_MS = 15_000;

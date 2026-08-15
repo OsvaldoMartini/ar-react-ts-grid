@@ -119,6 +119,39 @@ test('releases the pending request immediately when WebSocket.send throws', asyn
   expect(result.current.activeRun?.runId).toBe('server-run-1');
 });
 
+test('accepts a bounded Java V1 start response arriving after thirty seconds', async () => {
+  jest.useFakeTimers();
+  try {
+    const send = jest.fn();
+    const { result, rerender } = renderIntegrationHook(send);
+
+    let start!: ReturnType<typeof result.current.start>;
+    act(() => {
+      start = result.current.start(plan, 'REAL', 'JAVA_V1', false);
+    });
+    const observed = start.then(() => 'resolved', failure =>
+      failure instanceof Error ? failure.message : String(failure));
+    const startRequest = requestBody(send, 0);
+
+    act(() => {
+      jest.advanceTimersByTime(31_000);
+      rerender({
+        messages: [responseMessage(
+          'smokeTest.integration.startResponse',
+          startResponse(startRequest.requestId),
+        )],
+      });
+    });
+
+    await act(async () => {
+      await expect(observed).resolves.toBe('resolved');
+    });
+    expect(result.current.activeRun?.runId).toBe('server-run-1');
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
 test('keeps the active run when Finish is refused and permits Stop cleanup retry', async () => {
   const send = jest.fn();
   const { result, rerender } = renderIntegrationHook(send);
