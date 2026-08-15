@@ -969,6 +969,9 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
                 <SmokeTestV2RuntimeToggle
                   state={v2RuntimeState}
                   pending={v2RuntimePending}
+                  attention={integrationRuntimeMode === 'TYPESCRIPT_PLAYWRIGHT_V2'
+                    && v2RuntimeState !== 'READY'
+                    && v2RuntimeState !== 'READY_EXTERNAL'}
                   disabled={!connected
                     || snapshot === null}
                   onToggle={() => {
@@ -1034,6 +1037,8 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
                 onExcelDataModeChange={updateExcelDataMode}
                 executionMode={executionMode}
                 integrationRuntimeMode={integrationRuntimeMode}
+                v2RuntimeReady={v2RuntimeState === 'READY'
+                  || v2RuntimeState === 'READY_EXTERNAL'}
                 integrationPagePolicy={integrationPagePolicy}
                 integration={integration}
                 locatorRecoveryVerificationEnabled={locatorRecoveryVerificationEnabled}

@@ -93,6 +93,7 @@ export interface VariablesSmokeTestPanelProps {
   onExcelDataModeChange?: (mode: ExcelDataMode) => void;
   executionMode?: SmokeTestExecutionMode;
   integrationRuntimeMode?: SmokeTestIntegrationRuntimeMode;
+  v2RuntimeReady?: boolean;
   integrationPagePolicy?: SmokeTestIntegrationPagePolicy;
   integration?: SmokeTestIntegrationController;
   locatorRecoveryVerificationEnabled?: boolean;
@@ -226,6 +227,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   onExcelDataModeChange,
   executionMode = 'SMOKE',
   integrationRuntimeMode = 'JAVA_V1',
+  v2RuntimeReady = false,
   integrationPagePolicy = 'PRESERVE_ACTIVE',
   integration,
   locatorRecoveryVerificationEnabled = true,
@@ -474,6 +476,14 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   }, []);
 
   const run = async () => {
+    if (executionMode === 'INTEGRATION'
+        && integrationRuntimeMode === 'TYPESCRIPT_PLAYWRIGHT_V2'
+        && !v2RuntimeReady) {
+      setStatus('STOPPED');
+      setCounters({ ...EMPTY_COUNTERS, failed: 1 });
+      setEntries([logEntry(1, 'ERROR', 'Start SERVER before running V2.', 'failed')]);
+      return;
+    }
     resolvePause('STOP');
     stopRequestedRef.current = false;
     excelRowIndexRef.current = 0;

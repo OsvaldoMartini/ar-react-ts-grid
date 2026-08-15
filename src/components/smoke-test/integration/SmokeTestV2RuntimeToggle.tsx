@@ -8,6 +8,7 @@ type Props = {
   state: V2RuntimeState;
   pending?: boolean;
   disabled?: boolean;
+  attention?: boolean;
   onToggle: () => void;
 };
 
@@ -15,6 +16,7 @@ const SmokeTestV2RuntimeToggle: React.FC<Props> = ({
   state,
   pending = false,
   disabled = false,
+  attention = false,
   onToggle,
 }) => {
   const ready = state === 'READY' || state === 'READY_EXTERNAL';
@@ -24,6 +26,7 @@ const SmokeTestV2RuntimeToggle: React.FC<Props> = ({
       type="button"
       className={styles.toggle}
       data-ready={ready}
+      data-attention={attention && !ready}
       disabled={disabled || pending}
       aria-pressed={ready}
       aria-label="Open live runtime instances"

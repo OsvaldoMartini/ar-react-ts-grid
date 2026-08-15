@@ -38,6 +38,7 @@ type Props = {
   onExcelDataModeChange: (mode: ExcelDataMode) => void;
   executionMode: SmokeTestExecutionMode;
   integrationRuntimeMode: SmokeTestIntegrationRuntimeMode;
+  v2RuntimeReady: boolean;
   integrationPagePolicy: SmokeTestIntegrationPagePolicy;
   integration: SmokeTestIntegrationController;
   locatorRecoveryVerificationEnabled: boolean;
@@ -63,6 +64,7 @@ const SmokeTestSimulationWorkspace: React.FC<Props> = ({
   onExcelDataModeChange,
   executionMode,
   integrationRuntimeMode,
+  v2RuntimeReady,
   integrationPagePolicy,
   integration,
   locatorRecoveryVerificationEnabled,
@@ -88,6 +90,7 @@ const SmokeTestSimulationWorkspace: React.FC<Props> = ({
       onExcelDataModeChange={onExcelDataModeChange}
       executionMode={executionMode}
       integrationRuntimeMode={integrationRuntimeMode}
+      v2RuntimeReady={v2RuntimeReady}
       integrationPagePolicy={integrationPagePolicy}
       integration={integration}
       locatorRecoveryVerificationEnabled={locatorRecoveryVerificationEnabled}
