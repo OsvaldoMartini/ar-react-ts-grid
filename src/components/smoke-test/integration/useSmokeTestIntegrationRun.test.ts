@@ -30,6 +30,7 @@ const snapshot = {
   bindingEpoch: 'binding-1',
   workspaceEpoch: 9,
   botJob: { id: 32, homeBankingId: 2 },
+  graphRevision: REVISION,
 } as unknown as VariableWorkspaceSnapshot;
 
 const responseMessage = (operationId: string, body: Record<string, unknown>): string =>
@@ -150,6 +151,57 @@ test('accepts a bounded Java V1 start response arriving after thirty seconds', a
   } finally {
     jest.useRealTimers();
   }
+});
+
+test('Emergency Stop supersedes a pending start before a run ID exists', async () => {
+  const send = jest.fn();
+  const { result, rerender } = renderIntegrationHook(send);
+  const messages: string[] = [];
+
+  let start!: ReturnType<typeof result.current.start>;
+  let forceStop!: ReturnType<typeof result.current.forceStop>;
+  act(() => {
+    start = result.current.start(plan, 'REAL', 'JAVA_V1', false);
+    forceStop = result.current.forceStop();
+  });
+
+  await act(async () => {
+    await expect(start).rejects.toThrow('Emergency Stop cancelled');
+  });
+  expect(send).toHaveBeenCalledTimes(2);
+  const forceRequest = requestBody(send, 1);
+  expect(forceRequest).toMatchObject({
+    bindingEpoch: 'binding-1',
+    workspaceEpoch: 9,
+    homeBankingId: 2,
+    botJobId: 32,
+    graphRevision: REVISION,
+  });
+
+  messages.push(responseMessage('smokeTest.integration.forceStopResponse', {
+    ok: true,
+    contractVersion: 1,
+    requestId: forceRequest.requestId,
+    bindingEpoch: 'binding-1',
+    workspaceEpoch: 9,
+    homeBankingId: 2,
+    botJobId: 32,
+    graphRevision: REVISION,
+    status: 'STOP_REQUESTED',
+    pendingStartsCancelled: 1,
+    activeRunsInterrupted: 0,
+    message: 'Emergency Stop interrupted the current Integration startup or run.',
+  }));
+  act(() => rerender({ messages: [...messages] }));
+
+  await act(async () => {
+    await expect(forceStop).resolves.toMatchObject({
+      status: 'STOP_REQUESTED',
+      pendingStartsCancelled: 1,
+    });
+  });
+  expect(result.current.phase).toBe('IDLE');
+  expect(result.current.activeRun).toBeNull();
 });
 
 test('keeps the active run when Finish is refused and permits Stop cleanup retry', async () => {

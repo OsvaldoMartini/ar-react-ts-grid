@@ -615,6 +615,40 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     setStatus('STOPPED');
   };
 
+  const forceStop = async () => {
+    stopRequestedRef.current = true;
+    resolvePause('STOP');
+    settleLocatorRecovery({ kind: 'STOPPED', message: 'Emergency Stop was requested.' });
+    onActivePositionChange?.(null);
+    if (executionMode !== 'INTEGRATION') {
+      setStatus('STOPPED');
+      return;
+    }
+    setStatus('STOPPING');
+    try {
+      const result = await integrationRef.current?.forceStop();
+      setEntries(current => [
+        ...current,
+        logEntry(
+          processedCommands + 1,
+          result?.status === 'IDLE' ? 'INFO' : 'WARNING',
+          result?.message ?? 'Emergency Stop was requested.',
+          result?.status === 'IDLE' ? null : 'warning',
+        ),
+      ]);
+      setStatus('STOPPED');
+    } catch (failure) {
+      const message = failure instanceof Error
+        ? failure.message
+        : 'Emergency Stop could not reach the Integration service.';
+      setEntries(current => [
+        ...current,
+        logEntry(processedCommands + 1, 'ERROR', message, 'failed'),
+      ]);
+      setStatus('STOPPED');
+    }
+  };
+
   autoRunRef.current = run;
   autoStopRef.current = stop;
 
@@ -1160,10 +1194,9 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
         <button
           type="button"
           className={styles.stopButton}
-          disabled={executionMode === 'INTEGRATION'
-            ? !integration?.activeRun || status === 'STOPPING'
-            : status !== 'RUNNING'}
-          onClick={() => { void stop(); }}
+          aria-label="Emergency Stop Integration"
+          title="Emergency Stop the current Bot Job Integration startup or run"
+          onClick={() => { void forceStop(); }}
         >
           <Octagon size={14} aria-hidden="true" /> STOP
         </button>

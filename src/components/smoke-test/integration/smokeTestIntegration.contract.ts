@@ -82,6 +82,15 @@ export type SmokeTestIntegrationRefreshRequest = {
   graphRevision: string;
 };
 
+export type SmokeTestIntegrationForceStopRequest = SmokeTestIntegrationRefreshRequest;
+
+export type SmokeTestIntegrationForceStopResult = {
+  status: 'IDLE' | 'STOP_REQUESTED';
+  pendingStartsCancelled: number;
+  activeRunsInterrupted: number;
+  message: string;
+};
+
 export type SmokeTestIntegrationRuntimeWrite = {
   variableId: number;
   value: string;
@@ -337,6 +346,46 @@ export const buildSmokeTestIntegrationRefreshRequest = (
   botJobId: snapshot.botJob.id,
   graphRevision: snapshot.graphRevision,
 });
+
+export const buildSmokeTestIntegrationForceStopRequest = (
+  requestId: string,
+  snapshot: VariableWorkspaceSnapshot,
+): SmokeTestIntegrationForceStopRequest =>
+  buildSmokeTestIntegrationRefreshRequest(requestId, snapshot);
+
+export const parseSmokeTestIntegrationForceStopResponse = (
+  payload: unknown,
+  expected: SmokeTestIntegrationForceStopRequest,
+): SmokeTestIntegrationForceStopResult => {
+  const body = contractBody(payload, 'Integration emergency stop');
+  if (stringValue(body.requestId, 'Emergency Stop request ID') !== expected.requestId
+      || stringValue(body.bindingEpoch, 'Emergency Stop binding epoch') !== expected.bindingEpoch
+      || integerValue(body.workspaceEpoch, 'Emergency Stop workspace epoch', 1)
+        !== expected.workspaceEpoch
+      || integerValue(body.homeBankingId, 'Emergency Stop organization ID', 1)
+        !== expected.homeBankingId
+      || integerValue(body.botJobId, 'Emergency Stop Bot Job ID', 1)
+        !== expected.botJobId
+      || revisionValue(body.graphRevision, 'Emergency Stop graph revision')
+        !== expected.graphRevision.toLocaleLowerCase()) {
+    throw new Error('Emergency Stop response does not match this Smoke Test workspace.');
+  }
+  if (body.status !== 'IDLE' && body.status !== 'STOP_REQUESTED') {
+    throw new Error('Emergency Stop returned an invalid state.');
+  }
+  return {
+    status: body.status,
+    pendingStartsCancelled: integerValue(
+      body.pendingStartsCancelled,
+      'Emergency Stop pending start count',
+    ),
+    activeRunsInterrupted: integerValue(
+      body.activeRunsInterrupted,
+      'Emergency Stop active run count',
+    ),
+    message: stringValue(body.message, 'Emergency Stop message'),
+  };
+};
 
 export const parseSmokeTestIntegrationRefreshResponse = (
   payload: unknown,

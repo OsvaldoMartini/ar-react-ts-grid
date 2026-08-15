@@ -9,6 +9,8 @@ import {
 } from '../../variablesWorkspace.contract';
 import {
   buildSmokeTestIntegrationRefreshRequest,
+  buildSmokeTestIntegrationForceStopRequest,
+  parseSmokeTestIntegrationForceStopResponse,
   buildSmokeTestIntegrationStartRequest,
   parseSmokeTestIntegrationRefreshResponse,
   parseSmokeTestIntegrationStartResponse,
@@ -25,6 +27,7 @@ import {
   type SmokeTestIntegrationExcelWriteArtifact,
   type SmokeTestLocatorRecoveryDecision,
   type SmokeTestLocatorRecoveryResult,
+  type SmokeTestIntegrationForceStopResult,
 } from './smokeTestIntegration.contract';
 
 const START_TIMEOUT_MS = 75_000;
@@ -43,7 +46,7 @@ type Phase =
   | 'CLEANUP_REQUIRED';
 
 type PendingRequest = {
-  operation: 'start' | 'refresh' | 'step' | 'recover' | 'excelWrite' | 'stop' | 'finish';
+  operation: 'start' | 'refresh' | 'step' | 'recover' | 'excelWrite' | 'stop' | 'forceStop' | 'finish';
   requestId: string;
   responseOperation: string;
   resolve: (body: unknown) => void;
@@ -76,6 +79,7 @@ export type SmokeTestIntegrationController = {
   ) => Promise<SmokeTestLocatorRecoveryResult>;
   saveExcelWrite: (artifact: SmokeTestIntegrationExcelWriteArtifact) => Promise<string>;
   stop: (reason?: string) => Promise<void>;
+  forceStop: () => Promise<SmokeTestIntegrationForceStopResult>;
   finish: () => Promise<void>;
 };
 
@@ -268,6 +272,7 @@ export const useSmokeTestIntegrationRun = ({
       throw cleanupError;
     }
     generationRef.current += 1;
+    const startGeneration = generationRef.current;
     clearPending(new Error('A new Integration run replaced the pending request.'));
     replaceRun(null);
     setError(null);
@@ -311,9 +316,11 @@ export const useSmokeTestIntegrationRun = ({
       return run;
     } catch (failure) {
       const nextError = failure instanceof Error ? failure : new Error('Integration could not start.');
-      setError(nextError.message);
-      replaceRun(null);
-      setPhase('IDLE');
+      if (generationRef.current === startGeneration) {
+        setError(nextError.message);
+        replaceRun(null);
+        setPhase('IDLE');
+      }
       throw nextError;
     }
   }, [clearPending, nextRequestId, replaceRun, request, snapshot, startContext]);
@@ -490,6 +497,37 @@ export const useSmokeTestIntegrationRun = ({
   }, [clearPending, nextRequestId, replaceRun, request]);
 
   const stop = useCallback((reason?: string) => terminal('stop', reason), [terminal]);
+  const forceStop = useCallback(async () => {
+    if (!snapshot) throw new Error('Smoke Test has no authoritative workspace snapshot.');
+    terminalInFlightRef.current = true;
+    generationRef.current += 1;
+    clearPending(new Error('Emergency Stop cancelled the pending Integration operation.'));
+    setPhase('STOPPING');
+    const requestId = nextRequestId('force-stop');
+    const body = buildSmokeTestIntegrationForceStopRequest(requestId, snapshot);
+    try {
+      const result = await request(
+        'forceStop',
+        'smokeTest.integration.forceStopResponse',
+        body,
+        TERMINAL_TIMEOUT_MS,
+        payload => parseSmokeTestIntegrationForceStopResponse(payload, body),
+      );
+      replaceRun(null);
+      setError(null);
+      setPhase('IDLE');
+      return result;
+    } catch (failure) {
+      const nextError = failure instanceof Error
+        ? failure
+        : new Error('Emergency Stop was not acknowledged.');
+      setError(nextError.message);
+      setPhase('CLEANUP_REQUIRED');
+      throw nextError;
+    } finally {
+      terminalInFlightRef.current = false;
+    }
+  }, [clearPending, nextRequestId, replaceRun, request, snapshot]);
   const finish = useCallback(() => terminal('finish'), [terminal]);
 
   return {
@@ -502,6 +540,7 @@ export const useSmokeTestIntegrationRun = ({
     recoverStep,
     saveExcelWrite,
     stop,
+    forceStop,
     finish,
   };
 };
