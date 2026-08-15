@@ -1,7 +1,10 @@
 import { act, renderHook } from '@testing-library/react';
 import type { VariablesSmokeTestPlan } from '../../variables/domain/variablesSmokeTestTypes';
 import type { VariableWorkspaceSnapshot } from '../../variablesWorkspace.contract';
-import { useSmokeTestIntegrationRun } from './useSmokeTestIntegrationRun';
+import {
+  SmokeTestExternalRuntimeControlError,
+  useSmokeTestIntegrationRun,
+} from './useSmokeTestIntegrationRun';
 
 const REVISION = 'a'.repeat(64);
 
@@ -202,6 +205,41 @@ test('Emergency Stop supersedes a pending start before a run ID exists', async (
   });
   expect(result.current.phase).toBe('IDLE');
   expect(result.current.activeRun).toBeNull();
+});
+
+test('retires only the matching run after Runtime Instances control without sending another Stop', async () => {
+  const send = jest.fn();
+  const { result, rerender } = renderIntegrationHook(send);
+  const messages: string[] = [];
+
+  let start!: ReturnType<typeof result.current.start>;
+  act(() => {
+    start = result.current.start(plan, 'REAL', 'JAVA_V1', false);
+  });
+  const startRequest = requestBody(send, 0);
+  messages.push(responseMessage(
+    'smokeTest.integration.startResponse',
+    startResponse(startRequest.requestId),
+  ));
+  act(() => rerender({ messages: [...messages] }));
+  await act(async () => { await start; });
+
+  let step!: ReturnType<typeof result.current.executeStep>;
+  let retired = false;
+  act(() => {
+    step = result.current.executeStep(1735, 0, true);
+    retired = result.current.retireExternalRun('server-run-1', 'STOP');
+  });
+
+  expect(retired).toBe(true);
+  await act(async () => {
+    await expect(step).rejects.toBeInstanceOf(SmokeTestExternalRuntimeControlError);
+  });
+  expect(result.current.phase).toBe('IDLE');
+  expect(result.current.activeRun).toBeNull();
+  expect(result.current.error).toBeNull();
+  expect(send).toHaveBeenCalledTimes(2);
+  expect(result.current.retireExternalRun('another-run', 'KILL')).toBe(false);
 });
 
 test('keeps the active run when Finish is refused and permits Stop cleanup retry', async () => {

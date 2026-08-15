@@ -90,6 +90,7 @@ type RuntimeInstancesPending = {
   requestId: string;
   kind: 'LIST' | 'CONTROL';
   runId: string | null;
+  action: 'STOP' | 'KILL' | null;
   timeout: ReturnType<typeof setTimeout>;
 };
 
@@ -430,7 +431,13 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
       clearRuntimeInstancesPending();
       setStatus({ level: 'error', text: 'Runtime instance request timed out.' });
     }, 15_000);
-    runtimeInstancesPendingRef.current = { requestId, kind, runId: control?.runId ?? null, timeout };
+    runtimeInstancesPendingRef.current = {
+      requestId,
+      kind,
+      runId: control?.runId ?? null,
+      action: control?.action ?? null,
+      timeout,
+    };
     setRuntimeInstancesLoading(kind === 'LIST');
     setRuntimeInstancePendingRunId(control?.runId ?? null);
     webSocket.send(JSON.stringify({
@@ -516,6 +523,9 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
         if (current.kind === 'LIST') {
           setRuntimeInstances(Array.isArray(body?.instances) ? body.instances as SmokeTestRuntimeInstance[] : []);
         } else {
+          if (current.runId !== null && current.action !== null) {
+            integration.retireExternalRun(current.runId, current.action);
+          }
           setStatus({ level: 'ok', text: statusText(body, 'Runtime instance stopped.') });
           setTimeout(() => requestRuntimeInstances(), 0);
         }
@@ -674,6 +684,7 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     clearExcelDataModePending,
     handleRuntimeMemoryMessage,
     handleInstructionStatusMessage,
+    integration.retireExternalRun,
     messageGeneration,
     messages,
     replaceSnapshot,

@@ -47,7 +47,10 @@ import {
 } from './Engine/ifElseCommandEngine';
 import styles from './VariablesSmokeTestPanel.module.scss';
 import ExcelDataModeToggle, { type ExcelDataMode } from '../excel-data/ExcelDataModeToggle';
-import type { SmokeTestIntegrationController } from '../smoke-test/integration/useSmokeTestIntegrationRun';
+import {
+  SmokeTestExternalRuntimeControlError,
+  type SmokeTestIntegrationController,
+} from '../smoke-test/integration/useSmokeTestIntegrationRun';
 import type {
   SmokeTestExecutionMode,
   SmokeTestIntegrationPagePolicy,
@@ -335,6 +338,28 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     setPendingLocatorRecovery(null);
     resolve(result);
   }, []);
+
+  const settleExternalRuntimeStop = useCallback((message: string) => {
+    stopRequestedRef.current = true;
+    resolvePause('STOP');
+    settleLocatorRecovery({ kind: 'STOPPED', message });
+    onActivePositionChange?.(null);
+    setEntries(current => [
+      ...current,
+      logEntry(processedCommands + 1, 'WARNING', message, 'warning'),
+    ]);
+    setStatus('STOPPED');
+  }, [onActivePositionChange, processedCommands, resolvePause, settleLocatorRecovery]);
+
+  useEffect(() => {
+    if (executionMode !== 'INTEGRATION'
+        || status !== 'RUNNING'
+        || integration?.phase !== 'IDLE'
+        || integration.activeRun !== null) return;
+    settleExternalRuntimeStop(
+      'Runtime Instances stopped the active Integration run. The browser disposition follows the selected STOP or KILL action.',
+    );
+  }, [executionMode, integration?.activeRun, integration?.phase, settleExternalRuntimeStop, status]);
 
   const decideLocatorRecovery = useCallback(async (
     candidate: SmokeTestLocatorRecoveryCandidate | null,
@@ -1046,6 +1071,10 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
         }
       } catch (failure) {
         if (cancelled) return;
+        if (failure instanceof SmokeTestExternalRuntimeControlError) {
+          settleExternalRuntimeStop(failure.message);
+          return;
+        }
         const message = failure instanceof Error
           ? failure.message
           : 'Integration instruction failed without a correlated response.';
@@ -1099,6 +1128,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
     waitForLocatorRecovery,
     flushExcelWriteFiles,
     replaceExcelWriteManager,
+    settleExternalRuntimeStop,
     plan,
     processedCommands,
     runtimeWriteAvailable,

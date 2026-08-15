@@ -45,6 +45,16 @@ type Phase =
   | 'FINISHING'
   | 'CLEANUP_REQUIRED';
 
+export class SmokeTestExternalRuntimeControlError extends Error {
+  readonly action: 'STOP' | 'KILL';
+
+  constructor(action: 'STOP' | 'KILL') {
+    super(`Runtime Instances ${action} retired the active Integration run.`);
+    this.name = 'SmokeTestExternalRuntimeControlError';
+    this.action = action;
+  }
+}
+
 type PendingRequest = {
   operation: 'start' | 'refresh' | 'step' | 'recover' | 'excelWrite' | 'stop' | 'forceStop' | 'finish';
   requestId: string;
@@ -80,6 +90,7 @@ export type SmokeTestIntegrationController = {
   saveExcelWrite: (artifact: SmokeTestIntegrationExcelWriteArtifact) => Promise<string>;
   stop: (reason?: string) => Promise<void>;
   forceStop: () => Promise<SmokeTestIntegrationForceStopResult>;
+  retireExternalRun: (runId: string, action: 'STOP' | 'KILL') => boolean;
   finish: () => Promise<void>;
 };
 
@@ -391,6 +402,11 @@ export const useSmokeTestIntegrationRun = ({
       return result;
     } catch (failure) {
       const nextError = failure instanceof Error ? failure : new Error('Integration step failed.');
+      if (nextError instanceof SmokeTestExternalRuntimeControlError) {
+        setError(null);
+        setPhase('IDLE');
+        throw nextError;
+      }
       setError(nextError.message);
       if (!terminalInFlightRef.current) setPhase('READY');
       throw nextError;
@@ -528,6 +544,17 @@ export const useSmokeTestIntegrationRun = ({
       terminalInFlightRef.current = false;
     }
   }, [clearPending, nextRequestId, replaceRun, request, snapshot]);
+  const retireExternalRun = useCallback((runId: string, action: 'STOP' | 'KILL') => {
+    const current = activeRunRef.current;
+    if (current === null || current.runId !== runId) return false;
+    generationRef.current += 1;
+    terminalInFlightRef.current = false;
+    clearPending(new SmokeTestExternalRuntimeControlError(action));
+    replaceRun(null);
+    setError(null);
+    setPhase('IDLE');
+    return true;
+  }, [clearPending, replaceRun]);
   const finish = useCallback(() => terminal('finish'), [terminal]);
 
   return {
@@ -541,6 +568,7 @@ export const useSmokeTestIntegrationRun = ({
     saveExcelWrite,
     stop,
     forceStop,
+    retireExternalRun,
     finish,
   };
 };
