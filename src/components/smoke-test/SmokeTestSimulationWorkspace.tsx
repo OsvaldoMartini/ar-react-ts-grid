@@ -73,6 +73,7 @@ const SmokeTestSimulationWorkspace: React.FC<Props> = ({
 }) => (
   <section className={styles.workspace} aria-label="Simulation workspace Smoke Tests">
     <VariablesSmokeTestPanel
+      key={`${review.homeBankingId}:${review.botJobId}`}
       review={review}
       selectedBlockIds={selectedBlockIds}
       runtimeWriteAvailable={runtimeWriteAvailable}
