@@ -59,8 +59,17 @@ test('builds canonical locator envelopes for the exact detached session', () => 
     requestId: 'apply-1',
     elementKey: key,
     xpath: "//button[@test-id='go']",
+    runtimeMode: 'JAVA_V1',
     elementDetails: [target],
   });
+
+  const v2Apply = pageScannerLocatorApplyMessage(
+    scope,
+    { requestId: 'apply-v2', elementKey: key, xpath: "//button[@test-id='go']", target },
+    target,
+    'TYPESCRIPT_PLAYWRIGHT_V2',
+  );
+  expect(JSON.parse(v2Apply.body).runtimeMode).toBe('TYPESCRIPT_PLAYWRIGHT_V2');
 });
 
 test('converts a generated locator into an ElementDTO candidate with CSS and names', () => {

@@ -15,6 +15,10 @@ import SmokeTestRuntimeInstancesModal, {
   type SmokeTestRuntimeInstance,
 } from './smoke-test/integration/SmokeTestRuntimeInstancesModal';
 import { useSmokeTestIntegrationRun } from './smoke-test/integration/useSmokeTestIntegrationRun';
+import {
+  readSmokeRuntimePreference,
+  writeSmokeRuntimePreference,
+} from './smoke-test/integration/smokeRuntimePreference';
 import type {
   SmokeTestExecutionMode,
   SmokeTestIntegrationPagePolicy,
@@ -210,6 +214,12 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     const botJobChanged = previous !== null && previous.botJob.id !== next.botJob.id;
     snapshotRef.current = next;
     setSnapshot(next);
+    if (previous === null || botJobChanged) {
+      setIntegrationRuntimeMode(readSmokeRuntimePreference(
+        next.botJob.homeBankingId,
+        next.botJob.id,
+      ));
+    }
     setBlockFilters(current => previous === null || botJobChanged
       ? next.blocks.map(block => block.id)
       : current.filter(blockId => next.blocks.some(block => block.id === blockId)));
@@ -961,6 +971,8 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
                   disabled={smokeRunActive || integration.phase !== 'IDLE'}
                   onChange={(mode) => {
                     setIntegrationRuntimeMode(mode);
+                    const owner = snapshotRef.current?.botJob;
+                    if (owner) writeSmokeRuntimePreference(owner.homeBankingId, owner.id, mode);
                     if (mode === 'TYPESCRIPT_PLAYWRIGHT_V2') {
                       setIntegrationPagePolicy('RELOAD_SELECTED');
                     }

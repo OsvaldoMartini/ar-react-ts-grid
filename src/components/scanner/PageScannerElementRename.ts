@@ -32,6 +32,7 @@ export const pageScannerElementRenameMessage = (
   scope: PageScannerRenameScope,
   pending: PendingPageScannerElementRename,
   clientNamed: string | null,
+  runtimeMode: 'JAVA_V1' | 'TYPESCRIPT_PLAYWRIGHT_V2' = 'JAVA_V1',
 ) => ({
   type: PAGE_SCANNER_ELEMENT_RENAME_OPERATION,
   sessionId: scope.sessionId,
@@ -41,6 +42,7 @@ export const pageScannerElementRenameMessage = (
     contractVersion: 1,
     requestId: pending.requestId,
     elementKey: pending.elementKey,
+    runtimeMode,
     identity: {
       xPath: pending.target.xPath || '',
       iFrameXPath: pending.target.iFrameXPath || '',

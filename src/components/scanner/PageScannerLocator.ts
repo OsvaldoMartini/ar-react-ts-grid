@@ -53,6 +53,7 @@ export const pageScannerLocatorApplyMessage = (
   scope: LocatorEnvelopeScope,
   pending: PendingLocatorApply,
   element: ElementDTO,
+  runtimeMode: 'JAVA_V1' | 'TYPESCRIPT_PLAYWRIGHT_V2' = 'JAVA_V1',
 ) => ({
   type: PAGE_SCANNER_LOCATOR_APPLY_OPERATION,
   sessionId: scope.sessionId,
@@ -62,6 +63,7 @@ export const pageScannerLocatorApplyMessage = (
     requestId: pending.requestId,
     elementKey: pending.elementKey,
     xpath: pending.xpath,
+    runtimeMode,
     elementDetails: [element],
   }),
 });

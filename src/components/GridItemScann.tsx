@@ -41,6 +41,7 @@ import {
   type PendingMemoryListRequest,
 } from './memoryList.requestCorrelation';
 import ScrollingBannerText from './shared/ScrollingBannerText';
+import { readSmokeRuntimePreference } from './smoke-test/integration/smokeRuntimePreference';
 import {
   pageScannerExecutionTypeFor,
   pageScannerGroupTagFor,
@@ -984,6 +985,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
     }
 
     const requestId = createPageScannerRequestId('page-scanner-locator-apply');
+    const runtimeMode = readSmokeRuntimePreference(homeBankingId, botJobId);
     const elementKey = pageScannerLocatorElementKey(target);
     locatorApplyRef.current = { requestId, elementKey, xpath, target };
     setLocatorApplying(true);
@@ -994,6 +996,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
         { sessionId, homeBankingId, botJobId },
         { requestId, elementKey, xpath, target },
         target,
+        runtimeMode,
       )));
       locatorApplyTimerRef.current = setTimeout(() => {
         if (locatorApplyRef.current?.requestId !== requestId) return;
@@ -2239,6 +2242,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
         requestId,
         action,
         testAction: action === 'TEST_INPUT_DTO' ? 'input' : 'click',
+        runtimeMode: readSmokeRuntimePreference(homeBankingId, botJobId),
         elementDetails: [testedElement],
       };
       const message = {
@@ -2404,8 +2408,10 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
     }
 
     const requestId = createPageScannerRequestId('page-scanner-command');
+    const runtimeMode = readSmokeRuntimePreference(homeBankingId, botJobId);
     const payload = {
       requestId,
+      runtimeMode,
       focusProfile: dashboardFocus,
       searchTerms: dashboardSearchText,
       searchHiddenFields: dashboardSearchHidden,
@@ -2882,6 +2888,7 @@ const GridItemScann: React.FC<GridItemScannProps> = ({
           { sessionId, homeBankingId, botJobId },
           pending,
           clientNamed,
+          readSmokeRuntimePreference(homeBankingId, botJobId),
         )));
         pageScannerElementRenameTimerRef.current = setTimeout(() => {
           if (pageScannerElementRenameRef.current?.requestId !== requestId) return;

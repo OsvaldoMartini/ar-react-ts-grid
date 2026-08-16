@@ -99,6 +99,7 @@ afterEach(() => {
   mockMessages = [];
   mockConnected = true;
   mockSend.mockReset();
+  window.localStorage.clear();
   jest.useRealTimers();
 });
 
@@ -138,6 +139,23 @@ test('offers input and click tests for every scanned Web Element row', () => {
     action: 'TEST_CLICK_DTO',
     testAction: 'click',
   });
+});
+
+test('routes detached browser actions to the exact owner runtime preference', () => {
+  window.localStorage.setItem(
+    'arweb.smoke.runtime-mode.4.21',
+    'TYPESCRIPT_PLAYWRIGHT_V2',
+  );
+  render(<GridItemScann {...props} />);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh Web Page' }));
+  expect(JSON.parse(sentMessage('pageScanner.refresh').body).runtimeMode)
+    .toBe('TYPESCRIPT_PLAYWRIGHT_V2');
+
+  mockSend.mockClear();
+  fireEvent.click(screen.getByAltText('Test Click'));
+  expect(JSON.parse(sentMessage('pageScanner.testElement').body).runtimeMode)
+    .toBe('TYPESCRIPT_PLAYWRIGHT_V2');
 });
 
 test('sends exact-session requests and waits for persisted authoritative apply response', async () => {

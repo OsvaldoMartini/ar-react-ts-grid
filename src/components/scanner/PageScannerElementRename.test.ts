@@ -42,6 +42,7 @@ test('builds a reduced detached rename contract', () => {
     contractVersion: 1,
     requestId: 'rename-1',
     elementKey: pending.elementKey,
+    runtimeMode: 'JAVA_V1',
     identity: {
       xPath: target.xPath,
       iFrameXPath: '',
@@ -50,6 +51,11 @@ test('builds a reduced detached rename contract', () => {
     },
     clientNamed: 'Primary account',
   });
+
+  const v2Message = pageScannerElementRenameMessage({
+    sessionId: 'page-scanner-abc', homeBankingId: 2, botJobId: 29,
+  }, pending, 'Primary account', 'TYPESCRIPT_PLAYWRIGHT_V2');
+  expect(JSON.parse(v2Message.body).runtimeMode).toBe('TYPESCRIPT_PLAYWRIGHT_V2');
 });
 
 test('normalizes canonical names to a cleared override', () => {
