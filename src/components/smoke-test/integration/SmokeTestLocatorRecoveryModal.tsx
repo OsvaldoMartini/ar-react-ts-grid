@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, Minus, Octagon, Power, Save, ShieldAlert, SkipForward, X } from 'lucide-react';
+import { Check, Minus, Octagon, Power, Save, ScanSearch, ShieldAlert, SkipForward, X } from 'lucide-react';
 import type {
   LocatorMatchValue,
   SmokeTestLocatorRecovery,
@@ -13,6 +13,7 @@ type Props = {
   recovery: SmokeTestLocatorRecovery;
   verificationEnabled: boolean;
   onVerificationChange: (enabled: boolean) => void;
+  onOpenPageScanner: () => Promise<void>;
   onDecision: (
     candidate: SmokeTestLocatorRecoveryCandidate | null,
     decision: SmokeTestLocatorRecoveryDecision | 'STOP',
@@ -37,10 +38,13 @@ const SmokeTestLocatorRecoveryModal: React.FC<Props> = ({
   recovery,
   verificationEnabled,
   onVerificationChange,
+  onOpenPageScanner,
   onDecision,
 }) => {
   const [selectedId, setSelectedId] = useState(recovery.candidates[0]?.recoveryCandidateId ?? '');
   const [busy, setBusy] = useState(false);
+  const [scannerBusy, setScannerBusy] = useState(false);
+  const [scannerMessage, setScannerMessage] = useState('');
   const dialogRef = useRef<HTMLDivElement>(null);
   const selected = useMemo(
     () => recovery.candidates.find(candidate => candidate.recoveryCandidateId === selectedId) ?? null,
@@ -86,6 +90,22 @@ const SmokeTestLocatorRecoveryModal: React.FC<Props> = ({
     }
   };
 
+  const openPageScanner = async () => {
+    if (busy || scannerBusy) return;
+    setScannerBusy(true);
+    setScannerMessage('Opening the Page Scanner for this paused runtime...');
+    try {
+      await onOpenPageScanner();
+      setScannerMessage('Page Scanner opened. The recovery remains paused for your decision.');
+    } catch (failure) {
+      setScannerMessage(failure instanceof Error
+        ? failure.message
+        : 'Page Scanner could not be opened for this paused runtime.');
+    } finally {
+      setScannerBusy(false);
+    }
+  };
+
   return (
     <div className={styles.backdrop} role="presentation">
       <div
@@ -123,6 +143,7 @@ const SmokeTestLocatorRecoveryModal: React.FC<Props> = ({
         <section className={styles.summary}>
           No element was clicked, typed, or read. Compare the saved mapping with the live page,
           then explicitly choose how this one instruction continues.
+          {scannerMessage && <small role="status">{scannerMessage}</small>}
         </section>
 
         <div className={styles.tableViewport}>
@@ -179,6 +200,7 @@ const SmokeTestLocatorRecoveryModal: React.FC<Props> = ({
         </div>
 
         <footer>
+          <button type="button" className={styles.scanner} disabled={busy || scannerBusy} onClick={() => void openPageScanner()}><ScanSearch size={15} /> {scannerBusy ? 'Opening...' : 'Page Scanner'}</button>
           <button type="button" disabled={busy} onClick={() => void decide(null, 'CANCEL')}>Cancel Recovery</button>
           <button type="button" className={styles.stop} disabled={busy} onClick={() => void decide(null, 'STOP')}><Octagon size={15} /> Stop Execution</button>
           <button type="button" className={styles.bypass} disabled={busy} onClick={() => void decide(null, 'BYPASS')}><SkipForward size={15} /> Bypass &amp; Continue</button>

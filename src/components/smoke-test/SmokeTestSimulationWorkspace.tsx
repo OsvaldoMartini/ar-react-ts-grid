@@ -43,6 +43,7 @@ type Props = {
   integration: SmokeTestIntegrationController;
   locatorRecoveryVerificationEnabled: boolean;
   onLocatorRecoveryVerificationChange: (enabled: boolean) => void;
+  onOpenLocatorRecoveryPageScanner: () => Promise<void>;
   onStatusChange: (status: VariablesSmokeTestStatus) => void;
 };
 
@@ -69,6 +70,7 @@ const SmokeTestSimulationWorkspace: React.FC<Props> = ({
   integration,
   locatorRecoveryVerificationEnabled,
   onLocatorRecoveryVerificationChange,
+  onOpenLocatorRecoveryPageScanner,
   onStatusChange,
 }) => (
   <section className={styles.workspace} aria-label="Simulation workspace Smoke Tests">
@@ -96,6 +98,7 @@ const SmokeTestSimulationWorkspace: React.FC<Props> = ({
       integration={integration}
       locatorRecoveryVerificationEnabled={locatorRecoveryVerificationEnabled}
       onLocatorRecoveryVerificationChange={onLocatorRecoveryVerificationChange}
+      onOpenLocatorRecoveryPageScanner={onOpenLocatorRecoveryPageScanner}
       onStatusChange={onStatusChange}
     />
   </section>

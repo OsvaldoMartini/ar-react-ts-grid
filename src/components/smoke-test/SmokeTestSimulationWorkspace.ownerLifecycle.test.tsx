@@ -41,6 +41,7 @@ const callbacks = {
   integration: {} as never,
   locatorRecoveryVerificationEnabled: true,
   onLocatorRecoveryVerificationChange: () => undefined,
+  onOpenLocatorRecoveryPageScanner: () => Promise.resolve(),
   onStatusChange: () => undefined,
 };
 

@@ -98,6 +98,14 @@ type RuntimeInstancesPending = {
   timeout: ReturnType<typeof setTimeout>;
 };
 
+type PageScannerOpenPending = {
+  requestId: string;
+  botJobId: number;
+  resolve: () => void;
+  reject: (failure: Error) => void;
+  timeout: ReturnType<typeof setTimeout>;
+};
+
 const REQUEST_TIMEOUT_MS = 12_000;
 const SUPPORTING_WORKSPACES_TIMEOUT_MS = 45_000;
 
@@ -142,6 +150,7 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
   const excelDataModePendingRef = useRef<ExcelDataModePending | null>(null);
   const v2RuntimePendingRef = useRef<V2RuntimePending | null>(null);
   const runtimeInstancesPendingRef = useRef<RuntimeInstancesPending | null>(null);
+  const pageScannerOpenPendingRef = useRef<PageScannerOpenPending | null>(null);
   const snapshotRef = useRef<VariableWorkspaceSnapshot | null>(null);
   const [snapshot, setSnapshot] = useState<VariableWorkspaceSnapshot | null>(null);
   const [pending, setPending] = useState<PendingRequest | null>(null);
@@ -209,6 +218,14 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     setRuntimeInstancePendingRunId(null);
   }, []);
 
+  const rejectPageScannerOpen = useCallback((message: string) => {
+    const current = pageScannerOpenPendingRef.current;
+    if (current === null) return;
+    pageScannerOpenPendingRef.current = null;
+    clearTimeout(current.timeout);
+    current.reject(new Error(message));
+  }, []);
+
   const replaceSnapshot = useCallback((next: VariableWorkspaceSnapshot) => {
     const previous = snapshotRef.current;
     const botJobChanged = previous !== null && previous.botJob.id !== next.botJob.id;
@@ -228,12 +245,14 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
       clearExcelDataModePending();
       clearV2RuntimePending();
       clearRuntimeInstancesPending();
+      rejectPageScannerOpen('Page Scanner request was retired because the Bot Job changed.');
       setV2RuntimeState('UNKNOWN');
       setActiveSmokePosition(null);
       setSmokeExecutionTrace([]);
       setCommandRemainingByInstructionId({});
     }
-  }, [clearExcelDataModePending, clearPending, clearV2RuntimePending]);
+  }, [clearExcelDataModePending, clearPending, clearRuntimeInstancesPending,
+    clearV2RuntimePending, rejectPageScannerOpen]);
 
   const replaceRuntimeMemory = useCallback((
     runtimeMemory: VariableWorkspaceSnapshot['runtimeMemory'],
@@ -475,6 +494,45 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
     return true;
   }, [clearRuntimeInstancesPending, connected, sessionId, webSocket]);
 
+  const openLocatorRecoveryPageScanner = useCallback((): Promise<void> => {
+    const current = snapshotRef.current;
+    if (!connected || !webSocket || webSocket.readyState !== WebSocket.OPEN || !current) {
+      return Promise.reject(new Error('Page Scanner is unavailable because Smoke Test is disconnected.'));
+    }
+    if (pageScannerOpenPendingRef.current !== null) {
+      return Promise.reject(new Error('Page Scanner is already being opened.'));
+    }
+    requestSequenceRef.current += 1;
+    const requestId = `${Date.now()}-smoke-recovery-page-scanner-${requestSequenceRef.current}`;
+    return new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        if (pageScannerOpenPendingRef.current?.requestId !== requestId) return;
+        pageScannerOpenPendingRef.current = null;
+        reject(new Error('Page Scanner open request timed out.'));
+      }, REQUEST_TIMEOUT_MS);
+      pageScannerOpenPendingRef.current = {
+        requestId,
+        botJobId: current.botJob.id,
+        resolve,
+        reject,
+        timeout,
+      };
+      try {
+        webSocket.send(JSON.stringify({
+          type: 'pageScannerWorkspace.open',
+          sessionId,
+          body: JSON.stringify({ requestId, botJobId: current.botJob.id }),
+        }));
+      } catch (failure) {
+        pageScannerOpenPendingRef.current = null;
+        clearTimeout(timeout);
+        reject(failure instanceof Error
+          ? failure
+          : new Error('Page Scanner request could not be sent.'));
+      }
+    });
+  }, [connected, sessionId, webSocket]);
+
   useEffect(() => {
     if (!runtimeInstancesOpen) return undefined;
     const interval = window.setInterval(() => requestRuntimeInstances(), 2_000);
@@ -490,20 +548,25 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
       clearPending();
       clearExcelDataModePending();
       clearV2RuntimePending();
+      clearRuntimeInstancesPending();
+      rejectPageScannerOpen('Smoke Test disconnected while opening Page Scanner.');
       rejectSupportingWorkspaces('Smoke Test disconnected while preparing its supporting pages.');
       resetRuntimeMemory();
       return;
     }
     sendSnapshotRequest('variablesWorkspace.bootstrap');
-  }, [clearExcelDataModePending, clearPending, clearRuntimeInstancesPending, clearV2RuntimePending, connected, rejectSupportingWorkspaces, resetRuntimeMemory, sendSnapshotRequest]);
+  }, [clearExcelDataModePending, clearPending, clearRuntimeInstancesPending, clearV2RuntimePending,
+    connected, rejectPageScannerOpen, rejectSupportingWorkspaces, resetRuntimeMemory, sendSnapshotRequest]);
 
   useEffect(() => () => {
     clearPending();
     clearExcelDataModePending();
     clearV2RuntimePending();
     clearRuntimeInstancesPending();
+    rejectPageScannerOpen('Smoke Test closed while opening Page Scanner.');
     rejectSupportingWorkspaces('Smoke Test closed while preparing its supporting pages.');
-  }, [clearExcelDataModePending, clearPending, clearRuntimeInstancesPending, clearV2RuntimePending, rejectSupportingWorkspaces]);
+  }, [clearExcelDataModePending, clearPending, clearRuntimeInstancesPending, clearV2RuntimePending,
+    rejectPageScannerOpen, rejectSupportingWorkspaces]);
 
   useEffect(() => {
     if (processedMessageGenerationRef.current !== (messageGeneration ?? 0)) {
@@ -524,6 +587,23 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
         return;
       }
       const body = bodyObject(envelope.body);
+      if (envelope.operationId === 'pageScannerWorkspace.openResponse') {
+        const current = pageScannerOpenPendingRef.current;
+        if (current === null || body?.requestId !== current.requestId
+          || body?.botJobId !== current.botJobId) return;
+        pageScannerOpenPendingRef.current = null;
+        clearTimeout(current.timeout);
+        if (body?.ok === false) {
+          current.reject(new Error(statusText(body, 'Page Scanner could not be opened.')));
+        } else {
+          setStatus({
+            level: 'ok',
+            text: statusText(body, 'Page Scanner opened for Locator Recovery.'),
+          });
+          current.resolve();
+        }
+        return;
+      }
       if (envelope.operationId === 'smokeTest.integration.runtimeInstancesResponse'
         || envelope.operationId === 'smokeTest.integration.runtimeInstanceControlResponse') {
         const current = runtimeInstancesPendingRef.current;
@@ -1073,6 +1153,7 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
                 integration={integration}
                 locatorRecoveryVerificationEnabled={locatorRecoveryVerificationEnabled}
                 onLocatorRecoveryVerificationChange={setLocatorRecoveryVerificationEnabled}
+                onOpenLocatorRecoveryPageScanner={openLocatorRecoveryPageScanner}
                 onStatusChange={setSmokeRunStatus}
               />
               <SmokeTestConnectionReview

@@ -47,10 +47,12 @@ test('shows comparison evidence and submits the explicitly selected candidate on
   const first = candidate('a', 'Login');
   const second = candidate('b', 'Continue');
   const onDecision = jest.fn().mockResolvedValue(undefined);
+  const onOpenPageScanner = jest.fn().mockResolvedValue(undefined);
   render(
     <SmokeTestLocatorRecoveryModal
       instructionName="log_in"
       recovery={recovery(first, second)}
+      onOpenPageScanner={onOpenPageScanner}
       verificationEnabled
       onVerificationChange={jest.fn()}
       onDecision={onDecision}
@@ -60,6 +62,12 @@ test('shows comparison evidence and submits the explicitly selected candidate on
   expect(screen.getByRole('dialog', { name: 'Locator Recovery · log_in' })).toBeVisible();
   expect(screen.getByText('Saved canonical')).toBeVisible();
   expect(screen.getAllByLabelText('XPath: different')).toHaveLength(2);
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Page Scanner' }));
+  });
+  expect(onOpenPageScanner).toHaveBeenCalledTimes(1);
+  expect(onDecision).not.toHaveBeenCalled();
+  expect(screen.getByRole('dialog', { name: 'Locator Recovery · log_in' })).toBeVisible();
   fireEvent.click(screen.getAllByRole('radio')[1]);
   await act(async () => {
     fireEvent.click(screen.getByRole('button', { name: 'Use Once' }));
@@ -76,6 +84,7 @@ test('submits Use and Save only for the selected server candidate', async () => 
     <SmokeTestLocatorRecoveryModal
       instructionName="log_in"
       recovery={recovery(selected)}
+      onOpenPageScanner={jest.fn().mockResolvedValue(undefined)}
       verificationEnabled
       onVerificationChange={jest.fn()}
       onDecision={onDecision}
@@ -99,6 +108,7 @@ test.each([
     <SmokeTestLocatorRecoveryModal
       instructionName="log_in"
       recovery={recovery(candidate('a', 'Login'))}
+      onOpenPageScanner={jest.fn().mockResolvedValue(undefined)}
       verificationEnabled
       onVerificationChange={jest.fn()}
       onDecision={onDecision}
@@ -118,6 +128,7 @@ test('allows an empty recovery to be explicitly bypassed and contains keyboard f
     <SmokeTestLocatorRecoveryModal
       instructionName="missing_element"
       recovery={recovery()}
+      onOpenPageScanner={jest.fn().mockResolvedValue(undefined)}
       verificationEnabled
       onVerificationChange={jest.fn()}
       onDecision={onDecision}

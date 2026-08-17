@@ -101,6 +101,7 @@ export interface VariablesSmokeTestPanelProps {
   integration?: SmokeTestIntegrationController;
   locatorRecoveryVerificationEnabled?: boolean;
   onLocatorRecoveryVerificationChange?: (enabled: boolean) => void;
+  onOpenLocatorRecoveryPageScanner?: () => Promise<void>;
   onStatusChange?: (status: VariablesSmokeTestStatus) => void;
   autoStartToken?: number;
   autoStopToken?: number;
@@ -235,6 +236,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   integration,
   locatorRecoveryVerificationEnabled = true,
   onLocatorRecoveryVerificationChange,
+  onOpenLocatorRecoveryPageScanner,
   onStatusChange,
   autoStartToken = 0,
   autoStopToken = 0,
@@ -1322,6 +1324,9 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
           recovery={pendingLocatorRecovery.result.recovery}
           verificationEnabled={locatorRecoveryVerificationEnabled}
           onVerificationChange={(enabled) => onLocatorRecoveryVerificationChange?.(enabled)}
+          onOpenPageScanner={onOpenLocatorRecoveryPageScanner ?? (() => Promise.reject(
+            new Error('Page Scanner is unavailable for this Smoke Test workspace.'),
+          ))}
           onDecision={decideLocatorRecovery}
         />
       )}
