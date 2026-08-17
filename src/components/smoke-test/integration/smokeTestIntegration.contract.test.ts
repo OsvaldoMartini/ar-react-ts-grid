@@ -4,6 +4,8 @@ import {
   parseSmokeTestIntegrationStartResponse,
   parseSmokeTestIntegrationStepResponse,
   parseSmokeTestIntegrationTerminalResponse,
+  parseSmokeTestLocatorRecoveryScanResponse,
+  parseSmokeTestLocatorRecoveryTestResponse,
 } from './smokeTestIntegration.contract';
 
 const plan: VariablesSmokeTestPlan = {
@@ -55,6 +57,45 @@ test('builds a small Integration start request without browser execution facts',
   expect(request).not.toHaveProperty('instructions');
   expect(request).not.toHaveProperty('locators');
   expect(request).not.toHaveProperty('runtimeValues');
+});
+
+test('parses correlated recovery scan refresh and candidate test responses', () => {
+  const expected = {
+    requestId: 'recovery-scan-1',
+    runId: 'run-recovery-1',
+    integrationEpoch: 4,
+    sequence: 3,
+    instructionId: 1735,
+  };
+  const scan = parseSmokeTestLocatorRecoveryScanResponse({
+    ok: true,
+    contractVersion: 1,
+    ...expected,
+    status: 'COMPLETED',
+    message: 'Page Scanner completed.',
+    elementCount: 239,
+    recovery: { state: 'AWAITING_USER', candidates: [] },
+  }, expected);
+  expect(scan.elementCount).toBe(239);
+  expect(scan.recovery.candidates).toEqual([]);
+
+  const candidateId = 'a'.repeat(64);
+  const testResult = parseSmokeTestLocatorRecoveryTestResponse({
+    ok: true,
+    contractVersion: 1,
+    ...expected,
+    requestId: 'recovery-test-1',
+    status: 'COMPLETED',
+    message: 'Test Input completed.',
+    recoveryCandidateId: candidateId,
+    action: 'INPUT',
+  }, {
+    ...expected,
+    requestId: 'recovery-test-1',
+    recoveryCandidateId: candidateId,
+    action: 'INPUT',
+  });
+  expect(testResult.action).toBe('INPUT');
 });
 
 test('accepts the backend-authored frozen run identity', () => {

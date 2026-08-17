@@ -47,12 +47,13 @@ test('shows comparison evidence and submits the explicitly selected candidate on
   const first = candidate('a', 'Login');
   const second = candidate('b', 'Continue');
   const onDecision = jest.fn().mockResolvedValue(undefined);
-  const onOpenPageScanner = jest.fn().mockResolvedValue(undefined);
+  const onScanPage = jest.fn().mockResolvedValue('Page Scanner refreshed 2 candidates.');
   render(
     <SmokeTestLocatorRecoveryModal
       instructionName="log_in"
       recovery={recovery(first, second)}
-      onOpenPageScanner={onOpenPageScanner}
+      onScanPage={onScanPage}
+      onTestCandidate={jest.fn().mockResolvedValue('Candidate test completed.')}
       verificationEnabled
       onVerificationChange={jest.fn()}
       onDecision={onDecision}
@@ -65,7 +66,7 @@ test('shows comparison evidence and submits the explicitly selected candidate on
   await act(async () => {
     fireEvent.click(screen.getByRole('button', { name: 'Page Scanner' }));
   });
-  expect(onOpenPageScanner).toHaveBeenCalledTimes(1);
+  expect(onScanPage).toHaveBeenCalledTimes(1);
   expect(onDecision).not.toHaveBeenCalled();
   expect(screen.getByRole('dialog', { name: 'Locator Recovery · log_in' })).toBeVisible();
   fireEvent.click(screen.getAllByRole('radio')[1]);
@@ -73,7 +74,7 @@ test('shows comparison evidence and submits the explicitly selected candidate on
     fireEvent.click(screen.getByRole('button', { name: 'Use Once' }));
   });
 
-  await waitFor(() => expect(onDecision).toHaveBeenCalledWith(second, 'USE_ONCE'));
+  await waitFor(() => expect(onDecision).toHaveBeenCalledWith(second, 'USE_ONCE', 'CLICK'));
   expect(onDecision).toHaveBeenCalledTimes(1);
 });
 
@@ -84,7 +85,8 @@ test('submits Use and Save only for the selected server candidate', async () => 
     <SmokeTestLocatorRecoveryModal
       instructionName="log_in"
       recovery={recovery(selected)}
-      onOpenPageScanner={jest.fn().mockResolvedValue(undefined)}
+      onScanPage={jest.fn().mockResolvedValue('Page Scanner completed.')}
+      onTestCandidate={jest.fn().mockResolvedValue('Candidate test completed.')}
       verificationEnabled
       onVerificationChange={jest.fn()}
       onDecision={onDecision}
@@ -95,12 +97,42 @@ test('submits Use and Save only for the selected server candidate', async () => 
     fireEvent.click(screen.getByRole('button', { name: 'Use and Save Locator' }));
   });
 
-  await waitFor(() => expect(onDecision).toHaveBeenCalledWith(selected, 'USE_AND_SAVE'));
+  await waitFor(() => expect(onDecision).toHaveBeenCalledWith(selected, 'USE_AND_SAVE', 'CLICK'));
 });
 
-test('serializes recovery decisions behind a pending Page Scanner open request', async () => {
-  let resolveScanner: (() => void) | undefined;
-  const onOpenPageScanner = jest.fn(() => new Promise<void>((resolve) => {
+test('changes the selected recovery action and probes input or click without settling recovery', async () => {
+  const selected = candidate('a', 'Login');
+  const onDecision = jest.fn().mockResolvedValue(undefined);
+  const onTestCandidate = jest.fn().mockResolvedValue('Candidate test completed.');
+  render(
+    <SmokeTestLocatorRecoveryModal
+      instructionName="log_in"
+      recovery={recovery(selected)}
+      onScanPage={jest.fn().mockResolvedValue('Page Scanner completed.')}
+      onTestCandidate={onTestCandidate}
+      verificationEnabled
+      onVerificationChange={jest.fn()}
+      onDecision={onDecision}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: /Execution type CLICK/ }));
+  await act(async () => {
+    fireEvent.click(screen.getByTitle('Test Input on Login OCR'));
+  });
+  expect(onTestCandidate).toHaveBeenCalledWith(selected, 'INPUT');
+  expect(onDecision).not.toHaveBeenCalled();
+  expect(await screen.findByText('Candidate test completed.')).toBeVisible();
+
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Use Once' }));
+  });
+  await waitFor(() => expect(onDecision).toHaveBeenCalledWith(selected, 'USE_ONCE', 'INPUT'));
+});
+
+test('serializes recovery decisions behind a pending Page Scanner request', async () => {
+  let resolveScanner: ((message: string) => void) | undefined;
+  const onScanPage = jest.fn(() => new Promise<string>((resolve) => {
     resolveScanner = resolve;
   }));
   const onDecision = jest.fn().mockResolvedValue(undefined);
@@ -108,7 +140,8 @@ test('serializes recovery decisions behind a pending Page Scanner open request',
     <SmokeTestLocatorRecoveryModal
       instructionName="log_in"
       recovery={recovery(candidate('a', 'Login'))}
-      onOpenPageScanner={onOpenPageScanner}
+      onScanPage={onScanPage}
+      onTestCandidate={jest.fn().mockResolvedValue('Candidate test completed.')}
       verificationEnabled
       onVerificationChange={jest.fn()}
       onDecision={onDecision}
@@ -116,7 +149,7 @@ test('serializes recovery decisions behind a pending Page Scanner open request',
   );
 
   fireEvent.click(screen.getByRole('button', { name: 'Page Scanner' }));
-  expect(screen.getByRole('button', { name: 'Opening...' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Scanning...' })).toBeDisabled();
   expect(screen.getByRole('button', { name: 'Cancel Recovery' })).toBeDisabled();
   expect(screen.getByRole('button', { name: 'Stop Execution' })).toBeDisabled();
   expect(screen.getByRole('button', { name: 'Bypass & Continue' })).toBeDisabled();
@@ -126,18 +159,19 @@ test('serializes recovery decisions behind a pending Page Scanner open request',
     .toBeDisabled();
   expect(onDecision).not.toHaveBeenCalled();
 
-  await act(async () => resolveScanner?.());
+  await act(async () => resolveScanner?.('Page Scanner completed.'));
   await waitFor(() => expect(screen.getByRole('button', { name: 'Page Scanner' })).toBeEnabled());
   expect(screen.getByRole('button', { name: 'Use Once' })).toBeEnabled();
 });
 
-test('shows a Page Scanner launch failure without settling or closing recovery', async () => {
+test('shows a Page Scanner failure without settling or closing recovery', async () => {
   const onDecision = jest.fn().mockResolvedValue(undefined);
   render(
     <SmokeTestLocatorRecoveryModal
       instructionName="log_in"
       recovery={recovery(candidate('a', 'Login'))}
-      onOpenPageScanner={jest.fn().mockRejectedValue(new Error('Scanner owner is stale.'))}
+      onScanPage={jest.fn().mockRejectedValue(new Error('Scanner owner is stale.'))}
+      onTestCandidate={jest.fn().mockResolvedValue('Candidate test completed.')}
       verificationEnabled
       onVerificationChange={jest.fn()}
       onDecision={onDecision}
@@ -164,7 +198,8 @@ test.each([
     <SmokeTestLocatorRecoveryModal
       instructionName="log_in"
       recovery={recovery(candidate('a', 'Login'))}
-      onOpenPageScanner={jest.fn().mockResolvedValue(undefined)}
+      onScanPage={jest.fn().mockResolvedValue('Page Scanner completed.')}
+      onTestCandidate={jest.fn().mockResolvedValue('Candidate test completed.')}
       verificationEnabled
       onVerificationChange={jest.fn()}
       onDecision={onDecision}
@@ -175,7 +210,7 @@ test.each([
     fireEvent.click(screen.getByRole('button', { name: button }));
   });
 
-  await waitFor(() => expect(onDecision).toHaveBeenCalledWith(null, decision));
+  await waitFor(() => expect(onDecision).toHaveBeenCalledWith(null, decision, undefined));
 });
 
 test('allows an empty recovery to be explicitly bypassed and contains keyboard focus', async () => {
@@ -184,7 +219,8 @@ test('allows an empty recovery to be explicitly bypassed and contains keyboard f
     <SmokeTestLocatorRecoveryModal
       instructionName="missing_element"
       recovery={recovery()}
-      onOpenPageScanner={jest.fn().mockResolvedValue(undefined)}
+      onScanPage={jest.fn().mockResolvedValue('Page Scanner completed.')}
+      onTestCandidate={jest.fn().mockResolvedValue('Candidate test completed.')}
       verificationEnabled
       onVerificationChange={jest.fn()}
       onDecision={onDecision}
@@ -198,7 +234,7 @@ test('allows an empty recovery to be explicitly bypassed and contains keyboard f
   await act(async () => {
     fireEvent.click(screen.getByRole('button', { name: 'Bypass & Continue' }));
   });
-  await waitFor(() => expect(onDecision).toHaveBeenCalledWith(null, 'BYPASS'));
+  await waitFor(() => expect(onDecision).toHaveBeenCalledWith(null, 'BYPASS', undefined));
   const bypass = screen.getByRole('button', { name: 'Bypass & Continue' });
   const cancel = screen.getByRole('button', { name: 'Cancel Recovery' });
   bypass.focus();

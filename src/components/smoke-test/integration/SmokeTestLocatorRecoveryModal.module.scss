@@ -21,6 +21,17 @@
 .tableViewport tbody tr[data-selected=true] { background: #e7faff; box-shadow: inset 3px 0 #08a5be; }
 .tableViewport td.empty { padding: 28px; text-align: center; color: #526f83; white-space: normal; background: #f7fbfe; }
 .tableViewport td small { display: block; margin-top: 3px; font-weight: 400; color: #58748a; }
+.actionCell { min-width: 138px; white-space: normal !important; }
+.actionCell > small { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.testButton { min-height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 5px 8px; border: 1px solid; border-radius: 7px; font-family: inherit; cursor: pointer; }
+.testButton span { display: grid; line-height: 1; text-align: left; }
+.testButton strong { font-size: .64rem; font-weight: 900; letter-spacing: .02em; text-transform: uppercase; }
+.testButton small { margin-top: 2px !important; color: inherit !important; font-size: .54rem; font-weight: 800 !important; text-transform: uppercase; }
+.testButton:disabled { cursor: wait; opacity: .5; }
+.inputButton { color: #214f98; border-color: #668ac7; background: #eef4ff; }
+.clickButton { color: #9a4c00; border-color: #db8b2d; background: #fff4e6; }
+.spin { animation: spin 850ms linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 .match, .mismatch, .unavailable { display: inline-grid; place-items: center; width: 25px; height: 25px; border-radius: 50%; }
 .match { color: #fff; background: #16834a; box-shadow: 0 0 9px rgba(22,131,74,.4); }
 .mismatch { color: #fff; background: #c52a2a; box-shadow: 0 0 9px rgba(197,42,42,.45); }

@@ -152,6 +152,19 @@ export type SmokeTestLocatorRecovery = {
 };
 
 export type SmokeTestLocatorRecoveryDecision = 'USE_ONCE' | 'USE_AND_SAVE' | 'BYPASS' | 'CANCEL';
+export type SmokeTestLocatorRecoveryAction = 'CLICK' | 'INPUT' | 'OUTPUT';
+
+export type SmokeTestLocatorRecoveryScanResult = {
+  recovery: SmokeTestLocatorRecovery;
+  elementCount: number;
+  message: string;
+};
+
+export type SmokeTestLocatorRecoveryTestResult = {
+  recoveryCandidateId: string;
+  action: 'CLICK' | 'INPUT';
+  message: string;
+};
 
 export type SmokeTestLocatorRecoveryResult = {
   status: 'COMPLETED' | 'BYPASSED' | 'CANCELLED';
@@ -600,6 +613,67 @@ export const parseSmokeTestLocatorRecoveryResponse = (
     status: body.status,
     message: stringValue(body.message, 'Locator recovery message'),
     locatorSaved: body.locatorSaved === true,
+  };
+};
+
+const assertRecoveryCorrelation = (
+  body: JsonObject,
+  expected: Readonly<{
+    requestId: string;
+    runId: string;
+    integrationEpoch: number;
+    sequence: number;
+    instructionId: number;
+  }>,
+) => {
+  if (stringValue(body.requestId, 'Recovery request ID') !== expected.requestId
+      || stringValue(body.runId, 'Recovery run ID') !== expected.runId
+      || integerValue(body.integrationEpoch, 'Recovery Integration epoch', 1)
+        !== expected.integrationEpoch
+      || integerValue(body.sequence, 'Recovery sequence', 1) !== expected.sequence
+      || integerValue(body.instructionId, 'Recovery instruction ID', 1)
+        !== expected.instructionId) {
+    throw new Error('Locator recovery response does not match the paused instruction.');
+  }
+};
+
+export const parseSmokeTestLocatorRecoveryScanResponse = (
+  payload: unknown,
+  expected: Parameters<typeof assertRecoveryCorrelation>[1],
+): SmokeTestLocatorRecoveryScanResult => {
+  const body = contractBody(payload, 'Locator recovery Page Scanner');
+  assertRecoveryCorrelation(body, expected);
+  if (body.status !== 'COMPLETED') {
+    throw new Error(stringValue(body.message, 'Recovery scan message'));
+  }
+  const recovery = parseRecovery(body.recovery);
+  if (recovery === null) throw new Error('Recovery scan candidates are missing.');
+  return {
+    recovery,
+    elementCount: integerValue(body.elementCount, 'Recovery scan element count'),
+    message: stringValue(body.message, 'Recovery scan message'),
+  };
+};
+
+export const parseSmokeTestLocatorRecoveryTestResponse = (
+  payload: unknown,
+  expected: Parameters<typeof assertRecoveryCorrelation>[1] & Readonly<{
+    recoveryCandidateId: string;
+    action: 'CLICK' | 'INPUT';
+  }>,
+): SmokeTestLocatorRecoveryTestResult => {
+  const body = contractBody(payload, 'Locator recovery candidate test');
+  assertRecoveryCorrelation(body, expected);
+  if (body.status !== 'COMPLETED'
+      || revisionValue(body.recoveryCandidateId, 'Recovery candidate ID')
+        !== expected.recoveryCandidateId
+      || body.action !== expected.action) {
+    throw new Error(stringValue(body.message, 'Recovery candidate test message'));
+  }
+  return {
+    recoveryCandidateId: expected.recoveryCandidateId,
+    action: expected.action,
+    message: stringValue(body.message, 'Recovery candidate test message'),
   };
 };
 

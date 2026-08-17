@@ -56,6 +56,7 @@ import type {
   SmokeTestIntegrationPagePolicy,
   SmokeTestIntegrationRuntimeMode,
   SmokeTestIntegrationStepResult,
+  SmokeTestLocatorRecoveryAction,
   SmokeTestLocatorRecoveryCandidate,
 } from '../smoke-test/integration/smokeTestIntegration.contract';
 import SmokeTestWebPageRefreshButton from '../smoke-test/integration/SmokeTestWebPageRefreshButton';
@@ -101,7 +102,6 @@ export interface VariablesSmokeTestPanelProps {
   integration?: SmokeTestIntegrationController;
   locatorRecoveryVerificationEnabled?: boolean;
   onLocatorRecoveryVerificationChange?: (enabled: boolean) => void;
-  onOpenLocatorRecoveryPageScanner?: () => Promise<void>;
   onStatusChange?: (status: VariablesSmokeTestStatus) => void;
   autoStartToken?: number;
   autoStopToken?: number;
@@ -236,7 +236,6 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   integration,
   locatorRecoveryVerificationEnabled = true,
   onLocatorRecoveryVerificationChange,
-  onOpenLocatorRecoveryPageScanner,
   onStatusChange,
   autoStartToken = 0,
   autoStopToken = 0,
@@ -366,6 +365,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
   const decideLocatorRecovery = useCallback(async (
     candidate: SmokeTestLocatorRecoveryCandidate | null,
     decision: 'USE_ONCE' | 'USE_AND_SAVE' | 'BYPASS' | 'CANCEL' | 'STOP',
+    action?: SmokeTestLocatorRecoveryAction,
   ) => {
     const pending = pendingLocatorRecovery;
     const controller = integrationRef.current;
@@ -387,6 +387,7 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
       pending.result.instructionId,
       candidate?.recoveryCandidateId ?? '',
       decision,
+      action,
     );
     settleLocatorRecovery({
       kind: response.status === 'BYPASSED'
@@ -397,6 +398,46 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
       message: response.message,
     });
   }, [onActivePositionChange, pendingLocatorRecovery, settleLocatorRecovery]);
+
+  const scanLocatorRecoveryPage = useCallback(async (): Promise<string> => {
+    const pending = pendingLocatorRecovery;
+    const controller = integrationRef.current;
+    if (pending === null || controller === undefined) {
+      throw new Error('Locator Recovery is no longer active.');
+    }
+    const response = await controller.scanRecovery(
+      pending.result.sequence,
+      pending.result.instructionId,
+    );
+    setPendingLocatorRecovery(current => {
+      if (current === null
+          || current.result.sequence !== pending.result.sequence
+          || current.result.instructionId !== pending.result.instructionId) return current;
+      return {
+        ...current,
+        result: { ...current.result, recovery: response.recovery },
+      };
+    });
+    return response.message;
+  }, [pendingLocatorRecovery]);
+
+  const testLocatorRecoveryCandidate = useCallback(async (
+    candidate: SmokeTestLocatorRecoveryCandidate,
+    action: 'CLICK' | 'INPUT',
+  ): Promise<string> => {
+    const pending = pendingLocatorRecovery;
+    const controller = integrationRef.current;
+    if (pending === null || controller === undefined) {
+      throw new Error('Locator Recovery is no longer active.');
+    }
+    const response = await controller.testRecoveryCandidate(
+      pending.result.sequence,
+      pending.result.instructionId,
+      candidate.recoveryCandidateId,
+      action,
+    );
+    return response.message;
+  }, [pendingLocatorRecovery]);
 
   useEffect(() => {
     if (locatorRecoveryVerificationEnabled || pendingLocatorRecovery === null) return;
@@ -1324,9 +1365,8 @@ const VariablesSmokeTestPanel: React.FC<VariablesSmokeTestPanelProps> = ({
           recovery={pendingLocatorRecovery.result.recovery}
           verificationEnabled={locatorRecoveryVerificationEnabled}
           onVerificationChange={(enabled) => onLocatorRecoveryVerificationChange?.(enabled)}
-          onOpenPageScanner={onOpenLocatorRecoveryPageScanner ?? (() => Promise.reject(
-            new Error('Page Scanner is unavailable for this Smoke Test workspace.'),
-          ))}
+          onScanPage={scanLocatorRecoveryPage}
+          onTestCandidate={testLocatorRecoveryCandidate}
           onDecision={decideLocatorRecovery}
         />
       )}

@@ -373,3 +373,79 @@ test('keeps Stop single-flight when it cancels an in-flight step', async () => {
   expect(result.current.activeRun).toBeNull();
   expect(result.current.error).toBeNull();
 });
+
+test('correlates recovery scan, candidate test, and user-selected action requests', async () => {
+  const send = jest.fn();
+  const { result, rerender } = renderIntegrationHook(send);
+  const messages: string[] = [];
+  let start!: ReturnType<typeof result.current.start>;
+  act(() => { start = result.current.start(plan, 'REAL', 'JAVA_V1', false); });
+  const startRequest = requestBody(send, 0);
+  messages.push(responseMessage('smokeTest.integration.startResponse', startResponse(startRequest.requestId)));
+  act(() => rerender({ messages: [...messages] }));
+  await act(async () => { await start; });
+
+  let scan!: ReturnType<typeof result.current.scanRecovery>;
+  act(() => { scan = result.current.scanRecovery(1, 1735); });
+  const scanRequest = requestBody(send, 1);
+  expect(scanRequest).toMatchObject({ sequence: 1, instructionId: 1735 });
+  messages.push(responseMessage('smokeTest.integration.recoveryScanResponse', {
+    ok: true,
+    contractVersion: 1,
+    requestId: scanRequest.requestId,
+    runId: 'server-run-1',
+    integrationEpoch: 4,
+    sequence: 1,
+    instructionId: 1735,
+    status: 'COMPLETED',
+    message: 'Page Scanner completed.',
+    elementCount: 239,
+    recovery: { state: 'AWAITING_USER', candidates: [] },
+  }));
+  act(() => rerender({ messages: [...messages] }));
+  await act(async () => { await scan; });
+
+  const candidateId = 'a'.repeat(64);
+  let testCandidate!: ReturnType<typeof result.current.testRecoveryCandidate>;
+  act(() => { testCandidate = result.current.testRecoveryCandidate(1, 1735, candidateId, 'INPUT'); });
+  const testRequest = requestBody(send, 2);
+  expect(testRequest).toMatchObject({ recoveryCandidateId: candidateId, action: 'INPUT' });
+  messages.push(responseMessage('smokeTest.integration.recoveryTestResponse', {
+    ok: true,
+    contractVersion: 1,
+    requestId: testRequest.requestId,
+    runId: 'server-run-1',
+    integrationEpoch: 4,
+    sequence: 1,
+    instructionId: 1735,
+    recoveryCandidateId: candidateId,
+    action: 'INPUT',
+    status: 'COMPLETED',
+    message: 'Test Input completed.',
+  }));
+  act(() => rerender({ messages: [...messages] }));
+  await act(async () => { await testCandidate; });
+
+  let recover!: ReturnType<typeof result.current.recoverStep>;
+  act(() => { recover = result.current.recoverStep(1, 1735, candidateId, 'USE_ONCE', 'OUTPUT'); });
+  const recoverRequest = requestBody(send, 3);
+  expect(recoverRequest).toMatchObject({
+    recoveryCandidateId: candidateId,
+    decision: 'USE_ONCE',
+    action: 'OUTPUT',
+  });
+  messages.push(responseMessage('smokeTest.integration.recoverResponse', {
+    ok: true,
+    contractVersion: 1,
+    requestId: recoverRequest.requestId,
+    runId: 'server-run-1',
+    integrationEpoch: 4,
+    sequence: 1,
+    instructionId: 1735,
+    status: 'COMPLETED',
+    message: 'Recovery completed.',
+    locatorSaved: false,
+  }));
+  act(() => rerender({ messages: [...messages] }));
+  await act(async () => { await recover; });
+});

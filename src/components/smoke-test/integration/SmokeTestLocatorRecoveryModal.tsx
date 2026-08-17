@@ -1,8 +1,24 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, Minus, Octagon, Power, Save, ScanSearch, ShieldAlert, SkipForward, X } from 'lucide-react';
+import {
+  Check,
+  LoaderCircle,
+  Minus,
+  MousePointerClick,
+  Octagon,
+  Power,
+  Save,
+  ScanSearch,
+  ShieldAlert,
+  SkipForward,
+  TextCursorInput,
+  X,
+} from 'lucide-react';
+import WebElementTypeToggle from '../../scanner/WebElementTypeToggle';
+import type { WebElementExecutionType } from '../../webElementExecutionType';
 import type {
   LocatorMatchValue,
   SmokeTestLocatorRecovery,
+  SmokeTestLocatorRecoveryAction,
   SmokeTestLocatorRecoveryCandidate,
   SmokeTestLocatorRecoveryDecision,
 } from './smokeTestIntegration.contract';
@@ -13,10 +29,15 @@ type Props = {
   recovery: SmokeTestLocatorRecovery;
   verificationEnabled: boolean;
   onVerificationChange: (enabled: boolean) => void;
-  onOpenPageScanner: () => Promise<void>;
+  onScanPage: () => Promise<string>;
+  onTestCandidate: (
+    candidate: SmokeTestLocatorRecoveryCandidate,
+    action: 'CLICK' | 'INPUT',
+  ) => Promise<string>;
   onDecision: (
     candidate: SmokeTestLocatorRecoveryCandidate | null,
     decision: SmokeTestLocatorRecoveryDecision | 'STOP',
+    action?: SmokeTestLocatorRecoveryAction,
   ) => Promise<void>;
 };
 
@@ -33,23 +54,36 @@ const Match: React.FC<{ value: LocatorMatchValue; label: string }> = ({ value, l
 const attributes = (value: Readonly<Record<string, string>>): string =>
   Object.entries(value).map(([key, item]) => `${key}=${item}`).join('\n') || '—';
 
+const candidateLabel = (candidate: SmokeTestLocatorRecoveryCandidate): string =>
+  candidate.ocrMappedName || candidate.savedClientName || candidate.savedCanonicalName || 'candidate';
+
 const SmokeTestLocatorRecoveryModal: React.FC<Props> = ({
   instructionName,
   recovery,
   verificationEnabled,
   onVerificationChange,
-  onOpenPageScanner,
+  onScanPage,
+  onTestCandidate,
   onDecision,
 }) => {
   const [selectedId, setSelectedId] = useState(recovery.candidates[0]?.recoveryCandidateId ?? '');
+  const [candidateActions, setCandidateActions] = useState<Record<string, SmokeTestLocatorRecoveryAction>>({});
   const [busy, setBusy] = useState(false);
   const [scannerBusy, setScannerBusy] = useState(false);
   const [scannerMessage, setScannerMessage] = useState('');
+  const [testPending, setTestPending] = useState<{ candidateId: string; action: 'CLICK' | 'INPUT' } | null>(null);
+  const [testMessages, setTestMessages] = useState<Record<string, string>>({});
   const dialogRef = useRef<HTMLDivElement>(null);
   const selected = useMemo(
     () => recovery.candidates.find(candidate => candidate.recoveryCandidateId === selectedId) ?? null,
     [recovery.candidates, selectedId],
   );
+  const controlsBusy = busy || scannerBusy || testPending !== null;
+
+  useEffect(() => {
+    if (recovery.candidates.some(candidate => candidate.recoveryCandidateId === selectedId)) return;
+    setSelectedId(recovery.candidates[0]?.recoveryCandidateId ?? '');
+  }, [recovery.candidates, selectedId]);
 
   useEffect(() => {
     dialogRef.current?.focus();
@@ -81,28 +115,57 @@ const SmokeTestLocatorRecoveryModal: React.FC<Props> = ({
     candidate: SmokeTestLocatorRecoveryCandidate | null,
     decision: SmokeTestLocatorRecoveryDecision | 'STOP',
   ) => {
-    if (busy) return;
+    if (controlsBusy) return;
     setBusy(true);
     try {
-      await onDecision(candidate, decision);
+      await onDecision(
+        candidate,
+        decision,
+        candidate === null ? undefined : candidateActions[candidate.recoveryCandidateId]
+          ?? candidate.expectedAction,
+      );
     } finally {
       setBusy(false);
     }
   };
 
-  const openPageScanner = async () => {
-    if (busy || scannerBusy) return;
+  const scanPage = async () => {
+    if (controlsBusy) return;
     setScannerBusy(true);
-    setScannerMessage('Opening the Page Scanner for this paused runtime...');
+    setScannerMessage('Scanning the paused runtime page and refreshing recovery candidates...');
     try {
-      await onOpenPageScanner();
-      setScannerMessage('Page Scanner opened. The recovery remains paused for your decision.');
+      setScannerMessage(await onScanPage());
     } catch (failure) {
       setScannerMessage(failure instanceof Error
         ? failure.message
-        : 'Page Scanner could not be opened for this paused runtime.');
+        : 'The paused runtime page could not be scanned.');
     } finally {
       setScannerBusy(false);
+    }
+  };
+
+  const testCandidate = async (
+    candidate: SmokeTestLocatorRecoveryCandidate,
+    action: 'CLICK' | 'INPUT',
+  ) => {
+    if (controlsBusy) return;
+    setTestPending({ candidateId: candidate.recoveryCandidateId, action });
+    setTestMessages(current => ({
+      ...current,
+      [candidate.recoveryCandidateId]: `Testing ${action.toLocaleLowerCase()} on the paused page...`,
+    }));
+    try {
+      const message = await onTestCandidate(candidate, action);
+      setTestMessages(current => ({ ...current, [candidate.recoveryCandidateId]: message }));
+    } catch (failure) {
+      setTestMessages(current => ({
+        ...current,
+        [candidate.recoveryCandidateId]: failure instanceof Error
+          ? failure.message
+          : `Test ${action.toLocaleLowerCase()} failed.`,
+      }));
+    } finally {
+      setTestPending(null);
     }
   };
 
@@ -131,7 +194,7 @@ const SmokeTestLocatorRecoveryModal: React.FC<Props> = ({
               aria-pressed={verificationEnabled}
               aria-label={`${verificationEnabled ? 'Disable' : 'Enable'} locator recovery verification`}
               title="Turn off to bypass this recovery and future unresolved elements"
-              disabled={busy || scannerBusy}
+              disabled={controlsBusy}
               onClick={() => onVerificationChange(!verificationEnabled)}
             >
               <Power size={15} aria-hidden="true" />
@@ -151,6 +214,7 @@ const SmokeTestLocatorRecoveryModal: React.FC<Props> = ({
             <thead>
               <tr>
                 <th>Select</th><th>Saved canonical</th><th>Saved client_named</th><th>OCR / mapped</th>
+                <th>Action</th><th>Test Input</th><th>Test Click</th>
                 <th>Previous XPath</th><th>Previous custom XPath</th><th>Previous CSS</th>
                 <th>New XPath</th><th>New CSS</th><th>Stable attributes</th>
                 <th>Previous page</th><th>Current page</th><th>Tag / type / role / action</th>
@@ -162,9 +226,9 @@ const SmokeTestLocatorRecoveryModal: React.FC<Props> = ({
             <tbody>
               {recovery.candidates.length === 0 && (
                 <tr>
-                  <td colSpan={21} className={styles.empty}>
-                    No safe recovery candidates were found on the current page. Bypass can skip
-                    this instruction and continue the evaluation without performing an action.
+                  <td colSpan={24} className={styles.empty}>
+                    No safe recovery candidates were found on the current page. Run Page Scanner
+                    to refresh the comparison, or bypass this instruction without performing an action.
                   </td>
                 </tr>
               )}
@@ -174,6 +238,50 @@ const SmokeTestLocatorRecoveryModal: React.FC<Props> = ({
                   <td>{candidate.savedCanonicalName || '—'}</td>
                   <td>{candidate.savedClientName || '—'}</td>
                   <td>{candidate.ocrMappedName || '—'}</td>
+                  <td className={styles.actionCell}>
+                    <WebElementTypeToggle
+                      value={(candidateActions[candidate.recoveryCandidateId]
+                        ?? candidate.expectedAction) as WebElementExecutionType}
+                      disabled={controlsBusy}
+                      onChange={(action) => setCandidateActions(current => ({
+                        ...current,
+                        [candidate.recoveryCandidateId]: action,
+                      }))}
+                    />
+                    {testMessages[candidate.recoveryCandidateId] && (
+                      <small title={testMessages[candidate.recoveryCandidateId]}>
+                        {testMessages[candidate.recoveryCandidateId]}
+                      </small>
+                    )}
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      className={`${styles.testButton} ${styles.inputButton}`}
+                      disabled={controlsBusy}
+                      title={`Test Input on ${candidateLabel(candidate)}`}
+                      onClick={() => void testCandidate(candidate, 'INPUT')}
+                    >
+                      {testPending?.candidateId === candidate.recoveryCandidateId && testPending.action === 'INPUT'
+                        ? <LoaderCircle className={styles.spin} size={15} aria-hidden="true" />
+                        : <TextCursorInput size={15} aria-hidden="true" />}
+                      <span><strong>Test</strong><small>Input</small></span>
+                    </button>
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      className={`${styles.testButton} ${styles.clickButton}`}
+                      disabled={controlsBusy}
+                      title={`Test Click on ${candidateLabel(candidate)}`}
+                      onClick={() => void testCandidate(candidate, 'CLICK')}
+                    >
+                      {testPending?.candidateId === candidate.recoveryCandidateId && testPending.action === 'CLICK'
+                        ? <LoaderCircle className={styles.spin} size={15} aria-hidden="true" />
+                        : <MousePointerClick size={15} aria-hidden="true" />}
+                      <span><strong>Test</strong><small>Click</small></span>
+                    </button>
+                  </td>
                   <td title={candidate.previousXPath}>{candidate.previousXPath || '—'}</td>
                   <td title={candidate.previousCustomXPath}>{candidate.previousCustomXPath || '—'}</td>
                   <td title={candidate.previousCss}>{candidate.previousCss || '—'}</td>
@@ -200,12 +308,12 @@ const SmokeTestLocatorRecoveryModal: React.FC<Props> = ({
         </div>
 
         <footer>
-          <button type="button" className={styles.scanner} disabled={busy || scannerBusy} onClick={() => void openPageScanner()}><ScanSearch size={15} /> {scannerBusy ? 'Opening...' : 'Page Scanner'}</button>
-          <button type="button" disabled={busy || scannerBusy} onClick={() => void decide(null, 'CANCEL')}>Cancel Recovery</button>
-          <button type="button" className={styles.stop} disabled={busy || scannerBusy} onClick={() => void decide(null, 'STOP')}><Octagon size={15} /> Stop Execution</button>
-          <button type="button" className={styles.bypass} disabled={busy || scannerBusy} onClick={() => void decide(null, 'BYPASS')}><SkipForward size={15} /> Bypass &amp; Continue</button>
-          <button type="button" className={styles.once} disabled={busy || scannerBusy || selected === null} onClick={() => void decide(selected, 'USE_ONCE')}>Use Once</button>
-          <button type="button" className={styles.save} disabled={busy || scannerBusy || selected === null} onClick={() => void decide(selected, 'USE_AND_SAVE')}><Save size={15} /> Use and Save Locator</button>
+          <button type="button" className={styles.scanner} disabled={controlsBusy} onClick={() => void scanPage()}><ScanSearch size={15} /> {scannerBusy ? 'Scanning...' : 'Page Scanner'}</button>
+          <button type="button" disabled={controlsBusy} onClick={() => void decide(null, 'CANCEL')}>Cancel Recovery</button>
+          <button type="button" className={styles.stop} disabled={controlsBusy} onClick={() => void decide(null, 'STOP')}><Octagon size={15} /> Stop Execution</button>
+          <button type="button" className={styles.bypass} disabled={controlsBusy} onClick={() => void decide(null, 'BYPASS')}><SkipForward size={15} /> Bypass &amp; Continue</button>
+          <button type="button" className={styles.once} disabled={controlsBusy || selected === null} onClick={() => void decide(selected, 'USE_ONCE')}>Use Once</button>
+          <button type="button" className={styles.save} disabled={controlsBusy || selected === null} onClick={() => void decide(selected, 'USE_AND_SAVE')}><Save size={15} /> Use and Save Locator</button>
         </footer>
       </div>
     </div>
