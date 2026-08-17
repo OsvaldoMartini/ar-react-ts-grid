@@ -431,8 +431,15 @@ const SmokeTestPage: React.FC<Props> = ({ socketPort, sessionId, onClose }) => {
 
   const requestRuntimeInstances = useCallback((control?: { runId: string; action: 'STOP' | 'KILL' }) => {
     const current = snapshotRef.current;
-    if (!connected || !webSocket || webSocket.readyState !== WebSocket.OPEN
-      || !current || runtimeInstancesPendingRef.current !== null) return false;
+    if (!connected || !webSocket || webSocket.readyState !== WebSocket.OPEN || !current) return false;
+    const activeRequest = runtimeInstancesPendingRef.current;
+    if (activeRequest !== null) {
+      // A periodic LIST refresh must never swallow an explicit operator STOP/KILL. Retire only
+      // that read request; its late response is correlation-bound and will be ignored. A control
+      // already in flight remains authoritative and continues to reject duplicate controls.
+      if (!control || activeRequest.kind !== 'LIST') return false;
+      clearRuntimeInstancesPending();
+    }
     requestSequenceRef.current += 1;
     const requestId = `${Date.now()}-smoke-runtime-instances-${requestSequenceRef.current}`;
     const kind = control ? 'CONTROL' : 'LIST';
