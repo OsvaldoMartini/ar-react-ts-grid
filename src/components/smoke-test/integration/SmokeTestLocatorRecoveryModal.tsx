@@ -131,7 +131,7 @@ const SmokeTestLocatorRecoveryModal: React.FC<Props> = ({
               aria-pressed={verificationEnabled}
               aria-label={`${verificationEnabled ? 'Disable' : 'Enable'} locator recovery verification`}
               title="Turn off to bypass this recovery and future unresolved elements"
-              disabled={busy}
+              disabled={busy || scannerBusy}
               onClick={() => onVerificationChange(!verificationEnabled)}
             >
               <Power size={15} aria-hidden="true" />
@@ -201,11 +201,11 @@ const SmokeTestLocatorRecoveryModal: React.FC<Props> = ({
 
         <footer>
           <button type="button" className={styles.scanner} disabled={busy || scannerBusy} onClick={() => void openPageScanner()}><ScanSearch size={15} /> {scannerBusy ? 'Opening...' : 'Page Scanner'}</button>
-          <button type="button" disabled={busy} onClick={() => void decide(null, 'CANCEL')}>Cancel Recovery</button>
-          <button type="button" className={styles.stop} disabled={busy} onClick={() => void decide(null, 'STOP')}><Octagon size={15} /> Stop Execution</button>
-          <button type="button" className={styles.bypass} disabled={busy} onClick={() => void decide(null, 'BYPASS')}><SkipForward size={15} /> Bypass &amp; Continue</button>
-          <button type="button" className={styles.once} disabled={busy || selected === null} onClick={() => void decide(selected, 'USE_ONCE')}>Use Once</button>
-          <button type="button" className={styles.save} disabled={busy || selected === null} onClick={() => void decide(selected, 'USE_AND_SAVE')}><Save size={15} /> Use and Save Locator</button>
+          <button type="button" disabled={busy || scannerBusy} onClick={() => void decide(null, 'CANCEL')}>Cancel Recovery</button>
+          <button type="button" className={styles.stop} disabled={busy || scannerBusy} onClick={() => void decide(null, 'STOP')}><Octagon size={15} /> Stop Execution</button>
+          <button type="button" className={styles.bypass} disabled={busy || scannerBusy} onClick={() => void decide(null, 'BYPASS')}><SkipForward size={15} /> Bypass &amp; Continue</button>
+          <button type="button" className={styles.once} disabled={busy || scannerBusy || selected === null} onClick={() => void decide(selected, 'USE_ONCE')}>Use Once</button>
+          <button type="button" className={styles.save} disabled={busy || scannerBusy || selected === null} onClick={() => void decide(selected, 'USE_AND_SAVE')}><Save size={15} /> Use and Save Locator</button>
         </footer>
       </div>
     </div>

@@ -98,6 +98,62 @@ test('submits Use and Save only for the selected server candidate', async () => 
   await waitFor(() => expect(onDecision).toHaveBeenCalledWith(selected, 'USE_AND_SAVE'));
 });
 
+test('serializes recovery decisions behind a pending Page Scanner open request', async () => {
+  let resolveScanner: (() => void) | undefined;
+  const onOpenPageScanner = jest.fn(() => new Promise<void>((resolve) => {
+    resolveScanner = resolve;
+  }));
+  const onDecision = jest.fn().mockResolvedValue(undefined);
+  render(
+    <SmokeTestLocatorRecoveryModal
+      instructionName="log_in"
+      recovery={recovery(candidate('a', 'Login'))}
+      onOpenPageScanner={onOpenPageScanner}
+      verificationEnabled
+      onVerificationChange={jest.fn()}
+      onDecision={onDecision}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: 'Page Scanner' }));
+  expect(screen.getByRole('button', { name: 'Opening...' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Cancel Recovery' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Stop Execution' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Bypass & Continue' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Use Once' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Use and Save Locator' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Disable locator recovery verification' }))
+    .toBeDisabled();
+  expect(onDecision).not.toHaveBeenCalled();
+
+  await act(async () => resolveScanner?.());
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Page Scanner' })).toBeEnabled());
+  expect(screen.getByRole('button', { name: 'Use Once' })).toBeEnabled();
+});
+
+test('shows a Page Scanner launch failure without settling or closing recovery', async () => {
+  const onDecision = jest.fn().mockResolvedValue(undefined);
+  render(
+    <SmokeTestLocatorRecoveryModal
+      instructionName="log_in"
+      recovery={recovery(candidate('a', 'Login'))}
+      onOpenPageScanner={jest.fn().mockRejectedValue(new Error('Scanner owner is stale.'))}
+      verificationEnabled
+      onVerificationChange={jest.fn()}
+      onDecision={onDecision}
+    />,
+  );
+
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Page Scanner' }));
+  });
+
+  expect(await screen.findByText('Scanner owner is stale.')).toBeVisible();
+  expect(screen.getByRole('dialog', { name: /Locator Recovery/ })).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Use Once' })).toBeEnabled();
+  expect(onDecision).not.toHaveBeenCalled();
+});
+
 test.each([
   ['Cancel Recovery', 'CANCEL'],
   ['Bypass & Continue', 'BYPASS'],
