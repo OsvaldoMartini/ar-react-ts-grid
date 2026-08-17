@@ -40,7 +40,49 @@ const candidate = (id: string, name: string): SmokeTestLocatorRecoveryCandidate 
 
 const recovery = (...candidates: SmokeTestLocatorRecoveryCandidate[]): SmokeTestLocatorRecovery => ({
   state: 'AWAITING_USER',
+  failedTarget: {
+    savedCanonicalName: 'avanti',
+    savedClientName: 'Continue',
+    ocrMappedName: '',
+    previousXPath: "//*[@id='avanti']",
+    previousCustomXPath: "//*[@data-action='avanti']",
+    previousCss: '#avanti',
+    previousStableAttributes: { id: 'avanti' },
+    previousPageIdentity: `url-v1:${'d'.repeat(64)}`,
+    currentPageIdentity: `url-v1:${'c'.repeat(64)}`,
+    tag: 'button',
+    type: 'button',
+    role: 'button',
+    expectedAction: 'CLICK',
+    diagnosticCode: 'TARGET_NOT_FOUND',
+  },
   candidates,
+});
+
+test('renders the unresolved instruction first and database matches after it', () => {
+  const firstDatabaseMatch = candidate('a', 'Continue from database');
+  const secondDatabaseMatch = candidate('b', 'Alternative from database');
+  render(
+    <SmokeTestLocatorRecoveryModal
+      instructionName="avanti"
+      recovery={recovery(firstDatabaseMatch, secondDatabaseMatch)}
+      onScanPage={jest.fn().mockResolvedValue('Page Scanner completed.')}
+      onTestCandidate={jest.fn().mockResolvedValue('Candidate test completed.')}
+      verificationEnabled
+      onVerificationChange={jest.fn()}
+      onDecision={jest.fn().mockResolvedValue(undefined)}
+    />,
+  );
+
+  const rows = screen.getAllByRole('row');
+  expect(rows[1]).toHaveTextContent('avanti');
+  expect(rows[1]).toHaveTextContent('Target not located');
+  expect(rows[2]).toHaveTextContent('Continue from database');
+  expect(rows[3]).toHaveTextContent('Alternative from database');
+  expect(screen.getAllByRole('radio')).toHaveLength(2);
+
+  const headers = screen.getAllByRole('columnheader').map(header => header.textContent);
+  expect(headers.indexOf('XPath match')).toBe(headers.indexOf('Test Click') + 1);
 });
 
 test('shows comparison evidence and submits the explicitly selected candidate once', async () => {

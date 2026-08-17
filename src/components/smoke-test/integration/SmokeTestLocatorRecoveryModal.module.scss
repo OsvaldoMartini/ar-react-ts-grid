@@ -19,6 +19,9 @@
 .tableViewport th, .tableViewport td { max-width: 250px; padding: 7px 8px; border-right: 1px solid #d8e3eb; border-bottom: 1px solid #d8e3eb; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tableViewport thead th { position: sticky; top: 0; z-index: 2; text-align: left; color: #17324d; background: #dcecf7; }
 .tableViewport tbody tr[data-selected=true] { background: #e7faff; box-shadow: inset 3px 0 #08a5be; }
+.tableViewport tbody .failedTargetRow { background: #fff4e6; box-shadow: inset 4px 0 #d17a08; }
+.targetBadge { display: inline-flex; align-items: center; justify-content: center; padding: 4px 7px; color: #fff; border-radius: 999px; background: #bd2933; font-size: 10px; font-weight: 900; letter-spacing: .04em; text-transform: uppercase; box-shadow: 0 0 10px rgba(189, 41, 51, .38); }
+.notAvailable { color: #718393; font-weight: 800; }
 .tableViewport td.empty { padding: 28px; text-align: center; color: #526f83; white-space: normal; background: #f7fbfe; }
 .tableViewport td small { display: block; margin-top: 3px; font-weight: 400; color: #58748a; }
 .actionCell { min-width: 138px; white-space: normal !important; }

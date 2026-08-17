@@ -284,6 +284,22 @@ test('parses an owner-correlated locator recovery comparison without treating it
     replayed: false,
     recovery: {
       state: 'AWAITING_USER',
+      failedTarget: {
+        savedCanonicalName: 'login',
+        savedClientName: 'Banca Stato Login',
+        ocrMappedName: '',
+        previousXPath: '//*[@id="authored-login"]',
+        previousCustomXPath: '',
+        previousCss: '#authored-login',
+        previousStableAttributes: { id: 'authored-login' },
+        previousPageIdentity: `url-v1:${'c'.repeat(64)}`,
+        currentPageIdentity: `url-v1:${'c'.repeat(64)}`,
+        tag: 'button',
+        type: 'button',
+        role: 'button',
+        expectedAction: 'CLICK',
+        diagnosticCode: 'TARGET_NOT_FOUND',
+      },
       candidates: [{
         recoveryCandidateId: 'a'.repeat(64),
         registryCandidateId: 91,
@@ -326,6 +342,8 @@ test('parses an owner-correlated locator recovery comparison without treating it
 
   expect(result.code).toBe('TARGET_NOT_FOUND');
   expect(result.recovery?.state).toBe('AWAITING_USER');
+  expect(result.recovery?.failedTarget?.savedCanonicalName).toBe('login');
+  expect(result.recovery?.failedTarget?.diagnosticCode).toBe('TARGET_NOT_FOUND');
   expect(result.recovery?.candidates[0]?.matches.xpath).toBe(false);
   expect(result.recovery?.candidates[0]?.matches.customXPath).toBeNull();
   expect(result.recovery?.candidates[0]?.matches.frame).toBeNull();

@@ -146,8 +146,26 @@ export type SmokeTestLocatorRecoveryCandidate = {
   }>;
 };
 
+export type SmokeTestLocatorRecoveryFailedTarget = {
+  savedCanonicalName: string;
+  savedClientName: string;
+  ocrMappedName: string;
+  previousXPath: string;
+  previousCustomXPath: string;
+  previousCss: string;
+  previousStableAttributes: Readonly<Record<string, string>>;
+  previousPageIdentity: string;
+  currentPageIdentity: string;
+  tag: string;
+  type: string;
+  role: string;
+  expectedAction: 'CLICK' | 'INPUT' | 'OUTPUT';
+  diagnosticCode: string;
+};
+
 export type SmokeTestLocatorRecovery = {
   state: 'AWAITING_USER';
+  failedTarget?: SmokeTestLocatorRecoveryFailedTarget | null;
   candidates: readonly SmokeTestLocatorRecoveryCandidate[];
 };
 
@@ -250,6 +268,31 @@ const parseRecovery = (value: unknown): SmokeTestLocatorRecovery | null => {
   if (recovery.state !== 'AWAITING_USER' || !Array.isArray(recovery.candidates)) {
     throw new Error('Integration locator recovery is invalid.');
   }
+  const failedTarget = recovery.failedTarget == null ? null : (() => {
+    const target = objectValue(recovery.failedTarget, 'Unresolved recovery target');
+    const expectedAction = stringValue(target.expectedAction, 'Unresolved expected action');
+    if (!['CLICK', 'INPUT', 'OUTPUT'].includes(expectedAction)) {
+      throw new Error('Unresolved expected action is invalid.');
+    }
+    return Object.freeze({
+      savedCanonicalName: stringValue(target.savedCanonicalName, 'Unresolved canonical name', true),
+      savedClientName: stringValue(target.savedClientName, 'Unresolved client name', true),
+      ocrMappedName: stringValue(target.ocrMappedName, 'Unresolved OCR name', true),
+      previousXPath: stringValue(target.previousXPath, 'Unresolved XPath', true),
+      previousCustomXPath: stringValue(target.previousCustomXPath, 'Unresolved custom XPath', true),
+      previousCss: stringValue(target.previousCss, 'Unresolved CSS', true),
+      previousStableAttributes: textRecord(
+        target.previousStableAttributes, 'Unresolved stable attributes',
+      ),
+      previousPageIdentity: stringValue(target.previousPageIdentity, 'Unresolved previous page'),
+      currentPageIdentity: stringValue(target.currentPageIdentity, 'Unresolved current page'),
+      tag: stringValue(target.tag, 'Unresolved tag', true),
+      type: stringValue(target.type, 'Unresolved type', true),
+      role: stringValue(target.role, 'Unresolved role', true),
+      expectedAction: expectedAction as SmokeTestLocatorRecoveryFailedTarget['expectedAction'],
+      diagnosticCode: stringValue(target.diagnosticCode, 'Unresolved diagnostic'),
+    });
+  })();
   const candidates = recovery.candidates.map((raw, index) => {
     const candidate = objectValue(raw, `Recovery candidate ${index + 1}`);
     const expectedAction = stringValue(candidate.expectedAction, 'Recovery expected action');
@@ -293,7 +336,11 @@ const parseRecovery = (value: unknown): SmokeTestLocatorRecovery | null => {
       }),
     });
   });
-  return Object.freeze({ state: 'AWAITING_USER' as const, candidates: Object.freeze(candidates) });
+  return Object.freeze({
+    state: 'AWAITING_USER' as const,
+    failedTarget,
+    candidates: Object.freeze(candidates),
+  });
 };
 
 const contractBody = (payload: unknown, operation: string): JsonObject => {

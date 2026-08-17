@@ -21,6 +21,7 @@ import type {
   SmokeTestLocatorRecoveryAction,
   SmokeTestLocatorRecoveryCandidate,
   SmokeTestLocatorRecoveryDecision,
+  SmokeTestLocatorRecoveryFailedTarget,
 } from './smokeTestIntegration.contract';
 import styles from './SmokeTestLocatorRecoveryModal.module.scss';
 
@@ -79,6 +80,22 @@ const SmokeTestLocatorRecoveryModal: React.FC<Props> = ({
     [recovery.candidates, selectedId],
   );
   const controlsBusy = busy || scannerBusy || testPending !== null;
+  const failedTarget: SmokeTestLocatorRecoveryFailedTarget = recovery.failedTarget ?? {
+    savedCanonicalName: instructionName,
+    savedClientName: '',
+    ocrMappedName: '',
+    previousXPath: '',
+    previousCustomXPath: '',
+    previousCss: '',
+    previousStableAttributes: {},
+    previousPageIdentity: 'Unavailable',
+    currentPageIdentity: 'Unavailable',
+    tag: '',
+    type: '',
+    role: '',
+    expectedAction: 'CLICK',
+    diagnosticCode: 'TARGET_NOT_FOUND',
+  };
 
   useEffect(() => {
     if (recovery.candidates.some(candidate => candidate.recoveryCandidateId === selectedId)) return;
@@ -215,20 +232,50 @@ const SmokeTestLocatorRecoveryModal: React.FC<Props> = ({
               <tr>
                 <th>Select</th><th>Saved canonical</th><th>Saved client_named</th><th>OCR / mapped</th>
                 <th>Action</th><th>Test Input</th><th>Test Click</th>
+                <th>XPath match</th>
                 <th>Previous XPath</th><th>Previous custom XPath</th><th>Previous CSS</th>
                 <th>New XPath</th><th>New CSS</th><th>Stable attributes</th>
                 <th>Previous page</th><th>Current page</th><th>Tag / type / role / action</th>
                 <th>Confidence / reasons</th><th>Warnings</th>
-                <th>XPath match</th><th>Custom XPath match</th><th>CSS match</th>
+                <th>Custom XPath match</th><th>CSS match</th>
                 <th>Attributes match</th><th>Frame match</th><th>Shadow match</th>
               </tr>
             </thead>
             <tbody>
+              <tr className={styles.failedTargetRow} data-testid="locator-recovery-failed-target">
+                <td><span className={styles.targetBadge}>Target</span></td>
+                <td>{failedTarget.savedCanonicalName || instructionName}</td>
+                <td>{failedTarget.savedClientName || '—'}</td>
+                <td>{failedTarget.ocrMappedName || '—'}</td>
+                <td>{failedTarget.expectedAction}</td>
+                <td><span className={styles.notAvailable}>—</span></td>
+                <td><span className={styles.notAvailable}>—</span></td>
+                <td><Match value={null} label="XPath" /></td>
+                <td title={failedTarget.previousXPath}>{failedTarget.previousXPath || '—'}</td>
+                <td title={failedTarget.previousCustomXPath}>{failedTarget.previousCustomXPath || '—'}</td>
+                <td title={failedTarget.previousCss}>{failedTarget.previousCss || '—'}</td>
+                <td>—</td><td>—</td>
+                <td title={attributes(failedTarget.previousStableAttributes)}>
+                  {attributes(failedTarget.previousStableAttributes)}
+                </td>
+                <td title={failedTarget.previousPageIdentity}>{failedTarget.previousPageIdentity}</td>
+                <td title={failedTarget.currentPageIdentity}>{failedTarget.currentPageIdentity}</td>
+                <td>{[
+                  failedTarget.tag, failedTarget.type, failedTarget.role, failedTarget.expectedAction,
+                ].filter(Boolean).join(' · ')}</td>
+                <td><strong>Target not located</strong><small>Awaiting database or Page Scanner match</small></td>
+                <td>{failedTarget.diagnosticCode}</td>
+                <td><Match value={null} label="Custom XPath" /></td>
+                <td><Match value={null} label="CSS" /></td>
+                <td><Match value={null} label="Stable attributes" /></td>
+                <td><Match value={null} label="Frame" /></td>
+                <td><Match value={null} label="Shadow" /></td>
+              </tr>
               {recovery.candidates.length === 0 && (
                 <tr>
                   <td colSpan={24} className={styles.empty}>
-                    No safe recovery candidates were found on the current page. Run Page Scanner
-                    to refresh the comparison, or bypass this instruction without performing an action.
+                    No safe recovery candidates were found. The unresolved target remains above.
+                    Run Page Scanner to refresh database/live-page comparisons, or bypass this instruction.
                   </td>
                 </tr>
               )}
@@ -282,6 +329,7 @@ const SmokeTestLocatorRecoveryModal: React.FC<Props> = ({
                       <span><strong>Test</strong><small>Click</small></span>
                     </button>
                   </td>
+                  <td><Match value={candidate.matches.xpath} label="XPath" /></td>
                   <td title={candidate.previousXPath}>{candidate.previousXPath || '—'}</td>
                   <td title={candidate.previousCustomXPath}>{candidate.previousCustomXPath || '—'}</td>
                   <td title={candidate.previousCss}>{candidate.previousCss || '—'}</td>
@@ -295,7 +343,6 @@ const SmokeTestLocatorRecoveryModal: React.FC<Props> = ({
                   <td>{[candidate.tag, candidate.type, candidate.role, candidate.expectedAction].filter(Boolean).join(' · ')}</td>
                   <td><strong>{Math.round(candidate.confidence * 100)}%</strong><small>{candidate.reasons.join(' · ') || 'No strong evidence'}</small></td>
                   <td>{candidate.ambiguityWarnings.join(' · ') || '—'}</td>
-                  <td><Match value={candidate.matches.xpath} label="XPath" /></td>
                   <td><Match value={candidate.matches.customXPath} label="Custom XPath" /></td>
                   <td><Match value={candidate.matches.css} label="CSS" /></td>
                   <td><Match value={candidate.matches.stableAttributes} label="Stable attributes" /></td>
