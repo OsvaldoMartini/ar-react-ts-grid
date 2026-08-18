@@ -153,7 +153,6 @@ const SmokeTestLocatorRecoveryModal: React.FC<Props> = ({
     candidate: SmokeTestLocatorRecoveryCandidate | null,
     decision: SmokeTestLocatorRecoveryDecision | 'STOP',
   ) => {
-    if (controlsBusy) return;
     setBusy(true);
     try {
       await onDecision(
@@ -162,13 +161,16 @@ const SmokeTestLocatorRecoveryModal: React.FC<Props> = ({
         candidate === null ? undefined : candidateActions[candidate.recoveryCandidateId]
           ?? candidate.expectedAction,
       );
+    } catch (failure) {
+      setScannerMessage(failure instanceof Error
+        ? failure.message
+        : 'The Locator Recovery decision could not be completed.');
     } finally {
       setBusy(false);
     }
   };
 
   const scanPage = async () => {
-    if (controlsBusy) return;
     setScannerBusy(true);
     setScannerMessage('Scanning the paused runtime page and refreshing recovery candidates...');
     try {
@@ -186,7 +188,6 @@ const SmokeTestLocatorRecoveryModal: React.FC<Props> = ({
     candidate: SmokeTestLocatorRecoveryCandidate,
     action: 'CLICK' | 'INPUT',
   ) => {
-    if (controlsBusy) return;
     setTestPending({ candidateId: candidate.recoveryCandidateId, action });
     setTestMessages(current => ({
       ...current,

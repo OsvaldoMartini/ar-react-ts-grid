@@ -63,9 +63,9 @@ const SmokeTestLocatorRecoveryHelpModal: React.FC<Props> = ({ onClose }) => {
         className={styles.dialog}
         onKeyDown={event => {
           if (event.key !== 'Tab') return;
-          const controls = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>(
+          const controls = Array.from(dialogRef.current!.querySelectorAll<HTMLElement>(
             'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
-          ) || []);
+          ));
           if (!controls.length) return;
           const first = controls[0];
           const last = controls[controls.length - 1];

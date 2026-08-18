@@ -319,3 +319,247 @@ test('allows an empty recovery to be explicitly bypassed and contains keyboard f
   expect(screen.getByRole('button', { name: 'Disable locator recovery verification' }))
     .toHaveFocus();
 });
+
+test('renders the bounded failed-target fallback and toggles verification both ways', () => {
+  const onVerificationChange = jest.fn();
+  const fallbackRecovery: SmokeTestLocatorRecovery = {
+    state: 'AWAITING_USER',
+    candidates: [],
+  };
+  const { rerender } = render(
+    <SmokeTestLocatorRecoveryModal
+      instructionName="missing_target"
+      recovery={fallbackRecovery}
+      onScanPage={jest.fn().mockResolvedValue('Page Scanner completed.')}
+      onTestCandidate={jest.fn().mockResolvedValue('Candidate test completed.')}
+      verificationEnabled
+      onVerificationChange={onVerificationChange}
+      onDecision={jest.fn().mockResolvedValue(undefined)}
+    />,
+  );
+
+  expect(screen.getByTestId('locator-recovery-failed-target')).toHaveTextContent('missing_target');
+  expect(screen.getByTestId('locator-recovery-failed-target')).toHaveTextContent('Unavailable');
+  fireEvent.click(screen.getByRole('button', { name: 'Disable locator recovery verification' }));
+  expect(onVerificationChange).toHaveBeenLastCalledWith(false);
+
+  rerender(
+    <SmokeTestLocatorRecoveryModal
+      instructionName="missing_target"
+      recovery={fallbackRecovery}
+      onScanPage={jest.fn().mockResolvedValue('Page Scanner completed.')}
+      onTestCandidate={jest.fn().mockResolvedValue('Candidate test completed.')}
+      verificationEnabled={false}
+      onVerificationChange={onVerificationChange}
+      onDecision={jest.fn().mockResolvedValue(undefined)}
+    />,
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Enable locator recovery verification' }));
+  expect(onVerificationChange).toHaveBeenLastCalledWith(true);
+});
+
+test('moves selection to the first replacement candidate after a scanner refresh', async () => {
+  const first = candidate('a', 'First');
+  const replacement = candidate('b', 'Replacement');
+  const onDecision = jest.fn().mockResolvedValue(undefined);
+  const props = {
+    instructionName: 'continue',
+    onScanPage: jest.fn().mockResolvedValue('Page Scanner completed.'),
+    onTestCandidate: jest.fn().mockResolvedValue('Candidate test completed.'),
+    verificationEnabled: true,
+    onVerificationChange: jest.fn(),
+    onDecision,
+  };
+  const { rerender } = render(
+    <SmokeTestLocatorRecoveryModal {...props} recovery={recovery(first)} />,
+  );
+
+  rerender(<SmokeTestLocatorRecoveryModal {...props} recovery={recovery(replacement)} />);
+  await waitFor(() => expect(screen.getByRole('radio')).toBeChecked());
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Use Once' })));
+  expect(onDecision).toHaveBeenCalledWith(replacement, 'USE_ONCE', 'CLICK');
+});
+
+test('reports non-Error scanner and candidate failures without settling recovery', async () => {
+  const unnamed = {
+    ...candidate('a', ''),
+    savedClientName: '',
+    ocrMappedName: '',
+    newStableAttributes: {},
+    previousStableAttributes: {},
+  };
+  const onDecision = jest.fn().mockResolvedValue(undefined);
+  const onTestCandidate = jest.fn()
+    .mockRejectedValueOnce(new Error('Input probe failed.'))
+    .mockRejectedValueOnce('click-failure');
+  render(
+    <SmokeTestLocatorRecoveryModal
+      instructionName="missing_target"
+      recovery={recovery(unnamed)}
+      onScanPage={jest.fn().mockRejectedValue('scanner-failure')}
+      onTestCandidate={onTestCandidate}
+      verificationEnabled
+      onVerificationChange={jest.fn()}
+      onDecision={onDecision}
+    />,
+  );
+
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Page Scanner' })));
+  expect(await screen.findByText('The paused runtime page could not be scanned.')).toBeVisible();
+
+  await act(async () => fireEvent.click(screen.getByTitle('Test Input on candidate')));
+  expect(await screen.findByText('Input probe failed.')).toBeVisible();
+  await act(async () => fireEvent.click(screen.getByTitle('Test Click on candidate')));
+  expect(await screen.findByText('Test click failed.')).toBeVisible();
+  expect(onDecision).not.toHaveBeenCalled();
+});
+
+test('releases decision busy state after a rejected terminal request', async () => {
+  const onDecision = jest.fn()
+    .mockRejectedValueOnce(new Error('Decision failed.'))
+    .mockRejectedValueOnce('decision-failure');
+  render(
+    <SmokeTestLocatorRecoveryModal
+      instructionName="log_in"
+      recovery={recovery(candidate('a', 'Login'))}
+      onScanPage={jest.fn().mockResolvedValue('Page Scanner completed.')}
+      onTestCandidate={jest.fn().mockResolvedValue('Candidate test completed.')}
+      verificationEnabled
+      onVerificationChange={jest.fn()}
+      onDecision={onDecision}
+    />,
+  );
+
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Use Once' }));
+  });
+  expect(await screen.findByText('Decision failed.')).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Use Once' })).toBeEnabled();
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Use Once' })));
+  expect(await screen.findByText('The Locator Recovery decision could not be completed.')).toBeVisible();
+});
+
+test('renders empty candidate evidence with deterministic fallbacks', () => {
+  const emptyEvidence = {
+    ...candidate('a', ''),
+    savedClientName: '',
+    ocrMappedName: '',
+    previousXPath: '',
+    previousCustomXPath: '',
+    previousCss: '',
+    newXPath: '',
+    newCss: '',
+    previousStableAttributes: {},
+    newStableAttributes: {},
+    tag: '',
+    type: '',
+    role: '',
+    reasons: [],
+    ambiguityWarnings: [],
+  };
+  const failed = recovery(emptyEvidence);
+  failed.failedTarget = { ...failed.failedTarget!, savedCanonicalName: '' };
+  render(
+    <SmokeTestLocatorRecoveryModal
+      instructionName="fallback_name"
+      recovery={failed}
+      onScanPage={jest.fn().mockResolvedValue('Page Scanner completed.')}
+      onTestCandidate={jest.fn().mockResolvedValue('Candidate test completed.')}
+      verificationEnabled
+      onVerificationChange={jest.fn()}
+      onDecision={jest.fn().mockResolvedValue(undefined)}
+    />,
+  );
+
+  expect(screen.getByTestId('locator-recovery-failed-target')).toHaveTextContent('fallback_name');
+  expect(screen.getByText('No strong evidence')).toBeVisible();
+});
+
+test('contains focus in both directions and closes help by Escape or backdrop only', async () => {
+  render(
+    <SmokeTestLocatorRecoveryModal
+      instructionName="log_in"
+      recovery={recovery(candidate('a', 'Login'))}
+      onScanPage={jest.fn().mockResolvedValue('Page Scanner completed.')}
+      onTestCandidate={jest.fn().mockResolvedValue('Candidate test completed.')}
+      verificationEnabled
+      onVerificationChange={jest.fn()}
+      onDecision={jest.fn().mockResolvedValue(undefined)}
+    />,
+  );
+
+  const first = screen.getByRole('button', { name: 'Disable locator recovery verification' });
+  const last = screen.getByRole('button', { name: 'Open Locator Recovery rules' });
+  first.focus();
+  fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
+  expect(last).toHaveFocus();
+  last.focus();
+  fireEvent.keyDown(document, { key: 'Tab' });
+  expect(first).toHaveFocus();
+
+  fireEvent.click(last);
+  let rules = screen.getByRole('dialog', { name: 'Locator Recovery rules' });
+  fireEvent.mouseDown(rules);
+  expect(rules).toBeVisible();
+  fireEvent.keyDown(document, { key: 'Escape' });
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Locator Recovery rules' })).not.toBeInTheDocument());
+
+  fireEvent.click(last);
+  rules = screen.getByRole('dialog', { name: 'Locator Recovery rules' });
+  const close = screen.getByRole('button', { name: 'Close Locator Recovery rules' });
+  close.focus();
+  fireEvent.keyDown(rules, { key: 'Tab' });
+  expect(close).toHaveFocus();
+  fireEvent.keyDown(rules, { key: 'Tab', shiftKey: true });
+  expect(close).toHaveFocus();
+  rules.setAttribute('tabindex', '-1');
+  rules.focus();
+  fireEvent.keyDown(rules, { key: 'Tab', shiftKey: true });
+  fireEvent.keyDown(rules, { key: 'Tab' });
+  fireEvent.mouseDown(rules.parentElement as HTMLElement);
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Locator Recovery rules' })).not.toBeInTheDocument());
+});
+
+test('keeps focus on the recovery dialog when no enabled control is available', () => {
+  render(
+    <SmokeTestLocatorRecoveryModal
+      instructionName="log_in"
+      recovery={recovery(candidate('a', 'Login'))}
+      onScanPage={jest.fn().mockResolvedValue('Page Scanner completed.')}
+      onTestCandidate={jest.fn().mockResolvedValue('Candidate test completed.')}
+      verificationEnabled
+      onVerificationChange={jest.fn()}
+      onDecision={jest.fn().mockResolvedValue(undefined)}
+    />,
+  );
+
+  const dialog = screen.getByRole('dialog', { name: /Locator Recovery/ });
+  const querySelectorAll = dialog.querySelectorAll.bind(dialog);
+  dialog.querySelectorAll = jest.fn(() => []) as unknown as typeof dialog.querySelectorAll;
+  fireEvent.keyDown(document, { key: 'Tab' });
+  expect(dialog).toHaveFocus();
+  dialog.querySelectorAll = querySelectorAll;
+});
+
+test('ignores unrelated help keys and safely handles an empty help focus set', () => {
+  render(
+    <SmokeTestLocatorRecoveryModal
+      instructionName="log_in"
+      recovery={recovery(candidate('a', 'Login'))}
+      onScanPage={jest.fn().mockResolvedValue('Page Scanner completed.')}
+      onTestCandidate={jest.fn().mockResolvedValue('Candidate test completed.')}
+      verificationEnabled
+      onVerificationChange={jest.fn()}
+      onDecision={jest.fn().mockResolvedValue(undefined)}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: 'Open Locator Recovery rules' }));
+  const rules = screen.getByRole('dialog', { name: 'Locator Recovery rules' });
+  fireEvent.keyDown(rules, { key: 'ArrowDown' });
+  const querySelectorAll = rules.querySelectorAll.bind(rules);
+  rules.querySelectorAll = jest.fn(() => []) as unknown as typeof rules.querySelectorAll;
+  fireEvent.keyDown(rules, { key: 'Tab' });
+  expect(rules).toBeVisible();
+  rules.querySelectorAll = querySelectorAll;
+});
