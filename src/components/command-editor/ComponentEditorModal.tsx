@@ -1,0 +1,736 @@
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { PencilLine, X } from 'lucide-react';
+import SearchBox, { type SearchBoxOption } from '../SearchBox';
+import InstructionCommandBadge from '../bot-job-details/grid/InstructionCommandBadge';
+import { instructionCommandPresentation } from '../bot-job-details/grid/domain/instructionCommandPresentation';
+import type {
+  ComponentEditorBlockOption,
+  ComponentEditorCommand,
+  ComponentEditorVariableOption,
+  ComponentEditorVariableSlot,
+} from './componentEditor.types';
+import { commandEditorPlacementOptions } from './commandEditorPlacement';
+import { commandEditorPlacementFromValue } from './commandEditorPlacement';
+import { COMMAND_EDITOR_COMMAND_OPTIONS } from './commandEditorCommandOptions';
+import { canonicalInstructionAction } from '../bot-job-details/grid/domain/instructionRelationshipPolicy';
+import {
+  commandEditorBaseDraft,
+  commandEditorConfiguration,
+  isCommandEditorBaseDraftValid,
+} from './commandEditorDraft';
+import LoopCommandEditor from './editors/LoopCommandEditor';
+import RefreshLoopCommandEditor from './editors/RefreshLoopCommandEditor';
+import WaitCommandEditor from './editors/WaitCommandEditor';
+import CheckValueCommandEditor from './editors/CheckValueCommandEditor';
+import ExternalCheckCommandEditor from './editors/ExternalCheckCommandEditor';
+import ExcelWriteCommandEditor from './editors/ExcelWriteCommandEditor';
+import GotoCommandEditor from './editors/GotoCommandEditor';
+import SwipeCommandEditor from './editors/SwipeCommandEditor';
+import ConditionalCommandEditor from './editors/ConditionalCommandEditor';
+import CommandVariableBindingsEditor from './editors/CommandVariableBindingsEditor';
+import CommandEditorRelationshipWarningModal from './CommandEditorRelationshipWarningModal';
+import CommandEditorConditionalFamilyWarningModal from './CommandEditorConditionalFamilyWarningModal';
+import {
+  commandEditorConditionalFamilyImpact,
+  isCommandEditorConditionalBoundary,
+  type CommandEditorConditionalFamilyImpact,
+} from './commandEditorConditionalFamilyImpact';
+import {
+  commandEditorRelationshipImpact,
+  hasCommandEditorRelationshipImpact,
+  type CommandEditorRelationshipImpact,
+} from './commandEditorRelationshipImpact';
+import type {
+  CommandEditorMutationAction,
+  CommandEditorMutationIntent,
+} from './commandEditorMutation';
+import {
+  commandEditorVariableBindings,
+  updateCommandEditorVariableBinding,
+} from './commandEditorVariableBindings';
+import styles from './ComponentEditorModal.module.scss';
+
+export interface ComponentEditorModalStatus {
+  level: 'ok' | 'warn' | 'error';
+  text: string;
+}
+
+export interface ComponentEditorModalProps {
+  botJobId: number;
+  botJobName: string;
+  scopeLabel: string;
+  status?: ComponentEditorModalStatus | null;
+  blocks: readonly ComponentEditorBlockOption[];
+  connectionCount: number;
+  diagnosticCount: number;
+  command: ComponentEditorCommand;
+  commands: readonly ComponentEditorCommand[];
+  variables?: readonly ComponentEditorVariableOption[];
+  returnFocusElement?: HTMLElement | null;
+  children?: React.ReactNode;
+  pending?: boolean;
+  onSubmit?: (intent: CommandEditorMutationIntent) => void;
+  enabledActions?: readonly CommandEditorMutationAction[];
+  mode?: 'EDIT' | 'CREATE';
+  lockCommandSelection?: boolean;
+  onClose: () => void;
+}
+
+const focusableSelector = [
+  'button:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[href]',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',');
+
+const ComponentEditorModal: React.FC<ComponentEditorModalProps> = ({
+  botJobId,
+  botJobName,
+  scopeLabel,
+  status = null,
+  blocks,
+  connectionCount,
+  diagnosticCount,
+  command,
+  commands,
+  variables = [],
+  returnFocusElement = null,
+  children,
+  pending = false,
+  onSubmit,
+  enabledActions = ['UPDATE', 'COPY_NEW'],
+  mode = 'EDIT',
+  lockCommandSelection = false,
+  onClose,
+}) => {
+  const titleId = useId();
+  const descriptionId = useId();
+  const dialogRef = useRef<HTMLElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const initialTargetBlockId = command.blockId ?? 0;
+  const [targetBlockId, setTargetBlockId] = useState(initialTargetBlockId);
+  const [placementValue, setPlacementValue] = useState(
+    mode === 'CREATE' ? (initialTargetBlockId > 0 ? 'TOP' : 'END') : 'KEEP',
+  );
+  const originalCommandCode = canonicalInstructionAction(command.action);
+  const [selectedCommandCode, setSelectedCommandCode] = useState(originalCommandCode);
+  const [draft, setDraft] = useState(() => commandEditorBaseDraft(command));
+  const [variableBindings, setVariableBindings] = useState(() =>
+    commandEditorVariableBindings(command, command.action));
+  const commandChanged = selectedCommandCode !== originalCommandCode;
+  const [relationshipWarning, setRelationshipWarning] = useState<{
+    impact: CommandEditorRelationshipImpact;
+    intent: CommandEditorMutationIntent;
+  } | null>(null);
+  const [conditionalFamilyWarning, setConditionalFamilyWarning] = useState<{
+    impact: CommandEditorConditionalFamilyImpact;
+    intent: CommandEditorMutationIntent;
+  } | null>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(
+    returnFocusElement
+    ?? (typeof document !== 'undefined'
+      && document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null),
+  );
+
+  const blockSearchOptions = useMemo<SearchBoxOption[]>(() => blocks.map(block => ({
+    value: String(block.blockId),
+    label: `#${block.blockOrder} ${block.blockName}`,
+    sublabel: `${block.commandCount} command(s) · block ID ${block.blockId}`,
+    badges: [block.active === false
+      ? { text: 'INACTIVE', tone: 'red' as const }
+      : { text: 'ACTIVE', tone: 'green' as const }],
+    keywords: `${block.blockId} ${block.blockOrder} ${block.blockName}`,
+  })), [blocks]);
+  const commandSearchOptions = useMemo<SearchBoxOption[]>(() => {
+    const catalog = COMMAND_EDITOR_COMMAND_OPTIONS.some(
+      option => option.code === originalCommandCode,
+    )
+      ? COMMAND_EDITOR_COMMAND_OPTIONS
+      : [
+          { code: originalCommandCode, label: command.action || originalCommandCode },
+          ...COMMAND_EDITOR_COMMAND_OPTIONS,
+        ];
+    return catalog
+      .filter(option => mode === 'CREATE'
+        || !isCommandEditorConditionalBoundary(option.code)
+        || option.code === originalCommandCode)
+      .map(option => ({
+      value: option.code,
+      label: option.label,
+      icon: <InstructionCommandBadge action={option.code} iconOnly />,
+      sublabel: `command code ${option.code}`,
+      badges: option.code === originalCommandCode
+        ? [{ text: 'CURRENT', tone: 'green' as const }]
+        : [],
+      keywords: `${option.code} ${option.label}`,
+      }));
+  }, [command.action, mode, originalCommandCode]);
+  const selectCommand = (value: string | null) => {
+    if (lockCommandSelection) return;
+    if (value === null || value === selectedCommandCode) return;
+    setSelectedCommandCode(value);
+    setVariableBindings(commandEditorVariableBindings(command, value));
+    setDraft(current => value === originalCommandCode
+      ? commandEditorBaseDraft(command)
+      : {
+          ...current,
+          action: value,
+          operation: '',
+          configuration: commandEditorConfiguration(value, '', null, null),
+        });
+  };
+  const targetBlock = blocks.find(block => block.blockId === targetBlockId) ?? null;
+  const targetCommandCount = commands.filter(
+    candidate => candidate.blockId === targetBlockId,
+  ).length;
+  const conditionalImpactPreview = useMemo(
+    () => mode === 'EDIT'
+      ? commandEditorConditionalFamilyImpact(command, selectedCommandCode, commands)
+      : null,
+    [command, commands, mode, selectedCommandCode],
+  );
+  const conditionalPositionLocked = mode === 'EDIT'
+    && isCommandEditorConditionalBoundary(originalCommandCode)
+    && !commandChanged;
+  const placementOptions = useMemo(
+    () => {
+      const options = commandEditorPlacementOptions(
+        command,
+        targetBlockId,
+        commands,
+        conditionalImpactPreview?.boundariesToDelete.map(
+          boundary => boundary.instructionId,
+        ) ?? [],
+      );
+      return mode === 'CREATE'
+        ? options.filter(option => option.placement.kind !== 'KEEP')
+        : conditionalPositionLocked
+        ? options.filter(option => option.placement.kind === 'KEEP')
+        : options;
+    }, [
+      command,
+      commands,
+      conditionalImpactPreview,
+      conditionalPositionLocked,
+      mode,
+      targetBlockId,
+    ],
+  );
+
+  useEffect(() => {
+    if (!conditionalPositionLocked) return;
+    setTargetBlockId(command.blockId ?? 0);
+    setPlacementValue('KEEP');
+  }, [command.blockId, conditionalPositionLocked]);
+
+  useEffect(() => {
+    if (placementOptions.some(option => option.value === placementValue)) return;
+    const fallback = placementOptions.find(option => option.value === 'KEEP')
+      ?? placementOptions.find(option => option.value === 'END')
+      ?? placementOptions[0];
+    if (fallback) setPlacementValue(fallback.value);
+  }, [placementOptions, placementValue]);
+
+  useEffect(() => {
+    const nextTargetBlockId = command.blockId ?? 0;
+    setTargetBlockId(nextTargetBlockId);
+    setPlacementValue(mode === 'CREATE' ? (nextTargetBlockId > 0 ? 'TOP' : 'END') : 'KEEP');
+    setRelationshipWarning(null);
+    setConditionalFamilyWarning(null);
+    setSelectedCommandCode(canonicalInstructionAction(command.action));
+    setVariableBindings(commandEditorVariableBindings({
+      action: command.action,
+      variableId: command.variableId,
+      variableSlots: command.variableSlots,
+      storedConfiguration: command.storedConfiguration,
+    }, command.action));
+    setDraft({
+      name: command.instructionName,
+      action: command.action,
+      operation: command.operation,
+      configuration: commandEditorConfiguration(
+        command.action,
+        command.operation,
+        command.onHoldSeconds,
+        command.storedConfiguration,
+        command.variableId ?? null,
+      ),
+    });
+  }, [
+    command.action,
+    command.blockId,
+    command.instructionId,
+    command.instructionName,
+    command.onHoldSeconds,
+    command.operation,
+    command.storedConfiguration,
+    command.variableId,
+    command.variableSlots,
+    mode,
+  ]);
+
+  const setDesiredVariableBinding = (
+    slot: ComponentEditorVariableSlot,
+    variableId: number | null,
+  ) => {
+    setVariableBindings(current => updateCommandEditorVariableBinding(
+      current,
+      slot,
+      variableId,
+    ));
+    if (slot !== 'LEFT' && slot !== 'RIGHT') return;
+    setDraft(current => {
+      const configuration = current.configuration;
+      if (
+        configuration.kind !== 'CHECK_VALUE'
+        && configuration.kind !== 'EXTERNAL_CHECK'
+      ) {
+        return current;
+      }
+      return {
+        ...current,
+        configuration: slot === 'LEFT'
+          ? { ...configuration, leftVariableId: variableId }
+          : {
+              ...configuration,
+              operandKind: 'VARIABLE',
+              operandRawValue: '',
+              operandVariableId: variableId,
+            },
+      };
+    });
+  };
+
+  const configurationEditor = draft.configuration.kind === 'LOOP'
+    ? (
+        <LoopCommandEditor
+          value={draft.configuration}
+          disabled={pending}
+          onChange={(configuration) => setDraft(current => ({
+            ...current,
+            configuration,
+          }))}
+        />
+      )
+    : draft.configuration.kind === 'REFRESH_LOOP'
+      ? (
+          <RefreshLoopCommandEditor
+            value={draft.configuration}
+            disabled={pending}
+            onChange={(configuration) => setDraft(current => ({
+              ...current,
+              configuration,
+            }))}
+          />
+        )
+      : draft.configuration.kind === 'WAIT'
+        ? (
+            <WaitCommandEditor
+              value={draft.configuration}
+              disabled={pending}
+              onChange={(configuration) => setDraft(current => ({
+                ...current,
+                configuration,
+              }))}
+            />
+          )
+        : draft.configuration.kind === 'CHECK_VALUE'
+          ? (
+              <CheckValueCommandEditor
+                value={draft.configuration}
+                disabled={pending}
+                onChange={(configuration) => setDraft(current => ({ ...current, configuration }))}
+              />
+            )
+          : draft.configuration.kind === 'EXTERNAL_CHECK'
+            ? (
+                <ExternalCheckCommandEditor
+                  value={draft.configuration}
+                  disabled={pending}
+                  onChange={(configuration) => setDraft(current => ({ ...current, configuration }))}
+                />
+              )
+            : draft.configuration.kind === 'EXCEL_WRITE'
+              ? (
+                  <ExcelWriteCommandEditor
+                    value={draft.configuration}
+                    disabled={pending}
+                    onChange={(configuration) => setDraft(current => ({ ...current, configuration }))}
+                  />
+                )
+              : draft.configuration.kind === 'GOTO'
+                ? (
+                    <GotoCommandEditor
+                      value={draft.configuration}
+                      disabled={pending}
+                      onChange={(configuration) => setDraft(current => ({ ...current, configuration }))}
+                    />
+                  )
+                : draft.configuration.kind === 'SWIPE'
+                  ? (
+                      <SwipeCommandEditor
+                        value={draft.configuration}
+                        disabled={pending}
+                        onChange={(configuration) => setDraft(current => ({ ...current, configuration }))}
+                      />
+                    )
+                  : draft.configuration.kind === 'CONDITIONAL'
+                    ? (
+                        <ConditionalCommandEditor
+                          value={draft.configuration}
+                          variables={variables}
+                          disabled={pending}
+                          onChange={(configuration) => setDraft(current => ({ ...current, configuration }))}
+                        />
+                      )
+        : null;
+
+  const variableBindingsEditor = variableBindings.length > 0
+    ? (
+        <CommandVariableBindingsEditor
+          bindings={variableBindings}
+          variables={variables}
+          disabled={pending}
+          disconnectedOnly={mode === 'CREATE'}
+          onChange={setDesiredVariableBinding}
+        />
+      )
+    : null;
+
+  const placement = commandEditorPlacementFromValue(
+    placementOptions,
+    placementValue,
+  );
+  const canSubmit = Boolean(
+    onSubmit
+    && !pending
+    && (targetBlockId > 0 || (mode === 'CREATE' && targetBlockId === 0))
+    && placement
+    && isCommandEditorBaseDraftValid(draft)
+    && !(
+      conditionalPositionLocked
+      && (targetBlockId !== command.blockId || placement.kind !== 'KEEP')
+    )
+    && !(
+      mode === 'EDIT'
+      && ['ELSE', 'ENDIF'].includes(originalCommandCode)
+      && !commandChanged
+    )
+  );
+  const submit = (action: CommandEditorMutationAction) => {
+    if (!canSubmit || !placement || !onSubmit || !enabledActions.includes(action)) return;
+    const submittedPlacement = action === 'COPY_NEW' && placement.kind === 'KEEP'
+      ? { kind: 'AFTER_INSTRUCTION' as const, instructionId: command.instructionId }
+      : placement;
+    const intent: CommandEditorMutationIntent = {
+      action,
+      sourceInstructionId: command.instructionId,
+      targetBlockId,
+      placement: submittedPlacement,
+      draft: { ...draft, name: draft.name.trim() },
+      variableBindings: action === 'UPDATE' ? variableBindings : [],
+      allowRelationshipDisconnect: false,
+      allowConditionalFamilyDissolve: false,
+      conditionalFamilyDeleteIds: [],
+    };
+    if (action === 'UPDATE') {
+      const conditionalImpact = commandEditorConditionalFamilyImpact(
+        command,
+        draft.action,
+        commands,
+      );
+      if (conditionalImpact) {
+        setConditionalFamilyWarning({
+          impact: conditionalImpact,
+          intent: {
+            ...intent,
+            allowRelationshipDisconnect: true,
+            allowConditionalFamilyDissolve: true,
+            conditionalFamilyDeleteIds: conditionalImpact.boundariesToDelete
+              .map(boundary => boundary.instructionId),
+          },
+        });
+        return;
+      }
+      const impact = commandEditorRelationshipImpact(
+        command,
+        targetBlockId,
+        submittedPlacement,
+        commands,
+      );
+      if (hasCommandEditorRelationshipImpact(impact)) {
+        setRelationshipWarning({
+          impact,
+          intent: { ...intent, allowRelationshipDisconnect: true },
+        });
+        return;
+      }
+    }
+    onSubmit(intent);
+  };
+
+  useEffect(() => {
+    const returnFocusTarget = returnFocusRef.current;
+    closeRef.current?.focus();
+    return () => {
+      if (returnFocusTarget?.isConnected) returnFocusTarget.focus();
+    };
+  }, []);
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      onClose();
+      return;
+    }
+    if (event.key !== 'Tab') return;
+    const focusable = Array.from(
+      dialogRef.current?.querySelectorAll<HTMLElement>(focusableSelector) ?? [],
+    );
+    if (focusable.length === 0) {
+      event.preventDefault();
+      return;
+    }
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+
+  return (
+    <div className={styles.backdrop} onMouseDown={(event) => {
+      if (event.target === event.currentTarget) onClose();
+    }}>
+      <section
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
+        className={styles.dialog}
+        onKeyDown={handleKeyDown}
+      >
+        <header className={styles.header}>
+          <div className={styles.identity}>
+            <div className={styles.titleLine}>
+              <PencilLine size={22} aria-hidden="true" />
+              <h2 id={titleId}>Command Editor</h2>
+            </div>
+            <p id={descriptionId}>
+              {mode === 'CREATE'
+                ? 'Add a new disconnected command to the active Bot Job.'
+                : 'Review and update the selected command configuration.'}
+            </p>
+          </div>
+          <button
+            ref={closeRef}
+            type="button"
+            className={styles.closeIcon}
+            aria-label="Close Command Editor"
+            title="Close"
+            onClick={onClose}
+          >
+            <X size={18} aria-hidden="true" />
+          </button>
+        </header>
+
+        <div className={styles.body}>
+          <section className={styles.context} aria-label="Command Editor context">
+            <div><span>Bot Job</span><strong>#{botJobId} {botJobName}</strong></div>
+            <div><span>Original position</span><strong>{scopeLabel}</strong></div>
+            <b>{mode === 'CREATE' ? 'ADD MODE' : 'EDIT MODE'}</b>
+          </section>
+
+          <section className={styles.summary} aria-label="Command Editor summary">
+            <div><span>Target Block</span><strong>{targetBlock ? `#${targetBlock.blockOrder}` : '-'}</strong></div>
+            <div><span>Target commands</span><strong>{targetCommandCount}</strong></div>
+            <div><span>Connections</span><strong>{connectionCount}</strong></div>
+            <div><span>Diagnostics</span><strong>{diagnosticCount}</strong></div>
+          </section>
+
+          <SearchBox
+            label="Target Block"
+            placeholder="Search target block name or number..."
+            headerRight="Commands per block"
+            countLabel={count => `${count} BLOCK${count === 1 ? '' : 'S'}`}
+            options={blockSearchOptions}
+            value={targetBlockId >= 0 ? String(targetBlockId) : null}
+            onChange={(value) => {
+              if (value === null) return;
+              const nextTargetBlockId = Number(value);
+              if (
+                !Number.isSafeInteger(nextTargetBlockId)
+                || nextTargetBlockId < 0
+                || (nextTargetBlockId === 0 && mode !== 'CREATE')
+              ) return;
+              if (conditionalPositionLocked) return;
+              setTargetBlockId(nextTargetBlockId);
+              setPlacementValue(mode === 'CREATE'
+                ? (nextTargetBlockId > 0 ? 'TOP' : 'END')
+                : nextTargetBlockId !== command.blockId ? 'TOP'
+                : 'KEEP');
+            }}
+          />
+
+          <label className={styles.placementField}>
+            <span>Placement</span>
+            <select
+              value={placementValue}
+              onChange={(event) => setPlacementValue(event.target.value)}
+            >
+              {placementOptions.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <SearchBox
+            label="Command"
+            labelClassName={styles.commandLabel}
+            placeholder="Search command name or code..."
+            headerRight="Command catalog"
+            countLabel={count => `${count} COMMAND${count === 1 ? '' : 'S'}`}
+            options={commandSearchOptions}
+            value={selectedCommandCode}
+            onChange={selectCommand}
+            disabled={lockCommandSelection}
+          />
+
+          {lockCommandSelection && (
+            <p className={styles.commandLockedNotice} role="note">
+              Web Element type is locked. It cannot be changed into a command;
+              Placement, UPDATE, and COPY NEW remain available.
+            </p>
+          )}
+
+          <section className={styles.selectedCommand} aria-label="Selected command">
+            <div>
+              <span>{mode === 'CREATE' ? 'New command' : 'Selected command'}</span>
+              <strong>
+                {mode === 'CREATE'
+                  ? instructionCommandPresentation(selectedCommandCode).label
+                  : `#${command.instructionOrder ?? '?'} ${command.instructionName}`}
+              </strong>
+            </div>
+            <div>
+              <span>Command</span>
+              <strong>
+                {command.action || 'Unknown'}
+                {commandChanged ? ` → ${selectedCommandCode}` : ''}
+              </strong>
+            </div>
+            <div>
+              <span>Instruction ID</span>
+              <strong>{mode === 'CREATE' ? 'NEW' : command.instructionId}</strong>
+            </div>
+            <div>
+              <span>Block</span>
+              <strong>
+                #{command.blockOrder ?? '?'} {command.blockName || 'Unknown Block'}
+              </strong>
+            </div>
+          </section>
+
+          {(variableBindingsEditor || configurationEditor || children) && (
+            <section className={styles.editorContent} aria-label="Command configuration">
+              {variableBindingsEditor}
+              {configurationEditor}
+              {children}
+            </section>
+          )}
+        </div>
+
+        <footer className={styles.footer}>
+          {status && (
+            <div
+              role="status"
+              className={`${styles.status} ${status.level === 'ok'
+                ? styles.statusOk
+                : status.level === 'warn'
+                  ? styles.statusWarn
+                  : styles.statusError}`}
+            >
+              {status.text}
+            </div>
+          )}
+          <button type="button" className={styles.cancelButton} disabled={pending} onClick={onClose}>
+            CANCEL
+          </button>
+          {mode === 'CREATE' ? (
+            <button
+              type="button"
+              className={styles.updateButton}
+              disabled={!canSubmit || !enabledActions.includes('CREATE_NEW')}
+              title={onSubmit ? 'Add a new disconnected command' : 'Command persistence is not connected yet'}
+              onClick={() => submit('CREATE_NEW')}
+            >
+              ADD COMMAND
+            </button>
+          ) : (
+            <>
+              <button
+                type="button"
+                className={styles.copyButton}
+                disabled={!canSubmit
+                  || !enabledActions.includes('COPY_NEW')
+                  || isCommandEditorConditionalBoundary(originalCommandCode)}
+                title={isCommandEditorConditionalBoundary(originalCommandCode)
+                  ? 'Copy the complete IF family through Block transfer'
+                  : onSubmit
+                    ? 'Create a disconnected copy with a new instruction ID'
+                    : 'Command persistence is not connected yet'}
+                onClick={() => submit('COPY_NEW')}
+              >
+                COPY NEW
+              </button>
+              <button
+                type="button"
+                className={styles.updateButton}
+                disabled={!canSubmit || !enabledActions.includes('UPDATE')}
+                title={onSubmit ? 'Update the selected instruction' : 'Command persistence is not connected yet'}
+                onClick={() => submit('UPDATE')}
+              >
+                UPDATE
+              </button>
+            </>
+          )}
+        </footer>
+      </section>
+      {relationshipWarning && (
+        <CommandEditorRelationshipWarningModal
+          impact={relationshipWarning.impact}
+          onCancel={() => setRelationshipWarning(null)}
+          onContinue={() => {
+            const intent = relationshipWarning.intent;
+            setRelationshipWarning(null);
+            onSubmit?.(intent);
+          }}
+        />
+      )}
+      {conditionalFamilyWarning && (
+        <CommandEditorConditionalFamilyWarningModal
+          impact={conditionalFamilyWarning.impact}
+          onCancel={() => setConditionalFamilyWarning(null)}
+          onContinue={() => {
+            const intent = conditionalFamilyWarning.intent;
+            setConditionalFamilyWarning(null);
+            onSubmit?.(intent);
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+export default ComponentEditorModal;

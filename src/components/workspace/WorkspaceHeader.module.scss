@@ -1,0 +1,47 @@
+.header {
+  position: relative;
+  z-index: 45;
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(96px, auto) max-content;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 6px 10px;
+  border: 1px solid #b9cdd6;
+  border-radius: 7px;
+  background: linear-gradient(135deg, #f7fbfd 0%, #eaf3de 100%);
+  box-shadow: 0 1px 3px rgba(25, 55, 75, 0.15);
+  box-sizing: border-box;
+}
+
+.compact { min-height: 40px; padding-block: 4px; }
+.identity { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.eyebrow { color: #607d8b; font-size: 9px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+.titleRow, .actions { display: flex; align-items: center; }
+.titleRow { min-width: 0; gap: 7px; }
+.title { min-width: 0; margin: 0; overflow: hidden; color: #0b5394; font-size: 14px; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; }
+.subtitle { overflow: hidden; color: #455a64; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.connection { flex: 0 0 auto; padding: 1px 6px; border-radius: 999px; font-size: 9px; font-weight: 800; }
+.connected { background: #e8f5e9; color: #1b5e20; }
+.disconnected { background: #ffebee; color: #b71c1c; }
+.status { min-width: 0; overflow: hidden; padding: 4px 7px; border-radius: 4px; font-size: 10px; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.status_neutral { background: #eef3f5; color: #455a64; }
+.status_success { background: #e8f5e9; color: #1b5e20; }
+.status_warning { background: #fff3e0; color: #e65100; }
+.status_error { background: #ffebee; color: #b71c1c; }
+.actions { position: relative; z-index: 1; justify-content: flex-end; gap: 4px; flex-wrap: nowrap; }
+.actionButton { min-height: 26px; padding: 3px 9px; border: 1px solid #9fb7c3; border-radius: 4px; background: #fff; color: #0b5394; font-size: 10px; font-weight: 800; cursor: pointer; white-space: nowrap; }
+.actionButton:hover:not(:disabled) { filter: brightness(0.96); }
+.actionButton:disabled { cursor: not-allowed; opacity: 0.5; }
+.active { box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.55); }
+.tone_default { background: #fff; color: #0b5394; }
+.tone_primary { border-color: #0b5394; background: #0b5394; color: #fff; }
+.tone_success { border-color: #2e7d32; background: #2e7d32; color: #fff; }
+.tone_warning { border-color: #e67e22; background: #e67e22; color: #fff; }
+.tone_danger { border-color: #b71c1c; background: #fff; color: #b71c1c; }
+
+@media (max-width: 900px) {
+  .header { grid-template-columns: 1fr; }
+  .status { text-align: left; }
+  .actions { justify-content: flex-start; flex-wrap: wrap; }
+}

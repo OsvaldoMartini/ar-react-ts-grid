@@ -1,0 +1,9 @@
+.backdrop { position: fixed; z-index: 1300; inset: 0; display: grid; place-items: center; padding: 16px; background: #0f27436b; }
+.dialog { width: min(520px, 100%); overflow: hidden; border: 1px solid #8ab7df; border-radius: 10px; background: #fff; box-shadow: 0 18px 48px #0005; color: #17324d; }
+.dialog header { display: flex; align-items: center; gap: 8px; padding: 11px 13px; background: #0b5394; color: #fff; }
+.dialog h2 { flex: 1; margin: 0; font-size: .92rem; }
+.dialog header button { display: inline-grid; width: 28px; height: 28px; place-items: center; padding: 0; border: 1px solid #ffffff88; border-radius: 5px; background: #fff1; color: #fff; cursor: pointer; }
+.body { display: grid; gap: 10px; padding: 14px; font-size: .75rem; line-height: 1.45; }
+.body p, .body ul { margin: 0; }.body ul { display: grid; gap: 6px; padding-left: 20px; }
+.body aside { display: flex; gap: 8px; padding: 9px; border: 1px solid #93c5fd; border-radius: 7px; background: #eff6ff; color: #164e82; }
+.body aside svg { flex: 0 0 auto; margin-top: 1px; }

@@ -1,0 +1,535 @@
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import PagesOpenButton from './PagesOpenButton';
+import styles from './OrganizationManager.module.scss';
+import { useWebSocket } from './useWebSocket';
+import OrganizationAdvancedFields from './organization/OrganizationAdvancedFields';
+
+type StatusLevel = 'ok' | 'warn' | 'error';
+type ConfirmTarget =
+  | { kind: 'organization'; id: number; label: string; jobs: number }
+  | { kind: 'environment'; id: number; homeBankingId: number; label: string; total: number };
+
+interface OrganizationRow {
+  id: number;
+  name: string;
+  url: string;
+  jobs?: number;
+  priority?: string;
+  searchConfig?: string;
+  optionsConfig?: string;
+}
+
+interface HomeUrlRow {
+  id: number;
+  name?: string;
+  homeBankingId: number;
+  orgName?: string;
+  url: string;
+}
+
+interface OrganizationManagerProps {
+  socketPort: number;
+  sessionId: string;
+  showCloseAction?: boolean;
+  onClose?: () => void;
+}
+
+const NEW_ORG = 'new';
+const NEW_ENV = 'new';
+
+const emptyOrg: OrganizationRow = {
+  id: 0,
+  name: '',
+  url: '',
+  jobs: 0,
+  priority: '',
+  searchConfig: '',
+  optionsConfig: '',
+};
+
+const emptyUrl: HomeUrlRow = {
+  id: 0,
+  name: 'TEST',
+  homeBankingId: 0,
+  url: '',
+};
+
+function parseMessage(raw: string): { sessionId?: string; operationId?: string; body: any } {
+  const outer = JSON.parse(raw);
+  const operationId = outer.operationId || outer.type;
+  const body = typeof outer.body === 'string' ? JSON.parse(outer.body) : outer.body ?? outer;
+  return { sessionId: outer.sessionId, operationId, body };
+}
+
+function responseMessage(body: any, fallback: string): string {
+  return (
+    body?.error?.errorMessage ||
+    body?.error?.errorHeader ||
+    body?.error?.errorTitle ||
+    body?.message ||
+    fallback
+  );
+}
+
+const OrganizationManager: React.FC<OrganizationManagerProps> = ({
+  socketPort,
+  sessionId,
+  showCloseAction = false,
+  onClose,
+}) => {
+  const { webSocket, connected, messages, error } = useWebSocket(socketPort, sessionId);
+  const [organizations, setOrganizations] = useState<OrganizationRow[]>([]);
+  const [homeUrls, setHomeUrls] = useState<HomeUrlRow[]>([]);
+  const [orgDraft, setOrgDraft] = useState<OrganizationRow>(emptyOrg);
+  const [urlDraft, setUrlDraft] = useState<HomeUrlRow>(emptyUrl);
+  const [orgSelect, setOrgSelect] = useState<string>(NEW_ORG);
+  const [envSelect, setEnvSelect] = useState<string>(NEW_ENV);
+  const [confirmTarget, setConfirmTarget] = useState<ConfirmTarget | null>(null);
+  const processedMessageCountRef = useRef(0);
+  const [status, setStatus] = useState<{ level: StatusLevel; text: string }>({
+    level: 'warn',
+    text: 'Waiting for backend data',
+  });
+
+  const selectedOrgUrls = useMemo(
+    () => homeUrls.filter(row => Number(row.homeBankingId) === Number(orgDraft.id)),
+    [homeUrls, orgDraft.id],
+  );
+
+  const selectedOrgLabel = orgDraft.id ? `${orgDraft.id} - ${orgDraft.name}` : 'New Organization';
+  const selectedEnvLabel = urlDraft.id ? `${urlDraft.id} - ${urlDraft.name || 'TEST'}` : 'New Environment';
+  const selectedHomeBankingId = Number(
+    orgDraft.id || urlDraft.homeBankingId || (orgSelect !== NEW_ORG ? orgSelect : 0),
+  );
+
+  const send = useCallback(
+    (type: string, body: unknown = {}) => {
+      if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
+        setStatus({ level: 'warn', text: 'Socket is not connected yet' });
+        return;
+      }
+      webSocket.send(JSON.stringify({ type, sessionId, body: JSON.stringify(body) }));
+    },
+    [sessionId, webSocket],
+  );
+
+  useEffect(() => {
+    if (connected) {
+      send('organization.list');
+    }
+  }, [connected, send]);
+
+  useEffect(() => {
+    if (processedMessageCountRef.current > messages.length) {
+      processedMessageCountRef.current = 0;
+    }
+    const nextMessages = messages.slice(processedMessageCountRef.current);
+    processedMessageCountRef.current = messages.length;
+    for (const raw of nextMessages) {
+      try {
+        const { sessionId: responseSessionId, operationId, body } = parseMessage(raw);
+        if (responseSessionId && responseSessionId !== sessionId) continue;
+        if (operationId === 'organization.listResponse') {
+          setOrganizations(body.organizations || []);
+          setHomeUrls(body.homeUrls || []);
+          setStatus({ level: 'ok', text: 'Organizations loaded' });
+        } else if (operationId === 'organization.templateResponse') {
+          setOrgDraft(prev => ({
+            ...prev,
+            priority: body.priority || '',
+            searchConfig: body.searchConfig || '',
+            optionsConfig: body.optionsConfig || '',
+          }));
+          setStatus({ level: 'ok', text: 'Template loaded' });
+        } else if (
+          operationId === 'organization.saveResponse' ||
+          operationId === 'organization.deleteResponse' ||
+          operationId === 'homeUrl.saveResponse' ||
+          operationId === 'homeUrl.deleteResponse'
+        ) {
+          if (body.organizations) setOrganizations(body.organizations);
+          if (body.homeUrls) setHomeUrls(body.homeUrls);
+          setStatus({ level: body.ok === false ? 'error' : 'ok', text: responseMessage(body, operationId || 'Status') });
+          if (body.ok !== false && operationId === 'organization.deleteResponse') {
+            selectNewOrganization();
+          }
+          if (body.ok !== false && operationId === 'homeUrl.deleteResponse') {
+            selectNewEnvironment(orgDraft.id);
+          }
+        } else if (operationId === 'organization.status') {
+          setStatus({
+            level: body.level === 'error' ? 'error' : body.level === 'warning' ? 'warn' : 'ok',
+            text: body.message || 'Status update',
+          });
+        } else if (operationId === 'application.workspaceFocus') {
+          try {
+            window.focus();
+          } catch {
+            // Native focus is best-effort and may be refused by the window manager.
+          }
+        }
+      } catch (err) {
+        console.warn('OrganizationManager ignored socket message', err, raw);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages]);
+
+  const selectNewOrganization = () => {
+    setOrgSelect(NEW_ORG);
+    setEnvSelect(NEW_ENV);
+    setOrgDraft(emptyOrg);
+    setUrlDraft(emptyUrl);
+  };
+
+  const selectNewEnvironment = (homeBankingId: number) => {
+    setEnvSelect(NEW_ENV);
+    setUrlDraft({ ...emptyUrl, homeBankingId });
+  };
+
+  const selectOrg = (org: OrganizationRow) => {
+    setOrgSelect(String(org.id));
+    setOrgDraft({ ...emptyOrg, ...org });
+    selectNewEnvironment(org.id);
+  };
+
+  const selectUrl = (row: HomeUrlRow) => {
+    setEnvSelect(String(row.id));
+    setUrlDraft({ ...row });
+  };
+
+  const onOrganizationSelect = (value: string) => {
+    if (value === NEW_ORG) {
+      selectNewOrganization();
+      return;
+    }
+    const org = organizations.find(row => String(row.id) === value);
+    if (org) selectOrg(org);
+  };
+
+  const onEnvironmentSelect = (value: string) => {
+    if (value === NEW_ENV) {
+      selectNewEnvironment(orgDraft.id);
+      return;
+    }
+    const env = selectedOrgUrls.find(row => String(row.id) === value);
+    if (env) selectUrl(env);
+  };
+
+  const saveOrg = (mode: 'create' | 'update') => {
+    send(mode === 'create' ? 'organization.create' : 'organization.update', orgDraft);
+  };
+
+  const saveUrl = (mode: 'create' | 'update') => {
+    if (!selectedHomeBankingId) {
+      setStatus({ level: 'warn', text: 'Select an Organization before saving an Environment' });
+      return;
+    }
+    send(mode === 'create' ? 'homeUrl.create' : 'homeUrl.update', {
+      homeBankingId: selectedHomeBankingId,
+      homeUrlId: urlDraft.id,
+      name: urlDraft.name || 'TEST',
+      url: urlDraft.url,
+    });
+  };
+
+  const requestDeleteOrganization = (org: OrganizationRow) => {
+    const jobs = Number(org.jobs || 0);
+    if (jobs > 0) {
+      setStatus({
+        level: 'error',
+        text: `Cannot delete "${org.name}" because ${jobs} bot job${jobs === 1 ? '' : 's'} still use it.`,
+      });
+      return;
+    }
+    setConfirmTarget({ kind: 'organization', id: org.id, label: org.name, jobs });
+  };
+
+  const requestDeleteEnvironment = (env: HomeUrlRow) => {
+    if (selectedOrgUrls.length <= 1) {
+      setStatus({
+        level: 'error',
+        text: 'Cannot delete this Environment because the Organization must keep at least one Environment.',
+      });
+      return;
+    }
+    setConfirmTarget({
+      kind: 'environment',
+      id: env.id,
+      homeBankingId: env.homeBankingId,
+      label: env.name || env.url || `#${env.id}`,
+      total: selectedOrgUrls.length,
+    });
+  };
+
+  const confirmDelete = () => {
+    if (!confirmTarget) return;
+    if (confirmTarget.kind === 'organization') {
+      send('organization.delete', { id: confirmTarget.id });
+    } else {
+      send('homeUrl.delete', { homeBankingId: confirmTarget.homeBankingId, homeUrlId: confirmTarget.id });
+    }
+    setConfirmTarget(null);
+  };
+
+  const statusClass =
+    status.level === 'error' ? styles.statusError : status.level === 'ok' ? styles.statusOk : styles.statusWarn;
+
+  return (
+    <main className={styles.shell}>
+      <section className={styles.window}>
+        <header className={styles.topBar} data-floating-workspace-drag-handle>
+          <div className={styles.titleBlock}>
+            <h1 className={styles.title}>Organizations</h1>
+            <p className={styles.subtitle}>Organizations and child environments</p>
+          </div>
+          <div className={styles.topBarRight} data-floating-drag-ignore="true">
+            <div className={`${styles.status} ${statusClass}`} role="status">
+              {error ? error : status.text}
+            </div>
+            <PagesOpenButton
+              webSocket={webSocket}
+              connected={connected}
+              messages={messages}
+              sessionId={sessionId}
+            />
+            {showCloseAction && (
+              <button
+                type="button"
+                className={styles.closeButton}
+                title="Close only this Organizations window"
+                onClick={onClose}
+              >
+                Close
+              </button>
+            )}
+          </div>
+        </header>
+
+        <div className={styles.selectorBand}>
+          <label className={styles.selectorLabel}>
+            Organization
+            <select className={styles.select} value={orgSelect} onChange={e => onOrganizationSelect(e.target.value)}>
+              <option value={NEW_ORG}>+ New Organization</option>
+              {organizations.map(org => (
+                <option key={org.id} value={org.id}>
+                  {org.id} - {org.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className={styles.selectorLabel}>
+            Environment
+            <select
+              className={styles.select}
+              value={envSelect}
+              disabled={!orgDraft.id}
+              onChange={e => onEnvironmentSelect(e.target.value)}
+            >
+              <option value={NEW_ENV}>+ New Environment</option>
+              {selectedOrgUrls.map(row => (
+                <option key={row.id} value={row.id}>
+                  {row.id} - {row.name || 'TEST'}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <section className={styles.content}>
+          <div className={styles.editorPanel}>
+            <div className={styles.panelHeader}>
+              <span className={styles.panelTitle}>{selectedOrgLabel}</span>
+              <span className={styles.badge}>{orgDraft.jobs || 0} active jobs</span>
+            </div>
+
+            <div className={styles.body}>
+              <div className={styles.formGrid}>
+                <label className={styles.fieldLabel}>
+                  ID
+                  <input className={styles.input} value={orgDraft.id || ''} readOnly />
+                </label>
+                <label className={styles.fieldLabel}>
+                  Organization Name
+                  <input
+                    className={styles.input}
+                    value={orgDraft.name}
+                    placeholder="Avaloq, BancaStato, Temenos..."
+                    onChange={e => setOrgDraft(prev => ({ ...prev, name: e.target.value }))}
+                  />
+                </label>
+                <label className={`${styles.fieldLabel} ${styles.full}`}>
+                  URL Baseline
+                  <input
+                    className={styles.input}
+                    value={orgDraft.url}
+                    placeholder="https://..."
+                    onChange={e => setOrgDraft(prev => ({ ...prev, url: e.target.value }))}
+                  />
+                </label>
+              </div>
+              <OrganizationAdvancedFields
+                value={{
+                  priority: orgDraft.priority || '',
+                  searchConfig: orgDraft.searchConfig || '',
+                  optionsConfig: orgDraft.optionsConfig || '',
+                }}
+                onChange={(advanced) => setOrgDraft(prev => ({ ...prev, ...advanced }))}
+                onLoadTemplate={() => send('organization.template')}
+              />
+            </div>
+
+            <div className={styles.footer}>
+              <button className={styles.createBtn} onClick={() => saveOrg(orgDraft.id ? 'update' : 'create')}>
+                {orgDraft.id ? 'Update Organization' : 'Create Organization'}
+              </button>
+              <button
+                className={styles.dangerBtn}
+                disabled={!orgDraft.id || Number(orgDraft.jobs || 0) > 0}
+                onClick={() => requestDeleteOrganization(orgDraft)}
+              >
+                Delete
+              </button>
+            </div>
+
+            <div className={styles.listPanel}>
+              <div className={styles.listHeader}>Organization List</div>
+              <div className={styles.compactList}>
+                {organizations.map(org => (
+                  <div
+                    key={org.id}
+                    className={`${styles.listRow} ${orgDraft.id === org.id ? styles.activeRow : ''}`}
+                    onClick={() => selectOrg(org)}
+                  >
+                    <span>{org.name}</span>
+                    <small>{org.jobs || 0} jobs</small>
+                    <button
+                      type="button"
+                      className={styles.rowDelete}
+                      aria-label={`Delete organization ${org.name}`}
+                      title="Delete Organization"
+                      onClick={e => {
+                        e.stopPropagation();
+                        requestDeleteOrganization(org);
+                      }}
+                    >
+                      X
+                    </button>
+                  </div>
+                ))}
+                {organizations.length === 0 && <div className={styles.empty}>No organizations loaded.</div>}
+              </div>
+            </div>
+          </div>
+
+          <aside className={styles.sidePanel}>
+            <div className={styles.panelHeader}>
+              <span className={styles.panelTitle}>{selectedEnvLabel}</span>
+            </div>
+            <div className={styles.body}>
+              <label className={styles.fieldLabel}>
+                Environment ID
+                <input className={styles.input} value={urlDraft.id || ''} readOnly />
+              </label>
+              <label className={styles.fieldLabel}>
+                Environment Name
+                <input
+                  className={styles.input}
+                  value={urlDraft.name ?? 'TEST'}
+                  placeholder="TEST, UAT, DEV, prod..."
+                  disabled={!orgDraft.id}
+                  onChange={e => setUrlDraft(prev => ({ ...prev, name: e.target.value, homeBankingId: orgDraft.id }))}
+                />
+              </label>
+              <label className={styles.fieldLabel}>
+                Environment URL
+                <input
+                  className={styles.input}
+                  value={urlDraft.url}
+                  placeholder="https://uat.example.com"
+                  disabled={!orgDraft.id}
+                  onChange={e => setUrlDraft(prev => ({ ...prev, url: e.target.value, homeBankingId: orgDraft.id }))}
+                />
+              </label>
+            </div>
+            <div className={styles.footer}>
+              <button
+                className={styles.createBtn}
+                disabled={!selectedHomeBankingId}
+                onClick={() => saveUrl(urlDraft.id ? 'update' : 'create')}
+              >
+                {urlDraft.id ? 'Update Environment' : 'Create Environment'}
+              </button>
+              <button
+                className={styles.dangerBtn}
+                disabled={!orgDraft.id || !urlDraft.id || selectedOrgUrls.length <= 1}
+                onClick={() => requestDeleteEnvironment(urlDraft)}
+              >
+                Delete Environment
+              </button>
+            </div>
+
+            <div className={styles.listPanel}>
+              <div className={styles.listHeader}>Environment List</div>
+              <div className={styles.compactList}>
+                {selectedOrgUrls.map(row => (
+                  <div
+                    key={row.id}
+                    className={`${styles.listRow} ${urlDraft.id === row.id ? styles.activeRow : ''}`}
+                    onClick={() => selectUrl(row)}
+                  >
+                    <span>{row.name || 'TEST'}</span>
+                    <small>#{row.id}</small>
+                    <em>{row.url}</em>
+                    <button
+                      type="button"
+                      className={styles.rowDelete}
+                      aria-label={`Delete environment ${row.name || row.url}`}
+                      title="Delete Environment"
+                      onClick={e => {
+                        e.stopPropagation();
+                        requestDeleteEnvironment(row);
+                      }}
+                    >
+                      X
+                    </button>
+                  </div>
+                ))}
+                {selectedOrgUrls.length === 0 && <div className={styles.empty}>No environments for this organization.</div>}
+              </div>
+            </div>
+          </aside>
+        </section>
+      </section>
+      {confirmTarget && (
+        <div className={styles.confirmOverlay} role="presentation" onClick={() => setConfirmTarget(null)}>
+          <section className={styles.confirmDialog} role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}>
+            <div className={styles.confirmHeader}>Confirm deletion</div>
+            <div className={styles.confirmBody}>
+              <strong>{confirmTarget.label}</strong>
+              <p>
+                {confirmTarget.kind === 'organization'
+                  ? 'This will delete the Organization and its Environment records when no bot jobs are using it.'
+                  : 'This will delete the selected Environment when no bot jobs are using it.'}
+              </p>
+              <p className={styles.confirmHint}>
+                If this item is in use by bot jobs, the backend will refuse the delete and show the reason.
+              </p>
+            </div>
+            <div className={styles.confirmFooter}>
+              <button className={styles.cancelBtn} type="button" onClick={() => setConfirmTarget(null)}>
+                Cancel
+              </button>
+              <button className={styles.dangerBtn} type="button" onClick={confirmDelete}>
+                Delete
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+    </main>
+  );
+};
+
+export default OrganizationManager;

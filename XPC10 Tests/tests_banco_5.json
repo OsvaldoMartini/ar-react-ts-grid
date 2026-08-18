@@ -1,0 +1,884 @@
+{
+  "ok": true,
+  "elements": [
+    {
+      "typeElement": "Shadow-Child",
+      "tagName": "button",
+      "xPath": "/div[1]/div[1]/button[1]",
+      "someText": "Apri interfaccia di chat e collaborazione",
+      "attribId": "SmartLauncherButton",
+      "attribName": "",
+      "coordinates": "1761.00,789.00",
+      "attributeData": [
+        {
+          "name": "class",
+          "value": "x-unblu-launcher-button x-unblu-smart-launcher-button"
+        },
+        { "name": "id", "value": "SmartLauncherButton" },
+        { "name": "role", "value": "button" },
+        {
+          "name": "aria-label",
+          "value": "Apri interfaccia di chat e collaborazione"
+        },
+        { "name": "dialog-state", "value": "closed" },
+        {
+          "name": "style",
+          "value": "z-index: 2; pointer-events: auto; cursor: pointer; border-radius: 100px; padding: 16px; background-color: rgb(214, 0, 25); background-image: none; border: 0px solid transparent; color: rgb(255, 255, 255); transition: 200ms ease-in; outline: 0px; line-height: 0; animation: 400ms ease-out 0ms 1 normal none running x-unblu-launcher-anim-up-show;"
+        }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "unblu-floating-app",
+      "shadowRoot": "true",
+      "nestedShadow": "false",
+      "cssSelector": "button#SmartLauncherButton.x-unblu-launcher-button.x-unblu-smart-launcher-button",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "Apri interfaccia di chat e collaborazione",
+      "nameField": "Apri interfaccia di chat e collaborazione",
+      "definedName": "Apri interfaccia di chat e col",
+      "id": 1
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "button",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/header[1]/avq-app-bar[1]/mat-toolbar[1]/mat-toolbar-row[1]/avq-user-account-menu[1]/button[1]",
+      "someText": "Menu conto utente",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "1688.02,12.69",
+      "attributeData": [
+        { "name": "avq-icon-button", "value": "" },
+        {
+          "name": "class",
+          "value": "avq-icon-button avq-button-base mat-mdc-menu-trigger icon-control avq-state-layer-host avq-button--unstyled avq-button--icon"
+        },
+        { "name": "aria-label", "value": "Menu conto utente" },
+        {
+          "name": "test-id",
+          "value": "web-banking-portal.app-bar.user-account-menu.button"
+        },
+        { "name": "aria-haspopup", "value": "menu" },
+        { "name": "aria-expanded", "value": "false" }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "button.avq-icon-button.avq-button-base.mat-mdc-menu-trigger.icon-control.avq-state-layer-host.avq-button--unstyled.avq-button--icon",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "web-banking-portal.app-bar.user-account-menu.button",
+      "nameField": "web-banking-portal.app-bar.user-account-menu.button",
+      "definedName": "Menu conto utente",
+      "id": 2
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "button",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav[1]/div[1]/avq-main-nav[1]/avq-nav-list[1]/cdk-tree[1]/cdk-nested-tree-node[2]/button[1]",
+      "someText": "Conti e carte Contiene aggiornamenti; Conti e carte; Contiene aggiornamenti",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "12.00,133.00",
+      "attributeData": [
+        { "name": "avq-list-item", "value": "" },
+        {
+          "name": "class",
+          "value": "avq-list-item avq-list-item-node-toggle ng-tns-c577094672-0 avq-state-layer-host"
+        },
+        { "name": "aria-expanded", "value": "false" },
+        { "name": "data-with-leading-icon", "value": "account_balance_wallet" }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "button.avq-list-item.avq-list-item-node-toggle.ng-tns-c577094672-0.avq-state-layer-host",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "Conti e carte Contiene aggiornamenti; Conti e carte; Contiene aggiornamenti",
+      "nameField": "button",
+      "definedName": "Conti e carte Contiene aggiorn",
+      "id": 3
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "button",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav[1]/div[1]/avq-main-nav[1]/avq-nav-list[1]/cdk-tree[1]/cdk-nested-tree-node[3]/button[1]",
+      "someText": "Assistente Finanziario Contiene aggiornamenti; Assistente Finanziario; Contiene aggiornamenti",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "12.00,189.00",
+      "attributeData": [
+        { "name": "avq-list-item", "value": "" },
+        {
+          "name": "class",
+          "value": "avq-list-item avq-list-item-node-toggle ng-tns-c577094672-0 avq-state-layer-host"
+        },
+        { "name": "aria-expanded", "value": "false" },
+        { "name": "data-with-leading-icon", "value": "insert_chart" }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "button.avq-list-item.avq-list-item-node-toggle.ng-tns-c577094672-0.avq-state-layer-host",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "Assistente Finanziario Contiene aggiornamenti; Assistente Finanziario; Contiene aggiornamenti",
+      "nameField": "button",
+      "definedName": "Assistente Finanziario Contien",
+      "id": 4
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "button",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav[1]/div[1]/avq-main-nav[1]/avq-nav-list[1]/cdk-tree[1]/cdk-nested-tree-node[4]/button[1]",
+      "someText": "Patrimonio Contiene aggiornamenti; Patrimonio; Contiene aggiornamenti",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "12.00,245.00",
+      "attributeData": [
+        { "name": "avq-list-item", "value": "" },
+        {
+          "name": "class",
+          "value": "avq-list-item avq-list-item-node-toggle ng-tns-c577094672-0 avq-state-layer-host"
+        },
+        { "name": "aria-expanded", "value": "false" },
+        { "name": "data-with-leading-icon", "value": "performance_avq" }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "button.avq-list-item.avq-list-item-node-toggle.ng-tns-c577094672-0.avq-state-layer-host",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "Patrimonio Contiene aggiornamenti; Patrimonio; Contiene aggiornamenti",
+      "nameField": "button",
+      "definedName": "Patrimonio Contiene aggiorname",
+      "id": 5
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "button",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav[1]/div[1]/avq-main-nav[1]/avq-nav-list[1]/cdk-tree[1]/cdk-nested-tree-node[7]/button[1]",
+      "someText": "Pagamenti e fatture Contiene aggiornamenti; Pagamenti e fatture; Contiene aggiornamenti",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "12.00,413.00",
+      "attributeData": [
+        { "name": "avq-list-item", "value": "" },
+        {
+          "name": "class",
+          "value": "avq-list-item avq-list-item-node-toggle ng-tns-c577094672-0 avq-state-layer-host"
+        },
+        { "name": "aria-expanded", "value": "false" },
+        { "name": "data-with-leading-icon", "value": "asset_avq" }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "button.avq-list-item.avq-list-item-node-toggle.ng-tns-c577094672-0.avq-state-layer-host",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "Pagamenti e fatture Contiene aggiornamenti; Pagamenti e fatture; Contiene aggiornamenti",
+      "nameField": "button",
+      "definedName": "Pagamenti e fatture Contiene a",
+      "id": 6
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "button",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav[1]/div[1]/avq-main-nav[1]/avq-nav-list[1]/cdk-tree[1]/cdk-nested-tree-node[8]/button[1]",
+      "someText": "Mercati e divise Contiene aggiornamenti; Mercati e divise; Contiene aggiornamenti",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "12.00,469.00",
+      "attributeData": [
+        { "name": "avq-list-item", "value": "" },
+        {
+          "name": "class",
+          "value": "avq-list-item avq-list-item-node-toggle ng-tns-c577094672-0 avq-state-layer-host"
+        },
+        { "name": "aria-expanded", "value": "false" },
+        { "name": "data-with-leading-icon", "value": "trending_up" }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "button.avq-list-item.avq-list-item-node-toggle.ng-tns-c577094672-0.avq-state-layer-host",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "Mercati e divise Contiene aggiornamenti; Mercati e divise; Contiene aggiornamenti",
+      "nameField": "button",
+      "definedName": "Mercati e divise Contiene aggi",
+      "id": 7
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "button",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/assl-dashboard-retail-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/div[1]/avq-quick-link-container[1]/div[1]/avq-quick-link[4]/button[1]",
+      "someText": "Documenti",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "1489.50,133.00",
+      "attributeData": [
+        { "name": "_ngcontent-ng-c4247900421", "value": "" },
+        { "name": "avq-outlined-button", "value": "" },
+        {
+          "name": "class",
+          "value": "avq-button avq-button-base avq-quick-link-button avq-padding-4 avq-state-layer-host avq-button--primary avq-button--outlined"
+        },
+        {
+          "name": "test-id",
+          "value": "web-banking-portal.quick-link.quick-link-button"
+        }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "button.avq-button.avq-button-base.avq-quick-link-button.avq-padding-4.avq-state-layer-host.avq-button--primary.avq-button--outlined",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "web-banking-portal.quick-link.quick-link-button",
+      "nameField": "web-banking-portal.quick-link.quick-link-button",
+      "definedName": "Documenti",
+      "id": 8
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "button",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav[1]/div[1]/avq-main-nav[1]/avq-nav-list[1]/cdk-tree[1]/cdk-nested-tree-node[10]/button[1]",
+      "someText": "Documenti e estratti elettronici Contiene aggiornamenti; Documenti e estratti elettronici; Contiene aggiornamenti",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "12.00,581.00",
+      "attributeData": [
+        { "name": "avq-list-item", "value": "" },
+        {
+          "name": "class",
+          "value": "avq-list-item avq-list-item-node-toggle ng-tns-c577094672-0 avq-state-layer-host"
+        },
+        { "name": "aria-expanded", "value": "false" },
+        { "name": "data-with-leading-icon", "value": "insert_drive_file" }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "button.avq-list-item.avq-list-item-node-toggle.ng-tns-c577094672-0.avq-state-layer-host",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "Documenti e estratti elettronici Contiene aggiornamenti; Documenti e estratti elettronici; Contiene aggiornamenti",
+      "nameField": "button",
+      "definedName": "Documenti e estratti elettroni",
+      "id": 9
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "button",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav[1]/div[1]/avq-main-nav[1]/avq-nav-list[1]/cdk-tree[1]/cdk-nested-tree-node[11]/button[1]",
+      "someText": "Messaggi e notifiche Contiene aggiornamenti; Messaggi e notifiche; Contiene aggiornamenti",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "12.00,637.00",
+      "attributeData": [
+        { "name": "avq-list-item", "value": "" },
+        {
+          "name": "class",
+          "value": "avq-list-item avq-list-item-node-toggle ng-tns-c577094672-0 avq-state-layer-host"
+        },
+        { "name": "aria-expanded", "value": "false" },
+        { "name": "data-with-leading-icon", "value": "mail" }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "button.avq-list-item.avq-list-item-node-toggle.ng-tns-c577094672-0.avq-state-layer-host",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "Messaggi e notifiche Contiene aggiornamenti; Messaggi e notifiche; Contiene aggiornamenti",
+      "nameField": "button",
+      "definedName": "Messaggi e notifiche Contiene ",
+      "id": 10
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "button",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/assl-dashboard-retail-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/div[1]/avq-quick-link-container[1]/div[1]/avq-quick-link[1]/button[1]",
+      "someText": "Nuovo pagamento",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "427.50,133.00",
+      "attributeData": [
+        { "name": "_ngcontent-ng-c4247900421", "value": "" },
+        { "name": "avq-outlined-button", "value": "" },
+        {
+          "name": "class",
+          "value": "avq-button avq-button-base avq-quick-link-button avq-padding-4 avq-state-layer-host avq-button--primary avq-button--outlined"
+        },
+        {
+          "name": "test-id",
+          "value": "web-banking-portal.quick-link.quick-link-button"
+        }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "button.avq-button.avq-button-base.avq-quick-link-button.avq-padding-4.avq-state-layer-host.avq-button--primary.avq-button--outlined",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "web-banking-portal.quick-link.quick-link-button",
+      "nameField": "web-banking-portal.quick-link.quick-link-button",
+      "definedName": "Nuovo pagamento",
+      "id": 11
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "button",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/assl-dashboard-retail-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/div[1]/avq-quick-link-container[1]/div[1]/avq-quick-link[2]/button[1]",
+      "someText": "ordine di; Nuovo ordine di borsa",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "781.50,133.00",
+      "attributeData": [
+        { "name": "_ngcontent-ng-c4247900421", "value": "" },
+        { "name": "avq-outlined-button", "value": "" },
+        {
+          "name": "class",
+          "value": "avq-button avq-button-base avq-quick-link-button avq-padding-4 avq-state-layer-host avq-button--primary avq-button--outlined"
+        },
+        {
+          "name": "test-id",
+          "value": "web-banking-portal.quick-link.quick-link-button"
+        }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "button.avq-button.avq-button-base.avq-quick-link-button.avq-padding-4.avq-state-layer-host.avq-button--primary.avq-button--outlined",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "web-banking-portal.quick-link.quick-link-button",
+      "nameField": "web-banking-portal.quick-link.quick-link-button",
+      "definedName": "ordine di; Nuovo ordine di bor",
+      "id": 12
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "button",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/assl-dashboard-retail-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/div[1]/avq-web-banking-wealth-account-list-table-banklet[1]/avq-wealth-account-list-table[1]/mat-paginator[1]/div[1]/div[1]/div[2]/button[1]",
+      "someText": "Pagina precedente",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "1715.50,489.25",
+      "attributeData": [
+        { "name": "mat-icon-button", "value": "" },
+        { "name": "type", "value": "button" },
+        { "name": "mattooltipposition", "value": "above" },
+        { "name": "disabledinteractive", "value": "" },
+        {
+          "name": "class",
+          "value": "mat-mdc-tooltip-trigger mat-mdc-paginator-navigation-previous mdc-icon-button mat-mdc-icon-button mat-mdc-button-disabled mat-mdc-button-disabled-interactive mat-unthemed mat-mdc-button-base mat-mdc-tooltip-disabled"
+        },
+        { "name": "mat-ripple-loader-uninitialized", "value": "" },
+        {
+          "name": "mat-ripple-loader-class-name",
+          "value": "mat-mdc-button-ripple"
+        },
+        { "name": "mat-ripple-loader-centered", "value": "" },
+        { "name": "mat-ripple-loader-disabled", "value": "" },
+        { "name": "tabindex", "value": "-1" },
+        { "name": "aria-label", "value": "Pagina precedente" },
+        { "name": "aria-disabled", "value": "true" }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "button.mat-mdc-tooltip-trigger.mat-mdc-paginator-navigation-previous.mdc-icon-button.mat-mdc-icon-button.mat-mdc-button-disabled.mat-mdc-button-disabled-interactive.mat-unthemed.mat-mdc-button-base.mat-mdc-tooltip-disabled",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "Pagina precedente",
+      "nameField": "Pagina precedente",
+      "definedName": "Pagina precedente",
+      "id": 13
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "button",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/header[1]/avq-app-bar[1]/mat-toolbar[1]/mat-toolbar-row[1]/button[2]",
+      "someText": "Filtro",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "1553.89,12.00",
+      "attributeData": [
+        { "name": "_ngcontent-ng-c374048722", "value": "" },
+        { "name": "avq-text-button", "value": "" },
+        {
+          "name": "class",
+          "value": "avq-button avq-button-base avq-state-layer-host avq-button--primary avq-button--text"
+        },
+        {
+          "name": "aria-labelledby",
+          "value": "avq-global-filter-button-labelledby"
+        },
+        { "name": "aria-expanded", "value": "false" },
+        { "name": "aria-haspopup", "value": "dialog" },
+        { "name": "aria-controls", "value": "avq-global-filter-dialog" },
+        {
+          "name": "test-id",
+          "value": "web-banking-portal.app-bar.global-filter.button"
+        }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "button.avq-button.avq-button-base.avq-state-layer-host.avq-button--primary.avq-button--text",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "web-banking-portal.app-bar.global-filter.button",
+      "nameField": "web-banking-portal.app-bar.global-filter.button",
+      "definedName": "Filtro",
+      "id": 14
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "button",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/header[1]/avq-app-bar[1]/mat-toolbar[1]/mat-toolbar-row[1]/button[4]",
+      "someText": "logoutDisconnetti; Disconnetti",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "1744.02,12.00",
+      "attributeData": [
+        { "name": "_ngcontent-ng-c374048722", "value": "" },
+        { "name": "avq-tonal-button", "value": "" },
+        { "name": "color", "value": "primary" },
+        {
+          "name": "class",
+          "value": "avq-button avq-button-base avq-display-mobile-none logout-button avq-state-layer-host avq-button--primary avq-button--tonal"
+        },
+        {
+          "name": "test-id",
+          "value": "web-banking-portal.app-bar.logout.button"
+        }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "button.avq-button.avq-button-base.avq-display-mobile-none.logout-button.avq-state-layer-host.avq-button--primary.avq-button--tonal",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "web-banking-portal.app-bar.logout.button",
+      "nameField": "web-banking-portal.app-bar.logout.button",
+      "definedName": "logoutDisconnetti; Disconnetti",
+      "id": 15
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "button",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/assl-dashboard-retail-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/div[1]/avq-quick-link-container[1]/div[1]/avq-quick-link[3]/button[1]",
+      "someText": "eBill",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "1135.50,133.00",
+      "attributeData": [
+        { "name": "_ngcontent-ng-c4247900421", "value": "" },
+        { "name": "avq-outlined-button", "value": "" },
+        {
+          "name": "class",
+          "value": "avq-button avq-button-base avq-quick-link-button avq-padding-4 avq-state-layer-host avq-button--primary avq-button--outlined"
+        },
+        {
+          "name": "test-id",
+          "value": "web-banking-portal.quick-link.quick-link-button"
+        }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "button.avq-button.avq-button-base.avq-quick-link-button.avq-padding-4.avq-state-layer-host.avq-button--primary.avq-button--outlined",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "web-banking-portal.quick-link.quick-link-button",
+      "nameField": "web-banking-portal.quick-link.quick-link-button",
+      "definedName": "eBill",
+      "id": 16
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "button",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/assl-dashboard-retail-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/div[1]/avq-web-banking-wealth-account-list-table-banklet[1]/avq-wealth-account-list-table[1]/div[2]/avq-table[1]/table[1]/tbody[1]/tr[1]/td[4]/avq-position-context-action[1]/div[1]/avq-context-action-menu[1]/button[1]",
+      "someText": "Azioni",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "1763.50,424.25",
+      "attributeData": [
+        { "name": "avq-icon-button", "value": "" },
+        { "name": "avqtestid", "value": "web-banking-common-menu-trigger" },
+        {
+          "name": "class",
+          "value": "avq-icon-button avq-button-base mat-mdc-menu-trigger avq-state-layer-host avq-button--unstyled avq-button--icon ng-star-inserted"
+        },
+        { "name": "aria-label", "value": "Azioni" },
+        { "name": "test-id", "value": "web-banking-common-menu-trigger" },
+        { "name": "aria-haspopup", "value": "menu" },
+        { "name": "aria-expanded", "value": "false" }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "button.avq-icon-button.avq-button-base.mat-mdc-menu-trigger.avq-state-layer-host.avq-button--unstyled.avq-button--icon.ng-star-inserted",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "web-banking-common-menu-trigger",
+      "nameField": "web-banking-common-menu-trigger",
+      "definedName": "Azioni",
+      "id": 17
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "a",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/header[1]/avq-app-bar[1]/mat-toolbar[1]/mat-toolbar-row[1]/a[1]",
+      "someText": "Vai al contenuto principale",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "842.08,-76.00",
+      "attributeData": [
+        { "name": "_ngcontent-ng-c374048722", "value": "" },
+        { "name": "avqaccessiblelink", "value": "#skipToMainContent" },
+        { "name": "avq-link", "value": "" },
+        {
+          "name": "class",
+          "value": "avq-link skip-to-main-content avq-text-bold avq-subtitle-1"
+        },
+        { "name": "role", "value": "link" },
+        { "name": "tabindex", "value": "0" }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "a.avq-link.skip-to-main-content.avq-text-bold.avq-subtitle-1",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "Vai al contenuto principale",
+      "nameField": "a",
+      "definedName": "Vai al contenuto principale",
+      "id": 18
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "a",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav[1]/div[1]/avq-main-nav[1]/avq-nav-list[1]/cdk-tree[1]/cdk-nested-tree-node[5]/a[1]",
+      "someText": "Portafoglio MIO",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "12.00,301.00",
+      "attributeData": [
+        { "name": "avq-list-item", "value": "" },
+        { "name": "avqaccessiblelink", "value": "" },
+        {
+          "name": "class",
+          "value": "avq-list-item avq-state-layer-host ng-star-inserted"
+        },
+        {
+          "name": "test-id",
+          "value": "web-banking-portal.main-nav.nav-item.web-banking-bscch.nav-item.personal-advisor"
+        },
+        { "name": "data-with-leading-icon", "value": "issuer_person_avq" },
+        { "name": "role", "value": "link" },
+        { "name": "tabindex", "value": "0" },
+        { "name": "style", "value": "cursor: pointer;" }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "a.avq-list-item.avq-state-layer-host.ng-star-inserted",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "web-banking-portal.main-nav.nav-item.web-banking-bscch.nav-item.personal-advisor",
+      "nameField": "web-banking-portal.main-nav.nav-item.web-banking-bscch.nav-item.personal-advisor",
+      "definedName": "Portafoglio MIO",
+      "id": 19
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "a",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav[1]/div[1]/avq-main-nav[1]/avq-nav-list[1]/cdk-tree[1]/cdk-nested-tree-node[6]/a[1]",
+      "someText": "Previdenza",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "12.00,357.00",
+      "attributeData": [
+        { "name": "avq-list-item", "value": "" },
+        { "name": "avqaccessiblelink", "value": "" },
+        {
+          "name": "class",
+          "value": "avq-list-item avq-state-layer-host ng-star-inserted"
+        },
+        {
+          "name": "test-id",
+          "value": "web-banking-portal.main-nav.nav-item.web-banking-bscch.nav-item.third-pillar"
+        },
+        { "name": "data-with-leading-icon", "value": "previdenza" },
+        { "name": "role", "value": "link" },
+        { "name": "tabindex", "value": "0" },
+        { "name": "style", "value": "cursor: pointer;" }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "a.avq-list-item.avq-state-layer-host.ng-star-inserted",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "web-banking-portal.main-nav.nav-item.web-banking-bscch.nav-item.third-pillar",
+      "nameField": "web-banking-portal.main-nav.nav-item.web-banking-bscch.nav-item.third-pillar",
+      "definedName": "Previdenza",
+      "id": 20
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "a",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav[1]/div[1]/avq-main-nav[1]/avq-nav-list[1]/cdk-tree[1]/cdk-nested-tree-node[9]/a[1]",
+      "someText": "Crediti",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "12.00,525.00",
+      "attributeData": [
+        { "name": "avq-list-item", "value": "" },
+        { "name": "avqaccessiblelink", "value": "" },
+        {
+          "name": "class",
+          "value": "avq-list-item avq-state-layer-host ng-star-inserted"
+        },
+        {
+          "name": "test-id",
+          "value": "web-banking-portal.main-nav.nav-item.web-banking-bscch.nav-group.credit-overview"
+        },
+        { "name": "data-with-leading-icon", "value": "swap_vertical_circle" },
+        { "name": "role", "value": "link" },
+        { "name": "tabindex", "value": "0" },
+        { "name": "style", "value": "cursor: pointer;" }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "a.avq-list-item.avq-state-layer-host.ng-star-inserted",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "web-banking-portal.main-nav.nav-item.web-banking-bscch.nav-group.credit-overview",
+      "nameField": "web-banking-portal.main-nav.nav-item.web-banking-bscch.nav-group.credit-overview",
+      "definedName": "Crediti",
+      "id": 21
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "a",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav[1]/div[1]/avq-main-nav[1]/div[1]/avq-regulatory-links[1]/div[1]/a[1]",
+      "someText": "Informazioni legali",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "28.00,711.00",
+      "attributeData": [
+        { "name": "avqaccessiblelink", "value": "" },
+        { "name": "avq-link", "value": "" },
+        { "name": "class", "value": "avq-link ng-star-inserted" },
+        { "name": "role", "value": "link" },
+        { "name": "tabindex", "value": "0" }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "a.avq-link.ng-star-inserted",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "Informazioni legali",
+      "nameField": "a",
+      "definedName": "Informazioni legali",
+      "id": 22
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "a",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav[1]/div[1]/avq-main-nav[1]/div[1]/avq-regulatory-links[1]/div[1]/a[2]",
+      "someText": "Contatti",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "162.73,711.00",
+      "attributeData": [
+        { "name": "avqaccessiblelink", "value": "" },
+        { "name": "avq-link", "value": "" },
+        { "name": "class", "value": "avq-link ng-star-inserted" },
+        { "name": "role", "value": "link" },
+        { "name": "tabindex", "value": "0" }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "a.avq-link.ng-star-inserted",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "Contatti",
+      "nameField": "a",
+      "definedName": "Contatti",
+      "id": 23
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "a",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav[1]/div[1]/avq-main-nav[1]/div[1]/avq-regulatory-links[1]/div[1]/a[3]",
+      "someText": "Aiuto",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "231.41,711.00",
+      "attributeData": [
+        { "name": "avqaccessiblelink", "value": "" },
+        { "name": "avq-link", "value": "" },
+        { "name": "class", "value": "avq-link ng-star-inserted" },
+        { "name": "role", "value": "link" },
+        { "name": "tabindex", "value": "0" }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "a.avq-link.ng-star-inserted",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "Aiuto",
+      "nameField": "a",
+      "definedName": "Aiuto",
+      "id": 24
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "a",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/assl-dashboard-retail-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/div[1]/avq-page-navigation-button[1]/a[1]",
+      "someText": "Visualizzare; Visualizzare tutto",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "427.50,549.25",
+      "attributeData": [
+        { "name": "avqaccessiblelink", "value": "" },
+        { "name": "avq-text-button", "value": "" },
+        {
+          "name": "class",
+          "value": "avq-button avq-button-base avq-state-layer-host avq-button--primary avq-anchor-button avq-button--text"
+        },
+        { "name": "role", "value": "link" },
+        { "name": "tabindex", "value": "0" }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "a.avq-button.avq-button-base.avq-state-layer-host.avq-button--primary.avq-anchor-button.avq-button--text",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "Visualizzare; Visualizzare tutto",
+      "nameField": "a",
+      "definedName": "Visualizzare; Visualizzare tut",
+      "id": 25
+    },
+    {
+      "typeElement": "tagName-Found",
+      "tagName": "a",
+      "xPath": "/html/body/assl-root[1]/avq-web-banking-portal[1]/avq-portal-layout[1]/mat-sidenav-container[1]/mat-sidenav-content[1]/main[1]/assl-dashboard-retail-page[1]/avq-portal-page-layout[1]/section[1]/div[1]/div[1]/div[1]/div[1]/avq-page-navigation-button[1]/a[1]",
+      "someText": "Visualizzare; Visualizzare tutto",
+      "attribId": "",
+      "attribName": "",
+      "coordinates": "427.50,891.25",
+      "attributeData": [
+        { "name": "avqaccessiblelink", "value": "" },
+        { "name": "avq-text-button", "value": "" },
+        {
+          "name": "class",
+          "value": "avq-button avq-button-base avq-state-layer-host avq-button--primary avq-anchor-button avq-button--text"
+        },
+        { "name": "role", "value": "link" },
+        { "name": "tabindex", "value": "0" }
+      ],
+      "customXPath": "",
+      "iFrameXPath": "",
+      "shadowHost": "",
+      "shadowRoot": "false",
+      "nestedShadow": "false",
+      "cssSelector": "a.avq-button.avq-button-base.avq-state-layer-host.avq-button--primary.avq-anchor-button.avq-button--text",
+      "attributeValue": "",
+      "attributeType": "",
+      "searchAttributeValue": "",
+      "nameLabel": "Visualizzare; Visualizzare tutto",
+      "nameField": "a",
+      "definedName": "Visualizzare; Visualizzare tut",
+      "id": 26
+    }
+  ],
+  "totalElements": 26
+}

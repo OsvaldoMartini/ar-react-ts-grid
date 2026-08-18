@@ -1,0 +1,42 @@
+/*
+ * Sized to match WorkspaceHeader's .actionButton exactly (Refresh/Bot Job/
+ * Components/Pre Scan/Close): min-height 26px, padding 3px 9px, font-size
+ * 10px, font-weight 800 — so every header button reads as one consistent
+ * row regardless of which component rendered it.
+ */
+.actions {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.actions button {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+  min-width: 26px;
+  min-height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: #fff;
+  padding: 3px 9px;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.batButton { width: 28px; padding: 3px; z-index: 3; }
+.actions button:hover:not(:disabled) { filter: brightness(1.08); }
+.actions button:focus-visible { outline: 3px solid rgb(37 99 235 / 25%); outline-offset: 2px; }
+.actions button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.excelButton { background: #1d6f42; }
+.generateButton { background: #2563eb; }
+.reportButton { background: #6d28d9; }
+.batButton { background: #e8791b; }

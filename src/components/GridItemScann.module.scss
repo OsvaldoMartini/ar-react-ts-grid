@@ -1,0 +1,1974 @@
+// Scoped stylesheet for GridItemScann only. The content is a copy of
+// griditem.scss with one intentional difference: .instructionItem uses a
+// 4-column grid (26px label flexible-space actions) to reserve the first
+// 26px for the per-row "Keep" checkbox. Also includes the .keepCheckbox rule.
+// GridItem / GridItemComp / GridDrag2 / GridItemScannMobile still use the
+// shared 4-column griditem.scss — unchanged.
+
+/* Grid Container */
+.gridContainer {
+  padding: 0 12px 0 2px; /* Decreased padding */
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px; /* Decreased gap */
+  // height: 100vh;          /* NEW: take full viewport height */
+   height: 100%;      // use container height, not viewport
+  min-height: 0;     // important
+  box-sizing: border-box; /* make padding play nice with height */
+}
+
+/* Memory list: row "+" button + floating scanner panel */
+.memoryAddButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  margin-left: 4px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid #cc0000;
+  background-color: #ffffff;
+  color: #cc0000;
+  font-size: 11px;
+  font-weight: bold;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.5;
+}
+
+.memoryAddButton:hover {
+  opacity: 1;
+  background-color: #cc0000;
+  color: #ffffff;
+}
+
+.memoryToggleButton {
+  background-color: #c3d3d9;
+  color: #0b5394;
+  border: none;
+  border-radius: 4px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: bold;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.memoryPanel {
+  position: fixed;
+  z-index: 10000;
+  min-width: 280px;
+  max-width: 440px;
+  max-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border: 1px solid #0b5394;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+}
+
+.memoryPanelHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #0b5394;
+  color: #ffffff;
+  padding: 6px 8px;
+  cursor: move;
+  user-select: none;
+}
+
+.memoryPanelTitle {
+  flex: 1;
+  font-size: 0.9em;
+  font-weight: bold;
+}
+
+.memoryPanelHeaderBtn {
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  font-size: 12px;
+  padding: 0 4px;
+  cursor: pointer;
+}
+
+.memoryPanelSelectRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-bottom: 1px solid #ddd;
+  background: #f2f7f9;
+}
+
+.memoryPanelSelectLabel {
+  font-size: 12px;
+  font-weight: bold;
+  color: #0b5394;
+  white-space: nowrap;
+}
+
+.memoryPanelSelect {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  padding: 2px 4px;
+  border: 1px solid #b9cdd6;
+  border-radius: 4px;
+}
+
+.memoryPanelList {
+  height: 240px;
+  overflow-y: auto;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.memoryPanelFooter {
+  display: flex;
+  justify-content: flex-end;
+  padding: 6px 8px;
+  border-top: 1px solid #ddd;
+  background: #f2f7f9;
+}
+
+.memoryApplyButton {
+  background-color: #0b5394;
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 16px;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.memoryApplyButton:disabled {
+  background-color: #b9cdd6;
+  cursor: not-allowed;
+}
+
+.memoryPanelRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background-color: #e0f7fa;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 0.85em;
+}
+
+.memoryPanelOrder {
+  color: #0b5394;
+  font-weight: bold;
+  min-width: 20px;
+  text-align: right;
+}
+
+.memoryPanelRemove {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: #aa0000;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.memoryPanelEmpty {
+  padding: 10px;
+  color: #777777;
+  font-style: italic;
+}
+
+.ocrWorkspaceError {
+  flex: 0 0 auto;
+  margin: 6px 8px 0;
+  padding: 7px 9px;
+  border: 1px solid #c62828;
+  border-radius: 4px;
+  background: #ffebee;
+  color: #8e1515;
+  font-size: 12px;
+}
+
+.preScanDashboard {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  background: #f5f8fa;
+  border-bottom: 1px solid #b9cdd6;
+}
+
+.preScanStatus {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 24px;
+  padding: 3px 7px;
+  border: 1px solid #b9cdd6;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #455a64;
+  font-size: 12px;
+}
+
+.preScanStatusLabel {
+  flex: 0 0 auto;
+  min-width: 58px;
+  color: #0b5394;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.preScanStatusMessage {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preScanStatusCount {
+  margin-left: auto;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #0b5394;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.preScanStatus_waiting {
+  border-color: #ef6c00;
+  background: #fff3e0;
+}
+
+.preScanStatus_running {
+  border-color: #1565c0;
+  background: #e3f2fd;
+}
+
+.preScanStatus_done {
+  border-color: #2e7d32;
+  background: #e8f5e9;
+}
+
+.preScanStatus_empty {
+  border-color: #f9a825;
+  background: #fffde7;
+}
+
+.preScanStatus_failed {
+  border-color: #c62828;
+  background: #ffebee;
+}
+
+.preScanHiddenControl {
+  display: none;
+}
+
+.preScanToolbar,
+.preScanSearchRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.preScanFocusGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.preScanProfileManageButton {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  padding: 0;
+  border: 1px solid #9fb7c3;
+  border-radius: 4px;
+  background: #eef3f5;
+  color: #0b5394;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.preScanProfileManageButton:hover {
+  background: #dcecf5;
+}
+
+.preScanProfileManageButton:focus-visible {
+  outline: 2px solid rgba(11, 83, 148, 0.3);
+  outline-offset: 1px;
+}
+
+.preScanButton,
+.preScanPrimaryButton,
+.preScanIconButton,
+.preScanDangerButton {
+  min-height: 26px;
+  padding: 3px 9px;
+  border: 1px solid #9fb7c3;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #0b5394;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.preScanPrimaryButton {
+  border-color: #0b5394;
+  background: #0b5394;
+  color: #ffffff;
+}
+
+.preScanMappingsButton {
+  border-color: #c62828;
+  background: #ffffff;
+  color: #c62828;
+}
+
+.preScanMappingsButton:hover:not(:disabled) {
+  background: #ffebee;
+}
+
+.preScanIconButton {
+  background: #eaf3de;
+  color: #244f13;
+}
+
+.preScanDangerButton {
+  border-color: #8d1d1d;
+  background: #ffffff;
+  color: #8d1d1d;
+}
+
+.preScanButton:hover,
+.preScanPrimaryButton:hover,
+.preScanIconButton:hover,
+.preScanDangerButton:hover {
+  filter: brightness(0.96);
+}
+
+.preScanButton:disabled,
+.preScanPrimaryButton:disabled,
+.preScanIconButton:disabled,
+.preScanDangerButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.preScanLabel,
+.preScanToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #0b5394;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.preScanSelect,
+.preScanSearchInput {
+  min-height: 26px;
+  border: 1px solid #b9cdd6;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #1f2933;
+  font-size: 12px;
+}
+
+.preScanSelect {
+  min-width: 210px;
+}
+
+.preScanSearchInput {
+  width: min(460px, 46vw);
+  padding: 3px 7px;
+}
+
+/* Fixed Find row (matches existing toolbar/button design) */
+.gridFindRow {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  margin-top: 4px;
+  margin-bottom: 2px;
+  padding-bottom: 4px;
+
+  width: 100%;
+  background: #fff;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.12);
+}
+
+.gridScroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;   // ✅ scroll happens here
+}
+
+.gridFindLabel {
+  font-size: 12px;
+  font-weight: bold;
+  color: #0b5394;
+  white-space: nowrap;
+}
+
+.blockCollapseBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0 6px 0 4px;
+  padding: 0;
+  flex-shrink: 0;
+  border-radius: 0.5rem;
+  background: #ffedd5;
+  color: #f59e0b;
+  border: 1.5px solid #fdba74;
+  cursor: pointer;
+  line-height: 0;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: #fed7aa;
+    border-color: #f59e0b;
+  }
+
+  svg {
+    display: block;
+    flex-shrink: 0;
+  }
+}
+
+.gridFindInput {
+  @extend .toolbarInput;
+  flex: 1;          // ✅ takes all remaining free space
+  min-width: 0;     // ✅ prevents flex overflow issues
+}
+
+
+/* NEW: scrollable area for the grid/list */
+.gridFindInputWrap {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  display: flex;
+}
+
+.gridFindInput {
+  width: 100%;
+  padding-right: 26px;
+}
+
+.gridFindClear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid #9aa0a6;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #444444;
+  font-size: 11px;
+  font-weight: bold;
+  line-height: 16px;
+  cursor: pointer;
+}
+
+.gridFindClear:hover {
+  background: #e3f2fd;
+  border-color: #1976d2;
+  color: #0b5394;
+}
+
+/* NEW: scrollable area for the grid/list */
+.gridContent {
+  flex: 1;
+  overflow-y: auto;   /* only this part scrolls */
+  padding-top: 4px;   /* small spacing below toolbar */
+}
+
+.findHighlight {
+  padding: 0;              /* ✅ no extra spacing inside words */
+  margin: 0;
+  border-radius: 2px;
+
+  background: transparent; /* ✅ avoid background box that needs padding */
+  box-shadow: inset 0 1.45em 0 #fff2a8; /* ✅ highlight behind text */
+
+  display: inline;
+  line-height: inherit;
+}
+
+.instructionName {
+  margin-left: 6px;
+}
+
+/* Block Styling */
+.block {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px; /* Decreased gap */
+}
+
+/* Block Header */
+.blockHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px; /* Decreased gap */
+  padding: 8px; /* Reduced padding */
+  background-color: #0b5394; /* Dark blue background */
+  color: white; /* White text */
+  font-size: 1em; /* Decreased font size */
+  font-weight: bold; /* Bold text */
+  border-radius: 8px; /* Smaller rounded corners */
+  margin: 0;
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.4); /* Slightly smaller shadow */
+  height: 20px; /* Set a fixed height */
+  justify-content: space-between;
+
+  &.colorComponent1 {
+    background-color: #c3d3d9   !important;
+    color: #0b5394; 
+  }
+
+  &.colorComponent2 {
+    background-color: #add8e6   !important;
+    color: #0b5394; 
+  }
+  
+}
+
+.blockHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 5px; /* Adjust gap as needed */
+}
+
+.blockHeaderTestButton {
+  flex: 0 0 auto;
+  margin-left: 4px;
+}
+
+
+/* Block Name Span */
+.blockHeader .blockName  {
+  font-size: 14px; // Decrease font size
+  width: 200px; /* Set width of block name to 100px */
+  white-space: nowrap; /* Prevent text wrapping */
+  overflow: hidden; /* Hide overflow */
+  text-overflow: ellipsis; /* Add ellipsis if text is too long */
+}
+
+/* Block Name Span */
+.blockHeader .blockCount {
+  width: 50px; /* Set width of block name to 100px */
+  white-space: nowrap; /* Prevent text wrapping */
+  overflow: hidden; /* Hide overflow */
+  text-overflow: ellipsis; /* Add ellipsis if text is too long */
+}
+
+.blockOrderNumber{
+  font-size: 14px; // Decrease font size
+  // width: 200px; /* Set width of block name to 100px */
+  white-space: nowrap; /* Prevent text wrapping */
+  overflow: hidden; /* Hide overflow */
+  text-overflow: ellipsis; /* Add ellipsis if text is too long */
+}
+
+/* Move Buttons Container */
+.blockHeader .moveButtons {
+  margin-left: auto;
+  display: flex;
+  gap: 4px; /* Smaller gap between buttons */
+}
+
+
+/* Button Styling */
+.moveButton,
+.rollbackButton,
+.garbageButton,
+.editButton,
+.excelButton,
+.crossButton,
+.saveButton,
+.pickButton,
+.warningButton,
+.testButton,
+.arrowLeftButton,
+.brickButton {
+  // width: 22px;
+  height: 22px;
+  background-color: transparent;
+  padding: 0;
+  cursor: pointer;
+  transition: transform 0.3s ease; /* Smooth scaling on hover */
+
+  &:hover {
+    transform: scale(1.4); /* Slightly increase size on hover */
+  }
+  
+}
+
+.optionsRow {
+  display: flex;
+  flex-direction: row;
+  gap: 12px; // ← horizontal spacing between toggles (adjust 8px / 12px / 16px)
+  align-items: center;
+}
+
+// NOTE: the compact inline variant that used to live here (.optionsRowInline)
+// is now a self-contained component — see CompForce.tsx + CompForce.module.scss.
+// GridItem / GridItemComp / GridItemScann all render CompForce inside their
+// .optionsColumn instead of using this variant. Kept the base .optionsRow
+// rules above for any remaining non-inline usage.
+
+.optionsToggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+
+  box-sizing: border-box;
+  border: 1px solid transparent;   // <-- reserve space always
+
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  white-space: nowrap; 
+}
+
+/* ACTIVE */
+.optionsToggle.active {
+  background: #e6f4ea;
+  border-color: transparent;        // (optional, but explicit)
+}
+
+.optionsToggle.active .optionsToggleLabel {
+  color: #0f9d58;
+}
+
+/* INACTIVE */
+.optionsToggle.inactive {
+  background: transparent;
+  border-color: #e0e0e0;            // <-- instead of adding/removing border
+}
+
+.optionsToggle.inactive .optionsToggleLabel {
+  color: #d93025;
+}
+
+.optionsToggleIcon {
+  width: 14px;
+  height: 14px;
+  display: block;
+  flex: 0 0 14px;
+}
+.editContainer {
+  display: inline-flex;  /* Make input and image inline */
+  align-items: center;   /* Vertically center the items */
+  gap: 5px;              /* Add space between the text box and save button */
+  /* Make the edit container actually visible — without a sensible min width
+     the inline-flex shrinks to content + flex:1 zero-basis input collapses
+     to a barely-visible sliver inside the 30px grid track. */
+  min-width: 220px;
+}
+
+.editTextbox {
+  flex: 1; /* Make the input take the available space */
+  min-width: 160px; /* Ensure the seeded label is visible + editable */
+  padding: 2px 6px;
+  font-size: 12px;
+}
+
+.socketPort {
+  font-size: 7px;
+  display: inline-block;
+  color: white;
+  padding: 5px 12px 0px 0px;
+  vertical-align: text-top;
+}
+
+
+.garbageButton {
+  margin-right: 2px; /* Reduced space from the up button */
+}
+
+.editButton,
+.excelButton {
+  margin-left: 2px; /* Reduced margins */
+}
+
+/* Individual Button Padding */
+.editButton {
+  padding: 0 0 0 6px;
+}
+
+/* Individual Button Padding */
+.excelButton {
+  padding: 0 6px 0 0;
+}
+
+.saveButton {
+  padding: 0 2px 0 6px;
+}
+
+.pickButton{
+  padding: 0 2px 0 6px;
+}
+
+.warningButton{
+  padding: 0 2px 0 6px;
+}
+
+.testButton {
+  padding: 0 2px 0 6px;
+}
+
+.crossButton {
+  padding: 0 2px 0 6px;
+}
+
+/* Operations Button */
+.operations {
+  width: 20px;
+  height: 17px;
+  background-color: transparent;
+  margin-left: 2px;
+  padding: 0;
+  cursor: pointer;
+  pointer-events: none; 
+}
+
+/* New class for waitImage with same styles but different height */
+.waitImage {
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
+
+.inputImage {
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
+
+.outputImage {
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
+
+.clickImage {
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
+
+.closeImage {
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
+
+.screenImage {
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
+
+.linkImage{
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
+
+.ifelseImage {
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
+
+.instructionLine {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.refreshImage {
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
+
+.hiddenImage {
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
+
+.elseImage {
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
+
+.endifImage {
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
+
+
+.pauseImage {
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
+
+.gotoImage {
+  @extend .operations; /* Inherit styles from .operations */
+  height: 20px; /* Override height */
+}
+
+// .excelgotoImage {
+//   @extend .operations; /* Inherit styles from .operations */
+//   height: 20px; /* Override height */
+//   width: 30px; /* Override height */
+// }
+
+.excelGotoContainer {
+  @extend .moveButtons; /* Inherit styles from .moveButtons */
+  background-color: transparent; /* Transparent background */
+  background-color: #c3d3d9; /* Light gray background */
+  // padding: 10px;
+  border-radius: 5px;
+  display: flex; /* Use flexbox for layout */
+  align-items: center; /* Vertically center items */
+  // margin-bottom: 10px; /* Add some space below the container */
+
+
+  /* Add transition for smooth effect */
+  transition: background-color 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+  cursor: pointer; /* Indicates it's interactive */
+}
+
+.excelGotoContainer:hover {
+  background-color: #a7bed3;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); 
+}
+
+.excelgotoImage {
+  height: 16px;
+  width: 16px;
+  margin-right: 5px; 
+}
+
+.excelgotoText {
+  font-size: 0.8em; 
+  margin-right: 5px;
+  color: #b163ff;
+  white-space: nowrap; 
+}
+
+.crossImage {
+  height: 16px;
+  width: 16px;
+}
+
+
+/* Instructions List */
+.instructionsList {
+  display: flex;
+  flex-direction: column;
+  gap: 3px; /* Decreased gap */
+}
+
+// Per-row "Keep this element" checkbox (GridItemScann only). Lives in the
+// first 26px column of .instructionItem. Clicking it toggles membership in
+// keepSelectedIds; the header's "Delete Unchecked (N)" button prunes every
+// element whose id is NOT in the set.
+.keepCheckbox {
+  grid-column: 1;
+  justify-self: center;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  margin: 0;
+}
+
+/* Instruction Item */
+.instructionItem {
+  display: grid;
+  // grid-template-columns: 250px auto minmax(120px, 1fr) auto;
+  // First 26px column holds the Keep checkbox in GridItemScann; panes that
+  // don't render a checkbox just get a small empty gutter.
+  grid-template-columns: 26px minmax(50px, 350px) minmax(60px, 1fr) auto;
+  // gap: 8px; /* Decreased gap */
+  // padding: 8px; /* Decreased padding */
+  background-color: #e0f7fa;
+  box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1); /* Reduced shadow size */
+  border-radius: 6px; /* Smaller border-radius */
+  border: 1px solid #ddd;
+  align-items: center; /* Center content vertically */
+  
+  position: relative; // Required for background positioning
+  z-index: 1;
+
+
+  > .instructionLine {
+    grid-column: 2;
+    justify-self: start;
+    padding-left: 6px;
+    min-width: 0;
+  }
+
+  /* In edit mode the input + save icon need real horizontal room; let the
+     editContainer span columns 2 through 4 so the seeded text is actually
+     visible and editable. */
+  > .editContainer {
+    grid-column: 2 / span 3;
+    justify-self: stretch;
+    padding-left: 6px;
+    min-width: 0;
+  }
+
+  > .optionsColumn {
+    grid-column: 4;
+  }
+
+  > .attrSlot {
+    grid-column: 3;
+    justify-self: start;
+  }
+  &:hover {
+    background-color: #b2ebf2; /* Slightly darker for hover effect */
+    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2); /* Stronger shadow on hover */
+  }
+
+  .executionBackground {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    border-radius: 6px;
+    pointer-events: none;
+    animation: pulseBg 2s infinite;
+  }
+
+  // Color variants
+  .executionBackground.green {
+    background-color: #4caf50;
+    box-shadow: 0 0 10px #4caf50;
+  }
+
+  .executionBackground.red {
+    background-color: #f44336;
+    box-shadow: 0 0 10px #f44336;
+  }
+
+  .executionBackground.yellow {
+    background-color: #ffeb3b;
+    box-shadow: 0 0 10px #ffeb3b;
+  }
+    // Everything else above background EXCEPT the right-hand action column,
+    // which gets z-index: 0 below so it slides behind the row label when the
+    // viewport narrows (Roadmap 3 Phase 3d follow-up).
+    > *:not(.executionBackground):not(.optionsColumn) {
+      position: relative;
+      z-index: 100;
+    }
+
+}
+
+/* Change background to white when dropdown is open */
+.instructionItem.dropdownOpen {
+  background-color: #9ee6ef; /* Change background to white */
+  position: relative;
+  z-index: 999;
+}
+
+/* Margin for the first span element with instruction type */
+.instructionItem span:first-child {
+  margin-left: 3px; /* Add left margin of 3px */
+}
+
+/* Options column styling */
+.instructionItem .optionsColumn {
+  display: flex;
+  justify-content: flex-end; /* Align content to the right */
+  margin-right: 8px; /* Add right margin of 3px */
+    white-space: nowrap;
+  /* When the viewport narrows, the action buttons (CompForce S/N/T/E/F badges,
+     edit, save, test, cross-X) overflow their grid track and visually collide
+     with the picked-element label on the left. Drop them behind the left
+     content so the row text always reads cleanly. */
+  position: relative;
+  z-index: 0;
+}
+
+/* Roadmap 3 Phase 3d follow-up: keep the picked-element label readable when
+   the row shrinks and optionsColumn overflows behind it. Inherit the row's
+   background color so hover/active states still match. */
+.instructionItem .instructionLine,
+.instructionItem .instructionDetails {
+  position: relative;
+  z-index: 2;
+  background-color: inherit;
+}
+
+
+
+/* Instruction Item Span */
+.instructionItem span {
+  font-size: 0.85em; /* Smaller font size for span text */
+}
+
+/* For instruction-type: uses flex */
+.instructionType {
+  display: flex;
+  align-items: center; /* Align content vertically */
+  gap: 3px; /* Add a 3px gap between elements */
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.instructionType span {
+  font-weight: bold; /* Make the text bold */
+}
+
+.displayName {
+  display: block;
+  flex: 1 1 auto;
+  font-weight: bold;
+  min-width: 50px;
+  max-width: 350px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 1200px) {
+  .instructionItem {
+    grid-template-columns: 26px minmax(50px, 150px) minmax(60px, 1fr) auto;
+  }
+
+  .displayName {
+    max-width: 150px;
+  }
+}
+
+.instructionDetails {
+  font-weight: bold; /* Make the text bold */
+  margin-right: 3px; /* Add a 3px gap after the span */
+  display: inline-block; /* Ensure the span behaves as a block but allows space for the next element */
+}
+
+.toolbarMainButton {
+  background-color: #c3d3d9 !important;
+  color: #0b5394;
+  border: none;
+  padding: 5px 13px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+  font-size: 11px;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.attributesButton {
+  @extend .toolbarMainButton;
+}
+
+.sendAllButton {
+  @extend .toolbarMainButton;
+}
+
+.updateAllButton {
+  @extend .toolbarMainButton;
+}
+
+.attributesButton:hover,
+.sendAllButton:hover,
+.updateAllButton:hover {
+  background-color: #a9bec7 !important;
+  transform: scale(1.05);
+}
+
+.sendAllButton.sending,
+.updateAllButton.updating,
+.attributesButton.sending {
+  background-color: #4caf50 !important;
+  color: #0b5394 !important;
+  animation: pulseBg 2s infinite;
+  box-shadow: 0 0 10px #4caf50;
+}
+
+.sendAllButton:disabled,
+.updateAllButton:disabled,
+.attributesButton:disabled {
+  background-color: #cccccc;
+  color: #7a7a7a;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* === Toolbar above all sections === */
+.controlsToolbar {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: #fff;
+
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 6px;
+
+  margin-top: 4px;
+  margin-bottom: 2px;
+  font-size: 12px;
+  border-bottom: 1px solid #c0c0c0;
+  padding-bottom: 4px;
+  width: 100%;
+}
+
+/* ===== NEW: two-row toolbar layout (used by toolbar-row wrappers) ===== */
+.toolbarRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  flex-wrap: nowrap;
+}
+
+.toolbarRowTop {
+  justify-content: flex-start;
+}
+
+.toolbarRowBottom {
+  justify-content: space-between; /* left group on left, right group on right */
+}
+
+.toolbarLeft,
+.toolbarRight {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.toolbarRight {
+  margin-left: auto; /* keeps right cluster aligned right */
+}
+
+
+/* === Buttons inside top toolbar === */
+.buttonsToolbar {
+  // width: 110px;
+  background-color: #c3d3d9 !important;
+  color: #0b5394;
+  border: none;
+  padding: 5px 12px; /* slightly wider button */
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+  font-size: 11px;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.buttonsToolbar:hover {
+  background-color: #a9bec7 !important;
+  transform: scale(1.05);
+}
+
+/* When isSending = true */
+.buttonsToolbar.sending {
+  background-color: #4caf50 !important; /* yellow */
+  color: #0b5394 !important; /* dark blue text */
+  animation: pulseBg 2s infinite;
+  box-shadow: 0 0 10px #4caf50;
+}
+
+/* Disabled state for toolbar buttons */
+.buttonsToolbar:disabled {
+  background-color: #cccccc;
+  color: #7a7a7a;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+  opacity: 0.7;
+}
+
+
+/* Insert All Elements row directly after toolbar */
+.controlsToolbar + .controlsRow {
+  margin-top: -2px;
+}
+
+/* No-data header block directly after toolbar */
+.controlsToolbar + .block {
+  margin-top: -2px;
+}
+
+/* === Toolbar text fields === */
+.toolbarInput {
+  width: 250px;
+  padding: 6px 10px;
+  border: 1px solid #c0c0c0;
+  border-radius: 5px;
+  font-size: 12px;
+  color: #0b5394;
+  background-color: #f5f8fa;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+/* Add subtle extra space after input fields */
+.toolbarInput + .buttonsToolbar {
+  margin-left: 1px;
+}
+
+.toolbarInput:focus {
+  border-color: #0b5394;
+}
+
+/* vertical separator in the toolbar */
+.toolbarSeparator {
+  width: 1px;
+  height: 24px;              /* matches your 12px font & button height nicely */
+  background-color: #c0c0c0; /* same tone as your border */
+  display: inline-block;
+  margin: 0 3px;
+}
+
+.toolbarSelect {
+  width: 130px;          /* narrower */
+  padding: 3px 6px;      /* minimal height */
+  border: 1px solid #c0c0c0;
+  border-radius: 4px;
+  font-size: 11px;       /* slightly smaller font */
+  color: #0b5394;
+  background-color: #f5f8fa;
+  cursor: pointer;
+  white-space: nowrap;
+
+  &:focus {
+    border-color: #0b5394;
+  }
+}
+
+
+/* disabled look for the newBotJobName input when preset is not "Create New Bot jOb" */
+.toolbarInput:disabled {
+  background-color: #eeeeee;
+  color: #7a7a7a;
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+.toolbarInline {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.toolbarRefreshBtn {
+  padding: 4px 7px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: #f9f9f9;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.toolbarRefreshBtn:hover {
+  background: #eef;
+}
+
+/* Custom widths for new input fields */
+.inputAppName {
+  width: 80px !important;
+}
+
+.selectPackageName {
+  width: 150px !important;
+}
+
+.inputPackageName {
+  width: 150px !important;
+}
+
+.selectedAttribute {
+  margin-top: 10px;
+  font-weight: bold;
+  padding: 5px;
+  background-color: #b163ff;
+  border-radius: 5px;
+  color: white;
+}
+
+.lightYellowBackground {
+  background-color: #ffffe0; /* Light yellow color */
+}
+
+
+/* Horizontal group for Scanner + Scanner AI + Scrolling select */
+.scannerGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 4px;
+  border-radius: 6px;
+  background-color: #e0f7fa;      /* Light cyan */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  border: 1px solid #c2e9ef;      /* subtle border */
+  transition: background-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+/* Optional hover effect */
+.scannerGroup:hover {
+  background-color: #b2ebf2;      /* Slightly darker cyan */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12);
+}
+
+/* Scanner type dropdown – styled like main toolbar buttons */
+.scannerTypeSelect {
+  @extend .buttonsToolbar;      /* reuse your button sizing & base style */
+  padding-right: 28px;           /* space for the dropdown arrow */
+  text-align: left;
+  appearance: none;              /* remove native select look */
+  background-color: #ffffff;
+  color: #0b5394;
+  font-weight: bold;
+
+  /* custom arrow */
+  background-image: url("data:image/svg+xml;utf8,<svg fill='gray' height='20' width='20' xmlns='http://www.w3.org/2000/svg'><path d='M6 8l4 4 4-4z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 12px;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+
+/* Thin vertical separator between items */
+.groupDivider {
+  width: 1px;
+  height: 16px;
+  background-color: #8fcbd4;     /* darker cyan line */
+  margin: 0 3px;
+  display: inline-block;
+}
+
+/* Scrolling selector container */
+.scrollSelectGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.scrollLabel {
+  font-size: 11px;
+  font-weight: bold;
+  color: #0b5394;
+  white-space: nowrap;
+   margin-right: 2px;          /* very tight */
+}
+
+.scrollSelect {
+  @extend .toolbarSelect;
+  width: 90px;
+   padding: 3px 6px;           /* ↓ reduced height */
+  font-weight: bold;
+  color: #0b5394;
+}
+
+/* ===== Scroll buttons (toolbar) ===== */
+
+.scrollButtonsGroup {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.scrollButtons {
+  display: flex;
+  flex-direction: center;
+  gap: 2px;
+}
+
+.scrollButtons.inline {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.scrollBtn {
+ width: 26px;          /* same visual footprint as ↻ */
+  height: 22px;
+  padding: 0;
+  font-size: 11px;
+  // font-weight: bold;
+   font-weight: 700;
+  line-height: 1;
+  border-radius: 4px;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+/* UP */
+.scrollBtn.scrollUp {
+  background: linear-gradient(180deg, #4caf50, #2e7d32);
+  color: #ffffff;
+}
+
+/* DOWN */
+.scrollBtn.scrollDown {
+  background: linear-gradient(180deg, #ff9800, #ef6c00);
+  color: #ffffff;
+}
+
+/* Hover / Active */
+.scrollBtn:hover {
+  filter: brightness(1.15);
+}
+
+.scrollBtn:active {
+  transform: translateY(1px);
+}
+
+/* Disabled state (inherits toolbar behavior) */
+.scrollBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.navButtons {
+  margin-bottom: 2px;
+}
+
+.navBtn {
+  width: 28px;          // smaller hitbox
+  height: 24px;
+  padding: 0;
+  line-height: 1;
+  font-size: 13px;      // ↓ smaller font
+  font-weight: 800;     // ↑ bold
+  text-align: center;
+}
+
+.navBtn.back {
+  font-size: 13px;
+  font-weight: 900;     // strongest for arrow
+}
+
+.navBtn.home {
+  font-size: 14px;      // circle needs a touch more size
+  font-weight: 900;
+}
+
+.navBtn.recents {
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: -1px; // tighter "≡"
+}
+
+ .navBtn.nextDone {
+    // minimal, optional overrides
+    font-weight: 600;
+  }
+
+.navBtn.closeAll {
+  color: #d32f2f;
+  font-weight: bold;
+
+  &:hover {
+    background-color: rgba(211, 47, 47, 0.15);
+  }
+}
+
+/* Dropdown arrow styling */
+.dropdownColumn {
+  position: relative;
+  margin-right: 8px;
+}
+
+.dropdownArrow {
+  cursor: pointer;
+  width: 22px;
+  height: 22px;
+  transition: transform 0.3s ease; /* Smooth scaling on hover */
+
+  &:hover {
+    transform: scale(1.4); /* Slightly increase size on hover */
+  }
+}
+
+/* Dropdown menu styling */
+.dropdownMenu {
+  position: absolute;
+  z-index: 999;
+  top: 25px; /* Default: Adjust based on layout */
+  right: 0;
+  background-color: #e0f7fa;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+  padding: 4px 0;
+  font-size: 0.85em;
+ 
+  width: 150px;
+}
+
+.dropdownAbove {
+  top: auto;    /* Reset top */
+  bottom: 25px; /* Position the dropdown above the clicked element */
+}
+
+
+
+/* Individual menu items */
+.dropdownMenu div {
+  padding: 8px 12px;
+  cursor: pointer;
+  white-space: nowrap; /* Ensure the text stays on a single line */
+}
+
+/* Hover effect for menu items */
+.dropdownMenu div:hover {
+  background-color: #b2ebf2; /* Light blue background on hover */
+  color: #00796b; /* Darker text color on hover */
+}
+
+
+.blockExportFile {
+  font-size: 12px; // Decrease font size
+  color: #888;
+  margin-left: 10px;
+  font-style: italic;
+  white-space: nowrap; // Prevent text from wrapping
+  overflow: hidden;
+  text-overflow: ellipsis; // Add "..." if the text is too long
+}
+
+
+.w3Card {
+  display: inline-block;
+  background-color: white;
+  border: 2px solid black;
+  min-width: 200px;
+  width: 35%;
+  height: 80%;
+}
+
+.w3Gray {
+  text-align: center;
+}
+
+.controlsRow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 15px;
+  margin-top: -2px;
+  font-size: 12px;
+}
+
+/* Keep the controls row visible while .gridScroll scrolls */
+.fixedControlsRow {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: #fff; /* use your page bg */
+}
+
+
+.paginationControls {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  font-size: 12px;
+  width: 100px;
+  white-space: nowrap;
+}
+
+.paginationControls label {
+  font-weight: bold;
+  color: #333;
+}
+
+.paginationControls select {
+  padding: 8px 12px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+  font-size: 12px;
+  background-color: white;
+  cursor: pointer;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  width: 80px;
+}
+
+.paginationControls select:hover {
+  border-color: #007bff;
+}
+
+.paginationControls select:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+}
+
+.paginationControls button {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.paginationControls button:hover {
+  background-color: #0056b3;
+  transform: scale(1.05);
+}
+
+.paginationControls button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.paginationControls span {
+  font-weight: bold;
+  color: #555;
+}
+
+.bottomPaginationControls {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  font-size: 12px;
+}
+
+.bottomPaginationControls span {
+  white-space: nowrap; /* Prevent line breaks */
+}
+
+.noDataMessage {
+  font-size: 16px;
+  color: #888;
+  text-align: center;
+  margin-top: 20px;
+}
+
+.toggleSection {
+  margin-bottom: 20px;
+}
+
+.toggleButton {
+  padding: 5px 10px;
+  cursor: pointer;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+}
+
+@keyframes pulseBg {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* ===== Validate selector (toolbar-aligned) ===== */
+
+.validateInline {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Label: "Validate:" */
+.validateInline .toolbarLabel {
+  font-size: 11px;
+  font-weight: bold;
+  color: #0b5394;
+  white-space: nowrap;
+  margin-right: 2px; /* very tight */
+}
+
+/* Dropdown wrapper */
+.validateDropdown {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Trigger button (same footprint as toolbar buttons) */
+.validateTrigger {
+  width: auto;
+  min-width: 70px;
+  height: 22px;
+  padding: 3px 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #0b5394;
+  line-height: 1;
+  border-radius: 4px;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+/* Disabled state */
+.validateTrigger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Dropdown panel */
+.validateMenu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 60;
+
+  min-width: 300px;
+  padding: 6px;
+
+  background: #ffffff;
+  border: 1px solid rgba(11, 83, 148, 0.25);
+  border-radius: 6px;
+
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+}
+
+/* Single checkbox row */
+.validateItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+
+  padding: 4px 4px;
+  cursor: pointer;
+
+  font-size: 11px;
+  font-weight: 700;
+  color: #0b5394;
+}
+
+/* Checkbox alignment */
+.validateItem input[type="checkbox"] {
+  margin-top: 2px;
+}
+
+/* Text container */
+.validateItemText {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* Field value */
+.validateItemValue {
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+/* Confidence */
+.validateItemConf {
+  font-weight: 700;
+  opacity: 0.65;
+}
+
+
+// .instructionItem[data-executing='true'] {
+//   background-color: var(--execution-state-color); // optional if using a CSS var
+//   // animation: pulseBg 2s infinite;
+//   box-shadow: 0 0 10px var(--execution-state-color);
+//   z-index: 0; // or -1 if needed
+//   position: relative; // required for z-index to work
+// }
+
+
+/* ── Block header "id" / "id-test" view toggles (preScan dashboard) ── */
+
+.blockViewToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 16px;
+  margin-left: 4px;
+  padding: 0 7px;
+  border-radius: 8px;
+  border: 1px solid #ffffff;
+  background: transparent;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: bold;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.75;
+}
+
+.blockViewToggle:hover {
+  opacity: 1;
+}
+
+.blockViewToggleActive {
+  background: #ffffff;
+  color: #0b5394;
+  opacity: 1;
+}
+
+/* Raw id / test attribute shown in place of the element name */
+.idValueText {
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 0.85em;
+  color: #0b5394;
+}
+
+/* Element has no id / testing attribute */
+.dimmedDash {
+  opacity: 0.35;
+  font-weight: bold;
+}
+
+/* ── OCR review panel (per-block, floating, non-modal) ── */
+
+.ocrPanel {
+  min-width: 460px;
+  max-width: 640px;
+}
+
+.ocrPanelColumns {
+  display: grid;
+  grid-template-columns: 1fr 18px 1fr 52px;
+  gap: 6px;
+  padding: 4px 8px;
+  border-bottom: 1px solid #ddd;
+  background: #f2f7f9;
+  color: #0b5394;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.ocrPanelList {
+  max-height: 46vh;
+  overflow-y: auto;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ocrPanelRow {
+  display: grid;
+  grid-template-columns: 1fr 18px 1fr 52px;
+  gap: 6px;
+  align-items: center;
+  background-color: #e0f7fa;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 0.85em;
+}
+
+.ocrScannedText {
+  color: #555555;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ocrArrow {
+  color: #0b5394;
+  font-weight: bold;
+  text-align: center;
+}
+
+.ocrCurrentText {
+  color: #0b5394;
+  font-weight: bold;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ocrRowActions {
+  display: inline-flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.ocrAgreeBtn,
+.ocrDeferBtn {
+  width: 22px;
+  height: 20px;
+  padding: 0;
+  border-radius: 3px;
+  border: 1px solid #2e7d32;
+  background: #ffffff;
+  color: #2e7d32;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.ocrAgreeBtn:hover {
+  background: #2e7d32;
+  color: #ffffff;
+}
+
+.ocrDeferBtn {
+  border-color: #c62828;
+  color: #c62828;
+}
+
+.ocrDeferBtn:hover {
+  background: #c62828;
+  color: #ffffff;
+}
+
+.ocrSameBadge {
+  color: #999999;
+  font-size: 0.8em;
+  font-style: italic;
+  text-align: right;
+}
+
+/* Scanner-generated search id (element has no DOM id) — distinct from real ids */
+.idGeneratedText {
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 0.85em;
+  color: #b45309;
+  font-style: italic;
+}

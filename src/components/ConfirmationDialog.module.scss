@@ -1,0 +1,136 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.35);
+  padding: 14px;
+}
+
+.dialog {
+  width: min(460px, calc(100vw - 28px));
+  max-height: calc(100dvh - 28px);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #0b5394;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
+  overflow: hidden;
+}
+
+.dialog,
+.dialog * {
+  box-sizing: border-box;
+}
+
+.header {
+  flex: 0 0 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 12px;
+  background: #0b5394;
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.header span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.headerCloseButton {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 4px;
+  background: transparent;
+  color: #ffffff;
+  padding: 0;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.headerCloseButton:hover,
+.headerCloseButton:focus-visible {
+  background: rgba(255, 255, 255, 0.16);
+  outline: none;
+}
+
+.body {
+  min-height: 0;
+  overflow: auto;
+  padding: 13px 14px;
+  color: #1f2933;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.body p {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.body p + p {
+  margin-top: 8px;
+}
+
+.detail {
+  color: #0b5394;
+  font-weight: 700;
+}
+
+.detail.error {
+  color: #c62828;
+}
+
+.footer {
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 9px 12px;
+  border-top: 1px solid #d9d9d9;
+  background: #ececec;
+}
+
+.footer button {
+  min-width: 78px;
+  height: 34px;
+  border-radius: 4px;
+  padding: 0 13px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cancelButton {
+  border: 1px solid #9aa5b1;
+  background: #ffffff;
+  color: #1f2933;
+}
+
+.confirmButton {
+  border: 1px solid #0b5394;
+  background: #0b5394;
+  color: #ffffff;
+}
+
+.dangerButton {
+  border: 1px solid #c62828;
+  background: #c62828;
+  color: #ffffff;
+}

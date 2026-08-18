@@ -1,0 +1,214 @@
+import { fireEvent, render, screen } from '@testing-library/react';
+import ScannerWorkspaceHeader from './ScannerWorkspaceHeader';
+import { scannerState } from './Scanner.testUtils';
+
+const state = scannerState();
+
+test('renders scanner state and sends refresh action', async () => {
+  const onAction = jest.fn();
+  render(
+    <ScannerWorkspaceHeader
+      botJobName="Fallback"
+      connected
+      scannerState={state}
+      status="Ready"
+      onAction={onAction}
+    />,
+  );
+
+  expect(screen.getByText('AR Web Factory')).toBeInTheDocument();
+  expect(screen.getByText(/Apre Acconto/)).toBeInTheDocument();
+  expect(screen.getByText('https://bank.example')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+
+  expect(onAction).toHaveBeenCalledWith('REFRESH_STATE');
+});
+
+test('sends clear grid action', () => {
+  const onAction = jest.fn();
+  render(
+    <ScannerWorkspaceHeader
+      botJobName="Fallback"
+      connected
+      scannerState={state}
+      onAction={onAction}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: 'Clear Grid' }));
+
+  expect(onAction).toHaveBeenCalledWith('CLEAR_GRID');
+});
+
+test('shows active browser URL before environment URL', () => {
+  render(
+    <ScannerWorkspaceHeader
+      botJobName="Fallback"
+      connected
+      scannerState={{
+        ...state,
+        browser: {
+          ...state.browser,
+          state: 'OPEN',
+          activeUrl: 'https://active.bank.example/login',
+        },
+      }}
+    />,
+  );
+
+  expect(screen.getByText('https://active.bank.example/login')).toBeInTheDocument();
+  expect(screen.queryByText('https://bank.example')).not.toBeInTheDocument();
+});
+
+test('sends refresh page action', () => {
+  const onAction = jest.fn();
+  render(
+    <ScannerWorkspaceHeader
+      botJobName="Fallback"
+      connected
+      scannerState={state}
+      onAction={onAction}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh Web Page' }));
+
+  expect(onAction).toHaveBeenCalledWith('REFRESH_PAGE');
+});
+
+test('sends browser tab actions', () => {
+  const onAction = jest.fn();
+  render(
+    <ScannerWorkspaceHeader
+      botJobName="Fallback"
+      connected
+      scannerState={state}
+      onAction={onAction}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: 'Previous' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+
+  expect(onAction).toHaveBeenNthCalledWith(1, 'PREVIOUS_TAB');
+  expect(onAction).toHaveBeenNthCalledWith(2, 'NEXT_TAB');
+});
+
+test('sends scanner execution actions', () => {
+  const onAction = jest.fn();
+  render(
+    <ScannerWorkspaceHeader
+      botJobName="Fallback"
+      connected
+      scannerState={state}
+      onAction={onAction}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: 'Pre-Launch' }));
+  fireEvent.click(screen.getByRole('button', { name: 'STOP' }));
+
+  expect(onAction).toHaveBeenNthCalledWith(1, 'PRE_LAUNCH');
+  expect(onAction).toHaveBeenNthCalledWith(2, 'STOP_PRE_LAUNCH');
+});
+
+test('sends page scanner action', () => {
+  const onAction = jest.fn();
+  render(
+    <ScannerWorkspaceHeader
+      botJobName="Fallback"
+      connected
+      scannerState={state}
+      onAction={onAction}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: 'Page Scanner' }));
+
+  expect(onAction).toHaveBeenCalledWith('PAGE_SCANNER');
+});
+
+test('sends page scanner action with search terms', () => {
+  const onAction = jest.fn();
+  render(
+    <ScannerWorkspaceHeader
+      botJobName="Fallback"
+      connected
+      scannerState={{
+        ...state,
+        focus: { profile: 'custom', searchTerms: ['input', 'textarea'] },
+      }}
+      onAction={onAction}
+    />,
+  );
+
+  const search = screen.getByLabelText('Scanner search terms');
+  expect(search).toHaveValue('input, textarea');
+
+  fireEvent.change(search, { target: { value: 'button, [role="tab"] ' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+
+  expect(onAction).toHaveBeenCalledWith('PAGE_SCANNER', { searchTerms: 'button, [role="tab"]' });
+});
+
+test('disables search while scanner action is pending', () => {
+  render(
+    <ScannerWorkspaceHeader
+      botJobName="Fallback"
+      connected
+      scannerState={state}
+      pendingAction="PAGE_SCANNER"
+    />,
+  );
+
+  expect(screen.getByLabelText('Scanner search terms')).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Search' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Pre-Launch' })).toBeDisabled();
+});
+
+test('keeps STOP available while scanner execution is active', () => {
+  render(
+    <ScannerWorkspaceHeader
+      botJobName="Fallback"
+      connected
+      scannerState={{ ...state, executionState: 'RUNNING' }}
+    />,
+  );
+
+  expect(screen.getByRole('button', { name: 'Pre-Launch' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'STOP' })).not.toBeDisabled();
+});
+
+test('opens OCR configuration', () => {
+  const onOpenOcrConfig = jest.fn();
+  render(
+    <ScannerWorkspaceHeader
+      botJobName="Fallback"
+      connected
+      scannerState={state}
+      onOpenOcrConfig={onOpenOcrConfig}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: 'OCR Config' }));
+
+  expect(onOpenOcrConfig).toHaveBeenCalledTimes(1);
+});
+
+test('disables OCR configuration when unavailable', () => {
+  render(
+    <ScannerWorkspaceHeader
+      botJobName="Fallback"
+      connected
+      scannerState={{
+        ...state,
+        capabilities: { ...state.capabilities, canUseOcr: false },
+      }}
+    />,
+  );
+
+  expect(screen.getByRole('button', { name: 'OCR Config' })).toBeDisabled();
+});

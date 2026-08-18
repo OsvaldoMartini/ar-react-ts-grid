@@ -1,0 +1,226 @@
+/* SearchBox — searchable dropdown combobox styled after the AI Manager
+   "Exact bot and account" selector (searchable_tool.png). */
+
+.searchBox {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.boxLabel {
+  font-size: 0.6rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #52718e;
+}
+
+.inputShell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 210px;
+  height: 30px;
+  padding: 0 4px 0 9px;
+  border: 1px solid #b9c8d9;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #64748b;
+}
+
+.inputShellOpen,
+.inputShell:focus-within {
+  border-color: #2b6cad;
+  box-shadow: 0 0 0 2px rgba(43, 108, 173, 0.13);
+}
+
+.inputShellDisabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.searchIcon {
+  flex: 0 0 auto;
+}
+
+.inputShell input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #1f2937;
+  font-size: 0.73rem;
+}
+
+.inputShell input::placeholder {
+  color: #94a3b8;
+}
+
+.chevronButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.chevronButton:hover {
+  background: #eef4fb;
+}
+
+.chevronButton svg {
+  transition: transform 0.15s ease;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+.dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 60;
+  min-width: 100%;
+  width: max(100%, 270px);
+  max-height: 320px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #cdd9e7;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 10px 26px rgba(15, 34, 58, 0.18);
+  overflow: hidden;
+}
+
+.dropdownHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 11px;
+  border-bottom: 1px solid #e3ebf4;
+  background: #f7fafd;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.optionList {
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.optionCard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px solid #dbe4ee;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #1f2937;
+  text-align: left;
+  cursor: pointer;
+}
+
+.optionActive {
+  border-color: #9db9d8;
+  background: #f4f8fd;
+}
+
+.optionSelected {
+  border-color: #2b6cad;
+  background: #eaf3fc;
+  box-shadow: 0 0 0 1px rgba(43, 108, 173, 0.25);
+}
+
+.optionTitleLine {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 0;
+}
+
+.optionTitleLine strong {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #17293f;
+}
+
+.optionIcon {
+  align-items: center;
+  display: inline-flex;
+  flex: 0 0 auto;
+  justify-content: center;
+  min-height: 20px;
+  min-width: 22px;
+}
+
+.optionSublabel {
+  font-size: 0.66rem;
+  color: #7d8ea3;
+}
+
+.allOption strong {
+  color: #2b6cad;
+}
+
+.badge {
+  padding: 1px 6px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.badge_green {
+  border-color: #b3dcc4;
+  background: #e9f8ef;
+  color: #177a43;
+}
+
+.badge_red {
+  border-color: #ecc2c2;
+  background: #fdeeee;
+  color: #bb3535;
+}
+
+.badge_blue {
+  border-color: #b9d2ea;
+  background: #eaf3fc;
+  color: #2b6cad;
+}
+
+.badge_gray {
+  border-color: #d3dce6;
+  background: #f2f6fa;
+  color: #5c6b7d;
+}
+
+.noResults {
+  padding: 12px 10px;
+  font-size: 0.7rem;
+  color: #7d8ea3;
+  text-align: center;
+}

@@ -1,0 +1,291 @@
+// ═══════════════════════════════════════════════════════════════
+// mt-readytest.scss
+// Styles for ReadyForTestTab — extracted from inline style props
+// ═══════════════════════════════════════════════════════════════
+
+// ── Token aliases (mirrors MultiTest CSS custom properties) ──────────
+$mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+$teal:   #95d7d1;
+$amber:  #f59e0b;
+$green:  #34d399;
+$blue:   #60a5fa;
+$red:    #f87171;
+$purple: #a78bfa;
+
+// ── EXECUTION MODE WRAPPER ──────────────────────────────────────
+.rft-exec-wrapper {
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba($teal, 0.28);
+}
+
+// ── HEADER ROW: label left · badge right ───────────────────────
+.rft-exec-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 14px;
+  background: rgba($teal, 0.07);
+  border-bottom: 1px solid rgba($teal, 0.18);
+
+  &__label {
+    font-family: $mono;
+    font-size: 10px;
+    font-weight: 700;
+    color: $amber;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  &__badge {
+    font-family: $mono;
+    font-size: 9px;
+    font-weight: 800;
+    background: $amber;
+    color: #0a0800;
+    border-radius: 4px;
+    padding: 2px 10px;
+  }
+}
+
+// ── EXECUTION MODE GRID ─────────────────────────────────────────
+.rft-exec-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--cs-bg);
+}
+
+// ── EXECUTION CARD (base) ───────────────────────────────────────
+.rft-exec-card {
+  text-align: left;
+  padding: 14px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: $mono;
+
+  &:disabled {
+    opacity: 0.75;
+    cursor: not-allowed;
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  &__title {
+    font-family: $mono;
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  &__desc {
+    font-family: $mono;
+    font-size: 10px;
+    line-height: 1.65;
+  }
+
+  // ── Active: teal gradient, orange title ──
+  &--active {
+    background: linear-gradient(135deg, #dff7f4, $teal);
+    border: 1.5px solid $teal;
+    box-shadow: 0 0 18px rgba(149, 215, 209, 0.28);
+
+    .rft-exec-card__title { color: $amber; }
+    .rft-exec-card__desc  { color: #0d3733; }
+  }
+
+  // ── Inactive ──
+  &--inactive {
+    background: var(--cs-surface-2);
+    border: 1.5px solid var(--cs-border);
+
+    .rft-exec-card__title { color: var(--cs-muted); }
+    .rft-exec-card__desc  { color: var(--cs-dim); }
+  }
+}
+
+// ── ACTIVE / SELECT BADGE ───────────────────────────────────────
+.rft-exec-badge {
+  font-family: $mono;
+  font-size: 9px;
+  font-weight: 800;
+  border-radius: 4px;
+  padding: 2px 9px;
+  flex-shrink: 0;
+  white-space: nowrap;
+
+  // White pill on teal background
+  &--active {
+    background: #ffffff;
+    color: $amber;
+    border: 1px solid #ffffff;
+  }
+
+  // No background — just orange text
+  &--select {
+    background: transparent;
+    color: $amber;
+    border: none;
+  }
+}
+
+// ── STATUS + TIMEOUT STRIP ──────────────────────────────────────
+.rft-exec-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border-radius: 10px;
+
+  &--flow,
+  &--indep {
+    background: linear-gradient(135deg, #dff7f4, $teal);
+    border: 1px solid $teal;
+  }
+
+  &__label {
+    font-family: $mono;
+    font-size: 11px;
+    font-weight: 800;
+    margin-bottom: 4px;
+
+    &--flow,
+    &--indep { color: $amber; }
+  }
+}
+
+// ── TIMEOUT INPUT ───────────────────────────────────────────────
+.rft-timeout-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: $mono;
+  font-size: 10px;
+  color: #0d3733;
+
+  &--disabled { opacity: 0.45; }
+
+  &__text {
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    color: #0d3733;
+  }
+}
+
+.rft-timeout-input {
+  width: 72px;
+  padding: 5px 8px;
+  border-radius: 7px;
+  border: 1px solid rgba(#0d3733, 0.3);
+  background: rgba(#ffffff, 0.35);
+  color: #0d3733;
+  font-family: $mono;
+  font-size: 12px;
+  font-weight: 700;
+  outline: none;
+  text-align: center;
+
+  &--flow {
+    border-color: rgba(#0d3733, 0.45);
+  }
+}
+
+.rft-timeout-unit {
+  font-size: 11px;
+  color: #0d3733;
+
+  &--flow { color: #0d3733; }
+}
+
+// ── SYNC / APPLY ENV BADGES ─────────────────────────────────────
+.rft-sync-badge {
+  font-family: $mono;
+  font-size: 9px;
+  font-weight: 700;
+  border-radius: 4px;
+  padding: 2px 8px;
+  flex-shrink: 0;
+  white-space: nowrap;
+
+  &--stale {
+    color: $amber;
+    background: rgba($amber, 0.08);
+    border: 1px solid rgba($amber, 0.27);
+  }
+
+  &--ok {
+    color: $green;
+    background: rgba($green, 0.07);
+    border: 1px solid rgba($green, 0.19);
+  }
+}
+
+.rft-apply-btn {
+  flex-shrink: 0;
+  padding: 5px 13px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: $mono;
+  font-size: 10px;
+  font-weight: 800;
+  transition: all 0.15s;
+
+  &--stale:hover {
+    box-shadow: 0 0 20px rgba($amber, 0.4) !important;
+  }
+}
+
+// ── DATA SOURCE BUTTONS ─────────────────────────────────────────
+.rft-source-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: $mono;
+  font-size: 11px;
+  font-weight: 700;
+  transition: all 0.15s;
+
+  &--synth {
+    background: rgba($green, 0.07);
+    border: 1px solid rgba($green, 0.27);
+    color: $green;
+
+    &:hover {
+      background: rgba($green, 0.13);
+      border-color: $green;
+    }
+  }
+}
+
+.rft-source-badge {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-family: $mono;
+  font-size: 11px;
+
+  &--file {
+    background: rgba($blue, 0.07);
+    border: 1px solid rgba($blue, 0.2);
+    color: $blue;
+  }
+}
+
+// NOTE: Execute/run buttons use inline styles in the TSX because their
+// appearance (background, border, color, opacity, cursor) is fully
+// dynamic — driven by `running`, `pendingInBlock`, and `executionMode`
+// state. Static SCSS cannot express these state combinations cleanly.

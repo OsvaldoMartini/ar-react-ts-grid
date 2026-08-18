@@ -1,0 +1,45 @@
+.wrapper {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 8px 8px;
+  box-sizing: border-box;
+}
+
+.keepButtonsOnTop {
+  grid-template-columns: minmax(160px, 0.8fr) minmax(96px, auto) minmax(0, 2.2fr) !important;
+  min-width: 0;
+}
+
+.smokeTestButton,
+.runtimeVariablesButton {
+  align-items: center;
+  background: #0891b2;
+  border: 1px solid #0e7490;
+  border-radius: 4px;
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 10px;
+  font-weight: 800;
+  gap: 5px;
+  justify-content: center;
+  min-height: 26px;
+  padding: 3px 9px;
+  white-space: nowrap;
+}
+
+.smokeTestButton:disabled,
+.runtimeVariablesButton:disabled { cursor: not-allowed; opacity: 0.5; }
+.smokeTestButton:focus-visible,
+.runtimeVariablesButton:focus-visible { outline: 3px solid rgb(6 182 212 / 30%); outline-offset: 2px; }
+
+@media (max-width: 900px) {
+  .keepButtonsOnTop {
+    grid-template-columns: 1fr !important;
+  }
+}

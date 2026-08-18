@@ -1,0 +1,19 @@
+// The per-row "open command editor" arrow in the Bot Job Details grid.
+// Extracted from Griditem.module.scss: .dropdownColumn -> .column,
+// .dropdownArrow -> .arrow, styles preserved exactly.
+
+.column {
+  position: relative;
+  margin-right: 8px;
+}
+
+.arrow {
+  cursor: pointer;
+  width: 22px;
+  height: 22px;
+  transition: transform 0.3s ease; // Smooth scaling on hover
+
+  &:hover {
+    transform: scale(1.4); // Slightly increase size on hover
+  }
+}

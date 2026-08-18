@@ -1,3 +1,5 @@
+import type { PageScannerElementExecutionType } from './scanner/PageScannerElementExecutionType';
+
 // Sample data (mocketData)
 export interface BlockLoopInstructionLoadDTO {
   homeBankingId: number;
@@ -13,42 +15,31 @@ export interface BlockLoopInstructionLoadDTO {
   blockName: string;
   blockActive: boolean;
   blockWait: number;
+  onHoldSeconds?: number | null;
   actions: string;
   instructionActive: boolean;
-  parentId?: number;
+  parentId?: number | null;
   operation?: string;
   preComponent?: boolean;
   exportFile?: string;
   refreshLoop?: boolean;
   loopOnly?: boolean;
-  variableId?: number;
+  variableId?: number | null;
+  parentBlockId?: number | null;
+  defaultValue?: string;
+  forceCoordinates?: string | null; // F/E/T/N combinable, e.g. "FE"
+  // Roadmap 3 Phase 3d. Display-only override of `name`. Null = no override; UI shows `name`.
+  // Non-null = UI shows clientNamed; backend always uses `name` for matchers/locator/recovery.
+  clientNamed?: string | null;
 }
 
 
-export interface ComponentsInstructionsDTO {
-  homeBankingId: number;
-  tagName: string;
-  botJobId: number;
-  botJobName: string;
-  id: number;
-  instructionOrderNumber: number;
-  name: string;
-  description: string;
-  blockId: number;
-  blockOrderNumber: number;
-  blockName: string;
-  blockActive: boolean;
-  blockWait: number;
-  actions: string;
-  instructionActive: boolean;
-  parentId?: number;
-  operation?: string;
-  preComponent?: boolean;
-  exportFile?: string;
-  refreshLoop?: boolean;
-  loopOnly?: boolean;
-  variableId?: number;
-}
+/**
+ * Components and Bot Job Details render and mutate the same instruction shape.
+ * Keeping one canonical contract prevents component-only fields from silently
+ * disappearing when the shared grid gains a feature (for example defaultValue).
+ */
+export interface ComponentsInstructionsDTO extends BlockLoopInstructionLoadDTO {}
 
 export interface ElementDTO {
   id: number;
@@ -62,9 +53,35 @@ export interface ElementDTO {
   attributeData: AttributeData[];
   customXPath: string;
   iFrameXPath: string;
+  cssSelector?: string | null;
   attributeValue: string;
   attributeType: string;
-  searchAttributeValue: string;
+  defaultValue?: string;
+  autoScroll: string;
+  autoEnter: string;
+  active?: boolean | null;
+  // Transient Page Scanner / Memory List execution override. It deliberately
+  // leaves the scanner's raw tag, locator, and persisted classification intact.
+  executionTypeOverride?: PageScannerElementExecutionType | null;
+  // Bitstring of F/E/T/N/S toggled in GridItemScann before the element is
+  // promoted to an instruction. Flows through to instruction.force_coordinates
+  // on save (NEW_ELEMENT_DTO message).
+  forceCoordinates?: string | null;
+  blockId?: number;
+  // Roadmap 3 Phase 3d.
+  // definedName is the resolver-generated slug — the canonical identifier the
+  // backend writes to instruction.name. Treat it as immutable.
+  // clientNamed is the user's display-only override; if set and !== definedName,
+  // GridItemScann sends it as instruction.client_named on save (NEW_ELEMENT_DTO).
+  // The backend never uses clientNamed for matching/recovery — it's a UI label.
+  definedName?: string | null;
+  clientNamed?: string | null;
+}
+
+export interface BlockData {
+  id: number;
+  name: string;
+  botJobId: number;
 }
 
 export interface AttributeData {
@@ -107,6 +124,122 @@ export interface BotJobData {
   name: string;
   instructionId: number;
 }
+
+export interface ReferenceLoadDTO {
+  id: number | null;
+  homeBankingId: number | null;
+  botJobId: number | null;
+  referenceType: string;
+  value: string;
+  instructionId: number | null;
+}
+
+export interface InstructionLoad {
+  homeBankingId: number | null;
+  id: number;
+  botJobId: number | null;
+  botJobName: string;
+  instructionOrderNumber: number | null;
+  actions: string;
+  name: string;
+  // Roadmap 3 Phase 3d. Display-only override of `name`. Null = no override; UI shows `name`.
+  // Non-null = UI shows clientNamed; backend always uses `name` for matchers/locator/recovery.
+  clientNamed?: string | null;
+  xpath: string;
+  coordinates: string;
+  forceCoordinates: string | null; // F/E/T/N combinable, e.g. "FE"
+  iFrameXPath: string;
+  tagName: string;
+  shadowHost: string;
+  shadowRoot: string;
+  cssSelector: string;
+  description: string;
+  optional: boolean | null;
+  blockMarked: boolean | null;
+  defaultValue: string;
+  actionCustomMaxWaitSec: number | null;
+  onHoldSeconds: number | null;
+  codified: boolean | null;
+  exportToABR: boolean | null;
+  executed: boolean | null;
+  priority: string;
+  operation: string;
+  exportFile: string;
+  parentId: number | null;
+  blockId: number | null;
+  blockOrderNumber: number | null;
+  blockName: string;
+  blockActive: boolean | null;
+  instructionActive: boolean | null;
+  blockWait: number | null;
+  editMode: boolean;
+  refreshLoop: boolean | null;
+  loopOnly: boolean | null;
+  variableId: number | null;
+  type: string;
+  sessionId: string;
+  parentBlockId: number | null;
+  referenceLoadDTOList?: ReferenceLoadDTO[];
+}
+
+export interface HomeUrlDTO {
+  id: number | null;
+  url: string;
+  homeBankingId: number | null;
+  orgName: string;
+}
+
+export interface BlockLoadDTO {
+  homeBankingName?: string;
+  homeBankingId?: number;
+  id: number;
+  blockOrderNumber?: number;
+  name: string;
+  description?: string;
+  typeId?: number;
+  botJobId?: number;
+  botJobName?: string;
+  exportFile?: string;
+  active?: boolean | null;
+  wait?: number | null;
+  hasAnyInput?: boolean;
+  instructionLoad?: InstructionLoad[];
+}
+
+export interface HomeBankingLoadDTO {
+  id: number;
+  url: string;
+  name: string;
+  priority?: string;
+  searchConfig?: string;
+  optionsConfig?: string;
+  cookies?: string;
+  driverSession?: string;
+  username?: string;
+  password?: string;
+  jobs?: number;
+  homeUrlDTOs?: HomeUrlDTO[];
+}
+
+export interface BotJobLoadDTO {
+  id?: number;
+  name: string;
+  botJobId?: number;
+  description?: string;
+  priority?: string;
+  blockOrderNumber?: number;
+  blockName?: string;
+  blockId?: number;
+  blockDescription?: string;
+  homeBankingId?: number;
+  homeUrlId?: number;
+  typeId?: number;
+  active?: boolean;
+  blockLoadDTOList?: BlockLoadDTO[];
+  homeBankingLoadDTO?: HomeBankingLoadDTO;
+}
+
+
 
 export const elementsDTOMockData: ElementDTO[] = [
   // {

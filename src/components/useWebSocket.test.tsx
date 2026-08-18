@@ -1,0 +1,174 @@
+import React from 'react';
+import { act, cleanup, render, screen } from '@testing-library/react';
+import { useWebSocket } from './useWebSocket';
+
+class MockWebSocket {
+  static readonly CONNECTING = 0;
+  static readonly OPEN = 1;
+  static readonly CLOSING = 2;
+  static readonly CLOSED = 3;
+  static instances: MockWebSocket[] = [];
+
+  readonly url: string;
+  readyState = MockWebSocket.CONNECTING;
+  onopen: ((event: Event) => void) | null = null;
+  onmessage: ((event: MessageEvent) => void) | null = null;
+  onerror: ((event: Event) => void) | null = null;
+  onclose: ((event: CloseEvent) => void) | null = null;
+  send = jest.fn();
+  close = jest.fn(() => {
+    this.readyState = MockWebSocket.CLOSED;
+    this.onclose?.({} as CloseEvent);
+  });
+
+  constructor(url: string) {
+    this.url = url;
+    MockWebSocket.instances.push(this);
+  }
+
+  openConnection() {
+    this.readyState = MockWebSocket.OPEN;
+    this.onopen?.(new Event('open'));
+  }
+
+  receive(data: string) {
+    this.onmessage?.(new MessageEvent('message', { data }));
+  }
+
+  failConnection() {
+    this.readyState = MockWebSocket.CLOSED;
+    this.onclose?.({} as CloseEvent);
+  }
+}
+
+const originalWebSocket = global.WebSocket;
+
+const HookHarness: React.FC = () => {
+  const { reconnectAttempts, error } = useWebSocket(7357, 'botJobTasks-test');
+  return (
+    <div>
+      <span data-testid="attempts">{reconnectAttempts}</span>
+      <span data-testid="error">{error || ''}</span>
+    </div>
+  );
+};
+
+const CapabilityHookHarness: React.FC = () => {
+  const { reconnectAttempts } = useWebSocket(7357, 'pageMappingsManager', {
+    windowCapability: 'opaque +/?=& capability',
+  });
+  return <span data-testid="attempts">{reconnectAttempts}</span>;
+};
+
+beforeEach(() => {
+  jest.useFakeTimers();
+  MockWebSocket.instances = [];
+  Object.defineProperty(global, 'WebSocket', {
+    configurable: true,
+    writable: true,
+    value: MockWebSocket,
+  });
+});
+
+afterEach(() => {
+  cleanup();
+  jest.clearAllTimers();
+  jest.useRealTimers();
+});
+
+afterAll(() => {
+  Object.defineProperty(global, 'WebSocket', {
+    configurable: true,
+    writable: true,
+    value: originalWebSocket,
+  });
+});
+
+test('closes the locally created socket during cleanup and keeps only one live StrictMode connection', () => {
+  const { unmount } = render(
+    <React.StrictMode>
+      <HookHarness />
+    </React.StrictMode>,
+  );
+
+  expect(MockWebSocket.instances).toHaveLength(2);
+  expect(MockWebSocket.instances[0].close).toHaveBeenCalledTimes(1);
+  expect(
+    MockWebSocket.instances.filter((socket) => socket.readyState !== MockWebSocket.CLOSED),
+  ).toHaveLength(1);
+
+  unmount();
+
+  expect(MockWebSocket.instances[1].close).toHaveBeenCalledTimes(1);
+  act(() => {
+    jest.runOnlyPendingTimers();
+  });
+  expect(MockWebSocket.instances).toHaveLength(2);
+});
+
+test('bounds consecutive reconnects without creating parallel sockets', () => {
+  render(<HookHarness />);
+
+  expect(MockWebSocket.instances).toHaveLength(1);
+  for (let retry = 1; retry <= 5; retry += 1) {
+    const currentSocket = MockWebSocket.instances[MockWebSocket.instances.length - 1];
+    act(() => {
+      currentSocket.failConnection();
+      jest.runOnlyPendingTimers();
+    });
+
+    expect(MockWebSocket.instances).toHaveLength(retry + 1);
+    expect(
+      MockWebSocket.instances.filter((socket) => socket.readyState !== MockWebSocket.CLOSED),
+    ).toHaveLength(1);
+  }
+
+  const finalSocket = MockWebSocket.instances[MockWebSocket.instances.length - 1];
+  act(() => {
+    finalSocket.failConnection();
+    jest.runOnlyPendingTimers();
+  });
+
+  expect(MockWebSocket.instances).toHaveLength(6);
+  expect(screen.getByTestId('attempts')).toHaveTextContent('5');
+  expect(screen.getByTestId('error')).toHaveTextContent('Max reconnect attempts reached');
+});
+
+test('encodes optional connection parameters and retains them on reconnect', () => {
+  render(<CapabilityHookHarness />);
+
+  expect(MockWebSocket.instances).toHaveLength(1);
+  expect(MockWebSocket.instances[0].url).toBe(
+    'ws://localhost:7357/websocket?sessionId=pageMappingsManager&windowCapability=opaque+%2B%2F%3F%3D%26+capability',
+  );
+
+  act(() => {
+    MockWebSocket.instances[0].failConnection();
+    jest.runOnlyPendingTimers();
+  });
+
+  expect(MockWebSocket.instances).toHaveLength(2);
+  expect(MockWebSocket.instances[1].url).toBe(MockWebSocket.instances[0].url);
+});
+
+test('closes the current ARWeb page and never reconnects after application shutdown', () => {
+  const closeWindow = jest.spyOn(window, 'close').mockImplementation(() => undefined);
+  render(<HookHarness />);
+  const socket = MockWebSocket.instances[0];
+
+  act(() => socket.openConnection());
+  act(() => socket.receive(JSON.stringify({
+    operationId: 'application.shutdown',
+    sessionId: 'botJobTasks-test',
+    body: '{}',
+  })));
+
+  expect(closeWindow).toHaveBeenCalledTimes(1);
+  expect(socket.close).toHaveBeenCalledWith(1000, 'Application shutdown');
+
+  act(() => {
+    jest.runOnlyPendingTimers();
+  });
+  expect(MockWebSocket.instances).toHaveLength(1);
+  closeWindow.mockRestore();
+});

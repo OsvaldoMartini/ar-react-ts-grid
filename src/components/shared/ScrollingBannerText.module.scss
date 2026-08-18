@@ -1,0 +1,43 @@
+.viewport {
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.track {
+  display: inline-flex;
+  width: max-content;
+}
+
+.copy {
+  flex: 0 0 auto;
+}
+
+// The viewport is a stationary div. Only this text-only span is transformed.
+.moving > span.track {
+  animation: scrollingBanner var(--scroll-duration, 12s) linear infinite;
+  will-change: transform;
+}
+
+.moving > span.track > span.copy {
+  padding-right: 48px;
+}
+
+.moving:hover > span.track {
+  animation-play-state: paused;
+}
+
+@keyframes scrollingBanner {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .moving > span.track {
+    animation: none;
+    transform: none;
+  }
+
+  .moving > span.track > span.copy[aria-hidden='true'] {
+    display: none;
+  }
+}

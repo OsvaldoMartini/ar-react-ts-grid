@@ -1,0 +1,136 @@
+.actions {
+  align-items: center;
+  align-self: center;
+  border-left: 1px solid #d9e2ec;
+  display: flex;
+  gap: 6px;
+  min-width: 312px;
+  overflow-x: auto;
+  padding-left: 8px;
+}
+
+.statusButton,
+.testButton {
+  align-items: center;
+  appearance: none;
+  border: 1px solid;
+  border-radius: 7px;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: inline-flex;
+  font-family: inherit;
+  gap: 6px;
+  justify-content: center;
+  min-height: 34px;
+  padding: 5px 8px;
+  transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease,
+    transform 120ms ease;
+
+  span {
+    display: grid;
+    line-height: 1;
+    text-align: left;
+  }
+
+  strong {
+    font-size: 0.64rem;
+    font-weight: 900;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  small {
+    font-size: 0.54rem;
+    font-weight: 800;
+    margin-top: 2px;
+    text-transform: uppercase;
+  }
+
+  &:hover:not(:disabled) {
+    box-shadow: 0 3px 9px rgba(30, 55, 80, 0.16);
+    transform: translateY(-1px);
+  }
+
+  &:focus-visible {
+    outline: 3px solid rgba(46, 117, 182, 0.27);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+}
+
+.statusButton {
+  flex: 0 0 34px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0;
+  width: 34px;
+}
+
+.active {
+  background: #e7f7ed;
+  border-color: #3a9a5b;
+  color: #1d6d38;
+}
+
+.inactive {
+  background: #fff0f0;
+  border-color: #d45a5a;
+  color: #a61b1b;
+}
+
+.testActions {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 5px;
+}
+
+.testButton {
+  flex: 1 1 68px;
+  min-width: 0;
+  padding-inline: 5px;
+}
+
+.typeToggle {
+  flex: 0 0 auto;
+}
+
+.inputButton {
+  background: #eef4ff;
+  border-color: #668ac7;
+  color: #214f98;
+}
+
+.clickButton {
+  background: #fff4e6;
+  border-color: #db8b2d;
+  color: #9a4c00;
+}
+
+.spin {
+  animation: spin 850ms linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 900px) {
+  .actions {
+    border-left: 0;
+    border-top: 1px solid #d9e2ec;
+    grid-column: 1 / -1;
+    min-width: 0;
+    padding-left: 0;
+    padding-top: 8px;
+  }
+}
+
+@media (max-width: 520px) {
+  .actions {
+    justify-content: flex-start;
+  }
+}

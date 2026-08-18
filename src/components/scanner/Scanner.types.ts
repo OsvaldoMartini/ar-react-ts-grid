@@ -1,0 +1,86 @@
+export type ScannerAction =
+  | 'REFRESH_STATE'
+  | 'CLEAR_GRID'
+  | 'REFRESH_PAGE'
+  | 'PAGE_SCANNER'
+  | 'PREVIOUS_TAB'
+  | 'NEXT_TAB'
+  | 'PRE_LAUNCH'
+  | 'STOP_PRE_LAUNCH';
+
+export interface ScannerActionPayload {
+  searchTerms?: string;
+}
+
+export type ScannerStatusTone = 'neutral' | 'success' | 'warning' | 'error';
+
+export type ScannerBrowserStatus = 'UNKNOWN' | 'OPEN' | 'CLOSED';
+
+export type ScannerExecutionStatus =
+  | 'UNKNOWN'
+  | 'IDLE'
+  | 'STARTING'
+  | 'RUNNING'
+  | 'STOPPING'
+  | 'PASSED'
+  | 'FAILED'
+  | 'INTERRUPTED';
+
+export interface ScannerBlock {
+  id: number;
+  order: number;
+  name: string;
+  active: boolean;
+}
+
+export interface ScannerBrowserState {
+  state: ScannerBrowserStatus;
+  activeUrl: string;
+  activeTitle: string;
+  openTabs: number;
+  scannable: boolean;
+}
+
+export interface ScannerState {
+  revision: number;
+  botJobId: number;
+  botJobName: string;
+  homeBankingId: number;
+  environmentUrl: string;
+  blocks: ScannerBlock[];
+  browser: ScannerBrowserState;
+  focus: {
+    profile: string;
+    searchTerms: string[];
+  };
+  ocr: {
+    available: boolean;
+    status: string;
+  };
+  capabilities: {
+    canRefreshState: boolean;
+    canUsePageScanner: boolean;
+    canUseOcr: boolean;
+    canExecute: boolean;
+    canApplyElements: boolean;
+  };
+  executionState: ScannerExecutionStatus;
+}
+
+export interface ScannerResponse {
+  ok: boolean;
+  message?: string;
+  requestId?: string;
+  botJobId: number;
+  action?: ScannerAction;
+  state?: ScannerState | null;
+  errorCode?: string;
+  fieldErrors?: Record<string, string>;
+}
+
+export interface ScannerEnvelope {
+  sessionId: string;
+  operationId: string;
+  homeBankingId?: number;
+  body: ScannerResponse;
+}

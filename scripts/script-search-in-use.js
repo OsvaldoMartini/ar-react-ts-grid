@@ -6,7 +6,8 @@
   sessionId,
   destination,
   operationId,
-  homeBankingId
+  homeBankingId,
+  botJobId,
 ) {
   let pingIntervalId = null;
   let attempts = 0;
@@ -19,6 +20,17 @@
   const hoveredXPathMap = new Set(); // Changed from Map to Set
   let previousHighlightedElement = null;
   let pageFullyLoaded = false;
+
+  // --- NEW: stop any previous injected instance ---
+  try {
+    if (typeof window.__scannerToolCleanup === "function") {
+      window.__scannerToolCleanup(); // stop previous run
+    }
+  } catch (e) {}
+
+  // reset before registering this run
+  window.__scannerToolCleanup = null;
+
   window.elementInfoMap = new Map();
   // window.searchTerms = ["button", "input", "a", "select"];
   window.searchTerms = searchTerms;
@@ -26,6 +38,7 @@
   window.destination = destination;
   window.operationId = operationId;
   window.homeBankingId = homeBankingId;
+  window.botJobId = botJobId;
   window.sessionId = `${sessionId}`; // -${homeBankingId}`;
   // var elementInfoSubmit = new Map();
 
@@ -38,7 +51,7 @@
     try {
       //console.log(`Attempt ${attempts + 1} to connect to WebSocket...`);
       wSocket = new WebSocket(
-        `ws://localhost:${socketPort}/websocket?sessionId=${window.sessionId}`
+        `ws://localhost:${socketPort}/websocket?sessionId=${window.sessionId}`,
       );
 
       wSocket.onopen = () => {
@@ -54,7 +67,7 @@
           };
           // Convert the JSON message to a buffer
           const base64Message = btoa(
-            unescape(encodeURIComponent(JSON.stringify(subscriptionMessage)))
+            unescape(encodeURIComponent(JSON.stringify(subscriptionMessage))),
           );
           // Convert the buffer to a Base64 string
           wSocket.send(base64Message);
@@ -90,8 +103,8 @@
 
             if (window.sessionId === bodyData.sessionId) {
               if (bodyData.operationId === "highlight") {
-                const detailsData = Array.isArray(bodyData.details)
-                  ? bodyData.details
+                const detailsData = Array.isArray(bodyData.elementDetails)
+                  ? bodyData.elementDetails
                   : [];
 
                 //console.log("detailsData", detailsData[0]);
@@ -100,18 +113,21 @@
 
                 if (!hoveredElement) {
                   hoveredElement = document.querySelector(
-                    detailsData[0].cssSelector
+                    detailsData[0].cssSelector,
                   );
                 }
 
                 if (!hoveredElement) {
                   var hoveredElement = getElementByCoordinates(
-                    detailsData[0].coordinates
+                    detailsData[0].coordinates,
                   );
                 }
 
                 if (hoveredElement) {
                   // console.log("hoveredElement", hoveredElement);
+
+                  // NEW: keep the element used for highlight as "raw clicked" context
+                  window.__scannerRawClickedElement = hoveredElement;
 
                   const currentXPath = detailsData[0].xPath;
 
@@ -126,7 +142,7 @@
                   if (!originalStyles.has(currentXPath)) {
                     originalStyles.set(
                       currentXPath,
-                      hoveredElement.style.outline
+                      hoveredElement.style.outline,
                     );
                     hoveredXPathMap.add(currentXPath);
                   }
@@ -188,20 +204,38 @@
   }
 
   // Optionally, expose a cleanup function
-  window.cleanupWebSocket = () => {
+  const cleanup = () => {
     try {
-      //console.log("Cleaning up WebSocket...");
-      if (wSocket && wSocket.readyState === WebSocket.OPEN) {
-        wSocket.close();
+      alreadySent = true; // IMPORTANT: prevents reconnect loop in onclose
+
+      // stop restore timer
+      if (typeof restoreIntervalId !== "undefined") {
+        clearInterval(restoreIntervalId);
       }
+
+      // stop ping timer
       if (pingIntervalId) {
         clearInterval(pingIntervalId);
         pingIntervalId = null;
       }
-    } catch (cleanupError) {
-      //console.error("Error during WebSocket cleanup:", cleanupError);
-    }
+
+      // close ws even if CONNECTING
+      if (
+        wSocket &&
+        (wSocket.readyState === WebSocket.OPEN ||
+          wSocket.readyState === WebSocket.CONNECTING)
+      ) {
+        try {
+          wSocket.onclose = null; // avoid triggering reconnect logic
+        } catch (e) {}
+        wSocket.close(1000, "cleanup");
+      }
+    } catch (cleanupError) {}
   };
+
+  window.cleanupWebSocket = cleanup;
+  window.__scannerToolCleanup = cleanup; // NEW: so next injection can stop this one
+  window.addEventListener("beforeunload", cleanup, { once: true });
 
   function init(eventName) {
     if (pageFullyLoaded) {
@@ -228,7 +262,7 @@
   const collectElements = function collectElements(
     doc,
     searchTerms,
-    collectionFound
+    collectionFound,
   ) {
     // Collect elements from the current document using the provided search terms
     if (searchTerms.length > 0) {
@@ -244,7 +278,7 @@
         // If search term includes "with test-id", filter only elements that have a "test-id" attribute
         else if (selector.includes("with test-id")) {
           collectionFound.push(
-            ...Array.from(doc.querySelectorAll("[test-id]"))
+            ...Array.from(doc.querySelectorAll("[test-id]")),
           );
         } else {
           collectionFound.push(...Array.from(doc.querySelectorAll(selector)));
@@ -254,8 +288,8 @@
       // Collect all elements except iframes
       collectionFound.push(
         ...Array.from(doc.querySelectorAll("*")).filter(
-          (el) => el.tagName.toLowerCase() !== "iframe"
-        )
+          (el) => el.tagName.toLowerCase() !== "iframe",
+        ),
       );
     }
 
@@ -263,7 +297,7 @@
     collectionFound.forEach((element) => {
       if (
         ["html", "body", "main", "script", "meta", "head", "style"].includes(
-          element.tagName.toLowerCase()
+          element.tagName.toLowerCase(),
         )
       ) {
         return;
@@ -276,7 +310,7 @@
           "tagName-Found",
           elementIdentity.xPath,
           elementIdentity,
-          searchTerms
+          searchTerms,
         );
       }
     });
@@ -287,7 +321,7 @@
     typeDTO,
     referXPath,
     elementIdentity,
-    searchTerms
+    searchTerms,
   ) {
     if (
       searchTerms.length === 0 ||
@@ -297,11 +331,19 @@
         !searchTerms.includes("with test-id"))
     ) {
       // Check if the clicked element has a shadow root
-      let shadowHost = element;
+      // Check if the clicked element has a shadow root
+      let shadowHost = null;
 
-      // Locate the shadow host element if it has a shadow root
-      while (shadowHost && !shadowHost.shadowRoot) {
-        shadowHost = shadowHost.parentElement; // Traverse upwards in the DOM
+      // If element is inside an OPEN shadow root, jump directly to the host
+      const root = element.getRootNode && element.getRootNode();
+      if (root && root instanceof ShadowRoot) {
+        shadowHost = root.host;
+      } else {
+        // Fallback: walk up light DOM to find a host that owns a shadow root
+        shadowHost = element;
+        while (shadowHost && !shadowHost.shadowRoot) {
+          shadowHost = shadowHost.parentElement;
+        }
       }
 
       if (shadowHost && shadowHost.shadowRoot) {
@@ -312,14 +354,17 @@
         let clickableElements = findClickableElements(shadowRoot);
 
         // If clickable elements are found, perform your action (e.g., highlight them)
-        clickableElements.forEach((element) => {
+        clickableElements.forEach((shadowEl) => {
+          const shadowElIdentity = getElementIdentity(shadowEl);
+          if (!shadowElIdentity) return;
+
           pushElement(
-            element,
-            elementIdentity,
-            referXPath,
+            shadowEl,
+            shadowElIdentity,
+            shadowElIdentity.xPath,
             typeDTO,
             shadowHost,
-            shadowRoot
+            shadowRoot,
           );
         });
       } else {
@@ -356,11 +401,18 @@
       // If a match is found, set the element in the map
       if (matches) {
         // Check if the clicked element has a shadow root
-        let shadowHost = element;
+        let shadowHost = null;
 
-        // Locate the shadow host element if it has a shadow root
-        while (shadowHost && !shadowHost.shadowRoot) {
-          shadowHost = shadowHost.parentElement; // Traverse upwards in the DOM
+        // If element is inside an OPEN shadow root, jump directly to the host
+        const root = element.getRootNode && element.getRootNode();
+        if (root && root instanceof ShadowRoot) {
+          shadowHost = root.host;
+        } else {
+          // Fallback: walk up light DOM to find a host that owns a shadow root
+          shadowHost = element;
+          while (shadowHost && !shadowHost.shadowRoot) {
+            shadowHost = shadowHost.parentElement;
+          }
         }
 
         if (shadowHost && shadowHost.shadowRoot) {
@@ -371,14 +423,17 @@
           let clickableElements = findClickableElements(shadowRoot);
 
           // If clickable elements are found, perform your action (e.g., highlight them)
-          clickableElements.forEach((element) => {
+          clickableElements.forEach((shadowEl) => {
+            const shadowElIdentity = getElementIdentity(shadowEl);
+            if (!shadowElIdentity) return;
+
             pushElement(
-              element,
-              elementIdentity,
-              referXPath,
+              shadowEl,
+              shadowElIdentity,
+              shadowElIdentity.xPath,
               typeDTO,
               shadowHost,
-              shadowRoot
+              shadowRoot,
             );
           });
         } else {
@@ -389,7 +444,7 @@
             referXPath,
             typeDTO,
             null,
-            null
+            null,
           );
         }
         // window.elementInfoMap.set(
@@ -456,7 +511,7 @@
         iframe.id ||
         iframe.name ||
         "No description"
-      }; ${iframeDetails}`
+      }; ${iframeDetails}`,
     );
     // Store the iframe details in the elementInfoMap
     elementInfoMap.set(
@@ -467,15 +522,55 @@
         iframe.id ||
         iframe.name ||
         "No description"
-      };${iframeDetails}`
+      };${iframeDetails}`,
     );
   };
+
+  // NEW: collect Shadow DOM elements recursively (open shadow roots only)
+  function collectShadowElements(rootNode, searchTerms) {
+    try {
+      // Find potential shadow hosts in the current light DOM tree
+      const hosts = rootNode.querySelectorAll("*");
+
+      hosts.forEach((host) => {
+        if (!host || !host.shadowRoot) return; // only OPEN shadow roots
+
+        const shadowRoot = host.shadowRoot;
+
+        // Reuse your existing clickable finder (or broaden if you want)
+        const clickable = findClickableElements(shadowRoot);
+
+        clickable.forEach((shadowEl) => {
+          const shadowElIdentity = getElementIdentity(shadowEl);
+          if (!shadowElIdentity) return;
+
+          filterSearchTerms(
+            shadowEl,
+            "Shadow-Child",
+            shadowElIdentity.xPath,
+            shadowElIdentity,
+            searchTerms,
+          );
+
+          // Ensure it gets shadowHost/shadowRoot fields like your previous code
+          // filterSearchTerms will call pushElement with shadowHost/shadowRoot
+          // because shadowEl is inside a shadow root
+        });
+
+        // IMPORTANT: nested shadow roots inside this shadowRoot
+        // We need to walk inside it to find more hosts.
+        collectShadowElements(shadowRoot, searchTerms);
+      });
+    } catch (e) {
+      // swallow to keep scanner robust
+    }
+  }
 
   // Function to collect iframe elements recursively
   const collectIframeElements = function collectIframeElements(
     doc,
     collectionFound,
-    isIframeChild = false
+    isIframeChild = false,
   ) {
     doc.querySelectorAll("iframe").forEach((iframe) => {
       try {
@@ -502,7 +597,7 @@
               "iFrame-Found",
               elementIdentity.xPath,
               elementIdentity,
-              searchTerms
+              searchTerms,
             );
           }
 
@@ -535,7 +630,7 @@
                     "iFrame-Child",
                     `${xPathIFrame}${elementIdentity?.xPath}`,
                     elementIdentity,
-                    searchTerms
+                    searchTerms,
                   );
                 }
               });
@@ -550,8 +645,8 @@
               srcDocElements
                 ? srcDocElements.length
                 : iframeDocument
-                ? iframeDocument.querySelectorAll("*").length
-                : 0
+                  ? iframeDocument.querySelectorAll("*").length
+                  : 0,
             );
           }
 
@@ -571,7 +666,7 @@
                   "iFrame-Child",
                   `${xPathIFrame}${elementIdentity?.xPath}`,
                   elementIdentity,
-                  searchTerms
+                  searchTerms,
                 );
               }
             });
@@ -590,7 +685,7 @@
                 "iFrame-Child",
                 `${xPathIFrame}${elementIdentity?.xPath}`,
                 elementIdentity,
-                searchTerms
+                searchTerms,
               );
             }
           });
@@ -629,7 +724,7 @@
             "iFrame-Child",
             `${xPathIFrame}${elementIdentity?.xPath}`,
             elementIdentity,
-            searchTerms
+            searchTerms,
           );
         }
       });
@@ -637,7 +732,7 @@
 
   // Function to initialize the collection process
   const startCollectingElements = function startCollectingElements(
-    searchTerms
+    searchTerms,
   ) {
     // const searchTerms = ["button", "input", "a", "div"]; // Define elements to search for
     window.elementInfoMap = new Map(); // Initialize the map to store element information
@@ -646,19 +741,22 @@
     // First, collect iframe elements
     collectIframeElements(document, collectionFound, elementInfoMap);
 
+    // Then, collect shadow DOM elements in the top document
+    collectShadowElements(document, searchTerms);
+
     // Then, collect general elements based on search terms
     collectElements(document, searchTerms, collectionFound, elementInfoMap);
 
     window.allElementInfo = [];
 
     collectionFound = getResultMap(window.elementInfoMap);
-    console.log("All Collection Found :", collectionFound);
+    // console.log("All Collection Found :", collectionFound);
 
     const sameXPathFound = processElementsWithXPath(collectionFound);
     // console.log("processElementsWithXPath", sameXPathFound);
 
     const noRepeatedItems = findUniqueAndOneRepeated(sameXPathFound);
-    console.log("noRepeatedItems", noRepeatedItems); // Output the items with repetitions
+    // console.log("noRepeatedItems", noRepeatedItems); // Output the items with repetitions
 
     // Define the order
     const order = [
@@ -686,45 +784,69 @@
       return [...acc, ...filteredElements];
     }, []);
 
-    console.log("sortedList", sortedList);
+    // console.log("sortedList", sortedList);
 
     findMatLabel(sortedList);
 
     changeDivToLabelWithSomeText(sortedList);
 
+    normalizeSomeTextForTables(sortedList);
+
     limitMapSize(sortedList);
-    console.log("All element info stored in Map:", window.allElementInfo);
+    // console.log("All element info stored in Map:", window.allElementInfo);
     window.elementInfoMap.clear();
 
     if (wSocket && wSocket.readyState) {
       //console.log("WebSocket readyState:", wSocket.readyState);
     }
 
-    if (wSocket && wSocket.readyState === WebSocket.OPEN) {
-      const message = {
-        type: "SEARCH_TOOL",
-        sessionId: window.destination,
-        operationId: window.operationId,
-        homeBankingId: window.homeBankingId,
-        details: window.allElementInfo, // Send allElementInfo
-      };
+    // Send elementDetails in chunks of 25
+    // helper sleep function
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-      // Convert the JSON message to a buffer
-      const base64Message = btoa(
-        unescape(encodeURIComponent(JSON.stringify(message)))
-      );
-      // Convert the buffer to a Base64 string
-      wSocket.send(base64Message);
-      // wSocket.send(JSON.stringify(message));
-      //console.log("Sent SEARCH_TOOL:", message);
-      //console.log("Sent ENCODED Length:", base64Message.length);
-      //console.log("Sent ENCODED:", base64Message);
+    // Send elementDetails in chunks of 25 with 300ms delay
+    async function sendChunksWithDelay() {
+      if (wSocket && wSocket.readyState === WebSocket.OPEN) {
+        const CHUNK_SIZE = 25;
 
-      alreadySent = true;
-      window.allElementInfo = [];
-      window.elementInfoMap.clear();
-      window.revertSearchInjections();
+        // snapshot so later clears don't affect what we send
+        const all = Array.isArray(window.allElementInfo)
+          ? window.allElementInfo
+          : [];
+
+        for (let i = 0; i < all.length; i += CHUNK_SIZE) {
+          const chunk = all.slice(i, i + CHUNK_SIZE);
+
+          const message = {
+            type: "SEARCH_TOOL",
+            sessionId: window.destination,
+            operationId: window.operationId,
+            homeBankingId: window.homeBankingId,
+            botJobId: window.botJobId,
+
+            elementDetails: chunk,
+
+            chunkIndex: Math.floor(i / CHUNK_SIZE),
+            totalChunks: Math.ceil(all.length / CHUNK_SIZE),
+            chunkSize: CHUNK_SIZE,
+            totalElements: all.length,
+          };
+
+          const base64Message = btoa(
+            unescape(encodeURIComponent(JSON.stringify(message))),
+          );
+
+          wSocket.send(base64Message);
+          console.log(`Sent chunk #${i / CHUNK_SIZE}`, chunk);
+
+          // ⏱ wait 300ms before next chunk
+          await sleep(300);
+        }
+      }
     }
+
+    // call it
+    sendChunksWithDelay();
   };
 
   function pushElement(
@@ -733,7 +855,7 @@
     referXPath,
     typeDTO,
     shadowHost,
-    shadowRoot
+    shadowRoot,
   ) {
     let shadowHostSelector = "";
     let elementCssSelector = "";
@@ -785,9 +907,16 @@
     const elementIdentity = {
       ...elementIdentityTemp,
       shadowHost: shadowHostSelector,
-      shadowRoot: shadowRoot ? true : false,
-      nestedShadow: shadowPath.length > 1, // Detects if multiple shadow roots are involved
+      shadowRoot: String(!!shadowRoot), // "true" or "false"
+      nestedShadow: String(shadowPath.length > 1), // Detects if multiple shadow roots are involved
       cssSelector: elementCssSelector, // cssSelector shadowRoot
+    };
+
+    // ✅ compute names here
+    const names = defineNameTitlesJs(elementIdentity) || {
+      nameLabel: "",
+      nameField: "",
+      definedName: "",
     };
 
     // Store tagName and other details in the Map
@@ -800,7 +929,7 @@
 
       window.elementInfoMap.set(
         referXPath, // Keep Distinction iFrameXPath / child / etc...
-        elementDTO(typeDTO, elementIdentity)
+        elementDTO(typeDTO, elementIdentity, names),
       );
     }
   }
@@ -852,6 +981,65 @@
       someText,
     };
   };
+
+  function normalizeSomeTextForTables(sortedList) {
+    const raw = window.__scannerRawClickedElement;
+    if (!raw || !Array.isArray(sortedList) || sortedList.length === 0) return;
+
+    // Only apply inside instrument tables (or any mat-table)
+    const inInstrumentTable =
+      raw.closest?.("avq-instrument-table") ||
+      raw.closest?.("avq-trades-table") ||
+      raw.closest?.("table[mat-table]") ||
+      raw.closest?.("table.mat-mdc-table");
+
+    if (!inInstrumentTable) return;
+
+    // If it is inside a table, tagName must be "button"
+    sortedList.forEach((item) => {
+      if (!item) return;
+      item.tagName = "button";
+    });
+
+    // Get the clicked cell's text (this is what you want as someText)
+    const cell = raw.closest?.('td[role="gridcell"], td, th');
+    if (!cell) return;
+
+    const cellText = (cell.innerText || cell.textContent || "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (!cellText) return;
+
+    sortedList.forEach((item) => {
+      if (!item) return;
+
+      if (item.tagName === "input") {
+        const ariaLabel =
+          item.attributeData
+            ?.find((a) => a.name === "aria-label")
+            ?.value?.trim() || "";
+
+        const existingSomeTextAttr =
+          item.attributeData
+            ?.find((a) => a.name === "someText")
+            ?.value?.trim() || "";
+
+        if (!existingSomeTextAttr || existingSomeTextAttr === ariaLabel) {
+          item.someText = cellText;
+        }
+      } else {
+        item.someText = cellText;
+      }
+
+      if (Array.isArray(item.attributeData)) {
+        const idx = item.attributeData.findIndex((a) => a.name === "someText");
+        if (idx >= 0) item.attributeData[idx].value = item.someText;
+        else
+          item.attributeData.push({ name: "someText", value: item.someText });
+      }
+    });
+  }
 
   // Function to check if an element is hidden (using computed styles and attributes)
   const isHidden = (el) => {
@@ -928,7 +1116,7 @@
           if (foundAttr) {
             firstMeaningfulText = getAttributeText(
               foundAttr.name,
-              foundAttr.value
+              foundAttr.value,
             );
             if (firstMeaningfulText) break; // Stop at first meaningful attribute
           }
@@ -993,14 +1181,14 @@
           if (value) {
             const words = value.split(/\s+/);
             const filteredWords = words.filter(
-              (word) => !isTechnicalPattern(word)
+              (word) => !isTechnicalPattern(word),
             );
             const filteredText = filteredWords.join(" ").trim();
             if (filteredText) result.text.add(filteredText);
           } else if (placeholder) {
             const words = placeholder.split(/\s+/);
             const filteredWords = words.filter(
-              (word) => !isTechnicalPattern(word)
+              (word) => !isTechnicalPattern(word),
             );
             const filteredText = filteredWords.join(" ").trim();
             if (filteredText) result.text.add(filteredText);
@@ -1033,7 +1221,7 @@
           const textContent = child.textContent.trim();
           const words = textContent.split(/\s+/);
           const filteredWords = words.filter(
-            (word) => !isTechnicalPattern(word)
+            (word) => !isTechnicalPattern(word),
           );
           const filteredText = filteredWords.join(" ").trim();
           if (filteredText) {
@@ -1220,7 +1408,7 @@
     return tagName; // Default to the given tagName if no match
   }
 
-  const elementDTO = function elementDTO(typeElement, identity) {
+  const elementDTO = function elementDTO(typeElement, identity, names) {
     return {
       typeElement: typeElement,
       tagName: identity.tagName ?? "No Tag Name Detected",
@@ -1239,6 +1427,11 @@
       attributeValue: identity.attributeValue ?? "",
       attributeType: identity.attributeType ?? "",
       searchAttributeValue: identity.searchAttributeValue ?? "",
+      // NEW FIELDS (match your TargetElement fields)
+      // ✅ safe
+      nameLabel: names?.nameLabel ?? "",
+      nameField: names?.nameField ?? "",
+      definedName: names?.definedName ?? "",
     };
   };
 
@@ -1373,7 +1566,7 @@
           if (trimmedWord) {
             wordFrequency.set(
               trimmedWord,
-              (wordFrequency.get(trimmedWord) || 0) + 1
+              (wordFrequency.get(trimmedWord) || 0) + 1,
             );
 
             if (!wordToItems.has(trimmedWord)) {
@@ -1396,11 +1589,11 @@
     // Resolve elements with same coordinates, prioritizing "aria-label"
     coordinatesMap.forEach((elements) => {
       let priorityElement = elements.find((el) =>
-        el.attributeData?.some((attr) => attr.name === "aria-label")
+        el.attributeData?.some((attr) => attr.name === "aria-label"),
       );
       if (priorityElement) {
         const ariaLabelAttr = priorityElement.attributeData.find(
-          (attr) => attr.name === "aria-label"
+          (attr) => attr.name === "aria-label",
         );
         if (ariaLabelAttr) {
           elements.forEach((el) => {
@@ -1433,7 +1626,7 @@
         items.sort(
           (a, b) =>
             hasAttribute(b, "aria-label") - hasAttribute(a, "aria-label") ||
-            hasAttribute(b, "test-id") - hasAttribute(a, "test-id")
+            hasAttribute(b, "test-id") - hasAttribute(a, "test-id"),
         );
 
         if (!addedElements.has(items[0])) {
@@ -1511,19 +1704,27 @@
       }
     });
 
-    return filteredResult;
+    return finalResult;
   };
 
   function limitMapSize(sortedList) {
-    // Check the length of allElementInfo before adding new elements
-    //console.log("limitMapSize");
     let currentId = 1;
+
     sortedList.forEach((item) => {
-      if (window.allElementInfo.length < 35) {
-        window.allElementInfo.push({ ...item, id: currentId++ });
-      }
+      window.allElementInfo.push({ ...item, id: currentId++ });
     });
   }
+
+  // function limitMapSize(sortedList) {
+  //   // Check the length of allElementInfo before adding new elements
+  //   //console.log("limitMapSize");
+  //   let currentId = 1;
+  //   sortedList.forEach((item) => {
+  //     if (window.allElementInfo.length < 150) {
+  //       window.allElementInfo.push({ ...item, id: currentId++ });
+  //     }
+  //   });
+  // }
 
   function findMatLabel(sortedList) {
     sortedList.forEach((item) => {
@@ -1576,18 +1777,6 @@
     });
   }
 
-  function limitMapCharacters(elementInfoMap) {
-    // Check the length of allElementInfo before adding new elements
-    //console.log("limitMapCharacters");
-    elementInfoMap.forEach((value, key) => {
-      // Only add elements if there are fewer than 20 elements in the array
-      if (window.allElementInfo.length < 30) {
-        let modifiedValue = value;
-        window.allElementInfo.push(modifiedValue);
-      }
-    });
-  }
-
   // Event listener to handle incoming messages from iframes
   window.addEventListener("message", function (event) {
     if (event.origin !== window.trustedOriginURL) {
@@ -1618,7 +1807,7 @@
     setTimeout(() => init("Direct Execution"), 0);
   } else {
     document.addEventListener("DOMContentLoaded", () =>
-      setTimeout(() => init("DOMContentLoaded"), 0)
+      setTimeout(() => init("DOMContentLoaded"), 0),
     );
     window.addEventListener("load", () => init("load"));
     document.attachEvent?.("onreadystatechange", function () {
@@ -1642,7 +1831,7 @@
 
         try {
           const encodedPing = btoa(
-            unescape(encodeURIComponent(JSON.stringify(pingMessage)))
+            unescape(encodeURIComponent(JSON.stringify(pingMessage))),
           );
           wSocket.send(encodedPing);
           //console.log("Ping sent:", pingMessage);
@@ -1660,7 +1849,7 @@
         document,
         null,
         XPathResult.FIRST_ORDERED_NODE_TYPE,
-        null
+        null,
       );
       return result.singleNodeValue;
     } catch (error) {
@@ -1719,7 +1908,7 @@
   }
 
   // Set up the interval to call the function every 5 seconds (5000 milliseconds)
-  setInterval(restoreOriginalStyles, 5000);
+  const restoreIntervalId = setInterval(restoreOriginalStyles, 5000);
 
   // window.addEventListener("beforeunload", function (event) {
   //   // event.preventDefault();
@@ -1729,10 +1918,11 @@
   //   if (wSocket && wSocket.readyState === WebSocket.OPEN) {
   //     const message = {
   //       type: "CLOSE_BROWSER",
-  //       sessionId: `scannerReceiver`, //-${window.homeBankingId}`,
+  //       sessionId: `scanner-element-pane`, //-${window.homeBankingId}`,
   //       operationId: "closeBrowser",
   //       homeBankingId: window.homeBankingId,
-  //       details: window.allElementInfo, // Send allElementInfo
+  //       botJobId: window.botJobId,
+  //       elementDetails: window.allElementInfo, // Send allElementInfo
   //     };
 
   //     // Convert the JSON message to a buffer
@@ -1752,21 +1942,178 @@
   // startCollectingElements(window.searchTerms);
   // init("Initiate");
   // window.initSearchTerms = null; // Invalidating the function
-})(
-  arguments[0],
-  arguments[1],
-  arguments[2],
-  arguments[3],
-  arguments[4],
-  arguments[5],
-  arguments[6]
-);
+
+  function normalizeSpaces(s) {
+    return (s ?? "").toString().trim().replace(/\s+/g, " ");
+  }
+
+  function truncateAndNormalize(s, maxLen) {
+    const t = normalizeSpaces(s);
+    if (!t) return "";
+    return t.length > maxLen ? t.slice(0, maxLen) : t;
+  }
+
+  function getAttr(attributeData, name) {
+    if (!Array.isArray(attributeData)) return "";
+    const found = attributeData.find(
+      (a) =>
+        a &&
+        typeof a.name === "string" &&
+        a.name.toLowerCase() === name.toLowerCase(),
+    );
+    return found?.value ?? "";
+  }
+
+  // Similar intent as your Java "isValidString"
+  function hasText(s) {
+    return normalizeSpaces(s).length > 0;
+  }
+
+  function extractFileExtensionFromHref(href) {
+    const v = normalizeSpaces(href);
+    if (!v) return "";
+    // very small: take last path segment, then extension
+    try {
+      const u = new URL(v, window.location.href);
+      const path = u.pathname || "";
+      const last = path.split("/").pop() || "";
+      const m = last.match(/\.([a-z0-9]+)$/i);
+      return m ? m[1] : "";
+    } catch {
+      const m = v.match(/\.([a-z0-9]+)(?:[?#].*)?$/i);
+      return m ? m[1] : "";
+    }
+  }
+
+  /**
+   * Minimal port of your Java defineNameTitles + setElementText behavior.
+   * We DO NOT try to replicate clickability checks etc. (JS doesn't have WebElement.isEnabled reliably).
+   * Instead we follow your existing JS inputs: tagName + someText + attributes.
+   */
+  function defineNameTitlesJs(identity) {
+    // identity: { tagName, someText, attribId, attribName, attributeData }
+    const tag = (identity.tagName || "").toLowerCase();
+    const attrs = identity.attributeData || [];
+
+    // Java reads these attributes:
+    const labelAttr = getAttr(attrs, "label"); // rarely present on HTML, but keep it
+    const forLabelAttr = getAttr(attrs, "for");
+    const idAttr = getAttr(attrs, "id");
+    const nameAttr = getAttr(attrs, "name");
+    const ariaLabel = getAttr(attrs, "aria-label");
+    const formControlName = getAttr(attrs, "formcontrolname");
+    const testId = getAttr(attrs, "test-id");
+    const dataTestId = getAttr(attrs, "data-test-id");
+    const title = getAttr(attrs, "title");
+    const valueAttr = getAttr(attrs, "value");
+    const innerHTML = getAttr(attrs, "innerhtml"); // likely not present; kept for parity
+    const href = getAttr(attrs, "href");
+
+    const textLabel = normalizeSpaces(identity.someText); // your JS already extracts "best" visible text
+    const valueHrefFile = extractFileExtensionFromHref(href);
+
+    const isAnchor = tag === "a";
+    const isOption = tag === "option";
+
+    // ---- choose nameLabel + nameField (minimal mapping) ----
+    // We mirror your Java decision tree but using what JS already has.
+    let nameLabel = "";
+    let nameField = "";
+
+    if (hasText(labelAttr)) {
+      nameLabel = labelAttr;
+      nameField = labelAttr;
+    } else if (hasText(forLabelAttr)) {
+      nameLabel = forLabelAttr;
+      nameField = forLabelAttr;
+    } else if (isOption && hasText(valueAttr)) {
+      nameLabel = valueAttr;
+      nameField = valueAttr;
+    } else if (hasText(formControlName)) {
+      nameLabel = formControlName;
+      nameField = formControlName;
+    } else if (hasText(testId)) {
+      nameLabel = testId;
+      nameField = testId;
+    } else if (hasText(nameAttr)) {
+      nameLabel = nameAttr;
+      nameField = nameAttr;
+    } else if (hasText(ariaLabel)) {
+      nameLabel = ariaLabel;
+      nameField = ariaLabel;
+    } else if (isAnchor && hasText(innerHTML) && !/[<>]/.test(innerHTML)) {
+      nameLabel = innerHTML;
+      nameField = innerHTML;
+    } else if (hasText(idAttr)) {
+      nameLabel = idAttr;
+      nameField = idAttr;
+    } else if (hasText(valueHrefFile)) {
+      nameLabel = `${valueHrefFile} File`;
+      nameField = `${valueHrefFile} File`;
+    } else if (hasText(textLabel)) {
+      // for p/button/span/div in Java you set (textLabel, tagNameDefined)
+      // BUT then setElementText overrides definedName anyway.
+      nameLabel = textLabel;
+      nameField = tag; // closest equivalent to your Java for those cases
+    } else if (hasText(dataTestId)) {
+      nameLabel = dataTestId;
+      nameField = dataTestId;
+    } else if (hasText(title)) {
+      nameLabel = title;
+      nameField = title;
+    } else {
+      nameLabel = tag || "";
+      nameField = "NO IDENTIFICATION";
+    }
+
+    nameLabel = normalizeSpaces(nameLabel);
+    nameField = normalizeSpaces(nameField);
+
+    // ---- replicate Java setElementText() priority for definedName ----
+    let definedName = nameLabel;
+
+    // Your Java priority:
+    // if attribId/attribName/someText present:
+    //    definedName = someText (truncate 30)
+    //    else attribId else attribName else nameDefinedPriority
+    const hasAnyPriority =
+      hasText(identity.attribId) ||
+      hasText(identity.attribName) ||
+      hasText(identity.someText);
+
+    if (hasAnyPriority) {
+      if (hasText(identity.someText)) {
+        definedName = truncateAndNormalize(identity.someText, 30);
+      } else if (hasText(identity.attribId)) {
+        definedName = normalizeSpaces(identity.attribId);
+      } else if (hasText(identity.attribName)) {
+        definedName = normalizeSpaces(identity.attribName);
+      }
+    }
+
+    return {
+      nameLabel,
+      nameField,
+      definedName,
+    };
+  }
 // })(
-//   ["button", "input", "label", "a", "select"],
-//   false,
-//   51069,
-//   "scannerTool",
-//   "scannerGrid",
-//   "searchTerms",
-//   2
+//   arguments[0],
+//   arguments[1],
+//   arguments[2],
+//   arguments[3],
+//   arguments[4],
+//   arguments[5],
+//   arguments[6],
+//   arguments[7],
 // );
+})(
+  ["button", "textarea", "input", "label", "a", "select"],
+  false,
+  9999,
+  "scannerTool",
+  "scannerGrid",
+  "searchTerms",
+  184,
+  310,
+);

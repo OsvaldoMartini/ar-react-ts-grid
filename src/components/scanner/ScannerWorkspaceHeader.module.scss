@@ -1,0 +1,153 @@
+.wrapper {
+  flex: 0 0 auto;
+  width: 100%;
+  padding: 3px 0 2px;
+  box-sizing: border-box;
+}
+
+.urlLine {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #4b5563;
+  font-size: 12px;
+  padding: 2px 4px 0;
+}
+
+.searchRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto auto auto auto;
+  gap: 6px;
+  align-items: center;
+  padding: 4px 4px 0;
+}
+
+.searchInput {
+  min-width: 0;
+  height: 30px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 0 9px;
+  color: #111827;
+  background: #ffffff;
+  font-size: 12px;
+  outline: none;
+}
+
+.searchInput:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+}
+
+.searchInput:disabled {
+  color: #6b7280;
+  background: #f3f4f6;
+}
+
+.searchButton {
+  height: 30px;
+  border: 1px solid #1d4ed8;
+  border-radius: 6px;
+  padding: 0 12px;
+  color: #ffffff;
+  background: #2563eb;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.searchButton:disabled {
+  border-color: #cbd5e1;
+  color: #64748b;
+  background: #e5e7eb;
+  cursor: default;
+}
+
+.ocrButton {
+  height: 30px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 0 10px;
+  color: #1f2937;
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ocrButton:disabled {
+  color: #64748b;
+  background: #e5e7eb;
+  cursor: default;
+}
+
+.tabButton {
+  height: 30px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 0 10px;
+  color: #1f2937;
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tabButton:disabled {
+  color: #64748b;
+  background: #e5e7eb;
+  cursor: default;
+}
+
+.preLaunchButton {
+  height: 30px;
+  border: 1px solid #176b3a;
+  border-radius: 6px;
+  padding: 0 12px;
+  color: #ffffff;
+  background: #176b3a;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.preLaunchButton:disabled {
+  border-color: #cbd5e1;
+  color: #64748b;
+  background: #e5e7eb;
+  cursor: default;
+}
+
+.stopButton {
+  height: 30px;
+  border: 1px solid #b42318;
+  border-radius: 6px;
+  padding: 0 12px;
+  color: #ffffff;
+  background: #b42318;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.stopButton:disabled {
+  border-color: #cbd5e1;
+  color: #64748b;
+  background: #e5e7eb;
+  cursor: default;
+}
+
+@media (max-width: 560px) {
+  .searchRow {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+
+  .ocrButton {
+    grid-column: 1 / -1;
+  }
+
+  .preLaunchButton,
+  .stopButton {
+    grid-column: span 1;
+  }
+}

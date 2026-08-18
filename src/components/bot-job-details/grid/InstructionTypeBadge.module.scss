@@ -1,0 +1,62 @@
+// Instruction type icon + label for a Bot Job Details grid row.
+// Duplicated from Griditem.module.scss: `.operations`, the `@extend .operations`
+// image classes (all identical: base + height 20px), and `.instructionType`
+// (+ its bold span). Styles preserved exactly.
+
+.operations {
+  width: 20px;
+  height: 17px;
+  background-color: transparent;
+  margin-left: 2px;
+  padding: 0;
+  cursor: pointer;
+  pointer-events: none;
+}
+
+.inputImage,
+.outputImage,
+.clickImage,
+.closeImage,
+.screenImage,
+.linkImage,
+.ifelseImage,
+.refreshImage,
+.hiddenImage,
+.elseImage,
+.endifImage,
+.pauseImage,
+.gotoImage,
+.waitImage {
+  @extend .operations;
+  height: 20px; // Override height
+}
+
+.instructionType {
+  display: flex;
+  align-items: center; // Align content vertically
+  gap: 3px; // Add a 3px gap between elements
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.instructionType span {
+  font-weight: bold; // Make the text bold
+}
+
+.displayName {
+  display: block;
+  flex: 1 1 auto;
+  font-weight: bold;
+  min-width: 50px;
+  max-width: 350px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 1200px) {
+  .displayName {
+    max-width: 150px;
+  }
+}

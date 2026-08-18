@@ -1,0 +1,447 @@
+// mt-wizard.scss — BizWizard modal
+// Dynamic CAT_COLORS remain as inline styles — everything else is SCSS.
+@import 'mt-tokens';
+
+// ── Overlay ───────────────────────────────────────────────────────────────────
+
+.mt-wizard-overlay {
+  position:        fixed;
+  inset:           0;
+  background:      rgba(0, 0, 0, .7);
+  backdrop-filter: blur(4px);
+  z-index:         100;
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  animation:       mtOverlayIn .2s ease both;
+}
+
+@keyframes mtOverlayIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+// ── Modal ─────────────────────────────────────────────────────────────────────
+
+.mt-wizard {
+  background:     var(--cs-bg);
+  border:         1px solid var(--cs-border);
+  border-radius:  $r-xl;
+  width:          min(580px, 95vw);
+  max-height:     90vh;
+  display:        flex;
+  flex-direction: column;
+  overflow:       hidden;
+  box-shadow:     var(--cs-shadow-lg);
+  animation:      mtModalIn .25s cubic-bezier(.22, .68, 0, 1.15) both;
+}
+
+@keyframes mtModalIn {
+  from { opacity: 0; transform: scale(.96) translateY(12px); }
+  to   { opacity: 1; transform: scale(1)   translateY(0); }
+}
+
+// ── Header ────────────────────────────────────────────────────────────────────
+
+.mt-wizard__header {
+  padding:       16px 20px;
+  background:    var(--cs-header-bg);
+  border-bottom: 1px solid var(--cs-header-border);
+  display:       flex;
+  align-items:   center;
+  gap:           12px;
+  flex-shrink:   0;
+}
+
+.mt-wizard__header-icon { font-size: 18px; }
+
+.mt-wizard__titles { flex: 1; }
+
+.mt-wizard__title {
+  font-family:   $font-ui;
+  font-size:     14px;
+  font-weight:   700;
+  color:         var(--cs-text);
+  margin-bottom: 3px;
+  line-height:   1.2;
+}
+
+.mt-wizard__subtitle {
+  font-family: $font-ui;
+  font-size:   12px;
+  color:       var(--cs-muted);
+}
+
+.mt-wizard__close {
+  margin-left:     auto;
+  background:      transparent;
+  border:          1px solid var(--cs-border-sub);
+  border-radius:   $r-md;
+  color:           var(--cs-muted);
+  cursor:          pointer;
+  font-size:       16px;
+  width:           32px;
+  height:          32px;
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  flex-shrink:     0;
+  transition:      $t-fast;
+
+  &:hover {
+    border-color: var(--cs-red-border);
+    color:        var(--cs-red);
+    background:   var(--cs-red-bg);
+  }
+}
+
+// ── Scrollable body ───────────────────────────────────────────────────────────
+
+.mt-wizard__body {
+  flex:       1;
+  overflow-y: auto;
+  padding:    18px 20px;
+  display:    flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+// ── Category filter bar ───────────────────────────────────────────────────────
+
+.mt-wizard-cats {
+  display:       flex;
+  gap:           6px;
+  flex-wrap:     wrap;
+  margin-bottom: 14px;
+}
+
+.mt-wizard-cat-btn {
+  padding:        5px 12px;
+  background:     transparent;
+  border:         1px solid var(--cs-border-sub);
+  border-radius:  $r-full;
+  color:          var(--cs-muted);
+  cursor:         pointer;
+  font-family:    $font-ui;
+  font-size:      12px;
+  font-weight:    600;
+  letter-spacing: .01em;
+  transition:     $t-fast;
+  // active state: borderColor + color inline (per CAT_COLORS)
+
+  &:hover { border-color: var(--cs-border-2); color: var(--cs-text); }
+}
+
+// ── Case list ─────────────────────────────────────────────────────────────────
+
+.mt-wizard-cases {
+  display:        flex;
+  flex-direction: column;
+  gap:            8px;
+}
+
+// Case card — mirrors PersonalProfile .certCard
+.mt-wizard-case {
+  background:    var(--cs-surface);
+  border:        1px solid var(--cs-border);
+  border-radius: $r-lg;
+  padding:       14px 16px;
+  cursor:        pointer;
+  transition:    transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+  // hover border color set inline per CAT_COLORS
+
+  &:hover {
+    transform:  translateX(3px);
+    box-shadow: var(--cs-shadow-sm);
+  }
+}
+
+.mt-wizard-case__row {
+  display:     flex;
+  gap:         10px;
+  align-items: flex-start;
+}
+
+.mt-wizard-case__icon { font-size: 20px; }
+.mt-wizard-case__info { flex: 1; }
+.mt-wizard-case__step-count {
+  font-family: $font-mono;
+  font-size:   10px;
+  color:       var(--cs-dim);
+  flex-shrink: 0;
+}
+
+.mt-wizard-case__title {
+  font-family:   $font-ui;
+  font-size:     13px;
+  font-weight:   600;
+  color:         var(--cs-text);
+  margin-bottom: 4px;
+  line-height:   1.3;
+}
+
+.mt-wizard-case__desc {
+  font-family: $font-ui;
+  font-size:   12px;
+  color:       var(--cs-muted);
+  line-height: 1.55;
+}
+
+.mt-wizard-case__tags {
+  display:    flex;
+  gap:        5px;
+  margin-top: 8px;
+  flex-wrap:  wrap;
+}
+
+.mt-wizard-case__tag {
+  font-family:   $font-ui;
+  font-size:     10px;
+  font-weight:   500;
+  border-radius: $r-sm;
+  padding:       2px 7px;
+  border:        1px solid transparent;
+  // cat tag bg/border/color set inline (dynamic)
+}
+
+.mt-wizard-case__tag--risk-high {
+  background:   rgba(248, 113, 113, .12);
+  border-color: rgba(248, 113, 113, .28);
+  color:        var(--cs-red);
+}
+
+.mt-wizard-case__tag--risk-low {
+  background:   var(--cs-surface);
+  border-color: var(--cs-border-sub);
+  color:        var(--cs-dim);
+}
+
+.mt-wizard-case__tag--domain {
+  background:   var(--cs-surface);
+  border-color: var(--cs-border-sub);
+  color:        var(--cs-dim);
+}
+
+// ── Configure step ────────────────────────────────────────────────────────────
+
+.mt-wizard-config {
+  display:        flex;
+  flex-direction: column;
+  gap:            16px;
+}
+
+.mt-wizard-config-info {
+  padding:       12px 16px;
+  background:    var(--cs-surface);
+  border:        1px solid var(--cs-border);
+  border-radius: $r-lg;
+  box-shadow:    var(--cs-shadow-sm);
+}
+
+.mt-wizard-config-info__title {
+  font-family:   $font-ui;
+  font-size:     13px;
+  font-weight:   600;
+  color:         var(--cs-text);
+  margin-bottom: 5px;
+}
+
+.mt-wizard-config-info__desc {
+  font-family: $font-ui;
+  font-size:   12px;
+  color:       var(--cs-muted);
+  line-height: 1.55;
+}
+
+// ── Form fields ───────────────────────────────────────────────────────────────
+
+.mt-wizard-field__label {
+  font-family:    $font-ui;
+  font-size:      11px;
+  font-weight:    600;
+  color:          var(--cs-muted);
+  display:        block;
+  margin-bottom:  6px;
+  text-transform: uppercase;
+  letter-spacing: .7px;
+}
+
+.mt-wizard-field__input,
+.mt-wizard-field__select {
+  width:         100%;
+  background:    var(--cs-input-bg);
+  border:        1px solid var(--cs-border);
+  color:         var(--cs-text);
+  border-radius: $r-md;
+  padding:       9px 12px;
+  font-family:   $font-ui;
+  font-size:     13px;
+  outline:       none;
+  box-sizing:    border-box;
+  transition:    border-color .15s, box-shadow .15s;
+
+  &:focus {
+    border-color: var(--cs-accent);
+    box-shadow:   var(--cs-shadow-glow);
+  }
+}
+
+// ── Action buttons ────────────────────────────────────────────────────────────
+
+.mt-wizard-actions {
+  display:    flex;
+  gap:        10px;
+  flex-shrink: 0;
+}
+
+.mt-wizard-btn {
+  border-radius: $r-md;
+  padding:       11px 16px;
+  cursor:        pointer;
+  font-family:   $font-ui;
+  font-size:     13px;
+  font-weight:   600;
+  transition:    $t-fast;
+
+  &--back, &--new {
+    flex:       1;
+    background: transparent;
+    border:     1px solid var(--cs-border-sub);
+    color:      var(--cs-muted);
+    &:hover { border-color: var(--cs-border-2); color: var(--cs-text); }
+  }
+
+  &--run, &--rerun {
+    flex:        2;
+    background:  linear-gradient(135deg, #{$c-blue-700}, #{$c-blue-500});
+    border:      1.5px solid #{$c-blue-400};
+    color:       #ffffff;
+    font-weight: 700;
+    box-shadow:  var(--cs-shadow-blue);
+
+    &:hover {
+      background: linear-gradient(135deg, #{$c-blue-600}, #{$c-blue-400});
+      box-shadow: 0 6px 28px rgba(10, 102, 194, .40);
+    }
+  }
+
+  &--rerun { flex: 1; }
+}
+
+// ── Running header ────────────────────────────────────────────────────────────
+
+.mt-wizard-running-header { text-align: center; padding: 24px 0 16px; }
+.mt-wizard-running-icon   { font-size: 36px; margin-bottom: 10px; }
+.mt-wizard-running-title  {
+  font-family:   $font-ui;
+  font-size:     15px;
+  font-weight:   700;
+  color:         var(--cs-text);
+  margin-bottom: 4px;
+}
+
+// ── Step rows ─────────────────────────────────────────────────────────────────
+
+.mt-wizard-steps {
+  display:        flex;
+  flex-direction: column;
+  gap:            5px;
+}
+
+.mt-wizard-step {
+  display:       flex;
+  gap:           10px;
+  align-items:   center;
+  padding:       9px 13px;
+  flex-shrink:   0;
+  background:    var(--cs-card-bg);
+  border:        1px solid var(--cs-border-sub);
+  border-left:   3px solid transparent;
+  border-radius: $r-sm $r-md $r-md $r-sm;
+  transition:    $t-fast;
+
+  &--running {
+    border-color:      rgba(245, 158, 11, .22);
+    border-left-color: #f59e0b;
+    background:        rgba(245, 158, 11, .04);
+    .mt-wizard-step__label { color: #f59e0b; }
+  }
+  &--ok {
+    border-color:      rgba(34, 197, 94, .22);
+    border-left-color: #22c55e;
+    .mt-wizard-step__label { color: #22c55e; }
+  }
+  &--fail {
+    border-color:      rgba(248, 113, 113, .22);
+    border-left-color: #f87171;
+    .mt-wizard-step__label { color: #f87171; }
+  }
+
+  &__num   { font-family: $font-mono; font-size: 10px; color: var(--cs-dim); width: 18px; flex-shrink: 0; }
+  &__icon  { font-size: 16px; }
+  &__label { font-family: $font-ui; font-size: 12px; font-weight: 500; flex: 1; transition: color .15s; color: var(--cs-text); }
+  &__lat   { font-family: $font-mono; font-size: 10px; color: var(--cs-dim); }
+}
+
+// ── Stats grid ────────────────────────────────────────────────────────────────
+
+.mt-wizard-results {
+  display:        flex;
+  flex-direction: column;
+  gap:            14px;
+}
+
+.mt-wizard-stats {
+  display:               grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap:                   10px;
+
+  @media (max-width: 420px) { grid-template-columns: repeat(2, 1fr); }
+}
+
+// Stat tile — mirrors PersonalProfile Pricing .card with hover lift
+.mt-wizard-stat {
+  border-radius: $r-lg;
+  padding:       14px 12px;
+  text-align:    center;
+  border:        1px solid transparent;
+  transition:    transform .2s ease, box-shadow .2s ease;
+
+  &:hover { transform: translateY(-3px); box-shadow: var(--cs-shadow-md); }
+
+  &--ok      { background: var(--cs-green-bg);      border-color: var(--cs-green-border); }
+  &--fail    { background: var(--cs-red-bg);         border-color: var(--cs-red-border); }
+  &--total   { background: var(--cs-blue-badge-bg);  border-color: var(--cs-blue-badge-bdr); }
+  &--latency { background: var(--cs-yellow-bg);      border-color: var(--cs-yellow-border); }
+
+  &--ok      .mt-wizard-stat__value,
+  &--ok      .mt-wizard-stat__label  { color: var(--cs-green); }
+  &--fail    .mt-wizard-stat__value,
+  &--fail    .mt-wizard-stat__label  { color: var(--cs-red); }
+  &--total   .mt-wizard-stat__value,
+  &--total   .mt-wizard-stat__label  { color: var(--cs-blue-badge); }
+  &--latency .mt-wizard-stat__value,
+  &--latency .mt-wizard-stat__label  { color: var(--cs-yellow); }
+}
+
+.mt-wizard-stat__value {
+  font-family:   $font-ui;
+  font-size:     26px;
+  font-weight:   800;
+  line-height:   1;
+  margin-bottom: 5px;
+  letter-spacing: -.03em;
+}
+
+.mt-wizard-stat__label {
+  font-family:    $font-ui;
+  font-size:      10px;
+  font-weight:    600;
+  opacity:        .7;
+  text-transform: uppercase;
+  letter-spacing: .8px;
+}
+
+.mt-wizard-result-list    { display: flex; flex-direction: column; gap: 5px; }
+.mt-wizard-result-list > * { flex-shrink: 0; }
+.mt-wizard-result-actions { display: flex; gap: 10px; }

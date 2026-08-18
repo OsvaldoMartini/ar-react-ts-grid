@@ -1,0 +1,15 @@
+// The ✕ delete control shared by block headers, instruction rows, and the Excel
+// GOTO row in the Bot Job Details grid. Duplicated from the effective
+// `.crossButton` cascade (shared button group base + its padding override).
+
+.button {
+  height: 22px;
+  background-color: transparent;
+  padding: 0 2px 0 6px;
+  cursor: pointer;
+  transition: transform 0.3s ease; // Smooth scaling on hover
+
+  &:hover {
+    transform: scale(1.4); // Slightly increase size on hover
+  }
+}

@@ -1,0 +1,20 @@
+.frame {
+  position: fixed;
+  margin: 0;
+  border: 1px solid #0b5394;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+  color: #1f2933;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.frame,
+.frame *,
+.frame *::before,
+.frame *::after {
+  box-sizing: border-box;
+}

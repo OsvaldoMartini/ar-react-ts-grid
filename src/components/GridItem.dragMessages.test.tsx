@@ -1,0 +1,601 @@
+import React from 'react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import GridItem from './GridItem';
+import GridItemComp from './GridItemComp';
+import { BlockLoopInstructionLoadDTO, ComponentsInstructionsDTO } from './instructionsMockData';
+import { computeInstructionGraphRevision } from './bot-job-details/grid/domain/instructionGraphRevision';
+
+const mockSend = jest.fn();
+const mockWebSocket = { send: mockSend, readyState: WebSocket.OPEN } as unknown as WebSocket;
+let mockMessages: string[] = [];
+
+jest.mock('./useWebSocket', () => ({
+  useWebSocket: () => ({
+    webSocket: mockWebSocket,
+    connected: true,
+    reconnectAttempts: 0,
+    messages: mockMessages,
+    error: null,
+  }),
+}));
+
+jest.mock('./bot-job-details/useBotJobDetailsController', () => ({
+  useBotJobDetailsController: () => ({ state: null, sendAction: jest.fn() }),
+}));
+
+jest.mock('./bot-job-details/BotJobDetailsChrome', () => () => null);
+jest.mock('./bot-job-details/ComponentWorkspaceHeader', () => () => null);
+
+const row: BlockLoopInstructionLoadDTO = {
+  homeBankingId: 2,
+  tagName: 'button',
+  botJobId: 5,
+  botJobName: 'Drag regression',
+  id: 101,
+  instructionOrderNumber: 1,
+  name: 'Continue',
+  description: '',
+  blockId: 10,
+  blockOrderNumber: 1,
+  blockName: 'Main',
+  blockActive: true,
+  blockWait: 0,
+  actions: 'CLICK',
+  instructionActive: true,
+};
+
+const secondRow: BlockLoopInstructionLoadDTO = {
+  ...row,
+  id: 102,
+  instructionOrderNumber: 2,
+  name: 'Confirm',
+};
+
+const capabilityResponse = (sessionId: string) => {
+  const request = [...mockSend.mock.calls]
+    .reverse()
+    .map(([payload]) => JSON.parse(payload))
+    .find(message => message.type === 'instructionEditor.memoryCapabilities');
+  if (!request) throw new Error('Capability request was not sent');
+  const requestedBody = JSON.parse(request.body);
+  return JSON.stringify({
+  sessionId,
+  homeBankingId: 2,
+  operationId: 'instructionEditor.memoryCapabilitiesResponse',
+  body: JSON.stringify({
+    ok: true,
+    requestId: requestedBody.requestId,
+    targetSessionId: requestedBody.targetSessionId,
+    homeBankingId: requestedBody.homeBankingId,
+    botJobId: requestedBody.botJobId,
+    graphRevision: computeInstructionGraphRevision([row, secondRow], []),
+    capabilities: [row, secondRow].map(instruction => ({
+      instructionId: instruction.id,
+      canAddToMemory: true,
+      canMove: true,
+      canDelete: true,
+      allowedBlockIds: [10],
+    })),
+    blockCapabilities: [],
+    variableLinks: [],
+  }),
+  });
+};
+
+const unrelatedResponse = (sessionId: string) => JSON.stringify({
+  sessionId,
+  operationId: 'rowStatus',
+  body: JSON.stringify({ instructionId: 0, color: 'green' }),
+});
+
+const expectQueuedCapabilityEnablesDrag = async (sessionId: string) => {
+  await waitFor(() => expect(screen.getByLabelText('Move instruction 1')).toBeEnabled());
+  const synchronizedMemoryButtons = screen.getAllByTitle('Add step to memory list');
+  expect(synchronizedMemoryButtons).toHaveLength(2);
+  synchronizedMemoryButtons.forEach(button => expect(button).toBeEnabled());
+
+  // Native HTML5 drag: grab row 1 (instruction 101) and drop it on row 2 (index 1).
+  const sourceRow = screen.getByLabelText('Move instruction 1').closest('[draggable]');
+  const destinationRow = screen.getByLabelText('Move instruction 2').closest('[draggable]');
+  fireEvent.dragStart(sourceRow as Element);
+  fireEvent.drop(destinationRow as Element);
+
+  await waitFor(() => {
+    const move = mockSend.mock.calls
+      .map(([payload]) => JSON.parse(payload))
+      .find((message) => message.type === (
+        sessionId === 'componentTasks' ? 'COMPONENT_ROW_MOVE' : 'ROW_MOVE'
+      ));
+    expect(move).toMatchObject({
+      sessionId,
+      rowMoveLayoutVersion: 2,
+      graphRevision: computeInstructionGraphRevision([row, secondRow], []),
+    });
+    expect(move.updatedRows).toEqual([
+      expect.objectContaining({
+        instructionId: 102,
+        instructionOrderNumber: 1,
+        parentId: null,
+        parentBlockId: null,
+      }),
+      expect.objectContaining({
+        instructionId: 101,
+        instructionOrderNumber: 2,
+        parentId: null,
+        parentBlockId: null,
+      }),
+    ]);
+  });
+  expect(mockSend.mock.calls.map(([payload]) => JSON.parse(payload).type))
+    .not.toContain('instructionGraph.previewMove');
+};
+
+afterEach(() => {
+  cleanup();
+  mockMessages = [];
+  mockSend.mockReset();
+});
+
+test('Bot Job grid consumes a capability response even when a later frame is queued', async () => {
+  const props = {
+    homeBankingIdInitial: 2,
+    data: [row, secondRow],
+    socketPort: 52101,
+    sessionId: 'botJobTasks',
+    botJobIdInitial: 5,
+    botJobNameInitial: 'Drag regression',
+    onSessionOpen: jest.fn(),
+  };
+  const view = render(<GridItem {...props} />);
+  await waitFor(() => expect(mockSend.mock.calls
+    .map(([payload]) => JSON.parse(payload).type))
+    .toContain('instructionEditor.memoryCapabilities'));
+
+  mockMessages = [capabilityResponse(props.sessionId), unrelatedResponse(props.sessionId)];
+  view.rerender(<GridItem {...props} />);
+
+  await expectQueuedCapabilityEnablesDrag('botJobTasks');
+});
+
+test('Bot Job IF-family drag uses the proven ROW_MOVE path without optional v3 capability', async () => {
+  const familyRows: BlockLoopInstructionLoadDTO[] = [
+    { ...row, id: 101, instructionOrderNumber: 1, name: 'IF', actions: 'IF', parentId: 101, parentBlockId: 10 },
+    { ...row, id: 102, instructionOrderNumber: 2, name: 'IF body', actions: 'PAUSE' },
+    { ...row, id: 103, instructionOrderNumber: 3, name: 'ELSEIF', actions: 'ELSEIF', parentId: 101, parentBlockId: 10 },
+    { ...row, id: 104, instructionOrderNumber: 4, name: 'ELSEIF body', actions: 'PAUSE' },
+    { ...row, id: 105, instructionOrderNumber: 5, name: 'ELSE', actions: 'ELSE', parentId: 101, parentBlockId: 10 },
+    { ...row, id: 106, instructionOrderNumber: 6, name: 'ELSE body', actions: 'PAUSE' },
+    { ...row, id: 107, instructionOrderNumber: 7, name: 'ENDIF', actions: 'ENDIF', parentId: 101, parentBlockId: 10 },
+  ];
+  const props = {
+    homeBankingIdInitial: 2,
+    data: familyRows,
+    socketPort: 52101,
+    sessionId: 'botJobTasks',
+    botJobIdInitial: 5,
+    botJobNameInitial: 'Drag regression',
+    onSessionOpen: jest.fn(),
+  };
+  const view = render(<GridItem {...props} />);
+  await waitFor(() => expect(mockSend.mock.calls
+    .map(([payload]) => JSON.parse(payload).type))
+    .toContain('instructionEditor.memoryCapabilities'));
+
+  const request = [...mockSend.mock.calls]
+    .reverse()
+    .map(([payload]) => JSON.parse(payload))
+    .find(message => message.type === 'instructionEditor.memoryCapabilities');
+  const requestedBody = JSON.parse(request.body);
+  const graphRevision = computeInstructionGraphRevision(familyRows, []);
+  mockMessages = [JSON.stringify({
+    sessionId: props.sessionId,
+    homeBankingId: 2,
+    operationId: 'instructionEditor.memoryCapabilitiesResponse',
+    body: JSON.stringify({
+      ok: true,
+      requestId: requestedBody.requestId,
+      targetSessionId: requestedBody.targetSessionId,
+      homeBankingId: requestedBody.homeBankingId,
+      botJobId: requestedBody.botJobId,
+      graphRevision,
+      capabilities: familyRows.map(instruction => ({
+        instructionId: instruction.id,
+        canAddToMemory: true,
+        canMove: true,
+        canDelete: true,
+        allowedBlockIds: [10],
+      })),
+      blockCapabilities: [],
+      variableLinks: [],
+      // Deliberately no workspaceCapabilities.botJobGraphMutationV3.
+    }),
+  })];
+  view.rerender(<GridItem {...props} />);
+
+  await waitFor(() => expect(screen.getByLabelText('Move instruction 3')).toBeEnabled());
+  const source = screen.getByLabelText('Move instruction 3').closest('[draggable]');
+  const destination = screen.getByLabelText('Move instruction 4').closest('[draggable]');
+  fireEvent.dragStart(source as Element);
+  fireEvent.drop(destination as Element);
+
+  await waitFor(() => {
+    const move = mockSend.mock.calls
+      .map(([payload]) => JSON.parse(payload))
+      .find(message => message.type === 'ROW_MOVE');
+    expect(move).toMatchObject({
+      sessionId: 'botJobTasks',
+      rowMoveLayoutVersion: 2,
+      graphRevision,
+    });
+    expect(move.updatedRows.map((updated: { instructionId: number }) => updated.instructionId))
+      .toEqual([101, 102, 104, 103, 105, 106, 107]);
+  });
+  expect(mockSend.mock.calls.map(([payload]) => JSON.parse(payload).type))
+    .not.toContain('instructionGraphMutationV3');
+});
+
+test('Component grid consumes a capability response even when a later frame is queued', async () => {
+  const props = {
+    homeBankingIdInitial: 2,
+    dataComp: [row as ComponentsInstructionsDTO, secondRow as ComponentsInstructionsDTO],
+    socketPort: 52101,
+    sessionId: 'componentTasks',
+    botJobIdInitial: 5,
+    botJobNameInitial: 'Drag regression',
+    onSessionOpen: jest.fn(),
+  };
+  const view = render(<GridItemComp {...props} />);
+  await waitFor(() => expect(mockSend.mock.calls
+    .map(([payload]) => JSON.parse(payload).type))
+    .toContain('instructionEditor.memoryCapabilities'));
+
+  mockMessages = [capabilityResponse(props.sessionId), unrelatedResponse(props.sessionId)];
+  view.rerender(<GridItemComp {...props} />);
+
+  await expectQueuedCapabilityEnablesDrag('componentTasks');
+});
+
+test('Bot Job block plus stages its complete connected dependency union atomically', async () => {
+  const getValue: BlockLoopInstructionLoadDTO = {
+    ...secondRow,
+    blockId: 20,
+    blockOrderNumber: 2,
+    blockName: 'Extraction',
+    instructionOrderNumber: 1,
+    name: 'Get Value',
+    actions: 'GET',
+    parentId: 101,
+  };
+  const extractField: BlockLoopInstructionLoadDTO = {
+    ...getValue,
+    id: 103,
+    instructionOrderNumber: 2,
+    name: 'Extract Field',
+    actions: 'E',
+  };
+  const props = {
+    homeBankingIdInitial: 2,
+    data: [row, getValue, extractField],
+    socketPort: 52101,
+    sessionId: 'botJobTasks',
+    botJobIdInitial: 5,
+    botJobNameInitial: 'Drag regression',
+    // Dev takeover may start with a placeholder; the correlated server response below owns epoch 7.
+    workspaceEpochInitial: 1,
+    onSessionOpen: jest.fn(),
+  };
+  const view = render(<GridItem {...props} />);
+  await waitFor(() => expect(mockSend.mock.calls
+    .map(([payload]) => JSON.parse(payload).type))
+    .toContain('instructionEditor.memoryCapabilities'));
+
+  const request = [...mockSend.mock.calls]
+    .reverse()
+    .map(([payload]) => JSON.parse(payload))
+    .find(message => message.type === 'instructionEditor.memoryCapabilities');
+  const requestedBody = JSON.parse(request.body);
+  const memoryGroupRows = [
+    { id: 101, order: 1, name: 'Continue', action: 'CLICK', parentId: null, blockId: 10 },
+    { id: 102, order: 1, name: 'Get Value', action: 'GET', parentId: 101, blockId: 20 },
+    { id: 103, order: 2, name: 'Extract Field', action: 'E', parentId: 101, blockId: 20 },
+  ];
+  const graphRevision = computeInstructionGraphRevision(
+    [row, getValue, extractField],
+    [],
+  );
+  mockMessages = [JSON.stringify({
+    sessionId: 'botJobTasks',
+    homeBankingId: 2,
+    operationId: 'instructionEditor.memoryCapabilitiesResponse',
+    body: JSON.stringify({
+      ok: true,
+      requestId: requestedBody.requestId,
+      targetSessionId: 'botJobTasks',
+      homeBankingId: 2,
+      botJobId: 5,
+      workspaceEpoch: 7,
+      graphRevision,
+      capabilities: [101, 102, 103].map(instructionId => ({
+        instructionId,
+        canAddToMemory: true,
+        canMove: true,
+        canDelete: true,
+        allowedBlockIds: [10, 20],
+        memoryGroupKey: 'I:101,102,103|B:',
+        memoryGroupRows,
+        memoryGroupBlocks: [],
+      })),
+      blockCapabilities: [],
+    }),
+  })];
+  view.rerender(<GridItem {...props} />);
+  await waitFor(() => expect(screen.getAllByTitle(
+    'Add this complete connected block to Memory List',
+  )[0]).toBeEnabled());
+
+  fireEvent.click(screen.getAllByTitle(
+    'Add this complete connected block to Memory List',
+  )[0]);
+  expect(screen.getByText(
+    'Add the complete connected Bot Job Block to Memory List?',
+  )).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+
+  await waitFor(() => expect(mockSend.mock.calls
+    .map(([payload]) => JSON.parse(payload).type))
+    .toContain('memoryList.open'));
+  const open = [...mockSend.mock.calls]
+    .reverse()
+    .map(([payload]) => JSON.parse(payload))
+    .find(message => message.type === 'memoryList.open');
+  const openBody = JSON.parse(open.body);
+  const snapshot = openBody.snapshot;
+  expect(openBody.workspaceEpoch).toBe(7);
+  expect(snapshot.workspaceEpoch).toBe(7);
+  expect(snapshot.items.map(
+    (item: { payload: { instructionId: number } }) => item.payload.instructionId,
+  )).toEqual([101, 102, 103]);
+  expect(new Set(snapshot.items.map(
+    (item: { dependencyGroupKey?: string }) => item.dependencyGroupKey,
+  )).size).toBe(1);
+
+  mockMessages = [...mockMessages, JSON.stringify({
+    sessionId: 'botJobTasks',
+    homeBankingId: 2,
+    operationId: 'memoryList.openResponse',
+    body: JSON.stringify({
+      ok: true,
+      requestId: openBody.requestId,
+      botJobId: 5,
+      homeBankingId: 2,
+      workspaceEpoch: 7,
+      ownerEpoch: 'memory-owner-7',
+    }),
+  })];
+  view.rerender(<GridItem {...props} />);
+  await waitFor(() => expect(mockSend.mock.calls
+    .map(([payload]) => JSON.parse(payload))
+    .filter(message => message.type === 'memoryList.sync')
+    .some(message => JSON.parse(message.body).snapshot.items.length === 3))
+    .toBe(true));
+
+  const synchronizedBeforeStaleCommand = mockSend.mock.calls
+    .map(([payload]) => JSON.parse(payload))
+    .filter(message => message.type === 'memoryList.sync').length;
+  mockMessages = [...mockMessages, JSON.stringify({
+    sessionId: 'botJobTasks',
+    homeBankingId: 2,
+    operationId: 'memoryList.command',
+    body: JSON.stringify({
+      botJobId: 5,
+      workspaceEpoch: 6,
+      ownerEpoch: 'memory-owner-7',
+      command: 'CLEAR',
+      payload: {},
+    }),
+  })];
+  view.rerender(<GridItem {...props} />);
+  expect(mockSend.mock.calls
+    .map(([payload]) => JSON.parse(payload))
+    .filter(message => message.type === 'memoryList.sync')).toHaveLength(
+      synchronizedBeforeStaleCommand,
+    );
+
+  mockMessages = [...mockMessages, JSON.stringify({
+    sessionId: 'botJobTasks',
+    homeBankingId: 2,
+    operationId: 'memoryList.command',
+    body: JSON.stringify({
+      botJobId: 5,
+      workspaceEpoch: 7,
+      ownerEpoch: 'memory-owner-7',
+      command: 'CLEAR',
+      payload: {},
+    }),
+  })];
+  view.rerender(<GridItem {...props} />);
+  await waitFor(() => {
+    const syncMessages = mockSend.mock.calls
+      .map(([payload]) => JSON.parse(payload))
+      .filter(message => message.type === 'memoryList.sync');
+    expect(syncMessages.length).toBeGreaterThan(synchronizedBeforeStaleCommand);
+    expect(JSON.parse(syncMessages[syncMessages.length - 1].body).snapshot.items).toEqual([]);
+  });
+});
+
+test('an authoritative empty block never triggers the legacy automatic BLOCK_ORDER writer', async () => {
+  const props = {
+    homeBankingIdInitial: 2,
+    data: [
+      { ...row, blockOrderNumber: 2 },
+      { ...secondRow, blockOrderNumber: 2 },
+    ],
+    initialBlocks: [
+      {
+        blockId: 135,
+        blockOrderNumber: 1,
+        blockName: 'TEST',
+        blockActive: true,
+        blockWait: 0,
+      },
+      {
+        blockId: 10,
+        blockOrderNumber: 2,
+        blockName: 'Main',
+        blockActive: true,
+        blockWait: 0,
+      },
+    ],
+    socketPort: 52101,
+    sessionId: 'botJobTasks',
+    botJobIdInitial: 5,
+    botJobNameInitial: 'Drag regression',
+    onSessionOpen: jest.fn(),
+  };
+  render(<GridItem {...props} />);
+
+  await waitFor(() => expect(mockSend.mock.calls
+    .map(([payload]) => JSON.parse(payload).type))
+    .toContain('instructionEditor.memoryCapabilities'));
+  await new Promise(resolve => setTimeout(resolve, 0));
+
+  expect(mockSend.mock.calls
+    .map(([payload]) => JSON.parse(payload).type))
+    .not.toContain('BLOCK_ORDER');
+  expect(screen.getByText('TEST')).toBeInTheDocument();
+  expect(screen.getByText('No instructions in this block')).toBeInTheDocument();
+  const emptyBlockTitle = screen.getByText('TEST');
+  const populatedBlockTitle = screen.getByText('Main');
+  expect(
+    emptyBlockTitle.compareDocumentPosition(populatedBlockTitle)
+      & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+});
+
+test('Memory Apply structured refresh keeps the source and renders its fresh copy', async () => {
+  const props = {
+    homeBankingIdInitial: 2,
+    data: [row],
+    socketPort: 52101,
+    sessionId: 'botJobTasks',
+    botJobIdInitial: 5,
+    botJobNameInitial: 'Drag regression',
+    onSessionOpen: jest.fn(),
+  };
+  const view = render(<GridItem {...props} />);
+  const blocks = [
+    {
+      blockId: 10,
+      blockOrderNumber: 1,
+      blockName: 'Main',
+      blockActive: true,
+      blockWait: 0,
+    },
+    {
+      blockId: 135,
+      blockOrderNumber: 2,
+      blockName: 'TEST',
+      blockActive: true,
+      blockWait: 0,
+    },
+  ];
+  const update = (instructions: BlockLoopInstructionLoadDTO[], requestId: string) => JSON.stringify({
+    sessionId: 'botJobTasks',
+    homeBankingId: 2,
+    operationId: 'updateInstructions',
+    body: JSON.stringify({
+      instructions,
+      blocks,
+      botJobId: 5,
+      botJobName: 'Drag regression',
+      homeBankingId: 2,
+      memoryListRequestId: requestId,
+    }),
+  });
+
+  mockMessages = [update([row], 'memory-create-1')];
+  view.rerender(<GridItem {...props} />);
+  await waitFor(() => {
+    expect(screen.getByText('TEST')).toBeInTheDocument();
+    expect(screen.getByText('No instructions in this block')).toBeInTheDocument();
+  });
+
+  const copiedRow = {
+    ...row,
+    id: 201,
+    blockId: 135,
+    blockOrderNumber: 2,
+    blockName: 'TEST',
+    instructionOrderNumber: 1,
+  };
+  mockMessages = [
+    update([row], 'memory-create-1'),
+    update([row, copiedRow], 'memory-apply-1'),
+  ];
+  view.rerender(<GridItem {...props} />);
+
+  await waitFor(() => {
+    const mainTitle = screen.getByText('Main');
+    const mainCard = mainTitle.parentElement?.parentElement?.parentElement;
+    expect(mainCard).not.toBeNull();
+    expect(within(mainCard as HTMLElement).getByText('(101)Continue')).toBeInTheDocument();
+
+    const testTitle = screen.getByText('TEST');
+    const testCard = testTitle.parentElement?.parentElement?.parentElement;
+    expect(testCard).not.toBeNull();
+    expect(within(testCard as HTMLElement).getByText('(201)Continue')).toBeInTheDocument();
+    expect(within(testCard as HTMLElement).queryByText('No instructions in this block')).not.toBeInTheDocument();
+  });
+  expect(mockSend.mock.calls
+    .map(([payload]) => JSON.parse(payload).type))
+    .not.toContain('BLOCK_ORDER');
+});
+
+test('an uncorrelated producer Memory Apply cannot emit ROW_MOVE or remove its source row', async () => {
+  const props = {
+    homeBankingIdInitial: 2,
+    data: [row],
+    initialBlocks: [
+      {
+        blockId: 10,
+        blockOrderNumber: 1,
+        blockName: 'Main',
+        blockActive: true,
+        blockWait: 0,
+      },
+      {
+        blockId: 135,
+        blockOrderNumber: 2,
+        blockName: 'TEST',
+        blockActive: true,
+        blockWait: 0,
+      },
+    ],
+    socketPort: 52101,
+    sessionId: 'botJobTasks',
+    botJobIdInitial: 5,
+    botJobNameInitial: 'Copy regression',
+    onSessionOpen: jest.fn(),
+  };
+  const view = render(<GridItem {...props} />);
+
+  mockMessages = [JSON.stringify({
+    sessionId: 'botJobTasks',
+    homeBankingId: 2,
+    operationId: 'memoryList.command',
+    body: JSON.stringify({
+      botJobId: 5,
+      command: 'APPLY',
+      payload: {
+        targetBlockId: 135,
+        sourceItemKeys: ['BOT_JOB:101'],
+      },
+    }),
+  })];
+  view.rerender(<GridItem {...props} />);
+
+  expect(mockSend.mock.calls
+    .map(([payload]) => JSON.parse(payload).type))
+    .not.toContain('ROW_MOVE');
+  expect(screen.getByText('(101)Continue')).toBeInTheDocument();
+});

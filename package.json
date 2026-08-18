@@ -16,14 +16,19 @@
     "@types/jest": "^27.5.2",
     "@types/node": "^16.18.108",
     "@types/react": "^18.3.8",
-    "@types/react-beautiful-dnd": "^13.1.8",
     "@types/react-dom": "^18.3.0",
+    "@xyflow/react": "^12.11.2",
     "abr-react-ts-grid": "file:",
     "css-box-model": "^1.2.0",
+    "exceljs": "^4.4.0",
+    "i18next": "^25.8.17",
+    "i18next-browser-languagedetector": "^8.2.1",
+    "i18next-http-backend": "^3.0.2",
+    "lucide-react": "^1.24.0",
     "material-icons": "^1.13.14",
     "react": "^18.3.1",
-    "react-beautiful-dnd": "^13.1.1",
     "react-dom": "^18.3.1",
+    "react-i18next": "^16.5.7",
     "react-icons": "^5.4.0",
     "react-router-dom": "^7.0.2",
     "react-scripts": "5.0.1",
@@ -34,9 +39,12 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "start": "react-scripts start --host 0.0.0.0",
+    "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
+    "test:e2e": "node e2e/run-playwright.mjs test",
+    "test:e2e:install": "node e2e/run-playwright.mjs install chromium",
+    "test:e2e:headed": "node e2e/run-playwright.mjs test --headed",
     "eject": "react-scripts eject",
     "deploy": "gh-pages -d build"
   },
@@ -59,6 +67,7 @@
     ]
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "gh-pages": "^6.1.1"
   }
 }

@@ -1,0 +1,79 @@
+{
+  "metadata": {
+    "id": "plugin-ext-swiss-regulations",
+    "name": "Swiss Regulatory Compliance",
+    "version": "1.0.0",
+    "icon": "🇨🇭",
+    "description": "FINMA and Swiss-specific regulatory rules for banking operations",
+    "author": "External Plugin Author",
+    "category": "compliance-kyc",
+    "tags": ["FINMA", "Swiss", "regulatory", "compliance"],
+    "enabled": true
+  },
+  "rules": [
+    {
+      "id": "r-ext-ch-001",
+      "name": "FINMA Qualified Investor Check",
+      "description": "Clients with assets below CHF 500,000 cannot be classified as qualified investors under FINMA rules",
+      "condition": "Total assets < CHF 500,000 AND investor type = QUALIFIED",
+      "action": "Reject qualified investor classification",
+      "severity": "error",
+      "evaluateBody": "var assets = parseFloat(data && data.totalAssets || 0); var isQualified = data && data.investorType === 'QUALIFIED'; if (isQualified && assets < 500000) { return { passed: false, message: 'FINMA: Qualified investor requires min CHF 500,000 (has ' + assets + ')', severity: 'error' }; } return { passed: true, message: 'FINMA qualified investor check passed', severity: 'info' };"
+    },
+    {
+      "id": "r-ext-ch-002",
+      "name": "Swiss Withholding Tax",
+      "description": "Swiss domestic dividends are subject to 35% withholding tax (Verrechnungssteuer)",
+      "condition": "Dividend payment from Swiss issuer",
+      "action": "Apply 35% withholding tax",
+      "severity": "info",
+      "evaluateBody": "var country = data && data.issuerCountry || ''; if (country === 'CH' && data && data.type === 'DIVIDEND') { return { passed: false, message: 'Swiss withholding tax of 35% applies to this dividend', severity: 'info' }; } return { passed: true, message: 'No Swiss withholding tax applicable', severity: 'info' };"
+    }
+  ],
+  "testCases": [
+    {
+      "id": "ext-ch-tc-001",
+      "category": "Compliance & KYC",
+      "subcategory": "Regulatory Reporting",
+      "testName": "FINMA Qualified Investor Classification",
+      "businessDescription": "Verify that only clients meeting the FINMA asset threshold can be classified as qualified investors.",
+      "tags": ["FINMA", "qualified-investor", "Swiss"],
+      "parameters": {
+        "CLIENT_ID": "${CLIENT_ID}",
+        "TOTAL_ASSETS": "${TOTAL_ASSETS}",
+        "INVESTOR_TYPE": "QUALIFIED"
+      },
+      "steps": [
+        { "step": 1, "name": "Retrieve client assets", "businessDescription": "Load the client's total asset value from all portfolios and accounts." },
+        { "step": 2, "name": "Check FINMA threshold", "businessDescription": "Verify assets meet the CHF 500,000 minimum for qualified investor status." },
+        { "step": 3, "name": "Apply classification", "businessDescription": "Set or reject the qualified investor classification based on the check." }
+      ],
+      "expectedResult": "Client with sufficient assets is classified as qualified investor; client below threshold is rejected.",
+      "documentation": "Tests FINMA-compliant qualified investor classification per Swiss Financial Services Act (FinSA).",
+      "createdAt": "2026-03-18T00:00:00.000Z",
+      "updatedAt": "2026-03-18T00:00:00.000Z"
+    },
+    {
+      "id": "ext-ch-tc-002",
+      "category": "Compliance & KYC",
+      "subcategory": "Regulatory Reporting",
+      "testName": "Swiss Withholding Tax on Dividends",
+      "businessDescription": "Verify that dividends from Swiss issuers have 35% Verrechnungssteuer correctly applied.",
+      "tags": ["withholding-tax", "Swiss", "dividend"],
+      "parameters": {
+        "ISIN": "${ISIN}",
+        "ISSUER_COUNTRY": "CH",
+        "DIVIDEND_AMOUNT": "${AMOUNT}"
+      },
+      "steps": [
+        { "step": 1, "name": "Identify Swiss issuer", "businessDescription": "Determine if the dividend-paying instrument is a Swiss domestic security." },
+        { "step": 2, "name": "Calculate withholding", "businessDescription": "Apply the 35% Swiss withholding tax to the gross dividend amount." },
+        { "step": 3, "name": "Verify net payment", "businessDescription": "Confirm the net dividend credited equals 65% of the gross amount." }
+      ],
+      "expectedResult": "Net dividend after withholding tax equals 65% of gross dividend for Swiss securities.",
+      "documentation": "Tests Swiss Verrechnungssteuer (anticipatory tax) calculation on domestic dividends.",
+      "createdAt": "2026-03-18T00:00:00.000Z",
+      "updatedAt": "2026-03-18T00:00:00.000Z"
+    }
+  ]
+}

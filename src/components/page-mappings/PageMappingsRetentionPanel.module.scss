@@ -1,0 +1,150 @@
+.panel {
+  margin-top: 12px;
+  border: 1px solid #bfd2df;
+  border-radius: 9px;
+  padding: 10px;
+  background: #f7fbfd;
+  color: #274c65;
+}
+
+.panel > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.panel > header > div {
+  min-width: 0;
+}
+
+.panel > header p {
+  margin: 0 0 2px;
+  color: #607b8d;
+  font-size: .6rem;
+  font-weight: 900;
+  letter-spacing: .1em;
+}
+
+.panel > header strong {
+  font-size: .76rem;
+}
+
+.panel > header > span {
+  flex: 0 0 auto;
+  max-width: 100%;
+  border-radius: 12px;
+  padding: 3px 7px;
+  background: #e4f2f8;
+  color: #176482;
+  font-size: .65rem;
+  font-weight: 850;
+  text-align: right;
+}
+
+.counts {
+  display: flex;
+  gap: 6px;
+  margin: 9px 0;
+}
+
+.counts span {
+  border: 1px solid #d4e1e9;
+  border-radius: 6px;
+  padding: 4px 7px;
+  background: #fff;
+  font-size: .66rem;
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.fields label {
+  display: grid;
+  gap: 4px;
+  color: #536f82;
+  font-size: .63rem;
+  font-weight: 800;
+}
+
+.fields input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #aac2d2;
+  border-radius: 6px;
+  padding: 6px 7px;
+  background: #fff;
+  color: #18324a;
+  font: inherit;
+  font-size: .72rem;
+}
+
+.fields input[aria-invalid='true'] {
+  border-color: #c94b54;
+  outline: 1px solid #f0b4b8;
+}
+
+.hint,
+.validation,
+.unavailable p {
+  margin: 7px 0 0;
+  font-size: .65rem;
+  line-height: 1.35;
+}
+
+.hint {
+  color: #667d8d;
+}
+
+.validation {
+  color: #a32832;
+  font-weight: 750;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 9px;
+}
+
+.actions button {
+  min-height: 31px;
+  border: 1px solid #70a7bf;
+  border-radius: 6px;
+  padding: 0 8px;
+  background: #e6f4f9;
+  color: #145e7c;
+  font-size: .67rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.actions .purge {
+  border-color: #d4a365;
+  background: #fff4df;
+  color: #8b4d12;
+}
+
+.actions button:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+.unavailable {
+  border-color: #dfa7ac;
+  background: #fff1f2;
+  color: #8d2630;
+}
+
+@media (max-width: 480px) {
+  .fields,
+  .actions {
+    grid-template-columns: 1fr;
+  }
+}

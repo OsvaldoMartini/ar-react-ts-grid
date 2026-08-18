@@ -1,0 +1,17 @@
+.editor { display: grid; gap: 10px; }
+.editor header { display: grid; gap: 3px; }
+.editor header > span { color: #0b5394; font-size: .78rem; font-weight: 900; text-transform: uppercase; }
+.editor header > small { color: #66788a; font-size: .7rem; }
+.fields { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.fields label { display: grid; gap: 5px; }
+.fields label > span { color: #40566c; font-size: .7rem; font-weight: 800; }
+.fields input, .fields select { background: #fff; border: 1px solid #aebfd0; border-radius: 6px; color: #1f2933; font: inherit; min-height: 34px; padding: 5px 8px; }
+.wide { grid-column: 1 / -1; }
+.fileControl { align-items:stretch; display:flex; gap:8px; min-width:0; }
+.fileControl input { box-sizing:border-box; flex:1 1 auto; min-width:0; }
+.fileButton { align-items:center; background:linear-gradient(135deg,#e8f8ed,#d5f0de); border:1px solid #21863f; border-radius:7px; color:#17652f; cursor:pointer; display:inline-flex; flex:0 0 auto; gap:6px; justify-content:center; min-width:82px; padding:4px 9px; }
+.fileButton>span { display:grid; line-height:1; text-align:left; }
+.fileButton strong { font-size:.68rem; }
+.fileButton small { font-size:.56rem; font-weight:800; margin-top:2px; text-transform:uppercase; }
+.fileButton:hover:not(:disabled),.fileButton:focus-visible { box-shadow:0 0 0 2px rgba(35,122,59,.2),0 0 14px rgba(35,122,59,.22); outline:none; }
+.fileButton:disabled { cursor:not-allowed; opacity:.5; }

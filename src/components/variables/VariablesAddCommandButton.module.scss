@@ -1,0 +1,44 @@
+.button {
+  appearance: none;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 24px;
+  padding: 3px 8px;
+  border: 1px solid rgba(34, 197, 94, 0.55);
+  border-radius: 5px;
+  background: rgba(34, 197, 94, 0.18);
+  color: #16843b;
+  cursor: pointer;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.button:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.button svg {
+  flex: 0 0 auto;
+}

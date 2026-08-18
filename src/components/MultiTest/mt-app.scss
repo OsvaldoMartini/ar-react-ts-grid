@@ -1,0 +1,309 @@
+// mt-app.scss — App root, header, badge bar, tab bar
+@import 'mt-tokens';
+
+// ── Root ──────────────────────────────────────────────────────────────────────
+
+.mt-app {
+  font-family:             $font-ui;
+  background:              var(--cs-body-bg);
+  min-height:              100vh;
+  color:                   var(--cs-text);
+  display:                 flex;
+  flex-direction:          column;
+  -webkit-font-smoothing:  antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition:              $t-theme;
+
+  ::-webkit-scrollbar       { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: var(--cs-body-bg); }
+  ::-webkit-scrollbar-thumb {
+    background:    var(--cs-scroll-thumb);
+    border-radius: $r-full;
+    &:hover { background: var(--cs-accent); }
+  }
+
+  textarea:focus,
+  input:focus,
+  select:focus {
+    border-color: var(--cs-accent) !important;
+    box-shadow:   var(--cs-shadow-glow) !important;
+    outline:      none;
+  }
+}
+
+// ── Header row ────────────────────────────────────────────────────────────────
+
+.mt-header {
+  background:    var(--cs-header-bg);
+  border-bottom: 1px solid var(--cs-header-border);
+  padding:       14px 24px;
+  display:       flex;
+  align-items:   center;
+  gap:           16px;
+  transition:    $t-theme;
+
+  @media (max-width: 480px) { padding: 10px 14px; gap: 10px; }
+}
+
+// Logo mark — mirrors PersonalProfile .logoMark
+.mt-header__logo {
+  width:           38px;
+  height:          38px;
+  border-radius:   $r-sm;
+  background:      linear-gradient(135deg, #{$c-blue-500}, #{$c-blue-400});
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  font-family:     $font-ui;
+  font-size:       15px;
+  font-weight:     800;
+  color:           #ffffff;
+  flex-shrink:     0;
+  box-shadow:      0 3px 12px rgba(10, 102, 194, .35);
+  letter-spacing:  -.5px;
+}
+
+.mt-header__title {
+  font-family:    $font-ui;
+  font-size:      14px;
+  font-weight:    700;
+  color:          var(--cs-text);
+  letter-spacing: -.01em;
+  line-height:    1.2;
+  transition:     color .4s;
+}
+
+.mt-header__badges {
+  display:    flex;
+  gap:        5px;
+  margin-top: 4px;
+  flex-wrap:  wrap;
+}
+
+.mt-badge {
+  font-family:    $font-mono;
+  font-size:      10px;
+  font-weight:    500;
+  border-radius:  $r-sm;
+  padding:        2px 8px;
+  border:         1px solid transparent;
+  white-space:    nowrap;
+
+  &--dim  { color: var(--cs-muted);       background: var(--cs-surface);      border-color: var(--cs-border-sub); }
+  &--blue { color: var(--cs-blue-badge);  background: var(--cs-blue-badge-bg); border-color: var(--cs-blue-badge-bdr); }
+  &--job  { color: var(--cs-yellow);      background: var(--cs-yellow-bg);     border-color: var(--cs-yellow-border); }
+}
+
+.mt-header__controls {
+  margin-left: auto;
+  display:     flex;
+  gap:         8px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+// Wizard button — ghost style with green accent
+.mt-btn-wizard {
+  display:        inline-flex;
+  align-items:    center;
+  gap:            6px;
+  background:     transparent;
+  border:         1.5px solid var(--cs-green-border);
+  border-radius:  $r-sm;
+  color:          var(--cs-green);
+  padding:        6px 14px;
+  cursor:         pointer;
+  font-family:    $font-ui;
+  font-size:      12px;
+  font-weight:    600;
+  letter-spacing: .01em;
+  white-space:    nowrap;
+  transition:     $t-fast;
+
+  &:hover {
+    background:   var(--cs-green-bg);
+    border-color: var(--cs-green);
+    box-shadow:   0 0 12px var(--cs-green-glow);
+  }
+}
+
+// "● N API" counter
+.mt-api-count {
+  font-family:    $font-ui;
+  font-size:      12px;
+  font-weight:    600;
+  color:          var(--cs-green);
+  background:     var(--cs-green-bg);
+  border:         1px solid var(--cs-green-border);
+  border-radius:  $r-full;
+  padding:        4px 12px;
+  white-space:    nowrap;
+  letter-spacing: .01em;
+}
+
+// ── Stepper + tab bar ───────────────────────────────────────────────────────────
+
+
+.mt-nav-shell {
+  background:    var(--cs-tabs-bg);
+  border-bottom: 1px solid var(--cs-tabs-border);
+  transition:    $t-theme;
+}
+
+.mt-stepper {
+  padding:        14px 24px 10px;
+  display:        flex;
+  align-items:    flex-start;
+  overflow-x:     auto;
+  overflow-y:     hidden;
+  gap:            0;
+  scrollbar-width: thin;
+}
+
+.mt-step {
+  appearance:      none;
+  background:      transparent;
+  border:          none;
+  padding:         0;
+  min-width:       86px;
+  display:         flex;
+  flex-direction:  column;
+  align-items:     center;
+  gap:             8px;
+  cursor:          pointer;
+  color:           var(--cs-muted);
+  font-family:     $font-ui;
+  transition:      $t-fast;
+  flex:            0 0 auto;
+
+  &:hover .mt-step__circle {
+    transform:   translateY(-1px);
+    box-shadow:  0 0 0 4px var(--cs-accent-bg);
+  }
+
+  &:hover .mt-step__label {
+    color: var(--cs-text);
+  }
+}
+
+.mt-step__circle {
+  width:           30px;
+  height:          30px;
+  border-radius:   999px;
+  border:          2px solid var(--cs-tabs-border);
+  background:      var(--cs-header-bg);
+  display:         inline-flex;
+  align-items:     center;
+  justify-content: center;
+  font-size:       12px;
+  font-weight:     700;
+  line-height:     1;
+  transition:      $t-fast;
+}
+
+.mt-step__label {
+  font-size:      12px;
+  font-weight:    600;
+  letter-spacing: .01em;
+  white-space:    nowrap;
+  transition:     $t-fast;
+}
+
+.mt-step__connector {
+  height:         2px;
+  min-width:      64px;
+  margin:         14px 10px 0;
+  background:     var(--cs-tabs-border);
+  border-radius:  $r-full;
+  transition:     $t-fast;
+  flex:           1 0 48px;
+}
+
+.mt-step.is-complete {
+  color: var(--cs-green);
+
+  .mt-step__circle {
+    border-color: var(--cs-green);
+    background:   var(--cs-green-bg);
+    color:        var(--cs-green);
+  }
+
+  .mt-step__label {
+    color: var(--cs-green);
+  }
+}
+
+.mt-step.is-active {
+  color: var(--cs-tab-active-text);
+
+  .mt-step__circle {
+    border-color: var(--cs-tab-active-col);
+    background:   var(--cs-tab-active-col);
+    color:        #fff;
+    box-shadow:   0 6px 16px rgba(10, 102, 194, .24);
+  }
+
+  .mt-step__label {
+    color: var(--cs-tab-active-text);
+  }
+}
+
+.mt-step__connector.is-complete {
+  background: var(--cs-green);
+}
+
+
+.mt-tabs {
+  padding:       0 24px;
+  display:       flex;
+  gap:           2px;
+  overflow-x:    auto;
+  transition:    $t-theme;
+}
+
+.mt-tab-btn {
+  background:     none;
+  border:         none;
+  border-bottom:  2px solid transparent;
+  color:          var(--cs-tab-text);
+  padding:        12px 16px;
+  cursor:         pointer;
+  font-family:    $font-ui;
+  font-size:      13px;
+  font-weight:    500;
+  letter-spacing: .01em;
+  white-space:    nowrap;
+  transition:     $t-fast;
+
+  &.active {
+    border-bottom-color: var(--cs-tab-active-col);
+    color:               var(--cs-tab-active-text);
+    font-weight:         600;
+  }
+
+  &:hover:not(.active) {
+    color:         var(--cs-text);
+    background:    var(--cs-accent-bg);
+    border-radius: $r-sm $r-sm 0 0;
+  }
+}
+
+// ── Content / scroll ──────────────────────────────────────────────────────────
+
+.mt-content {
+  flex:           1;
+  overflow:       hidden;
+  display:        flex;
+  flex-direction: column;
+}
+
+.mt-scroll {
+  flex:       1;
+  overflow-y: auto;
+}
+
+@media (max-width: 900px) {
+  .mt-stepper { padding: 12px 16px 8px; }
+  .mt-tabs { padding: 0 16px; }
+  .mt-step__connector { min-width: 40px; margin-inline: 8px; }
+}

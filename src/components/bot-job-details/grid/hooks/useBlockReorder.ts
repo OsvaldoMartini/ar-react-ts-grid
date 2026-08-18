@@ -1,0 +1,202 @@
+import { useCallback, useEffect, useRef } from 'react';
+import { BlockLoopInstructionLoadDTO } from '../../../instructionsMockData';
+import type { WorkspaceBlock } from '../domain/workspaceBlocks';
+
+/**
+ * Minimal instruction shape block reorder needs. Both grids' DTOs satisfy it
+ * (BlockLoopInstructionLoadDTO for the Bot Job grid, ComponentsInstructionsDTO for
+ * the Component grid) — the hook is generic over it so it can be shared.
+ */
+export interface BlockReorderInstruction {
+  blockId: number;
+  blockOrderNumber: number;
+  botJobId: number;
+  blockName: string;
+}
+
+/** The grid's block → instructions grouping (keyed by blockId). */
+export type GroupedData<T extends BlockReorderInstruction = BlockLoopInstructionLoadDTO> = {
+  [blockId: number]: {
+    blockName: string;
+    exportFile?: string;
+    instructions: T[];
+  };
+};
+
+export interface UseBlockReorderDeps<T extends BlockReorderInstruction = BlockLoopInstructionLoadDTO> {
+  groupedData: GroupedData<T>;
+  instructionsData: T[];
+  setInstructionsData: React.Dispatch<React.SetStateAction<T[]>>;
+  setIsDataReordered: React.Dispatch<React.SetStateAction<boolean>>;
+  workspaceBlocks?: WorkspaceBlock[];
+  setWorkspaceBlocks?: React.Dispatch<React.SetStateAction<WorkspaceBlock[]>>;
+  webSocket: WebSocket | null;
+  connected: boolean;
+  botJobId: number | null;
+  botJobName: string | null;
+  homeBankingId: number;
+  /**
+   * Which workspace the BLOCK_MOVE targets. The backend derives the block table +
+   * WHERE key from this: 'botJobTasks' → block/bot_job_id, 'componentTasks' →
+   * component_block/home_banking_id. So this is the ONLY thing that varies between
+   * the Bot Job and Component grids for block reorder.
+   */
+  targetSessionId: 'botJobTasks' | 'componentTasks';
+}
+
+export interface UseBlockReorder {
+  /** Source of an in-flight whole-block drag (null between drags). */
+  dragBlockRef: React.MutableRefObject<{ index: number; blockId: number } | null>;
+  /** Reorder blocks fromIndex→toIndex: renumber every block 1..N and send one BLOCK_MOVE. */
+  commitBlockReorder: (fromIndex: number, toIndex: number) => void;
+  handleBlockDragStart: (index: number, blockId: number) => (event: React.DragEvent) => void;
+  handleBlockDrop: (index: number) => (event: React.DragEvent) => void;
+  handleBlockDragEnd: () => void;
+  /** Current order-sorted index of a block by id (-1 if absent). */
+  sortedBlockIndex: (blockId: number) => number;
+  handleMoveBlockUp: (blockId: number) => void;
+  handleMoveBlockDown: (blockId: number) => void;
+}
+
+/**
+ * Phase 6, step 7 — whole-block reordering, SHARED by the Bot Job (`botJobTasks`) and
+ * Component (`componentTasks`) grids: drag a block header onto another (native HTML5
+ * drag) or use the up/down buttons. Both paths funnel through `commitBlockReorder`,
+ * which renumbers every block's blockOrderNumber 1..N and sends ONE BLOCK_MOVE with
+ * the full ordered list (never a 2-block swap). The caller passes `targetSessionId`;
+ * the backend derives the table (block/component_block) + WHERE key from it. Includes
+ * the window.__blockReorder diagnostic hook the drag regression drives.
+ *
+ * The instruction-drag path (onDragEnd / applyDragMove) is intentionally left in
+ * GridItem — it mutates core grid data through the WS response and co-extracts with
+ * the data layer.
+ */
+export function useBlockReorder<T extends BlockReorderInstruction = BlockLoopInstructionLoadDTO>(
+  deps: UseBlockReorderDeps<T>,
+): UseBlockReorder {
+  const {
+    groupedData, instructionsData, setInstructionsData, setIsDataReordered,
+    workspaceBlocks = [], setWorkspaceBlocks,
+    webSocket, connected, botJobId, botJobName, homeBankingId, targetSessionId,
+  } = deps;
+
+  const dragBlockRef = useRef<{ index: number; blockId: number } | null>(null);
+
+  const orderedBlocks = useCallback((): WorkspaceBlock[] => {
+    if (workspaceBlocks.length > 0) {
+      return [...workspaceBlocks]
+        .sort((left, right) => left.blockOrderNumber - right.blockOrderNumber);
+    }
+    return Object.values(groupedData)
+      .filter(block => block.instructions.length > 0)
+      .map(block => {
+        const first = block.instructions[0];
+        return {
+          blockId: first.blockId,
+          blockOrderNumber: first.blockOrderNumber,
+          blockName: first.blockName,
+          blockActive: true,
+          blockWait: 0,
+          exportFile: block.exportFile,
+        };
+      })
+      .sort((left, right) => left.blockOrderNumber - right.blockOrderNumber);
+  }, [groupedData, workspaceBlocks]);
+
+  const commitBlockReorder = useCallback((fromIndex: number, toIndex: number) => {
+    if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return;
+    const blocks = orderedBlocks();
+    if (fromIndex >= blocks.length || toIndex >= blocks.length) return;
+    const reordered = [...blocks];
+    const [moved] = reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, moved);
+    const updatedBlocks = reordered.map((block, i) => ({
+      blockId: block.blockId,
+      botJobId,
+      blockOrderNumber: i + 1,
+      blockName: block.blockName,
+    }));
+    const orderByBlockId = new Map(updatedBlocks.map(block => [block.blockId, block.blockOrderNumber]));
+    const updatedData = instructionsData.map(instruction => ({
+      ...instruction,
+      blockOrderNumber: orderByBlockId.get(instruction.blockId) ?? instruction.blockOrderNumber,
+    }));
+    setInstructionsData(updatedData);
+    setWorkspaceBlocks?.(reordered.map((block, index) => ({
+      ...block,
+      blockOrderNumber: index + 1,
+    })));
+    setIsDataReordered(false);
+    console.log('[Block][drag] reorder', { from: fromIndex, to: toIndex, updatedBlocks });
+    if (webSocket && connected) {
+      webSocket.send(JSON.stringify({
+        type: 'BLOCK_MOVE',
+        botJobId,
+        botJobName,
+        homeBankingId,
+        sessionId: targetSessionId,
+        updatedBlocks,
+      }));
+    }
+  }, [instructionsData, setInstructionsData, setIsDataReordered, setWorkspaceBlocks,
+    webSocket, connected, botJobId, botJobName, homeBankingId, targetSessionId,
+    orderedBlocks]);
+
+  const handleBlockDragStart = (index: number, blockId: number) => (event: React.DragEvent) => {
+    dragBlockRef.current = { index, blockId };
+    try {
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', `block-${blockId}`);
+    } catch {
+      // dataTransfer may be restricted; the ref still carries the source.
+    }
+    console.log(`[Block][drag] GRABBED block ${blockId} at index ${index}`);
+  };
+
+  const handleBlockDrop = (index: number) => (event: React.DragEvent) => {
+    if (!dragBlockRef.current) return; // an instruction drag — let InstructionList handle it
+    event.preventDefault();
+    event.stopPropagation();
+    const source = dragBlockRef.current;
+    dragBlockRef.current = null;
+    commitBlockReorder(source.index, index);
+  };
+
+  const handleBlockDragEnd = () => {
+    dragBlockRef.current = null;
+  };
+
+  useEffect(() => {
+    (window as any).__blockReorder = (fromIndex: number, toIndex: number) =>
+      commitBlockReorder(fromIndex, toIndex);
+    return () => {
+      delete (window as any).__blockReorder;
+    };
+  }, [commitBlockReorder]);
+
+  const sortedBlockIndex = (blockId: number) =>
+    orderedBlocks().findIndex(block => Number(block.blockId) === Number(blockId));
+
+  const handleMoveBlockUp = (blockId: number) => {
+    const index = sortedBlockIndex(blockId);
+    if (index > 0) commitBlockReorder(index, index - 1);
+  };
+
+  const handleMoveBlockDown = (blockId: number) => {
+    const index = sortedBlockIndex(blockId);
+    if (index >= 0 && index < orderedBlocks().length - 1) {
+      commitBlockReorder(index, index + 1);
+    }
+  };
+
+  return {
+    dragBlockRef,
+    commitBlockReorder,
+    handleBlockDragStart,
+    handleBlockDrop,
+    handleBlockDragEnd,
+    sortedBlockIndex,
+    handleMoveBlockUp,
+    handleMoveBlockDown,
+  };
+}

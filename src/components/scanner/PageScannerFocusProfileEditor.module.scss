@@ -1,0 +1,398 @@
+.frame {
+  z-index: 240;
+  width: min(500px, calc(100vw - 32px));
+  max-height: min(590px, calc(100vh - 32px));
+  max-height: min(590px, calc(100dvh - 32px));
+}
+
+.panel {
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #fff;
+  color: #1f2933;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.header {
+  flex: 0 0 auto;
+  min-height: 50px;
+  padding: 7px 9px 7px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid #0a467d;
+  background: #0b5394;
+  color: #fff;
+  cursor: move;
+  user-select: none;
+}
+
+.heading {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.heading span {
+  min-width: 0;
+  display: grid;
+}
+
+.heading strong {
+  font-size: 14px;
+}
+
+.heading small {
+  margin-top: 2px;
+  color: #dcecf5;
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.headerButton {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.headerButton:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.body {
+  min-height: 0;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: auto;
+  background: #f8fafc;
+}
+
+.fieldGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 90px;
+  gap: 10px;
+}
+
+.field {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.field input,
+.field select,
+.field textarea {
+  min-width: 0;
+  width: 100%;
+  border: 1px solid #94a3b8;
+  border-radius: 4px;
+  background: #fff;
+  color: #1f2933;
+  padding: 6px 7px;
+  font: 12px Arial, Helvetica, sans-serif;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  outline: 2px solid rgba(11, 83, 148, 0.18);
+  border-color: #0b5394;
+}
+
+.field input:read-only {
+  background: #eef3f5;
+  color: #52616b;
+}
+
+.field textarea {
+  min-height: 118px;
+  resize: vertical;
+  line-height: 1.35;
+}
+
+.field small {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.searchTermsField {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.searchTermsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.searchTermsToolbar {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.termToolbarButton,
+.removeTermButton {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid #94a3b8;
+  border-radius: 4px;
+  background: #fff;
+  color: #334155;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.termToolbarButton:hover:not(:disabled) {
+  border-color: #0b5394;
+  background: #eaf3fb;
+  color: #0b5394;
+}
+
+.termToolbarButton:disabled,
+.removeTermButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.searchTermsTableWrap {
+  min-width: 0;
+  max-height: 235px;
+  overflow: auto;
+  border: 1px solid #94a3b8;
+  border-radius: 4px;
+  background: #fff;
+}
+
+.searchTermsTable {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.searchTermsTable th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 5px 6px;
+  border-bottom: 1px solid #cbd5e1;
+  background: #e9f0f5;
+  color: #334155;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.searchTermsTable th:first-child {
+  width: 94px;
+}
+
+.searchTermsTable th:last-child {
+  width: 38px;
+}
+
+.searchTermsTable td {
+  padding: 6px;
+  border-bottom: 1px solid #e2e8f0;
+  vertical-align: top;
+}
+
+.searchTermsTable tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.patternCell select,
+.termCell input {
+  min-width: 0;
+  width: 100%;
+  height: 28px;
+  border: 1px solid #94a3b8;
+  border-radius: 4px;
+  background: #fff;
+  color: #1f2933;
+  padding: 4px 6px;
+  font: 11px Arial, Helvetica, sans-serif;
+}
+
+.patternCell select:focus,
+.termCell input:focus {
+  outline: 2px solid rgba(11, 83, 148, 0.18);
+  border-color: #0b5394;
+}
+
+.patternCell select:disabled,
+.termCell input:disabled {
+  background: #eef3f5;
+  color: #64748b;
+}
+
+.termCell {
+  min-width: 0;
+}
+
+.termHelp,
+.termHelpError {
+  display: block;
+  margin-top: 3px;
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.25;
+}
+
+.termHelp {
+  color: #64748b;
+}
+
+.termHelpError {
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+.termActionCell {
+  text-align: center;
+}
+
+.removeTermButton {
+  border-color: #efb3ad;
+  color: #b42318;
+}
+
+.removeTermButton:hover:not(:disabled) {
+  border-color: #b42318;
+  background: #fff1f0;
+}
+
+.emptyTerms {
+  padding: 14px 8px !important;
+  color: #64748b;
+  font-size: 10px;
+  text-align: center;
+}
+
+.searchTermsSummary {
+  min-height: 14px;
+  color: #52616b;
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.refreshing {
+  animation: searchTermsSpin 0.8s linear infinite;
+}
+
+@keyframes searchTermsSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.error {
+  margin: 0;
+  padding: 7px 9px;
+  border: 1px solid #fecaca;
+  border-radius: 4px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 11px;
+}
+
+.protectedNotice {
+  margin: 0;
+  padding: 7px 9px;
+  border: 1px solid #b9cdd6;
+  border-radius: 4px;
+  background: #eef5f8;
+  color: #455a64;
+  font-size: 11px;
+}
+
+.footer {
+  flex: 0 0 auto;
+  padding: 9px 12px;
+  border-top: 1px solid #cbd5e1;
+  display: grid;
+  grid-template-columns: auto auto 1fr auto auto;
+  gap: 7px;
+  background: #fff;
+}
+
+.footer button {
+  min-height: 30px;
+  padding: 4px 10px;
+  border: 1px solid #94a3b8;
+  border-radius: 4px;
+  background: #fff;
+  color: #334155;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.footer button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.footer .deleteButton:not(:disabled) {
+  border-color: #b42318;
+  color: #b42318;
+}
+
+.footer .saveButton {
+  border-color: #0b5394;
+  background: #0b5394;
+  color: #fff;
+}
+
+@media (max-width: 560px) {
+  .fieldGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .footer {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .footer > span {
+    display: none;
+  }
+}

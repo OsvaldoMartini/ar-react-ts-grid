@@ -1,0 +1,468 @@
+.shell {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  background: #f4f7fb;
+  color: #1f2937;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.window {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  background: #1d4f91;
+  color: #ffffff;
+}
+
+.titleBlock {
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.subtitle {
+  margin: 2px 0 0;
+  overflow: hidden;
+  color: #d9e8ff;
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topBarRight {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.status {
+  max-width: min(42vw, 520px);
+  overflow: hidden;
+  padding: 5px 9px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.statusOk {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.statusWarn {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.statusError {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.closeButton {
+  flex: 0 0 auto;
+  min-height: 28px;
+  padding: 5px 10px;
+  border: 1px solid #c62828;
+  border-radius: 3px;
+  background: #ffffff;
+  color: #c62828;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.closeButton:hover {
+  background: #ffebee;
+}
+
+.targetRow {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: max-content minmax(180px, 1fr) max-content max-content;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #d9e2ef;
+  background: #ffffff;
+}
+
+.targetRow label {
+  color: #0b5394;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.targetRow select {
+  min-width: 0;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid #b8c6d9;
+  border-radius: 5px;
+  background: #ffffff;
+  color: #172033;
+  font-size: 0.76rem;
+}
+
+.count {
+  min-width: 28px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #e8f1fb;
+  color: #15518d;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.clearButton,
+.applyButton {
+  min-height: 30px;
+  padding: 4px 12px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.clearButton {
+  border: 1px solid #b8c6d9;
+  background: #eef4fb;
+  color: #123d6b;
+}
+
+.list {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow: auto;
+  padding: 10px 12px;
+}
+
+.item {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 8px;
+  border: 1px solid #cbdde3;
+  border-radius: 5px;
+  background: #e0f7fa;
+}
+
+.draggingItem {
+  border-color: #1d6fb8;
+  box-shadow: 0 8px 20px rgba(18, 61, 107, 0.22);
+}
+
+.inactiveItem {
+  opacity: 0.7;
+}
+
+.dragHandle {
+  width: 24px;
+  height: 26px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #0b5394;
+  cursor: grab;
+  font-size: 1.08rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.dragHandle:hover:not(:disabled) {
+  background: #c8edf2;
+}
+
+.dragHandle:active {
+  cursor: grabbing;
+}
+
+.dragHandle:focus-visible {
+  outline: 2px solid #1d6fb8;
+  outline-offset: -2px;
+}
+
+.order {
+  min-width: 24px;
+  color: #0b5394;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-align: right;
+}
+
+.itemIcon {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  object-fit: contain;
+}
+
+.itemText {
+  min-width: 0;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.itemText strong,
+.itemText small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.itemText strong {
+  color: #1f2937;
+  font-size: 0.8rem;
+}
+
+.itemText small {
+  color: #607d8b;
+  font-size: 0.67rem;
+}
+
+.inactiveBadge {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #eceff1;
+  color: #546e7a;
+  font-size: 0.64rem;
+  font-weight: 800;
+}
+
+.removeButton {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #aa0000;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.removeButton:hover:not(:disabled) {
+  background: #ffebee;
+}
+
+.empty {
+  margin: auto;
+  padding: 24px;
+  color: #607d8b;
+  font-size: 0.82rem;
+  font-style: italic;
+  text-align: center;
+}
+
+.footer {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-top: 1px solid #d9e2ef;
+  background: #ffffff;
+  color: #607d8b;
+  font-size: 0.72rem;
+}
+
+.applyButton {
+  min-width: 92px;
+  border: 1px solid #0b5394;
+  background: #0b5394;
+  color: #ffffff;
+}
+
+.clearButton:disabled,
+.applyButton:disabled,
+.dragHandle:disabled,
+.removeButton:disabled,
+.targetRow select:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+@media (max-width: 640px) {
+  .topBar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .topBarRight {
+    width: 100%;
+  }
+
+  .status {
+    max-width: none;
+    flex: 1;
+  }
+
+  .targetRow {
+    grid-template-columns: max-content minmax(0, 1fr);
+  }
+
+  .count,
+  .clearButton {
+    justify-self: end;
+  }
+}
+
+@media (max-width: 360px), (max-height: 260px) {
+  .topBar {
+    min-height: 34px;
+    align-items: center;
+    flex-direction: row;
+    gap: 4px;
+    padding: 3px 5px;
+  }
+
+  .title {
+    font-size: 0.82rem;
+    white-space: nowrap;
+  }
+
+  .subtitle {
+    display: none;
+  }
+
+  .topBarRight {
+    width: auto;
+    flex: 1;
+    gap: 4px;
+  }
+
+  .status {
+    max-width: none;
+    min-width: 0;
+    flex: 1;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-size: 0.58rem;
+  }
+
+  .closeButton {
+    min-height: 24px;
+    padding: 2px 6px;
+    font-size: 10px;
+  }
+
+  .targetRow {
+    grid-template-columns: max-content minmax(0, 1fr) max-content;
+    gap: 4px;
+    padding: 3px 5px;
+  }
+
+  .targetRow label {
+    font-size: 0.64rem;
+  }
+
+  .targetRow select {
+    height: 26px;
+    padding: 0 4px;
+    font-size: 0.65rem;
+  }
+
+  .count {
+    display: none;
+  }
+
+  .clearButton,
+  .applyButton {
+    min-height: 26px;
+    padding: 2px 7px;
+    font-size: 0.64rem;
+  }
+
+  .list {
+    gap: 3px;
+    padding: 4px 5px;
+  }
+
+  .item {
+    gap: 3px;
+    padding: 3px 4px;
+  }
+
+  .order {
+    min-width: 17px;
+    font-size: 0.65rem;
+  }
+
+  .dragHandle {
+    width: 18px;
+    height: 20px;
+    font-size: 0.85rem;
+  }
+
+  .itemIcon {
+    width: 16px;
+    height: 16px;
+  }
+
+  .itemText strong {
+    font-size: 0.68rem;
+  }
+
+  .itemText small,
+  .inactiveBadge {
+    display: none;
+  }
+
+  .removeButton {
+    width: 20px;
+    height: 20px;
+    font-size: 0.67rem;
+  }
+
+  .empty {
+    padding: 6px;
+    font-size: 0.68rem;
+  }
+
+  .footer {
+    min-height: 32px;
+    gap: 6px;
+    padding: 3px 5px;
+    font-size: 0.62rem;
+  }
+
+  .applyButton {
+    min-width: 62px;
+  }
+}

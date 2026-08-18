@@ -1,0 +1,23 @@
+.focusHighlight {
+  animation: instruction-focus-pulse 1.6s ease-out;
+  outline: 3px solid #ff8800;
+  outline-offset: 2px;
+  box-shadow:
+    0 0 8px rgb(255 136 0 / 55%),
+    0 0 18px rgb(255 136 0 / 35%);
+}
+
+@keyframes instruction-focus-pulse {
+  0%,
+  35% {
+    outline-color: #ff8800;
+    box-shadow:
+      0 0 10px rgb(255 136 0 / 80%),
+      0 0 24px rgb(255 136 0 / 55%);
+  }
+
+  100% {
+    outline-color: transparent;
+    box-shadow: none;
+  }
+}
