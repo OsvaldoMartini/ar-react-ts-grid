@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import SmokeTestLocatorRecoveryModal from './SmokeTestLocatorRecoveryModal';
 import type {
   SmokeTestLocatorRecovery,
@@ -7,6 +7,7 @@ import type {
 } from './smokeTestIntegration.contract';
 
 const candidate = (id: string, name: string): SmokeTestLocatorRecoveryCandidate => ({
+  origin: id === 'a' ? 'PREVIOUS' : 'CURRENT',
   recoveryCandidateId: id.repeat(64),
   registryCandidateId: id === 'a' ? 101 : 202,
   savedCanonicalName: name,
@@ -41,6 +42,7 @@ const candidate = (id: string, name: string): SmokeTestLocatorRecoveryCandidate 
 const recovery = (...candidates: SmokeTestLocatorRecoveryCandidate[]): SmokeTestLocatorRecovery => ({
   state: 'AWAITING_USER',
   failedTarget: {
+    origin: 'BOT_JOB',
     savedCanonicalName: 'avanti',
     savedClientName: 'Continue',
     ocrMappedName: '',
@@ -76,13 +78,41 @@ test('renders the unresolved instruction first and database matches after it', (
 
   const rows = screen.getAllByRole('row');
   expect(rows[1]).toHaveTextContent('avanti');
+  expect(rows[1]).toHaveTextContent('BOT JOB');
   expect(rows[1]).toHaveTextContent('Target not located');
   expect(rows[2]).toHaveTextContent('Continue from database');
+  expect(rows[2]).toHaveTextContent('PREVIOUS');
   expect(rows[3]).toHaveTextContent('Alternative from database');
+  expect(rows[3]).toHaveTextContent('CURRENT');
   expect(screen.getAllByRole('radio')).toHaveLength(2);
 
   const headers = screen.getAllByRole('columnheader').map(header => header.textContent);
   expect(headers.indexOf('XPath match')).toBe(headers.indexOf('Test Click') + 1);
+  expect(headers.indexOf('Origin')).toBe(headers.indexOf('Select') + 1);
+});
+
+test('opens the Locator Recovery rules beside the save action and restores focus', async () => {
+  render(
+    <SmokeTestLocatorRecoveryModal
+      instructionName="log_in"
+      recovery={recovery(candidate('a', 'Login'))}
+      onScanPage={jest.fn().mockResolvedValue('Page Scanner completed.')}
+      onTestCandidate={jest.fn().mockResolvedValue('Candidate test completed.')}
+      verificationEnabled
+      onVerificationChange={jest.fn()}
+      onDecision={jest.fn().mockResolvedValue(undefined)}
+    />,
+  );
+
+  const help = screen.getByRole('button', { name: 'Open Locator Recovery rules' });
+  fireEvent.click(help);
+  const rules = screen.getByRole('dialog', { name: 'Locator Recovery rules' });
+  expect(rules).toBeVisible();
+  expect(within(rules).getByText('BOT JOB')).toBeVisible();
+  expect(within(rules).getByText('PREVIOUS')).toBeVisible();
+  expect(within(rules).getByText('CURRENT')).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: 'Close Locator Recovery rules' }));
+  await waitFor(() => expect(help).toHaveFocus());
 });
 
 test('shows comparison evidence and submits the explicitly selected candidate once', async () => {
@@ -277,9 +307,8 @@ test('allows an empty recovery to be explicitly bypassed and contains keyboard f
     fireEvent.click(screen.getByRole('button', { name: 'Bypass & Continue' }));
   });
   await waitFor(() => expect(onDecision).toHaveBeenCalledWith(null, 'BYPASS', undefined));
-  const bypass = screen.getByRole('button', { name: 'Bypass & Continue' });
-  const cancel = screen.getByRole('button', { name: 'Cancel Recovery' });
-  bypass.focus();
+  const help = screen.getByRole('button', { name: 'Open Locator Recovery rules' });
+  help.focus();
   fireEvent.keyDown(document, { key: 'Tab' });
   expect(screen.getByRole('button', { name: 'Disable locator recovery verification' }))
     .toHaveFocus();

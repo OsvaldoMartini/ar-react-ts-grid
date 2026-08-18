@@ -15,12 +15,15 @@
 .summary { flex: 0 0 auto; margin: 12px 14px 0; padding: 10px 12px; border: 1px solid #8fc9dc; border-radius: 9px; color: #254a64; background: #f8fcff; }
 .summary small { display: block; margin-top: 6px; color: #0b6076; font-weight: 800; }
 .tableViewport { flex: 1 1 auto; min-height: 0; margin: 12px 14px; overflow: auto; border: 1px solid #bdd1df; background: #fff; }
-.tableViewport table { border-collapse: separate; border-spacing: 0; min-width: 2500px; width: 100%; font-size: 12px; }
+.tableViewport table { border-collapse: separate; border-spacing: 0; min-width: 2620px; width: 100%; font-size: 12px; }
 .tableViewport th, .tableViewport td { max-width: 250px; padding: 7px 8px; border-right: 1px solid #d8e3eb; border-bottom: 1px solid #d8e3eb; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tableViewport thead th { position: sticky; top: 0; z-index: 2; text-align: left; color: #17324d; background: #dcecf7; }
 .tableViewport tbody tr[data-selected=true] { background: #e7faff; box-shadow: inset 3px 0 #08a5be; }
 .tableViewport tbody .failedTargetRow { background: #fff4e6; box-shadow: inset 4px 0 #d17a08; }
-.targetBadge { display: inline-flex; align-items: center; justify-content: center; padding: 4px 7px; color: #fff; border-radius: 999px; background: #bd2933; font-size: 10px; font-weight: 900; letter-spacing: .04em; text-transform: uppercase; box-shadow: 0 0 10px rgba(189, 41, 51, .38); }
+.originBadge { display: inline-flex; align-items: center; justify-content: center; min-width: 68px; padding: 4px 7px; color: #fff; border-radius: 999px; font-size: 10px; font-weight: 900; letter-spacing: .04em; text-transform: uppercase; }
+.botJobOrigin { background: #bd2933; box-shadow: 0 0 10px rgba(189,41,51,.38); }
+.previousOrigin { background: #6b4ab3; box-shadow: 0 0 10px rgba(107,74,179,.34); }
+.currentOrigin { background: #07869d; box-shadow: 0 0 11px rgba(34,211,238,.45); }
 .notAvailable { color: #718393; font-weight: 800; }
 .tableViewport td.empty { padding: 28px; text-align: center; color: #526f83; white-space: normal; background: #f7fbfe; }
 .tableViewport td small { display: block; margin-top: 3px; font-weight: 400; color: #58748a; }
@@ -47,4 +50,7 @@
 .dialog footer .bypass { color: #fff; border-color: #b56b08; background: #d17a08; box-shadow: 0 0 13px rgba(245, 158, 11, .38); }
 .dialog footer .once { color: #fff; border-color: #087f94; background: #07869d; }
 .dialog footer .save { color: #fff; border-color: #057f72; background: #078c7d; box-shadow: 0 0 13px rgba(34,211,238,.42); }
+.dialog footer .helpButton { width: 38px; min-width: 38px; height: 38px; min-height: 38px; justify-content: center; overflow: hidden; padding: 0; border: 0; border-radius: 9999px; color: #fff; background: #2e75b6; box-shadow: rgba(0,0,0,.25) 0 4px 16px; transition: transform .15s, box-shadow .15s, background .15s; }
+.dialog footer .helpButton:hover:not(:disabled) { background: #0b5394; box-shadow: rgba(11,83,148,.42) 0 6px 20px; transform: translateY(-1px); }
+.dialog footer .helpButton:focus-visible { outline: 3px solid rgba(46,117,182,.34); outline-offset: 3px; }
 @media (max-width: 680px) { .backdrop { padding: 8px; } .dialog { width: calc(100vw - 16px); height: calc(100vh - 16px); } .dialog > header { align-items: flex-start; } .dialog footer { justify-content: stretch; } .dialog footer button { flex: 1 1 145px; justify-content: center; } }

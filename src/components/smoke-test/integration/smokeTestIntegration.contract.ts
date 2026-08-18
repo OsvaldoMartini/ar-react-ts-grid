@@ -113,8 +113,10 @@ export type SmokeTestIntegrationStepResult = {
 };
 
 export type LocatorMatchValue = boolean | null;
+export type SmokeTestLocatorRecoveryOrigin = 'BOT_JOB' | 'PREVIOUS' | 'CURRENT';
 
 export type SmokeTestLocatorRecoveryCandidate = {
+  origin: Exclude<SmokeTestLocatorRecoveryOrigin, 'BOT_JOB'>;
   recoveryCandidateId: string;
   registryCandidateId: number;
   savedCanonicalName: string;
@@ -147,6 +149,7 @@ export type SmokeTestLocatorRecoveryCandidate = {
 };
 
 export type SmokeTestLocatorRecoveryFailedTarget = {
+  origin: 'BOT_JOB';
   savedCanonicalName: string;
   savedClientName: string;
   ocrMappedName: string;
@@ -275,6 +278,7 @@ const parseRecovery = (value: unknown): SmokeTestLocatorRecovery | null => {
       throw new Error('Unresolved expected action is invalid.');
     }
     return Object.freeze({
+      origin: 'BOT_JOB' as const,
       savedCanonicalName: stringValue(target.savedCanonicalName, 'Unresolved canonical name', true),
       savedClientName: stringValue(target.savedClientName, 'Unresolved client name', true),
       ocrMappedName: stringValue(target.ocrMappedName, 'Unresolved OCR name', true),
@@ -304,7 +308,14 @@ const parseRecovery = (value: unknown): SmokeTestLocatorRecovery | null => {
       throw new Error('Recovery confidence is invalid.');
     }
     const matches = objectValue(candidate.matches, 'Recovery locator matches');
+    const origin = candidate.origin == null
+      ? 'PREVIOUS'
+      : stringValue(candidate.origin, 'Recovery candidate origin');
+    if (!['PREVIOUS', 'CURRENT'].includes(origin)) {
+      throw new Error('Recovery candidate origin is invalid.');
+    }
     return Object.freeze({
+      origin: origin as SmokeTestLocatorRecoveryCandidate['origin'],
       recoveryCandidateId: revisionValue(candidate.recoveryCandidateId, 'Recovery candidate ID'),
       registryCandidateId: integerValue(candidate.registryCandidateId, 'Registry candidate ID', 1),
       savedCanonicalName: stringValue(candidate.savedCanonicalName, 'Saved canonical name', true),

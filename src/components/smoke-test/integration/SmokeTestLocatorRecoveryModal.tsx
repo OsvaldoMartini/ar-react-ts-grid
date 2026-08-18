@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Check,
+  CircleHelp,
   LoaderCircle,
   Minus,
   MousePointerClick,
@@ -24,6 +25,7 @@ import type {
   SmokeTestLocatorRecoveryFailedTarget,
 } from './smokeTestIntegration.contract';
 import styles from './SmokeTestLocatorRecoveryModal.module.scss';
+import SmokeTestLocatorRecoveryHelpModal from './SmokeTestLocatorRecoveryHelpModal';
 
 type Props = {
   instructionName: string;
@@ -74,13 +76,16 @@ const SmokeTestLocatorRecoveryModal: React.FC<Props> = ({
   const [scannerMessage, setScannerMessage] = useState('');
   const [testPending, setTestPending] = useState<{ candidateId: string; action: 'CLICK' | 'INPUT' } | null>(null);
   const [testMessages, setTestMessages] = useState<Record<string, string>>({});
+  const [helpOpen, setHelpOpen] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const helpButtonRef = useRef<HTMLButtonElement>(null);
   const selected = useMemo(
     () => recovery.candidates.find(candidate => candidate.recoveryCandidateId === selectedId) ?? null,
     [recovery.candidates, selectedId],
   );
   const controlsBusy = busy || scannerBusy || testPending !== null;
   const failedTarget: SmokeTestLocatorRecoveryFailedTarget = recovery.failedTarget ?? {
+    origin: 'BOT_JOB',
     savedCanonicalName: instructionName,
     savedClientName: '',
     ocrMappedName: '',
@@ -193,6 +198,7 @@ const SmokeTestLocatorRecoveryModal: React.FC<Props> = ({
         className={styles.dialog}
         role="dialog"
         aria-modal="true"
+        aria-hidden={helpOpen || undefined}
         aria-labelledby="locator-recovery-title"
         tabIndex={-1}
       >
@@ -230,7 +236,7 @@ const SmokeTestLocatorRecoveryModal: React.FC<Props> = ({
           <table>
             <thead>
               <tr>
-                <th>Select</th><th>Saved canonical</th><th>Saved client_named</th><th>OCR / mapped</th>
+                <th>Select</th><th>Origin</th><th>Saved canonical</th><th>Saved client_named</th><th>OCR / mapped</th>
                 <th>Action</th><th>Test Input</th><th>Test Click</th>
                 <th>XPath match</th>
                 <th>Previous XPath</th><th>Previous custom XPath</th><th>Previous CSS</th>
@@ -243,7 +249,8 @@ const SmokeTestLocatorRecoveryModal: React.FC<Props> = ({
             </thead>
             <tbody>
               <tr className={styles.failedTargetRow} data-testid="locator-recovery-failed-target">
-                <td><span className={styles.targetBadge}>Target</span></td>
+                <td><span className={styles.notAvailable}>—</span></td>
+                <td><span className={`${styles.originBadge} ${styles.botJobOrigin}`}>BOT JOB</span></td>
                 <td>{failedTarget.savedCanonicalName || instructionName}</td>
                 <td>{failedTarget.savedClientName || '—'}</td>
                 <td>{failedTarget.ocrMappedName || '—'}</td>
@@ -273,7 +280,7 @@ const SmokeTestLocatorRecoveryModal: React.FC<Props> = ({
               </tr>
               {recovery.candidates.length === 0 && (
                 <tr>
-                  <td colSpan={24} className={styles.empty}>
+                  <td colSpan={25} className={styles.empty}>
                     No safe recovery candidates were found. The unresolved target remains above.
                     Run Page Scanner to refresh database/live-page comparisons, or bypass this instruction.
                   </td>
@@ -282,6 +289,11 @@ const SmokeTestLocatorRecoveryModal: React.FC<Props> = ({
               {recovery.candidates.map(candidate => (
                 <tr key={candidate.recoveryCandidateId} data-selected={candidate.recoveryCandidateId === selectedId}>
                   <td><input type="radio" name="locator-recovery" checked={candidate.recoveryCandidateId === selectedId} onChange={() => setSelectedId(candidate.recoveryCandidateId)} /></td>
+                  <td>
+                    <span className={`${styles.originBadge} ${candidate.origin === 'CURRENT' ? styles.currentOrigin : styles.previousOrigin}`}>
+                      {candidate.origin}
+                    </span>
+                  </td>
                   <td>{candidate.savedCanonicalName || '—'}</td>
                   <td>{candidate.savedClientName || '—'}</td>
                   <td>{candidate.ocrMappedName || '—'}</td>
@@ -361,7 +373,21 @@ const SmokeTestLocatorRecoveryModal: React.FC<Props> = ({
           <button type="button" className={styles.bypass} disabled={controlsBusy} onClick={() => void decide(null, 'BYPASS')}><SkipForward size={15} /> Bypass &amp; Continue</button>
           <button type="button" className={styles.once} disabled={controlsBusy || selected === null} onClick={() => void decide(selected, 'USE_ONCE')}>Use Once</button>
           <button type="button" className={styles.save} disabled={controlsBusy || selected === null} onClick={() => void decide(selected, 'USE_AND_SAVE')}><Save size={15} /> Use and Save Locator</button>
+          <button
+            ref={helpButtonRef}
+            type="button"
+            className={styles.helpButton}
+            aria-label="Open Locator Recovery rules"
+            title="Open Locator Recovery rules"
+            onClick={() => setHelpOpen(true)}
+          ><CircleHelp size={19} aria-hidden="true" /></button>
         </footer>
+        {helpOpen && (
+          <SmokeTestLocatorRecoveryHelpModal onClose={() => {
+            setHelpOpen(false);
+            window.requestAnimationFrame(() => helpButtonRef.current?.focus());
+          }} />
+        )}
       </div>
     </div>
   );
