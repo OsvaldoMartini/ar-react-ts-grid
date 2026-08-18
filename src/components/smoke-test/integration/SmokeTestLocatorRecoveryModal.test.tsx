@@ -19,7 +19,9 @@ const candidate = (id: string, name: string): SmokeTestLocatorRecoveryCandidate 
   previousStableAttributes: { id: `old-${id}` },
   newXPath: `//*[@data-live='${id}']`,
   newCss: `[data-live='${id}']`,
-  newStableAttributes: { id: `live-${id}` },
+  newStableAttributes: id === 'b'
+    ? { 'automation.test-id.attribute': 'qa-hook', 'qa-hook': `live-${id}` }
+    : { 'data-testid': `live-${id}` },
   previousPageIdentity: `url-v1:${id.repeat(64)}`,
   currentPageIdentity: `url-v1:${'c'.repeat(64)}`,
   tag: 'button',
@@ -49,7 +51,7 @@ const recovery = (...candidates: SmokeTestLocatorRecoveryCandidate[]): SmokeTest
     previousXPath: "//*[@id='avanti']",
     previousCustomXPath: "//*[@data-action='avanti']",
     previousCss: '#avanti',
-    previousStableAttributes: { id: 'avanti' },
+    previousStableAttributes: { 'test-id': 'avanti' },
     previousPageIdentity: `url-v1:${'d'.repeat(64)}`,
     currentPageIdentity: `url-v1:${'c'.repeat(64)}`,
     tag: 'button',
@@ -80,15 +82,18 @@ test('renders the unresolved instruction first and database matches after it', (
   expect(rows[1]).toHaveTextContent('avanti');
   expect(rows[1]).toHaveTextContent('BOT JOB');
   expect(rows[1]).toHaveTextContent('Target not located');
+  expect(rows[1]).toHaveTextContent('test-id=avanti');
   expect(rows[2]).toHaveTextContent('Continue from database');
   expect(rows[2]).toHaveTextContent('PREVIOUS');
   expect(rows[3]).toHaveTextContent('Alternative from database');
   expect(rows[3]).toHaveTextContent('CURRENT');
+  expect(rows[3]).toHaveTextContent('qa-hook=live-b');
   expect(screen.getAllByRole('radio')).toHaveLength(2);
 
   const headers = screen.getAllByRole('columnheader').map(header => header.textContent);
   expect(headers.indexOf('XPath match')).toBe(headers.indexOf('Test Click') + 1);
-  expect(headers.indexOf('Origin')).toBe(headers.indexOf('Select') + 1);
+  expect(headers.indexOf('Test ID')).toBe(headers.indexOf('Select') + 1);
+  expect(headers.indexOf('Origin')).toBe(headers.indexOf('Test ID') + 1);
 });
 
 test('opens the Locator Recovery rules beside the save action and restores focus', async () => {
@@ -111,6 +116,7 @@ test('opens the Locator Recovery rules beside the save action and restores focus
   expect(within(rules).getByText('BOT JOB')).toBeVisible();
   expect(within(rules).getByText('PREVIOUS')).toBeVisible();
   expect(within(rules).getByText('CURRENT')).toBeVisible();
+  expect(within(rules).getByText('TEST ID')).toBeVisible();
   fireEvent.click(screen.getByRole('button', { name: 'Close Locator Recovery rules' }));
   await waitFor(() => expect(help).toHaveFocus());
 });

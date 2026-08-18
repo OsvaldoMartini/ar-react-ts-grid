@@ -57,6 +57,22 @@ const Match: React.FC<{ value: LocatorMatchValue; label: string }> = ({ value, l
 const attributes = (value: Readonly<Record<string, string>>): string =>
   Object.entries(value).map(([key, item]) => `${key}=${item}`).join('\n') || '—';
 
+const testId = (value: Readonly<Record<string, string>>): string => {
+  const normalized = Object.fromEntries(
+    Object.entries(value).map(([name, item]) => [name.toLocaleLowerCase(), item]),
+  );
+  const configured = normalized['automation.test-id.attribute']?.trim().toLocaleLowerCase();
+  const names = ['data-testid', 'data-test-id', 'test-id', 'data-cy', 'data-qa'];
+  if (configured && !names.includes(configured)) names.push(configured);
+  const name = names.find(candidate => normalized[candidate]?.trim());
+  return name ? `${name}=${normalized[name]}` : '—';
+};
+
+const candidateTestId = (candidate: SmokeTestLocatorRecoveryCandidate): string => {
+  const current = testId(candidate.newStableAttributes);
+  return current === '—' ? testId(candidate.previousStableAttributes) : current;
+};
+
 const candidateLabel = (candidate: SmokeTestLocatorRecoveryCandidate): string =>
   candidate.ocrMappedName || candidate.savedClientName || candidate.savedCanonicalName || 'candidate';
 
@@ -236,7 +252,7 @@ const SmokeTestLocatorRecoveryModal: React.FC<Props> = ({
           <table>
             <thead>
               <tr>
-                <th>Select</th><th>Origin</th><th>Saved canonical</th><th>Saved client_named</th><th>OCR / mapped</th>
+                <th>Select</th><th>Test ID</th><th>Origin</th><th>Saved canonical</th><th>Saved client_named</th><th>OCR / mapped</th>
                 <th>Action</th><th>Test Input</th><th>Test Click</th>
                 <th>XPath match</th>
                 <th>Previous XPath</th><th>Previous custom XPath</th><th>Previous CSS</th>
@@ -250,6 +266,7 @@ const SmokeTestLocatorRecoveryModal: React.FC<Props> = ({
             <tbody>
               <tr className={styles.failedTargetRow} data-testid="locator-recovery-failed-target">
                 <td><span className={styles.notAvailable}>—</span></td>
+                <td title={testId(failedTarget.previousStableAttributes)}>{testId(failedTarget.previousStableAttributes)}</td>
                 <td><span className={`${styles.originBadge} ${styles.botJobOrigin}`}>BOT JOB</span></td>
                 <td>{failedTarget.savedCanonicalName || instructionName}</td>
                 <td>{failedTarget.savedClientName || '—'}</td>
@@ -280,7 +297,7 @@ const SmokeTestLocatorRecoveryModal: React.FC<Props> = ({
               </tr>
               {recovery.candidates.length === 0 && (
                 <tr>
-                  <td colSpan={25} className={styles.empty}>
+                  <td colSpan={26} className={styles.empty}>
                     No safe recovery candidates were found. The unresolved target remains above.
                     Run Page Scanner to refresh database/live-page comparisons, or bypass this instruction.
                   </td>
@@ -289,6 +306,7 @@ const SmokeTestLocatorRecoveryModal: React.FC<Props> = ({
               {recovery.candidates.map(candidate => (
                 <tr key={candidate.recoveryCandidateId} data-selected={candidate.recoveryCandidateId === selectedId}>
                   <td><input type="radio" name="locator-recovery" checked={candidate.recoveryCandidateId === selectedId} onChange={() => setSelectedId(candidate.recoveryCandidateId)} /></td>
+                  <td title={candidateTestId(candidate)}>{candidateTestId(candidate)}</td>
                   <td>
                     <span className={`${styles.originBadge} ${candidate.origin === 'CURRENT' ? styles.currentOrigin : styles.previousOrigin}`}>
                       {candidate.origin}

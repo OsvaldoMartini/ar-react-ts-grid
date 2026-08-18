@@ -17,6 +17,7 @@ const groups = [
   {
     title: 'Candidate inspection',
     rules: [
+      ['TEST ID', 'The first locator priority. It includes data-testid, data-test-id, test-id, data-cy, data-qa, and a client attribute explicitly configured in Page Scanner.'],
       ['ACTION', 'Choose CLICK, INPUT, or OUTPUT for the eventual recovery attempt. Changing the action does not execute or save anything.'],
       ['TEST INPUT', 'Uses the active run’s exact REAL/SYNTHETIC row or runtime variable and tries one input against the selected candidate. It never settles or saves recovery.'],
       ['TEST CLICK', 'Tries one click against the selected candidate on the exact paused V1/V2 browser. It never settles or saves recovery.'],
